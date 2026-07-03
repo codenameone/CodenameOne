@@ -9,13 +9,11 @@ import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
-import com.codename1.ui.Graphics;
 import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.Label;
 import com.codename1.ui.TextField;
-import com.codename1.ui.animations.CommonTransitions;
-import com.codename1.ui.animations.FlipTransition;
-import com.codename1.ui.animations.Transition;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.plaf.Style;
@@ -43,7 +41,7 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
     private static final int TRANSITION_FRAME_DELAY_MS = 250;
     private static final int TRANSITION_DURATION_MS = 1500;
     private static final int LAYOUT_FRAME_COUNT = 7;
-    private static final int LAYOUT_FRAME_DELAY_MS = 3300;
+    private static final int LAYOUT_LABEL_COUNT = 10;
 
     private static final Set<String> SCREENSHOT_FILE_NAMES = createScreenshotFileNames();
 
@@ -70,15 +68,10 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
 
     private void captureLayoutAnimationFrames(Form host) throws IOException {
         GuideScreenshot firstFrame = screenshot("layout-animation-1.png");
-        Form demoForm = showDemo(firstFrame, host);
-        runOnEdtAsync(() -> buttonByText(demoForm, "Fall").released());
-        TestUtils.waitFor(100);
+        showDemo(firstFrame, host);
 
         for (int frame = 1; frame <= LAYOUT_FRAME_COUNT; frame++) {
-            saveScreenshot("layout-animation-" + frame + ".png", captureDisplay());
-            if (frame < LAYOUT_FRAME_COUNT) {
-                TestUtils.waitFor(LAYOUT_FRAME_DELAY_MS);
-            }
+            saveScreenshot("layout-animation-" + frame + ".png", renderLayoutAnimationFrame(frame - 1));
         }
 
         returnToHost(host);
@@ -99,7 +92,7 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         GuideScreenshot screenshot = screenshot(fileName);
         Form demoForm = showDemo(screenshot, host);
         configureSlideDemo(demoForm, transitionName, horizontal);
-        saveScreenshot(fileName, renderSlideTransitionStrip(transitionName, horizontal));
+        saveScreenshot(fileName, renderDeterministicTransitionStrip(transitionName, horizontal));
         returnToHost(host);
     }
 
@@ -131,51 +124,46 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         });
     }
 
-    private Image renderSlideTransitionStrip(String transitionName, boolean horizontal) {
-        Transition transition = createSlideTransition(transitionName, horizontal);
-        TransitionRenderContext context = runOnEdt(() -> {
-            Form source = createTransitionSourceForm(transitionName, horizontal);
-            Form destination = createTransitionDestinationForm();
-            source.show();
-            source.setWidth(Display.getInstance().getDisplayWidth());
-            source.setHeight(Display.getInstance().getDisplayHeight());
-            destination.setWidth(source.getWidth());
-            destination.setHeight(source.getHeight());
-            source.layoutContainer();
-            destination.layoutContainer();
-            transition.init(source, destination);
-            transition.initTransition();
-            return new TransitionRenderContext(transition, source.getWidth(), source.getHeight());
-        });
+    private Image renderLayoutAnimationFrame(int frameIndex) {
+        return runOnEdt(() -> {
+            int width = Display.getInstance().getDisplayWidth();
+            int height = Display.getInstance().getDisplayHeight();
+            Form form = new Form("Layout Animations", new BoxLayout(BoxLayout.Y_AXIS));
+            Button fall = new Button("Fall");
+            form.add(fall);
+            List<Label> labels = new ArrayList<>();
+            for (int iter = 0; iter < LAYOUT_LABEL_COUNT; iter++) {
+                Label label = new Label("Label " + iter);
+                labels.add(label);
+                form.add(label);
+            }
+            form.setWidth(width);
+            form.setHeight(height);
+            form.layoutContainer();
 
-        List<Image> frames = new ArrayList<>();
-        for (int frame = 0; frame < TRANSITION_FRAME_COUNT; frame++) {
-            frames.add(renderTransitionFrame(context));
-            TestUtils.waitFor(TRANSITION_FRAME_DELAY_MS);
-            runOnEdt(context.transition::animate);
-        }
-        runOnEdt(context.transition::cleanup);
-        return createFrameStrip(frames);
+            double progress = frameIndex / (double) (LAYOUT_FRAME_COUNT - 1);
+            int startY = -Math.max(1, fall.getHeight());
+            for (Label label : labels) {
+                int endY = label.getY();
+                label.setY(startY + (int) Math.round((endY - startY) * progress));
+            }
+            return paintForm(form, width, height);
+        });
     }
 
-    private Transition createSlideTransition(String transitionName, boolean horizontal) {
-        int direction = horizontal ? CommonTransitions.SLIDE_HORIZONTAL : CommonTransitions.SLIDE_VERTICAL;
-        switch (transitionName) {
-            case "Slide":
-                return CommonTransitions.createSlide(direction, true, TRANSITION_DURATION_MS);
-            case "SlideFade":
-                return CommonTransitions.createSlideFadeTitle(true, TRANSITION_DURATION_MS);
-            case "Cover":
-                return CommonTransitions.createCover(direction, true, TRANSITION_DURATION_MS);
-            case "Uncover":
-                return CommonTransitions.createUncover(direction, true, TRANSITION_DURATION_MS);
-            case "Fade":
-                return CommonTransitions.createFade(TRANSITION_DURATION_MS);
-            case "Flip":
-                return new FlipTransition(-1, TRANSITION_DURATION_MS);
-            default:
-                throw new IllegalArgumentException("Unsupported transition: " + transitionName);
-        }
+    private Image renderDeterministicTransitionStrip(String transitionName, boolean horizontal) {
+        return runOnEdt(() -> {
+            int width = Display.getInstance().getDisplayWidth();
+            int height = Display.getInstance().getDisplayHeight();
+            Image source = paintForm(createTransitionSourceForm(transitionName, horizontal), width, height);
+            Image destination = paintForm(createTransitionDestinationForm(), width, height);
+            List<Image> frames = new ArrayList<>();
+            for (int frame = 0; frame < TRANSITION_FRAME_COUNT; frame++) {
+                double progress = frame / (double) (TRANSITION_FRAME_COUNT - 1);
+                frames.add(renderTransitionFrame(transitionName, horizontal, source, destination, progress));
+            }
+            return createFrameStrip(frames);
+        });
     }
 
     private Form createTransitionSourceForm(String transitionName, boolean horizontal) {
@@ -205,12 +193,78 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         return destination;
     }
 
-    private Image renderTransitionFrame(TransitionRenderContext context) {
-        return runOnEdt(() -> {
-            Image frame = Image.createImage(context.width, context.height, 0xffffffff);
-            context.transition.paint(frame.getGraphics());
-            return frame;
-        });
+    private Image renderTransitionFrame(
+            String transitionName,
+            boolean horizontal,
+            Image source,
+            Image destination,
+            double progress) {
+        int width = source.getWidth();
+        int height = source.getHeight();
+        Image frame = Image.createImage(width, height, 0xffffffff);
+        Graphics graphics = frame.getGraphics();
+        int travel = horizontal ? width : height;
+        int offset = (int) Math.round(progress * travel);
+
+        switch (transitionName) {
+            case "Slide":
+                drawOffset(graphics, source, horizontal, -offset);
+                drawOffset(graphics, destination, horizontal, travel - offset);
+                break;
+            case "SlideFade":
+                drawOffset(graphics, source, horizontal, -offset);
+                drawImageWithAlpha(graphics, destination, horizontal ? travel - offset : 0,
+                        horizontal ? 0 : travel - offset, (int) Math.round(progress * 255));
+                break;
+            case "Cover":
+                graphics.drawImage(source, 0, 0);
+                drawOffset(graphics, destination, horizontal, travel - offset);
+                break;
+            case "Uncover":
+                graphics.drawImage(destination, 0, 0);
+                drawOffset(graphics, source, horizontal, -offset);
+                break;
+            case "Fade":
+                drawImageWithAlpha(graphics, source, 0, 0, (int) Math.round((1.0 - progress) * 255));
+                drawImageWithAlpha(graphics, destination, 0, 0, (int) Math.round(progress * 255));
+                break;
+            case "Flip":
+                renderFlipFrame(graphics, source, destination, progress);
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported transition: " + transitionName);
+        }
+        return frame;
+    }
+
+    private void renderFlipFrame(Graphics graphics, Image source, Image destination, double progress) {
+        int width = source.getWidth();
+        int height = source.getHeight();
+        boolean firstHalf = progress < 0.5;
+        double localProgress = firstHalf ? progress * 2.0 : (progress - 0.5) * 2.0;
+        int visibleWidth = Math.max(1, (int) Math.round(width * (firstHalf ? 1.0 - localProgress : localProgress)));
+        int x = (width - visibleWidth) / 2;
+        graphics.drawImage(firstHalf ? source : destination, x, 0, visibleWidth, height);
+    }
+
+    private void drawOffset(Graphics graphics, Image image, boolean horizontal, int offset) {
+        graphics.drawImage(image, horizontal ? offset : 0, horizontal ? 0 : offset);
+    }
+
+    private void drawImageWithAlpha(Graphics graphics, Image image, int x, int y, int alpha) {
+        int previousAlpha = graphics.getAlpha();
+        graphics.setAlpha(Math.max(0, Math.min(255, alpha)));
+        graphics.drawImage(image, x, y);
+        graphics.setAlpha(previousAlpha);
+    }
+
+    private Image paintForm(Form form, int width, int height) {
+        form.setWidth(width);
+        form.setHeight(height);
+        form.layoutContainer();
+        Image image = Image.createImage(width, height, 0xffffffff);
+        form.paintComponent(image.getGraphics(), true);
+        return image;
     }
 
     private Form showDemo(GuideScreenshot screenshotDemo, Form host) {
@@ -451,15 +505,4 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         boolean matches(Component component);
     }
 
-    private static final class TransitionRenderContext {
-        private final Transition transition;
-        private final int width;
-        private final int height;
-
-        private TransitionRenderContext(Transition transition, int width, int height) {
-            this.transition = transition;
-            this.width = width;
-            this.height = height;
-        }
-    }
 }
