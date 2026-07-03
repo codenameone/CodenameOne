@@ -667,18 +667,14 @@ public class BytecodeMethod implements SignatureSet {
                         hasRealInstruction = true;
                         continue;
                     case Opcodes.NEWARRAY:
-                        // primitive array allocation (also a VarOp via visitIntInsn):
-                        // pushes a fresh object ref onto the local operand array --
-                        // safe under object mode exactly like NEW/ANEWARRAY.
-                        if (!obj) {
-                            return false;
-                        }
-                        hasRealInstruction = true;
-                        continue;
                     case Opcodes.ALOAD:
                     case Opcodes.ASTORE:
-                        // object local slot -> lives in the method-local frame array,
-                        // scanned conservatively. Only legal under object mode.
+                        // Object-mode-only ops sharing one gate: NEWARRAY (a VarOp via
+                        // visitIntInsn) allocates a primitive array and pushes a fresh
+                        // object ref onto the local operand array -- safe under object
+                        // mode exactly like NEW/ANEWARRAY -- while ALOAD/ASTORE touch an
+                        // object local slot that lives in the method-local frame array,
+                        // scanned conservatively.
                         if (!obj) {
                             return false;
                         }
@@ -3758,21 +3754,31 @@ public class BytecodeMethod implements SignatureSet {
             // arithmetic/store reduction passes can fold the read straight into a
             // direct register expression (instead of round-tripping the operand
             // stack). Without this the surrounding math stays in slow SP[] form.
-            AssignableExpression read = new AssignableExpression() {
-                public boolean assignTo(String varName, StringBuilder sb) {
-                    if (varName != null) {
-                        sb.append("    ").append(varName).append(" = ");
-                    }
-                    sb.append(lvalue);
-                    if (varName != null) {
-                        sb.append(";\n");
-                    }
-                    return true;
-                }
-            };
+            AssignableExpression read = new ScalarReplacedRead(lvalue);
             instructions.set(g, new CustomIntruction(code, code, new ArrayList<String>(), read));
             instructions.remove(i);   // drop the ALOAD; read now occupies one slot
             // 'i' now points at the read (former g-1); loop's i++ moves past it.
+        }
+    }
+
+    /// Bare-lvalue read for a scalar-replaced field (see srRewriteFieldReads).
+    /// Static: it captures only the lvalue string, not the enclosing method.
+    private static final class ScalarReplacedRead implements AssignableExpression {
+        private final String lvalue;
+
+        ScalarReplacedRead(String lvalue) {
+            this.lvalue = lvalue;
+        }
+
+        public boolean assignTo(String varName, StringBuilder sb) {
+            if (varName != null) {
+                sb.append("    ").append(varName).append(" = ");
+            }
+            sb.append(lvalue);
+            if (varName != null) {
+                sb.append(";\n");
+            }
+            return true;
         }
     }
 
