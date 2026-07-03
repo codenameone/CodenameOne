@@ -18,12 +18,15 @@ import com.codename1.ui.ComponentGroup;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
+import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.RadioButton;
 import com.codename1.ui.Slider;
+import com.codename1.ui.Stroke;
 import com.codename1.ui.Tabs;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
@@ -35,7 +38,6 @@ import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Border;
-import com.codename1.ui.plaf.RoundBorder;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.spinner.Picker;
 import com.codenameone.developerguide.Demo;
@@ -99,8 +101,28 @@ public final class GuideStaticScreenshotDemos {
     public static Demo gridLayout(String title, int rows, int cols) {
         return formDemo(title, "GridLayout", () -> {
             Form form = new Form(title, new GridLayout(rows, cols));
-            for (int i = 1; i <= rows * cols; i++) {
-                form.add(coloredLabel("Cell " + i, 0x1565c0 + (i * 0x050505)));
+            String[] labels;
+            if ("Grid Layout 2x2".equals(title)) {
+                labels = new String[]{"First", "Second", "Third", "Fourth", "Fifth"};
+            } else if ("Grid Layout 2x4".equals(title)) {
+                labels = new String[]{
+                        "First item with longer text",
+                        "Second item with longer text",
+                        "Third item with longer text",
+                        "Fourth item with longer text",
+                        "Fifth item with longer text",
+                        "Sixth item with longer text",
+                        "Seventh item with longer text",
+                        "Eighth item with longer text"
+                };
+            } else {
+                labels = new String[rows * cols];
+                for (int i = 0; i < labels.length; i++) {
+                    labels[i] = "Cell " + (i + 1);
+                }
+            }
+            for (int i = 0; i < labels.length; i++) {
+                form.add(coloredLabel(labels[i], 0x1565c0 + ((i + 1) * 0x050505)));
             }
             return form;
         });
@@ -251,9 +273,12 @@ public final class GuideStaticScreenshotDemos {
 
     public static Demo floatingHintDemo() {
         return formDemo("FloatingHint", "Floating text fields", () -> {
-            Form form = simpleForm("FloatingHint");
-            form.add(new FloatingHint(new TextField("Jane", "First Name")));
-            form.add(new FloatingHint(new TextField("", "Last Name")));
+            Form form = simpleForm("Floating Hint");
+            TextField first = new TextField("", "First Field");
+            TextField second = new TextField("", "Second Field");
+            form.add(new FloatingHint(first));
+            form.add(new FloatingHint(second));
+            form.add(new Button("Go"));
             return form;
         });
     }
@@ -272,14 +297,40 @@ public final class GuideStaticScreenshotDemos {
 
     public static Demo floatingActionDemo(boolean badge) {
         return formDemo(badge ? "Badge Floating Button" : "Floating Action", "Floating action button", () -> {
-            Form form = simpleForm(badge ? "Badge" : "Floating Action");
-            form.add(new SpanLabel("Floating actions stay attached to important contextual operations."));
-            FloatingActionButton fab = badge ? FloatingActionButton.createBadge("3") : FloatingActionButton.createFAB(FontImage.MATERIAL_ADD);
-            if (!badge) {
-                fab.createSubFAB(FontImage.MATERIAL_PERSON, "Contact");
-                fab.createSubFAB(FontImage.MATERIAL_MAIL, "Message");
+            if (badge) {
+                Form form = simpleForm("Badge");
+                Button chat = new Button("");
+                FontImage.setMaterialIcon(chat, FontImage.MATERIAL_CHAT, 7);
+
+                FloatingActionButton badgeButton = FloatingActionButton.createBadge("33");
+                Container badgedChat = badgeButton.bindFabToContainer(chat, Component.RIGHT, Component.TOP);
+                int badgeHostSize = Display.getInstance().convertToPixels(18, true);
+                badgedChat.setPreferredSize(new Dimension(badgeHostSize, badgeHostSize));
+                form.add(FlowLayout.encloseCenter(badgedChat));
+
+                TextField changeBadgeValue = new TextField("33");
+                changeBadgeValue.addDataChangedListener((type, index) -> {
+                    badgeButton.setText(changeBadgeValue.getText());
+                    badgeButton.getParent().revalidate();
+                });
+                form.add(changeBadgeValue);
+                return form;
             }
-            fab.bindFabToContainer(form.getContentPane());
+            FloatingActionButton fab = FloatingActionButton.createFAB(FontImage.MATERIAL_ADD);
+            FloatingActionButton people = fab.createSubFAB(FontImage.MATERIAL_PEOPLE, "");
+            FloatingActionButton contacts = fab.createSubFAB(FontImage.MATERIAL_IMPORT_CONTACTS, "");
+
+            Form form = new Form("Floating Action", new BorderLayout());
+            Container content = new Container(new BorderLayout());
+            content.setUIID("PaddedContainer");
+            content.add(BorderLayout.NORTH,
+                    new SpanLabel("Expanded floating actions reveal related contextual operations."));
+            Container actions = new Container(BoxLayout.y());
+            actions.add(FlowLayout.encloseRight(new Label("People"), people));
+            actions.add(FlowLayout.encloseRight(new Label("Contacts"), contacts));
+            actions.add(FlowLayout.encloseRight(fab));
+            content.add(BorderLayout.CENTER, actions);
+            form.add(BorderLayout.CENTER, content);
             return form;
         });
     }
@@ -299,21 +350,24 @@ public final class GuideStaticScreenshotDemos {
             g.setColor(0xff0000);
             g.fillRect(cmp.getX(), cmp.getY(), cmp.getWidth(), cmp.getHeight());
             g.setColor(0xffffff);
-            g.drawString("Hi World", cmp.getX() + 20, cmp.getY() + 20);
+            g.setFont(Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_LARGE));
+            g.drawString("Hi World", cmp.getX() + 60, cmp.getY() + 90);
         }));
     }
 
     public static Demo graphicsGlassPaneDemo() {
         return formDemo("Glass Pane", "Glass pane drawing", () -> {
             Form form = simpleForm("Glass Pane");
-            form.add(new Button("Button")).add(new TextField("Text", "Hint"));
+            Style warningStyle = new Style(0xff0000, 0, Font.getDefaultFont(), (byte) 0);
+            Image warningImage = FontImage.createMaterial(FontImage.MATERIAL_WARNING, warningStyle).toImage();
+            TextField field = new TextField("My Field");
+            field.getAllStyles().setMarginUnit(Style.UNIT_TYPE_DIPS);
+            field.getAllStyles().setMargin(5, 5, 5, 5);
+            form.add(field);
             form.setGlassPane((g, rect) -> {
-                g.setColor(0x1565c0);
-                g.setAlpha(90);
-                g.fillRoundRect(rect.getX() + 40, rect.getY() + 180, rect.getWidth() - 80, 260, 40, 40);
-                g.setAlpha(255);
-                g.setColor(0xffffff);
-                g.drawString("GlassPane overlay", rect.getX() + 70, rect.getY() + 250);
+                int x = field.getAbsoluteX() + field.getWidth() - warningImage.getWidth() / 2;
+                int y = field.getAbsoluteY() + field.getHeight() / 2 - warningImage.getHeight() / 2;
+                g.drawImage(warningImage, x, y);
             });
             return form;
         });
@@ -322,17 +376,30 @@ public final class GuideStaticScreenshotDemos {
     public static Demo shapedClippingDemo() {
         return formDemo("Shaped Clipping", "Graphics clipping", () -> newPaintForm("Shaped Clipping", (g, cmp) -> {
             GeneralPath path = new GeneralPath();
-            path.moveTo(cmp.getX() + cmp.getWidth() / 2, cmp.getY() + 80);
-            path.lineTo(cmp.getX() + cmp.getWidth() - 100, cmp.getY() + cmp.getHeight() - 160);
-            path.lineTo(cmp.getX() + 100, cmp.getY() + cmp.getHeight() - 160);
-            path.closePath();
+            int x = cmp.getX();
+            int y = cmp.getY();
+            int width = cmp.getWidth();
+            int height = cmp.getHeight();
+            int shapeWidth = Math.min(width - 120, 360);
+            int shapeHeight = Math.min(height - 160, 720);
+            int left = x + (width - shapeWidth) / 2;
+            int top = y + 80;
+            path.moveTo(left + shapeWidth * 2 / 5, top);
+            path.lineTo(left + shapeWidth * 3 / 5, top);
+            path.lineTo(left + shapeWidth * 3 / 5, top + shapeHeight);
+            path.lineTo(left + shapeWidth * 2 / 5, top + shapeHeight);
+            path.lineTo(left + shapeWidth * 2 / 5, top + shapeHeight / 6);
+            path.lineTo(left + shapeWidth / 10, top + shapeHeight * 2 / 5);
+            path.lineTo(left + shapeWidth / 10, top + shapeHeight / 4);
+            path.lineTo(left + shapeWidth * 2 / 5, top);
+
             g.setColor(0xeeeeee);
-            g.fillRect(cmp.getX(), cmp.getY(), cmp.getWidth(), cmp.getHeight());
+            g.fillRect(x, y, width, height);
             g.setClip(path);
-            g.setColor(0x00796b);
-            g.fillRect(cmp.getX(), cmp.getY(), cmp.getWidth(), cmp.getHeight());
-            g.setColor(0xffffff);
-            g.drawString("Clipped", cmp.getX() + 140, cmp.getY() + 240);
+            g.drawImage(createGuideIcon(), left, top, shapeWidth, shapeHeight);
+            g.setClip(path.getBounds());
+            g.setColor(0x0d47a1);
+            g.drawShape(path, new Stroke(2, Stroke.CAP_ROUND, Stroke.JOIN_ROUND, 4));
         }));
     }
 
@@ -345,7 +412,7 @@ public final class GuideStaticScreenshotDemos {
                 button.getAllStyles().setFgColor(0xd81b60);
             } else if (mode == 2) {
                 button.setText("Material Save");
-                button.getAllStyles().setBorder(RoundBorder.create().color(0x00796b));
+                button.getAllStyles().setFgColor(0x00796b);
             }
             form.add(button);
             return form;
@@ -354,11 +421,10 @@ public final class GuideStaticScreenshotDemos {
 
     public static Demo sliderDemo() {
         return formDemo("Slider", "Slider values", () -> {
-            Form form = simpleForm("Slider");
-            Slider slider = new Slider();
-            slider.setEditable(true);
-            slider.setProgress(70);
-            form.add(slider);
+            Form form = new Form("Star Slider", BoxLayout.y());
+            Slider slider = createStarRankSlider();
+            slider.setProgress(5);
+            form.add(FlowLayout.encloseCenter(slider));
             return form;
         });
     }
@@ -528,5 +594,49 @@ public final class GuideStaticScreenshotDemos {
         if (parent != null) {
             form.getToolbar().addCommandToLeftBar("Back", null, ignored -> parent.showBack());
         }
+    }
+
+    private static Slider createStarRankSlider() {
+        Slider starRank = new Slider();
+        starRank.setEditable(true);
+        starRank.setMinValue(0);
+        starRank.setMaxValue(10);
+        Font font = Font.createTrueTypeFont("native:MainLight", "native:MainLight").
+                derive(Display.getInstance().convertToPixels(5, true), Font.STYLE_PLAIN);
+        Style style = new Style(0xffff33, 0, font, (byte) 0);
+        Image fullStar = FontImage.createMaterial(FontImage.MATERIAL_STAR, style).toImage();
+        style.setOpacity(100);
+        style.setFgColor(0);
+        Image emptyStar = FontImage.createMaterial(FontImage.MATERIAL_STAR, style).toImage();
+        initStarRankStyle(starRank.getSliderEmptySelectedStyle(), emptyStar);
+        initStarRankStyle(starRank.getSliderEmptyUnselectedStyle(), emptyStar);
+        initStarRankStyle(starRank.getSliderFullSelectedStyle(), fullStar);
+        initStarRankStyle(starRank.getSliderFullUnselectedStyle(), fullStar);
+        starRank.setPreferredSize(new Dimension(fullStar.getWidth() * 5, fullStar.getHeight()));
+        return starRank;
+    }
+
+    private static void initStarRankStyle(Style style, Image star) {
+        style.setBackgroundType(Style.BACKGROUND_IMAGE_TILE_BOTH);
+        style.setBorder(Border.createEmpty());
+        style.setBgImage(star);
+        style.setBgTransparency(0);
+    }
+
+    private static Image createGuideIcon() {
+        Image image = Image.createImage(50, 100, 0xffffffff);
+        Graphics graphics = image.getGraphics();
+        graphics.setAntiAliased(true);
+        graphics.setColor(0x42a5f5);
+        graphics.fillArc(6, 2, 38, 38, 0, 360);
+        graphics.setColor(0xffca28);
+        graphics.fillArc(12, 10, 8, 8, 0, 360);
+        graphics.fillArc(30, 10, 8, 8, 0, 360);
+        graphics.setColor(0x1e88e5);
+        graphics.fillRoundRect(10, 38, 30, 50, 8, 8);
+        graphics.setColor(0x0d47a1);
+        graphics.drawLine(18, 88, 12, 98);
+        graphics.drawLine(32, 88, 38, 98);
+        return image;
     }
 }

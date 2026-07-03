@@ -40,6 +40,8 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
     private static final int TRANSITION_DURATION_MS = 1500;
     private static final int LAYOUT_FRAME_COUNT = 7;
     private static final int LAYOUT_LABEL_COUNT = 10;
+    private static final int MAX_STATIC_SCREENSHOT_WIDTH = 720;
+    private static final int MAX_STRIP_FRAME_WIDTH = 360;
 
     private static final Set<String> SCREENSHOT_FILE_NAMES = createScreenshotFileNames();
 
@@ -71,7 +73,9 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
                 continue;
             }
             showDemoWithoutParent(screenshot);
-            saveScreenshot(screenshot.getFileName(), captureDisplay());
+            TestUtils.waitFor(100);
+            saveScreenshot(screenshot.getFileName(),
+                    prepareStaticScreenshot(screenshot.getFileName(), captureStaticScreenshot(screenshot.getFileName())));
             returnToHost(host);
         }
     }
@@ -85,7 +89,7 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
     private void captureLayoutAnimationFrames(Form host) throws IOException {
         GuideScreenshot firstFrame = screenshot("layout-animation-1.png");
         showDemo(firstFrame, host);
-        Image baseFrame = captureDisplay();
+        Image baseFrame = cropLayoutAnimationFrame(captureDisplay());
 
         for (int frame = 1; frame <= LAYOUT_FRAME_COUNT; frame++) {
             saveScreenshot("layout-animation-" + frame + ".png", renderLayoutAnimationFrame(frame - 1, baseFrame));
@@ -110,8 +114,8 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         Form demoForm = showDemo(screenshot, host);
         configureSlideDemo(demoForm, transitionName, horizontal);
         TestUtils.waitFor(100);
-        Image sourceFrame = captureDisplay();
-        Image destinationFrame = captureTransitionDestinationFrame();
+        Image sourceFrame = cropTransitionFrame(fileName, captureDisplay());
+        Image destinationFrame = cropTransitionFrame(fileName, captureTransitionDestinationFrame());
         saveScreenshot(fileName,
                 renderDeterministicTransitionStrip(transitionName, horizontal, sourceFrame, destinationFrame));
         returnToHost(host);
@@ -122,7 +126,8 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         Form demoForm = showDemo(screenshot, host);
         runOnEdtAsync(() -> buttonByText(demoForm, "+").released());
         TestUtils.waitFor(50);
-        saveScreenshot(screenshot.getFileName(), captureFrameStrip(TRANSITION_FRAME_COUNT, TRANSITION_FRAME_DELAY_MS));
+        saveScreenshot(screenshot.getFileName(), captureFrameStrip(TRANSITION_FRAME_COUNT, TRANSITION_FRAME_DELAY_MS,
+                this::cropBubbleFrame));
         returnToHost(host);
     }
 
@@ -130,7 +135,8 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         GuideScreenshot screenshot = screenshot("mighty-morphing-components-1.png");
         showDemo(screenshot, host);
         TestUtils.waitFor(50);
-        saveScreenshot(screenshot.getFileName(), captureFrameStrip(TRANSITION_FRAME_COUNT, TRANSITION_FRAME_DELAY_MS));
+        saveScreenshot(screenshot.getFileName(), captureFrameStrip(TRANSITION_FRAME_COUNT, TRANSITION_FRAME_DELAY_MS,
+                this::cropMorphFrame));
         returnToHost(host);
     }
 
@@ -240,6 +246,67 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         return frame;
     }
 
+    private Image prepareStaticScreenshot(String fileName, Image screenshot) {
+        Image prepared = screenshot;
+        if ("badge-floating-button.png".equals(fileName)
+                || "floating-action.png".equals(fileName)
+                || "components-slider.png".equals(fileName)
+                || "components-floatinghint.png".equals(fileName)
+                || "graphics-glasspane.png".equals(fileName)
+                || "graphics-fontimage-fixed.png".equals(fileName)
+                || "graphics-fontimage-style.png".equals(fileName)
+                || "graphics-fontimage-material.png".equals(fileName)) {
+            prepared = cropByRatio(screenshot, 0, 0, 1, 0.42);
+        } else if ("graphics-hiworld.png".equals(fileName)) {
+            prepared = cropByRatio(screenshot, 0, 0, 1, 0.5);
+        } else if ("shaped-clipping.png".equals(fileName)) {
+            prepared = cropByRatio(screenshot, 0.18, 0.17, 0.64, 0.54);
+        } else if ("components-dialog-modal-south.png".equals(fileName)
+                || "components-dialog-modal-bottom-half.png".equals(fileName)) {
+            prepared = cropByRatio(screenshot, 0, 0.35, 1, 0.65);
+        } else if ("components-interaction-dialog.png".equals(fileName)) {
+            prepared = cropByRatio(screenshot, 0, 0, 1, 0.6);
+        }
+        return scaleToMaxWidth(prepared, MAX_STATIC_SCREENSHOT_WIDTH);
+    }
+
+    private Image cropLayoutAnimationFrame(Image frame) {
+        return scaleToMaxWidth(cropByRatio(frame, 0, 0, 1, 0.5), MAX_STATIC_SCREENSHOT_WIDTH);
+    }
+
+    private Image cropTransitionFrame(String fileName, Image frame) {
+        if ("transition-bubble.png".equals(fileName)) {
+            return cropBubbleFrame(frame);
+        }
+        return scaleToMaxWidth(cropByRatio(frame, 0, 0, 1, 0.58), MAX_STRIP_FRAME_WIDTH);
+    }
+
+    private Image cropBubbleFrame(Image frame) {
+        return scaleToMaxWidth(cropByRatio(frame, 0, 0, 1, 0.58), MAX_STRIP_FRAME_WIDTH);
+    }
+
+    private Image cropMorphFrame(Image frame) {
+        return scaleToMaxWidth(cropByRatio(frame, 0, 0, 1, 0.48), MAX_STRIP_FRAME_WIDTH);
+    }
+
+    private Image cropByRatio(Image image, double xRatio, double yRatio, double widthRatio, double heightRatio) {
+        int x = Math.max(0, Math.min(image.getWidth() - 1, (int) Math.round(image.getWidth() * xRatio)));
+        int y = Math.max(0, Math.min(image.getHeight() - 1, (int) Math.round(image.getHeight() * yRatio)));
+        int width = Math.max(1, (int) Math.round(image.getWidth() * widthRatio));
+        int height = Math.max(1, (int) Math.round(image.getHeight() * heightRatio));
+        width = Math.min(width, image.getWidth() - x);
+        height = Math.min(height, image.getHeight() - y);
+        return image.subImage(x, y, width, height, true);
+    }
+
+    private Image scaleToMaxWidth(Image image, int maxWidth) {
+        if (image.getWidth() <= maxWidth) {
+            return image;
+        }
+        int height = Math.max(1, (int) Math.round(image.getHeight() * (maxWidth / (double) image.getWidth())));
+        return image.scaled(maxWidth, height);
+    }
+
     private void renderFlipFrame(Graphics graphics, Image source, Image destination, double progress) {
         int width = source.getWidth();
         int height = source.getHeight();
@@ -342,17 +409,28 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
             if (screenshot != null) {
                 return screenshot;
             }
-            Form form = Display.getInstance().getCurrent();
-            Image fallback = Image.createImage(form.getWidth(), form.getHeight());
-            form.paintComponent(fallback.getGraphics(), true);
-            return fallback;
+            return captureCurrentFormPaint();
         });
     }
 
-    private Image captureFrameStrip(int frameCount, int frameDelayMs) {
+    private Image captureStaticScreenshot(String fileName) {
+        if ("graphics-glasspane.png".equals(fileName)) {
+            return runOnEdt(this::captureCurrentFormPaint);
+        }
+        return captureDisplay();
+    }
+
+    private Image captureCurrentFormPaint() {
+        Form form = Display.getInstance().getCurrent();
+        Image fallback = Image.createImage(form.getWidth(), form.getHeight());
+        form.paintComponent(fallback.getGraphics(), true);
+        return fallback;
+    }
+
+    private Image captureFrameStrip(int frameCount, int frameDelayMs, ImageProcessor frameProcessor) {
         List<Image> frames = new ArrayList<>();
         for (int frame = 0; frame < frameCount; frame++) {
-            frames.add(captureDisplay());
+            frames.add(frameProcessor.process(captureDisplay()));
             if (frame < frameCount - 1) {
                 TestUtils.waitFor(frameDelayMs);
             }
@@ -499,12 +577,21 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         return false;
     }
 
+    @Override
+    public int getTimeoutMillis() {
+        return 600000;
+    }
+
     private interface UiSupplier<T> {
         T get();
     }
 
     private interface ComponentMatcher {
         boolean matches(Component component);
+    }
+
+    private interface ImageProcessor {
+        Image process(Image image);
     }
 
 }

@@ -88,16 +88,6 @@ jobs:
           set -euo pipefail
           scripts/developer-guide/verify-guide-screenshots-captured.sh
 
-      - name: Prepare generated guide screenshot artifact
-        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
-        run: |
-          set -euo pipefail
-          GENERATED_DIR="build/developer-guide/guide-screenshots/generated"
-          mkdir -p "${GENERATED_DIR}"
-          while IFS= read -r screenshot; do
-            cp "${HOME}/.cn1/${screenshot}" "${GENERATED_DIR}/${screenshot}"
-          done < <(sed -e 's/#.*//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' scripts/developer-guide/guide-screenshots.txt | awk 'length($0) > 0')
-
       - name: Compile Android demo sources
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
@@ -126,22 +116,6 @@ jobs:
           ARTIFACT_DIR="build/developer-guide/guide-screenshots"
           mkdir -p "${ARTIFACT_DIR}"
           scripts/developer-guide/compare-guide-screenshots.sh "${ARTIFACT_DIR}"
-
-      - name: Upload guide screenshot mismatches
-        if: steps.compare_guide_screenshots.outcome == 'failure'
-        uses: actions/upload-artifact@v7
-        with:
-          name: developer-guide-screenshots
-          path: build/developer-guide/guide-screenshots
-          if-no-files-found: warn
-
-      - name: Upload generated guide screenshots
-        if: always() && (github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true')
-        uses: actions/upload-artifact@v7
-        with:
-          name: developer-guide-generated-screenshots
-          path: build/developer-guide/guide-screenshots/generated
-          if-no-files-found: warn
 
       - name: Fail when guide screenshots differ
         if: steps.compare_guide_screenshots.outcome == 'failure'
@@ -615,12 +589,6 @@ jobs:
             }
             if (artifactLinks.has('developer-guide-unused-images')) {
               links.push(`- [Unused image report](${artifactLinks.get('developer-guide-unused-images')})`);
-            }
-            if (artifactLinks.has('developer-guide-generated-screenshots')) {
-              links.push(`- [Generated guide screenshots](${artifactLinks.get('developer-guide-generated-screenshots')})`);
-            }
-            if (artifactLinks.has('developer-guide-screenshots')) {
-              links.push(`- [Guide screenshot mismatches](${artifactLinks.get('developer-guide-screenshots')})`);
             }
             if (artifactLinks.has('developer-guide-paragraph-capitalization')) {
               links.push(`- [Paragraph capitalization report](${artifactLinks.get('developer-guide-paragraph-capitalization')})`);
