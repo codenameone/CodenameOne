@@ -110,6 +110,26 @@ jobs:
           echo "status=$?" >> "$GITHUB_OUTPUT"
           set -e
 
+      - name: Set up Node 20 for Mermaid validation
+        if: steps.detect.outputs.has_posts == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Install Playwright Chromium
+        if: steps.detect.outputs.has_posts == 'true'
+        run: |
+          set -euo pipefail
+          cd scripts
+          npm init -y 2>/dev/null || true
+          npm install playwright
+          npx playwright install-deps chromium
+          npx playwright install chromium
+
+      - name: Validate blog Mermaid diagrams
+        if: steps.detect.outputs.has_posts == 'true'
+        run: node scripts/website/validate_mermaid.mjs docs/website/content/blog
+
       - name: Upload net-new findings report
         if: ${{ always() && steps.detect.outputs.has_posts == 'true' }}
         uses: actions/upload-artifact@v7

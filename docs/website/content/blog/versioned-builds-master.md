@@ -1,5 +1,5 @@
 ---
-title: "Versioned Builds Are Back, And Master Builds Are Better Than Nightlies"
+title: "Versioned Builds Are Back, With Master Builds For Fast Verification"
 slug: versioned-builds-master
 url: /blog/versioned-builds-master/
 date: '2026-07-07'
@@ -9,7 +9,7 @@ feed_html: '<img src="https://www.codenameone.com/blog/versioned-builds-master.j
 series: ["release-2026-07-03"]
 ---
 
-![Versioned Builds Are Back, And Master Builds Are Better Than Nightlies](/blog/versioned-builds-master.jpg)
+![Versioned Builds Are Back, With Master Builds For Fast Verification](/blog/versioned-builds-master.jpg)
 
 Versioned builds are back.
 
@@ -41,9 +41,9 @@ The more interesting part is `master`:
 build.cn1Version=master
 ```
 
-This builds against the current development head of Codename One. A few years ago, community developers asked for nightly or daily builds. We resisted because pushing nightly artifacts through Maven Central and support channels is messier than it sounds. A fixed nightly is also stale the moment the next fix lands.
+This builds against the current development head of Codename One. Community developers recently asked for nightly or daily builds, but pushing nightly artifacts through Maven Central and support channels is messier than it sounds. A fixed nightly is also stale the moment the next fix lands.
 
-Building against `master` is the better developer loop for most cases. If a fix landed this morning and you need to verify it on a device, you do not wait for tomorrow's nightly. You ask the cloud build to use the current development head.
+Building against `master` is a faster developer loop for most verification cases. If a fix landed this morning and you need to verify it on a device, you do not wait for tomorrow's nightly. You ask the cloud build to use the current development head.
 
 {{< mermaid >}}
 flowchart TD

@@ -76,7 +76,7 @@ Versioned builds are back, and the model is better suited to Maven than the old 
 build.cn1Version=master
 ```
 
-Building against master is in some ways better than the nightly build request we resisted for years. You are not waiting for an artificial daily package. You are asking the build server to use the current development head.
+Community developers recently asked for nightly or daily builds. Building against master solves the same verification problem without waiting for an artificial daily package. You are asking the build server to use the current development head.
 
 Subscription tiers limit versioned build access because old versions create support churn, not because fetching a few artifacts drives the business model. The further back a build goes, the harder it is to diagnose a regression against the current code. The new model still opens versioned builds much further down the account ladder than before, including limited access for basic/free usage, while giving paying teams the longer support windows they actually need. Tuesday's post covers the tradeoff.
 

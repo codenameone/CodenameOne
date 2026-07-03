@@ -53,6 +53,8 @@ try {
         Image frame = renderFrame(i);
         writer.writeFrame(frame, i * 1000L / 30L);
     }
+
+    short[] pcm = renderAudioTrack();
     writer.writeAudio(pcm, 44100, 2, 0);
 } finally {
     writer.close();
@@ -134,15 +136,17 @@ try {
 The Whisper cn1lib already returned text. The new transcription API returns timed segments:
 
 ```java
-Transcriber t = Transcriber.getDefault();
+String modelPath = FileSystemStorage.getInstance().getAppHomePath()
+        + "/ggml-base.en.bin";
+Transcriber t = WhisperRecognizer.transcriber(modelPath);
 TranscriptionResult result = t.transcribe(
-        new TranscriptionRequest(audioPath).setLanguage("en"));
+        new TranscriptionRequest(audioPath).setLanguageTag("en-US")).get();
 
 String srt = result.toSrt();
 String vtt = result.toVtt();
 ```
 
-Those segment timestamps are the missing link between "we transcribed the video" and "the video has subtitles." A generated training clip, game replay, tutorial or support recording can now get caption files automatically.
+That `get()` call is blocking, so run it off the EDT or use the returned `AsyncResource` callback. Those segment timestamps are the missing link between "we transcribed the video" and "the video has subtitles." A generated training clip, game replay, tutorial or support recording can now get caption files automatically.
 
 The Whisper PR also fixed native packaging gaps: Android now ships a JNI AAR with native slices, iOS exposes timed segments, JavaSE keeps a fallback segment, Linux and Windows native bridge modules are packaged, and JavaScript is explicitly unsupported.
 
