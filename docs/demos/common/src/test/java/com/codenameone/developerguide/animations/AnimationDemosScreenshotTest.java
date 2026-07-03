@@ -249,7 +249,6 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
     private Image prepareStaticScreenshot(String fileName, Image screenshot) {
         Image prepared = screenshot;
         if ("badge-floating-button.png".equals(fileName)
-                || "floating-action.png".equals(fileName)
                 || "components-slider.png".equals(fileName)
                 || "components-floatinghint.png".equals(fileName)
                 || "graphics-glasspane.png".equals(fileName)
@@ -257,6 +256,8 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
                 || "graphics-fontimage-style.png".equals(fileName)
                 || "graphics-fontimage-material.png".equals(fileName)) {
             prepared = cropByRatio(screenshot, 0, 0, 1, 0.42);
+        } else if ("floating-action.png".equals(fileName)) {
+            prepared = cropByRatio(screenshot, 0, 0, 1, 0.55);
         } else if ("graphics-hiworld.png".equals(fileName)) {
             prepared = cropByRatio(screenshot, 0, 0, 1, 0.5);
         } else if ("shaped-clipping.png".equals(fileName)) {

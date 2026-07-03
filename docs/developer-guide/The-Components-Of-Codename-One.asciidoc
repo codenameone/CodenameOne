@@ -2361,7 +2361,7 @@ Those familiar with this widget know that there are many nuances to this UI that
 
 Floating buttons can also be used to badge an arbitrary component in the style popularized by iOS/macOS. A badge appears in the top right corner and includes special numeric details such as `unread count.`.
 
-The code below adds a simple badge to an icon button:
+The code below adds a simple badge to a chat button:
 
 [source,java]
 ----

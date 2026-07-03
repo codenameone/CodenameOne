@@ -59,7 +59,7 @@ class TheComponentsOfCodenameOneJava140Snippet {
         // tag::the-components-of-codename-one-java-140[]
         Form hi = new Form("Badge");
 
-        Button chat = new Button("");
+        Button chat = new Button("Chat");
         FontImage.setMaterialIcon(chat, FontImage.MATERIAL_CHAT, 7);
 
         FloatingActionButton badge = FloatingActionButton.createBadge("33");

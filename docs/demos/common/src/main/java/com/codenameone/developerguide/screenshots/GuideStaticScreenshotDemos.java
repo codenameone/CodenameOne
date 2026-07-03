@@ -299,13 +299,11 @@ public final class GuideStaticScreenshotDemos {
         return formDemo(badge ? "Badge Floating Button" : "Floating Action", "Floating action button", () -> {
             if (badge) {
                 Form form = simpleForm("Badge");
-                Button chat = new Button("");
+                Button chat = new Button("Chat");
                 FontImage.setMaterialIcon(chat, FontImage.MATERIAL_CHAT, 7);
 
                 FloatingActionButton badgeButton = FloatingActionButton.createBadge("33");
                 Container badgedChat = badgeButton.bindFabToContainer(chat, Component.RIGHT, Component.TOP);
-                int badgeHostSize = Display.getInstance().convertToPixels(18, true);
-                badgedChat.setPreferredSize(new Dimension(badgeHostSize, badgeHostSize));
                 form.add(FlowLayout.encloseCenter(badgedChat));
 
                 TextField changeBadgeValue = new TextField("33");
@@ -323,8 +321,7 @@ public final class GuideStaticScreenshotDemos {
             Form form = new Form("Floating Action", new BorderLayout());
             Container content = new Container(new BorderLayout());
             content.setUIID("PaddedContainer");
-            content.add(BorderLayout.NORTH,
-                    new SpanLabel("Expanded floating actions reveal related contextual operations."));
+            content.add(BorderLayout.NORTH, new Label("Expanded actions"));
             Container actions = new Container(BoxLayout.y());
             actions.add(FlowLayout.encloseRight(new Label("People"), people));
             actions.add(FlowLayout.encloseRight(new Label("Contacts"), contacts));
