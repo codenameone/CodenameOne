@@ -1,0 +1,30 @@
+{{- $series := .Params.series -}}
+{{- if and $series (gt (len $series) 0) -}}
+  {{- $key := index $series 0 -}}
+  {{- $pages := where site.RegularPages "Section" .Section -}}
+  {{- $pages = where $pages "Params.series" "intersect" (slice $key) -}}
+  {{- $pages = sort $pages "Date" "asc" -}}
+  {{- $current := . -}}
+  {{- $previous := false -}}
+  {{- $next := false -}}
+  {{- $found := false -}}
+  {{- range $pages -}}
+    {{- if eq .RelPermalink $current.RelPermalink -}}
+      {{- $found = true -}}
+    {{- else if not $found -}}
+      {{- $previous = . -}}
+    {{- else if not $next -}}
+      {{- $next = . -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if or $previous $next -}}
+  <nav class="blog-series-nav" aria-label="Release series navigation">
+    {{- with $previous -}}
+    <a class="blog-series-nav__previous" href="{{ .RelPermalink }}">Previously: {{ .Title }}</a>
+    {{- end -}}
+    {{- with $next -}}
+    <a class="blog-series-nav__next" href="{{ .RelPermalink }}">Read next: {{ .Title }}</a>
+    {{- end -}}
+  </nav>
+  {{- end -}}
+{{- end -}}
