@@ -323,8 +323,11 @@ RaisedButton.disabled { background-color: rgba(255,255,255,0.5); color: rgba(60,
 
 /* clearGlass FlatButton: a MORE translucent capsule than the .glass() Button (more
    backdrop shows through) with a blue label. */
-FlatButton { cn1-derive: Button; color: #000000; background-color: rgba(255,255,255,0.32); border: 0.25mm solid rgba(255,255,255,0.7); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); }
-FlatButton.pressed { color: #000000; background-color: rgba(255,255,255,0.52); border: 0.25mm solid rgba(255,255,255,0.85); cn1-background-type: cn1-pill-border; }
+/* Nearly invisible fill: the native clearGlass capsule is frost you mostly see
+   by its rim; 0.32 white read as a solid pill. Padding trimmed to the native
+   text inset (2.1mm). */
+FlatButton { cn1-derive: Button; color: #000000; background-color: rgba(255,255,255,0.16); border: 0.25mm solid rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); padding: 1mm 2.1mm 1mm 2.1mm; }
+FlatButton.pressed { color: #000000; background-color: rgba(255,255,255,0.34); border: 0.25mm solid rgba(255,255,255,0.7); cn1-background-type: cn1-pill-border; padding: 1mm 2.1mm 1mm 2.1mm; }
 
 TextField {
     color: #000000;
@@ -498,17 +501,17 @@ Toolbar {
     color: #000000;
     padding: 0;
     margin: 0;
-    /* Liquid Glass nav bar: blur the content scrolling behind it (no CEF). A
-       strong radius (30px) matches the heavy UIKit glass blur -- weaker radii
-       left too much backdrop detail showing through and scored lower. */
-    backdrop-filter: blur(32px);
+    /* NO bar-wide glass: the iOS 26 nav bar is effectively invisible -- the
+       backdrop reads through unmodified and only the floating circle items and
+       title sit on it. The old bar-wide blur(32px) painted a washed frost BAND
+       across the strip that the native reference simply does not have. */
 }
 /* TitleArea derives from Toolbar so theme overrides on Toolbar cascade
    to TitleArea. UIManager used to install a defensive
    Toolbar.derive=TitleArea default that produced a cycle when paired
    with TitleArea.derive=Toolbar; the framework now skips that default
    when the user theme has already wired TitleArea -> Toolbar. */
-TitleArea { cn1-derive: Toolbar; padding: 1mm 2mm 1mm 2mm; backdrop-filter: blur(32px); }
+TitleArea { cn1-derive: Toolbar; padding: 1mm 2mm 1mm 2mm; }
 
 Title {
     color: #000000;
@@ -526,8 +529,10 @@ MainTitle { cn1-derive: Title; }
 
 /* iOS 26 nav-bar items: a circular translucent-white glass button holding a blue
    glyph (no text). cn1-round-border draws the circle; rgba gives the glass fill. */
-BackCommand { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.72); padding: 1.6mm; margin: 0.5mm; cn1-background-type: cn1-round-border; }
-TitleCommand { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.72); padding: 1.6mm; margin: 0.5mm; cn1-background-type: cn1-round-border; }
+/* Leading/trailing margins reproduce the native bar-item inset from the screen
+   edge (~2.6mm); flush-to-edge circles were the single biggest Toolbar diff. */
+BackCommand { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.72); padding: 1.6mm; margin: 0.5mm 0.5mm 0.5mm 2.6mm; cn1-background-type: cn1-round-border; }
+TitleCommand { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.72); padding: 1.6mm; margin: 0.5mm 2.6mm 0.5mm 0.5mm; cn1-background-type: cn1-round-border; }
 
 /* ---- Desktop chrome (macOS conventions) ----
    Only used when the desktop port enables interactiveScrollBool /
@@ -605,9 +610,12 @@ TabsContainer {
     /* Floating WHITE glass capsule (native iOS 26 bar): a translucent white fill over
        the blurred backdrop so it reads as a distinct white pill even over light-grey
        content, not a near-invisible frost. The blur still lets colour bleed through. */
-    background-color: rgba(255,255,255,0.82);
+    /* Sampled against the golden over the shared backdrop: the native pill is
+       only ~22% white over a LIGHTLY blurred local backdrop (yellow stays
+       yellow); 0.60/blur40 washed and cross-mixed the colours. */
+    background-color: rgba(255,255,255,0.22);
     color: #3c3c43;
-    backdrop-filter: blur(40px);
+    backdrop-filter: blur(24px);
     /* Horizontal end-padding widens the pill at its rounded ends WITHOUT moving the tab
        centres (the pill grows symmetrically and the content shifts by the same amount,
        cancelling) -- this is how native's first/last cells get extra width. Tuned so the
@@ -941,8 +949,8 @@ PopupContent {
     /* Dark FlatButton matches light: iOS 26's flat glass button is a light cream
        pill with DARK text in BOTH appearances (native ref). White text flipped it
        to the dark "charcoal" material; dark text uses the light pass-through frost. */
-    FlatButton { color: #000000; background-color: rgba(255,255,255,0.32); border: 0.25mm solid rgba(255,255,255,0.7); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); }
-    FlatButton.pressed { color: #000000; background-color: rgba(255,255,255,0.52); border: 0.25mm solid rgba(255,255,255,0.85); cn1-background-type: cn1-pill-border; }
+    FlatButton { color: #000000; background-color: rgba(255,255,255,0.16); border: 0.25mm solid rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); padding: 1mm 2.1mm 1mm 2.1mm; }
+    FlatButton.pressed { color: #000000; background-color: rgba(255,255,255,0.34); border: 0.25mm solid rgba(255,255,255,0.7); cn1-background-type: cn1-pill-border; padding: 1mm 2.1mm 1mm 2.1mm; }
 
     RaisedButton { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
     RaisedButton.pressed { color: #ffffff; background-color: var(--accent-pressed-color-dark, #64b1ff); cn1-background-type: cn1-pill-border; }
@@ -987,12 +995,12 @@ PopupContent {
     OnOffSwitch { color: var(--accent-color-dark, #0a84ff); background-color: #2c2c2e; }
     OnOffSwitch.selected { background-color: #30d158; color: #ffffff; }
 
-    Toolbar { background-color: transparent; color: #ffffff; backdrop-filter: blur(32px); }
-    TitleArea { background-color: transparent; color: #ffffff; backdrop-filter: blur(32px); }
+    Toolbar { background-color: transparent; color: #ffffff; }
+    TitleArea { background-color: transparent; color: #ffffff; }
     Title { color: #ffffff; background-color: transparent; }
     MainTitle { color: #ffffff; background-color: transparent; }
-    BackCommand { color: #ffffff; background-color: rgba(44,44,46,0.72); cn1-background-type: cn1-round-border; }
-    TitleCommand { color: #ffffff; background-color: rgba(44,44,46,0.72); cn1-background-type: cn1-round-border; }
+    BackCommand { color: #ffffff; background-color: rgba(24,24,26,0.80); padding: 1.6mm; margin: 0.5mm 0.5mm 0.5mm 2.6mm; cn1-background-type: cn1-round-border; }
+    TitleCommand { color: #ffffff; background-color: rgba(24,24,26,0.80); padding: 1.6mm; margin: 0.5mm 2.6mm 0.5mm 0.5mm; cn1-background-type: cn1-round-border; }
 
     /* Desktop scrollbar (macOS) dark overrides. cn1-background-type must be
        re-declared so the round primitive carries into dark mode. */
@@ -1024,8 +1032,10 @@ PopupContent {
        so the pill shows through; only the glyph (fgColor) is forced
        white. */
     TabIcon { color: #ffffff; background-color: transparent; }
-    TabIcon.selected { color: #ffffff; background-color: transparent; }
-    TabIcon.pressed { color: #ffffff; background-color: transparent; }
+    /* With the dark lens tint disabled (it flooded the dark bar solid blue)
+       the selected glyph carries the accent itself, like the native dark bar. */
+    TabIcon.selected { color: #0a84ff; background-color: transparent; }
+    TabIcon.pressed { color: #0a84ff; background-color: transparent; }
 
     /* Dark glass panel: a translucent dark tint so the backdrop reads through as
        Liquid Glass (matches the dark UIVisualEffectView in the isolation tests). */

@@ -245,7 +245,10 @@ public final class Cn1WidgetRenderer {
             int selColor;
             int unselColor;
             if (iosTabs) {
-                selColor = dark ? 0x409cff : 0x0a84ff;
+                // Both appearances use the native vivid accent: in light the lens
+                // re-tints the deliberately-dark glyph; in dark the lens tint is
+                // disabled (it flooded the dark bar) and the glyph carries it.
+                selColor = 0x0a84ff;
                 unselColor = dark ? 0xebebf5 : 0x3c3c43;
             } else {
                 selColor = com.codename1.ui.plaf.UIManager.getInstance()
@@ -310,7 +313,8 @@ public final class Cn1WidgetRenderer {
                 // light mode is just the blurred backdrop. The native DARK glass darkens
                 // the backdrop a touch, so dark keeps a very light black frost; light is
                 // fully transparent. The blur hook runs regardless of opacity.
-                bar.getAllStyles().setBgTransparency(dark ? 16 : 0);
+                // The native bar adds NO tint in either mode -- the strip is pure backdrop.
+                bar.getAllStyles().setBgTransparency(0);
                 Container row = new Container(new BorderLayout());
                 row.setUIID("Container");
                 row.getAllStyles().setBgTransparency(0);

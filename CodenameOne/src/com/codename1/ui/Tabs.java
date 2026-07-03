@@ -1732,9 +1732,14 @@ public class Tabs extends Container {
                         -1f, m.barGrowMag, 0f, 0x000000, 0f);
             }
             drawSelectionPill(g, m.capX, m.capY, m.capW, m.capH, m.flight);
-            // Accent supplied by the lens (the glyphs paint dark); default iOS blue.
+            // Accent supplied by the lens in LIGHT mode only: the keying tints DARK
+            // pixels toward the accent, which is right over a light frost (the
+            // deliberately-dark glyphs turn blue) but floods a dark bar solid blue,
+            // because everything under the drop is dark there. On dark bars the
+            // glyphs carry the accent directly (theme) and the lens keeps only its
+            // magnify/aberration optics.
             int tint = getUIManager().getThemeConstant("tabSelLensTintColorInt", 0x0a84ff);
-            g.lensRegion(m.lensX, m.lensY, m.lensW, m.lensH, -1f, m.magnify, m.aberration, tint, m.tintStrength);
+            g.lensRegion(m.lensX, m.lensY, m.lensW, m.lensH, -1f, m.magnify, m.aberration, tint, dark ? 0f : m.tintStrength);
             return;
         }
         // Non-glass platforms: a translucent rounded capsule.
