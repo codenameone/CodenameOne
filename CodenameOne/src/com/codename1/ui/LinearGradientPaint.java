@@ -31,10 +31,6 @@ import static com.codename1.ui.MultipleGradientPaint.CycleMethod.REFLECT;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
-///
 /// #### See also
 ///
 /// - Graphics#setColor(com.codename1.ui.Paint)

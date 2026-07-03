@@ -33,9 +33,6 @@ import com.codename1.util.AsyncResource;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public class BrowserWindow {
 
     /// Implementation for BrowserWindow provided by the platform implementation.  The default
@@ -177,9 +174,6 @@ public class BrowserWindow {
 
     /// A future that is returned from the eval() method.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static class EvalRequest extends AsyncResource<String> {
         private String js;
 

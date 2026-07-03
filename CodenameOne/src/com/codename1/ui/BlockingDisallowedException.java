@@ -29,10 +29,6 @@ package com.codename1.ui;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
-///
 /// #### See also
 ///
 /// - Display#invokeWithoutBlocking(java.lang.Runnable)

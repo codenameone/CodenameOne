@@ -93,6 +93,8 @@ include::Motion-Sensors.asciidoc[]
 
 include::Miscellaneous-Features.asciidoc[]
 
+include::Video-IO.asciidoc[]
+
 include::performance.asciidoc[]
 
 include::Testing-with-JUnit.adoc[]

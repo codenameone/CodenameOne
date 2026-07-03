@@ -202,9 +202,6 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     ///
     /// - `end`: The end date
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public void setDateRange(Date start, Date end) {
         explicitStartMonth = true;
         explicitEndMonth = true;
@@ -282,9 +279,6 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
 
     /// Gets the start month of this Spinner.
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public int getStartMonth() {
         return startMonth;
     }
@@ -292,9 +286,6 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
 
     /// Gets the end month of this spinner.
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public int getEndMonth() {
         return endMonth;
     }
@@ -302,18 +293,12 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
 
     /// Gets the start day of month.
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public int getStartDay() {
         return startDay;
     }
 
     /// Gets the end day of month.
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public int getEndDay() {
         return endDay;
     }

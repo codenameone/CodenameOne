@@ -31,9 +31,6 @@ import com.codename1.util.SuccessCallback;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public abstract class AbstractMedia implements AsyncMedia {
     private final EventDispatcher stateChangeListeners = new EventDispatcher();
     private final EventDispatcher errorListeners = new EventDispatcher();

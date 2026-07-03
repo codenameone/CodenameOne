@@ -31,9 +31,6 @@ package com.codename1.media;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public class RemoteControlListener {
 
     /// Called when user presses play button on remote control.

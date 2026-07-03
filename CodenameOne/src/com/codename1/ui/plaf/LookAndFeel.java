@@ -223,10 +223,6 @@ public abstract class LookAndFeel {
     ///
     /// A span representing the positions of characters in the label
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - TextSelection
@@ -271,9 +267,6 @@ public abstract class LookAndFeel {
     ///
     /// The spans for the given text field.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public abstract Spans calculateTextAreaSpan(TextSelection sel, TextArea ta);
 
     /// Draws the text field without its cursor which is drawn in a separate method
@@ -298,9 +291,6 @@ public abstract class LookAndFeel {
     ///
     /// The spans for the given text field.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public abstract Spans calculateTextFieldSpan(TextSelection sel, TextArea ta);
 
     /// Draws the cursor of the text field, blinking is handled simply by avoiding

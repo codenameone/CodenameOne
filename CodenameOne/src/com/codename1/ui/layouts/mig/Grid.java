@@ -1149,9 +1149,6 @@ public final class Grid {
     /// has a content bias according to
     /// `net.miginfocom.layout.ComponentWrapper#getContentBias()`.
     ///
-    /// #### Since
-    ///
-    /// 5.0
     public boolean layout(int[] bounds, UnitValue alignX, UnitValue alignY, boolean debug) {
         return layoutImpl(bounds, alignX, alignY, debug, false);
     }
@@ -1180,9 +1177,6 @@ public final class Grid {
     /// has a content bias according to
     /// `net.miginfocom.layout.ComponentWrapper#getContentBias()`.
     ///
-    /// #### Since
-    ///
-    /// 5.0
     private boolean layoutImpl(int[] bounds, UnitValue alignX, UnitValue alignY, boolean debug, boolean trialRun) {
         if (debug) {
             debugRects = new ArrayList<int[]>();
@@ -1225,7 +1219,7 @@ public final class Grid {
                                     }
                                 }
 
-                                // @since 3.7.2 Needed or absolute "pos" pointing to "visual" or "container" didn't work if
+                                // Needed or absolute "pos" pointing to "visual" or "container" didn't work if
                                 // their bounds changed during the layout cycle. At least not in SWT.
                                 if (linkTargetIDs != null && (linkTargetIDs.containsKey("visual") || linkTargetIDs.containsKey("container"))) {
                                     layoutAgain = true;

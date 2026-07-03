@@ -112,9 +112,6 @@ import static com.codename1.ui.ComponentSelector.$;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public class Sheet extends Container {
     private static Rectangle[] sheetBoundsList = new Rectangle[0];
     private static final int N = 0;
@@ -470,9 +467,6 @@ public class Sheet extends Container {
     ///
     /// The current sheet or null.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static Sheet getCurrentSheet() {
         if (CN.getCurrentForm() == null) {
             return null;
@@ -499,9 +493,6 @@ public class Sheet extends Container {
     ///
     /// The sheet containing the component, or null if it is not on a sheet.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static Sheet findContainingSheet(Component cmp) {
         Container parent = cmp.getParent();
         while (parent != null) {
@@ -533,9 +524,6 @@ public class Sheet extends Container {
     ///
     /// - `allowClose`: True to allow user to close the sheet.  False to prevent it.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setAllowClose(boolean allowClose) {
         if (allowClose != this.allowClose) {
             this.allowClose = allowClose;
@@ -561,9 +549,6 @@ public class Sheet extends Container {
     ///
     /// True if swipe-to-dismiss is enabled.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public boolean isSwipeToDismissEnabled() {
         return swipeToDismissEnabled;
     }
@@ -578,9 +563,6 @@ public class Sheet extends Container {
     ///
     /// - `swipeToDismissEnabled`: True to enable the swipe-to-dismiss gesture, false to disable it.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void setSwipeToDismissEnabled(boolean swipeToDismissEnabled) {
         if (this.swipeToDismissEnabled != swipeToDismissEnabled) {
             this.swipeToDismissEnabled = swipeToDismissEnabled;
@@ -641,9 +623,6 @@ public class Sheet extends Container {
     ///
     /// The sheet title text.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public String getTitle() {
         return title.getText();
     }
@@ -658,9 +637,6 @@ public class Sheet extends Container {
     ///
     /// - `title`: The title text.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void setTitle(String title) {
         this.title.setText(title);
     }
@@ -671,9 +647,6 @@ public class Sheet extends Container {
     ///
     /// The current title component.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public Component getTitleComponent() {
         return titleComponent;
     }
@@ -687,9 +660,6 @@ public class Sheet extends Container {
     ///
     /// - `cmp`: The component to use for the title area, or `null` to restore the default title label.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void setTitleComponent(Component cmp) {
         if (cmp == null) {
             cmp = title;
@@ -753,14 +723,14 @@ public class Sheet extends Container {
     /// internally to complete it. The cast is unchecked at runtime -- pick a type
     /// you control inside the sheet.
     ///
-    /// #### Since 8.0
+    /// #### Since 7.0
     public <T> AsyncResource<T> showForResult() {
         return showForResult(DEFAULT_TRANSITION_DURATION);
     }
 
     /// `#showForResult` with a custom slide duration.
     ///
-    /// #### Since 8.0
+    /// #### Since 7.0
     @SuppressWarnings("unchecked")
     public <T> AsyncResource<T> showForResult(int duration) {
         // Always create a fresh resource per show -- re-showing a Sheet via
@@ -779,7 +749,7 @@ public class Sheet extends Container {
     ///   in which case subscribers see the same outcome as a user-initiated
     ///   dismissal.
     ///
-    /// #### Since 8.0
+    /// #### Since 7.0
     public void finish(Object result) {
         AsyncResource<Object> r = pendingResult;
         pendingResult = null;
@@ -979,10 +949,6 @@ public class Sheet extends Container {
     /// - `position`: One of `BorderLayout#CENTER`, `BorderLayout#NORTH`, `BorderLayout#SOUTH`,
     ///   `BorderLayout#WEST`, or `BorderLayout#EAST`.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #setPosition(java.lang.String)
@@ -1076,10 +1042,6 @@ public class Sheet extends Container {
     ///
     /// - `tabletPosition`: Position to use on a tablet and desktop. One of `BorderLayout#CENTER`,
     ///   `BorderLayout#NORTH`, `BorderLayout#SOUTH`, `BorderLayout#WEST`, or `BorderLayout#EAST`.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -1381,9 +1343,6 @@ public class Sheet extends Container {
     ///
     /// True if the current sheet is an ancestor of sheet.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isAncestorSheetOf(Sheet sheet) {
         sheet = sheet.getParentSheet();
         if (sheet == this) { //NOPMD CompareObjectsWithEquals
@@ -1405,9 +1364,6 @@ public class Sheet extends Container {
     ///
     /// - `l`
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void addCloseListener(ActionListener l) {
         closeListeners.addListener(l);
     }
@@ -1448,9 +1404,6 @@ public class Sheet extends Container {
     ///
     /// - `l`: Listener
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void addBackListener(ActionListener l) {
         backListeners.addListener(l);
     }

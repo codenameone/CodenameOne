@@ -26,9 +26,6 @@ package com.codename1.ui.validation;
 ///
 /// @author Diamond Mubaarak
 ///
-/// #### Since
-///
-/// 7.0
 public class NotConstraint implements Constraint {
 
     private final Constraint[] constraints;

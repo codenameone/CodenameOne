@@ -67,7 +67,7 @@ import java.util.logging.Logger;
  * which disables billing support.
  *
  * The build server will strip this class if billing is not enabled.
- * @since 8.0
+ * @since 7.0
  */
 public class BillingSupport implements IBillingSupport {
     final CodenameOneActivity activity;

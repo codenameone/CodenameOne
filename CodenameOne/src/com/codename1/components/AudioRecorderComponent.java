@@ -246,9 +246,6 @@ import static com.codename1.ui.ComponentSelector.$;
 /// to either accept the recording, cancel it, or try again.
 /// @author Steve Hannah
 ///
-/// #### Since
-///
-/// 7.0
 public class AudioRecorderComponent extends Container implements ActionSource {
     private final Button record;
     private final Button pause;

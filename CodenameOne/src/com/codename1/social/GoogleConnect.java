@@ -129,9 +129,6 @@ public class GoogleConnect extends Login {
     /// An [AsyncResource] resolving to the [OidcTokens] for the signed-in
     /// user.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public AsyncResource<OidcTokens> signIn(final String clientId,
                                             final String redirectUri,
                                             final String... scopes) {

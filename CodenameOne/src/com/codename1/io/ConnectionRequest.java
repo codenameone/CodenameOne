@@ -354,9 +354,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// True if this connection supports read timeouts;
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static boolean isReadTimeoutSupported() {
         return Util.getImplementation().isReadTimeoutSupported();
     }
@@ -425,9 +422,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// true if the platform supports native cookie sharing.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static boolean isNativeCookieSharingSupported() {
         return Util.getImplementation().isNativeCookieSharingSupported();
     }
@@ -474,9 +468,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// AsyncResource that will resolve with either an exception or the parsed JSON data.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static AsyncResource<Map<String, Object>> fetchJSONAsync(String url) {
         final AsyncResource<Map<String, Object>> out = new AsyncResource<Map<String, Object>>();
         final ConnectionRequest cr = new ConnectionRequest();
@@ -591,9 +582,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// True if the request is insecure, i.e. does not check SSL certificate for validity.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isInsecure() {
         return insecure;
     }
@@ -604,9 +592,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// - `insecure`
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setInsecure(boolean insecure) {
         this.insecure = insecure;
     }
@@ -711,9 +696,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// The read timeout.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public int getReadTimeout() {
         return readTimeout;
     }
@@ -2660,9 +2642,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// - `useCache`: If true, then this will first check the storage to see if the image is already downloaded.
     ///
-    /// #### Since
-    ///
-    /// 3.4
     public void downloadImageToStorage(String storageFile, final SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail, boolean useCache) {
         setDestinationStorage(storageFile);
         downloadImage(onSuccess, onFail, useCache);
@@ -2678,9 +2657,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// AsyncResource that will resolve to the loaded image.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public AsyncResource<Image> downloadImageToStorage(String storageFile) {
         return downloadImageToStorage(storageFile, true);
     }
@@ -2698,9 +2674,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// AsyncResource that will resolve to the loaded image.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public AsyncResource<Image> downloadImageToStorage(String storageFile, boolean useCache) {
         final AsyncResource<Image> out = new AsyncResource<Image>();
         downloadImageToStorage(storageFile, new ImageStorageSuccessCallback(out),
@@ -2719,9 +2692,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// - `useCache`: If true, then this will first check the storage to see if the image is already downloaded.
     ///
-    /// #### Since
-    ///
-    /// 3.4
     public void downloadImageToStorage(String storageFile, SuccessCallback<Image> onSuccess, boolean useCache) {
         downloadImageToStorage(storageFile, onSuccess, new CallbackAdapter<Image>(), useCache);
     }
@@ -2735,9 +2705,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// - `onSuccess`: Callback called if the image is successfully loaded.
     ///
-    /// #### Since
-    ///
-    /// 3.4
     public void downloadImageToStorage(String storageFile, SuccessCallback<Image> onSuccess) {
         downloadImageToStorage(storageFile, onSuccess, new CallbackAdapter<Image>(), true);
     }
@@ -2751,9 +2718,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// - `onSuccess`: Callback called if the image is successfully loaded.
     ///
-    /// #### Since
-    ///
-    /// 3.4
     public void downloadImageToStorage(String storageFile, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
         downloadImageToStorage(storageFile, onSuccess, onFail, true);
     }
@@ -2771,9 +2735,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// AsyncResource resolving to the downloaded image.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public AsyncResource<Image> downloadImageToFileSystem(String file, boolean useCache) {
         final AsyncResource<Image> out = new AsyncResource<Image>();
         downloadImageToFileSystem(file, new ImageFileSystemSuccessCallback(out),
@@ -2793,9 +2754,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// AsyncResource resolving to the downloaded image.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public AsyncResource<Image> downloadImageToFileSystem(String file) {
         return downloadImageToFileSystem(file, true);
     }
@@ -2813,9 +2771,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// - `useCache`: If true, then this will first check the storage to see if the image is already downloaded.
     ///
-    /// #### Since
-    ///
-    /// 3.4
     public void downloadImageToFileSystem(String file, final SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail, boolean useCache) {
         setDestinationFile(file);
         downloadImage(onSuccess, onFail, useCache);
@@ -2832,9 +2787,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// - `useCache`: If true, then this will first check the storage to see if the image is already downloaded.
     ///
-    /// #### Since
-    ///
-    /// 3.4
     public void downloadImageToFileSystem(String file, SuccessCallback<Image> onSuccess, boolean useCache) {
         downloadImageToFileSystem(file, onSuccess, new CallbackAdapter<Image>(), useCache);
     }
@@ -2848,9 +2800,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// - `onSuccess`: Callback called if the image is successfully loaded.
     ///
-    /// #### Since
-    ///
-    /// 3.4
     public void downloadImageToFileSystem(String file, SuccessCallback<Image> onSuccess) {
         downloadImageToFileSystem(file, onSuccess, new CallbackAdapter<Image>(), true);
     }
@@ -2866,9 +2815,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// - `onFail`: Callback called if the image fails to load.
     ///
-    /// #### Since
-    ///
-    /// 3.4
     public void downloadImageToFileSystem(String file, SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
         downloadImageToFileSystem(file, onSuccess, onFail, true);
     }
@@ -2981,9 +2927,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// - `data`: a data to pass in the post body
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setRequestBody(Data data) {
         if (requestArguments != null) {
             throw new IllegalStateException("Request body and arguments are mutually exclusive, you can't use both");
@@ -2999,9 +2942,6 @@ public class ConnectionRequest implements IOProgressListener {
     ///
     /// the requestBody
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public Data getRequestBodyData() {
         if (requestBody != null) {
             return new Data() {

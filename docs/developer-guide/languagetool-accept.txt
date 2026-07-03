@@ -612,6 +612,11 @@ dlopen
 zig
 transcoder
 
+# VideoIO chapter (com.codename1.media.VideoIO). A "resampler" converts a
+# variable-frame-rate clip to a constant frame rate; standard video term not in
+# LanguageTool's en_US dictionary.
+[Rr]esamplers?
+
 # Crash protection terminology.
 # "Symbolicated" / "symbolicate" is the term of art for resolving raw
 # stack frame addresses back to file:line via a build's symbols. Used

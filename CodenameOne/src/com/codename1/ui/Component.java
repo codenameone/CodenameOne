@@ -239,16 +239,10 @@ public class Component implements Animation, StyleListener, Editable {
     boolean hasLead;
     /// The elevation at which this component was rendered in its last rendering.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     int renderedElevation;
     /// The index at which this component was rendered in its last rendering.  This acts as a z-index within
     /// an elevation layer.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     int renderedElevationComponentIndex;
     Dimension scrollSize;
     boolean shouldCalcPreferredSize = true;
@@ -464,10 +458,6 @@ public class Component implements Animation, StyleListener, Editable {
     private boolean pinchBlocksDragAndDrop;
     /// Holds a reference to the current surface this this component is registered with.
     ///
-    /// #### Since
-    ///
-    /// 8.0
-    ///
     /// #### See also
     ///
     /// - #registerElevatedInternal(Component)
@@ -602,9 +592,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// The editing delegate for this component.
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public Editable getEditingDelegate() {
         return this.editingDelegate;
     }
@@ -618,9 +605,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `editable`: An editable delegate.
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public void setEditingDelegate(Editable editable) {
         this.editingDelegate = editable;
     }
@@ -1254,10 +1238,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// Self for chaining.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - Style#stripMarginAndPadding()
@@ -1356,9 +1336,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `opaque`: False to not paint the component's background.
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public final void setOpaque(boolean opaque) {
         this.opaque = opaque;
     }
@@ -2069,9 +2046,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// The owner component or null.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public Component getOwner() {
         return owner;
     }
@@ -2092,10 +2066,6 @@ public class Component implements Animation, StyleListener, Editable {
     /// #### Parameters
     ///
     /// - `owner`: The component to set as the owner of this component.
-    ///
-    /// #### Since
-    ///
-    /// 6.0
     ///
     /// #### See also
     ///
@@ -2122,10 +2092,6 @@ public class Component implements Animation, StyleListener, Editable {
     /// #### Returns
     ///
     /// True if this component is owned by cmp.
-    ///
-    /// #### Since
-    ///
-    /// 6.0
     ///
     /// #### See also
     ///
@@ -2170,10 +2136,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// @return True if the coordinate is either inside the bounds of this component
     /// or a component owned by this component.
-    ///
-    /// #### Since
-    ///
-    /// 6.0
     ///
     /// #### See also
     ///
@@ -2708,10 +2670,6 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `relativeX`: The relative X coordinate onto which the shadow should be drawn.
     ///
     /// - `relativeY`: The relative Y coordinate onto which the shadow should be drawn.
-    ///
-    /// #### Since
-    ///
-    /// 8.0
     ///
     /// #### See also
     ///
@@ -3835,9 +3793,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// True if this component has a fixed preferred size.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean hasFixedPreferredSize() {
         return sizeRequestedByUser || preferredSizeStr != null;
     }
@@ -3937,10 +3892,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// The same Rectangle that was passed as a parameter.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #getBounds()
@@ -3977,10 +3928,6 @@ public class Component implements Animation, StyleListener, Editable {
     /// #### Returns
     ///
     /// The same Rectangle that was passed as a parameter.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -5055,9 +5002,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `y`: The y-coordinate of the remaining finger in the drag. (Absolute)
     ///
-    /// #### Since
-    ///
-    /// 7.0
     protected void pinchReleased(int x, int y) {
 
     }
@@ -6195,9 +6139,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// text selection support object
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public TextSelectionSupport getTextSelectionSupport() {
         return null;
     }
@@ -6417,9 +6358,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `l`: Listener to be subscribed.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void addStateChangeListener(ActionListener<ComponentStateChangeEvent> l) {
         if (stateChangeListeners == null) {
             stateChangeListeners = new EventDispatcher();
@@ -6434,9 +6372,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `l`: Listener to be unsubscribed.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void removeStateChangeListener(ActionListener<ComponentStateChangeEvent> l) {
         if (stateChangeListeners != null) {
             stateChangeListeners.removeListener(l);
@@ -6461,9 +6396,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `l`: callback to receive pointer events
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void addLongPressListener(ActionListener l) {
         if (longPressListeners == null) {
             longPressListeners = new EventDispatcher();
@@ -6672,9 +6604,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `l`: callback to remove
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void removeLongPressListener(ActionListener l) {
         if (longPressListeners != null) {
             longPressListeners.removeListener(l);
@@ -6960,9 +6889,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `unselectedStyle`: The unselected style.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     protected void initUnselectedStyle(Style unselectedStyle) {
 
     }
@@ -6973,9 +6899,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `unselectedStyle`: The pressed style.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     protected void initPressedStyle(Style pressedStyle) {
 
     }
@@ -6986,9 +6909,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `unselectedStyle`: The disabled style.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     protected void initDisabledStyle(Style disabledStyle) {
 
     }
@@ -6999,9 +6919,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `unselectedStyle`: The selected style.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     protected void initSelectedStyle(Style selectedStyle) {
 
     }
@@ -7801,10 +7718,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `cmp`: The component to register with the neares surface.
     ///
-    /// #### Since
-    ///
-    /// 8.0
-    ///
     /// #### See also
     ///
     /// - Container#addElevatedComponent(Component)
@@ -8501,9 +8414,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// This method is merely a public accessor for `#shouldBlockSideSwipe()`.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public final boolean blocksSideSwipe() {
         return shouldBlockSideSwipe();
     }
@@ -9024,9 +8934,6 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// Returns true if the component is hidden.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isHidden(boolean checkParent) {
         if (isHidden()) {
             return true;

@@ -82,7 +82,6 @@ import com.codename1.util.AsyncResource;
 ///   passkey ceremony). Use this class when you specifically have your own
 ///   relying party.
 ///
-/// @since 7.0.245
 public final class WebAuthnClient {
 
     private static WebAuthnClient INSTANCE = new WebAuthnClient();

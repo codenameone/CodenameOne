@@ -332,9 +332,6 @@ public abstract class MediaManager {
     /// A static map of audio buffers.  These can be used to register an Audio buffer to receive
     /// raw PCM data from the microphone.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     private static final Map<String, AudioBuffer> audioBuffers = new HashMap<String, AudioBuffer>();
     private static RemoteControlListener remoteControlListener;
 
@@ -349,9 +346,6 @@ public abstract class MediaManager {
     ///
     /// The AudioBuffer or null if no buffer exists at that path.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static AudioBuffer getAudioBuffer(String path) {
         return getAudioBuffer(path, false, 256);
     }
@@ -372,9 +366,6 @@ public abstract class MediaManager {
     ///
     /// The audio buffer or null if no buffer exists at that path and the create flag is false.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static AudioBuffer getAudioBuffer(String path, boolean create, int size) {
         AudioBuffer buf = null;
         if (create && !audioBuffers.containsKey(path)) {
@@ -396,9 +387,6 @@ public abstract class MediaManager {
     ///
     /// - `path`: The path to the buffer.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static void releaseAudioBuffer(String path) {
         AudioBuffer buf = audioBuffers.get(path);
         if (buf != null) {
@@ -415,10 +403,6 @@ public abstract class MediaManager {
     ///
     /// - `path`: The path to the audio buffer to delete.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### Deprecated
     ///
     /// Prefer to use `#releaseAudioBuffer(java.lang.String)`
@@ -433,9 +417,6 @@ public abstract class MediaManager {
     /// @return The currently registered remote control listener, or null if
     /// none is registered.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static RemoteControlListener getRemoteControlListener() {
         return remoteControlListener;
     }
@@ -448,9 +429,6 @@ public abstract class MediaManager {
     ///
     /// - `l`: The remote control listener to set.  null to set no listener.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static synchronized void setRemoteControlListener(RemoteControlListener l) {
         boolean shouldStop = remoteControlListener != null && l == null;
         if (shouldStop) {
@@ -495,9 +473,6 @@ public abstract class MediaManager {
     /// @return Media a Media Object that can be used to control the playback
     /// of the media
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static AsyncResource<Media> createBackgroundMediaAsync(String uri) {
         return Display.getInstance().createBackgroundMediaAsync(uri);
     }
@@ -558,9 +533,6 @@ public abstract class MediaManager {
     /// @return Media a Media Object that can be used to control the playback
     /// of the media
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static AsyncResource<Media> createMediaAsync(InputStream stream, String mimeType, Runnable onCompletion) {
         return Display.getInstance().createMediaAsync(stream, mimeType, onCompletion);
     }
@@ -604,9 +576,6 @@ public abstract class MediaManager {
     /// @return Media a Media Object that can be used to control the playback
     /// of the media
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static AsyncResource<Media> createMediaAsync(String uri, boolean isVideo, Runnable onCompletion) {
         return Display.getInstance().createMediaAsync(uri, isVideo, onCompletion);
     }
@@ -732,9 +701,6 @@ public abstract class MediaManager {
     ///
     /// - `IOException`: id failed to create a Media object
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
         if (builder.isRedirectToAudioBuffer()) {
             return builder.build();
@@ -776,9 +742,6 @@ public abstract class MediaManager {
     ///
     /// The media object as an AsyncMedia instance.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static AsyncMedia getAsyncMedia(final Media media) {
         if (media instanceof AsyncMedia) {
             return (AsyncMedia) media;

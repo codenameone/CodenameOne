@@ -32,9 +32,6 @@ import java.io.UnsupportedEncodingException;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public interface Data {
 
     /// Appends the data's content to an output stream.
@@ -89,9 +86,6 @@ public interface Data {
 
     /// Wraps a File as a Data object.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     class FileData implements Data {
         private final File file;
 
@@ -120,9 +114,6 @@ public interface Data {
 
     /// Wraps a Storage object as a Data object.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     class StorageData implements Data {
         private final String key;
 
@@ -150,9 +141,6 @@ public interface Data {
 
     /// Wraps a byte[] array as a Data object.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     class ByteData implements Data {
         private final byte[] bytes;
 

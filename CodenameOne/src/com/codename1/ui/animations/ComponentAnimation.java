@@ -293,10 +293,6 @@ public abstract class ComponentAnimation {
     /// that they mutate reside in separate branches of the UI tree.  I.e. As long as neither
     /// container contains the other, their mutations are compatible.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - AnimationManager#addUIMutation(com.codename1.ui.Container, com.codename1.ui.animations.ComponentAnimation)

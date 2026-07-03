@@ -435,9 +435,6 @@ public final class RoundBorder extends Border {
     ///
     /// True if only left side is rounded.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isOnlyLeftRounded() {
         return onlyLeftRounded;
     }
@@ -463,9 +460,6 @@ public final class RoundBorder extends Border {
     ///
     /// True if only right side is rounded.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isOnlyRightRounded() {
         return onlyRightRounded;
     }

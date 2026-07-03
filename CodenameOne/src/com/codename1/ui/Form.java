@@ -286,9 +286,6 @@ public class Form extends Container {
     ///
     /// - `allow`: Whether to allow layoutOnPaint behaviour in this this form and it's containers.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public void setAllowEnableLayoutOnPaint(boolean allow) {
         super.setAllowEnableLayoutOnPaint(allow);
@@ -305,9 +302,6 @@ public class Form extends Container {
     ///
     /// - `l`: Listener registered to receive paste events.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void addPasteListener(ActionListener l) {
         if (pasteListener == null) {
             pasteListener = new EventDispatcher();
@@ -320,10 +314,6 @@ public class Form extends Container {
     /// #### Parameters
     ///
     /// - `l`: Listener to unregister to receive paste events.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -396,10 +386,6 @@ public class Form extends Container {
     ///
     /// - `l`: The paste event.  Includes no useful data currently.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #addPasteListener(com.codename1.ui.events.ActionListener)
@@ -417,9 +403,6 @@ public class Form extends Container {
     ///
     /// The text selection support for this form.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public TextSelection getTextSelection() {
         if (textSelection == null) {
             textSelection = new TextSelection(getContentPane());
@@ -463,9 +446,6 @@ public class Form extends Container {
     ///
     /// The source command.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public Command getSourceCommand() {
         return sourceCommand;
     }
@@ -477,9 +457,6 @@ public class Form extends Container {
     ///
     /// - `sourceCommand`: The source command.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setSourceCommand(Command sourceCommand) {
         this.sourceCommand = sourceCommand;
     }
@@ -535,9 +512,6 @@ public class Form extends Container {
     ///
     /// - `invisibleAreaUnderVKB`: The area hidden by the VKB in pixels.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void setOverrideInvisibleAreaUnderVKB(int invisibleAreaUnderVKB) {
         overrideInvisibleAreaUnderVKB = invisibleAreaUnderVKB;
     }
@@ -606,10 +580,6 @@ public class Form extends Container {
     /// #### Returns
     ///
     /// The safe area on which to draw.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -1003,10 +973,6 @@ public class Form extends Container {
     }
 
     /// Causes the display safe area to be recalculated the next time the form list laid out.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -1592,7 +1558,7 @@ public class Form extends Container {
     ///
     /// Pass `null` to remove a previously installed guard.
     ///
-    /// #### Since 8.0
+    /// #### Since 7.0
     ///
     /// #### See also
     ///
@@ -1603,7 +1569,7 @@ public class Form extends Container {
 
     /// Returns the currently installed pop guard, or null.
     ///
-    /// #### Since 8.0
+    /// #### Since 7.0
     public com.codename1.router.PopGuard getPopGuard() {
         return popGuard;
     }
@@ -1614,7 +1580,7 @@ public class Form extends Container {
     /// by developer code that implements its own back navigation and wants to
     /// honor any pop guard installed on the form.
     ///
-    /// #### Since 8.0
+    /// #### Since 7.0
     public boolean checkPopGuard(com.codename1.router.PopReason reason) {
         com.codename1.router.PopGuard g = this.popGuard;
         if (g == null) {
@@ -3400,9 +3366,6 @@ public class Form extends Container {
     /// Gets the handle for the current pointer press event.  A new object
     /// is generated for each pointer press.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     Object getCurrentPointerPress() {
         return currentPointerPress;
     }

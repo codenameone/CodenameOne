@@ -1282,9 +1282,6 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public int getGap() {
         return gap;
@@ -1292,9 +1289,6 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public void setGap(int gap) {
         if (gap != this.gap) {
@@ -1305,9 +1299,6 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public int getTextPosition() {
         String iconPosition = getIconPosition();
@@ -1329,9 +1320,6 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public void setTextPosition(int textPosition) {
         switch (textPosition) {
@@ -1375,9 +1363,6 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /// {@inheritDoc}
     ///
-    /// #### Since
-    ///
-    /// 8.0
     @Override
     public void setMaterialIcon(char c, float size) {
         icon.setMaterialIcon(c, size);
@@ -1385,9 +1370,6 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /// {@inheritDoc}
     ///
-    /// #### Since
-    ///
-    /// 8.0
     @Override
     public void setFontIcon(Font font, char c, float size) {
         icon.setFontIcon(font, c, size);
@@ -1395,9 +1377,6 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public Image getRolloverIcon() {
         return icon.getRolloverIcon();
@@ -1405,9 +1384,6 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public void setRolloverIcon(Image arg0) {
         icon.setRolloverIcon(arg0);
@@ -1415,9 +1391,6 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public Image getPressedIcon() {
         return icon.getPressedIcon();
@@ -1425,9 +1398,6 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public void setPressedIcon(Image arg0) {
         icon.setPressedIcon(arg0);
@@ -1435,9 +1405,6 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public Image getDisabledIcon() {
         return icon.getDisabledIcon();
@@ -1445,9 +1412,6 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public void setDisabledIcon(Image arg0) {
         icon.setDisabledIcon(arg0);
@@ -1455,9 +1419,6 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public Image getRolloverPressedIcon() {
         return icon.getRolloverPressedIcon();
@@ -1465,9 +1426,6 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public void setRolloverPressedIcon(Image icn) {
         icon.setRolloverPressedIcon(icn);
@@ -1475,9 +1433,6 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public Image getIconFromState() {
         return icon.getIconFromState();

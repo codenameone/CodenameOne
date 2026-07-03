@@ -756,9 +756,6 @@ public class ImageViewer extends Component {
     ///
     /// The cropped image.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public Image getCroppedImage(int backgroundColor) {
         if (image == null) {
             return null;
@@ -783,9 +780,6 @@ public class ImageViewer extends Component {
     ///
     /// Cropped image in specified dimensions.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public Image getCroppedImage(int width, int height, int backgroundColor) {
         if (image == null) {
             return null;

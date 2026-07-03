@@ -80,10 +80,6 @@ package com.codename1.capture;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
-///
 /// #### See also
 ///
 /// - Capture#captureVideo(com.codename1.capture.VideoCaptureConstraints)

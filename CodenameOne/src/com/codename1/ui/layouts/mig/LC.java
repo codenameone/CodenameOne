@@ -439,9 +439,6 @@ public final class LC {
     ///
     /// The current value. Never `null`. Check if not set with `.isUnset()`.
     ///
-    /// #### Since
-    ///
-    /// 3.5
     public BoundSize getPackWidth() {
         return packW;
     }
@@ -459,9 +456,6 @@ public final class LC {
     ///
     /// - `size`: The new pack size. If `null` it will be corrected to an "unset" BoundSize.
     ///
-    /// #### Since
-    ///
-    /// 3.5
     public void setPackWidth(BoundSize size) {
         packW = size != null ? size : BoundSize.NULL_SIZE;
     }
@@ -479,9 +473,6 @@ public final class LC {
     ///
     /// The current value. Never `null`. Check if not set with `.isUnset()`.
     ///
-    /// #### Since
-    ///
-    /// 3.5
     public BoundSize getPackHeight() {
         return packH;
     }
@@ -499,9 +490,6 @@ public final class LC {
     ///
     /// - `size`: The new pack size. If `null` it will be corrected to an "unset" BoundSize.
     ///
-    /// #### Since
-    ///
-    /// 3.5
     public void setPackHeight(BoundSize size) {
         packH = size != null ? size : BoundSize.NULL_SIZE;
     }
@@ -516,9 +504,6 @@ public final class LC {
     ///
     /// The pack alignment. Always between 0f and 1f, inclusive.
     ///
-    /// #### Since
-    ///
-    /// 3.5
     public float getPackHeightAlign() {
         return phAlign;
     }
@@ -532,9 +517,6 @@ public final class LC {
     ///
     /// - `align`: The pack alignment. Always between 0f and 1f, inclusive. Values outside this will be truncated.
     ///
-    /// #### Since
-    ///
-    /// 3.5
     public void setPackHeightAlign(float align) {
         phAlign = Math.max(0f, Math.min(1f, align));
     }
@@ -548,9 +530,6 @@ public final class LC {
     ///
     /// The pack alignment. Always between 0f and 1f, inclusive.
     ///
-    /// #### Since
-    ///
-    /// 3.5
     public float getPackWidthAlign() {
         return pwAlign;
     }
@@ -564,9 +543,6 @@ public final class LC {
     ///
     /// - `align`: The pack alignment. Always between 0f and 1f, inclusive. Values outside this will be truncated.
     ///
-    /// #### Since
-    ///
-    /// 3.5
     public void setPackWidthAlign(float align) {
         pwAlign = Math.max(0f, Math.min(1f, align));
     }
@@ -580,9 +556,6 @@ public final class LC {
     /// @return The width for the container that this layout constraint is set for. Not `null` but
     /// all sizes can be `null`.
     ///
-    /// #### Since
-    ///
-    /// 3.5
     public BoundSize getWidth() {
         return width;
     }
@@ -596,9 +569,6 @@ public final class LC {
     /// - `size`: @param size The width for the container that this layout constraint is set for. `null` is translated to
     /// a bound size containing only null sizes.
     ///
-    /// #### Since
-    ///
-    /// 3.5
     public void setWidth(BoundSize size) {
         this.width = size != null ? size : BoundSize.NULL_SIZE;
     }
@@ -612,9 +582,6 @@ public final class LC {
     /// @return The height for the container that this layout constraint is set for. Not `null` but
     /// all sizes can be `null`.
     ///
-    /// #### Since
-    ///
-    /// 3.5
     public BoundSize getHeight() {
         return height;
     }
@@ -628,9 +595,6 @@ public final class LC {
     /// - `size`: @param size The height for the container that this layout constraint is set for. `null` is translated to
     /// a bound size containing only null sizes.
     ///
-    /// #### Since
-    ///
-    /// 3.5
     public void setHeight(BoundSize size) {
         this.height = size != null ? size : BoundSize.NULL_SIZE;
     }
@@ -650,9 +614,6 @@ public final class LC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new LayoutConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.5
     public LC pack() {
         return pack("pref", "pref");
     }
@@ -674,9 +635,6 @@ public final class LC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new LayoutConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.5
     public LC pack(String width, String height) {
         setPackWidth(width != null ? ConstraintParser.parseBoundSize(width, false, true) : BoundSize.NULL_SIZE);
         setPackHeight(height != null ? ConstraintParser.parseBoundSize(height, false, false) : BoundSize.NULL_SIZE);
@@ -700,9 +658,6 @@ public final class LC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new LayoutConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.5
     public LC packAlign(float alignX, float alignY) {
         setPackWidthAlign(alignX);
         setPackHeightAlign(alignY);
@@ -837,9 +792,6 @@ public final class LC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new LayoutConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public LC rightToLeft() {
         setLeftToRight(Boolean.FALSE);
         return this;
@@ -865,9 +817,6 @@ public final class LC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new LayoutConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public LC topToBottom() {
         setTopToBottom(true);
         return this;

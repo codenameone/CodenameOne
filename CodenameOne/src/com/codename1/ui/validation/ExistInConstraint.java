@@ -30,9 +30,6 @@ import java.util.List;
 ///
 /// @author Diamond Mubaarak
 ///
-/// #### Since
-///
-/// 7.0
 public class ExistInConstraint implements Constraint {
 
     private final List<String> items;

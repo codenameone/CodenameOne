@@ -224,10 +224,6 @@ public class Oauth2 {
     /// @return True the redirect was handled.  False if it was not handled.  If this returns true, then you should just return from the start() method, and instead
     /// handle control flow in your callback.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #setUseRedirectForWeb(boolean)
@@ -305,9 +301,6 @@ public class Oauth2 {
     ///
     /// True if this component will use an external web browser window.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isUseBrowserWindow() {
         return useBrowserWindow;
     }
@@ -322,9 +315,6 @@ public class Oauth2 {
     ///
     /// - `useBrowserWindow`: True to use a browser window for the login process.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setUseBrowserWindow(boolean useBrowserWindow) {
         this.useBrowserWindow = useBrowserWindow;
     }
@@ -334,10 +324,6 @@ public class Oauth2 {
     /// #### Returns
     ///
     /// True if this component will use a redirect for Oauth login.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -361,10 +347,6 @@ public class Oauth2 {
     /// #### Parameters
     ///
     /// - `redirect`: Set to true to use a redirect for Oauth login instead of an iframe when running on the web.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -491,9 +473,6 @@ public class Oauth2 {
     ///
     /// - `map`: Parsed JSON object of response.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     protected void handleTokenRequestResponse(Map map) {
         token = (String) map.get("access_token");
         Object ex = map.get("expires_in");
@@ -516,9 +495,6 @@ public class Oauth2 {
     ///
     /// - `t`: The query string.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     protected void handleTokenRequestResponse(String t) {
         token = t.substring(t.indexOf("=") + 1, t.indexOf("&"));
         int off = t.indexOf("expires=");

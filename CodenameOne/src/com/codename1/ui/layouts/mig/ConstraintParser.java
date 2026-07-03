@@ -1570,9 +1570,6 @@ public final class ConstraintParser {
     /// @return Those parts of the string that are separated with
     /// `sep`. Never null and at least of size 1
     ///
-    /// #### Since
-    ///
-    /// 6.7.2 Changed so more than one space in a row works as one space.
     private static String[] toTrimmedTokens(String s, char sep) {
         int toks = 0;
         int sSize = s.length();

@@ -582,6 +582,27 @@ public final class IOSNative {
     native int getNSDataSize(long nsData);
     native void nsDataToByteArray(long nsData, byte[] data);
 
+    // ---- VideoIO (com.codename1.media.VideoIO) ----
+    native boolean videoSupportsHEVC();
+    native long videoReaderOpen(String path);
+    native int videoReaderWidth(long peer);
+    native int videoReaderHeight(long peer);
+    native long videoReaderDuration(long peer);
+    native float videoReaderFrameRate(long peer);
+    native boolean videoReaderHasVideo(long peer);
+    native boolean videoReaderHasAudio(long peer);
+    native int videoReaderAudioSampleRate(long peer);
+    native int videoReaderAudioChannels(long peer);
+    /** Returns an NSData* (as a peer) holding width*height*4 RGBA bytes for the frame at ms, or 0. */
+    native long videoReaderFrameAt(long peer, long ms);
+    /** Returns an NSData* (as a peer) holding interleaved signed 16-bit PCM for the whole audio track, or 0. */
+    native long videoReaderReadAudio(long peer);
+    native void videoReaderClose(long peer);
+    native long videoWriterOpen(String path, int width, int height, float fps, boolean hevc, int bitRate, int gop, boolean hasAudio, int sampleRate, int channels, int audioBitRate);
+    native void videoWriterAddFrame(long peer, byte[] rgba, int width, int height, long ptsMs);
+    native void videoWriterAddAudio(long peer, byte[] pcm16le, int sampleRate, int channels, long ptsMs);
+    native boolean videoWriterClose(long peer);
+
     native long createNSData(String file);
     native long createNSDataResource(String name, String type);
     native int read(long nsData, int pointer);

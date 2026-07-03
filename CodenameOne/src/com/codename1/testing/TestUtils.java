@@ -1328,9 +1328,6 @@ public final class TestUtils {
     ///
     /// - `absoluteError`: is the maximum allowed error, a value of 1 represents a 1% error.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static void assertRange(double expected, double actual, double absoluteError) {
         if (verbose) {
             log("assertRange(" + expected + ", " + actual + ")");

@@ -31,8 +31,5 @@ import com.codename1.ui.events.ActionListener;
 ///
 /// @author Steve Hannah
 ///
-/// #### Since
-///
-/// 8.0
 public interface Plugin extends ActionListener<PluginEvent> {
 }

@@ -45,9 +45,6 @@ import static com.codename1.ui.CN.isEdt;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public class AsyncResource<V> extends Observable {
     private final Object lock = new Object();
     private V value;
@@ -73,9 +70,6 @@ public class AsyncResource<V> extends Observable {
     ///
     /// True if the exception was caused by cancelling an AsyncResource.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static boolean isCancelled(Throwable t) {
         if (t == null) {
             return false;
@@ -98,9 +92,6 @@ public class AsyncResource<V> extends Observable {
     ///
     /// A combined AsyncResource.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static AsyncResource<Boolean> all(AsyncResource<?>... resources) {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
         final Set<AsyncResource> pending = new HashSet<AsyncResource>(Arrays.asList(resources));
@@ -154,9 +145,6 @@ public class AsyncResource<V> extends Observable {
     ///
     /// A combined AsyncResource.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static AsyncResource<Boolean> all(java.util.Collection<AsyncResource<?>> resources) {
         return all(resources.toArray(new AsyncResource[resources.size()]));
     }
@@ -168,9 +156,6 @@ public class AsyncResource<V> extends Observable {
     ///
     /// - `resources`: The resources to wait for.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static void await(java.util.Collection<AsyncResource<?>> resources) throws AsyncExecutionException {
         await(resources.toArray(new AsyncResource[resources.size()]));
     }
@@ -182,9 +167,6 @@ public class AsyncResource<V> extends Observable {
     ///
     /// - `resources`: The resources to wait for.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static void await(AsyncResource<?>... resources) throws AsyncExecutionException {
         final boolean[] complete = new boolean[1];
         final Throwable[] t = new Throwable[1];
@@ -575,9 +557,6 @@ public class AsyncResource<V> extends Observable {
     ///
     /// - `resource`
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void addListener(final AsyncResource<V> resource) {
         ready(new SuccessCallback<V>() {
             @Override
@@ -604,9 +583,6 @@ public class AsyncResource<V> extends Observable {
     /// to test the error parameter of `java.lang.Throwable)` to see if
     /// if was caused by a cancellation.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void onResult(final AsyncResult<V> onResult) {
         ready(new SuccessCallback<V>() {
             @Override
@@ -627,9 +603,6 @@ public class AsyncResource<V> extends Observable {
     ///
     /// A Promise wrapping this AsyncResource.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public Promise<V> asPromise() {
         return Promise.promisify(this);
     }
@@ -658,9 +631,6 @@ public class AsyncResource<V> extends Observable {
         ///
         /// True if this exception was caused by cancelling an AsyncResource.
         ///
-        /// #### Since
-        ///
-        /// 7.0
         public boolean isCancelled() {
             if (cause != null && cause.getClass() == CancellationException.class) {
                 return true;
@@ -677,10 +647,6 @@ public class AsyncResource<V> extends Observable {
     /// to test a particular exception to see if it resulted from cancelling an AsyncResource as this will
     /// return true if the exception itself is a CancellationException, or if the exception was caused by
     /// a CancellationException.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///

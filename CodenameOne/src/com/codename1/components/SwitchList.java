@@ -36,10 +36,6 @@ import static com.codename1.ui.ComponentSelector.$;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 6.0
-///
 /// #### See also
 ///
 /// - ButtonList for code samples;
