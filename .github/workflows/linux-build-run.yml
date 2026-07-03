@@ -207,6 +207,9 @@ jobs:
         working-directory: vm
         env:
           CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}/artifacts/linux-port/raw
+          # Full app stdout/stderr -- the only evidence when the suite wedges
+          # mid-run (uploaded with the screenshot artifact below).
+          CN1_APP_LOG_TEE: ${{ github.workspace }}/artifacts/linux-port/raw/app-output.log
           # Build the native ELF (and the demo) against an old glibc for portability.
           CN1_CC: /usr/local/bin/cn1-zig-cc
           # After the suite runs, the capture test relinks the same objects into a
@@ -268,6 +271,7 @@ jobs:
           docker run --rm \
             -v "$GITHUB_WORKSPACE":/cn1 -w /cn1 \
             -e CN1_SHOT_OUTPUT_DIR=/cn1/artifacts/linux-port/raw-musl \
+            -e CN1_APP_LOG_TEE=/cn1/artifacts/linux-port/raw-musl/app-output.log \
             -e LIBGL_ALWAYS_SOFTWARE=1 \
             docker.io/library/alpine:3.20 sh -ec '
               sed -i "s|^#\(.*/community\)|\1|" /etc/apk/repositories

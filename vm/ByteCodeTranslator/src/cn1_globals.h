@@ -79,7 +79,13 @@ typedef long long          JAVA_LONG;
 typedef float              JAVA_FLOAT;
 typedef double             JAVA_DOUBLE;
 
-typedef char              JAVA_ARRAY_BYTE;
+/* MUST be signed char, not plain char: Java bytes are signed, but bare char is
+ * UNSIGNED in the aarch64/arm Linux ABI (it is signed on x86/x64 and on all
+ * Apple targets, which is why this never bit the iOS builds). On the Linux
+ * arm64 port the unsigned reads broke every negative-byte round-trip -- seen as
+ * SimdApiTest's saturating byte add and the allocaByteFilled readback failing
+ * deterministically on that leg only. */
+typedef signed char       JAVA_ARRAY_BYTE;
 typedef char              JAVA_ARRAY_BOOLEAN;
 typedef unsigned short    JAVA_ARRAY_CHAR;
 typedef short             JAVA_ARRAY_SHORT;

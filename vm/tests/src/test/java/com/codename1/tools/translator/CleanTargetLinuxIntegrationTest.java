@@ -341,7 +341,8 @@ class CleanTargetLinuxIntegrationTest {
         Path serverClasses = Files.createTempDirectory("cn1ss-server");
         assertEquals(0, CompilerHelper.compile(jdk.jdkHome, Arrays.asList(
                 "-d", serverClasses.toString(), "-sourcepath", serverSrc.getParent().toString(),
-                serverSrc.toString())), "Cn1ssScreenshotServer should compile");
+                serverSrc.toString())), "Cn1ssScreenshotServer should compile:\n"
+                + CompilerHelper.getLastErrorLog());
 
         int port = 8765;
         Path outDir = Files.createTempDirectory("cn1ss-linux-out");
@@ -374,9 +375,21 @@ class CleanTargetLinuxIntegrationTest {
             final AtomicBoolean finished = new AtomicBoolean(false);
             final Process appF = app;
             Thread areader = new Thread(() -> {
+                // Tee the app's merged stdout/stderr to CN1_APP_LOG_TEE when
+                // set: when the suite wedges mid-run on CI this is the only
+                // record of the exception/diagnostic output that preceded it.
+                java.io.PrintWriter tee = null;
+                try {
+                    String teePath = System.getenv("CN1_APP_LOG_TEE");
+                    if (teePath != null) {
+                        tee = new java.io.PrintWriter(new java.io.FileWriter(teePath, true), true);
+                    }
+                } catch (IOException ignore) {
+                }
                 try (BufferedReader r = new BufferedReader(new InputStreamReader(appF.getInputStream(), StandardCharsets.UTF_8))) {
                     String line;
                     while ((line = r.readLine()) != null) {
+                        if (tee != null) { tee.println(line); }
                         if (line.contains("CN1SS:SUITE:FINISHED")) { finished.set(true); }
                     }
                 } catch (IOException ignore) {

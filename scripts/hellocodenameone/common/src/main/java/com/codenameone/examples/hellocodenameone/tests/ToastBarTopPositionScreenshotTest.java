@@ -46,23 +46,65 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
         System.out.println("[ToastBarTop] showMessage at " + System.currentTimeMillis());
         ToastBar.showMessage("Info message at top", FontImage.MATERIAL_INFO, 30000);
 
-        // Wait for the toast animation to complete before taking the screenshot
-        UITimer.timer(2000, false, parent, new Runnable() {
+        // A fixed 2s sleep raced the toast's slide-in on slow CI targets (the
+        // watch simulator lost it every run, tvOS intermittently). Poll for
+        // the toast component actually being laid out and visible instead,
+        // then settle one extra beat so the slide animation's final frame is
+        // what gets captured. Cap the wait so a genuinely broken toast still
+        // produces a (failing) screenshot with the diagnostic dump below.
+        final UITimer[] timerRef = new UITimer[1];
+        timerRef[0] = UITimer.timer(200, true, parent, new Runnable() {
+            private int waited;
+            private int settle;
+            private boolean fired;
             public void run() {
-                // Diagnostic dump of the layered-pane tree at capture time: on
-                // some CI environments the toast has not appeared 2s after
-                // showMessage, and this is the only evidence of its state.
-                // ToastBar sits in a class-specific sub-layer, so dump the
-                // wrapper (the parent of the default layer) two levels deep.
-                Container base = parent.getLayeredPane();
-                Container wrapper = base.getParent() != null ? base.getParent() : base;
-                StringBuilder sb = new StringBuilder("[ToastBarTop] capture at ")
-                        .append(System.currentTimeMillis());
-                dump(wrapper, sb, 0);
-                System.out.println(sb.toString());
-                run.run();
+                if (fired) {
+                    return;
+                }
+                waited += 200;
+                boolean shown = toastVisible(parent);
+                if (shown) {
+                    settle++;
+                }
+                if ((shown && settle >= 2) || waited >= 15000) {
+                    fired = true;
+                    if (timerRef[0] != null) {
+                        timerRef[0].cancel();
+                    }
+                    Container base = parent.getLayeredPane();
+                    Container wrapper = base.getParent() != null ? base.getParent() : base;
+                    StringBuilder sb = new StringBuilder("[ToastBarTop] capture at ")
+                            .append(System.currentTimeMillis())
+                            .append(" waited=").append(waited);
+                    dump(wrapper, sb, 0);
+                    System.out.println(sb.toString());
+                    run.run();
+                }
             }
         });
+    }
+
+    /** True when a visible, non-empty component sits in a ToastBar layer. */
+    private static boolean toastVisible(Form parent) {
+        Container base = parent.getLayeredPane();
+        Container wrapper = base.getParent() != null ? base.getParent() : base;
+        return findVisibleToast(wrapper, 0);
+    }
+
+    private static boolean findVisibleToast(Component c, int depth) {
+        if (depth <= 2 && c.getClass().getName().contains("ToastBar")
+                && c.isVisible() && c.getHeight() > 0) {
+            return true;
+        }
+        if (depth < 2 && c instanceof Container) {
+            Container ct = (Container) c;
+            for (int i = 0; i < ct.getComponentCount(); i++) {
+                if (findVisibleToast(ct.getComponentAt(i), depth + 1)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static void dump(Component c, StringBuilder sb, int depth) {
