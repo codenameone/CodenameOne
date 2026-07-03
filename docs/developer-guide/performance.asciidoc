@@ -88,11 +88,11 @@ NOTE: This hint is intended for ParparVM native translation and doesn't apply to
 ===== Fused object layout: `@Fused`
 
 A class annotated `@com.codename1.annotations.Fused` tells the translator that
-primitive arrays created in its constructors are *fully encapsulated*: they are
+primitive arrays created in its constructors are *fully encapsulated*: they're
 implementation details the class never hands out. The translator then lays the
 owner object and those arrays out in a **single allocation block** -- one
-allocation instead of several, one GC visit instead of several, no pointer
-chase between the object and its buffer.
+allocation instead of several, one GC visit instead of several, and no
+pointer indirection between the object and its buffer.
 
 [source,java]
 ----
@@ -113,7 +113,7 @@ The contract you accept by annotating:
   static, or an array -- their lifetime is the owner's lifetime. Reading them,
   iterating them, and passing them as transient call arguments is fine.
 * Keep the fields private and never return them from a getter. If the class
-  hands its buffer out, do not annotate it.
+  hands its buffer out, don't annotate it.
 
 Everything else stays automatic and safe: constructors that compute
 non-constant sizes, reflective instantiation, delegating constructors and
@@ -126,7 +126,7 @@ internally -- a typical string is one allocation, not two.
 ===== Optimizations you get without annotations
 
 Several ParparVM optimizations are applied automatically when the translator
-can *prove* they are safe; knowing they exist helps you write code that
+can *prove* they're safe; knowing they exist helps you write code that
 benefits from them:
 
 * **Stack-allocated string building.** Every string concatenation the compiler

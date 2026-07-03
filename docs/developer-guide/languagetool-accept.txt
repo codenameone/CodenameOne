@@ -664,3 +664,4 @@ foldables?
 bitmask
 DeX
 Siri
+devirtualization
