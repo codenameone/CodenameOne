@@ -11,7 +11,7 @@ series: ["release-2026-07-03"]
 
 ![Motion, Stylus, Trackpads And Foldables In The Core](/blog/motion-input-form-factors.jpg)
 
-For a long time, mobile meant a touch screen and a few platform-specific escape hatches. That is no longer enough. A Codename One app can run on phones, tablets, desktops, watches, TVs, browsers, foldables, touch laptops, external displays, cars, and devices with pens, mice and trackpads.
+For a long time, mobile meant a touch screen and a few platform-specific escape hatches. That is no longer enough. A Codename One app can run on phones, tablets, desktops, watches, TVs, browsers, foldables, touch laptops, external displays, cars, and devices with pens, mice, and trackpads.
 
 [PR #5310](https://github.com/codenameone/CodenameOne/pull/5310) and [PR #5309](https://github.com/codenameone/CodenameOne/pull/5309) make that hardware visible through core APIs instead of cn1libs and platform branches.
 
