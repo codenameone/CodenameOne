@@ -7473,9 +7473,16 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
 #if TARGET_OS_WATCH
     // Capture the Core Graphics surface. Drain any pending ops first so the
     // snapshot reflects the latest painted frame, then PNG-encode the bitmap.
-    [[CodenameOne_GLViewController instance] drawFrame:CGRectZero];
-    CN1WatchRenderingView *wv = [CN1WatchHost sharedHost].renderingView;
-    UIImage *wimg = wv != nil ? [wv currentFrame] : nil;
+    // Both steps run under the drain lock: without it the pump thread can be
+    // mid-drain drawing into the bitmap while currentFrame reads it, and
+    // CGBitmapContextCreateImage intermittently returns nil under that
+    // contention (delivered as 1x1 placeholder screenshots by the harness).
+    UIImage *wimg = nil;
+    @synchronized (CN1WatchDrainLockObject()) {
+        [[CodenameOne_GLViewController instance] drawFrame:CGRectZero];
+        CN1WatchRenderingView *wv = [CN1WatchHost sharedHost].renderingView;
+        wimg = wv != nil ? [wv currentFrame] : nil;
+    }
     NSData *wpng = wimg != nil ? UIImagePNGRepresentation(wimg) : nil;
     JAVA_OBJECT wbyteArr = JAVA_NULL;
     if (wpng != nil && [wpng length] > 0) {

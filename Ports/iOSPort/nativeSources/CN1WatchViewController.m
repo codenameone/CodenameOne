@@ -152,8 +152,18 @@ static CGRect watchFlushRect;
 // so an unserialized overlap lets one drain's EndFrame NULL the context while
 // the other is mid-execution -- its remaining ops silently no-op and are lost
 // (they were already consumed from the queue), leaving partially painted or
-// permanently stale frames.
-static NSObject *watchDrainLock = nil;
+// permanently stale frames. The screenshot path also takes this lock around
+// its bitmap read (CN1WatchDrainLockObject below): CGBitmapContextCreateImage
+// against a context the pump is concurrently drawing into can return nil,
+// which surfaced as intermittent 1x1 placeholder captures in the CN1SS suite.
+NSObject *CN1WatchDrainLockObject(void) {
+    static NSObject *lock = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        lock = [[NSObject alloc] init];
+    });
+    return lock;
+}
 
 // Drain the current op queue into the Core Graphics surface.
 - (void)drawFrame:(CGRect)rect {
@@ -161,11 +171,7 @@ static NSObject *watchDrainLock = nil;
     if (v == nil) {
         return;
     }
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        watchDrainLock = [[NSObject alloc] init];
-    });
-    @synchronized (watchDrainLock) {
+    @synchronized (CN1WatchDrainLockObject()) {
         NSArray *ops;
         CGRect flushRect;
         @synchronized (self) {

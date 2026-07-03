@@ -84,5 +84,10 @@
 
 @end
 
+// The op-queue drain lock (defined by the watch render driver). The screenshot
+// path must hold it around drain + bitmap read: reading the CG bitmap while
+// the pump thread is drawing into it can yield a nil CGImage.
+NSObject *CN1WatchDrainLockObject(void);
+
 #endif // TARGET_OS_WATCH
 #endif // CN1WatchHost_h
