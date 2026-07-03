@@ -2281,6 +2281,26 @@ public class LinuxImplementation extends CodenameOneImplementation {
         return new LinuxWebSocketImpl(url);
     }
 
+    /* --------------------------------------------------------- video I/O */
+
+    private com.codename1.media.VideoIO videoIO;
+    private boolean videoIOResolved;
+
+    @Override
+    public com.codename1.media.VideoIO getVideoIO() {
+        if (!videoIOResolved) {
+            videoIOResolved = true;
+            try {
+                if (LinuxNative.videoBackendAvailable()) {
+                    videoIO = new LinuxVideoIO();
+                }
+            } catch (Throwable t) {
+                videoIO = null;
+            }
+        }
+        return videoIO;
+    }
+
     /* --------------------------------------------------------- image I/O */
 
     @Override

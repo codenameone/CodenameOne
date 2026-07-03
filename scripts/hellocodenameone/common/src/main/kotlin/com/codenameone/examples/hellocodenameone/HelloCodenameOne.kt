@@ -49,6 +49,11 @@ open class HelloCodenameOne : Lifecycle() {
         } catch (t: Throwable) {
             System.out.println("CN1SS:CARPLAY_DIAG:EXCEPTION " + t.javaClass.name + ": " + t.message)
         }
+        // NOTE: VideoIO is exercised by VideoIORoundTripTest (registered LAST in
+        // Cn1ssDeviceRunner), not here. Touching the native media stack (AVFoundation on
+        // iOS/Mac, GStreamer on Linux, ...) at startup perturbs the display color space and
+        // contends with rendering, which shifts the screenshot baselines -- so the only
+        // VideoIO activity must happen after every screenshot has been captured.
         try {
             NativeInterfaceLanguageValidator.validate()
         } catch (t: Throwable) {
