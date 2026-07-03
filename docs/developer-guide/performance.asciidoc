@@ -85,9 +85,79 @@ public abstract class CodenameOneImplementation {
 
 NOTE: This hint is intended for ParparVM native translation and doesn't apply to the JavaScript back end.
 
+===== Fused object layout: `@Fused`
+
+A class annotated `@com.codename1.annotations.Fused` tells the translator that
+primitive arrays created in its constructors are *fully encapsulated*: they are
+implementation details the class never hands out. The translator then lays the
+owner object and those arrays out in a **single allocation block** -- one
+allocation instead of several, one GC visit instead of several, no pointer
+chase between the object and its buffer.
+
+[source,java]
+----
+@com.codename1.annotations.Fused
+class RgbImage {
+    private final int[] pixels;   // laid out INSIDE the RgbImage allocation
+    private final byte[] flags;
+    RgbImage(int w, int h) {
+        pixels = new int[w * h];  // computed sizes (w * h) fuse too
+        flags = new byte[16];
+    }
+}
+----
+
+The contract you accept by annotating:
+
+* The fused arrays must never be *stored* into another object's field, a
+  static, or an array -- their lifetime is the owner's lifetime. Reading them,
+  iterating them, and passing them as transient call arguments is fine.
+* Keep the fields private and never return them from a getter. If the class
+  hands its buffer out, do not annotate it.
+
+Everything else stays automatic and safe: constructors that compute
+non-constant sizes, reflective instantiation, delegating constructors and
+oversized arrays (bigger than the small-object allocator handles) all fall
+back to ordinary separate allocations with identical semantics.
+
+`java.lang.String` and `java.lang.StringBuilder` are fused this way
+internally -- a typical string is one allocation, not two.
+
+===== Optimizations you get without annotations
+
+Several ParparVM optimizations are applied automatically when the translator
+can *prove* they are safe; knowing they exist helps you write code that
+benefits from them:
+
+* **Stack-allocated string building.** Every string concatenation the compiler
+  lowers to a `StringBuilder` chain -- and any builder the translator can
+  prove never escapes its method -- is allocated on the C stack, including
+  its initial character buffer. A typical `"a" + x + "b"` allocates *nothing*
+  on the heap except the resulting `String`. This is proven per call site by
+  escape analysis; passing the builder to another method or storing it in a
+  field simply keeps that site on the ordinary heap path.
+* **Tagged integers.** On 64-bit targets, `Integer.valueOf` returns a tagged
+  immediate pointer instead of allocating -- boxing an `int` for a map key is
+  free. 32-bit-pointer targets (including Apple Watch) fall back to heap
+  boxing automatically.
+* **Closed-world devirtualization.** A virtual call with no reachable override
+  compiles to a direct C call, which link-time optimization can then inline.
+  `final` classes and methods make this trivially provable.
+* **Compact collections.** `HashMap`/`LinkedHashMap` use open addressing over
+  parallel arrays -- no entry objects, no allocation on `put`, `clear()` is
+  three array wipes.
+* **Bounds-check elimination.** The canonical
+  `for (int i = 0; i < arr.length; i++)` loop shape is proven safe and
+  compiled without per-access checks -- prefer it over manual index juggling.
+
+The benchmark and correctness suite that gates these optimizations lives in
+`vm/benchmarks` in the repository, with run instructions in its README; every
+optimization must produce output bit-identical to a host JVM there before it
+ships.
+
 ===== Fast method-stack path
 
-The translator can emit a fast method-stack prologue/epilogue (`DEFINE_METHOD_STACK_FAST_*` and `CN1_FAST_RETURN_RELEASE`) for methods that meet strict safety criteria.
+The translator can emit a fast method-stack prologue/epilogue (`DEFINE_METHOD_STACK_FAST_*` and `CN1_FAST_RETURN_RELEASE`) for methods that meet strict safety criteria. Methods that qualify for the stricter *frameless* form (no try/catch, no synchronization) skip the VM frame entirely -- their locals become plain C locals the optimizer keeps in registers.
 
 In practice, this tends to help for:
 

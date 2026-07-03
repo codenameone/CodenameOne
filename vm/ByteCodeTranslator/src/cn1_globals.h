@@ -676,8 +676,14 @@ extern int instanceofFunction(int sourceClass, int destId);
 // POINTERS ONLY: on a 32-bit-pointer target a 32-bit int can't be tagged losslessly, so
 // it must fall back to heap boxing. That includes armv7/armv7k AND arm64_32 (Apple Watch
 // Series 4+, which is 64-bit hardware but uses 32-bit pointers) -- hence the gate is on
-// __SIZEOF_POINTER__, not the architecture. Opt in with -DCN1_TAGGED_INT.
-#if defined(CN1_TAGGED_INT) && defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ >= 8)
+// __SIZEOF_POINTER__, not the architecture. DEFAULT ON for 64-bit-pointer
+// targets (the shipping iOS/tv/desktop shape); opt out with
+// -DCN1_DISABLE_TAGGED_INT. The gate below still auto-disables it wherever
+// pointers are 32-bit, so no per-target configuration is needed.
+#if !defined(CN1_DISABLE_TAGGED_INT) && !defined(CN1_TAGGED_INT)
+#define CN1_TAGGED_INT
+#endif
+#if defined(CN1_TAGGED_INT) && !defined(CN1_DISABLE_TAGGED_INT) && defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ >= 8)
 #define CN1_TAGGED_ACTIVE 1
 #else
 #define CN1_TAGGED_ACTIVE 0

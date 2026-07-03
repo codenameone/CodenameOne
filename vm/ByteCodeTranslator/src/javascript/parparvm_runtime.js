@@ -5283,7 +5283,14 @@ bindNative(["cn1_java_lang_StringBuilder_getChars_int_int_char_1ARRAY_int"], fun
   }
   return null;
 });
-bindNative(["cn1_java_lang_String_charAt_int_R_char"], function(__cn1ThisObject, index) { return jvm.toNativeString(__cn1ThisObject).charCodeAt(index | 0) | 0; });
+bindNative(["cn1_java_lang_String_charAt_int_R_char"], function(__cn1ThisObject, index) {
+  const ns = jvm.toNativeString(__cn1ThisObject);
+  index = index | 0;
+  if (index < 0 || index >= ns.length) {
+    throw new Error("ArrayIndexOutOfBoundsException");
+  }
+  return ns.charCodeAt(index) | 0;
+});
 bindNative(["cn1_java_lang_String_equals_java_lang_Object_R_boolean"], function(__cn1ThisObject, obj) {
   return (obj != null && obj.__class === "java_lang_String" && jvm.toNativeString(__cn1ThisObject) === jvm.toNativeString(obj)) ? 1 : 0;
 });

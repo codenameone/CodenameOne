@@ -142,8 +142,12 @@ static inline JAVA_INT cn1InlStrHash(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s) {
 
 static inline JAVA_CHAR cn1InlStrCharAt(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s, JAVA_INT index) {
     struct obj__java_lang_String* t = (struct obj__java_lang_String*)s;
-    JAVA_ARRAY arr = (JAVA_ARRAY)t->java_lang_String_value;
-    if(__builtin_expect((unsigned int)index < (unsigned int)arr->length, 1)) {
+    // bound by the string's LOGICAL length (count), not the backing array's
+    // capacity: an aliasing/offset-constructed String can sit in an array
+    // longer than count, and charAt(length()) must throw, not read past the
+    // logical end
+    if(__builtin_expect((unsigned int)index < (unsigned int)t->java_lang_String_count, 1)) {
+        JAVA_ARRAY arr = (JAVA_ARRAY)t->java_lang_String_value;
         return ((JAVA_ARRAY_CHAR*)arr->data)[t->java_lang_String_offset + index];
     }
     return java_lang_String_charAt___int_R_char(threadStateData, s, index); // throws
