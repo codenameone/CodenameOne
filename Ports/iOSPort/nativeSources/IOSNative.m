@@ -12978,10 +12978,11 @@ JAVA_INT drawLabelText(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, J
                 if ((!isTickerRunning) && endsWith3Points) {
                     if(threePoints == JAVA_NULL) {
                         threePoints = newStringFromCString(threadStateData, "...");
-                        removeObjectFromHeapCollection(threadStateData, threePoints);
-                        removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)threePoints)->java_lang_String_value);
-                        ((struct obj__java_lang_String*)threePoints)->java_lang_String_value->__codenameOneReferenceCount = 999999;
-                        threePoints->__codenameOneReferenceCount = 999999;
+                        // permanent cache: the old removeObjectFromHeapCollection +
+                        // refcount=999999 pin is gone (the header field was relocated
+                        // off-object and BiBOP objects are page-swept); the immortal
+                        // root registry marks it and its value array every cycle
+                        cn1AddImmortalRoot(threePoints);
                         threePointsWidth = com_codename1_impl_ios_IOSImplementation_stringWidth___java_lang_Object_java_lang_String_R_int(threadStateData, __cn1ThisObject, nativeFont, threePoints);
                     }
                     
@@ -12993,10 +12994,8 @@ JAVA_INT drawLabelText(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, J
             } else if (endsWith3Points) {
                 if(threePoints == JAVA_NULL) {
                     threePoints = newStringFromCString(threadStateData, "...");
-                    removeObjectFromHeapCollection(threadStateData, threePoints);
-                    removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)threePoints)->java_lang_String_value);
-                    ((struct obj__java_lang_String*)threePoints)->java_lang_String_value->__codenameOneReferenceCount = 999999;
-                    threePoints->__codenameOneReferenceCount = 999999;
+                    // permanent cache: see the RTL branch above
+                    cn1AddImmortalRoot(threePoints);
                     threePointsWidth = com_codename1_impl_ios_IOSImplementation_stringWidth___java_lang_Object_java_lang_String_R_int(threadStateData, __cn1ThisObject, nativeFont, threePoints);
                 }
                 JAVA_INT index = 1;
