@@ -88,6 +88,16 @@ jobs:
           set -euo pipefail
           scripts/developer-guide/verify-guide-screenshots-captured.sh
 
+      - name: Prepare generated guide screenshot artifact
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+        run: |
+          set -euo pipefail
+          GENERATED_DIR="build/developer-guide/guide-screenshots/generated"
+          mkdir -p "${GENERATED_DIR}"
+          while IFS= read -r screenshot; do
+            cp "${HOME}/.cn1/${screenshot}" "${GENERATED_DIR}/${screenshot}"
+          done < <(sed -e 's/#.*//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' scripts/developer-guide/guide-screenshots.txt | awk 'length($0) > 0')
+
       - name: Compile Android demo sources
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
