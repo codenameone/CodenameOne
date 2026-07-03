@@ -62,9 +62,10 @@
     ToolbarGlassRecipe: "chrome";
     TitleAreaGlassRecipe: "chrome";
     TabsContainerGlassRecipe: "pill";
-    /* Inset the capsule from the cell/pill edge so the bright bar-frost rim (236) shows
-       AROUND it like native, instead of the lens covering it to the pill edge. */
-    tabSelInsetMm: "0.6";
+    /* Rim measured from the native bar: the selected pill leaves only ~2px of
+       bar frost at the edge (pill 276x175 vs bar 179 tall) -- 0.6mm insets shrank
+       the capsule to 236x161 and read as a floating inner pill. */
+    tabSelInsetMm: "0.12";
     /* iOS 26 selection-DROP lens morph (Tabs.paintSelectionCapsule ->
        Graphics.lensRegion): the detailed envelopes (stretch/squash/lift/lens
        magnify/aberration/tint timing) live in NAMED PRESETS inside the motion
@@ -88,6 +89,11 @@
        iOS (falling back to the Material icon font elsewhere / when a symbol is
        missing). Set false to force the Material font everywhere. */
     iosSFSymbolsBool: true;
+    /* Opt-in: the check-box / radio state glyphs render as real SF Symbols on
+       iOS (checkmark.circle.fill / largecircle.fill.circle / circle). The
+       Material radio glyph's ring/dot ratio (thick ring, small dot) does not
+       match the native thin-ring/large-dot look. */
+    iosSFStateIconsBool: true;
     commandBehavior: Native;
     ios7StatusBarHack: true;
     paintsTitleBarBool: true;
@@ -201,9 +207,13 @@
     checkBoxUncheckedIconInt: 59446;
     radioCheckedIconInt: 59447;
     radioUncheckedIconInt: 59446;
-    /* Glyph size is driven by the CheckBox/RadioButton font-size (4.4mm -> ~80px,
-       matching the native SF symbol). checkBoxIconSizeMM is intentionally NOT set:
-       when present the runtime sizes the box to it and overrides the font height. */
+    /* Explicit glyph size for the SF state icons (iosSFStateIconsBool): SF renders
+       ~11% past its nominal size and the global iosSFSlotPct 115 (a tab-bar tuning)
+       inflates it further, so a 5.05mm request lands the rendered circle at the
+       native 108px @3x. Without these the font-height sizing (6mm -> 115px request)
+       produced a 128px circle. */
+    radioIconSizeMM: "5.9";
+    checkBoxIconSizeMM: "5.9";
     /* iOS slider: a thin (~3px) track with a large round white knob. The thumb
        is drawn at the component height, so the runner sizes the slider tile to
        the knob diameter and the thumb width matches it -> a circle. */
@@ -653,14 +663,18 @@ Tab {
        size. Horizontal trimmed to land the cells on native's ~244px spacing; vertical
        raised so the pill matches native's height (~172px) -- a taller capsule pill also
        widens (its rounded ends scale with height). */
-    padding: 0.65mm 2.9mm 1.35mm 2.9mm;
+    /* Vertical split measured against the native bar: CN1 glyphs sat ~3px high
+       (label centre 123.5 vs native 126.5 @3x), so the top inset absorbs the
+       shift; totals keep the cell (and pill) height at native's ~172px. */
+    padding: 0.86mm 2.9mm 1.24mm 2.9mm;
     /* Same margin as Tab.selected/pressed so selecting only TOGGLES the capsule
        background -- it must not change the cell geometry. Small margins so the
        selected capsule nearly reaches the pill edges (native): minimal top/bottom
        + thin left/right. */
     margin: 0.18mm 0.4mm 0.18mm 0.4mm;
     font-family: "native:MainRegular";
-    font-size: 1.8mm;
+    /* Native tab glyphs measure ~20 rows @3x vs 22 at 1.8mm -- 1.65mm matches. */
+    font-size: 1.65mm;
     text-align: center;
 }
 /* iOS 26 bottom tab bar: the selected item sits on its OWN brighter frosted

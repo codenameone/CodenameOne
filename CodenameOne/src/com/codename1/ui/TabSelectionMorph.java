@@ -87,7 +87,9 @@ final class TabSelectionMorph {
             tk.grow = 0.14f;
             tk.squashH = 0.18f;
             tk.liftMm = 0.5f;
-            tk.bubbleWidthPct = 96;
+            // Wider than the cell: the native iOS 26 selected pill overlaps its
+            // neighbour cells (276px over a 253px cell on the @3x reference bar).
+            tk.bubbleWidthPct = 109;
             tk.overflowPct = 18;
             tk.downBiasMm = 0.3f;
             tk.restMag = 1.08f;
@@ -204,6 +206,17 @@ final class TabSelectionMorph {
         capX += (w - bubbleW) / 2;
         w = bubbleW;
 
+        // The drop may be wider than its cell (bubbleWidthPct > 100) and the
+        // spring overshoots the end cells -- but it must never leave the bar:
+        // the native pill overlaps NEIGHBOUR cells, not the backdrop.
+        if (capX < barLeftX) {
+            w -= barLeftX - capX;
+            capX = barLeftX;
+        }
+        if (capX + w > barRightX) {
+            w = barRightX - capX;
+        }
+
         m.capX = capX;
         m.capY = capYBase;
         m.capW = w;
@@ -213,7 +226,11 @@ final class TabSelectionMorph {
         m.aberration = tk.peakAb * m.flight;
         m.tintStrength = tk.tintStrength;
 
-        int baseLensH = capHBase + capHBase * tk.overflowPct / 100;
+        // The vertical bulge past the bar is a FLIGHT effect: the native drop
+        // swells while travelling but its settled pill sits fully inside the
+        // bar -- a constant overflow left a tinted crescent past the bar's
+        // rounded ends at rest.
+        int baseLensH = capHBase + (int) (capHBase * (tk.overflowPct / 100f) * m.flight);
         int lensH = (int) (baseLensH * vScale);
         int lensY = capYBase + capHBase / 2 - lensH / 2 - liftPx + tk.downBiasPx;
         m.lensX = capX;

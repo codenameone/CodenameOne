@@ -7659,6 +7659,13 @@ public final class FontImage extends Image {
         SF_SYMBOLS.put(Character.valueOf(MATERIAL_MENU), "line.3.horizontal");
         SF_SYMBOLS.put(Character.valueOf(MATERIAL_NOTIFICATIONS), "bell.fill");
         SF_SYMBOLS.put(Character.valueOf(MATERIAL_MAIL), "envelope.fill");
+        // Selection-state glyphs (check box / radio button). The Material radio
+        // glyph draws a small dot inside a wide gap; the native iOS glyph is a
+        // thin ring with a large dot (largecircle.fill.circle), so the Material
+        // fallback and the SF rendering differ visibly here by design.
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_CHECK_CIRCLE), "checkmark.circle.fill");
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_RADIO_BUTTON_CHECKED), "largecircle.fill.circle");
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_RADIO_BUTTON_UNCHECKED), "circle");
     }
 
     /// Like createMaterial, but when SF Symbols are enabled (theme constant

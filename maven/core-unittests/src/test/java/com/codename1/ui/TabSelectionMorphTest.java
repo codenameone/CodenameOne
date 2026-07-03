@@ -73,7 +73,7 @@ class TabSelectionMorphTest {
         assertEquals(0f, m.flight, 1e-4, "no flight at the ends");
         assertEquals(1.08f, m.magnify, 1e-4, "settled magnify == restMag");
         assertEquals(0f, m.aberration, 1e-4);
-        assertEquals(48, m.lensH, "lensH == base (capH + overflow) at rest"); // 40 + 40*20%
+        assertEquals(CAP_H, m.lensH, "no overflow at rest -- the bulge is a flight effect");
         assertFalse(m.barGrow, "no bar-grow at t=0");
     }
 
@@ -85,7 +85,7 @@ class TabSelectionMorphTest {
         assertEquals(80, m.capW);
         assertEquals(0f, m.flight, 1e-4);
         assertEquals(1.08f, m.magnify, 1e-4);
-        assertEquals(48, m.lensH);
+        assertEquals(CAP_H, m.lensH, "no overflow at rest -- the bulge is a flight effect");
         assertFalse(m.barGrow, "no bar-grow at t=1");
     }
 
@@ -128,13 +128,17 @@ class TabSelectionMorphTest {
     void frameTableAtFixedProgressPoints() {
         // {t, capX, capW, lensX, lensY, lensW, lensH, magnify, aberration, flight, barGrow}
         Object[][] frames = {
-            {0.00f, 20, 80, 20, 46, 80, 48, 1.0800f, 0.0000f, 0.0000f, false},
-            {0.10f, 32, 105, 32, 38, 105, 56, 1.1726f, 0.0185f, 0.9259f, true},
+            {0.00f, 20, 80, 20, 50, 80, 40, 1.0800f, 0.0000f, 0.0000f, false},
+            {0.10f, 32, 105, 32, 39, 105, 54, 1.1726f, 0.0185f, 0.9259f, true},
             {0.25f, 71, 105, 71, 37, 105, 56, 1.1800f, 0.0200f, 1.0000f, true},
             {0.50f, 164, 105, 164, 37, 105, 56, 1.1800f, 0.0200f, 1.0000f, false},
-            {0.75f, 220, 90, 220, 38, 90, 61, 1.1300f, 0.0100f, 0.5000f, false},
-            {0.90f, 230, 98, 230, 45, 98, 50, 1.0800f, 0.0000f, 0.0000f, false},
-            {1.00f, 220, 80, 220, 46, 80, 48, 1.0800f, 0.0000f, 0.0000f, false},
+            {0.75f, 220, 90, 220, 41, 90, 55, 1.1300f, 0.0100f, 0.5000f, false},
+            // t=0.9: the spring overshoots the target cell; the drop's right
+            // edge (230+98=328) would leave the bar (right edge 310), so the
+            // bar-bounds clamp trims the width -- the drop compresses against
+            // the bar end instead of painting over the backdrop.
+            {0.90f, 230, 80, 230, 49, 80, 42, 1.0800f, 0.0000f, 0.0000f, false},
+            {1.00f, 220, 80, 220, 50, 80, 40, 1.0800f, 0.0000f, 0.0000f, false},
         };
         for (Object[] f : frames) {
             float t = (Float) f[0];
@@ -167,7 +171,9 @@ class TabSelectionMorphTest {
         assertEquals(0.14f, tk.grow, 1e-6);
         assertEquals(0.18f, tk.squashH, 1e-6);
         assertEquals(0.5f, tk.liftMm, 1e-6);
-        assertEquals(96, tk.bubbleWidthPct);
+        // 109: the native selected pill is wider than its cell (overlaps the
+        // neighbours) -- measured 276px over a 253px cell on the @3x reference bar.
+        assertEquals(109, tk.bubbleWidthPct);
         assertEquals(18, tk.overflowPct);
         assertEquals(0.3f, tk.downBiasMm, 1e-6);
         assertEquals(1.08f, tk.restMag, 1e-6);
@@ -227,5 +233,29 @@ class TabSelectionMorphTest {
         assertEquals(a.lensH, b.lensH);
         assertEquals(a.magnify, b.magnify, 0f);
         assertEquals(a.aberration, b.aberration, 0f);
+    }
+
+    /**
+     * A drop wider than its cell (bubbleWidthPct > 100, the shipped ios26
+     * geometry) travelling to an END cell, with spring overshoot, must never
+     * paint outside the bar: the native pill overlaps neighbour cells, not
+     * the backdrop past the bar's rounded ends.
+     */
+    @Test
+    void wideDropStaysInsideTheBar() {
+        TabSelectionMorph.Tokens tk = tokens();
+        tk.bubbleWidthPct = 120;
+        // last cell: flush against the bar's right edge
+        int lastX = BAR_RIGHT - INNER_X - 100;
+        for (float t = 0f; t <= 1.0001f; t += 0.05f) {
+            TabSelectionMorph m = TabSelectionMorph.compute(t, FROM_X, FROM_W,
+                    lastX, 100, INNER_X, CAP_Y, CAP_H, BAR_LEFT, BAR_RIGHT, tk);
+            assertTrue(m.capX >= BAR_LEFT, "capX " + m.capX + " left of bar at t=" + t);
+            assertTrue(m.capX + m.capW <= BAR_RIGHT,
+                    "cap right edge " + (m.capX + m.capW) + " past bar at t=" + t);
+            assertTrue(m.lensX >= BAR_LEFT, "lensX " + m.lensX + " left of bar at t=" + t);
+            assertTrue(m.lensX + m.lensW <= BAR_RIGHT,
+                    "lens right edge " + (m.lensX + m.lensW) + " past bar at t=" + t);
+        }
     }
 }

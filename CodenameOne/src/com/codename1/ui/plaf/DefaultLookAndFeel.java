@@ -2597,13 +2597,38 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     /// in millimetres (decoupled from the label font, so a native theme's box can
     /// be larger than its text); otherwise the box is sized to the style font
     /// height (legacy behaviour, leaving existing themes untouched).
-    private static FontImage stateIcon(char icon, Style s, String sizeMM) {
+    private static Image stateIcon(char icon, Style s, String sizeMM) {
+        // Opt-in SF Symbol state glyphs (iosSFStateIconsBool): on iOS the box /
+        // circle renders as the real Apple symbol (thin ring + large dot for the
+        // selected radio) instead of the Material glyph, whose ring/dot ratio is
+        // visibly different. Off (the default) keeps legacy Material rendering.
+        boolean sf = UIManager.getInstance().isThemeConstant("iosSFStateIconsBool", false);
+        float mm = -1f;
         if (sizeMM != null) {
             try {
-                return FontImage.createMaterial(icon, s, Float.parseFloat(sizeMM.trim()));
+                mm = Float.parseFloat(sizeMM.trim());
             } catch (NumberFormatException ignore) {
                 // malformed constant -> fall back to font-height sizing
             }
+        }
+        if (sf) {
+            if (mm < 0) {
+                // derive mm from the style font height so the SF image matches
+                // the size the Material glyph would have had
+                Font f = s.getFont();
+                if (f != null) {
+                    float pxPerMm = Display.getInstance().convertToPixels(10f) / 10f;
+                    if (pxPerMm > 0) {
+                        mm = f.getHeight() / pxPerMm;
+                    }
+                }
+            }
+            if (mm > 0) {
+                return FontImage.createSFOrMaterial(icon, s, mm);
+            }
+        }
+        if (mm > 0) {
+            return FontImage.createMaterial(icon, s, mm);
         }
         return FontImage.createMaterial(icon, s);
     }
@@ -2666,7 +2691,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             if (boxUIID != null) {
                 uncheckedBox = uim.createStyle(boxUIID + ".", "", false);
             }
-            FontImage checkedDis = stateIcon(checkedIcon, dis, iconMM);
+            Image checkedDis = stateIcon(checkedIcon, dis, iconMM);
             // Disabled-unchecked uses the disabled style (greyed), NOT the
             // selected style - otherwise a disabled, unchecked box/circle is
             // tinted with the accent colour (very visible in dark mode where
@@ -2679,10 +2704,10 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             if (boxUIID != null) {
                 uncheckedBoxDis = uim.createStyle(boxUIID + ".", "dis#", false);
             }
-            FontImage uncheckedDis = stateIcon(uncheckedIcon, uncheckedBoxDis, iconMM);
+            Image uncheckedDis = stateIcon(uncheckedIcon, uncheckedBoxDis, iconMM);
             if (focus) {
-                FontImage checkedSelected = stateIcon(checkedIcon, sel, iconMM);
-                FontImage uncheckedSelected = stateIcon(uncheckedIcon, sel, iconMM);
+                Image checkedSelected = stateIcon(checkedIcon, sel, iconMM);
+                Image uncheckedSelected = stateIcon(uncheckedIcon, sel, iconMM);
                 setCheckBoxFocusImages(checkedSelected, uncheckedSelected, checkedDis, uncheckedDis);
             } else {
                 // The checked glyph reflects the selected style so a theme that
@@ -2690,8 +2715,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 // Material/iOS theme using its accent) tints the checked box with
                 // it. Themes whose selected colour equals the unselected colour
                 // are unaffected.
-                FontImage checkedUnselected = stateIcon(checkedIcon, sel, iconMM);
-                FontImage uncheckedUnselected = stateIcon(uncheckedIcon, uncheckedBox, iconMM);
+                Image checkedUnselected = stateIcon(checkedIcon, sel, iconMM);
+                Image uncheckedUnselected = stateIcon(uncheckedIcon, uncheckedBox, iconMM);
                 setCheckBoxImages(checkedUnselected, uncheckedUnselected, checkedDis, uncheckedDis);
             }
         }
@@ -2741,7 +2766,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             if (boxUIID != null) {
                 uncheckedBox = uim.createStyle(boxUIID + ".", "", false);
             }
-            FontImage checkedDis = stateIcon(checkedIcon, dis, iconMM);
+            Image checkedDis = stateIcon(checkedIcon, dis, iconMM);
             // Disabled-unchecked uses the disabled style (greyed), NOT the
             // selected style - otherwise a disabled, unchecked box/circle is
             // tinted with the accent colour (very visible in dark mode where
@@ -2754,16 +2779,16 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             if (boxUIID != null) {
                 uncheckedBoxDis = uim.createStyle(boxUIID + ".", "dis#", false);
             }
-            FontImage uncheckedDis = stateIcon(uncheckedIcon, uncheckedBoxDis, iconMM);
+            Image uncheckedDis = stateIcon(uncheckedIcon, uncheckedBoxDis, iconMM);
             if (focus) {
-                FontImage checkedSelected = stateIcon(checkedIcon, sel, iconMM);
-                FontImage uncheckedSelected = stateIcon(uncheckedIcon, sel, iconMM);
+                Image checkedSelected = stateIcon(checkedIcon, sel, iconMM);
+                Image uncheckedSelected = stateIcon(uncheckedIcon, sel, iconMM);
                 setRadioButtonFocusImages(checkedSelected, uncheckedSelected, checkedDis, uncheckedDis);
             } else {
                 // See updateCheckBoxConstants: the checked glyph reflects the
                 // selected style so native themes tint it with their accent.
-                FontImage checkedUnselected = stateIcon(checkedIcon, sel, iconMM);
-                FontImage uncheckedUnselected = stateIcon(uncheckedIcon, uncheckedBox, iconMM);
+                Image checkedUnselected = stateIcon(checkedIcon, sel, iconMM);
+                Image uncheckedUnselected = stateIcon(uncheckedIcon, uncheckedBox, iconMM);
                 setRadioButtonImages(checkedUnselected, uncheckedUnselected, checkedDis, uncheckedDis);
             }
         }
