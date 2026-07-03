@@ -455,18 +455,12 @@ public final class Display extends CN1Constants {
     ///
     /// - `bookmark`: A `Runnable` that can be run to restore the app to a particular point.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void setBookmark(Runnable bookmark) {
         this.bookmark = bookmark;
     }
 
     /// Runs the last bookmark that was set using `#setBookmark(java.lang.Runnable)`
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void restoreToBookmark() {
         if (this.bookmark != null) {
             this.bookmark.run();
@@ -479,9 +473,6 @@ public final class Display extends CN1Constants {
     ///
     /// The plugin support object.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public PluginSupport getPluginSupport() {
         return pluginSupport;
     }
@@ -706,9 +697,6 @@ public final class Display extends CN1Constants {
     ///
     /// This is executed when a new listener is registered using `com.codename1.media.MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener)`
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void stopRemoteControl() {
         impl.stopRemoteControl();
     }
@@ -719,9 +707,6 @@ public final class Display extends CN1Constants {
     ///
     /// This is executed when the user registers a new listener using `MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener)`
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void startRemoteControl() {
         impl.startRemoteControl();
     }
@@ -754,9 +739,6 @@ public final class Display extends CN1Constants {
     ///
     /// true when the platform indicates a larger text preference.
     ///
-    /// #### Since
-    ///
-    /// 7.1
     public boolean isLargerTextEnabled() {
         return impl.isLargerTextEnabled();
     }
@@ -768,9 +750,6 @@ public final class Display extends CN1Constants {
     ///
     /// scale factor for larger system fonts.
     ///
-    /// #### Since
-    ///
-    /// 7.1
     public float getLargerTextScale() {
         return impl.getLargerTextScale();
     }
@@ -784,10 +763,6 @@ public final class Display extends CN1Constants {
     /// #### Returns
     ///
     /// Whether async stack traces are enabled.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -805,10 +780,6 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `enableAsyncStackTraces`: True to enable async stack traces.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -1400,9 +1371,6 @@ public final class Display extends CN1Constants {
     /// - `BlockingDisallowedException`: @throws BlockingDisallowedException If `#invokeAndBlock(java.lang.Runnable)` is attempted
     /// anywhere in the Runnable.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void invokeWithoutBlocking(Runnable r) {
         if (disableInvokeAndBlock || !isEdt()) {
             r.run();
@@ -1429,9 +1397,6 @@ public final class Display extends CN1Constants {
     /// - `BlockingDisallowedException`: @throws BlockingDisallowedException If `#invokeAndBlock(java.lang.Runnable)` is attempted
     /// anywhere in the Runnable.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public <T> T invokeWithoutBlockingWithResultSync(RunnableWithResultSync<T> r) {
         if (disableInvokeAndBlock || !isEdt()) {
             return r.run();
@@ -1961,9 +1926,6 @@ public final class Display extends CN1Constants {
     ///
     /// True if the last mouse press was a right click.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isRightMouseButtonDown() {
         return impl.isRightMouseButtonDown();
     }
@@ -2944,9 +2906,6 @@ public final class Display extends CN1Constants {
     ///
     /// The value converted to pixels.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public int convertToPixels(float value, byte unitType) {
         return convertToPixels(value, unitType, true);
     }
@@ -2967,9 +2926,6 @@ public final class Display extends CN1Constants {
     ///
     /// The value converted to pixels.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public int convertToPixels(float value, byte unitType, boolean horizontal) {
         switch (unitType) {
             case Style.UNIT_TYPE_REM:
@@ -3228,10 +3184,6 @@ public final class Display extends CN1Constants {
     ///
     /// - `l`: The listener.
     ///
-    /// #### Since
-    ///
-    /// 6.0
-    ///
     /// #### See also
     ///
     /// - #removeVirtualKeyboardListener(com.codename1.ui.events.ActionListener)
@@ -3253,10 +3205,6 @@ public final class Display extends CN1Constants {
     ///
     /// - `l`: The listener.
     ///
-    /// #### Since
-    ///
-    /// 6.0
-    ///
     /// #### See also
     ///
     /// - #addVirtualKeyboardListener(com.codename1.ui.events.ActionListener)
@@ -3272,9 +3220,6 @@ public final class Display extends CN1Constants {
     ///
     /// - `show`
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public void fireVirtualKeyboardEvent(boolean show) {
         if (virtualKeyboardListeners != null) {
             virtualKeyboardListeners.fireActionEvent(new ActionEvent(show));
@@ -3287,9 +3232,6 @@ public final class Display extends CN1Constants {
     ///
     /// Height of the VKB that overlaps the screen.
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public int getInvisibleAreaUnderVKB() {
         return impl.getInvisibleAreaUnderVKB();
     }
@@ -3625,10 +3567,6 @@ public final class Display extends CN1Constants {
     ///
     /// true if Full-screen mode is supported on this platform.
     ///
-    /// #### Since
-    ///
-    /// 6.0
-    ///
     /// #### See also
     ///
     /// - #requestFullScreen()
@@ -3652,10 +3590,6 @@ public final class Display extends CN1Constants {
     ///
     /// @return true on success.  This will also return true if the app is already running in full-screen mode.  It will return false
     /// if the app fails to enter full-screen mode.
-    ///
-    /// #### Since
-    ///
-    /// 6.0
     ///
     /// #### See also
     ///
@@ -3681,10 +3615,6 @@ public final class Display extends CN1Constants {
     /// @return true on success.  This will also return true if the app is already NOT in full-screen mode.  It will return false
     /// if the app fails to exit full-screen mode.
     ///
-    /// #### Since
-    ///
-    /// 6.0
-    ///
     /// #### See also
     ///
     /// - #requestFullScreen()
@@ -3701,10 +3631,6 @@ public final class Display extends CN1Constants {
     /// #### Returns
     ///
     /// true if the app is currently in full-screen mode.
-    ///
-    /// #### Since
-    ///
-    /// 6.0
     ///
     /// #### See also
     ///
@@ -3792,9 +3718,6 @@ public final class Display extends CN1Constants {
     ///
     /// - `message`: The message.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void postMessage(MessageEvent message) {
         impl.postMessage(message);
     }
@@ -3810,9 +3733,6 @@ public final class Display extends CN1Constants {
     ///
     /// - `l`: The listener.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void addMessageListener(ActionListener<MessageEvent> l) {
         if (messageListeners == null) {
             messageListeners = new EventDispatcher();
@@ -3826,9 +3746,6 @@ public final class Display extends CN1Constants {
     ///
     /// - `l`: The listener.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void removeMessageListener(ActionListener<MessageEvent> l) {
         if (messageListeners != null) {
             messageListeners.removeListener(l);
@@ -3840,10 +3757,6 @@ public final class Display extends CN1Constants {
     /// #### Parameters
     ///
     /// - `evt`
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -4156,10 +4069,6 @@ public final class Display extends CN1Constants {
     ///
     /// Device density as a string.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #getDeviceDensity()
@@ -4213,10 +4122,6 @@ public final class Display extends CN1Constants {
     /// #### Returns
     ///
     /// The display safe area.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -4310,9 +4215,6 @@ public final class Display extends CN1Constants {
     ///
     /// a handle that can be used to control the playback of the audio
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public AsyncResource<Media> createMediaAsync(String uri, boolean video, Runnable onCompletion) {
         return impl.createMediaAsync(uri, video, onCompletion);
     }
@@ -4860,9 +4762,6 @@ public final class Display extends CN1Constants {
     ///
     /// - `RuntimeException`: if this feature failed or unsupported on the platform
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void captureAudio(MediaRecorderBuilder recordingOptions, ActionListener response) {
         impl.captureAudio(recordingOptions, response);
     }
@@ -4897,10 +4796,6 @@ public final class Display extends CN1Constants {
     /// - `constraints`: Capture constraints to use.
     ///
     /// - `response`: a callback Object to retrieve the file path
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -5840,10 +5735,6 @@ public final class Display extends CN1Constants {
     ///
     /// - `IOException`
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### Deprecated
     ///
     /// use MediaRecorderBuilder#build()
@@ -6158,9 +6049,6 @@ public final class Display extends CN1Constants {
     ///
     /// True if the scroll-wheel is responsible for current pointer events.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public boolean isScrollWheeling() {
         return impl.isScrollWheeling();
     }
@@ -6850,10 +6738,6 @@ public final class Display extends CN1Constants {
     ///
     /// An image of the screen, or null if it failed.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### Deprecated
     ///
     /// use screenshot(SuccessCallback) instead
@@ -6868,9 +6752,6 @@ public final class Display extends CN1Constants {
     ///
     /// - `callback`: will be invoked on the EDT with a screenshot
     ///
-    /// #### Since
-    ///
-    /// 7.0.211
     public void screenshot(SuccessCallback<Image> callback) {
         impl.screenshot(callback);
     }
@@ -6899,10 +6780,6 @@ public final class Display extends CN1Constants {
     /// #### Returns
     ///
     /// The Timer object that can be used to cancel the task.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -6935,10 +6812,6 @@ public final class Display extends CN1Constants {
     /// #### Returns
     ///
     /// The timer object which can be used to cancel the task.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -6989,9 +6862,6 @@ public final class Display extends CN1Constants {
     ///
     /// A shared BrowserComponent
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public BrowserComponent getSharedJavascriptContext() {
         return impl.getSharedJavscriptContext();
     }

@@ -26,9 +26,6 @@ package com.codename1.ui;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public interface IconHolder {
 
     /// Returns the labels icon
@@ -102,9 +99,6 @@ public interface IconHolder {
     ///
     /// - `uiid`: The uiid to use for the material icon style.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     void setIconUIID(String uiid);
 
     /// Gets the component that should be used for styling material the material icon.  If `#setIconUIID(java.lang.String)` has been used
@@ -115,9 +109,6 @@ public interface IconHolder {
     ///
     /// The component to use for styling the material icon.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     Component getIconStyleComponent();
 
     /// This method is shorthand for `char, float)`
@@ -128,9 +119,6 @@ public interface IconHolder {
     ///
     /// - `size`: the size of the icon in millimeters
     ///
-    /// #### Since
-    ///
-    /// 8.0
     void setMaterialIcon(char c, float size);
 
     /// This method is shorthand for `com.codename1.ui.Font, char, float)`
@@ -141,8 +129,5 @@ public interface IconHolder {
     ///
     /// - `size`: the size of the icon in millimeters
     ///
-    /// #### Since
-    ///
-    /// 8.0
     void setFontIcon(Font font, char c, float size);
 }

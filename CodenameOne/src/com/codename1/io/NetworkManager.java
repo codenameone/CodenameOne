@@ -428,9 +428,6 @@ public final class NetworkManager {
     ///
     /// AsyncResource resolving to the connection request on complete.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public AsyncResource<ConnectionRequest> addToQueueAsync(final ConnectionRequest request) {
         final AsyncResource<ConnectionRequest> out = new AsyncResource<ConnectionRequest>();
         class WaitingClass implements ActionListener<NetworkEvent> {

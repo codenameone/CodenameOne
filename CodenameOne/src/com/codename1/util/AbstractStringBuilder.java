@@ -21,10 +21,6 @@ package com.codename1.util;
 /// and modifying Strings. This class is intended as a base class for
 /// `StringBuffer` and `StringBuilder`.
 ///
-/// #### Since
-///
-/// 1.5
-///
 /// #### See also
 ///
 /// - StringBuffer
@@ -562,10 +558,6 @@ abstract class AbstractStringBuilder {
     /// @return the index of the specified character, -1 if the character isn't
     /// found.
     ///
-    /// #### Since
-    ///
-    /// 1.4
-    ///
     /// #### See also
     ///
     /// - #lastIndexOf(String)
@@ -586,10 +578,6 @@ abstract class AbstractStringBuilder {
     ///
     /// @return the index of the specified character, -1 if the character isn't
     /// found
-    ///
-    /// #### Since
-    ///
-    /// 1.4
     ///
     /// #### See also
     ///
@@ -646,10 +634,6 @@ abstract class AbstractStringBuilder {
     ///
     /// - `NullPointerException`: if `string` is `null`.
     ///
-    /// #### Since
-    ///
-    /// 1.4
-    ///
     /// #### See also
     ///
     /// - String#lastIndexOf(java.lang.String)
@@ -674,10 +658,6 @@ abstract class AbstractStringBuilder {
     /// #### Throws
     ///
     /// - `NullPointerException`: if `subString` is `null`.
-    ///
-    /// #### Since
-    ///
-    /// 1.4
     ///
     /// #### See also
     ///
@@ -725,9 +705,6 @@ abstract class AbstractStringBuilder {
     /// Trims off any extra capacity beyond the current length. Note, this method
     /// is NOT guaranteed to change the capacity of this object.
     ///
-    /// #### Since
-    ///
-    /// 1.5
     public void trimToSize() {
         if (count < value.length) {
             char[] newValue = new char[count];
@@ -750,10 +727,6 @@ abstract class AbstractStringBuilder {
     ///
     /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `index` is negative or greater than or equal to
     /// `#length()`.
-    ///
-    /// #### Since
-    ///
-    /// 1.5
     ///
     /// #### See also
     ///
@@ -781,10 +754,6 @@ abstract class AbstractStringBuilder {
     ///
     /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `index` is less than 1 or greater than
     /// `#length()`.
-    ///
-    /// #### Since
-    ///
-    /// 1.5
     ///
     /// #### See also
     ///
@@ -816,10 +785,6 @@ abstract class AbstractStringBuilder {
     /// - `IndexOutOfBoundsException`: @throws IndexOutOfBoundsException if `beginIndex` is negative or greater than
     /// `endIndex` or `endIndex` is greater than
     /// `#length()`.
-    ///
-    /// #### Since
-    ///
-    /// 1.5
     ///
     /// #### See also
     ///
@@ -854,10 +819,6 @@ abstract class AbstractStringBuilder {
     /// `#length()` or if there aren't enough code points
     /// before or after `index` to match
     /// `codePointOffset`.
-    ///
-    /// #### Since
-    ///
-    /// 1.5
     ///
     /// #### See also
     ///

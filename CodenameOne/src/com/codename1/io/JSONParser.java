@@ -1014,9 +1014,6 @@ public class JSONParser implements JSONParseCallback {
     ///
     /// - `longs`: True to use
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setUseLongsInstance(boolean longs) {
         useLongs = longs;
     }
@@ -1027,9 +1024,6 @@ public class JSONParser implements JSONParseCallback {
     ///
     /// True if null values are included in parsed content.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isIncludeNullsInstance() {
         return includeNulls;
     }
@@ -1040,9 +1034,6 @@ public class JSONParser implements JSONParseCallback {
     ///
     /// - `include`: True to include null values in parsed content.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setIncludeNullsInstance(boolean include) {
         includeNulls = include;
     }
@@ -1053,9 +1044,6 @@ public class JSONParser implements JSONParseCallback {
     ///
     /// True if the parser will generate Boolean objects and not just Strings for boolean values.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isUseBooleanInstance() {
         return useBoolean;
     }
@@ -1066,9 +1054,6 @@ public class JSONParser implements JSONParseCallback {
     ///
     /// - `useBoolean`: True to generate Boolean objects and not just Strings for boolean values.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setUseBooleanInstance(boolean useBoolean) {
         this.useBoolean = useBoolean;
     }
@@ -1296,10 +1281,6 @@ public class JSONParser implements JSONParseCallback {
     /// #### Returns
     ///
     /// True if strict mode is enabled.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///

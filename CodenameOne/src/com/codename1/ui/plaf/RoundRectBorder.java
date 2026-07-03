@@ -121,25 +121,16 @@ public final class RoundRectBorder extends Border {
     /// value indicates that it should just calculate the position as normal, suing the
     /// the provided tracking component bounds.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     private float trackComponentVerticalPosition = -1;
     /// Var to explicitly set the position of the arrow when tracking a component. Values
     /// between 0 and 1, with zero being the left, and 1 being the right.  Default negative
     /// value indicates that it should just calculate the position as normal, suing the
     /// the provided tracking component bounds.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     private float trackComponentHorizontalPosition = -1;
     /// Var to explicitly set the position of the arrow when tracking a component. Acceptable
     /// values `Component#TOP`, `Component#BOTTOM`, `Component#LEFT`, `Component#RIGHT`.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     private int trackComponentSide = -1;
     /// The thickness of the edge of the border if applicable, 0 if no stroke is needed
     private float strokeThickness;
@@ -198,9 +189,6 @@ public final class RoundRectBorder extends Border {
     ///
     /// a border instance
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public RoundRectBorder arrowSize(float size) {
         this.arrowSize = size;
         return this;
@@ -212,9 +200,6 @@ public final class RoundRectBorder extends Border {
     ///
     /// - `size`: Size of arrow in millimeters.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setArrowSize(float size) {
         this.arrowSize = size;
     }
@@ -250,9 +235,6 @@ public final class RoundRectBorder extends Border {
     ///
     /// Self for chaining.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public RoundRectBorder trackComponentSide(int side) {
         this.trackComponentSide = side;
         return this;
@@ -265,9 +247,6 @@ public final class RoundRectBorder extends Border {
     /// @return The side that the arrow should be rendered on. Values `Component#TOP`, `Component#BOTTOM`, `Component#LEFT`, or a negative number to indicate that the position will be calculated based on the position of the tracking component.
     /// or `Component#BOTTOM`.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public int getTrackComponentSide() {
         return trackComponentSide;
     }
@@ -283,9 +262,6 @@ public final class RoundRectBorder extends Border {
     ///
     /// Self for chainging.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public RoundRectBorder trackComponentVerticalPosition(float pos) {
         this.trackComponentVerticalPosition = pos;
         return this;
@@ -298,9 +274,6 @@ public final class RoundRectBorder extends Border {
     /// @return Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from top to bottom.  Negative values result in
     /// default behaviour, which is to calculate the position based on the tracking component position.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public float getTrackComponentVerticalPosition() {
         return trackComponentVerticalPosition;
     }
@@ -316,9 +289,6 @@ public final class RoundRectBorder extends Border {
     ///
     /// Self for chainging.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public RoundRectBorder trackComponentHorizontalPosition(float pos) {
         this.trackComponentHorizontalPosition = pos;
         return this;
@@ -331,9 +301,6 @@ public final class RoundRectBorder extends Border {
     /// @return Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from left to right.  Negative values result in
     /// default behaviour, which is to calculate the position based on the tracking component position.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public float getTrackComponentHorizontalPosition() {
         return trackComponentHorizontalPosition;
     }
@@ -354,9 +321,6 @@ public final class RoundRectBorder extends Border {
     ///
     /// Self for chaining.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public RoundRectBorder useCache(boolean useCache) {
         this.useCache = useCache;
         return this;

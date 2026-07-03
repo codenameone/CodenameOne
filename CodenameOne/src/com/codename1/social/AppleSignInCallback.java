@@ -27,7 +27,6 @@ package com.codename1.social;
 /// the three terminal outcomes -- success, error, cancellation -- so the
 /// caller can tell user-intent (cancel) apart from a real failure.
 ///
-/// @since 7.0.245
 public interface AppleSignInCallback {
 
     /// User completed the sheet successfully.

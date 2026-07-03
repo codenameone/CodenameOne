@@ -661,9 +661,6 @@ public class Motion {
     ///
     /// Current velocity in pixels per millisecond.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public double getVelocity() {
         final long localCurrentMotionTime = getCurrentMotionTime();
         final int lastReturnedValueLocal = lastReturnedValue;
@@ -690,9 +687,6 @@ public class Motion {
     ///
     /// The number of sampling points that can be used by `#getVelocity()`.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public int countAvailableVelocitySamplingPoints() {
         int count = 1;
         final long localCurrentMotionTime = getCurrentMotionTime();

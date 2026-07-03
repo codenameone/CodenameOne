@@ -289,10 +289,6 @@ public class Label extends Component implements IconHolder, TextHolder {
     ///
     /// the badge text to be used on this label.  May return if no text is set.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #setBadgeText(java.lang.String)
@@ -314,10 +310,6 @@ public class Label extends Component implements IconHolder, TextHolder {
     /// - `badgeText`: @param badgeText The text to include in the badge.   null or empty strings will result in the
     /// badge not being rendered.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #getBadgeText()
@@ -335,10 +327,6 @@ public class Label extends Component implements IconHolder, TextHolder {
     /// #### Parameters
     ///
     /// - `badgeUIID`: The UIID to use for the badge.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -359,10 +347,6 @@ public class Label extends Component implements IconHolder, TextHolder {
     ///
     /// The component whose style can be used to style the badge.  May return null if none set.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #setBadgeText(java.lang.String)
@@ -382,9 +366,6 @@ public class Label extends Component implements IconHolder, TextHolder {
     ///
     /// The component to use for styling the material icon.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public Component getIconStyleComponent() {
         if (iconStyleComponent != null) {
@@ -470,9 +451,6 @@ public class Label extends Component implements IconHolder, TextHolder {
     ///
     /// - `c`: The character to render in the font.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void setFontIcon(char c) {
         Component iconStyle = getIconStyleComponent();
         if (this.font == null) {
@@ -1408,18 +1386,12 @@ public class Label extends Component implements IconHolder, TextHolder {
     ///
     /// - `shiftMillimeters`: the shiftMillimeters to set
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setShiftMillimeters(float shiftMillimeters) {
         this.shiftMillimeters = shiftMillimeters;
     }
 
     /// Returns the number of millimeters that should be shifted in tickering as a float.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public float getShiftMillimetersF() {
         return shiftMillimeters;
     }
@@ -1526,10 +1498,6 @@ public class Label extends Component implements IconHolder, TextHolder {
     /// you must enable text selection on the Form with `Form#getTextSelection()` and `TextSelection#setEnabled(boolean)`,
     /// and also ensure that the label's text selection is enabled via `#setTextSelectionEnabled(boolean)`.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #setTextSelectionEnabled(boolean)
@@ -1543,10 +1511,6 @@ public class Label extends Component implements IconHolder, TextHolder {
     /// #### Parameters
     ///
     /// - `enabled`
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -1659,9 +1623,6 @@ public class Label extends Component implements IconHolder, TextHolder {
     ///
     /// - `uiid`: The uiid to use for the material icon style.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public void setIconUIID(String uiid) {
         if (iconStyleComponent == null || !uiid.equals(iconStyleComponent.getUIID())) {

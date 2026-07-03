@@ -27,10 +27,6 @@ package com.codename1.util;
 /// chaining method calls together. For example, `new StringBuilder("One
 /// should ").append("always strive ").append("to achieve Harmony")`.
 ///
-/// #### Since
-///
-/// 1.5
-///
 /// #### Deprecated
 ///
 /// we will be moving to the proper string builder very soon

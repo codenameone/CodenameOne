@@ -367,9 +367,6 @@ public class ComboBox<T> extends List<T> implements ActionSource {
 
     /// Returns true if the popup dialog is currently showing for this combobox.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public boolean isShowingPopupDialog() {
         return showingPopupDialog;
     }

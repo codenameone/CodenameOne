@@ -1070,9 +1070,6 @@ public abstract class Purchase {
     ///
     /// True if the platform supports the `#manageSubscriptions(java.lang.String)` method.
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public boolean isManageSubscriptionsSupported() {
         return false;
     }
@@ -1089,9 +1086,6 @@ public abstract class Purchase {
     /// management for a particular sku, so this parameter is ignored there.  If included on Android, howerver,
     /// it will open the UI for managing the specified sku.
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public void manageSubscriptions(String sku) {
         Dialog.show("Not Supported", "This platform doesn't support in-app subscription management. ", "OK", null);
     }
@@ -1103,9 +1097,6 @@ public abstract class Purchase {
     /// @return The store code.  One of `Receipt#STORE_CODE_ITUNES`, `Receipt#STORE_CODE_PLAY`, `Receipt#STORE_CODE_SIMULATOR`, or
     /// `Receipt#STORE_CODE_WINDOWS`.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public String getStoreCode() {
         return null;
     }

@@ -2325,10 +2325,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `opacity`: The shadow opacity.
     ///
-    /// #### Since
-    ///
-    /// 8.0
-    ///
     /// #### See also
     ///
     /// - Component#paintShadows(Graphics, int, int)
@@ -2348,10 +2344,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// True if the platform supports drawing shadows.
     ///
-    /// #### Since
-    ///
-    /// 8.0
-    ///
     /// #### See also
     ///
     /// - #drawShadow(Object, Object, int, int, int, int, int, int, int, float)
@@ -2365,9 +2357,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// True if drawing shadows is hardware accelerated.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public boolean isDrawShadowFast() {
         return false;
     }
@@ -2841,9 +2830,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// True if last mouse press was a right click.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isRightMouseButtonDown() {
         return false;
     }
@@ -4755,10 +4741,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// The same rectangle that was passed as a parameter.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - Form#getSafeArea()
@@ -5020,10 +5002,6 @@ public abstract class CodenameOneImplementation {
     /// #### Returns
     ///
     /// a handle that can be used to control the playback of the audio
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -5364,10 +5342,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// True if the implementation handled the message.  False to let BrowserComponent handle it in its default way.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - BrowserComponent#postMessage(java.lang.String, java.lang.String)
@@ -5554,9 +5528,6 @@ public abstract class CodenameOneImplementation {
     /// then `BrowserComponent#captureScreenshot()` will just use `Component#toImage()`
     /// for screenshots.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public AsyncResource<Image> captureBrowserScreenshot(PeerComponent browserPeer) {
         return null;
     }
@@ -6058,9 +6029,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// True if platform supports native cookie sharing.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public boolean isNativeCookieSharingSupported() {
         return false;
     }
@@ -7254,10 +7222,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// An image of the screen, or null if it failed.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### Deprecated
     ///
     /// replaced by screenshot()
@@ -7287,9 +7251,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// A shared BrowserComponent
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public final BrowserComponent getSharedJavscriptContext() {
         if (sharedJavascriptContext == null) {
             sharedJavascriptContext = createSharedJavascriptContext();
@@ -7305,9 +7266,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// A shared BrowserComponent
     ///
-    /// #### Since
-    ///
-    /// 7.0
     protected BrowserComponent createSharedJavascriptContext() {
         BrowserComponent out = new BrowserComponent();
         out.setPage("<!doctype html><html><body></body></html>", null);
@@ -7355,10 +7313,6 @@ public abstract class CodenameOneImplementation {
     /// - `constraints`: Constraints for the capture.
     ///
     /// - `response`: Callback for the resulting video.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -8030,9 +7984,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `m12`: the Y coordinate translation element of the 3x3 matrix
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public Object makeTransformAffine(double m00,
                                       double m10,
                                       double m01,
@@ -8060,9 +8011,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `m12`: the Y coordinate translation element of the 3x3 matrix
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setTransformAffine(Object nativeTransform, double m00,
                                    double m10,
                                    double m01,
@@ -8747,10 +8695,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `aThis`
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #deinitializeTextSelection(com.codename1.ui.TextSelection)
@@ -8763,10 +8707,6 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `aThis`
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -8788,10 +8728,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// Native peer.  Format chosen by implementation.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #addHeavyActionListener(java.lang.Object, com.codename1.ui.events.ActionListener)
@@ -8809,10 +8745,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `l`: The action listener.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #createHeavyButton(com.codename1.ui.Button)
@@ -8829,10 +8761,6 @@ public abstract class CodenameOneImplementation {
     /// - `peer`: THe heavy button peer.
     ///
     /// - `l`: The action listener.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -8857,9 +8785,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `height`: The height of the light peer.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void updateHeavyButtonBounds(Object peer, int x, int y, int width, int height) {
 
     }
@@ -8870,10 +8795,6 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `peer`: The heavy peer.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -8889,10 +8810,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `peer`: The heavy peer.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #initHeavyButton(java.lang.Object)
@@ -8904,10 +8821,6 @@ public abstract class CodenameOneImplementation {
 
     /// Checks whether the current platform requires a heavy button for copy to clipboard functionality to work.
     /// This will be true on the Javascript port.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -8922,9 +8835,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `sel`: The current TextSelection instance for the current form.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void copySelectionToClipboard(TextSelection sel) {
         copyToClipboard(sel.getSelectionAsText());
     }
@@ -8936,10 +8846,6 @@ public abstract class CodenameOneImplementation {
     /// - `nativeGraphics`: The native graphics context
     ///
     /// - `hints`: Hints
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -8965,10 +8871,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// The current rendering hints.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - Graphics#RENDERING_HINT_FAST
@@ -8982,9 +8884,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// This is executed when the user registers a new listener using `MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener)`
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void startRemoteControl() {
 
     }
@@ -8994,9 +8893,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// This is executed when a new listener is registered using `MediaManager#setRemoteControlListener(com.codename1.media.RemoteControlListener)`
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void stopRemoteControl() {
 
     }
@@ -9009,9 +8905,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `readTimeout`
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setReadTimeout(Object connection, int readTimeout) {
 
     }
@@ -9023,10 +8916,6 @@ public abstract class CodenameOneImplementation {
     /// - `connection`
     ///
     /// - `insecure`: True to make connection insecure.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -9043,9 +8932,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// True if the platform supports read timeouts.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isReadTimeoutSupported() {
         return false;
     }
@@ -9060,10 +8946,6 @@ public abstract class CodenameOneImplementation {
     /// #### Returns
     ///
     /// The browser window object, or null.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -9100,10 +8982,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `l`: The listener
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #createNativeBrowserWindow(java.lang.String)
@@ -9118,10 +8996,6 @@ public abstract class CodenameOneImplementation {
     /// - `window`: The window from which to remove the listener.
     ///
     /// - `l`: The listener
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -9140,10 +9014,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `height`: The height in pixels.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #createNativeBrowserWindow(java.lang.String)
@@ -9158,10 +9028,6 @@ public abstract class CodenameOneImplementation {
     /// - `window`: The window
     ///
     /// - `title`: The title
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -9178,10 +9044,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `window`: The window
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #createNativeBrowserWindow(java.lang.String)
@@ -9195,10 +9057,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `window`: The window
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #createNativeBrowserWindow(java.lang.String)
@@ -9211,10 +9069,6 @@ public abstract class CodenameOneImplementation {
     /// #### Parameters
     ///
     /// - `window`: The window
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -9230,10 +9084,6 @@ public abstract class CodenameOneImplementation {
     /// - `window`: The window
     ///
     /// - `req`: The javascript eval request.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -9252,10 +9102,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `l`: The listener
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #createNativeBrowserWindow(java.lang.String)
@@ -9270,10 +9116,6 @@ public abstract class CodenameOneImplementation {
     /// - `window`: The window.
     ///
     /// - `l`: The listener
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -9328,9 +9170,6 @@ public abstract class CodenameOneImplementation {
     /// - `builder`: @param builder THe media builder with settings for the recorder.
     /// getAvailableRecordingMimeTypes()
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
         return createMediaRecorder(builder.getPath(), builder.getMimeType());
     }
@@ -9841,9 +9680,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// the socket object to use
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public Object connectSocket(String host, int port, int connectTimeout) {
         throw new RuntimeException("Not supported");
     }
@@ -11223,9 +11059,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// - `message`: The message.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void postMessage(MessageEvent message) {
 
     }
@@ -11262,9 +11095,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// true when the platform indicates a larger text preference.
     ///
-    /// #### Since
-    ///
-    /// 7.1
     public boolean isLargerTextEnabled() {
         return false;
     }
@@ -11276,9 +11106,6 @@ public abstract class CodenameOneImplementation {
     ///
     /// scale factor for larger system fonts.
     ///
-    /// #### Since
-    ///
-    /// 7.1
     public float getLargerTextScale() {
         return 1.0f;
     }

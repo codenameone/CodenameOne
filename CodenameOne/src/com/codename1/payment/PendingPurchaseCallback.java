@@ -32,9 +32,6 @@ package com.codename1.payment;
 ///
 /// @author Steve Hannah
 ///
-/// #### Since
-///
-/// 8.0
 public interface PendingPurchaseCallback extends PurchaseCallback {
     void itemPurchasePending(String sku);
 }

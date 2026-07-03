@@ -48,7 +48,6 @@ import com.codename1.util.AsyncResource;
 /// preserves cookies for single sign-on, and integrates with password and
 /// passkey autofill.
 ///
-/// @since 7.0.245
 public final class SystemBrowser {
 
     /// Port-supplied implementation, registered at app startup. Reads /

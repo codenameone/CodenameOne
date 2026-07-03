@@ -597,9 +597,6 @@ public class Rectangle implements Shape {
     ///
     /// - `bounds`: A rectangle whose bounds will be copied.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setBounds(Rectangle bounds) {
         setBounds(bounds.x, bounds.y, bounds.size.getWidth(), bounds.size.getHeight());
     }

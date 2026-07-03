@@ -87,9 +87,6 @@ public class BoxLayout extends Layout {
     public static final int Y_AXIS_BOTTOM_LAST = 4;
     private final int axis;
     private final Dimension dim = new Dimension(0, 0);
-    /// #### Since
-    ///
-    /// 7.0
     private int align = Component.TOP;
 
     /// Creates a new instance of BoxLayout
@@ -126,9 +123,6 @@ public class BoxLayout extends Layout {
     ///
     /// BoxLayout with center alignment on Y_AXIS.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static BoxLayout yCenter() {
         BoxLayout out = new BoxLayout(BoxLayout.Y_AXIS);
         out.setAlign(Component.CENTER);
@@ -141,9 +135,6 @@ public class BoxLayout extends Layout {
     ///
     /// BoxLayout with bottom alignment on Y_AXIS.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static BoxLayout yBottom() {
         BoxLayout out = new BoxLayout(BoxLayout.Y_AXIS);
         out.setAlign(Component.BOTTOM);
@@ -165,9 +156,6 @@ public class BoxLayout extends Layout {
     ///
     /// BoxLayout with center alignment on X_AXIS.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static BoxLayout xCenter() {
         BoxLayout out = new BoxLayout(BoxLayout.X_AXIS);
         out.setAlign(Component.CENTER);
@@ -180,9 +168,6 @@ public class BoxLayout extends Layout {
     ///
     /// BoxLayout with right alignment on X_AXIS.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static BoxLayout xRight() {
         BoxLayout out = new BoxLayout(BoxLayout.X_AXIS);
         out.setAlign(Component.RIGHT);
@@ -212,9 +197,6 @@ public class BoxLayout extends Layout {
     ///
     /// the newly created container
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static Container encloseYCenter(Component... cmps) {
         return Container.encloseIn(yCenter(), cmps);
     }
@@ -229,9 +211,6 @@ public class BoxLayout extends Layout {
     ///
     /// the newly created container
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static Container encloseYBottom(Component... cmps) {
         return Container.encloseIn(yBottom(), cmps);
     }
@@ -286,9 +265,6 @@ public class BoxLayout extends Layout {
     ///
     /// the newly created container
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static Container encloseXCenter(Component... cmps) {
         return Container.encloseIn(xCenter(), cmps);
     }
@@ -303,9 +279,6 @@ public class BoxLayout extends Layout {
     ///
     /// the newly created container
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static Container encloseXRight(Component... cmps) {
         return Container.encloseIn(xRight(), cmps);
     }
@@ -317,9 +290,6 @@ public class BoxLayout extends Layout {
     ///
     /// The alignment.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public int getAlign() {
         return this.align;
     }
@@ -331,9 +301,6 @@ public class BoxLayout extends Layout {
     ///
     /// - `align`: One of `Component#CENTER`, `Component#BOTTOM`, `Component#RIGHT`, to adjust the alignment of children.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setAlign(int align) {
         this.align = align;
     }

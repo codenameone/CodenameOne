@@ -412,9 +412,6 @@ public class Tree extends Container {
     ///
     /// The corresponding component in the UI or null if not found.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public Component findNodeComponent(Object node) {
         return findNodeComponent(node, this);
     }
@@ -431,9 +428,6 @@ public class Tree extends Container {
     ///
     /// The corresponding UI component for node, or null if not found.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public Component findNodeComponent(Object node, Component root) {
         if (root == null) {
             return findNodeComponent(node, this);
@@ -570,9 +564,6 @@ public class Tree extends Container {
     ///
     /// UI component for the given node's parent.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public Component getParentComponent(Component nodeComponent) {
         if (nodeComponent == null) {
             return null;
@@ -586,9 +577,6 @@ public class Tree extends Container {
     ///
     /// - `nodeComponent`: The node component.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void refreshNode(Component nodeComponent) {
         if (nodeComponent == null) {
             throw new IllegalArgumentException("refreshNode expects a non-null argument");
@@ -727,9 +715,6 @@ public class Tree extends Container {
     ///
     /// - `size`: The size in millimetres for the icon.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     protected void setNodeMaterialIcon(char c, Component node, float size) {
         FontImage.setMaterialIcon(node, FontImage.MATERIAL_FOLDER, 3);
     }
@@ -805,9 +790,6 @@ public class Tree extends Container {
     ///
     /// The model.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     protected Object getModel(Component node) {
         return node.getClientProperty(KEY_OBJECT);
     }

@@ -300,9 +300,6 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
 
     /// {@inheritDoc}
     ///
-    /// #### Since
-    ///
-    /// 6.0
     @Override
     public void removeSelectedIndices(int... indices) {
         if (isMultiSelectionMode()) {
@@ -322,9 +319,6 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
 
     /// {@inheritDoc}
     ///
-    /// #### Since
-    ///
-    /// 6.0
     @Override
     public int[] getSelectedIndices() {
 
@@ -363,10 +357,6 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
     /// #### Throws
     ///
     /// - `IllegalArgumentException`: If `#isMultiSelectionMode()` is false, and indices length is greater than 1.
-    ///
-    /// #### Since
-    ///
-    /// 6.0
     ///
     /// #### See also
     ///
@@ -412,9 +402,6 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
     ///
     /// the multiSelectionMode
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public boolean isMultiSelectionMode() {
         return multiSelectionMode;
     }
@@ -425,9 +412,6 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
     ///
     /// - `multiSelectionMode`: the multiSelectionMode to set
     ///
-    /// #### Since
-    ///
-    /// 6.0
     public void setMultiSelectionMode(boolean multiSelectionMode) {
         this.multiSelectionMode = multiSelectionMode;
     }

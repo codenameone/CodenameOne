@@ -264,9 +264,6 @@ public class LocalNotification {
     ///
     /// True if the notification will display in the device's notification center even when the app is in the foreground.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean isForeground() {
         return foreground;
     }
@@ -278,9 +275,6 @@ public class LocalNotification {
     ///
     /// - `foreground`: True to display this notification in the notification center even when the app is in the foreground.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setForeground(boolean foreground) {
         this.foreground = foreground;
     }

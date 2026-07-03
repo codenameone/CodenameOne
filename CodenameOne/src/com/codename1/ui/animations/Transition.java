@@ -70,9 +70,6 @@ public abstract class Transition implements Animation {
     /// the rest of components, so the transition may need to be able to paint the source
     /// or destination without these containers, and paint them separately.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     protected void hideInterformContainers() {
         if (!(getSource() instanceof Form && getDestination() instanceof Form)) {
             return;
@@ -91,9 +88,6 @@ public abstract class Transition implements Animation {
     /// the rest of components, so the transition may need to be able to paint the source
     /// or destination without these containers, and paint them separately.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     protected void showInterformContainers() {
         if (!(getSource() instanceof Form && getDestination() instanceof Form)) {
             return;
@@ -113,9 +107,6 @@ public abstract class Transition implements Animation {
     ///
     /// - `g`: Graphics context to paint to.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     protected void paintInterformContainers(Graphics g) {
         if (!(getSource() instanceof Form && getDestination() instanceof Form)) {
             return;

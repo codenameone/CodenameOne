@@ -26,9 +26,6 @@ package com.codename1.ui;
 ///
 /// @author Steve Hannah
 ///
-/// #### Since
-///
-/// 7.0
 abstract class LeadUtil {
 
     /// Gets the lead parent for a component, or the component itself if there is

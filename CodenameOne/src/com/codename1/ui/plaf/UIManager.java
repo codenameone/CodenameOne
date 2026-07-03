@@ -419,9 +419,6 @@ public class UIManager {
     ///
     /// The IconUIID corresponding to the given ID - or null if none is defined in the theme.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public String getIconUIIDFor(String id) {
         if (id == null || id.length() == 0) {
             return null;
