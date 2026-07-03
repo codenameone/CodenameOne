@@ -33,12 +33,15 @@ jobs:
               - 'docs/demos/**'
               - 'scripts/developer-guide/compare-guide-screenshots.sh'
               - 'scripts/developer-guide/guide-screenshots.txt'
+              - 'scripts/developer-guide/verify-guide-screenshot-manifest.sh'
+              - 'scripts/developer-guide/verify-guide-screenshots-captured.sh'
               - '.github/workflows/developer-guide-docs.yml'
             docs:
               - 'docs/developer-guide/**'
               - 'docs/demos/common/src/main/snippets/**'
               - 'scripts/developer-guide/migrate-inline-guide-snippets.py'
               - 'scripts/developer-guide/validate-guide-snippets.py'
+              - 'scripts/developer-guide/verify-guide-screenshot-manifest.sh'
               - '.github/workflows/developer-guide-docs.yml'
             workflow:
               - '.github/workflows/developer-guide-docs.yml'
@@ -72,6 +75,12 @@ jobs:
           touch "$HOME/.codenameone/guibuilder.jar"
           cp maven/CodeNameOneBuildClient.jar "$HOME/.codenameone/CodeNameOneBuildClient.jar"
           xvfb-run -a mvn -B -ntp -Dgenerate-gui-sources-done=true -Dcodename1.platform=javase -f docs/demos/pom.xml test
+
+      - name: Verify guide screenshot manifest
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+        run: |
+          set -euo pipefail
+          scripts/developer-guide/verify-guide-screenshot-manifest.sh
 
       - name: Verify guide screenshots were captured
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'

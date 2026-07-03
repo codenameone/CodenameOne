@@ -1,4 +1,16 @@
 layout-animation-1.png
+layout-animation-2.png
+layout-animation-3.png
+layout-animation-4.png
+layout-animation-5.png
+layout-animation-6.png
+layout-animation-7.png
 transition-slide.png
+transition-slide-vertical.png
+transition-slide-fade.png
+transition-cover.png
+transition-uncover.png
+transition-fade.png
+transition-flip.png
 transition-bubble.png
 mighty-morphing-components-1.png

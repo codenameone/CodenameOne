@@ -40,7 +40,19 @@ public final class DemoRegistry {
     private static final List<GuideScreenshot> SCREENSHOTS = Collections.unmodifiableList(
             Arrays.asList(
                     screenshot("layout-animations", "Layout Animations", "layout-animation-1.png"),
+                    screenshot("layout-animations", "Layout Animations", "layout-animation-2.png"),
+                    screenshot("layout-animations", "Layout Animations", "layout-animation-3.png"),
+                    screenshot("layout-animations", "Layout Animations", "layout-animation-4.png"),
+                    screenshot("layout-animations", "Layout Animations", "layout-animation-5.png"),
+                    screenshot("layout-animations", "Layout Animations", "layout-animation-6.png"),
+                    screenshot("layout-animations", "Layout Animations", "layout-animation-7.png"),
                     screenshot("slide-transitions", "Slide Transitions", "transition-slide.png"),
+                    screenshot("slide-transitions", "Slide Transitions", "transition-slide-vertical.png"),
+                    screenshot("slide-transitions", "Slide Transitions", "transition-slide-fade.png"),
+                    screenshot("slide-transitions", "Slide Transitions", "transition-cover.png"),
+                    screenshot("slide-transitions", "Slide Transitions", "transition-uncover.png"),
+                    screenshot("slide-transitions", "Slide Transitions", "transition-fade.png"),
+                    screenshot("slide-transitions", "Slide Transitions", "transition-flip.png"),
                     screenshot("bubble-transition", "Bubble Transition", "transition-bubble.png"),
                     screenshot("morph-transition", "Morph Transition", "mighty-morphing-components-1.png")
             )

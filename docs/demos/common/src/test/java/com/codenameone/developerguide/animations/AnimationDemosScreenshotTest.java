@@ -4,16 +4,25 @@ import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.testing.AbstractTest;
 import com.codename1.testing.TestUtils;
+import com.codename1.ui.Button;
+import com.codename1.ui.CheckBox;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.Graphics;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
+import com.codename1.ui.TextField;
+import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.util.ImageIO;
 import com.codenameone.developerguide.DemoRegistry;
 import com.codenameone.developerguide.GuideScreenshot;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -25,6 +34,11 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
     private static final String HOST_TITLE = "Demo Test Host";
     private static final long FORM_TIMEOUT_MS = 10000L;
     private static final String STORAGE_PREFIX = "developer-guide.screenshots.";
+    private static final int TRANSITION_FRAME_COUNT = 6;
+    private static final int TRANSITION_FRAME_DELAY_MS = 250;
+    private static final int TRANSITION_DURATION_MS = 1500;
+    private static final int LAYOUT_FRAME_COUNT = 7;
+    private static final int LAYOUT_FRAME_DELAY_MS = 3300;
 
     private static final Set<String> SCREENSHOT_FILE_NAMES = createScreenshotFileNames();
 
@@ -41,20 +55,99 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         });
         waitForCurrentForm(host);
 
-        for (GuideScreenshot screenshotDemo : DemoRegistry.getScreenshots()) {
-            Form previous = currentForm();
-            runOnEdt(() -> screenshotDemo.getDemo().show(host));
-            Form demoForm = waitForFormChange(previous);
-            waitForFormReady(demoForm);
-
-            Image screenshot = capture(demoForm);
-            saveScreenshot(storageKeyFor(screenshotDemo), screenshot);
-
-            runOnEdt(host::show);
-            waitForHost(host);
-        }
+        captureLayoutAnimationFrames(host);
+        captureSlideTransitionStrips(host);
+        captureBubbleTransitionStrip(host);
+        captureMorphTransitionStrip(host);
 
         return true;
+    }
+
+    private void captureLayoutAnimationFrames(Form host) throws IOException {
+        GuideScreenshot firstFrame = screenshot("layout-animation-1.png");
+        Form demoForm = showDemo(firstFrame, host);
+        runOnEdtAsync(() -> buttonByText(demoForm, "Fall").released());
+        TestUtils.waitFor(100);
+
+        for (int frame = 1; frame <= LAYOUT_FRAME_COUNT; frame++) {
+            saveScreenshot("layout-animation-" + frame + ".png", captureDisplay());
+            if (frame < LAYOUT_FRAME_COUNT) {
+                TestUtils.waitFor(LAYOUT_FRAME_DELAY_MS);
+            }
+        }
+
+        returnToHost(host);
+    }
+
+    private void captureSlideTransitionStrips(Form host) throws IOException {
+        captureSlideTransitionStrip(host, "transition-slide.png", "Slide", true);
+        captureSlideTransitionStrip(host, "transition-slide-vertical.png", "Slide", false);
+        captureSlideTransitionStrip(host, "transition-slide-fade.png", "SlideFade", true);
+        captureSlideTransitionStrip(host, "transition-cover.png", "Cover", true);
+        captureSlideTransitionStrip(host, "transition-uncover.png", "Uncover", true);
+        captureSlideTransitionStrip(host, "transition-fade.png", "Fade", true);
+        captureSlideTransitionStrip(host, "transition-flip.png", "Flip", true);
+    }
+
+    private void captureSlideTransitionStrip(Form host, String fileName, String transitionName, boolean horizontal)
+            throws IOException {
+        GuideScreenshot screenshot = screenshot(fileName);
+        Form demoForm = showDemo(screenshot, host);
+        configureSlideDemo(demoForm, transitionName, horizontal);
+        runOnEdtAsync(() -> buttonByText(demoForm, "Show").released());
+        TestUtils.waitFor(50);
+        saveScreenshot(fileName, captureFrameStrip(TRANSITION_FRAME_COUNT, TRANSITION_FRAME_DELAY_MS));
+        returnToHost(host);
+    }
+
+    private void captureBubbleTransitionStrip(Form host) throws IOException {
+        GuideScreenshot screenshot = screenshot("transition-bubble.png");
+        Form demoForm = showDemo(screenshot, host);
+        runOnEdtAsync(() -> buttonByText(demoForm, "+").released());
+        TestUtils.waitFor(50);
+        saveScreenshot(screenshot.getFileName(), captureFrameStrip(TRANSITION_FRAME_COUNT, TRANSITION_FRAME_DELAY_MS));
+        returnToHost(host);
+    }
+
+    private void captureMorphTransitionStrip(Form host) throws IOException {
+        GuideScreenshot screenshot = screenshot("mighty-morphing-components-1.png");
+        showDemo(screenshot, host);
+        TestUtils.waitFor(50);
+        saveScreenshot(screenshot.getFileName(), captureFrameStrip(TRANSITION_FRAME_COUNT, TRANSITION_FRAME_DELAY_MS));
+        returnToHost(host);
+    }
+
+    private void configureSlideDemo(Form demoForm, String transitionName, boolean horizontal) {
+        runOnEdt(() -> {
+            Picker picker = componentByType(demoForm, Picker.class);
+            TextField duration = componentByType(demoForm, TextField.class);
+            CheckBox horizontalToggle = componentByType(demoForm, CheckBox.class);
+            picker.setSelectedString(transitionName);
+            duration.setText(String.valueOf(TRANSITION_DURATION_MS));
+            horizontalToggle.setSelected(horizontal);
+        });
+    }
+
+    private Form showDemo(GuideScreenshot screenshotDemo, Form host) {
+        Form previous = currentForm();
+        runOnEdt(() -> screenshotDemo.getDemo().show(host));
+        Form demoForm = waitForFormChange(previous);
+        waitForFormReady(demoForm);
+        return demoForm;
+    }
+
+    private void returnToHost(Form host) {
+        runOnEdt(host::show);
+        waitForHost(host);
+    }
+
+    private GuideScreenshot screenshot(String fileName) {
+        for (GuideScreenshot screenshot : DemoRegistry.getScreenshots()) {
+            if (fileName.equals(screenshot.getFileName())) {
+                return screenshot;
+            }
+        }
+        throw new IllegalStateException("No guide screenshot registered for: " + fileName);
     }
 
     private void clearPreviousScreenshots() {
@@ -89,18 +182,58 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         OutputStream out = null;
         try {
             out = storage.createOutputStream(storageKey);
-            io.save(screenshot, out, ImageIO.FORMAT_PNG, 1);
+            io.save(screenshot, out, imageFormat(storageKey), 1);
         } finally {
             Util.cleanup(out);
         }
     }
 
-    private Image capture(Form form) {
+    private String imageFormat(String storageKey) {
+        if (storageKey.endsWith(".jpg") || storageKey.endsWith(".jpeg")) {
+            return ImageIO.FORMAT_JPEG;
+        }
+        return ImageIO.FORMAT_PNG;
+    }
+
+    private Image captureDisplay() {
         return runOnEdt(() -> {
-            Image screenshot = Image.createImage(form.getWidth(), form.getHeight());
-            form.paintComponent(screenshot.getGraphics(), true);
-            return screenshot;
+            Image screenshot = Display.getInstance().captureScreen();
+            if (screenshot != null) {
+                return screenshot;
+            }
+            Form form = Display.getInstance().getCurrent();
+            Image fallback = Image.createImage(form.getWidth(), form.getHeight());
+            form.paintComponent(fallback.getGraphics(), true);
+            return fallback;
         });
+    }
+
+    private Image captureFrameStrip(int frameCount, int frameDelayMs) {
+        List<Image> frames = new ArrayList<>();
+        for (int frame = 0; frame < frameCount; frame++) {
+            frames.add(captureDisplay());
+            if (frame < frameCount - 1) {
+                TestUtils.waitFor(frameDelayMs);
+            }
+        }
+        return createFrameStrip(frames);
+    }
+
+    private Image createFrameStrip(List<Image> frames) {
+        int width = 0;
+        int height = 0;
+        for (Image frame : frames) {
+            width += frame.getWidth();
+            height = Math.max(height, frame.getHeight());
+        }
+        Image strip = Image.createImage(width, height, 0xffffffff);
+        Graphics graphics = strip.getGraphics();
+        int x = 0;
+        for (Image frame : frames) {
+            graphics.drawImage(frame, x, 0);
+            x += frame.getWidth();
+        }
+        return strip;
     }
 
     private Form waitForFormChange(Form previous) {
@@ -145,6 +278,34 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         return runOnEdt(() -> Display.getInstance().getCurrent());
     }
 
+    private Button buttonByText(Form form, String text) {
+        Button button = findComponent(form, Button.class, component -> text.equals(((Button) component).getText()));
+        assertNotNull(button, "Expected button not found: " + text);
+        return button;
+    }
+
+    private <T extends Component> T componentByType(Form form, Class<T> type) {
+        T component = findComponent(form, type, ignored -> true);
+        assertNotNull(component, "Expected component not found: " + type.getName());
+        return component;
+    }
+
+    private <T extends Component> T findComponent(Component root, Class<T> type, ComponentMatcher matcher) {
+        if (type.isInstance(root) && matcher.matches(root)) {
+            return type.cast(root);
+        }
+        if (root instanceof Container) {
+            Container container = (Container) root;
+            for (int i = 0; i < container.getComponentCount(); i++) {
+                T found = findComponent(container.getComponentAt(i), type, matcher);
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
+    }
+
     private boolean hasSize(Form form) {
         Boolean hasSize = runOnEdt(() -> form.getWidth() > 0 && form.getHeight() > 0);
         return hasSize.booleanValue();
@@ -180,6 +341,10 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
         });
     }
 
+    private void runOnEdtAsync(Runnable runnable) {
+        Display.getInstance().callSerially(runnable);
+    }
+
     private static Set<String> createScreenshotFileNames() {
         Set<String> names = new HashSet<>();
         for (GuideScreenshot screenshot : DemoRegistry.getScreenshots()) {
@@ -195,5 +360,9 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
 
     private interface UiSupplier<T> {
         T get();
+    }
+
+    private interface ComponentMatcher {
+        boolean matches(Component component);
     }
 }
