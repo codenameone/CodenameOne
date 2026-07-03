@@ -48,14 +48,19 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
 
         // A fixed 2s sleep raced the toast's slide-in on slow CI targets (the
         // watch simulator lost it every run, tvOS intermittently). Poll for
-        // the toast component actually being laid out and visible instead,
-        // then settle one extra beat so the slide animation's final frame is
-        // what gets captured. Cap the wait so a genuinely broken toast still
-        // produces a (failing) screenshot with the diagnostic dump below.
+        // the toast component being visible AND then hold for a settle window
+        // that clears its slide animation: show() runs slideUpAndWait(2) +
+        // slideDownAndWait(800), so the ToastBarComponent reports visible with
+        // full bounds ~400ms in while the animation is still compositing it
+        // into view -- capturing then snapshots a half-slid (or absent) toast
+        // (seen on tvOS). Require SETTLE_MS of continuous visibility past the
+        // ~802ms animation before capturing. Cap the total wait so a genuinely
+        // broken toast still yields a (failing) screenshot with the dump below.
+        final int SETTLE_MS = 1400;
         final UITimer[] timerRef = new UITimer[1];
         timerRef[0] = UITimer.timer(200, true, parent, new Runnable() {
             private int waited;
-            private int settle;
+            private int shownFor;
             private boolean fired;
             public void run() {
                 if (fired) {
@@ -63,10 +68,8 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
                 }
                 waited += 200;
                 boolean shown = toastVisible(parent);
-                if (shown) {
-                    settle++;
-                }
-                if ((shown && settle >= 2) || waited >= 15000) {
+                shownFor = shown ? shownFor + 200 : 0;
+                if ((shown && shownFor >= SETTLE_MS) || waited >= 15000) {
                     fired = true;
                     if (timerRef[0] != null) {
                         timerRef[0].cancel();
