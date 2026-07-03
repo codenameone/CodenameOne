@@ -1394,7 +1394,9 @@ extern struct ThreadLocalData* getThreadLocalData();
  * pointer on Apple/glibc targets; the Windows compat shim's pthread_t is a
  * struct, so there GetCurrentThreadId() supplies the per-thread identity. */
 #if defined(_WIN32)
-#define CN1_MONITOR_SELF() ((JAVA_LONG)GetCurrentThreadId())
+/* The compat shim's pthread_t is {handle, id}; id is GetCurrentThreadId(),
+ * unique per thread. Using the shim keeps windows.h out of this header. */
+#define CN1_MONITOR_SELF() ((JAVA_LONG)pthread_self().id)
 #else
 #define CN1_MONITOR_SELF() ((JAVA_LONG)(uintptr_t)pthread_self())
 #endif
