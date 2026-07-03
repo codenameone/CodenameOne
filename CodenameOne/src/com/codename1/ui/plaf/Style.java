@@ -111,13 +111,9 @@ public class Style {
     public static final String OPACITY = "opacity";
     /// Elevation attribute name for the theme hashtable.
     public static final String ELEVATION = "elevation";
-    /// Icon gap attribute name for the theme hashtable.
-    ///
-    /// #### Since
-    ///
-    /// 8.0
+    /// Letter spacing attribute name for the theme hashtable.
     public static final String LETTER_SPACING = "letterSpacing";
-
+    /// Icon gap attribute name for the theme hashtable.
     public static final String ICON_GAP = "iconGap";
     /// Icon gap unit attribute.
     ///
