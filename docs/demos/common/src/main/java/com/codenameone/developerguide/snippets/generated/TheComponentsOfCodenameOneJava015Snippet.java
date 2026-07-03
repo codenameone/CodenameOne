@@ -65,7 +65,7 @@ class TheComponentsOfCodenameOneJava015Snippet {
         dlg.addComponent(BorderLayout.SOUTH, close);
         Dimension pre = dlg.getContentPane().getPreferredSize();
         int displayWidth = Display.getInstance().getDisplayWidth();
-        int dialogWidth = Math.max(pre.getWidth() + pre.getWidth() / 6, displayWidth / 2);
+        int dialogWidth = Math.max(pre.getWidth() + pre.getWidth() / 6, displayWidth * 2 / 3);
         dlg.show(0, 0, displayWidth - dialogWidth, 0);
         // end::the-components-of-codename-one-java-015[]
     }
