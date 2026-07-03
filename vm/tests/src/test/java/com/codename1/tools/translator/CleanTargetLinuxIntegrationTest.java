@@ -382,7 +382,11 @@ class CleanTargetLinuxIntegrationTest {
                 try {
                     String teePath = System.getenv("CN1_APP_LOG_TEE");
                     if (teePath != null) {
-                        tee = new java.io.PrintWriter(new java.io.FileWriter(teePath, true), true);
+                        java.io.File teeFile = new java.io.File(teePath);
+                        if (teeFile.getParentFile() != null) {
+                            teeFile.getParentFile().mkdirs();
+                        }
+                        tee = new java.io.PrintWriter(new java.io.FileWriter(teeFile, true), true);
                     }
                 } catch (IOException ignore) {
                 }
