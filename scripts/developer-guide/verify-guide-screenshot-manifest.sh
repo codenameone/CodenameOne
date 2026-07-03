@@ -19,7 +19,8 @@ generated_refs_sorted="${tmp_dir}/generated-refs.txt"
 
 grep -v '^[[:space:]]*$' "${MANIFEST_FILE}" | sort -u > "${manifest_sorted}"
 
-rg -o 'img/[A-Za-z0-9._/-]+\.(png|jpg|jpeg)' "${GUIDE_DIR}" \
+find "${GUIDE_DIR}" -type f \( -name '*.adoc' -o -name '*.asciidoc' \) -print0 \
+  | xargs -0 grep -Eoh 'img/[A-Za-z0-9._/-]+\.(png|jpg|jpeg)' \
   | sed -E 's#.*img/##' \
   | sort -u > "${referenced_sorted}"
 
