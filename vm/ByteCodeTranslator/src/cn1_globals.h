@@ -1434,6 +1434,9 @@ extern JAVA_BOOLEAN  throwException_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OB
 extern JAVA_OBJECT __NEW_java_lang_NullPointerException(CODENAME_ONE_THREAD_STATE);
 extern JAVA_OBJECT __NEW_INSTANCE_java_lang_NullPointerException(CODENAME_ONE_THREAD_STATE);
 extern JAVA_OBJECT __NEW_INSTANCE_java_lang_StackOverflowError(CODENAME_ONE_THREAD_STATE);
+// Throws the PREALLOCATED StackOverflowError (pre-filled trace, no allocation,
+// no trace building) -- safe to call at stack exhaustion. See cn1_globals.m.
+extern void cn1ThrowStackOverflow(CODENAME_ONE_THREAD_STATE);
 extern JAVA_OBJECT __NEW_java_lang_ArrayIndexOutOfBoundsException(CODENAME_ONE_THREAD_STATE);
 extern JAVA_VOID java_lang_ArrayIndexOutOfBoundsException___INIT_____int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT __cn1Arg1);
 extern void throwArrayIndexOutOfBoundsException(CODENAME_ONE_THREAD_STATE, int index);
@@ -1869,7 +1872,7 @@ static inline void cn1_init_method_stack_fast(CODENAME_ONE_THREAD_STATE, JAVA_OB
     }
 #endif
     if (threadStateData->callStackOffset >= CN1_STACK_OVERFLOW_CALL_DEPTH_LIMIT - 1) {
-        throwException(threadStateData, __NEW_INSTANCE_java_lang_StackOverflowError(threadStateData));
+        cn1ThrowStackOverflow(threadStateData);
         return;
     }
     /* The call-depth guard above does not protect the operand/locals stack: a
@@ -1878,7 +1881,7 @@ static inline void cn1_init_method_stack_fast(CODENAME_ONE_THREAD_STATE, JAVA_OB
      * memset/write past the buffer end -> access violation instead of a catchable
      * StackOverflowError. The 1024-slot margin leaves room to build+throw it. */
     if (threadStateData->threadObjectStackOffset + localsStackSize + stackSize >= CN1_MAX_OBJECT_STACK_DEPTH - 1024) {
-        throwException(threadStateData, __NEW_INSTANCE_java_lang_StackOverflowError(threadStateData));
+        cn1ThrowStackOverflow(threadStateData);
         return;
     }
     if (fullClear) {
@@ -1907,11 +1910,11 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     if(__cn1ThisObject == JAVA_NULL) { THROW_NULL_POINTER_EXCEPTION(); }
 #endif
     if (threadStateData->callStackOffset >= CN1_STACK_OVERFLOW_CALL_DEPTH_LIMIT - 1) {
-        throwException(threadStateData, __NEW_INSTANCE_java_lang_StackOverflowError(threadStateData));
+        cn1ThrowStackOverflow(threadStateData);
         return;
     }
     if (threadStateData->threadObjectStackOffset + localsStackSize + stackSize >= CN1_MAX_OBJECT_STACK_DEPTH - 1024) {
-        throwException(threadStateData, __NEW_INSTANCE_java_lang_StackOverflowError(threadStateData));
+        cn1ThrowStackOverflow(threadStateData);
         return;
     }
     memset(&threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset], 0, sizeof(struct elementStruct) * (localsStackSize + stackSize));
@@ -2016,7 +2019,7 @@ extern void cn1ComputeNativeStackLimit(CODENAME_ONE_THREAD_STATE);
     do { \
         if (__builtin_expect(threadStateData->nativeStackLimit == 0, 0)) { cn1ComputeNativeStackLimit(threadStateData); } \
         if (__builtin_expect((JAVA_LONG)(intptr_t)__builtin_frame_address(0) < threadStateData->nativeStackLimit, 0)) { \
-            throwException(threadStateData, __NEW_INSTANCE_java_lang_StackOverflowError(threadStateData)); \
+            cn1ThrowStackOverflow(threadStateData); \
             return retval; \
         } \
     } while(0)

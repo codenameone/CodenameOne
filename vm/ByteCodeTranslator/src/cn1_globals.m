@@ -3830,6 +3830,26 @@ JAVA_OBJECT xmlvm_create_java_string(CODENAME_ONE_THREAD_STATE, const char *chr)
     return newStringFromCString(threadStateData, chr);
 }
 
+// Preallocated StackOverflowError (the JDK does the same): an SOE is thrown at
+// STACK EXHAUSTION, where building a fresh error's stack trace calls more
+// methods -- each of which trips the same overflow guard and throws again,
+// recursing until the hard guard page (observed as a 500+ frame
+// throwException/fillInStack/getStack storm ending in SIGSEGV on iOS).
+// The preallocated instance has its stack field PRE-FILLED, so
+// fillInStack's null-check skips trace building entirely: throwing it
+// allocates nothing and calls nothing.
+JAVA_OBJECT cn1PreallocSOE = JAVA_NULL;
+extern void set_field_java_lang_Throwable_stack(JAVA_OBJECT __cn1Val, JAVA_OBJECT __cn1T);
+
+void cn1ThrowStackOverflow(CODENAME_ONE_THREAD_STATE) {
+    JAVA_OBJECT soe = cn1PreallocSOE;
+    if(soe == JAVA_NULL) {
+        // startup-only fallback (before initConstantPool preallocates)
+        soe = __NEW_INSTANCE_java_lang_StackOverflowError(threadStateData);
+    }
+    throwException(threadStateData, soe);
+}
+
 void initConstantPool() {
     __STATIC_INITIALIZER_java_lang_Class(getThreadLocalData());
     struct ThreadLocalData* threadStateData = getThreadLocalData();
@@ -3861,6 +3881,14 @@ void initConstantPool() {
     #endif
     constantPoolObjects = tmpConstantPoolObjects;
     invokedGC = NO;
+
+    // preallocate the shared StackOverflowError with a pre-filled trace (see
+    // cn1ThrowStackOverflow above); built HERE where stack is plentiful
+    cn1PreallocSOE = __NEW_INSTANCE_java_lang_StackOverflowError(threadStateData);
+    set_field_java_lang_Throwable_stack(
+        newStringFromCString(threadStateData, "java.lang.StackOverflowError\n    (trace suppressed: thrown at stack exhaustion)\n"),
+        cn1PreallocSOE);
+    cn1AddImmortalRoot(cn1PreallocSOE);
 
     enteringNativeAllocations();
 
