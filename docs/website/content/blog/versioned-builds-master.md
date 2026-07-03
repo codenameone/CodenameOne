@@ -46,7 +46,7 @@ This builds against the current development head of Codename One. A few years ag
 Building against `master` is the better developer loop for most cases. If a fix landed this morning and you need to verify it on a device, you do not wait for tomorrow's nightly. You ask the cloud build to use the current development head.
 
 {{< mermaid >}}
-flowchart LR
+flowchart TD
     A["A fix lands on master"] --> B["Framework artifacts published"]
     B --> C["Your build sets build.cn1Version=master"]
     C --> D["Cloud build uses current development head"]

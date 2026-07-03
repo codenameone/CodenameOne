@@ -1,41 +1,25 @@
 ---
-title: "One Codebase, More Surfaces: Cars, Sensors, Commerce, Video And Builds"
+title: "More Surfaces, Same Deal: Cars, Sensors, Commerce, Video And Builds"
 slug: one-codebase-more-surfaces
 url: /blog/one-codebase-more-surfaces/
 date: '2026-07-03'
 author: Shai Almog
-description: "This week's release pushes Codename One beyond the phone rectangle: car dashboards, motion sensors, desktop-class input, foldables, cloud entitlements, versioned builds, and real video generation from one codebase."
-feed_html: '<img src="https://www.codenameone.com/blog/one-codebase-more-surfaces.jpg" alt="One Codebase, More Surfaces" /> This release pushes Codename One beyond the phone rectangle: car dashboards, motion sensors, desktop-class input, foldables, cloud entitlements, versioned builds, and real video generation from one codebase.'
+description: "This week's release adds car dashboards, motion sensors, desktop-class input, foldables, Commerce, Secrets, versioned builds, and real video generation while keeping last week's open-source deal intact."
+feed_html: '<img src="https://www.codenameone.com/blog/one-codebase-more-surfaces.jpg" alt="More Surfaces, Same Deal" /> This release adds car dashboards, motion sensors, desktop-class input, foldables, Commerce, Secrets, versioned builds, and real video generation while keeping last week''s open-source deal intact.'
 series: ["release-2026-07-03"]
 ---
 
-![One Codebase, More Surfaces: Cars, Sensors, Commerce, Video And Builds](/blog/one-codebase-more-surfaces.jpg)
+![More Surfaces, Same Deal: Cars, Sensors, Commerce, Video And Builds](/blog/one-codebase-more-surfaces.jpg)
 
-This week's release is about Codename One apps showing up in more places without turning into separate projects.
+Last week's release post was about funding open source without the bait and switch. This week's release tests that idea again, because two of the new features touch paid infrastructure directly: Commerce and versioned builds.
 
-A phone screen is still the center of most apps, but it is no longer the whole app. The same product may need a CarPlay list, an Android Auto grid, a foldable tabletop layout, a stylus drawing surface, trackpad zoom, motion gestures, a server-validated subscription, a pinned production build, and a generated video clip for sharing or support.
+That kind of expansion often makes the model slippery. A platform adds something developers need, puts it behind an account tier, and over time the open part gets worse or the paid part starts taxing success. We do not want to drift into that, so the useful question for this week is not just what shipped, but how the paid pieces behave.
 
-Those are not one feature. They are the shape of modern app work. The interesting part is whether a cross-platform stack can expose those surfaces without pushing developers back into native forks for every serious use case.
+Commerce validates purchases and normalizes entitlements, but it does not replace IAP and it does not take a cut. If quota runs out, validation degrades; the Apple or Google purchase still goes through. Everyone gets the Secrets API because volume stays low, and keeping keys out of source code should not be a luxury feature. Versioned builds are back, including limited access lower down the account ladder, and master builds give the community a way to verify fixes without waiting for nightly artifacts.
 
-That is the story this week.
+That is the continuation of last week's deal: charge for services that cost money to run, but keep them optional, predictable, and as broadly useful as we can make them.
 
-Codename One now has core APIs for car projection, motion sensors, richer pointer input, foldable posture, frame-accurate video, sample-accurate PCM mixing, and timed subtitles. It also has cloud-side pieces for commerce validation, secrets, and versioned builds. Some of this is open source framework code. Some of it is optional service infrastructure. The boundary matters.
-
-{{< mermaid >}}
-flowchart LR
-    A["One Codename One app"] --> B["Phone / tablet UI"]
-    A --> C["Car dashboard templates"]
-    A --> D["Motion and input hardware"]
-    A --> E["Foldables and desktop windows"]
-    A --> F["Generated media"]
-    A --> G["Optional cloud services"]
-    G --> H["Receipt validation, secrets, builds"]
-    H -. "support and capacity, not revenue share" .-> A
-{{< /mermaid >}}
-
-The real question is not "how many bullet points shipped?" It is "where does this force the developer into a trap?"
-
-For the core APIs, the answer should be boring: if a sensor, stylus, foldable hinge, car head unit, or video backend is unavailable, the app can detect that and adapt. For the cloud APIs, the answer has to be more explicit: **Codename One does not take a percentage of your in-app purchases, subscriptions, ad revenue, commerce revenue, or app revenue**. Commerce validates receipts and entitlements. It does not replace IAP, does not process the payment, and does not become a toll booth. If Commerce quota is exhausted, validation degrades; store purchases still go through and users are not blocked from buying.
+The rest of the release pushes the open source core outward: car projection, motion sensors, richer pointer input, foldable posture, frame-accurate video, sample-accurate PCM mixing, and timed subtitles. A phone screen is still the center of most apps, but it is no longer the whole app. A serious product may also need a CarPlay list, an Android Auto grid, a stylus drawing surface, trackpad zoom, motion gestures, a pinned production build, and a generated video clip for sharing or support.
 
 Here is what shipped.
 
@@ -51,13 +35,11 @@ The API is zero cost when unused. Referencing `com.codename1.car` is what tells 
 
 ## Motion, Input, And Real Hardware
 
-[PR #5310](https://github.com/codenameone/CodenameOne/pull/5310) adds `com.codename1.sensors`, a cross-platform motion API with accelerometer, gyroscope, magnetometer, derived gravity, linear acceleration, orientation, and common gestures such as shake, flip, tilt, pick up, and free fall. This replaces the old external `sensors-codenameone` approach with a core API and a core gesture engine.
+[PR #5310](https://github.com/codenameone/CodenameOne/pull/5310) adds `com.codename1.sensors`, a cross-platform motion API with accelerometer, gyroscope, magnetometer, derived gravity, linear acceleration, orientation, and common gestures such as shake, flip, tilt, pick up, and free fall. This replaces the old external `sensors-codenameone` cn1lib with a core API and a core gesture engine.
 
 [PR #5309](https://github.com/codenameone/CodenameOne/pull/5309) fills in the other side of modern hardware: rich pointer events, mouse buttons, wheel and trackpad scrolling, stylus pressure and tilt, foldable posture, desktop windowing, and external display awareness.
 
-![Motion sensor showcase running in the Codename One test app](/blog/motion-input-form-factors/motion-showcase.png)
-
-Together they make Codename One less phone-only. A canvas can tell the difference between a finger, a mouse and a stylus. A foldable can split layout around a hinge. A trackpad pinch can zoom the same component as a mobile pinch. Sunday's post covers the full hardware story.
+Together they make Codename One less phone-only. A canvas can tell the difference between a finger, a mouse, and a stylus. A foldable can split layout around a hinge. A trackpad pinch can zoom the same component as a mobile pinch. Sunday's post covers the full hardware story.
 
 ## Commerce And Secrets
 
@@ -128,9 +110,9 @@ There are four smaller changes worth calling out:
 
 ## Wrapping Up
 
-The release is large because the app surface is larger now. It reaches cars, foldables, desktops, sensors, stylus devices, media pipelines, cloud validation and older build timelines. The job of the framework is to keep those surfaces connected to one codebase without hiding the tradeoffs.
+The release is large because the app surface is larger now. It reaches cars, foldables, desktops, sensors, stylus devices, media pipelines, cloud validation, and older build timelines.
 
-That includes the business tradeoffs. Cloud validation should help, not hold purchases hostage. Build tiers should buy capacity and support windows, not a license to keep your own revenue. Optional should mean optional.
+The business side needs the same discipline as the API side. Cloud validation should help, not hold purchases hostage. Build tiers should buy capacity and support windows, not a license to keep your own revenue. Optional should mean optional, especially when the project stays open source.
 
 ---
 

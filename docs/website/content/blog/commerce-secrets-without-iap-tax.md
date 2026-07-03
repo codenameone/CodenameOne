@@ -31,7 +31,7 @@ flowchart TD
     D --> E["Commerce refresh()"]
     E --> F["Cloud receipt validation"]
     F --> G["Entitlement cache"]
-    G --> H["isEntitled(\"pro\")"]
+    G --> H["isEntitled(pro)"]
     C --> StoreOK["Purchase still completes even if cloud validation is unavailable"]
 {{< /mermaid >}}
 

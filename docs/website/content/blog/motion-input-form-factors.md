@@ -15,8 +15,6 @@ For a long time, mobile meant a touch screen and a few platform-specific escape 
 
 [PR #5310](https://github.com/codenameone/CodenameOne/pull/5310) and [PR #5309](https://github.com/codenameone/CodenameOne/pull/5309) make that hardware visible through core APIs instead of cn1libs and platform branches.
 
-![Motion sensor showcase running in the Codename One test app](/blog/motion-input-form-factors/motion-showcase.png)
-
 ## Motion Sensors And Gestures
 
 The new `com.codename1.sensors` package exposes accelerometer, gyroscope and magnetometer readings. It also derives gravity, linear acceleration and orientation in the core when the platform does not provide them directly.
@@ -153,11 +151,11 @@ CN.addPostureListener(e -> relayoutForPosture(CN.getDevicePosture()));
 
 On Android, foldable support is opt-in with `android.foldableSupport=true`, so apps that do not need the AndroidX window library do not carry it. The simulator can generate posture changes for testing.
 
-## Why These Belong Together
+## Wrapping Up
 
-Motion sensors and pointer metadata look unrelated until you build a real app. A drawing app wants stylus pressure, trackpad zoom, mouse wheel panning and maybe device tilt. A game wants accelerometer gestures and external display awareness. A media app wants foldable tabletop layout and trackpad scrubbing. These are not separate platforms anymore. They are one app running on hardware that keeps changing shape.
+Input used to mean key codes, pointer coordinates, and maybe a scroll wheel. That model is too small now. A modern app has to reason about pointer type, pressure, hover, buttons, tilt, posture, trackpads, sensor sampling, and gestures that may or may not exist on the current device.
 
-The new APIs are additive, default-safe and core-owned. That is the part that matters.
+The new APIs do not make that complexity disappear. They put it behind capability checks and default-safe events, so the same component can handle a finger on a phone, a stylus on a tablet, a mouse on desktop, and a foldable hinge without turning every screen into platform-specific code.
 
 ---
 
