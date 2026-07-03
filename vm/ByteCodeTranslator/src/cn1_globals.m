@@ -3492,6 +3492,17 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
 static int gcMarkResolveThreadCount() {
 #ifdef CN1_GC_MARK_THREADS
     int n = CN1_GC_MARK_THREADS;
+#elif 1
+    // ISOLATION EXPERIMENT (git-A/B): default to SERIAL marking. The acquire-load
+    // fix removed the parallel mark-worker crash, but arm64 Linux still corrupts the
+    // heap (crash moved to a frameless method reading a smashed threadStateData), so
+    // a SECOND ordering hole remains somewhere in the branch-only parallel-GC work.
+    // Forcing one marker here bypasses the entire parallel path (gcMarkDrainParallel
+    // -> gcMarkDrain, no atomics, no pool, no local buffers). If arm64 goes green,
+    // parallel marking is the sole remaining corruptor and the concurrency audit
+    // continues offline with CN1_GC_MARK_THREADS>1; if it still crashes, the bug is
+    // elsewhere in the branch GC changes (nursery / tagged-int / BiBOP sweep).
+    int n = 1;
 #elif defined(_WIN32)
     // no sysconf in the Win32 shim; NUMBER_OF_PROCESSORS is always set on Windows
     const char* np = getenv("NUMBER_OF_PROCESSORS");
