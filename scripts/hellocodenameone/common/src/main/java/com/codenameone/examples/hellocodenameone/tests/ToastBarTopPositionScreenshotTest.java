@@ -41,24 +41,25 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
     protected void registerReadyCallback(final Form parent, final Runnable run) {
         ToastBar tb = ToastBar.getInstance();
         tb.setPosition(Component.TOP);
+        // Show the toast INSTANTLY (no slide). The slide animation's completion
+        // is not guaranteed on every backend -- the Metal and tvOS offscreen
+        // pipelines left the ToastBarComponent stuck at height 0, so time-based
+        // capture snapshotted an absent toast and the screenshot flaked. The
+        // instant path lays the toast out synchronously via revalidate, so it is
+        // deterministically present the moment showMessage returns, on every
+        // platform. This still validates what the test exists for: the TOP
+        // position leaves no empty band above the toast.
+        tb.setAnimated(false);
 
-        // Use a long timeout so the toast stays visible for the screenshot
-        System.out.println("[ToastBarTop] showMessage at " + System.currentTimeMillis());
+        // Long timeout so the toast stays up well past the capture.
         ToastBar.showMessage("Info message at top", FontImage.MATERIAL_INFO, 30000);
 
-        // A fixed 2s sleep raced the toast's slide-in on slow CI targets (the
-        // watch simulator lost it every run, tvOS intermittently). Poll for
-        // the toast component being visible AND then hold for a settle window
-        // that clears its slide animation: show() runs slideUpAndWait(2) +
-        // slideDownAndWait(800), so the ToastBarComponent reports visible with
-        // full bounds ~400ms in while the animation is still compositing it
-        // into view -- capturing then snapshots a half-slid (or absent) toast
-        // (seen on tvOS). Require SETTLE_MS of continuous visibility past the
-        // ~802ms animation before capturing. Cap the total wait so a genuinely
-        // broken toast still yields a (failing) screenshot with the dump below.
-        final int SETTLE_MS = 1400;
+        // Poll briefly for the toast to be laid out + painted (a couple of frames),
+        // then capture. With animation off this settles almost immediately; the
+        // cap only guards a genuinely broken toast so a (failing) screenshot with
+        // the diagnostic dump is still produced.
         final UITimer[] timerRef = new UITimer[1];
-        timerRef[0] = UITimer.timer(200, true, parent, new Runnable() {
+        timerRef[0] = UITimer.timer(100, true, parent, new Runnable() {
             private int waited;
             private int shownFor;
             private boolean fired;
@@ -66,10 +67,10 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
                 if (fired) {
                     return;
                 }
-                waited += 200;
+                waited += 100;
                 boolean shown = toastVisible(parent);
-                shownFor = shown ? shownFor + 200 : 0;
-                if ((shown && shownFor >= SETTLE_MS) || waited >= 15000) {
+                shownFor = shown ? shownFor + 100 : 0;
+                if ((shown && shownFor >= 300) || waited >= 5000) {
                     fired = true;
                     if (timerRef[0] != null) {
                         timerRef[0].cancel();

@@ -138,6 +138,13 @@ public final class ToastBar {
     /// updateStatus() was running.
     private boolean pendingUpdateStatus;
 
+    /// When false the toast is shown/hidden instantly without the slide
+    /// animation. The slide relies on the animation manager ticking, which is
+    /// not guaranteed to complete on every backend (the Metal/tvOS offscreen
+    /// pipelines can leave the toast stuck at height 0), making animated shows
+    /// nondeterministic for screenshot capture. Defaults to animated.
+    private boolean animated = true;
+
     private ToastBar() {
 
     }
@@ -434,6 +441,27 @@ public final class ToastBar {
         this.position = position;
     }
 
+    /// Controls whether the toast slides in/out with an animation. Disable it to
+    /// show/hide the toast instantly - useful for deterministic screenshot
+    /// capture on backends where the animation manager may not complete the
+    /// slide. Defaults to `true` (animated).
+    ///
+    /// #### Parameters
+    ///
+    /// - `animated`: `true` to animate the slide, `false` to show/hide instantly
+    public void setAnimated(boolean animated) {
+        this.animated = animated;
+    }
+
+    /// Returns whether the toast slides with an animation. See `#setAnimated(boolean)`.
+    ///
+    /// #### Returns
+    ///
+    /// `true` when animated (the default), `false` when shown instantly
+    public boolean isAnimated() {
+        return animated;
+    }
+
     /// Updates the ToastBar UI component with the settings of the current status.
     private void updateStatus() {
         final ToastBarComponent c = getToastBarComponent();
@@ -725,14 +753,26 @@ public final class ToastBar {
 
             c.label.setPreferredH(UIManager.getInstance().getLookAndFeel().getTextAreaSize(c.label, true).getHeight());
             c.setShouldCalcPreferredSize(true);
-            $(c).slideUpAndWait(2);
-            $(c).slideDownAndWait(800);
+            if (animated) {
+                $(c).slideUpAndWait(2);
+                $(c).slideDownAndWait(800);
+            } else {
+                // Instant show: skip the slide (whose completion isn't guaranteed
+                // on every backend) and let a plain revalidate lay the toast out
+                // to its preferred height so it renders deterministically.
+                c.setVisible(true);
+                if (f != null) {
+                    f.revalidate();
+                } else {
+                    c.getParent().revalidate();
+                }
+            }
             c.setVisible(true);
             updateStatus();
 
         } else {
             Form f = c.getComponentForm();
-            if (Display.getInstance().getCurrent() == f && !f.getMenuBar().isMenuShowing()) { //NOPMD CompareObjectsWithEquals
+            if (animated && Display.getInstance().getCurrent() == f && !f.getMenuBar().isMenuShowing()) { //NOPMD CompareObjectsWithEquals
                 if (this.position == Component.BOTTOM) {
                     c.setY(c.getY() + c.getHeight());
                 }
