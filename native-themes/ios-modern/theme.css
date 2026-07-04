@@ -480,7 +480,9 @@ SpinnerRenderer {
     font-family: "native:MainRegular";
     font-size: 3.2mm;
     text-align: center;
-    padding: 1mm 2mm 1mm 2mm;
+    /* Native UIPickerView rows sit on an ~87px @3x pitch; 1mm insets spread the
+       wheel to ~110px per row. */
+    padding: 0.4mm 2mm 0.4mm 2mm;
 }
 /* The selected (centre) row paints the translucent rounded selection band -- the
    FRONT_ANGLE cell renders via the normal cell paint, so its selected style is the
@@ -490,7 +492,7 @@ SpinnerRenderer.selected {
     background-color: rgba(120,120,128,0.10);
     border-radius: 2.5mm;
     text-align: center;
-    padding: 1mm 2mm 1mm 2mm;
+    padding: 0.4mm 2mm 0.4mm 2mm;
 }
 /* The centre (selected) row carries the translucent rounded selection band -- a
    full-bounds overlay with a round border degenerates into a big circle that hides
@@ -500,7 +502,7 @@ SpinnerRendererFocus {
     background-color: rgba(120,120,128,0.16);
     border-radius: 2mm;
     text-align: center;
-    padding: 1mm 2mm 1mm 2mm;
+    padding: 0.4mm 2mm 0.4mm 2mm;
 }
 /* No full-height overlay fill (it would cover the wheel); the focus row is the band. */
 SpinnerOverlay { background-color: transparent; padding: 0; margin: 0; }
