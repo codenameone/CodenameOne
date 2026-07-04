@@ -153,9 +153,9 @@ public final class GuideStaticScreenshotDemos {
         return formDemo("TableLayout Enclose", "TableLayout.encloseIn()", () -> {
             Form form = new Form("Table Layout", new BorderLayout());
             Container table = TableLayout.encloseIn(3,
-                    coloredLabel("First", 0x0d47a1),
-                    coloredLabel("Second", 0x00695c),
-                    coloredLabel("Third grows", 0x6a1b9a));
+                    coloredLabel("One", 0x0d47a1),
+                    coloredLabel("Two", 0x00695c),
+                    coloredLabel("Grows", 0x6a1b9a));
             form.add(BorderLayout.NORTH, table);
             return form;
         });

@@ -487,7 +487,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 ==== Loading images from URLs
 
-You can also load images from remote URLs. The compiled guide fixture uses a local asset so the build is deterministic and does not depend on network access; application CSS can use the same `url(...)` syntax with an HTTPS URL:
+You can also load images from remote URLs. The compiled guide fixture uses a local asset so the build is deterministic and doesn't depend on network access; application CSS can use the same `url(...)` syntax with an HTTPS URL:
 
 [source,css]
 ----
@@ -814,7 +814,6 @@ include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-043,i
 ----
 
 IMPORTANT: All matching `font-scale` constants will be applied to the styles. If you define 3 font-scale constants that all match the current runtime environment, they will all be applied. For example, If there are 3 matching font-scale constants with `2.0`, `3.0`, and `4.0`, then fonts will be scaled by 2*3*4=24!
-
 
 
 

@@ -8,9 +8,9 @@ class BasicsJava021Snippet {
     void snippet() {
         // tag::basics-java-021[]
         Container table = TableLayout.encloseIn(3,
-                new Label("First"),
-                new Label("Second"),
-                new Label("Third grows"));
+                new Label("One"),
+                new Label("Two"),
+                new Label("Grows"));
         Form hi = new Form("TableLayout.encloseIn()");
         hi.add(table);
         hi.show();
