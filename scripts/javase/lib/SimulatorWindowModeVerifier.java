@@ -94,7 +94,18 @@ public class SimulatorWindowModeVerifier {
 
             waitForSimulatorWarmup(Duration.ofSeconds("network-monitor".equals(parsed.scenario) ? 12 : 8));
 
+            // The warmup above is a floor for the scenario to reach its
+            // steady state, but on slow runners the simulator window may not
+            // have painted yet, which used to fail the run with a blank/flat
+            // capture. Keep polling until the desktop shows actual content
+            // (or a generous deadline passes and validation reports the
+            // real failure).
             BufferedImage image = captureDesktop();
+            Instant renderDeadline = Instant.now().plusSeconds(30);
+            while (isBlankOrFlat(image) && Instant.now().isBefore(renderDeadline)) {
+                Thread.sleep(500);
+                image = captureDesktop();
+            }
             validateScreenshotContent(image);
 
             Path screenshotPath = Path.of(parsed.screenshotPath);
@@ -144,6 +155,17 @@ public class SimulatorWindowModeVerifier {
         if (image.getWidth() < 120 || image.getHeight() < 120) {
             throw new AssertionError("Screenshot is unexpectedly small: " + image.getWidth() + "x" + image.getHeight());
         }
+        int samples = sampleColorCount(image);
+        if (samples < 3) {
+            throw new AssertionError("Screenshot appears blank/flat (insufficient color variation): " + samples);
+        }
+    }
+
+    private static boolean isBlankOrFlat(BufferedImage image) {
+        return sampleColorCount(image) < 3;
+    }
+
+    private static int sampleColorCount(BufferedImage image) {
         Set<Integer> samples = new HashSet<Integer>();
         int stepX = Math.max(1, image.getWidth() / 24);
         int stepY = Math.max(1, image.getHeight() / 24);
@@ -152,9 +174,7 @@ public class SimulatorWindowModeVerifier {
                 samples.add(image.getRGB(x, y));
             }
         }
-        if (samples.size() < 3) {
-            throw new AssertionError("Screenshot appears blank/flat (insufficient color variation): " + samples.size());
-        }
+        return samples.size();
     }
 
     /**
