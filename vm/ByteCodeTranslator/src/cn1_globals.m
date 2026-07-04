@@ -3447,6 +3447,26 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
             gcMarkWorklistTop--;
             JAVA_OBJECT obj = gcMarkWorklist[gcMarkWorklistTop].obj;
             JAVA_BOOLEAN force = gcMarkWorklist[gcMarkWorklistTop].force;
+#ifdef CN1_BIBOP_VALIDATE
+            // The (serial) mark drain crashed here dereferencing obj->parentCls on
+            // an object with a garbage header. Report WHAT is wrong at the source:
+            // parentCls==0 => a mid-construction (memset-elided) object wrongly in
+            // the worklist; parentCls non-null but heapPosition insane / gcMark not
+            // this cycle => a freed/corrupted slot pushed as live.
+            if(obj == JAVA_NULL || CN1_IS_TAGGED(obj) ||
+               obj->__codenameOneParentClsReference == 0 ||
+               (obj->__heapPosition != CN1_BIBOP_HEAP_POS && obj->__heapPosition < -1)) {
+                fprintf(stderr, "CN1BIBOP MARKDRAIN CORRUPT: obj=%p tagged=%d parentCls=%p "
+                        "heapPosition=%d gcMark=%d curMark=%d force=%d\n",
+                        (void*)obj, (int)CN1_IS_TAGGED(obj),
+                        (obj && !CN1_IS_TAGGED(obj)) ? (void*)obj->__codenameOneParentClsReference : (void*)0,
+                        (obj && !CN1_IS_TAGGED(obj)) ? obj->__heapPosition : -999,
+                        (obj && !CN1_IS_TAGGED(obj)) ? obj->__codenameOneGcMark : -999,
+                        currentGcMarkValue, (int)force);
+                fflush(stderr);
+                abort();
+            }
+#endif
             gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
             if(fp != 0) {
                 fp(threadStateData, obj, force);
