@@ -7,6 +7,11 @@ name: Linux x64 ASan diagnostic
 
 on:
   workflow_dispatch:
+  # Runs on the feature branch only when this file changes (workflow_dispatch
+  # can't be triggered from a non-default branch). Delete with the workflow.
+  push:
+    branches: [parparvm-perf-tier1]
+    paths: ['.github/workflows/linux-asan-x64.yml']
 
 jobs:
   asan-x64:
