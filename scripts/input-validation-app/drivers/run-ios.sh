@@ -179,6 +179,16 @@ sleep 2
 cleanup
 trap - EXIT INT TERM
 
+# The live stream takes a few seconds to attach its predicate, and xcodebuild
+# can drive the first gestures before it is live -- a CI run lost the tap
+# event this way while XCUITest itself passed. `log show` reads the persisted
+# unified-log archive retroactively, so appending it recovers anything the
+# stream missed; the event greps below run against the union.
+iv_log "Appending buffered device log (log show) to cover the stream attach window"
+xcrun simctl spawn "$SIM_UDID" log show --style compact --level debug \
+    --predicate '(processImagePath CONTAINS[c] "'"$BUNDLE_ID"'") OR (eventMessage CONTAINS "CN1IV:")' \
+    --last 30m >> "$LOG_FILE" 2>/dev/null || true
+
 # Assertion: each expected event must appear at least once in the log.
 REQUIRED_EVENTS=(
   "CN1IV:READY:tap"
