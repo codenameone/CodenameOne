@@ -1257,6 +1257,24 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
         int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
         if(__builtin_expect(bi < p->slotCount, 1)) {
             JAVA_OBJECT o = (JAVA_OBJECT)((char*)p + p->firstSlotOffset + (long)bi * p->slotSize);
+#ifdef CN1_BIBOP_VALIDATE
+            // INVARIANT: the per-thread current page must be OWNED and match this
+            // size class, and the bumped slot must lie inside the page. A violation
+            // means bibopCurrent[ci] points at a retired/recycled/reformatted page
+            // (the intermittent x64 cn1BibopFastAlloc crash). Abort AT the source,
+            // in a normal (non-ASan) build so ASan's layout changes can't mask it.
+            if(p->classIndex != ci || p->owned != JAVA_TRUE ||
+               (char*)o < (char*)p + p->firstSlotOffset ||
+               (char*)o + p->slotSize > (char*)p + CN1_BIBOP_PAGE_SIZE) {
+                fprintf(stderr, "CN1BIBOP FASTALLOC CORRUPT: ci=%d p=%p classIndex=%d owned=%d "
+                        "bi=%d slotSize=%d slotCount=%d firstSlotOffset=%d o=%p pageEnd=%p\n",
+                        ci, (void*)p, p->classIndex, (int)p->owned, bi, p->slotSize,
+                        p->slotCount, p->firstSlotOffset, (void*)o,
+                        (void*)((char*)p + CN1_BIBOP_PAGE_SIZE));
+                fflush(stderr);
+                abort();
+            }
+#endif
             int hdr = (int)sizeof(struct JavaObjectPrototype);
             if(size > hdr) {
                 // NOT removable: skipping this is ~2x SLOWER -- uninitialized ref
@@ -1321,6 +1339,18 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
         int bi = atomic_load_explicit(&p->bumpIndex, memory_order_relaxed);
         if(__builtin_expect(bi < p->slotCount, 1)) {
             JAVA_OBJECT o = (JAVA_OBJECT)((char*)p + p->firstSlotOffset + (long)bi * p->slotSize);
+#ifdef CN1_BIBOP_VALIDATE
+            if(p->classIndex != ci || p->owned != JAVA_TRUE ||
+               (char*)o < (char*)p + p->firstSlotOffset ||
+               (char*)o + p->slotSize > (char*)p + CN1_BIBOP_PAGE_SIZE) {
+                fprintf(stderr, "CN1BIBOP NOZERO CORRUPT: ci=%d p=%p classIndex=%d owned=%d "
+                        "bi=%d slotSize=%d slotCount=%d firstSlotOffset=%d o=%p\n",
+                        ci, (void*)p, p->classIndex, (int)p->owned, bi, p->slotSize,
+                        p->slotCount, p->firstSlotOffset, (void*)o);
+                fflush(stderr);
+                abort();
+            }
+#endif
             // BODY MEMSET ELIDED (init-before-publish -- see comment above).
             // parentCls is deliberately left 0 UNTIL THE PUBLISH: a thread can be
             // SIGNAL-STOPPED at an arbitrary instruction inside the construction

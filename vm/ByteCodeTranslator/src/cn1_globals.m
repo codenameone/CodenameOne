@@ -1871,6 +1871,19 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
     while(list != 0) {
         CN1BibopPage* page = list;
         list = page->nextPool;
+#ifdef CN1_BIBOP_VALIDATE
+        // INVARIANT: only RETIRED (non-owned) pages reach the sweep. If an OWNED
+        // page (some thread's live bibopCurrent[ci]) is on the sweep stack, the
+        // sweep will reset/recycle it out from under that thread -> the
+        // intermittent cn1BibopFastAlloc crash. Catch it here, at the source.
+        if(page->owned == JAVA_TRUE) {
+            fprintf(stderr, "CN1BIBOP SWEEP OF OWNED PAGE: page=%p classIndex=%d bumpIndex=%d\n",
+                    (void*)page, page->classIndex,
+                    atomic_load_explicit(&page->bumpIndex, memory_order_relaxed));
+            fflush(stderr);
+            abort();
+        }
+#endif
 #ifndef CN1_BIBOP_NO_FASTSWEEP
         // ---- O(1) page decision (no per-slot walk). -------------------------------
         // A page is HOMOGENEOUS when every occupied slot is a dead-or-graced object
