@@ -3993,6 +3993,15 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public com.codename1.impl.ARImpl createARImpl() {
+        if (!nativeInstance.cn1ArIsSupported(0) && !nativeInstance.cn1ArIsSupported(1)) {
+            // AR compiled out (non-AR app, tvOS/watchOS) or unsupported device.
+            return null;
+        }
+        return new IOSARImpl();
+    }
+
+    @Override
     public String [] getAvailableRecordingMimeTypes() {
         // All of these amount to the same thing.
         // We record in AAC format, wrapped in an mp4 container.

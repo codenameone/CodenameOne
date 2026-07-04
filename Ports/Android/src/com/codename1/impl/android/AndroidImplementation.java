@@ -10539,6 +10539,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return new AndroidCameraImpl(act);
     }
 
+    @Override
+    public com.codename1.impl.ARImpl createARImpl() {
+        Activity act = getActivity();
+        if (act == null) {
+            return null;
+        }
+        // The ARCore-backed impl lives in a package the build deletes for
+        // apps that never reference com.codename1.ar (it compiles against
+        // com.google.ar.core which only exists when the AR gradle dependency
+        // was injected), so it must be reached reflectively.
+        try {
+            Class<?> clazz = Class.forName("com.codename1.impl.android.ar.AndroidARImpl");
+            return (com.codename1.impl.ARImpl) clazz
+                    .getConstructor(Activity.class).newInstance(act);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
     // Deeper-network connectivity platform factories. Each returns a small
     // platform-specific class living under
     // com.codename1.impl.android.connectivity. Those classes are loaded

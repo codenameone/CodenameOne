@@ -244,6 +244,42 @@ class GltfLoaderTest extends UITestBase {
     }
 
     @Test
+    void deviceFreeLoadMatchesDeviceLoad() {
+        byte[] data = utf8(triangleGltfJson(triangleBuffer()));
+        Mesh direct = GltfLoader.load(data);
+        Mesh viaDevice = GltfLoader.load(new StubDevice(), data);
+        assertEquals(viaDevice.getVertices().getVertexCount(), direct.getVertices().getVertexCount());
+        assertEquals(viaDevice.getIndices().getIndexCount(), direct.getIndices().getIndexCount());
+        assertArrayEquals(viaDevice.getVertices().getData(), direct.getVertices().getData());
+        assertArrayEquals(viaDevice.getIndices().getData(), direct.getIndices().getData());
+    }
+
+    @Test
+    void deviceFreeStreamLoadClosesTheStream() throws IOException {
+        byte[] data = utf8(triangleGltfJson(triangleBuffer()));
+        final boolean[] closed = {false};
+        InputStream in = new ByteArrayInputStream(data) {
+            @Override
+            public void close() throws IOException {
+                closed[0] = true;
+                super.close();
+            }
+        };
+        Mesh mesh = GltfLoader.load(in);
+        assertNotNull(mesh);
+        assertTrue(closed[0], "loader must close the supplied stream");
+    }
+
+    @Test
+    void imageModelWithoutMaterialHasMeshAndNullImage() {
+        byte[] data = utf8(triangleGltfJson(triangleBuffer()));
+        GltfLoader.GltfImageModel model = GltfLoader.loadImageModel(data);
+        assertNotNull(model.getMesh());
+        assertEquals(3, model.getMesh().getVertices().getVertexCount());
+        assertNull(model.getBaseColorImage());
+    }
+
+    @Test
     void rejectsEmptyOrTooShortData() {
         StubDevice d = new StubDevice();
         assertThrows(IllegalArgumentException.class, () -> GltfLoader.load(d, new byte[0]));

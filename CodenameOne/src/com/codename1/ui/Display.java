@@ -6083,6 +6083,16 @@ public final class Display extends CN1Constants {
         return impl.createCameraImpl();
     }
 
+    /// Creates a fresh per-session backend for the `com.codename1.ar.AR`
+    /// augmented reality API. Returns `null` on platforms without AR support.
+    /// Application code should use `AR.open(...)` rather than calling this
+    /// directly.
+    ///
+    /// @hidden
+    public com.codename1.impl.ARImpl getARBackend() {
+        return impl.createARImpl();
+    }
+
     /// Indicates whether the native picker dialog is supported for the given type
     /// which can include one of PICKER_TYPE_DATE_AND_TIME, PICKER_TYPE_TIME, PICKER_TYPE_DATE
     ///

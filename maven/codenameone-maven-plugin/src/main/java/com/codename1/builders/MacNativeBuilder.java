@@ -257,7 +257,10 @@ class MacNativeBuilder {
     String parparvmOptionalFrameworksArg() {
         return "-Doptional.frameworks=AddressBookUI.framework;"
                 + "AddressBook.framework;MessageUI.framework;"
-                + "MediaPlayer.framework;GLKit.framework;OpenGLES.framework";
+                + "MediaPlayer.framework;GLKit.framework;OpenGLES.framework;"
+                // ARKit world tracking is unavailable on the Mac slice; linked
+                // on iOS when the app references com.codename1.ar.
+                + "ARKit.framework";
     }
 
     String getIosMinDeploymentTarget() {
