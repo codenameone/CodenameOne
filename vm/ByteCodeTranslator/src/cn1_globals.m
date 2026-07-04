@@ -3448,23 +3448,41 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
             JAVA_OBJECT obj = gcMarkWorklist[gcMarkWorklistTop].obj;
             JAVA_BOOLEAN force = gcMarkWorklist[gcMarkWorklistTop].force;
 #ifdef CN1_BIBOP_VALIDATE
-            // The (serial) mark drain crashed here dereferencing obj->parentCls on
-            // an object with a garbage header. Report WHAT is wrong at the source:
-            // parentCls==0 => a mid-construction (memset-elided) object wrongly in
-            // the worklist; parentCls non-null but heapPosition insane / gcMark not
-            // this cycle => a freed/corrupted slot pushed as live.
-            if(obj == JAVA_NULL || CN1_IS_TAGGED(obj) ||
-               obj->__codenameOneParentClsReference == 0 ||
-               (obj->__heapPosition != CN1_BIBOP_HEAP_POS && obj->__heapPosition < -1)) {
-                fprintf(stderr, "CN1BIBOP MARKDRAIN CORRUPT: obj=%p tagged=%d parentCls=%p "
-                        "heapPosition=%d gcMark=%d curMark=%d force=%d\n",
-                        (void*)obj, (int)CN1_IS_TAGGED(obj),
-                        (obj && !CN1_IS_TAGGED(obj)) ? (void*)obj->__codenameOneParentClsReference : (void*)0,
-                        (obj && !CN1_IS_TAGGED(obj)) ? obj->__heapPosition : -999,
-                        (obj && !CN1_IS_TAGGED(obj)) ? obj->__codenameOneGcMark : -999,
-                        currentGcMarkValue, (int)force);
-                fflush(stderr);
-                abort();
+            // The (serial) mark drain crashed here calling obj->parentCls->markFunction
+            // on an object whose parentCls is a non-null GARBAGE pointer (fp jumped into
+            // libc). A live, correctly-enqueued object always carries gcMark ==
+            // currentGcMarkValue (gcMarkObject stamps it BEFORE pushing) or -1 (grace),
+            // and a real clazz's markFunction lies in the app text (never a libc/heap
+            // address). Abort AT the source with the full object + fp state so the next
+            // run says whether this is a freed/reused slot (stale gcMark) or a
+            // corrupted-parentCls object.
+            {
+                gcMarkFunctionPointer __vfp = (obj != JAVA_NULL && !CN1_IS_TAGGED(obj)
+                    && obj->__codenameOneParentClsReference != 0)
+                    ? obj->__codenameOneParentClsReference->markFunction : (gcMarkFunctionPointer)0;
+                int __vmark = (obj != JAVA_NULL && !CN1_IS_TAGGED(obj)) ? obj->__codenameOneGcMark : -999;
+                int __vhp = (obj != JAVA_NULL && !CN1_IS_TAGGED(obj)) ? obj->__heapPosition : -999;
+                // A real markFunction lives in the app text segment; anchor off a
+                // known app function (&gcMarkObject) and flag any fp more than 256MB
+                // away (the observed garbage fp was a libc-range address).
+                uintptr_t __anchor = (uintptr_t)(void*)&gcMarkObject;
+                uintptr_t __fpv = (uintptr_t)(void*)__vfp;
+                int __fpBad = (__vfp != 0) &&
+                    ((__fpv > __anchor ? __fpv - __anchor : __anchor - __fpv) > (256ULL << 20));
+                if(obj == JAVA_NULL || CN1_IS_TAGGED(obj) ||
+                   obj->__codenameOneParentClsReference == 0 ||
+                   (__vhp != CN1_BIBOP_HEAP_POS && __vhp < -1) ||
+                   (__vmark != currentGcMarkValue && __vmark != -1) ||
+                   __fpBad) {
+                    fprintf(stderr, "CN1BIBOP MARKDRAIN CORRUPT: obj=%p tagged=%d parentCls=%p "
+                            "markFn=%p heapPosition=%d gcMark=%d curMark=%d FREE_MARK=%d force=%d\n",
+                            (void*)obj, (int)CN1_IS_TAGGED(obj),
+                            (obj && !CN1_IS_TAGGED(obj)) ? (void*)obj->__codenameOneParentClsReference : (void*)0,
+                            (void*)__vfp, __vhp, __vmark, currentGcMarkValue,
+                            CN1_BIBOP_FREE_MARK, (int)force);
+                    fflush(stderr);
+                    abort();
+                }
             }
 #endif
             gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
