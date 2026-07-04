@@ -315,6 +315,10 @@ jobs:
           cp -f "$ART"/raw-x64/windows-benchmark-stats.txt "$ART/" 2>/dev/null || true
           source scripts/lib/cn1ss.sh
           cn1ss_setup "$JAVA_HOME/bin/java" "$(pwd)/scripts/common/java"
+          # Gate for real: differing or missing screenshots FAIL the job (the
+          # comparison previously only posted diffs to the PR and exited green,
+          # which let 100+ render changes land unreviewed).
+          export CN1SS_FAIL_ON_MISMATCH=1
           REF_DIR="$(pwd)/scripts/windows/screenshots"
           cn1ss_process_and_report \
             "Native Windows port (cross-compiled)" \
