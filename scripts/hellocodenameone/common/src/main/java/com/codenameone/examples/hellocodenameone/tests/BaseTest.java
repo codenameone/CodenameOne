@@ -62,33 +62,7 @@ public abstract class BaseTest extends AbstractTest {
     /// it reports no in-flight animations, then take the screenshot. Guarded
     /// by a max-wait so a runaway animation can't deadlock the suite.
     private void awaitAnimationsThenScreenshot(Form form, String imageName) {
-        logThemeStateDiag(imageName);
         awaitSettledThenCapture(form, imageName, 0, this::done);
-    }
-
-    /// DIAGNOSTIC (temporary, remove after the theme-restore investigation):
-    /// the Windows/Linux cross pipelines render some default-theme screens
-    /// with the native (material) base MISSING after the dual-appearance
-    /// tests -- title/chrome falls back to the legacy grey. Log the resolved
-    /// chrome styles per capture so the CI device log pinpoints where the
-    /// theme state degrades.
-    private void logThemeStateDiag(String imageName) {
-        try {
-            com.codename1.ui.plaf.UIManager m = com.codename1.ui.plaf.UIManager.getInstance();
-            com.codename1.ui.plaf.Style ta = m.getComponentStyle("TitleArea");
-            com.codename1.ui.plaf.Style fo = m.getComponentStyle("Form");
-            com.codename1.ui.plaf.Style tb = m.getComponentStyle("Toolbar");
-            System.out.println("CN1SS:DIAG:theme " + imageName
-                    + " TitleArea=" + Integer.toHexString(ta.getBgColor())
-                    + "/t" + (ta.getBgTransparency() & 0xff)
-                    + " Toolbar=" + Integer.toHexString(tb.getBgColor())
-                    + "/t" + (tb.getBgTransparency() & 0xff)
-                    + " Form=" + Integer.toHexString(fo.getBgColor())
-                    + "/t" + (fo.getBgTransparency() & 0xff)
-                    + " darkMode=" + Display.getInstance().isDarkMode());
-        } catch (Throwable t) {
-            System.out.println("CN1SS:DIAG:theme " + imageName + " probe failed: " + t);
-        }
     }
 
     /// Capture {@code form} as {@code imageName} once it settles, then invoke
