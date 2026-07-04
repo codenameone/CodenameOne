@@ -1,0 +1,129 @@
+# TEMPORARY DIAGNOSTIC (parparvm-perf-tier1): build the Linux x64 suite native
+# ELF with -DCN1_BIBOP_VALIDATE (invariant assertions in the BiBOP allocator/sweep)
+# and run the suite repeatedly on a REAL x86 runner to catch the intermittent
+# cn1BibopFastAlloc crash AT ITS SOURCE. Normal build (NOT ASan -- ASan masks this
+# bug's stack/register-layout trigger). Serial marking = the crashing config.
+# DELETE once the bug is fixed.
+name: Linux x64 BiBOP validate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [parparvm-perf-tier1]
+    paths: ['.github/workflows/linux-x64-bibop-validate.yml']
+
+jobs:
+  bibop-validate-x64:
+    name: x64 suite with BiBOP invariant assertions
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install GTK stack + toolchain
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build pkg-config unzip xvfb fonts-dejavu-core gcc g++ gdb \
+            libgtk-3-dev libcairo2-dev libpango1.0-dev libgdk-pixbuf-2.0-dev libglib2.0-dev \
+            libfontconfig1-dev libfreetype-dev libcurl4-openssl-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+            libwebkit2gtk-4.1-dev libsecret-1-dev libnotify-dev libgeoclue-2-dev \
+            libepoxy-dev libegl1-mesa-dev libgles2-mesa-dev libgl1-mesa-dri
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '8' }
+      - run: echo "JDK_8_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 11
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '11' }
+      - run: echo "JDK_11_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '17' }
+      - run: echo "JDK_17_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Restore JDK 8 as active
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '8' }
+
+      - name: Build core + Linux port (JDK 8)
+        run: |
+          cd maven
+          JAVA_HOME="$JDK_8_HOME" mvn -B -pl linux -am \
+            -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase install
+
+      - name: Build plugin + cn1-ads-mock (JDK 8)
+        run: |
+          cd maven
+          JAVA_HOME="$JDK_8_HOME" mvn -B -pl codenameone-maven-plugin,cn1-ads-mock -am \
+            -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase install
+
+      - name: Build suite classes (JDK 17)
+        run: |
+          set -e
+          export JAVA_HOME="$JDK_17_HOME"
+          Xvfb :98 -screen 0 1600x1200x24 >/tmp/xvfb-build.log 2>&1 &
+          export DISPLAY=:98
+          sleep 2
+          mkdir -p "$HOME/.codenameone"
+          [ -f "$HOME/.codenameone/guibuilder.jar" ] || : > "$HOME/.codenameone/guibuilder.jar"
+          mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am install -DskipTests -Dmaven.javadoc.skip=true
+
+      - name: Translate + build (validate) + run suite x3
+        working-directory: vm
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          set -e
+          mkdir -p "${{ github.workspace }}/artifacts/bibop"
+          # gcc wrapper: -DCN1_BIBOP_VALIDATE (invariant asserts), SERIAL marking
+          # (default -- the crashing config), normal -O2, keep the VM flags. NOT ASan.
+          sudo tee /usr/local/bin/cn1-val-cc >/dev/null <<'WRAP'
+          #!/bin/sh
+          exec gcc -DCN1_BIBOP_VALIDATE -O2 -g -fno-omit-frame-pointer \
+            -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf "$@"
+          WRAP
+          sudo chmod +x /usr/local/bin/cn1-val-cc
+          export CN1_CC=/usr/local/bin/cn1-val-cc
+          ulimit -c unlimited
+          echo '/tmp/cores/core.%e.%p' | sudo tee /proc/sys/kernel/core_pattern >/dev/null
+          mkdir -p /tmp/cores
+          Xvfb :99 -screen 0 1200x1600x24 >/tmp/xvfb.log 2>&1 &
+          export DISPLAY=:99
+          sleep 2
+          mvn -B clean package -pl JavaAPI -am -DskipTests
+          hit=0
+          for run in 1 2 3; do
+            echo "===== BiBOP validate suite run $run ====="
+            export CN1_APP_LOG_TEE="${{ github.workspace }}/artifacts/bibop/app-output-$run.log"
+            rc=0
+            mvn -B test -pl tests -am \
+              -Dtest=CleanTargetLinuxIntegrationTest#capturesHelloSuiteOverWebSocketLinux \
+              -Dsurefire.failIfNoSpecifiedTests=false || rc=$?
+            if grep -q "CN1BIBOP" "$CN1_APP_LOG_TEE" 2>/dev/null; then
+              echo "!!! BiBOP invariant fired on run $run !!!"; hit=1
+              grep -A2 "CN1BIBOP" "$CN1_APP_LOG_TEE" | head -20
+            fi
+          done
+          # Post-mortem any core (the abort() leaves one).
+          for core in /tmp/cores/core.*; do
+            [ -f "$core" ] || continue
+            elf="$(/usr/bin/find /tmp -maxdepth 4 -name LinuxHelloMain -type f 2>/dev/null | head -1)"
+            { echo "=== core $core (elf=$elf) ==="; gdb "$elf" "$core" -batch \
+                -ex 'set pagination off' -ex 'thread apply all bt' 2>&1; } \
+              >> "${{ github.workspace }}/artifacts/bibop/crash-stacks.txt" || true
+          done
+          echo "=== BiBOP hits summary: hit=$hit ==="
+          grep -h "CN1BIBOP" "${{ github.workspace }}"/artifacts/bibop/*.log 2>/dev/null || echo "(no CN1BIBOP invariant fired in 3 runs)"
+          exit 0
+
+      - name: Upload BiBOP diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64-bibop
+          path: ${{ github.workspace }}/artifacts/bibop
+          if-no-files-found: warn
+          retention-days: 3
