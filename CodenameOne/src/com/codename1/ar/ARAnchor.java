@@ -81,6 +81,9 @@ public class ARAnchor {
     /// #### Parameters
     ///
     /// - `node`: the root node to render at this anchor, or null
+    // Identity comparison is intentional: re-attaching the exact same node
+    // instance must not clear its session wiring first.
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
     public void setNode(ARNode node) {
         if (detached) {
             throw new IllegalStateException("anchor is detached");

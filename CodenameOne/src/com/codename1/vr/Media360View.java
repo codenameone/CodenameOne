@@ -60,14 +60,17 @@ public class Media360View extends Container {
     private static final float MAX_PITCH_DEGREES = 89f;
 
     private final RenderView renderView;
-    private volatile Image pendingImage;
-    private volatile boolean imageDirty;
-    private volatile TextureSource textureSource;
-    private volatile boolean sourceDirty;
-    private volatile float yaw;
-    private volatile float pitch;
-    private volatile boolean stereo;
-    private volatile boolean headTrackingEnabled;
+    // Guards the state the EDT writes and the render thread reads each frame
+    // (the codebase convention is locking over volatile fields).
+    private final Object stateLock = new Object();
+    private Image pendingImage;
+    private boolean imageDirty;
+    private TextureSource textureSource;
+    private boolean sourceDirty;
+    private float yaw;
+    private float pitch;
+    private boolean stereo;
+    private boolean headTrackingEnabled;
     private HeadTracker tracker;
 
     private int lastDragX = -1;
@@ -95,8 +98,10 @@ public class Media360View extends Container {
     ///
     /// - `image`: the panorama to display
     public void setImage(Image image) {
-        pendingImage = image;
-        imageDirty = true;
+        synchronized (stateLock) {
+            pendingImage = image;
+            imageDirty = true;
+        }
         renderView.requestRender();
     }
 
@@ -107,27 +112,35 @@ public class Media360View extends Container {
     ///
     /// - `source`: the source, or null to remove it
     public void setTextureSource(TextureSource source) {
-        textureSource = source;
-        sourceDirty = true;
+        synchronized (stateLock) {
+            textureSource = source;
+            sourceDirty = true;
+        }
         renderView.requestRender();
     }
 
     /// Switches between a full-viewport mono view (the default) and
     /// side-by-side stereo for cardboard-style viewers.
     public void setStereo(boolean stereo) {
-        this.stereo = stereo;
+        synchronized (stateLock) {
+            this.stereo = stereo;
+        }
         renderView.requestRender();
     }
 
     /// True when rendering side-by-side stereo.
     public boolean isStereo() {
-        return stereo;
+        synchronized (stateLock) {
+            return stereo;
+        }
     }
 
     /// Enables gyroscope look-around, composed with drag navigation. When the
     /// device has no motion sensors this quietly stays drag-only.
     public void setHeadTrackingEnabled(boolean enabled) {
-        headTrackingEnabled = enabled;
+        synchronized (stateLock) {
+            headTrackingEnabled = enabled;
+        }
         if (enabled) {
             if (tracker == null) {
                 tracker = new HeadTracker();
@@ -147,37 +160,49 @@ public class Media360View extends Container {
 
     /// True when gyroscope look-around is enabled.
     public boolean isHeadTrackingEnabled() {
-        return headTrackingEnabled;
+        synchronized (stateLock) {
+            return headTrackingEnabled;
+        }
     }
 
     /// The horizontal look angle in degrees; positive turns right.
     public float getYaw() {
-        return yaw;
+        synchronized (stateLock) {
+            return yaw;
+        }
     }
 
     /// Sets the horizontal look angle in degrees.
     public void setYaw(float yawDegrees) {
-        this.yaw = yawDegrees;
+        synchronized (stateLock) {
+            this.yaw = yawDegrees;
+        }
         renderView.requestRender();
     }
 
     /// The vertical look angle in degrees, clamped so the view cannot flip
     /// over the poles; positive looks up.
     public float getPitch() {
-        return pitch;
+        synchronized (stateLock) {
+            return pitch;
+        }
     }
 
     /// Sets the vertical look angle in degrees. Clamped to stay off the
     /// poles.
     public void setPitch(float pitchDegrees) {
-        this.pitch = clampPitch(pitchDegrees);
+        synchronized (stateLock) {
+            this.pitch = clampPitch(pitchDegrees);
+        }
         renderView.requestRender();
     }
 
     /// Resets the view to look straight ahead and recenters the gyroscope.
     public void reset() {
-        yaw = 0f;
-        pitch = 0f;
+        synchronized (stateLock) {
+            yaw = 0f;
+            pitch = 0f;
+        }
         if (tracker != null) {
             tracker.recenter();
         }
@@ -202,7 +227,7 @@ public class Media360View extends Container {
     @Override
     protected void initComponent() {
         super.initComponent();
-        if (headTrackingEnabled && tracker != null) {
+        if (isHeadTrackingEnabled() && tracker != null) {
             tracker.start();
         }
     }
@@ -230,8 +255,10 @@ public class Media360View extends Container {
             int h = Math.max(1, getHeight());
             // Dragging the image right turns the view left, matching the
             // grab-the-world gesture users expect from panorama viewers.
-            yaw -= (x - lastDragX) * 180f / w;
-            pitch = clampPitch(pitch + (y - lastDragY) * 180f / h);
+            synchronized (stateLock) {
+                yaw -= (x - lastDragX) * 180f / w;
+                pitch = clampPitch(pitch + (y - lastDragY) * 180f / h);
+            }
         }
         lastDragX = x;
         lastDragY = y;
@@ -272,12 +299,33 @@ public class Media360View extends Container {
 
         @Override
         public void onFrame(GraphicsDevice device) {
-            refreshTexture(device);
-            computeLook();
+            // Snapshot the EDT-owned state once per frame.
+            TextureSource sourceNow;
+            boolean sourceDirtyNow;
+            Image imageNow;
+            boolean imageDirtyNow;
+            float yawNow;
+            float pitchNow;
+            boolean stereoNow;
+            boolean trackingNow;
+            synchronized (stateLock) {
+                sourceNow = textureSource;
+                sourceDirtyNow = sourceDirty;
+                sourceDirty = false;
+                imageNow = pendingImage;
+                imageDirtyNow = imageDirty;
+                imageDirty = false;
+                yawNow = yaw;
+                pitchNow = pitch;
+                stereoNow = stereo;
+                trackingNow = headTrackingEnabled;
+            }
+            refreshTexture(device, sourceNow, sourceDirtyNow, imageNow, imageDirtyNow);
+            computeLook(yawNow, pitchNow, trackingNow);
             int w = surfaceWidth;
             int h = surfaceHeight;
             device.clear(0xff000000, true, true);
-            if (stereo) {
+            if (stereoNow) {
                 int half = w / 2;
                 drawSphere(device, 0, 0, half, h);
                 drawSphere(device, half, 0, w - half, h);
@@ -287,10 +335,9 @@ public class Media360View extends Container {
             }
         }
 
-        private void refreshTexture(GraphicsDevice device) {
-            TextureSource source = textureSource;
-            if (sourceDirty) {
-                sourceDirty = false;
+        private void refreshTexture(GraphicsDevice device, TextureSource source,
+                                    boolean sourceChanged, Image img, boolean imageChanged) {
+            if (sourceChanged) {
                 if (texture != null) {
                     device.dispose(texture);
                     texture = null;
@@ -306,9 +353,7 @@ public class Media360View extends Container {
                 if (texture != null) {
                     source.updateTexture(device, texture);
                 }
-            } else if (imageDirty) {
-                imageDirty = false;
-                Image img = pendingImage;
+            } else if (imageChanged) {
                 if (texture != null) {
                     device.dispose(texture);
                     texture = null;
@@ -316,15 +361,15 @@ public class Media360View extends Container {
                 if (img != null) {
                     texture = device.createTexture(img);
                     texture.setFilter(Texture.Filter.LINEAR);
-                    }
+                }
             }
             material.setTexture(texture);
         }
 
-        private void computeLook() {
-            float yawRad = (float) Math.toRadians(yaw);
-            float pitchRad = (float) Math.toRadians(pitch);
-            if (headTrackingEnabled && tracker != null) {
+        private void computeLook(float yawDegrees, float pitchDegrees, boolean tracking) {
+            float yawRad = (float) Math.toRadians(yawDegrees);
+            float pitchRad = (float) Math.toRadians(pitchDegrees);
+            if (tracking && tracker != null) {
                 // The drag yaw acts as a manual offset on top of the gyro
                 // orientation; drag pitch is ignored while the gyro owns it.
                 tracker.getOrientation(quat);

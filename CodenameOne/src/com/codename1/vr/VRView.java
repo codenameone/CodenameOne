@@ -68,14 +68,18 @@ public class VRView extends Container {
     private final RenderView renderView;
     private final Camera eyeCamera = new Camera();
     private final float[] quat = Quaternion.identity();
-    private volatile boolean stereo;
-    private volatile boolean headTrackingEnabled = true;
-    private volatile int clearColor = 0xff000000;
-    private volatile float posX;
-    private volatile float posY;
-    private volatile float posZ;
-    private volatile int surfaceWidth = 1;
-    private volatile int surfaceHeight = 1;
+    // Guards the settings the EDT writes and the render thread reads each
+    // frame (the codebase convention is locking over volatile fields).
+    private final Object stateLock = new Object();
+    private boolean stereo;
+    private boolean headTrackingEnabled = true;
+    private int clearColor = 0xff000000;
+    private float posX;
+    private float posY;
+    private float posZ;
+    // Written and read on the render thread only.
+    private int surfaceWidth = 1;
+    private int surfaceHeight = 1;
 
     /// Creates a VR view with default settings.
     ///
@@ -127,7 +131,9 @@ public class VRView extends Container {
     /// Enables or disables head tracking. When disabled the last orientation
     /// freezes; combine with `VRCameraRig` manually for custom control.
     public void setHeadTrackingEnabled(boolean enabled) {
-        this.headTrackingEnabled = enabled;
+        synchronized (stateLock) {
+            this.headTrackingEnabled = enabled;
+        }
         if (isInitialized()) {
             if (enabled) {
                 tracker.start();
@@ -140,7 +146,9 @@ public class VRView extends Container {
 
     /// True when head tracking drives the view orientation.
     public boolean isHeadTrackingEnabled() {
-        return headTrackingEnabled;
+        synchronized (stateLock) {
+            return headTrackingEnabled;
+        }
     }
 
     /// Rotates the view so the current direction becomes "straight ahead".
@@ -151,27 +159,35 @@ public class VRView extends Container {
 
     /// Switches between side-by-side stereo and a single centered viewpoint.
     public void setStereo(boolean stereo) {
-        this.stereo = stereo;
+        synchronized (stateLock) {
+            this.stereo = stereo;
+        }
         renderView.requestRender();
     }
 
     /// True when rendering side-by-side stereo.
     public boolean isStereo() {
-        return stereo;
+        synchronized (stateLock) {
+            return stereo;
+        }
     }
 
     /// Sets the head center position in world space, for example to move the
     /// viewer through the scene.
     public void setPosition(float x, float y, float z) {
-        posX = x;
-        posY = y;
-        posZ = z;
+        synchronized (stateLock) {
+            posX = x;
+            posY = y;
+            posZ = z;
+        }
         renderView.requestRender();
     }
 
     /// The background clear color as `0xAARRGGBB`. Default opaque black.
     public void setClearColor(int argb) {
-        this.clearColor = argb;
+        synchronized (stateLock) {
+            this.clearColor = argb;
+        }
         renderView.requestRender();
     }
 
@@ -196,7 +212,7 @@ public class VRView extends Container {
     @Override
     protected void initComponent() {
         super.initComponent();
-        if (headTrackingEnabled) {
+        if (isHeadTrackingEnabled()) {
             tracker.start();
         }
     }
@@ -222,15 +238,29 @@ public class VRView extends Container {
 
         @Override
         public void onFrame(GraphicsDevice device) {
-            if (headTrackingEnabled) {
+            boolean trackingNow;
+            boolean stereoNow;
+            int clearNow;
+            float px;
+            float py;
+            float pz;
+            synchronized (stateLock) {
+                trackingNow = headTrackingEnabled;
+                stereoNow = stereo;
+                clearNow = clearColor;
+                px = posX;
+                py = posY;
+                pz = posZ;
+            }
+            if (trackingNow) {
                 tracker.getOrientation(quat);
                 rig.setOrientation(quat);
             }
-            rig.setPosition(posX, posY, posZ);
+            rig.setPosition(px, py, pz);
             int w = surfaceWidth;
             int h = surfaceHeight;
-            device.clear(clearColor, true, true);
-            if (stereo) {
+            device.clear(clearNow, true, true);
+            if (stereoNow) {
                 int half = w / 2;
                 renderEye(device, VREye.LEFT, 0, 0, half, h);
                 renderEye(device, VREye.RIGHT, half, 0, w - half, h);

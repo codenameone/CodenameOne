@@ -214,9 +214,7 @@ public final class Quaternion {
                                      float dtSeconds, float[] dst) {
         float angle = (float) Math.sqrt(gx * gx + gy * gy + gz * gz) * dtSeconds;
         if (angle == 0.0f) {
-            if (dst != q) {
-                copy(q, dst);
-            }
+            copy(q, dst);
             return;
         }
         float[] delta = fromAxisAngle(angle, gx, gy, gz);

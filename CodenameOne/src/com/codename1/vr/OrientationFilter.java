@@ -47,10 +47,6 @@ public final class OrientationFilter {
     private final float[] v = new float[3];
     private final float[] correction = new float[4];
 
-    /// Creates a filter at the identity orientation.
-    public OrientationFilter() {
-    }
-
     /// Sets the complementary blend coefficient in `(0, 1]`: the fraction of
     /// each update that trusts the integrated gyroscope over the
     /// accelerometer/magnetometer reference. Higher values are smoother but

@@ -36,9 +36,6 @@ public final class VRCameraRig {
     private float z;
     private final float[] q = Quaternion.identity();
 
-    // Scratch buffer, allocated once.
-    private final float[] v = new float[3];
-
     /// Creates a rig with the supplied settings.
     ///
     /// #### Parameters
@@ -78,6 +75,7 @@ public final class VRCameraRig {
     ///
     /// - `aspect`: the per-eye viewport aspect ratio (width / height)
     public void apply(Camera out, VREye eye, float aspect) {
+        float[] v = new float[3];
         float half = settings.getIpdMeters() * 0.5f * eye.offsetSign();
         v[0] = half;
         v[1] = 0f;

@@ -48,7 +48,7 @@ public final class ARSession implements AutoCloseable {
     private final ARSessionOptions options;
     private final Bridge bridge = new Bridge();
     private ARView view;
-    private volatile boolean closed;
+    private boolean closed;
 
     private final LinkedHashMap<String, ARPlane> planes = new LinkedHashMap<String, ARPlane>();
     private final LinkedHashMap<String, ARAnchor> anchors = new LinkedHashMap<String, ARAnchor>();
@@ -260,6 +260,7 @@ public final class ARSession implements AutoCloseable {
             return;
         }
         closed = true;
+        bridge.stop();
         try {
             impl.close();
         } finally {
@@ -306,24 +307,24 @@ public final class ARSession implements AutoCloseable {
     private void fireTrackingEvent() {
         ARTrackingListener[] ls = trackingListeners.toArray(
                 new ARTrackingListener[trackingListeners.size()]);
-        for (int i = 0; i < ls.length; i++) {
-            ls[i].trackingStateChanged(this, trackingState, failureReason);
+        for (ARTrackingListener l : ls) {
+            l.trackingStateChanged(this, trackingState, failureReason);
         }
     }
 
     private void firePlaneEvent(ARPlaneEvent ev) {
         ARPlaneListener[] ls = planeListeners.toArray(
                 new ARPlaneListener[planeListeners.size()]);
-        for (int i = 0; i < ls.length; i++) {
-            ls[i].planeChanged(ev);
+        for (ARPlaneListener l : ls) {
+            l.planeChanged(ev);
         }
     }
 
     private void fireAnchorEvent(ARAnchorEvent ev) {
         ARAnchorListener[] ls = anchorListeners.toArray(
                 new ARAnchorListener[anchorListeners.size()]);
-        for (int i = 0; i < ls.length; i++) {
-            ls[i].anchorChanged(ev);
+        for (ARAnchorListener l : ls) {
+            l.anchorChanged(ev);
         }
     }
 
@@ -347,6 +348,21 @@ public final class ARSession implements AutoCloseable {
         private ARPose pendingCameraPose;
         private ARLightEstimate pendingLight;
         private boolean drainScheduled;
+        // Set under the lock when the session closes; every producer checks
+        // it so late implementation events are dropped without touching the
+        // (EDT-confined) session state.
+        private boolean stopped;
+
+        void stop() {
+            synchronized (lock) {
+                stopped = true;
+                ops.clear();
+                planeUpdates.clear();
+                anchorUpdates.clear();
+                pendingCameraPose = null;
+                pendingLight = null;
+            }
+        }
 
         @Override
         public void onTrackingStateChanged(ARTrackingState state, ARTrackingFailureReason reason) {
@@ -366,7 +382,7 @@ public final class ARSession implements AutoCloseable {
                 return;
             }
             synchronized (lock) {
-                if (closed) {
+                if (stopped) {
                     return;
                 }
                 planeUpdates.put(plane.getId(), plane);
@@ -401,7 +417,7 @@ public final class ARSession implements AutoCloseable {
                 return;
             }
             synchronized (lock) {
-                if (closed) {
+                if (stopped) {
                     return;
                 }
                 Object[] prev = anchorUpdates.get(anchorId);
@@ -443,7 +459,7 @@ public final class ARSession implements AutoCloseable {
                 return;
             }
             synchronized (lock) {
-                if (closed) {
+                if (stopped) {
                     return;
                 }
                 pendingLight = estimate;
@@ -457,7 +473,7 @@ public final class ARSession implements AutoCloseable {
                 return;
             }
             synchronized (lock) {
-                if (closed) {
+                if (stopped) {
                     return;
                 }
                 pendingCameraPose = pose;
@@ -467,7 +483,7 @@ public final class ARSession implements AutoCloseable {
 
         private void enqueueOp(Object[] op) {
             synchronized (lock) {
-                if (closed) {
+                if (stopped) {
                     return;
                 }
                 ops.add(op);
@@ -495,12 +511,7 @@ public final class ARSession implements AutoCloseable {
             ARLightEstimate newLight;
             synchronized (lock) {
                 drainScheduled = false;
-                if (closed) {
-                    ops.clear();
-                    planeUpdates.clear();
-                    anchorUpdates.clear();
-                    pendingCameraPose = null;
-                    pendingLight = null;
+                if (stopped) {
                     return;
                 }
                 opsSnapshot = ops.toArray(new Object[ops.size()][]);
@@ -521,19 +532,18 @@ public final class ARSession implements AutoCloseable {
             if (newLight != null) {
                 lightEstimate = newLight;
             }
-            for (int i = 0; i < opsSnapshot.length; i++) {
-                applyOp(opsSnapshot[i]);
+            for (Object[] op : opsSnapshot) {
+                applyOp(op);
             }
-            for (int i = 0; i < planeSnapshot.length; i++) {
-                ARPlane p = planeSnapshot[i];
+            for (ARPlane p : planeSnapshot) {
                 if (planes.containsKey(p.getId())) {
                     planes.put(p.getId(), p);
                     firePlaneEvent(new ARPlaneEvent(ARPlaneEvent.Kind.UPDATED, p, ARSession.this));
                 }
             }
-            for (int i = 0; i < anchorSnapshot.length; i++) {
-                String id = (String) anchorSnapshot[i].getKey();
-                Object[] u = (Object[]) anchorSnapshot[i].getValue();
+            for (Map.Entry entry : anchorSnapshot) {
+                String id = (String) entry.getKey();
+                Object[] u = (Object[]) entry.getValue();
                 ARAnchor anchor = anchors.get(id);
                 if (anchor == null) {
                     continue;
