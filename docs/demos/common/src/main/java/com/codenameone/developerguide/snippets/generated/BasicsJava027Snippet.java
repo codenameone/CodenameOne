@@ -61,7 +61,9 @@ class BasicsJava027Snippet {
         Button btn = new Button("Submit");
         LayeredLayout ll = (LayeredLayout)cnt.getLayout();
         cnt.add(btn);
+        // tag::basics-java-027-insets[]
         ll.setInsets(btn, "auto 0 0 auto");
+        // end::basics-java-027-insets[]
         // end::basics-java-027[]
     }
 }

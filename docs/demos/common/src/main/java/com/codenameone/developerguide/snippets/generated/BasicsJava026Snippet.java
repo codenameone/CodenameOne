@@ -71,8 +71,10 @@ class BasicsJava026Snippet {
         close.setUIID("Container");
         close.getAllStyles().setFgColor(0xff0000);
         FontImage.setMaterialIcon(close, FontImage.MATERIAL_CLOSE);
+        // tag::basics-java-026-layered[]
         hi.add(LayeredLayout.encloseIn(settingsLabel,
                 FlowLayout.encloseRight(close)));
+        // end::basics-java-026-layered[]
         // end::basics-java-026[]
     }
 }

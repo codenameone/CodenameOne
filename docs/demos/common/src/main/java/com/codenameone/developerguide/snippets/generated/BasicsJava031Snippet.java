@@ -62,9 +62,11 @@ class BasicsJava031Snippet {
         Button btn = new Button("Submit");
         TextField tf = new TextField();
         cnt.add(tf).add(btn);
+        // tag::basics-java-031-reference[]
         ll.setInsets(tf, "auto")
           .setInsets(btn, "auto auto auto 0")
           .setReferenceComponentLeft(btn, tf, 1f);
+        // end::basics-java-031-reference[]
         // end::basics-java-031[]
     }
 }

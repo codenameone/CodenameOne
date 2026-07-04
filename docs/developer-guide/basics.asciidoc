@@ -456,6 +456,10 @@ image::img/layered-layout.png[The X on this button was placed there using the la
 
 The code to generate this UI is slightly complex and contains few relevant pieces. The truly relevant piece is this block:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava026Snippet.java[tag=basics-java-026-layered,indent=0]
+----
 
 You're doing three distinct things here:
 
@@ -496,6 +500,10 @@ image::img/guibuilder-2-insets-1.png[Button positioned in bottom right using ins
 
 The thing new here is this line:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava027Snippet.java[tag=basics-java-027-insets,indent=0]
+----
 
 This is called after `btn` has already been added to the container. It says that you want its insets to be "auto" on the top and left, and `0` on the right and bottom. This *insets* string follows the CSS notation of `top right bottom left` (that's: start on top and go clockwise), and the values of each inset may be provided in pixels (px), millimetres (mm), percent (%), or the special "auto" value. Like CSS, you can also specify the insets using a 1, 2, or 3 values. For example:
 
@@ -512,6 +520,10 @@ NOTE: The "inset bounding box" is the containing box from which a component's in
 
 If one inset is fixed (that's: defined in px, mm, or %), and the opposite inset is "auto," then the "auto" inset will allow the component to be its preferred size. If you want to position a component to be centered vertically, and 5mm from the left edge, you could do:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava028Snippet.java[tag=basics-java-028,indent=0]
+----
 
 Resulting in:
 
@@ -520,6 +532,10 @@ image::img/guibuilder-2-insets-2.png[Button vertically centered 5mm from left ed
 
 Move it to the right edge with:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava029Snippet.java[tag=basics-java-029,indent=0]
+----
 
 ===== `%` insets
 
@@ -559,6 +575,10 @@ image::img/guibuilder-2-insets-3.png[Button's left inset linked to text field,sc
 
 The two active lines here are the last two:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava031Snippet.java[tag=basics-java-031-reference,indent=0]
+----
 
 NOTE: The reference position is defined as the distance, expressed as a fraction of the reference component's length on the inset's axis, between the reference component's leading (outer) edge and the point from which the inset is measured. A reference position of 0 means that the inset is measured from the leading edge of the reference component. A value of 1.0 means that the inset is measured from the trailing edge of the reference component. A value of 0.5 means that the inset is measured from the center of the reference component. Etc. Any floating point value can be used, though the most common values are 0 and 1.
 
@@ -645,6 +665,10 @@ The API was deprecated to serve as a warning of its experimental status.
 
 The best reference for MiG would probably be its http://www.miglayout.com/QuickStart.pdf[quick start guide (PDF link)]. As a reference you ported one of the samples from that PDF to Codename One:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava035Snippet.java[tag=basics-java-035,indent=0]
+----
 
 .MiG layout sample ported to Codename One
 image::img/mig-layout.png[MiG layout sample ported to Codename One,scaledwidth=20%]

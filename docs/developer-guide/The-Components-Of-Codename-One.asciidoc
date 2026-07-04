@@ -1194,6 +1194,10 @@ TIP: `Table` is based on the https://www.codenameone.com/javadoc/com/codename1/u
 
 Here is a trivial sample of using the standard table component:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava068Snippet.java[tag=the-components-of-codename-one-java-068,indent=0]
+----
 
 .Simple Table usage
 image::img/components-table.png[Simple Table usage,scaledwidth=20%]
@@ -1204,6 +1208,10 @@ The more "interesting" capabilities of the `Table` class can be utilized through
 
 For example:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava069Snippet.java[tag=the-components-of-codename-one-java-069,indent=0]
+----
 
 .Table with spanning & fixed widths to 33%
 image::img/components-table-with-spanning.png[Table with spanning and fixed widths to 33%,scaledwidth=20%]
@@ -1212,6 +1220,10 @@ To customize the table cell behavior you can derive the `Table` to create a "ren
 
 The example above can be extended to include far more capabilities:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava070Snippet.java[tag=the-components-of-codename-one-java-070,indent=0]
+----
 
 .Table with customize cells using the pinstripe effect
 image::img/components-table-pinstripe.png[Table with customize cells using the pinstripe effect,scaledwidth=20%]
@@ -1221,6 +1233,10 @@ image::img/components-table-pinstripe-edit.png[Picker table cell during edit,sca
 
 To line wrap table cells you can override the `createCell` method and return a https://www.codenameone.com/javadoc/com/codename1/ui/TextArea.html[TextArea] instead of a https://www.codenameone.com/javadoc/com/codename1/ui/TextField.html[TextField] since the `TextArea` defaults to the multi-line behavior this should work seamlessly. For example:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava071Snippet.java[tag=the-components-of-codename-one-java-071,indent=0]
+----
 
 TIP: Notice that you don't need to do anything else as binding to the `TextArea` is built-in to the `Table`.
 
@@ -1236,6 +1252,10 @@ image::img/components-table-multiline-landscape.png[Multiline table cell in land
 
 Sorting tables by clicking the titles is something that should work out of the box by using an API like `setSortSupported(true)`:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava072Snippet.java[tag=the-components-of-codename-one-java-072,indent=0]
+----
 
 Notice this works with numbers, Strings and might work with dates but you can support any object type by overriding the method `protected Comparator createColumnSortComparator(int column)` which should return a comparator for your custom object type in the column.
 
