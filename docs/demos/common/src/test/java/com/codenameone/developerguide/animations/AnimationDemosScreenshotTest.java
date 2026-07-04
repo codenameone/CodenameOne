@@ -347,6 +347,7 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
     private boolean shouldTrimBlankBottom(String fileName) {
         return fileName.startsWith("flow-layout")
                 || fileName.startsWith("box-layout")
+                || fileName.startsWith("table-layout")
                 || "components-button.png".equals(fileName)
                 || "components-link-button.png".equals(fileName)
                 || "raised-flat-buttons.png".equals(fileName)

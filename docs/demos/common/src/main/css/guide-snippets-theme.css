@@ -155,6 +155,41 @@ MyButton {
 }
 /* end::css-css-003[] */
 
+/* tag::css-css-004[] */
+#Constants {
+    includeNativeBool: true;
+    commandBehavior: "Side";
+    defaultFontSizeInt: 18;
+    defaultDesktopFontSizeInt: 14;
+    defaultSourceDPIInt: "0";
+    menuImage: "menu.png";
+}
+
+MenuIcon {
+    background-image: url(images/menu.png);
+}
+/* end::css-css-004[] */
+
+/* tag::css-css-005[] */
+#Constants {
+    --header-color: blue;
+}
+
+Header {
+    color: var(--header-color, blue);
+}
+/* end::css-css-005[] */
+
+/* tag::css-css-006[] */
+#Constants {
+    --custom-property-name: #0066cc;
+}
+
+ExampleSelector {
+    color: var(--custom-property-name, #0066cc);
+}
+/* end::css-css-006[] */
+
 /* tag::css-css-007[] */
 #Constants {
     --main-bg-color: red;
@@ -175,17 +210,228 @@ MyContainer {
 }
 /* end::css-css-008[] */
 
+/* tag::css-css-009[] */
+RoundBorder {
+    border: 1px #3399ff cn1-round-border;
+    text-align: center;
+    margin: 2mm;
+    padding: 3mm;
+}
+
+RoundBorderFilled {
+    background: cn1-round-border;
+    background-color: #cccccc;
+    text-align: center;
+    margin: 2mm;
+    padding: 3mm;
+}
+/* end::css-css-009[] */
+
+/* tag::css-css-010[] */
+PillBorder {
+    border: 1pt #3399ff cn1-pill-border;
+    text-align: center;
+}
+
+PillBorderFilled {
+    background: cn1-pill-border;
+    background-color: #3399ff;
+    color: white;
+    text-align: center;
+}
+/* end::css-css-010[] */
+
+/* tag::css-css-011[] */
+RoundRectLabel {
+    background-color: red;
+    border-radius: 2mm;
+}
+/* end::css-css-011[] */
+
+/* tag::css-css-012[] */
+EllipticalBorder {
+    border-radius: 2mm 4mm 6mm 1mm / 1mm 3mm 5mm 7mm;
+    cn1-box-shadow-spread: 1.5mm;
+    cn1-box-shadow-inset: inset;
+}
+/* end::css-css-012[] */
+
+/* tag::css-css-013[] */
+LinearGradientA { background: linear-gradient(0deg, #cccccc, #666666); }
+LinearGradientB { background: linear-gradient(to top, #cccccc, #666666); }
+LinearGradientC { background: linear-gradient(45deg, #eaeaea, #666666); }
+LinearGradientD { background: linear-gradient(135deg, #ff0080 0%, #ff8c00 50%, #40e0d0 100%); }
+LinearGradientE { background: linear-gradient(to bottom right, #ff0066, #000033); }
+LinearGradientF { background: linear-gradient(90deg, rgba(255, 0, 0, 0.6), blue); }
+/* end::css-css-013[] */
+
+/* tag::css-css-014[] */
+RadialGradientA { background: radial-gradient(circle, gray, white); }
+RadialGradientB { background: radial-gradient(ellipse closest-side at 25% 75%, #ffffff, #000000); }
+RadialGradientC { background: radial-gradient(circle farthest-corner at right, #ffffee, #006666 60%, #000011 100%); }
+/* end::css-css-014[] */
+
+/* tag::css-css-015[] */
+ConicGradientA { background: conic-gradient(red, yellow, green, blue, red); }
+ConicGradientB { background: conic-gradient(from 45deg at 50% 50%, #ff0066 0%, #ffcc00 25%, #00cc66 50%, #0066ff 75%, #ff0066 100%); }
+/* end::css-css-015[] */
+
+/* tag::css-css-016[] */
+MyStripe { background: repeating-linear-gradient(45deg, #eeeeee 0%, #eeeeee 10%, #cccccc 10%, #cccccc 20%); }
+MyTarget { background: repeating-radial-gradient(circle at center, #ffffff 0%, #ffffff 20%, #cc3333 20%, #cc3333 40%); }
+/* end::css-css-016[] */
+
+/* tag::css-css-017[] */
+MyOverlay {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(12px);
+}
+
+MyBlurredImage {
+    filter: blur(4px);
+}
+
+MyFaded {
+    filter: brightness(0.7) contrast(1.15);
+}
+
+MyGrayscale {
+    filter: grayscale(1);
+}
+
+MySepia {
+    filter: sepia(0.8) saturate(1.1);
+}
+/* end::css-css-017[] */
+
+/* tag::css-css-018[] */
+SomeStyle {
+    background-image: url(images/my-image.png);
+    cn1-source-dpi: 160;
+}
+/* end::css-css-018[] */
+
+/* tag::css-css-019[] */
+SomeStyle {
+    background-image: url(images/my-image.png);
+    cn1-source-dpi: 0;
+}
+/* end::css-css-019[] */
+
 /* tag::css-css-020[] */
 #Constants {
   defaultSourceDPIInt: 0;
 }
 /* end::css-css-020[] */
 
+/* tag::css-css-021[] */
+MyStyle {
+    background-image: url(images/mymultiimage.png);
+}
+/* end::css-css-021[] */
+
+/* tag::css-css-022[] */
+Images {
+    background-image: url(images/NowLogo.png),
+        url(images/Username-icon.png),
+        url(images/Password-icon.png),
+        url(images/Name-icon.png),
+        url(images/Email-icon.png),
+        url(images/SeaIce.png),
+        url(images/Back-icon.png),
+        url(images/Source-icon.png),
+        url(images/Date-icon.png),
+        url(images/Arrow-right.png),
+        url(images/Share-icon.png),
+        url(images/Text-icon.png),
+        url(images/Comments-icon.png),
+        url(images/RedPlanet.png),
+        url(images/News-icon.png),
+        url(images/Channels-icon.png),
+        url(images/Bookmarks-icon.png),
+        url(images/Overview-icon.png),
+        url(images/Calendar-icon.png),
+        url(images/Timeline-icon.png),
+        url(images/Profile-icon.png),
+        url(images/Widgets-icon.png),
+        url(images/Settings-icon.png),
+        url(images/Bookmark-icon.png);
+}
+/* end::css-css-022[] */
+
+/* tag::css-css-023[] */
+ImagesRemote {
+    background-image: url(images/remote-logo.png);
+}
+/* end::css-css-023[] */
+
+/* tag::css-css-024[] */
+NinePiece {
+    border-image: url(images/dashbg_landscape.png);
+}
+/* end::css-css-024[] */
+
+/* tag::css-css-025[] */
+NinePiece {
+    border-image: url(images/dashbg_landscape.png);
+    border-image-slice: 10% 49%;
+}
+
+NinePiece2 {
+    border-image: url(images/dashbg_landscape.png);
+    border-image-slice: 10% 49% 20%;
+}
+
+NinePiece3 {
+    border-image: url(images/dashbg_landscape.png);
+    border-image-slice: 10% 30% 40% 20%;
+}
+
+NinePiece4 {
+    border-image: url(images/dashbg_landscape.png);
+    border-image-slice: 10%;
+}
+/* end::css-css-025[] */
+
+/* tag::css-css-026[] */
+MyContainer {
+    background-image: url(images/myimage.png);
+    cn1-background-type: cn1-image-scaled-fill;
+}
+/* end::css-css-026[] */
+
 /* tag::css-css-027[] */
 SideCommand {
     font-family:  "native:MainThin";
 }
 /* end::css-css-027[] */
+
+/* tag::css-css-028[] */
+@font-face {
+    font-family: "GuideDemoFont";
+    src: url(res/GuideDemoFont-Regular.ttf);
+}
+/* end::css-css-028[] */
+
+/* tag::css-css-029[] */
+MyLabel {
+    font-family: "GuideDemoFont";
+}
+/* end::css-css-029[] */
+
+/* tag::css-css-030[] */
+@font-face {
+    font-family: "GuideDownloadedFont";
+    src: url(res/GuideDemoFont-Regular.ttf);
+}
+/* end::css-css-030[] */
+
+/* tag::css-css-031[] */
+@font-face {
+    font-family: "GuideIconFont";
+    src: url(res/GuideIconFont.ttf);
+}
+/* end::css-css-031[] */
 
 /* tag::css-css-032[] */
 #Constants {
@@ -199,6 +445,135 @@ SideCommand {
  defaultDesktopFontSizeInt: 14;
 }
 /* end::css-css-033[] */
+
+/* tag::css-css-034[] */
+@font-face {
+    font-family: "GuideDemoFont";
+    src: url(res/GuideDemoFont-Regular.ttf);
+}
+
+@font-face {
+    font-family: "GuideDemoFont-Bold";
+    src: url(res/GuideDemoFont-Bold.ttf);
+}
+
+PlainText0p5mm { font-size: 0.5mm; }
+PlainText1mm { font-size: 1mm; }
+PlainText2mm { font-size: 2mm; }
+PlainText5mm { font-size: 5mm; }
+PlainText10mm { font-size: 10mm; }
+PlainText50mm { font-size: 50mm; }
+PlainTextSmall { font-size: small; }
+PlainTextMedium { font-size: medium; }
+PlainTextLarge { font-size: large; }
+PlainText3pt { font-size: 3pt; }
+PlainText6pt { font-size: 6pt; }
+PlainText12pt { font-size: 12pt; }
+PlainText20pt { font-size: 20pt; }
+PlainText36pt { font-size: 36pt; }
+
+BoldText { font-weight: bold; }
+BoldText1mm { font-weight: bold; font-size: 1mm; }
+BoldText2mm { font-weight: bold; font-size: 2mm; }
+BoldText3mm { font-weight: bold; font-size: 3mm; }
+BoldText5mm { font-weight: bold; font-size: 5mm; }
+
+ItalicText { font-style: italic; }
+ItalicText3mm { font-style: italic; font-size: 3mm; }
+ItalicBoldText { font-style: italic; font-weight: bold; }
+
+PlainTextUnderline { text-decoration: underline; }
+BoldTextUnderline { text-decoration: underline; font-weight: bold; }
+ItalicTextUnderline { text-decoration: underline; font-style: italic; }
+
+PlainText3d {
+    text-decoration: cn1-3d;
+    color: white;
+    background-color: #3399ff;
+}
+
+BoldText3d {
+    text-decoration: cn1-3d;
+    font-weight: bold;
+    color: white;
+    background-color: #3399ff;
+}
+
+ItalicText3d {
+    text-decoration: cn1-3d;
+    font-style: italic;
+    color: white;
+    background-color: #3399ff;
+}
+
+PlainText3dLowered {
+    text-decoration: cn1-3d-lowered;
+    color: black;
+    background-color: #3399ff;
+}
+
+BoldText3dLowered {
+    text-decoration: cn1-3d-lowered;
+    font-weight: bold;
+    color: black;
+    background-color: #3399ff;
+}
+
+ItalicText3dLowered {
+    text-decoration: cn1-3d-lowered;
+    font-style: italic;
+    color: black;
+    background-color: #3399ff;
+}
+
+PlainText3dShadow {
+    text-decoration: cn1-3d-shadow-north;
+    color: white;
+    background-color: #3399ff;
+}
+
+BoldText3dShadow {
+    text-decoration: cn1-3d-shadow-north;
+    font-weight: bold;
+    color: white;
+    background-color: #3399ff;
+}
+
+ItalicText3dShadow {
+    text-decoration: cn1-3d-shadow-north;
+    font-style: italic;
+    color: white;
+    background-color: #3399ff;
+}
+
+MainThin {
+    font-size: 200%;
+    background: radial-gradient(circle at top left, yellow, blue 100%);
+}
+
+MainRegular0001 {
+    font-family: "native:MainRegular";
+    color: blue;
+    border: 1px cn1-pill-border blue;
+    padding: 2mm;
+}
+
+MainRegular0001.pressed {
+    font-family: "native:MainRegular";
+    background: cn1-pill-border blue;
+    color: white;
+    border: 1px solid white;
+    padding: 2mm;
+}
+
+Heading {
+    font-size: 4mm;
+    font-family: "GuideDemoFont-Bold";
+    color: black;
+    padding: 2mm;
+    text-align: center;
+}
+/* end::css-css-034[] */
 
 /* tag::css-css-035[] */
 Button {
@@ -234,6 +609,30 @@ Label {
     }
 }
 /* end::css-css-036[] */
+
+/* tag::css-css-037[] */
+@media platform-and, density-high {
+    Label {
+        color: green;
+    }
+}
+/* end::css-css-037[] */
+
+/* tag::css-css-038[] */
+@media platform-ios, density-high, density-low {
+    Label {
+        color: red;
+    }
+}
+/* end::css-css-038[] */
+
+/* tag::css-css-039[] */
+@media device-desktop, platform-mac {
+    Label {
+        color: blue;
+    }
+}
+/* end::css-css-039[] */
 
 /* tag::css-css-040[] */
 Label {
@@ -273,3 +672,27 @@ Label {
  platform-ios-density-low-font-scale: "1.3";
 }
 /* end::css-css-043[] */
+
+/* tag::svg-transcoder-css-001[] */
+HomeIcon {
+    background: url(home.svg);
+    cn1-svg-width: 6mm;
+    cn1-svg-height: 6mm;
+    cn1-background-type: cn1-image-scaled-fit;
+}
+/* end::svg-transcoder-css-001[] */
+
+/* tag::svg-transcoder-css-002[] */
+StarIcon { background: url(star.svg); cn1-svg-width: 4mm; cn1-svg-height: 4mm; }
+PrimaryIcon { background: url(home.svg); cn1-svg-width: 6mm; cn1-svg-height: 6mm; }
+LogoBanner { background: url(logo.svg); cn1-svg-width: 32mm; cn1-svg-height: 12mm; }
+/* end::svg-transcoder-css-002[] */
+
+/* tag::svg-transcoder-css-003[] */
+SpinnerStyle {
+    background: url(spinner.json);
+    cn1-svg-width: 12mm;
+    cn1-svg-height: 12mm;
+    cn1-background-type: cn1-image-scaled-fit;
+}
+/* end::svg-transcoder-css-003[] */

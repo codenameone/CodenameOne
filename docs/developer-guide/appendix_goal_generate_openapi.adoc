@@ -77,6 +77,12 @@ emitted method shape:
 include::../demos/common/src/main/java/com/example/petstore/PetApi.java[tag=appendix-goal-generate-openapi-java-001,indent=0]
 ----
 
+The model type referenced by the generated API is emitted into the generated model package:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/example/petstore/model/Pet.java[tag=appendix-goal-generate-openapi-java-002,indent=0]
+----
 
 Model types are emitted as fully qualified names (the API interface
 lives in `<basePackage>` and models under `<basePackage>.model`) so

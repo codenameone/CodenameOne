@@ -73,7 +73,7 @@ For example:
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-004,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-004,indent=0]
 ----
 
 In the above example, the constants referring to an image name as a string requires that the image exists in one of the following locations:
@@ -131,16 +131,16 @@ As of CodenameOne 7.0, you can use variables in your CSS file via the `var()` CS
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-005,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-005,indent=0]
 ----
 
 The `var()` function can be used inside property values. That is, You can't use it in property names or selectors.
 
-**Syntax**:
+The `var()` grammar follows the browser CSS form:
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-006,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-006,indent=0]
 ----
 
 The `<custom-property-name>` must begin with two dashes (`--`).
@@ -226,21 +226,21 @@ Rounded borders can be achieved in a few different ways. The easiest methods are
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-009,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-009,indent=0]
 ----
 
 **Examples using `cn1-pill-border`**
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-010,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-010,indent=0]
 ----
 
 **Examples using `border-radius`**
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-011,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-011,indent=0]
 ----
 
 `cn1-pill-border` and `cn1-round-border` don't support the standard CSS `box-shadow` property. This is because the `box-shadow` property parameters don't map onto the shadow parameters for the Codename One `RoundBorder` class. To get shadows on the `cn1-pill-border`, you should use one or more of the following CSS properties:
@@ -258,7 +258,7 @@ Codename One also exposes per-corner elliptical radius controls that map to the 
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-012,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-012,indent=0]
 ----
 
 In the example above, the four horizontal radii (`2mm 4mm 6mm 1mm`) populate the `cn1-border-*-radius-x` properties clockwise from the top-left corner. The four values after the slash fill the matching `cn1-border-*-radius-y` entries. Setting `cn1-box-shadow-inset: inset;` converts the shadow into an inset glow that follows the same elliptical curvature.
@@ -289,7 +289,7 @@ Any angle in degrees, radians, or `turn`, or the canonical `to <side>` / `to <si
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-013,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-013,indent=0]
 ----
 
 **`radial-gradient`**
@@ -298,7 +298,7 @@ Full CSS radial syntax: `circle` or `ellipse`, any of the four extent keywords (
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-014,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-014,indent=0]
 ----
 
 **`conic-gradient`**
@@ -307,7 +307,7 @@ Sweep / pie-style gradient. Optional `from <angle>` (CSS convention: 0° points 
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-015,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-015,indent=0]
 ----
 
 **`repeating-linear-gradient` / `repeating-radial-gradient`**
@@ -316,7 +316,7 @@ Identical syntax to their non-repeating counterparts. The stop pattern tiles out
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-016,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-016,indent=0]
 ----
 
 ===== filter and backdrop-filter
@@ -328,7 +328,7 @@ CSS `filter` and `backdrop-filter` accept a chain of functions. Two storage form
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-017,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-017,indent=0]
 ----
 
 .`filter: blur()` applied at a graphics primitive level — the framework's screenshot test renders RGB stripes and a gradient, then blurs both via `Graphics.gaussianBlur(...)`. Component-level paint-time integration of `filter:` declarations is in progress; until it lands, set the radius / matrix on a `Style` and consume them via the corresponding `Graphics` primitives manually.
@@ -380,7 +380,7 @@ Some images have this density information embedded in the image itself so that t
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-018,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-018,indent=0]
 ----
 
 NOTE: `cn1-source-dpi` values are meant to fall into threshold ranges. Values less than or equal to 120, are interpreted as low density. 121 - 160 are medium density (iPhone 3GS). 161 - 320, high density (iPhone 4S). 321 - 480 == HD. 481 and higher == 2HD. In general, you should try to use images that are one of these DPIs exactly: 160, 320, or 480, then images will be scaled up or down to the other densities accordingly.
@@ -391,7 +391,7 @@ By default all images are imported as multi-images (unless you define the `defau
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-019,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-019,indent=0]
 ----
 
 [NOTE]
@@ -425,7 +425,7 @@ For example, Given the CSS directives:
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-021,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-021,indent=0]
 ----
 
 The files would look like:
@@ -475,7 +475,7 @@ It's quite useful to be able to embed images inside the resource file that's gen
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-022,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-022,indent=0]
 ----
 
 Then in Java, you might do something like:
@@ -487,11 +487,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 ==== Loading images from URLs
 
-You can also load images from remote URLs. For example:
+You can also load images from remote URLs. The compiled guide fixture uses a local asset so the build is deterministic and does not depend on network access; application CSS can use the same `url(...)` syntax with an HTTPS URL:
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-023,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-023,indent=0]
 ----
 
 ==== Generating 9-Piece Image borders
@@ -504,7 +504,7 @@ For example:
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-024,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-024,indent=0]
 ----
 
 
@@ -514,7 +514,7 @@ If you want more specific "slice" points, you can add the `border-image-slice` p
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-025,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-025,indent=0]
 ----
 
 ==== Image backgrounds
@@ -555,7 +555,7 @@ The potential for confusion is mitigated somewhat, but still exists when using C
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-026,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-026,indent=0]
 ----
 
 === Image compression
@@ -594,21 +594,21 @@ If you want to use a font other than the built-in fonts, you'll need to define t
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-028,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-028,indent=0]
 ----
 
 Then you'll be able to reference the font using the specified `font-family` in any CSS element. For example:
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-029,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-029,indent=0]
 ----
 
-The `@font-face` directive's `src` property will accept both local and remote URLs. For example:
+The `@font-face` directive's `src` property will accept both local and remote URLs. The guide fixture below uses a local font so the demo build remains offline and repeatable; application CSS can replace the URL with an HTTPS font URL:
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-030,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-030,indent=0]
 ----
 
 In this case, it will download the `myfont.ttf` file to the same directory as the CSS file. From then on it will use that locally downloaded version of the font so that it doesn't have to make a network request for each build.
@@ -617,14 +617,14 @@ Fonts are automatically copied to the project's "src" directory when the CSS fil
 
 **GitHub URLs**
 
-Fonts hosted on GitHub are accessible using a special `github:` protocol to make it easier to reference such fonts. For example, the following directive includes the "FontAwesome" font directly from GitHub
+Fonts hosted on GitHub are accessible using a special `github:` protocol to make it easier to reference such fonts. The compiled guide fixture uses a bundled icon font for offline validation; application CSS can use the same rule shape with a `github:` URL.
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-031,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-031,indent=0]
 ----
 
-NOTE: Apparently FontAwesome has removed its public repositories from GitHub so this URL no longer works.
+NOTE: If a third-party font repository moves or changes licensing, vendor the font into your project and reference it locally so builds stay reproducible.
 
 ==== `font-size`
 
@@ -681,7 +681,7 @@ See link:Supported-Properties#text-decoration[the text-decoration section] in th
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-034,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-034,indent=0]
 ----
 
 === Media queries
@@ -754,20 +754,20 @@ You can combine multiple media queries together, separated by a comma. Queries o
 .Example: Targeting styles to Android devices with high density
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-037,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-037,indent=0]
 ----
 
 .Example: Targeting styles to iOS devices with high or low density
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-038,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-038,indent=0]
 ----
 
 .Example: Targeting Mac Desktop:
 
 [source,css]
 ----
-include::../demos/common/src/main/css/developer-guide/css.css[tag=css-css-039,indent=0]
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-039,indent=0]
 ----
 
 ==== Order or precedence
@@ -814,7 +814,6 @@ include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-043,i
 ----
 
 IMPORTANT: All matching `font-scale` constants will be applied to the styles. If you define 3 font-scale constants that all match the current runtime environment, they will all be applied. For example, If there are 3 matching font-scale constants with `2.0`, `3.0`, and `4.0`, then fonts will be scaled by 2*3*4=24!
-
 
 
 

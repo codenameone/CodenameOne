@@ -40,6 +40,7 @@ import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.spinner.Picker;
+import com.codename1.ui.table.TableLayout;
 import com.codenameone.developerguide.Demo;
 
 import java.util.Date;
@@ -136,6 +137,53 @@ public final class GuideStaticScreenshotDemos {
                 grid.add(coloredLabel("Item " + i, 0x00695c + (i * 0x030303)));
             }
             form.add(BorderLayout.CENTER, grid);
+            return form;
+        });
+    }
+
+    public static Demo tableLayoutOverflow() {
+        return formDemo("TableLayout 2x2", "TableLayout overflow", () -> {
+            Form form = new Form("TableLayout", new TableLayout(2, 2));
+            addTiles(form, "First", "Second", "Third", "Fourth", "Fifth");
+            return form;
+        });
+    }
+
+    public static Demo tableLayoutEnclose() {
+        return formDemo("TableLayout Enclose", "TableLayout.encloseIn()", () -> {
+            Form form = new Form("Table Layout", new BorderLayout());
+            Container table = TableLayout.encloseIn(3,
+                    coloredLabel("First", 0x0d47a1),
+                    coloredLabel("Second", 0x00695c),
+                    coloredLabel("Third grows", 0x6a1b9a));
+            form.add(BorderLayout.NORTH, table);
+            return form;
+        });
+    }
+
+    public static Demo tableLayoutConstraints() {
+        return formDemo("TableLayout Constraints", "TableLayout constraints", () -> {
+            TableLayout layout = new TableLayout(4, 3);
+            layout.setGrowHorizontally(true);
+            Form form = new Form("Table Layout", layout);
+
+            TableLayout.Constraint title = layout.createConstraint();
+            title.setHorizontalSpan(3);
+            title.setHorizontalAlign(Component.CENTER);
+            form.add(title, coloredLabel("Invoice", 0x0d47a1));
+
+            form.add(coloredLabel("Item", 0x00695c));
+            form.add(coloredLabel("Qty", 0x00695c));
+            form.add(coloredLabel("Total", 0x00695c));
+            form.add(new Label("Design"));
+            form.add(new Label("2"));
+            form.add(new Label("$120"));
+
+            TableLayout.Constraint notes = layout.createConstraint();
+            notes.setHorizontalSpan(2);
+            notes.setHeightPercentage(40);
+            form.add(notes, new SpanLabel("Notes span two columns"));
+            form.add(new Button("Pay"));
             return form;
         });
     }

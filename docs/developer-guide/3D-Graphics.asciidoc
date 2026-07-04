@@ -99,6 +99,10 @@ https://www.codenameone.com/javadoc/com/codename1/gpu/VertexBuffer.html[VertexBu
 with a `VertexFormat`, fill the interleaved float data, and (optionally) an
 https://www.codenameone.com/javadoc/com/codename1/gpu/IndexBuffer.html[IndexBuffer]:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ThreeDGraphicsJava003Snippet.java[tag=3d-graphics-java-003,indent=0]
+----
 
 Vertex buffers are allocated through the platform SIMD allocator, which on iOS
 (ParparVM) places the data at a fixed, aligned native address so it can be handed

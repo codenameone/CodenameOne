@@ -357,6 +357,10 @@ Despite being constraint based the `TableLayout` isn't strict about constraints 
 
 WARNING: Unlike `GridLayout` `TableLayout` won't implicitly add a row if the row/column count is wrong
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava020Snippet.java[tag=basics-java-020,indent=0]
+----
 
 .2×2 TableLayout with 5 elements, notice that the last element is missing
 image::img/table-layout-2x2.png[2×2 TableLayout with 5 elements, notice that the last element is missing,scaledwidth=20%]
@@ -365,6 +369,10 @@ image::img/table-layout-2x2.png[2×2 TableLayout with 5 elements, notice that th
 
 The default usage of the `encloseIn` method below uses the `setGrowHorizontally` flag:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava021Snippet.java[tag=basics-java-021,indent=0]
+----
 
 .`TableLayout.encloseIn()` with default behavior of growing the last column
 image::img/table-layout-enclose.png[TableLayout.encloseIn() with default behavior of growing the last column,scaledwidth=20%]
@@ -397,8 +405,12 @@ The <<table-layout-constraint-sample,table layout constraint sample>> tries to s
 
 [[table-layout-constraint-sample]]
 
+The constraint sample below spans the title across all three columns and spans the notes row across two columns:
 
-Here is the full code mentioned in item 3:
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/BasicsJava022Snippet.java[tag=basics-java-022,indent=0]
+----
 
 [[full-code-tablelayout-constraint]]
 

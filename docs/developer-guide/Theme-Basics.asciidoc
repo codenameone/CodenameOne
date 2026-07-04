@@ -432,6 +432,10 @@ IMPORTANT: Due to licensing restrictions Codename One doesn't bundle Apple's iOS
 
 The code below demonstrates all the major fonts available in Codename One with the handlee ttf file posing as a standin for arbitrary TTF:
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ThemeBasicsJava005Snippet.java[tag=theme-basics-java-005,indent=0]
+----
 
 .The fonts running on the ipad simulator on a Mac, notice that this will look different on a PC
 image::img/theme-font-catalog.png[The fonts running on the ipad simulator on a Mac, notice that this will look different on a PC,scaledwidth=60%]

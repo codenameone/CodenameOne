@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import argparse
-import os
 import re
 import shutil
 import subprocess
@@ -167,14 +166,17 @@ def validate_includes(includes):
                 f"{item['sourceFile']}:{item['line']}: Java/Kotlin guide snippets in the common demo "
                 f"must live under a compiled source root, not src/main/snippets: {item['target']}"
             )
-        if item["language"].strip().lower() == "css" and (
-            "/demos/common/src/main/snippets/" in item["target"]
-            or item["target"].startswith("../demos/common/src/main/snippets/")
-        ):
-            errors.append(
-                f"{item['sourceFile']}:{item['line']}: CSS guide snippets in the common demo "
-                f"must live under src/main/css so the CSS compiler sees them: {item['target']}"
-            )
+        if item["language"].strip().lower() == "css":
+            css_root = (Path("docs/demos/common/src/main/css")).resolve()
+            try:
+                relative_css_path = target_path.relative_to(css_root)
+            except ValueError:
+                relative_css_path = None
+            if relative_css_path is None or relative_css_path.parent != Path(".") or not target_path.name.endswith("theme.css"):
+                errors.append(
+                    f"{item['sourceFile']}:{item['line']}: CSS guide snippets in the common demo "
+                    f"must live in a root src/main/css/*theme.css file compiled by the CSS goal: {item['target']}"
+                )
         if item["language"].strip().lower() in ("javascript", "html") and (
             "/demos/common/" in item["target"] or item["target"].startswith("../demos/common/")
         ):
@@ -211,8 +213,7 @@ def validate_includes(includes):
                     "text": text,
                 }
             )
-    if os.environ.get("CN1_VALIDATE_JAVA_SNIPPET_COMPILE") == "1":
-        errors.extend(validate_java_snippets(java_snippets))
+    errors.extend(validate_java_snippets(java_snippets))
     return errors
 
 

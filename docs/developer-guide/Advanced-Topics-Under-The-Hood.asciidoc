@@ -13,6 +13,13 @@ image::img/build-hints-codenameone-settings.png[The build hints UI in Codename O
 
 You can also set the build hints directly in the `codenameone_settings.properties` file. When you do that, each setting must start with the `codename1.arg.` prefix. For example, `android.debug=true` becomes `codename1.arg.android.debug=true`.
 
+Application code can read a custom build argument through `Display.getProperty()`:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/AppArgSnippet.java[tag=appArg,indent=0]
+----
+
 Here is the current list of supported arguments. Build hints change over time, so consult the discussion forum if you don't find what you need here:
 
 .Build hints
@@ -2253,7 +2260,14 @@ The interface definition for `UnreadUpdatesCallback` is:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/AppArgSnippet.java[tag=appArg,indent=0]
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/UnreadUpdatesCallback.java[tag=unreadUpdatesCallback,indent=0]
+----
+
+The callback status enum is also mirrored in common code:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/MobihelpCallbackStatus.java[tag=mobihelpCallbackStatus,indent=0]
 ----
 
 In other words: if you were to implement this method (planned for a later section), you need to have a way for the native code to call the `callback.onResult()` method of the passed parameter.
@@ -2269,7 +2283,7 @@ For the second issue, you will create a static method that can take the token ge
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/support/mobihelp/UnreadUpdatesCallback.java[tag=unreadUpdatesCallback,indent=0]
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/MobihelpNativeCallback.java[tag=mobihelpNativeCallback,indent=0]
 ----
 
 *Things to notice here:*
@@ -2283,6 +2297,11 @@ include::../demos/common/src/main/java/com/codenameone/support/mobihelp/UnreadUp
 
 Most Native SDKs include some sort of initialization method where you pass your developer and application credentials to the API. After filling in FreshDesk's web-based form to create a new application, it generated an application ID, an app "secret," and a "domain." The SDK requires you to pass all three of these values to its `init()` method through the `MobihelpConfig` class.
 
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/MobihelpConfig.java[tag=mobihelpConfig,indent=0]
+----
+
 Note, but, that FreshDesk (and most other service provides that have native SDKs) requires you to create different Apps for each platform. This means that your App ID and App secret will be different on iOS than they will be on Android.
 
 Your public API therefore needs to enable you to provide many credentials in the same app, and your API needs to know to use the correct credentials depending on the device that the app is running on.
@@ -2291,7 +2310,7 @@ Many solutions to this problem exist, but the chosen approach provides two diffe
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/support/mobihelp/MobihelpNativeCallback.java[tag=mobihelpNativeCallback,indent=0]
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpInitAndroid,indent=0]
 ----
 
 and
@@ -2305,14 +2324,14 @@ Then you can set up the API with code like:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpInitAndroid,indent=0]
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/MobihelpUsage.java[tag=mobihelpUsage,indent=0]
 ----
 
 ===== The resulting public API
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/support/mobihelp/MobihelpUsage.java[tag=mobihelpUsage,indent=0]
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpClassOverview,indent=0]
 ----
 
 ===== The native interface
@@ -2321,7 +2340,7 @@ The final native interface is identical to your public API, except in cases wher
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpClassOverview,indent=0]
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/MobihelpNative.java[tag=mobihelpNative,indent=0]
 ----
 
 Notice also, that the native interface includes a set of methods with names prefixed with `config__`. This naming convention identifies methods that map to the `MobihelpConfig` class. A separate native interface for these would have been possible, but keeping all the native stuff in one class is simpler and easier to maintain.
@@ -2332,14 +2351,14 @@ You've a public API, and you have a native interface. The idea is that the publi
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/support/mobihelp/MobihelpNative.java[tag=mobihelpNative,indent=0]
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpClassOverview,indent=0]
 ----
 
 You will initialize this `peer` inside the `init()` method of the `Mobihelp` class. Notice, though that `init()` is `private` since you've provided distinct abstractions for the Android and iOS apps:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpClassOverview,indent=0]
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpInitMethods,indent=0]
 ----
 
 *Things to Notice*:
@@ -2353,7 +2372,7 @@ For most of the methods in the `Mobihelp` class, you can see that the public API
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpInitMethods,indent=0]
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpSetUserFullNameMethod,indent=0]
 ----
 
 For some other methods, the public API needs to break apart the parameters into a form that the native interface can accept. For example: the `init()` method, shown above, takes a `MobihelpConfig` object as a parameter, but it passed the properties of the `config` object individually into the native interface.
@@ -2363,14 +2382,14 @@ Another example, is the `showSupport(ArrayList<String> tags)` method. The corres
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpSetUserFullNameMethod,indent=0]
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpShowSupportWithTags,indent=0]
 ----
 
 The other non-trivial wrapper is the `getUnreadCountAsync()` method that you discussed before:
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpShowSupportWithTags,indent=0]
+include::../demos/common/src/main/java/com/codenameone/support/mobihelp/Mobihelp.java[tag=mobihelpGetUnreadCountAsync,indent=0]
 ----
 
 ==== Step 5: Implementing the native interface in Android
@@ -2410,7 +2429,7 @@ include::../demos/android/src/main/java/com/codenameone/support/mobihelp/Mobihel
 +
 [source,java]
 ----
-include::../demos/android/src/main/java/com/codenameone/support/mobihelp/MobihelpNativeImpl.java[tag=mobihelpNativeClearUserData,indent=0]
+include::../demos/android/src/main/java/com/codenameone/support/mobihelp/MobihelpNativeImpl.java[tag=mobihelpNativeShowSolutions,indent=0]
 ----
 +
 (Note here that the `activity()` method is another convenience method to retrieve the app's current `Activity` from the `AndroidNativeUtil` class).
@@ -2418,7 +2437,7 @@ include::../demos/android/src/main/java/com/codenameone/support/mobihelp/Mobihel
 +
 [source,java]
 ----
-include::../demos/android/src/main/java/com/codenameone/support/mobihelp/MobihelpNativeImpl.java[tag=mobihelpNativeShowSolutions,indent=0]
+include::../demos/android/src/main/java/com/codenameone/support/mobihelp/MobihelpNativeImpl.java[tag=mobihelpNativeGetUnreadCountAsync,indent=0]
 ----
 
 ==== Step 6: Bundling the native SDKs
@@ -2678,7 +2697,7 @@ This is a layout manager that arranges components in a center column aligned to 
 
 [source,java]
 ----
-include::../demos/android/src/main/java/com/codenameone/support/mobihelp/MobihelpNativeImpl.java[tag=mobihelpNativeGetUnreadCountAsync,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/CenterLayoutDemo.java[tag=centerLayout,indent=0]
 ----
 
 .Center layout staircase effect with margin
@@ -2746,7 +2765,7 @@ That's a big mess of stuff, but it's pretty easy to pick through it when you kno
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/advancedtopics/CenterLayoutDemo.java[tag=centerLayout,indent=0]
+include::../demos/common/src/main/java/com/codename1/hellokotlin2/KotlinForm.java[tag=kotlinForm,indent=0]
 ----
 
 Even comparing this line with the class definition from the source file you've learned something about the Kotlin compiler. It has made the class `final` by default. That observation shouldn't affect your assessment here, but it's kind of interesting.
