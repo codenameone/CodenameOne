@@ -9,6 +9,8 @@
  */
 package com.codename1.gpu;
 
+import com.codename1.util.MathUtil;
+
 /// Portable quaternion math used by the 3D, AR and VR APIs. Every operation
 /// works on plain `float[4]` arrays laid out as `{x, y, z, w}` so it behaves
 /// identically on every platform. A quaternion of this form represents a
@@ -191,7 +193,7 @@ public final class Quaternion {
             wa = 1.0f - t;
             wb = t;
         } else {
-            float theta = (float) Math.acos(dot);
+            float theta = (float) MathUtil.acos(dot);
             float invSin = 1.0f / (float) Math.sin(theta);
             wa = (float) Math.sin((1.0f - t) * theta) * invSin;
             wb = (float) Math.sin(t * theta) * invSin;

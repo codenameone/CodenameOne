@@ -1,6 +1,6 @@
 == Virtual Reality and 360 Media
 
-The `com.codename1.vr` package renders application scenes in stereoscopic VR and displays 360 degree panoramas, built entirely on the portable `com.codename1.gpu` pipeline and the `com.codename1.sensors` motion sensors. There is no platform SDK dependency: everything here runs wherever `Display.getInstance().isGpuSupported()` is true, which includes the simulator, and adds nothing to the build for apps that do not use it.
+The `com.codename1.vr` package renders application scenes in stereoscopic VR and displays 360-degree panoramas, built entirely on the portable `com.codename1.gpu` pipeline and the `com.codename1.sensors` motion sensors. There is no platform SDK dependency: everything here runs wherever `Display.getInstance().isGpuSupported()` is true, which includes the simulator, and adds nothing to the build for apps that don't use it.
 
 [IMPORTANT]
 ====
@@ -35,13 +35,13 @@ Like `com.codename1.gpu.Renderer`, the `VRRenderer` and `TextureSource` callback
 |Per-eye camera math over the existing `com.codename1.gpu.Camera`, usable without `VRView` for custom pipelines.
 
 |`Media360View`
-|A 360 degree panorama viewer: equirectangular image on the inside of a sphere with drag or gyroscope look-around.
+|A 360-degree panorama viewer: an equirectangular image on the inside of a sphere with drag or gyroscope look-around.
 
 |`TextureSource`
 |Extension point feeding dynamic textures (procedural animation, future video) to `Media360View`.
 |===
 
-=== Getting started: a stereo scene
+=== Getting started: A stereo scene
 
 A `VRRenderer` draws the same scene for every eye; the camera differences produce the depth effect. The view configures the viewport and camera before each `onEyeFrame`, so the renderer only issues draw calls:
 
@@ -73,9 +73,9 @@ f.show();
 
 === Head tracking
 
-`VRView` starts its `HeadTracker` when the component appears and stops it when it leaves the screen; the sensors draw power only in between. The tracker fuses the gyroscope with the accelerometer (tilt reference) and, when present, the magnetometer (yaw reference) through a complementary filter - tune the blend via `getHeadTracker().getFilter().setGyroWeight(float)`.
+`VRView` starts its `HeadTracker` when the component appears and stops it when it leaves the screen; the sensors draw power only between the two. The tracker fuses the gyroscope with the accelerometer (tilt reference) and, when present, the magnetometer (yaw reference) through a complementary filter - tune the blend via `getHeadTracker().getFilter().setGyroWeight(float)`.
 
-Call `recenter()` to make the current view direction the new "straight ahead", keeping pitch and roll - the standard VR recentering gesture. On devices without a gyroscope the tracker falls back to accelerometer tilt: pitch and roll stay accurate but yaw has no stable reference. `HeadTracker.isSupported()` reports whether any usable motion hardware exists; without it the orientation simply stays put and the scene still renders.
+Call `recenter()` to make the current view direction the new "straight ahead," keeping pitch and roll - the standard VR recentering gesture. On devices without a gyroscope the tracker falls back to accelerometer tilt: pitch and roll stay accurate but yaw has no stable reference. `HeadTracker.isSupported()` reports whether any usable motion hardware exists; without it the orientation simply stays put and the scene still renders.
 
 === The 360 photo viewer
 
@@ -92,7 +92,7 @@ Dragging looks around with the grab-the-world gesture; `setHeadTrackingEnabled(t
 
 === 360 video and dynamic content
 
-There is no platform path from media frames to GPU textures yet, so 360 video is not supported directly. `TextureSource` is the extension point for dynamic content: the view calls `createTexture` once on the render thread and `updateTexture` before every frame, so procedurally animated panoramas work today and a future media-to-texture bridge can plug in without API changes.
+There is no platform path from media frames to GPU textures yet, so 360 video isn't supported directly. `TextureSource` is the extension point for dynamic content: the view calls `createTexture` once on the render thread and `updateTexture` before every frame, so procedurally animated panoramas work today and a future media-to-texture bridge can plug in without API changes.
 
 [source,java]
 ----
@@ -114,6 +114,6 @@ Both `VRView` and `Media360View` run in the simulator through the desktop 3D bac
 
 === Limitations and notes
 
-- *Lens distortion*: the stereo output is undistorted side-by-side rendering. Barrel distortion for lens-based viewers requires an offscreen render pass the portable GPU API does not expose yet, so there is deliberately no distortion setting to configure.
-- *Battery*: continuous rendering plus live sensors is the most power-hungry mode a phone UI can run; stop or pause the view whenever it is not visible (the component does this automatically on hide).
-- *Coordinates*: the world frame matches the AR and gpu packages - meters, right handed, Y up, -Z forward - so content and math move freely between the three APIs.
+- *Lens distortion*: the stereo output is undistorted side-by-side rendering. Barrel distortion for lens-based viewers requires an offscreen render pass the portable GPU API doesn't expose yet, so there is no distortion setting to configure.
+- *Battery*: continuous rendering plus live sensors is the most power-hungry mode a phone UI can run; stop or pause the view whenever it isn't visible (the component does this automatically on hide).
+- *Coordinates*: the world frame matches the AR and 3D graphics APIs (meters, right-handed, Y up, -Z forward), letting content and math move between the three without conversion.

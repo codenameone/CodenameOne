@@ -23,6 +23,7 @@
 package com.codename1.vr;
 
 import com.codename1.gpu.Quaternion;
+import com.codename1.util.MathUtil;
 
 /// Deterministic complementary sensor-fusion filter that turns raw gyroscope,
 /// accelerometer and magnetometer readings into a device orientation
@@ -123,7 +124,7 @@ public final class OrientationFilter {
                     // Angle of the horizontal field from world north (-Z). A
                     // yaw drift of epsilon shows up here as -epsilon, so
                     // applying the measured angle directly cancels the drift.
-                    float yawError = (float) Math.atan2(hx, -hz);
+                    float yawError = (float) MathUtil.atan2(hx, -hz);
                     Quaternion.setAxisAngle(correction, yawError * blend, 0f, 1f, 0f);
                     Quaternion.multiply(correction, q, q);
                     Quaternion.normalize(q);
@@ -144,7 +145,7 @@ public final class OrientationFilter {
         if (clen < 1e-6f) {
             return;
         }
-        float angle = (float) Math.atan2(clen, dot);
+        float angle = (float) MathUtil.atan2(clen, dot);
         Quaternion.setAxisAngle(correction, angle * fraction, cx, cy, cz);
         Quaternion.multiply(correction, q, q);
         Quaternion.normalize(q);
@@ -188,7 +189,7 @@ public final class OrientationFilter {
         }
         // A device yaw of theta puts the forward vector at atan2 angle
         // -theta, so applying the measured angle directly cancels the yaw.
-        float yaw = (float) Math.atan2(v[0], -v[2]);
+        float yaw = (float) MathUtil.atan2(v[0], -v[2]);
         Quaternion.setAxisAngle(correction, yaw, 0f, 1f, 0f);
         Quaternion.multiply(correction, q, q);
         Quaternion.normalize(q);

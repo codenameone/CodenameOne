@@ -251,7 +251,6 @@ public class Media360View extends Container {
         private Mesh sphere;
         private Material material;
         private Texture texture;
-        private boolean textureFromSource;
         private final Camera camera = new Camera();
         private final float[] quat = Quaternion.identity();
         private final float[] dir = new float[3];
@@ -296,12 +295,10 @@ public class Media360View extends Container {
                     device.dispose(texture);
                     texture = null;
                 }
-                textureFromSource = false;
             }
             if (source != null) {
                 if (texture == null) {
                     texture = source.createTexture(device);
-                    textureFromSource = true;
                     if (texture != null) {
                         texture.setFilter(Texture.Filter.LINEAR);
                     }
@@ -319,8 +316,7 @@ public class Media360View extends Container {
                 if (img != null) {
                     texture = device.createTexture(img);
                     texture.setFilter(Texture.Filter.LINEAR);
-                    textureFromSource = false;
-                }
+                    }
             }
             material.setTexture(texture);
         }

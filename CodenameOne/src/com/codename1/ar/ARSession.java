@@ -137,13 +137,25 @@ public final class ARSession implements AutoCloseable {
                 out.complete(hits);
             }
         });
-        in.except(new SuccessCallback<Throwable>() {
-            @Override public void onSucess(Throwable t) {
-                out.error(t);
-            }
-        });
+        in.except(new ErrorForwarder(out));
         impl.hitTest(xNorm, yNorm, in);
         return out;
+    }
+
+    /// Forwards an implementation hit-test failure to the application-facing
+    /// resource. A named static class since it only needs the target resource,
+    /// not the enclosing session.
+    private static final class ErrorForwarder implements SuccessCallback<Throwable> {
+        private final AsyncResource<ARHitResult[]> out;
+
+        ErrorForwarder(AsyncResource<ARHitResult[]> out) {
+            this.out = out;
+        }
+
+        @Override
+        public void onSucess(Throwable t) {
+            out.error(t);
+        }
     }
 
     /// Creates an anchor at an arbitrary world pose and registers it with the

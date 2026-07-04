@@ -1,12 +1,12 @@
 == Augmented Reality
 
-The `com.codename1.ar` package composites virtual 3D content into the live camera image: the session tracks the device's position in the real world, detects surfaces, recognizes registered images and faces, and keeps virtual objects locked to real-world positions as the user moves. It is backed by ARKit on iOS and by ARCore (Google Play Services for AR) on Android, behind one portable API.
+The `com.codename1.ar` package composites virtual 3D content into the live camera image: the session tracks the device's position in the real world, detects surfaces, recognizes registered images and faces, and keeps virtual objects locked to real-world positions as the user moves. It's backed by ARKit on iOS and by ARCore (Google Play Services for AR) on Android, behind one portable API.
 
 Referencing any class in the package is enough to wire the build: the class scanner injects the camera permission, the `NSCameraUsageDescription` plist entry (override the text with the `ios.NSCameraUsageDescription` build hint), links ARKit and SceneKit on iOS and adds the ARCore dependency plus the `com.google.ar.core` manifest entry on Android. Apps that never touch the package pay no size, permission or store-visibility cost. By default the Android manifest marks AR `optional` so the app still installs on devices without ARCore; set the `android.ar.required=true` build hint to make the app AR-only.
 
 [WARNING]
 ====
-Always guard AR functionality behind `AR.isSupported()`. Older devices, tvOS, watchOS, desktop builds and browsers report `false`; feature-specific hardware such as face tracking is gated separately through `AR.getCapabilities()`.
+Always guard AR functionality behind `AR.isSupported()`. Older devices, tvOS, watchOS, desktop builds and browsers report `false`; feature-specific hardware such as face tracking is gated through `AR.getCapabilities()`.
 ====
 
 === Concepts
@@ -25,7 +25,7 @@ Always guard AR functionality behind `AR.isSupported()`. Older devices, tvOS, wa
 |The component that renders the camera image composited with the anchored content. Add it to a form like any other component.
 
 |`ARPose`
-|An immutable position + rotation in world space: meters, right handed, Y up, -Z forward from the initial camera direction. Converts to a `com.codename1.gpu.Matrix4` compatible matrix.
+|An immutable position + rotation in world space: meters, right-handed, Y up, -Z forward from the initial camera direction. Converts to a `com.codename1.gpu.Matrix4` compatible matrix.
 
 |`ARPlane`
 |A detected real-world surface (floor, table, wall) that grows and refines as the session learns the environment.
@@ -43,7 +43,7 @@ Always guard AR functionality behind `AR.isSupported()`. Older devices, tvOS, wa
 |The real-world lighting estimate, polled per frame to shade content so it blends in.
 |===
 
-=== Getting started: place a model on the floor
+=== Getting started: Place a model on the floor
 
 The canonical AR loop is: open a session, show its view, wait for a plane, hit test a tap, anchor content at the hit.
 
@@ -136,7 +136,7 @@ The physical width matters: the platform uses it to estimate the image's distanc
 
 Face tracking is a distinct session configuration using the front camera; open it with `ARSessionOptions.trackingMode(ARTrackingMode.FACE)` after checking `AR.getCapabilities().isFaceTrackingSupported()`. Detected faces arrive as `ARFaceAnchor`s through the anchor listener, carrying the head pose plus optional finer geometry:
 
-- `getRegionPose(ARFaceRegion)` returns the pose of a named region. Availability differs per platform - ARCore supplies the nose tip and forehead regions, ARKit supplies the eyes - so always handle a `null` region.
+- `getRegionPose(ARFaceRegion)` returns the pose of a named region. Availability differs per platform (ARCore supplies the nose tip and forehead regions, ARKit supplies the eyes), which is why code must always handle a `null` region.
 - `getMeshVertices()` / `getMeshTriangles()` expose the tracked face mesh where the platform provides one, or `null` where it does not.
 
 === Events and threading
@@ -153,8 +153,8 @@ On devices, use the standard native tools: the generated Xcode project debugs th
 
 === Platform notes
 
-- *Dependencies*: injected automatically as described above. The ARCore dependency adds roughly 2 MB to Android binaries; iOS links the system ARKit/SceneKit frameworks at no size cost.
+- *Dependencies*: injected automatically as described above. The ARCore dependency adds about 2 MB to Android binaries; iOS links the system ARKit/SceneKit frameworks at no size cost.
 - *Capabilities*: face tracking requires a capable front camera (a TrueDepth camera on iOS). Check `ARCapabilities` per feature rather than assuming.
-- *Face regions*: ARCore supplies `NOSE_TIP`, `FOREHEAD_LEFT` and `FOREHEAD_RIGHT`; ARKit supplies `LEFT_EYE` and `RIGHT_EYE`. Code that uses regions should degrade gracefully when a region is `null`.
+- *Face regions*: ARCore supplies `NOSE_TIP`, `FOREHEAD_LEFT` and `FOREHEAD_RIGHT`; ARKit supplies `LEFT_EYE` and `RIGHT_EYE`. Code that uses regions must handle a `null` region.
 - *ARCore installation*: on Android, Play Services for AR may need installing or updating; when `AR.open` triggers that flow it throws with a message saying to retry once installation completes.
 - *tvOS / watchOS*: AR compiles out entirely; `AR.isSupported()` reports `false`.
