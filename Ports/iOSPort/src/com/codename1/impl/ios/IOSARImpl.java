@@ -126,15 +126,28 @@ public class IOSARImpl extends ARImpl {
     }
 
     @Override
-    public void hitTest(float xNorm, float yNorm, final AsyncResource<ARHitResult[]> result) {
+    public void hitTest(float xNorm, float yNorm, AsyncResource<ARHitResult[]> result) {
         String packed = sessionPeer == 0 ? null
                 : IOSImplementation.nativeInstance.cn1ArHitTest(sessionPeer, xNorm, yNorm);
-        final ARHitResult[] hits = parseHits(packed);
-        Display.getInstance().callSerially(new Runnable() {
-            @Override public void run() {
-                result.complete(hits);
-            }
-        });
+        Display.getInstance().callSerially(
+                new CompleteOnEdt<ARHitResult[]>(result, parseHits(packed)));
+    }
+
+    /// Resolves an AsyncResource on the EDT. A named static class since it
+    /// only needs the resource and value, not the enclosing impl.
+    private static final class CompleteOnEdt<T> implements Runnable {
+        private final AsyncResource<T> result;
+        private final T value;
+
+        CompleteOnEdt(AsyncResource<T> result, T value) {
+            this.result = result;
+            this.value = value;
+        }
+
+        @Override
+        public void run() {
+            result.complete(value);
+        }
     }
 
     // packed: "hitId|type|tx|ty|tz|qx|qy|qz|qw|distance|planeId;..."
@@ -293,14 +306,10 @@ public class IOSARImpl extends ARImpl {
     }
 
     @Override
-    public void requestPermissions(final AsyncResource<Boolean> result) {
+    public void requestPermissions(AsyncResource<Boolean> result) {
         // iOS prompts for the camera permission when the AR session first
         // runs; there is no separate pre-flight, so report available.
-        Display.getInstance().callSerially(new Runnable() {
-            @Override public void run() {
-                result.complete(Boolean.TRUE);
-            }
-        });
+        Display.getInstance().callSerially(new CompleteOnEdt<Boolean>(result, Boolean.TRUE));
     }
 
     @Override

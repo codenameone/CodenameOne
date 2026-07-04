@@ -305,12 +305,26 @@ public class AndroidARImpl extends ARImpl {
         }
     }
 
-    private void completeHits(final AsyncResource<ARHitResult[]> result, final ARHitResult[] hits) {
-        Display.getInstance().callSerially(new Runnable() {
-            public void run() {
-                result.complete(hits);
-            }
-        });
+    private void completeHits(AsyncResource<ARHitResult[]> result, ARHitResult[] hits) {
+        Display.getInstance().callSerially(new CompleteOnEdt<ARHitResult[]>(result, hits));
+    }
+
+    /**
+     * Resolves an AsyncResource on the EDT. A named static class since it
+     * only needs the resource and value, not the enclosing impl.
+     */
+    private static final class CompleteOnEdt<T> implements Runnable {
+        private final AsyncResource<T> result;
+        private final T value;
+
+        CompleteOnEdt(AsyncResource<T> result, T value) {
+            this.result = result;
+            this.value = value;
+        }
+
+        public void run() {
+            result.complete(value);
+        }
     }
 
     @Override
@@ -457,14 +471,11 @@ public class AndroidARImpl extends ARImpl {
     }
 
     @Override
-    public void requestPermissions(final AsyncResource<Boolean> result) {
-        final boolean granted = AndroidImplementation.checkForPermission(
+    public void requestPermissions(AsyncResource<Boolean> result) {
+        boolean granted = AndroidImplementation.checkForPermission(
                 Manifest.permission.CAMERA, "AR needs the camera");
-        Display.getInstance().callSerially(new Runnable() {
-            public void run() {
-                result.complete(Boolean.valueOf(granted));
-            }
-        });
+        Display.getInstance().callSerially(
+                new CompleteOnEdt<Boolean>(result, Boolean.valueOf(granted)));
     }
 
     @Override
