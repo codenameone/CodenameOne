@@ -28,6 +28,8 @@ grid-layout-2x2.png
 grid-layout-2x4.png
 grid-layout-autofit-portrait.png
 grid-layout-autofit-landscape.png
+layered-layout.png
+gridbag-layout.png
 table-layout-2x2.png
 table-layout-enclose.png
 table-layout-constraints.png

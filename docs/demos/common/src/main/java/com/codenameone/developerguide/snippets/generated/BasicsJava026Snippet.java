@@ -31,7 +31,7 @@ import java.io.*;
 import java.util.*;
 
 
-class BasicsJava026Snippet {
+public class BasicsJava026Snippet {
 
     Object context;
     Object url;
@@ -55,7 +55,7 @@ class BasicsJava026Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    void snippet() throws Exception {
+    public static Form createForm() {
         // tag::basics-java-026[]
         Form hi = new Form("Layered Layout");
         int w = Math.min(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
@@ -76,5 +76,10 @@ class BasicsJava026Snippet {
                 FlowLayout.encloseRight(close)));
         // end::basics-java-026-layered[]
         // end::basics-java-026[]
+        return hi;
+    }
+
+    void snippet() throws Exception {
+        createForm().show();
     }
 }

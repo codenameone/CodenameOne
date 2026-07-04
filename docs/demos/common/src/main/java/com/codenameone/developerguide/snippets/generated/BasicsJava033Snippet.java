@@ -31,7 +31,7 @@ import java.io.*;
 import java.util.*;
 
 
-class BasicsJava033Snippet {
+public class BasicsJava033Snippet {
 
     Object context;
     Object url;
@@ -55,44 +55,53 @@ class BasicsJava033Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    void snippet() throws Exception {
+    public static Form createForm() {
         // tag::basics-java-033[]
+        Form hi = new Form("GridBagLayout", new BorderLayout());
+        Container grid = new Container(new GridBagLayout());
+        Style gridStyle = grid.getAllStyles();
+        gridStyle.setPaddingUnit(Style.UNIT_TYPE_DIPS);
+        gridStyle.setPadding(4, 4, 4, 4);
         Button button;
-        hi.setLayout(new GridBagLayout());
         GridBagConstraints c = new GridBagConstraints();
         //natural height, maximum width
         c.fill = GridBagConstraints.HORIZONTAL;
-        button = new Button("Button 1");
+        button = new Button("One");
+        button.setCapsText(false);
         c.weightx = 0.5;
         c.fill = GridBagConstraints.HORIZONTAL;
         c.gridx = 0;
         c.gridy = 0;
-        hi.addComponent(c, button);
+        grid.addComponent(c, button);
 
-        button = new Button("Button 2");
+        button = new Button("Two");
+        button.setCapsText(false);
         c.fill = GridBagConstraints.HORIZONTAL;
         c.weightx = 0.5;
         c.gridx = 1;
         c.gridy = 0;
-        hi.addComponent(c, button);
+        grid.addComponent(c, button);
 
-        button = new Button("Button 3");
+        button = new Button("Three");
+        button.setCapsText(false);
         c.fill = GridBagConstraints.HORIZONTAL;
         c.weightx = 0.5;
         c.gridx = 2;
         c.gridy = 0;
-        hi.addComponent(c, button);
+        grid.addComponent(c, button);
 
         button = new Button("Long-Named Button 4");
+        button.setCapsText(false);
         c.fill = GridBagConstraints.HORIZONTAL;
         c.ipady = 40;      //make this component tall
         c.weightx = 0.0;
         c.gridwidth = 3;
         c.gridx = 0;
         c.gridy = 1;
-        hi.addComponent(c, button);
+        grid.addComponent(c, button);
 
         button = new Button("5");
+        button.setCapsText(false);
         c.fill = GridBagConstraints.HORIZONTAL;
         c.ipady = 0;       //reset to default
         c.weighty = 1.0;   //request any extra vertical space
@@ -101,7 +110,13 @@ class BasicsJava033Snippet {
         c.gridx = 1;       //aligned with button 2
         c.gridwidth = 2;   //2 columns wide
         c.gridy = 2;       //third row
-        hi.addComponent(c, button);
+        grid.addComponent(c, button);
+        hi.add(BorderLayout.NORTH, grid);
         // end::basics-java-033[]
+        return hi;
+    }
+
+    void snippet() throws Exception {
+        createForm().show();
     }
 }
