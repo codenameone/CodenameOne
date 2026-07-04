@@ -166,11 +166,11 @@
     iosSFSlotPct: "115";
     iosSFVBias: "50";
     switchThumbPaddingInt: 1;
-    /* Native iOS UISwitch proportions: the thumb is a CIRCLE clearly inset inside
-       the track (thumbScaleY < trackScaleY + a real inset), so the grey/green
-       track stays visible around it. Earlier 1.7/1.7/0.1 made the thumb fill the
-       whole capsule, hiding the track and reading as a bare floating circle. */
-    switchThumbScaleY: "1.4";
+    /* Native iOS 26 UISwitch proportions, measured from the goldens: the thumb
+       is a WIDE capsule nearly filling the track (74px of the 79px track height,
+       ~5px rim) -- 1.4/0.22 drew an 62px thumb that read as a small floating
+       knob. */
+    switchThumbScaleY: "1.55";
     switchTrackScaleY: "1.6";
     /* Native switch track measured 177x78px (ratio 2.27); trackScaleX/trackScaleY
        must equal that ratio (3.6/1.6 = 2.25). 2.6 made the track too narrow. */
@@ -184,10 +184,9 @@
     switchTrackOffOutlineWidthMM: "0";
     switchTrackOnOutlineWidthMM: "0";
     switchTrackOffOutlineColor: "e9e9ea";
-    switchThumbInsetMM: "0.22";
-    /* The native UISwitch thumb is a CIRCLE (not elongated); widthScale 1.0 keeps
-       it round so it matches the golden. */
-    switchThumbWidthScale: "1.35";
+    switchThumbInsetMM: "0.1";
+    /* Native thumb is wider than tall (106x74 off / 104x67 on @3x). */
+    switchThumbWidthScale: "1.4";
     /* iOS 26 Liquid Glass thumb: while it slides the knob stretches along the travel
        axis and squashes vertically like a droplet (peaks mid-slide, round at the ends)
        and carries a soft glass sheen. stretch/squash are percentages. */
@@ -989,9 +988,14 @@ PopupContent {
     RadioButton.selected { color: #0a84ff; }
     RadioButton.disabled { color: #48484a; background-color: transparent; }
 
-    Switch { color: #ffffff; background-color: #2c2c2e; }
+    /* Off track sampled from the native dark switch: #464649 (2c2c2e was the
+       surface colour and read too dark). */
+    Switch { color: #ffffff; background-color: #464649; }
     Switch.selected { color: #ffffff; background-color: #30d158; }
-    Switch.disabled { color: #ebebf5; background-color: #3a3a3c; }
+    /* Sampled from the native disabled UISwitch (dark): the thumb dims to a mid
+       grey (#808080) and the track sits near surface-dark -- ebebf5/3a3a3c read
+       as an ENABLED off switch. */
+    Switch.disabled { color: #808080; background-color: #232325; }
     /* Dark slider: inactive track is a dark grey (not the light #e5e5ea), active
        track blue, thumb white. */
     Slider { background-color: #3a3a3c; color: #ffffff; }
