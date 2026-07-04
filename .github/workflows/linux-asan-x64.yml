@@ -55,10 +55,22 @@ jobs:
           JAVA_HOME="$JDK_8_HOME" mvn -B -pl linux -am \
             -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase install
 
-      - name: Build suite classes
+      - name: Build plugin + cn1-ads-mock (JDK 8)
         run: |
-          JAVA_HOME="$JDK_8_HOME" mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am \
-            install -DskipTests -Dmaven.javadoc.skip=true
+          cd maven
+          JAVA_HOME="$JDK_8_HOME" mvn -B -pl codenameone-maven-plugin,cn1-ads-mock -am \
+            -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase install
+
+      - name: Build suite classes (hellocodenameone-common, JDK 17)
+        run: |
+          set -e
+          export JAVA_HOME="$JDK_17_HOME"
+          Xvfb :98 -screen 0 1600x1200x24 >/tmp/xvfb-build.log 2>&1 &
+          export DISPLAY=:98
+          sleep 2
+          mkdir -p "$HOME/.codenameone"
+          [ -f "$HOME/.codenameone/guibuilder.jar" ] || : > "$HOME/.codenameone/guibuilder.jar"
+          mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am install -DskipTests -Dmaven.javadoc.skip=true
 
       - name: Translate + build + run suite under ASan
         working-directory: vm
