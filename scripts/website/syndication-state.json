@@ -678,6 +678,39 @@
         "url": "https://medium.com/p/94089979c81e/edit",
         "syndicated_at": "2026-07-02T17:14:42+00:00"
       }
+    },
+    "funding-open-source-without-the-bait-and-switch": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmr529n7t00010aj1doxehjnp",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a47ce8483904781bbd1ecdd",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-03T15:01:17+00:00"
+      },
+      "devto": {
+        "id": 4061338,
+        "url": "https://dev.to/codenameone/funding-open-source-without-the-bait-and-switch-analytics-native-maps-tv-and-more-1h1j",
+        "syndicated_at": "2026-07-03T15:14:15+00:00"
+      },
+      "foojay": {
+        "id": 124679,
+        "url": "https://foojay.io/wp-admin/post.php?post=124679&action=edit",
+        "preview_url": "https://foojay.io/?p=124679",
+        "featured_media_id": 124678,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-07-03T15:15:12+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/437da890be1e/edit",
+        "syndicated_at": "2026-07-03T17:01:49+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3663930/edit.html",
+        "syndicated_at": "2026-07-03T17:03:20+00:00"
+      }
     }
   }
 }
