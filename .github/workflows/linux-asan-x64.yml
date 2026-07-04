@@ -1,0 +1,100 @@
+# TEMPORARY DIAGNOSTIC (parparvm-perf-tier1): build the Linux x64 suite native
+# ELF with AddressSanitizer on a REAL x86 runner and run it, to pinpoint the
+# intermittent x64-only heap corruption in cn1BibopFastAlloc (a page-level UAF
+# the arm64 ASan run cannot surface). Serial marking (the shipped default = the
+# crashing config). Manually triggered; DELETE once the bug is fixed.
+name: Linux x64 ASan diagnostic
+
+on:
+  workflow_dispatch:
+
+jobs:
+  asan-x64:
+    name: x64 suite under AddressSanitizer
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install GTK stack + gcc/libasan
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build pkg-config unzip xvfb fonts-dejavu-core gcc g++ libasan8 gdb \
+            libgtk-3-dev libcairo2-dev libpango1.0-dev libgdk-pixbuf-2.0-dev libglib2.0-dev \
+            libfontconfig1-dev libfreetype-dev libcurl4-openssl-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+            libwebkit2gtk-4.1-dev libsecret-1-dev libnotify-dev libgeoclue-2-dev \
+            libepoxy-dev libegl1-mesa-dev libgles2-mesa-dev libgl1-mesa-dri
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '8' }
+      - run: echo "JDK_8_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 11
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '11' }
+      - run: echo "JDK_11_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '17' }
+      - run: echo "JDK_17_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      - name: Restore JDK 8 as active
+        uses: actions/setup-java@v5
+        with: { distribution: 'temurin', java-version: '8' }
+
+      - name: Build core + Linux port (JDK 8)
+        run: |
+          cd maven
+          JAVA_HOME="$JDK_8_HOME" mvn -B -pl linux -am \
+            -DskipTests -Dmaven.javadoc.skip=true -Plocal-dev-javase install
+
+      - name: Build suite classes
+        run: |
+          JAVA_HOME="$JDK_8_HOME" mvn -B -f scripts/hellocodenameone/pom.xml -pl common -am \
+            install -DskipTests -Dmaven.javadoc.skip=true
+
+      - name: Translate + build + run suite under ASan
+        working-directory: vm
+        env:
+          CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}/artifacts/asan/raw
+          CN1_APP_LOG_TEE: ${{ github.workspace }}/artifacts/asan/app-output.log
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          set -e
+          mkdir -p "${{ github.workspace }}/artifacts/asan"
+          # gcc ASan wrapper -- instrument compile+link, SERIAL marking (default,
+          # the crashing config), skip -fsanitize on assembly, keep VM flags.
+          sudo tee /usr/local/bin/cn1-asan-cc >/dev/null <<'WRAP'
+          #!/bin/sh
+          SAN="-fsanitize=address -fno-omit-frame-pointer"
+          for a in "$@"; do case "$a" in *.s|*.S) SAN="";; esac; done
+          exec gcc $SAN -g -O1 -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf "$@"
+          WRAP
+          sudo chmod +x /usr/local/bin/cn1-asan-cc
+          export CN1_CC=/usr/local/bin/cn1-asan-cc
+          # halt on the first genuine finding; log_path writes asan.<pid>.
+          export ASAN_OPTIONS=detect_leaks=0:abort_on_error=1:halt_on_error=1:print_stacktrace=1:log_path=${{ github.workspace }}/artifacts/asan/asan
+          Xvfb :99 -screen 0 1200x1600x24 >/tmp/xvfb.log 2>&1 &
+          export DISPLAY=:99
+          sleep 2
+          mvn -B clean package -pl JavaAPI -am -DskipTests
+          rc=0
+          mvn -B test -pl tests -am \
+            -Dtest=CleanTargetLinuxIntegrationTest#capturesHelloSuiteOverWebSocketLinux \
+            -Dsurefire.failIfNoSpecifiedTests=false || rc=$?
+          echo "=== ASan reports ==="
+          cat "${{ github.workspace }}"/artifacts/asan/asan.* 2>/dev/null || echo "(none -- suite may have completed clean)"
+          echo "=== app-output tail ==="
+          tail -60 "${{ github.workspace }}/artifacts/asan/app-output.log" 2>/dev/null || true
+          exit 0
+
+      - name: Upload ASan artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-asan-x64
+          path: ${{ github.workspace }}/artifacts/asan
+          if-no-files-found: warn
+          retention-days: 3
