@@ -3033,6 +3033,24 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // orders every parentClsReference read below -- the guard, the CAS-success deref,
     // and (transitively, through the worklist mutex) the drain worker's deref.
     int markSnapshot = __atomic_load_n(&obj->__codenameOneGcMark, __ATOMIC_ACQUIRE);
+#if !defined(CN1_DISABLE_BIBOP)
+    // A FREED BiBOP slot sits on its page free-list, which stores the intrusive
+    // next pointer in the slot's first word -- i.e. OVER __codenameOneParentClsReference
+    // (offset 0). Such a slot is NOT a live object: its parentCls is a garbage
+    // free-list pointer and its class/mark functions are meaningless. The
+    // conservative native-stack scan legitimately hands us interior pointers to
+    // whatever a stack word happens to hold, including a free slot (this is how it
+    // manifested: an x86 stack word pointed at a freed slot -- arm64's differing
+    // layout, and ASan's redzone layout, simply never produced that word, which is
+    // why the crash looked x64-only and vanished under ASan). Marking it would
+    // stamp gcMark=current over FREE_MARK, push it, and the drain would then call
+    // through its clobbered parentCls -> jump to a garbage address. Reject it here:
+    // a free slot has no live fields to trace. FREE_MARK is never a live mark
+    // (live == currentGcMarkValue or -1 grace), so this can't skip a real object.
+    if(markSnapshot == CN1_BIBOP_FREE_MARK) {
+        return;
+    }
+#endif
     if(obj->__codenameOneParentClsReference == 0 || obj->__codenameOneParentClsReference == (&class__java_lang_Class)) {
         return;
     }

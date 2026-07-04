@@ -3,7 +3,7 @@
 # and run the suite repeatedly on a REAL x86 runner to catch the intermittent
 # cn1BibopFastAlloc crash AT ITS SOURCE. Normal build (NOT ASan -- ASan masks this
 # bug's stack/register-layout trigger). Serial marking = the crashing config.
-# DELETE once the bug is fixed. (rev3: + gcMark + markFn-range checks)
+# DELETE once the bug is fixed. (rev4: FIX applied -- confirm no crash + no assert fire)
 name: Linux x64 BiBOP validate
 
 on:
