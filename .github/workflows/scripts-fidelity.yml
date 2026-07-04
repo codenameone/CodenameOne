@@ -152,10 +152,10 @@ jobs:
           arch: x86_64
           target: google_apis
           disk-size: 2048M
-          # TRANSITIONAL: the first run under committed-goldens scoring re-anchors
-          # the baseline (upload below); once that baseline is committed, drop
-          # FIDELITY_UPDATE_BASELINE so the ratchet gates for real.
-          script: adb shell wm size 480x800 && adb shell wm density 160 && FIDELITY_UPDATE_BASELINE=1 ./scripts/run-android-fidelity-tests.sh "${{ steps.build.outputs.gradle_project_dir }}"
+          # The committed baseline is the ratchet floor: the gate fails the job
+          # on any regression. To re-anchor intentionally, run locally with
+          # FIDELITY_UPDATE_BASELINE=1 and commit the updated baseline JSON.
+          script: adb shell wm size 480x800 && adb shell wm density 160 && ./scripts/run-android-fidelity-tests.sh "${{ steps.build.outputs.gradle_project_dir }}"
       - name: Upload fidelity artifacts
         if: always()
         uses: actions/upload-artifact@v7
@@ -259,10 +259,10 @@ jobs:
           xcrun simctl bootstatus "$UDID" -b
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
       - name: Run fidelity suite (simulator, Metal)
-        # TRANSITIONAL: the first run on the runner's own iOS 26 runtime
-        # re-anchors the baseline (upload below); once committed, drop
-        # FIDELITY_UPDATE_BASELINE so the ratchet gates for real.
-        run: FIDELITY_UPDATE_BASELINE=1 ./scripts/run-ios-fidelity-tests.sh "${{ steps.simapp.outputs.app_path }}" "${{ steps.sim.outputs.udid }}"
+        # The committed baseline is the ratchet floor: the gate fails the job
+        # on any regression. To re-anchor intentionally, run locally with
+        # FIDELITY_UPDATE_BASELINE=1 and commit the updated baseline JSON.
+        run: ./scripts/run-ios-fidelity-tests.sh "${{ steps.simapp.outputs.app_path }}" "${{ steps.sim.outputs.udid }}"
       - name: Upload fidelity artifacts
         if: always()
         uses: actions/upload-artifact@v7

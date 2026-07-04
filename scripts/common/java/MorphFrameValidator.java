@@ -105,8 +105,33 @@ public class MorphFrameValidator {
                 }
             }
         }
+        // Fail-closed on ABSENT groups: the spec declares which components
+        // capture frames, so a capture pipeline that silently stops delivering
+        // (or drops one appearance) must fail here -- grouping only delivered
+        // files would otherwise validate green on whatever survived.
+        List<String> missingGroups = new ArrayList<>();
+        for (String componentId : declaredFrames.keySet()) {
+            for (String appearance : new String[]{"light", "dark"}) {
+                String key = componentId + "_" + appearance;
+                if (!groups.containsKey(key)) {
+                    missingGroups.add(key + ": no frames delivered for a spec-declared frame component");
+                }
+            }
+        }
+        if (!missingGroups.isEmpty()) {
+            System.err.println("[morph] FAIL: " + missingGroups.size() + " missing frame group(s):");
+            for (String m : missingGroups) {
+                System.err.println("  - " + m);
+            }
+            if (outJson != null) {
+                Files.writeString(outJson, "{\"groups\":{}}\n", StandardCharsets.UTF_8);
+            }
+            System.exit(22);
+            return;
+        }
         if (groups.isEmpty()) {
-            System.out.println("[morph] no animation frames found in " + framesDir + "; nothing to validate");
+            System.out.println("[morph] no animation frames found in " + framesDir
+                    + " and the spec declares none; nothing to validate");
             if (outJson != null) {
                 Files.writeString(outJson, "{\"groups\":{}}\n", StandardCharsets.UTF_8);
             }

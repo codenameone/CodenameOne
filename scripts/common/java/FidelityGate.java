@@ -82,6 +82,18 @@ public class FidelityGate {
         }
 
         if (arguments.updateBaseline != null) {
+            // A baseline refresh from a PARTIAL run would silently ratchet only
+            // the surviving pairs -- broken pairs must fail the update just like
+            // they fail the gate.
+            if (!broken.isEmpty()) {
+                System.err.println("[gate] FAIL: refusing to update the baseline; " + broken.size()
+                        + " pair(s) could not be compared:");
+                for (String b : broken) {
+                    System.err.println("  - " + b);
+                }
+                System.exit(EXIT_REGRESSION);
+                return;
+            }
             updateBaseline(arguments, current, currentGeometry);
             return;
         }

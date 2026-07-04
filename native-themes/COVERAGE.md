@@ -11,9 +11,31 @@ state and per light/dark appearance, with a one-way ratchet gate
 effects, deterministic animation-frame validation (`MorphFrameValidator`).
 
 Scores below are the min-max fidelity across the component's tested
-states/appearances. iOS numbers are from the current branch artifact set;
-Android numbers are the committed CI baseline. Both are refreshed by the
-`scripts-fidelity` workflow on every run.
+states/appearances, taken from the committed ratchet baselines
+(`scripts/fidelity-app/baseline/*.json`) -- the same numbers the CI gate
+enforces. They are refreshed here whenever the baseline is deliberately
+re-anchored, so this file and the gate can never disagree.
+
+### What the scores do and do not claim
+
+- The headline percentage is a TOLERANT overlay comparison: it absorbs small
+  position/size drift and anti-aliasing differences. Geometry (bbox center
+  offset, width/height ratios) is measured separately, gated by its own
+  ratchet in `FidelityGate`, and flagged per-pair in the report's main table
+  ("OFF" column) -- a high score with an OFF geometry flag means the pixels
+  blend well but the widget is materially mis-sized/mis-placed. `TabOne` is
+  the canonical example: 95.6-96.1%% overlay with width ratio 0.75 / height
+  ratio 0.54 vs native (tracked, not yet fixed).
+- Corner-radius agreement is reported but NOT gated: the estimator is stable
+  to ~1px, the same range honest AA occupies.
+- The `GlassPanel*` rows isolate the glass BLEND over four backdrops and are
+  scored as `material: normal` by design (both sides render the same
+  backdrop); they do not score masked glass optics on their own.
+- Animation frames validate CN1 determinism and motion properties (travel,
+  overshoot, lens size, tint timing) against COMMITTED CN1 frame goldens --
+  they do NOT compare against native intermediate frames. Native motion is
+  captured as video (`scripts/capture-native-*-video`) and parity is a manual
+  review step; automated native-motion comparison is future work.
 
 ## iOS Modern (iOS 26 Liquid Glass)
 
@@ -23,21 +45,22 @@ Android numbers are the committed CI baseline. Both are refreshed by the
 |---|---|---|---:|---|
 | UIButton .glass | `Button` | Button | 90.9-93.4 | frosted capsule, backdrop-filter glass |
 | UIButton .prominentGlass | `RaisedButton` UIID | RaisedButton | 87.8-92.5 | geometry: ~10% wider than native (tracked) |
-| UIButton .plain | `FlatButton` UIID | FlatButton | 86.2-86.5 | geometry: native pill radius 92px vs CN1 44px (tracked) |
+| UIButton .plain | `FlatButton` UIID | FlatButton | 86.7-88.2 | geometry: native pill radius 92px vs CN1 44px (tracked) |
 | UITextField | `TextField` | TextField | 97.3-97.6 | |
-| Check glyph (Reminders style) | `CheckBox` | CheckBox | 89.8-95.6 | iOS has no native checkbox; compared glyph-to-glyph |
-| Radio glyph | `RadioButton` | RadioButton | 87.8-92.8 | |
-| UISwitch | `Switch` | Switch | 85.4-96.2 | + liquid droplet thumb morph (frame-validated) |
+| Check glyph (Reminders style) | `CheckBox` | CheckBox | 92.2-97.5 | SF Symbol glyphs (iosSFStateIconsBool); iOS has no native checkbox |
+| Radio glyph | `RadioButton` | RadioButton | 92.2-95.5 | SF largecircle.fill.circle glyph |
+| UISwitch | `Switch` | Switch | 92.1-96.8 | + liquid droplet thumb morph (frame-validated) |
 | UISlider | `Slider` | Slider | 92.4-95.1 | |
 | UIProgressView | `Slider` (ProgressBar UIID) | ProgressBar | 94.4-95.4 | |
-| UITabBar (floating pill) | `Tabs` | Tabs | 84.7-85.7 | + selection-lens morph (frame-validated); SF-vs-Material glyph gap dominates |
-| UINavigationBar | Toolbar UIID bar | Toolbar | 72.4-78.7 | worst pair; geometry: CN1 bar 9% wide, squarer corners (tracked) |
+| UITabBar (floating pill) | `Tabs` | Tabs | 84.8-86.4 | + selection-lens morph (frame-validated); residual = frost texture, worst iOS rows |
+| UINavigationBar | Toolbar UIID bar | Toolbar | 87.6-87.7 | residual = frost texture; still bottom-quartile |
 | UIAlertController (alert) | Dialog UIID card | Dialog | 97.0-97.1 | |
-| UIPickerView | `GenericSpinner` | Spinner | 89.8-90.0 | wheel perspective fade approximated |
-| UIVisualEffectView / UIGlassEffect | GlassPanel UIID | GlassPanel{Grey,Red,Grad,Photo} | 94.9-98.6 | glass-blend isolation over 4 backdrops |
+| UIPickerView | `GenericSpinner` | Spinner | 91.5-91.8 | whole-row perspective; CN1 wheel wraps short models (native does not); dark off-row contrast tracked |
+| UIVisualEffectView / UIGlassEffect | GlassPanel UIID | GlassPanel{Grey,Red,Grad,Photo} | 96.1-98.6 | glass-blend isolation over 4 backdrops (see scope note above) |
 
-Isolation/ladder cases (not user-facing components): TabOne 95.2-95.9,
-TabsGeom 92.9-93.2, GlassText/GlassIcon 98.6-98.7.
+Isolation/ladder cases (not user-facing components): TabOne 95.6-96.1
+(geometry OFF: w 0.75 / h 0.54 -- see scope note), TabsGeom 93.0-93.5,
+GlassText/GlassIcon 98.6-98.7.
 
 Animated glass (validated per-frame at fixed progress, no native golden):
 TabsMorph (selection lens: travel, overshoot, lens size, tint timing),
@@ -64,6 +87,19 @@ SwitchMorph (droplet stretch/squash).
 | Tab bar badge | Tabs badge | not started |
 | UISlider liquid thumb morph | Slider droplet (reuse SwitchThumbDroplet) | planned (task tracked) |
 
+### Known visual gaps (tracked, honest list)
+
+- iOS `Tabs`/`Toolbar` frost texture: the two worst iOS families; theme knobs
+  are at measured optima and two material-level tweaks (saturation, edge
+  feather) measured flat -- closing this requires a closer reproduction of the
+  native Liquid Glass material in the Metal patch, not tuning.
+- `TabOne` geometry (w 0.75 / h 0.54 vs native) despite its high overlay score.
+- iOS `Spinner` dark: off-row text contrast is low (uniform ~0.32 fade matches
+  the native tone but the dark-sheet contrast is tracked for another pass).
+- Android `ProgressBar`: ~1.5x native track height (geometry-tracked).
+- Android disabled dark `Button`: lower contrast than native.
+- Android FAB/switch small geometry deltas (geometry-tracked).
+
 ### Feature-level gaps
 
 - Live glass while scrolling: composed-patch cache recomposes per frame when
@@ -80,19 +116,19 @@ SwitchMorph (droplet stretch/squash).
 
 | Native control | Fidelity test | Score (min-max) |
 |---|---|---:|
-| MaterialButton (filled) | Button | 93.8-98.5 |
-| MaterialButton (tonal) | RaisedButton | 98.6-98.8 |
-| MaterialButton (outlined) | FlatButton | 92.8-94.5 |
-| TextInputLayout | TextField | 95.1-98.2 |
-| MaterialCheckBox | CheckBox | 94.1-96.6 |
-| MaterialRadioButton | RadioButton | 94.9-97.1 |
-| MaterialSwitch | Switch | 91.1-97.5 |
-| Slider | Slider | 97.1-99.8 |
-| LinearProgressIndicator | ProgressBar | 100.0 |
-| TabLayout | Tabs | 91.5-99.4 |
-| MaterialToolbar | Toolbar | 92.2-96.5 |
-| MaterialAlertDialog | Dialog | 91.0-93.9 |
-| FloatingActionButton | FloatingActionButton | 99.0-99.1 |
+| MaterialButton (filled) | Button | 92.6-96.8 |
+| MaterialButton (tonal) | RaisedButton | 95.2-97.3 |
+| MaterialButton (outlined) | FlatButton | 91.2-93.8 |
+| TextInputLayout | TextField | 96.2-97.6 |
+| MaterialCheckBox | CheckBox | 94.7-95.4 |
+| MaterialRadioButton | RadioButton | 94.5-95.5 |
+| MaterialSwitch | Switch | 95.4-96.4 |
+| Slider | Slider | 98.4-99.6 |
+| LinearProgressIndicator | ProgressBar | 96.9-97.3 |
+| TabLayout | Tabs | 92.3-95.2 |
+| MaterialToolbar | Toolbar | 95.1-98.7 |
+| MaterialAlertDialog | Dialog | 95.7-95.8 |
+| FloatingActionButton | FloatingActionButton | 94.4-97.1 |
 
 ### Missing components
 

@@ -174,15 +174,19 @@ public class RenderFidelityReport {
         commentLines.add("");
 
         // Per-pair fidelity table (worst first): the percentage data for every
-        // mismatch, at a glance, without scrolling through the image cards.
+        // mismatch, at a glance, without scrolling through the image cards. The
+        // geometry column flags pairs whose bbox is materially off-native even
+        // when the tolerant overlay score is high -- a 95% score with a
+        // half-height widget must not read as parity.
         if (compared > 0) {
-            commentLines.add("| Component | State | Appearance | Material | Fidelity | SSIM | mean delta | vs base |");
-            commentLines.add("|---|---|---|---|--:|--:|--:|--:|");
+            commentLines.add("| Component | State | Appearance | Material | Fidelity | SSIM | mean delta | vs base | Geometry |");
+            commentLines.add("|---|---|---|---|--:|--:|--:|--:|---|");
             for (PairRow row : comparedRows) {
                 String[] p = splitTest(row.test);
-                commentLines.add(String.format("| %s | %s | %s | %s | %.1f%% | %.3f | %.2f | %s |",
+                commentLines.add(String.format("| %s | %s | %s | %s | %.1f%% | %.3f | %.2f | %s | %s |",
                         p[0], p[1], p[2], row.material.isEmpty() ? "-" : row.material,
-                        row.fidelity, nz(row.ssim), nz(row.meanDelta), deltaCell(row.delta)));
+                        row.fidelity, nz(row.ssim), nz(row.meanDelta), deltaCell(row.delta),
+                        geometryFlag(row.geometry)));
             }
             commentLines.add("");
 
@@ -328,6 +332,43 @@ public class RenderFidelityReport {
             return new String[] {test.substring(0, last), "", appearance};
         }
         return new String[] {test.substring(0, prev), test.substring(prev + 1, last), appearance};
+    }
+
+    /// Compact geometry cell for the MAIN table: "ok" when the widget bbox is
+    /// close to native, otherwise the offending numbers prefixed with "OFF"
+    /// (center offset beyond 6px, or a size ratio outside 0.90..1.10). The
+    /// tolerant overlay score absorbs geometry drift, so this keeps a
+    /// high-scoring but wrongly-sized pair from reading as parity.
+    private static String geometryFlag(Map<String, Object> geometry) {
+        if (geometry == null) {
+            return "-";
+        }
+        Double off = toDouble(geometry.get("center_offset"));
+        Double wr = toDouble(geometry.get("width_ratio"));
+        Double hr = toDouble(geometry.get("height_ratio"));
+        if (off == null || wr == null || hr == null) {
+            return "-";
+        }
+        StringBuilder bad = new StringBuilder();
+        if (off > 6.0d) {
+            bad.append(String.format("off %.0fpx", off));
+        }
+        if (wr < 0.90d || wr > 1.10d) {
+            if (bad.length() > 0) {
+                bad.append(", ");
+            }
+            bad.append(String.format("w %.2f", wr));
+        }
+        if (hr < 0.90d || hr > 1.10d) {
+            if (bad.length() > 0) {
+                bad.append(", ");
+            }
+            bad.append(String.format("h %.2f", hr));
+        }
+        if (bad.length() == 0) {
+            return "ok";
+        }
+        return "**OFF** (" + bad + ")";
     }
 
     /// Baseline-delta for a table cell (ASCII only).

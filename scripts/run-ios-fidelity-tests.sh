@@ -156,28 +156,32 @@ cp -f "$WORK_DIR/fidelity-comment.md" "$ARTIFACTS_DIR/fidelity-comment.md" 2>/de
 
 # ---- deterministic animation-frame validation ----
 # Frames are self-goldens (CN1 vs committed CN1): golden drift, stuck frames,
-# non-monotonic travel and broken overshoot all fail here. Missing goldens are
-# seeded from the run (and must be committed); the strips land in artifacts so
-# reviewers can see the whole motion at a glance.
-if [ "$FRAME_COUNT" -gt 0 ]; then
-  FRAME_GOLDENS_DIR="$APP_DIR/goldens/${GOLDEN_SET}-frames"
-  rf_log "STAGE:MORPH_FRAMES -> validating ${FRAME_COUNT} animation frame(s)"
-  frame_rc=0
-  cn1ss_java_run MorphFrameValidator \
-    --frames-dir "$FRAMES_WORK_DIR" \
-    --goldens-dir "$FRAME_GOLDENS_DIR" \
-    --spec "$CN1SS_FIDELITY_SPEC" \
-    --seed-missing \
-    --out-json "$ARTIFACTS_DIR/morph-frames.json" \
-    --strip-dir "$ARTIFACTS_DIR" || frame_rc=$?
-  cp -f "$FRAMES_WORK_DIR"/*.png "$ARTIFACTS_DIR/" 2>/dev/null || true
-  if [ "$frame_rc" -ne 0 ]; then
-    rf_log "Animation-frame validation FAILED (rc=$frame_rc)"
-    if [ "${CN1SS_FAIL_ON_MISMATCH:-0}" = "1" ]; then
-      [ "$rc" -eq 0 ] && rc=$frame_rc
-    else
-      rf_log "WARNING: not failing the run (CN1SS_FAIL_ON_MISMATCH unset)"
-    fi
+# non-monotonic travel and broken overshoot all fail here. The validator ALWAYS
+# runs -- it fails when a spec-declared frame group delivered nothing, so a
+# capture pipeline that silently stops producing frames cannot pass. Seeding of
+# missing goldens is a deliberate LOCAL act (FIDELITY_UPDATE_GOLDENS=1); in CI a
+# missing frame golden is a failure, never self-approved.
+FRAME_GOLDENS_DIR="$APP_DIR/goldens/${GOLDEN_SET}-frames"
+rf_log "STAGE:MORPH_FRAMES -> validating ${FRAME_COUNT} animation frame(s)"
+FRAME_ARGS=(
+  --frames-dir "$FRAMES_WORK_DIR"
+  --goldens-dir "$FRAME_GOLDENS_DIR"
+  --spec "$CN1SS_FIDELITY_SPEC"
+  --out-json "$ARTIFACTS_DIR/morph-frames.json"
+  --strip-dir "$ARTIFACTS_DIR"
+)
+if [ "${FIDELITY_UPDATE_GOLDENS:-0}" = "1" ]; then
+  FRAME_ARGS+=(--seed-missing)
+fi
+frame_rc=0
+cn1ss_java_run MorphFrameValidator "${FRAME_ARGS[@]}" || frame_rc=$?
+cp -f "$FRAMES_WORK_DIR"/*.png "$ARTIFACTS_DIR/" 2>/dev/null || true
+if [ "$frame_rc" -ne 0 ]; then
+  rf_log "Animation-frame validation FAILED (rc=$frame_rc)"
+  if [ "${CN1SS_FAIL_ON_MISMATCH:-0}" = "1" ]; then
+    [ "$rc" -eq 0 ] && rc=$frame_rc
+  else
+    rf_log "WARNING: not failing the run (CN1SS_FAIL_ON_MISMATCH unset)"
   fi
 fi
 
