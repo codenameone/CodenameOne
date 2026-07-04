@@ -9,8 +9,11 @@
  */
 package com.codenameone.inputvalidation.gestures;
 
+import com.codename1.io.FileSystemStorage;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
+
+import java.io.OutputStream;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.Container;
@@ -102,7 +105,24 @@ public final class GestureSuite {
         });
     }
 
+    private static final StringBuilder EVENT_LOG = new StringBuilder();
+
+    /// Console output routes through NSLog -> unified logging on iOS, which
+    /// DROPS messages under burst pressure (CI observed interleaved event
+    /// lines missing from both `log stream` and `log show`). The full event
+    /// transcript is therefore also rewritten to a file in the app home on
+    /// every line; the platform driver reads it from the app container after
+    /// the run. The console line stays as a live-progress channel.
     private static void log(String line) {
         System.out.println(line);
+        EVENT_LOG.append(line).append('\n');
+        try {
+            FileSystemStorage fs = FileSystemStorage.getInstance();
+            OutputStream os = fs.openOutputStream(fs.getAppHomePath() + "cn1iv-events.log");
+            os.write(EVENT_LOG.toString().getBytes("UTF-8"));
+            os.close();
+        } catch (Exception err) {
+            // the console channel remains as the fallback
+        }
     }
 }
