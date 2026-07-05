@@ -760,6 +760,9 @@ static pthread_mutex_t gcSatbMutex = PTHREAD_MUTEX_INITIALIZER;
 // Monotonic count of objects transitioned unmarked->marked this process; the SATB
 // drain snapshots it around a batch to detect "marked nothing new" (fixpoint).
 long gcMarkNewObjectCount = 0;
+// Forward (tentative) declaration -- the real definition is below near the worklist;
+// the belt pass in codenameOneGCMark forces it to trigger the full BiBOP rescan.
+static JAVA_BOOLEAN gcMarkWorklistOverflow;
 
 void cn1SatbEnqueue(JAVA_OBJECT old) {
     pthread_mutex_lock(&gcSatbMutex);
@@ -1065,6 +1068,28 @@ void codenameOneGCMark() {
             gcMarkObject(d, batch[i], JAVA_FALSE);
         }
         if(n > 0) gcMarkDrain(d);
+    }
+
+    // Belt pass -- guaranteed drain completeness before sweep. gcMarkDrain triggers the
+    // BiBOP page rescan only on a worklist OVERFLOW; if a marked object ever had its mark
+    // function skipped, its reachable children go untraversed and are swept while live --
+    // the intermittent Linux crash (a marked Component.BGPainter whose owning Component,
+    // reached only through this$0, was freed). Force one full rescan + drain to a fixpoint
+    // unconditionally so EVERY marked object's mark function runs and all reachable children
+    // are marked. gcMarkDrain re-pushes each marked slot and loops until a pass marks nothing
+    // new -> O(reachable) and idempotent; recovers any marked-but-untraversed subtree.
+    {
+        long __beltBefore = gcMarkNewObjectCount;
+        gcMarkWorklistOverflow = JAVA_TRUE;   // force the BiBOP page-rescan path on
+        gcMarkDrain(d);
+#ifdef CN1_BIBOP_VALIDATE
+        if(gcMarkNewObjectCount != __beltBefore) {
+            fprintf(stderr, "CN1BIBOP DRAIN INCOMPLETE: belt pass recovered %ld "
+                    "reachable-but-unmarked object(s) before sweep\n",
+                    gcMarkNewObjectCount - __beltBefore);
+            fflush(stderr);
+        }
+#endif
     }
 }
 
