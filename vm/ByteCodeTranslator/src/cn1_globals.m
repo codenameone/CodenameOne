@@ -2882,6 +2882,16 @@ static JAVA_BOOLEAN gcMarkWorklistOverflow = JAVA_FALSE;
 // writing it from many workers would be a benign-value-but-still-reported data race.
 static JAVA_BOOLEAN gcMarkFoundUnmarkedChildInPass = JAVA_FALSE;
 
+#ifdef CN1_BIBOP_VALIDATE
+// Forensic (serial mark): the object gcMarkDrain is currently tracing -- i.e. the
+// PARENT whose mark function is marking children. The gcMarkObject child-side
+// validation dumps this so a corrupt child tells us WHO referenced it, which
+// distinguishes a conservative-scan root-miss (parent live, child wrongly freed)
+// from a worklist/slot reuse (the parent itself is stale). Written on the single
+// GC/mark thread only, read in the same-thread child-mark below.
+volatile JAVA_OBJECT gcMarkCurrentDrainObj = JAVA_NULL;
+#endif
+
 // ===================== Parallel mark drain =====================
 //
 // The transitive drain (popping objects and running their per-class mark functions,
@@ -3113,6 +3123,42 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
         }
         return;
     }
+#ifdef CN1_BIBOP_VALIDATE
+    // Forensic (child side): the intermittent arm64 suite crash faults EXACTLY at the
+    // stamp below -- gcMarkObject marking a child (e.g. Component.BGPainter.this$0)
+    // whose header is readable at the acquire-load (above) but reclaimed by the time
+    // we write its mark. Detect a corrupt/reclaimed child BEFORE that write and dump
+    // both the child and the parent that referenced it (gcMarkCurrentDrainObj), so a
+    // reproduction says root-miss (parent live, child wrongly freed) vs slot-reuse.
+    // A live child carries heapPosition CN1_BIBOP_HEAP_POS or >= -1, and its clazz's
+    // markFunction lies in the app text (never a libc/heap address); anything else is
+    // a freed/reused slot or a dangling reference.
+    {
+        gcMarkFunctionPointer __cfp = obj->__codenameOneParentClsReference
+            ? obj->__codenameOneParentClsReference->markFunction : (gcMarkFunctionPointer)0;
+        uintptr_t __anchor = (uintptr_t)(void*)&gcMarkObject;
+        uintptr_t __fpv = (uintptr_t)(void*)__cfp;
+        int __fpBad = (__cfp != 0) &&
+            ((__fpv > __anchor ? __fpv - __anchor : __anchor - __fpv) > (256ULL << 20));
+        int __hp = obj->__heapPosition;
+        if((__hp != CN1_BIBOP_HEAP_POS && __hp < -1) || __fpBad) {
+            JAVA_OBJECT __p = gcMarkCurrentDrainObj;
+            fprintf(stderr, "CN1BIBOP MARKOBJ CORRUPT CHILD: child=%p parentCls=%p childMarkFn=%p "
+                    "childHeapPos=%d childGcMark=%d curMark=%d FREE_MARK=%d :: drainParent=%p "
+                    "parentCls=%p parentMarkFn=%p parentHeapPos=%d parentGcMark=%d\n",
+                    (void*)obj, (void*)obj->__codenameOneParentClsReference, (void*)__cfp,
+                    __hp, obj->__codenameOneGcMark, currentGcMarkValue, CN1_BIBOP_FREE_MARK,
+                    (void*)__p,
+                    __p ? (void*)__p->__codenameOneParentClsReference : (void*)0,
+                    (__p && __p->__codenameOneParentClsReference)
+                        ? (void*)__p->__codenameOneParentClsReference->markFunction : (void*)0,
+                    __p ? __p->__heapPosition : -999,
+                    __p ? __p->__codenameOneGcMark : -999);
+            fflush(stderr);
+            abort();
+        }
+    }
+#endif
     obj->__codenameOneGcMark = markVal;
     CN1_BIBOP_STAMP_MARKED(obj, markVal);
     gcMarkFoundUnmarkedChildInPass = JAVA_TRUE;
@@ -3515,6 +3561,9 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
 #endif
             gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
             if(fp != 0) {
+#ifdef CN1_BIBOP_VALIDATE
+                gcMarkCurrentDrainObj = obj;
+#endif
                 fp(threadStateData, obj, force);
             }
         }
