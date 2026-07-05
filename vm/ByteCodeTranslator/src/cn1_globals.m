@@ -1528,12 +1528,15 @@ JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     // points at it (observed: java.lang.System.LOCK freed under the GC thread's
     // own wait()). Deliver the intended semantics: register it as a permanent
     // GC root instead.
-    // A MATURED (-4) object is also BiBOP-resident (its memory is a page slot). Removing
-    // its table entry would stop the legacy rescan from tracing its SUBTREE (children could
-    // then be swept). Deliver "immortal" the same way: register a permanent root and keep
-    // the table entry (idempotent double-trace), rather than fall through to entry removal.
-    if(o != JAVA_NULL && !CN1_IS_TAGGED(o) &&
-       (o->__heapPosition == CN1_BIBOP_HEAP_POS || o->__heapPosition == CN1_BIBOP_ADOPTED)) {
+    // ONLY a plain BiBOP slot (-3) gets the make-immortal shortcut: dead -3 objects never
+    // reach this function (the legacy sweep only walks allObjectsInHeap, which they are not
+    // in), so a -3 here can only be a caller asking to pin a live object as a root.
+    // A MATURED (-4) object must NOT take this branch: the legacy sweep DOES call this on
+    // dead -4 objects to remove them before freeing, and pinning a dead object as an
+    // immortal root while freeAndFinalize frees it corrupts the heap. -4 falls through to
+    // findPointerPosInHeap removal, which is correct for both the sweep and the (never
+    // observed in practice) make-immortal-of-an-already-matured-object case.
+    if(o != JAVA_NULL && !CN1_IS_TAGGED(o) && o->__heapPosition == CN1_BIBOP_HEAP_POS) {
         cn1AddImmortalRoot(o);
         return JAVA_TRUE;
     }
