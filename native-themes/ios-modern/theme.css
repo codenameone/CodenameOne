@@ -1062,7 +1062,7 @@ PopupContent {
        native Liquid Glass bar (0.55 was too opaque -> flat grey vs native's tint;
        fully transparent left NO visible pill on plain-blur ports and even on
        Metal read lighter than the native bar's slight dark wash). */
-    TabsContainer { background-color: rgba(22,22,26,0.30); color: #ebebf5; cn1-background-type: cn1-pill-border; backdrop-filter: blur(40px); border: none; }
+    TabsContainer { background-color: rgba(22,22,26,0.18); color: #ebebf5; cn1-background-type: cn1-pill-border; backdrop-filter: blur(40px); border: none; }
     Tab { color: #ebebf5; background-color: transparent; }
     /* Dark bottom tab bar: the selected item sits on a lighter frosted sub-capsule
        over the dark pill (layered glass), matching the native UITabBar. */
