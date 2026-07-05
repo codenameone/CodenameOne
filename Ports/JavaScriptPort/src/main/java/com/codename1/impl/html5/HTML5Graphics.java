@@ -430,7 +430,16 @@ public class HTML5Graphics {
     public void fillRect(int x, int y, int width, int height) {
         primitiveRenderAdapter.fillRect(x, y, width, height);
     }
-    
+
+    /**
+     * In-place backdrop blur for backdrop-filter styles; see
+     * {@link com.codename1.impl.html5.graphics.BlurRegion}. cornerRadius 0 =
+     * rectangular, -1 = capsule, &gt;0 = rounded rect radius in px.
+     */
+    public void blurRegion(int x, int y, int width, int height, float radius, float cornerRadius) {
+        dispatchOp(new com.codename1.impl.html5.graphics.BlurRegion(x, y, width, height, radius, cornerRadius));
+    }
+
     public void clearRect(int x, int y, int width, int height) {
         primitiveRenderAdapter.clearRect(x, y, width, height);
     }

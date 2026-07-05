@@ -159,6 +159,13 @@ public class BufferedGraphics extends HTML5Graphics {
     }
 
     @Override
+    public void blurRegion(int x, int y, int width, int height, float radius, float cornerRadius) {
+        // Route through addOp (this class's chokepoint) so the empty-clip cull
+        // applies; the base class records into its own immediate context.
+        addOp(new com.codename1.impl.html5.graphics.BlurRegion(x, y, width, height, radius, cornerRadius));
+    }
+
+    @Override
     public void clearRect(int x, int y, int width, int height) {
         primitiveRenderAdapter.clearRect(x, y, width, height);
     }

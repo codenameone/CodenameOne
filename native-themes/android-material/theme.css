@@ -489,7 +489,10 @@ DesktopHorizontalScrollThumb.pressed {
    combining it with a visible border would drop into the 9-piece
    rasterization path. */
 Tabs { background-color: #fef7ff; padding: 0; margin: 0; }
-TabsContainer { background-color: #fef7ff; color: #1d1b20; padding: 0; margin: 0; }
+/* border:none on the tab UIIDs: when this theme is LAYERED over another via
+   addThemeProps (the Playground preview, runtime theme switching) a base
+   theme's Tab border would otherwise survive the merge and box every cell. */
+TabsContainer { border: none; background-color: #fef7ff; color: #1d1b20; padding: 0; margin: 0; }
 /* Material 3 TabLayout draws a full-width hairline divider along its bottom edge
    (surfaceVariant outline). The tab row is a custom Container that does not paint
    a border, so Tabs reads this UIID's bgColor and paints the line directly
@@ -498,6 +501,7 @@ TabsDivider { background-color: #cac4d0; }
 
 Tab {
     color: #49454f;
+    border: none;
     background-color: #fef7ff;
     /* Top padding tuned against the native tile: 2.2mm sat the icon+label
        ~6px lower than TabLayout and grew the bar by the same 6px. */
@@ -517,8 +521,8 @@ Tab {
     icon-gap: 1mm;
     text-align: center;
 }
-Tab.selected { color: var(--accent-color, #6750a4); background-color: #fef7ff; font-family: "native:MainBold"; font-size: 2.25mm; }
-Tab.pressed { color: var(--accent-color, #6750a4); background-color: #fef7ff; }
+Tab.selected { color: var(--accent-color, #6750a4); border: none; background-color: #fef7ff; font-family: "native:MainBold"; font-size: 2.25mm; }
+Tab.pressed { color: var(--accent-color, #6750a4); border: none; background-color: #fef7ff; }
 
 SelectedTab { cn1-derive: Tab; color: var(--accent-color, #6750a4); background-color: #fef7ff; font-family: "native:MainBold"; font-size: 2.25mm; }
 UnselectedTab { cn1-derive: Tab; color: #49454f; }

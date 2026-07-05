@@ -628,6 +628,7 @@ TabbedPane { background-color: transparent; padding: 0; margin: 0; }
    icon-over-label items; the selected item sits on a lighter inner pill and turns
    blue, the others are dark. cn1-pill-border draws the capsule; rgba is the glass. */
 TabsContainer {
+    border: none;  /* see Tab: survive addThemeProps layering */
     /* Floating WHITE glass capsule (native iOS 26 bar): a translucent white fill over
        the blurred backdrop so it reads as a distinct white pill even over light-grey
        content, not a near-invisible frost. The blur still lets colour bleed through. */
@@ -666,6 +667,11 @@ Tab {
        reading blue mid-morph. Dark enough (lum < the lens tint key ~55) that a tab the
        drop passes over tints too (half-blue during travel). */
     color: #2c2c2e;
+    /* Explicit no-border: when this theme is LAYERED over another via
+       addThemeProps (the Playground preview, apps switching themes at
+       runtime) a base theme's Tab border would otherwise survive the merge
+       and draw a boxy outline around every tab cell. */
+    border: none;
     background-color: transparent;
     /* With equal-width cells (tabsEqualWidthBool) the GridLayout sizes every cell to
        the widest tab's content + this padding, so the padding sets the cell (and pill)
@@ -703,6 +709,7 @@ Tab {
    the native bar does not have). Omit the background-type so it stays transparent. */
 Tab.selected {
     color: #2c2c2e;                 /* dark; the lens drop colours it blue */
+    border: none;                   /* see Tab: survive addThemeProps layering */
     background-color: transparent;
     margin: 0.18mm 0.4mm 0.18mm 0.4mm;
 }
@@ -712,6 +719,7 @@ Tab.selected {
    capsule is the only selection visual; a press just keeps the capsule. */
 Tab.pressed {
     color: #2c2c2e;                 /* dark; the lens drop colours it blue */
+    border: none;                   /* see Tab: survive addThemeProps layering */
     background-color: transparent;
     margin: 0.18mm 0.4mm 0.18mm 0.4mm;
 }
@@ -1050,9 +1058,11 @@ PopupContent {
 
     Tabs { background-color: transparent; }
     TabbedPane { background-color: transparent; }
-    /* Dark glass tab pill: more translucent so the backdrop reads through like the
-       native Liquid Glass bar (0.55 was too opaque -> flat grey vs native's tint). */
-    TabsContainer { background-color: transparent; color: #ebebf5; cn1-background-type: cn1-pill-border; backdrop-filter: blur(40px); }
+    /* Dark glass tab pill: translucent so the backdrop reads through like the
+       native Liquid Glass bar (0.55 was too opaque -> flat grey vs native's tint;
+       fully transparent left NO visible pill on plain-blur ports and even on
+       Metal read lighter than the native bar's slight dark wash). */
+    TabsContainer { background-color: rgba(22,22,26,0.30); color: #ebebf5; cn1-background-type: cn1-pill-border; backdrop-filter: blur(40px); border: none; }
     Tab { color: #ebebf5; background-color: transparent; }
     /* Dark bottom tab bar: the selected item sits on a lighter frosted sub-capsule
        over the dark pill (layered glass), matching the native UITabBar. */
