@@ -655,8 +655,28 @@ void placeObjectInHeapCollection(JAVA_OBJECT obj) {
     }
 }
 
-extern struct ThreadLocalData** allThreads; 
+extern struct ThreadLocalData** allThreads;
 extern int nThreadsToKill;
+
+// Graduate a surviving BiBOP object into the legacy mark/sweep (poor-man's generational
+// promotion). NON-MOVING: the object's memory stays in its BiBOP slot; we only register
+// it in allObjectsInHeap (so the unconditional legacy rescan traces it -- always complete,
+// unlike the overflow-gated BiBOP rescan) and flag its slot CN1_BIBOP_ADOPTED so the BiBOP
+// page sweep skips it (one owner, no double-clearing). Runs on the GC thread during the
+// mark; mutators never touch allObjectsInHeap directly and nothing moves, so no reference
+// can dangle. placeObjectInHeapCollection sets heapPosition to the array index; we override
+// it to the -4 sentinel (the legacy sweep finds the object by walk-index, not heapPosition).
+static void cn1MatureObject(JAVA_OBJECT obj) {
+#ifndef CN1_DISABLE_BIBOP
+    // Mark the host page STICKY-adopted BEFORE registering: its slots must now always
+    // take the full per-slot sweep walk (which skips live -4 slots) instead of the O(1)
+    // page reset, which would recycle this still-live object's memory out from under the
+    // legacy collector (dangling / gcMark==0 in the legacy sweep).
+    ((CN1BibopPage*)(((uintptr_t)obj) & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1)))->gcHasAdopted = JAVA_TRUE;
+#endif
+    placeObjectInHeapCollection(obj);
+    obj->__heapPosition = CN1_BIBOP_ADOPTED;
+}
 
 JAVA_BOOLEAN hasAgressiveAllocator;
 
@@ -760,6 +780,20 @@ static pthread_mutex_t gcSatbMutex = PTHREAD_MUTEX_INITIALIZER;
 // Monotonic count of objects transitioned unmarked->marked this process; the SATB
 // drain snapshots it around a batch to detect "marked nothing new" (fixpoint).
 long gcMarkNewObjectCount = 0;
+
+// ---- Poor-man's generational adoption: mature surviving BiBOP subtrees into legacy ----
+// Policy (compile-time A/B): TENURE(1) matures a reachable non-leaf BiBOP object once it
+// has SURVIVED a prior cycle (its old mark was a positive prior-cycle value), plus a
+// CASCADE so the whole reachable subtree matures together (never half a tree). ONMARK(2)
+// matures every reachable non-leaf BiBOP object immediately. 0 disables adoption.
+#ifndef CN1_ADOPT_POLICY
+#define CN1_ADOPT_POLICY 1
+#endif
+#if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
+// Set by gcMarkDrain while running a MATURED object's mark function, so the children it
+// marks are matured too -- this is the cascade that keeps the whole subtree in one system.
+static JAVA_BOOLEAN gcCurrentlyMaturing = JAVA_FALSE;
+#endif
 // Forward (tentative) declaration -- the real definition is below near the worklist;
 // the belt pass in codenameOneGCMark forces it to trigger the full BiBOP rescan.
 static JAVA_BOOLEAN gcMarkWorklistOverflow;
@@ -1644,6 +1678,7 @@ static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
     p->gcAllocedSinceSweep = JAVA_FALSE;
     p->gcNeedsReclaim = JAVA_FALSE;
     p->gcHasMonitors = JAVA_FALSE;
+    p->gcHasAdopted = JAVA_FALSE;
     atomic_store_explicit(&p->gcLastMarkedEpoch, 0, memory_order_relaxed);
     p->gcGraceEpoch = 0;
 #endif
@@ -2072,6 +2107,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         // gcGraceEpoch is the upper bound on survivor epochs as of the last full walk.
         if(page->gcAllocedSinceSweep == JAVA_FALSE &&
            page->gcNeedsReclaim == JAVA_FALSE &&
+           page->gcHasAdopted == JAVA_FALSE &&
            page->freeList == 0 &&
            atomic_load_explicit(&page->gcLastMarkedEpoch, memory_order_relaxed) != V) {
             int graceEpoch = page->gcGraceEpoch;
@@ -2120,6 +2156,14 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
 #endif
         for(int i = 0 ; i < n ; i++) {
             JAVA_OBJECT o = cn1BibopSlot(page, i);
+            // MATURED (adopted) slot: its lifecycle belongs to the legacy mark/sweep now.
+            // Skip it entirely (no double-clearing) -- BiBOP counts it as occupied/live so
+            // the page isn't reclaimed. The legacy sweep flips it back to -3 on death, and a
+            // LATER BiBOP sweep of this page then reclaims it as a normal dead slot.
+            if(o->__heapPosition == CN1_BIBOP_ADOPTED) {
+                liveCount++;
+                continue;
+            }
             int m = o->__codenameOneGcMark;
             if(m == CN1_BIBOP_FREE_MARK) {
                 *(void**)o = fl; fl = o; freeCount++;
@@ -2456,7 +2500,10 @@ JAVA_OBJECT cn1ConservativeResolve(void* w) {
                 // whose first 8 bytes still hold the free-list next pointer.
                 int m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_ACQUIRE);
                 if(m == CN1_BIBOP_FREE_MARK) return JAVA_NULL;   // on the page free-list
-                if(o->__heapPosition != CN1_BIBOP_HEAP_POS) return JAVA_NULL;
+                // Accept both a normal BiBOP slot and a MATURED (adopted) slot -- a
+                // matured object's memory is still in this page, so a conservative stack
+                // word must still resolve to it or it would be missed as a root and swept.
+                if(o->__heapPosition != CN1_BIBOP_HEAP_POS && o->__heapPosition != CN1_BIBOP_ADOPTED) return JAVA_NULL;
                 return o;                                        // interior -> slot base
             } else if(b < cand) lo = mid + 1; else hi = mid - 1;
         }
@@ -2928,7 +2975,14 @@ void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     // A BiBOP page slot must never be free()'d -- it is reclaimed in place into
     // its page free-list by cn1BibopSweep. This is a defensive guard; no legacy
     // path should reach here with a page slot (they are not in allObjectsInHeap).
-    if(obj->__heapPosition == CN1_BIBOP_HEAP_POS) {
+    // A MATURED (-4) object's memory is also a page slot -- never free() it either;
+    // the legacy sweep flips it back to -3 (below) and the BiBOP sweep reclaims it.
+    if(obj->__heapPosition == CN1_BIBOP_HEAP_POS || obj->__heapPosition == CN1_BIBOP_ADOPTED) {
+        if(obj->__heapPosition == CN1_BIBOP_ADOPTED) {
+            // Hand the slot back to BiBOP: revert to a normal dead BiBOP slot so the next
+            // sweep of its (retired) page reclaims it to the page free-list.
+            obj->__heapPosition = CN1_BIBOP_HEAP_POS;
+        }
         return;
     }
 #endif
@@ -3188,7 +3242,9 @@ struct JavaObjectPrototype cn1TaggedProxy = { .__codenameOneParentClsReference =
 // Relaxed + idempotent: every parallel marker that newly marks a slot on this page stores
 // the same value; the GC-thread sweep reads it after the mark-pool join barrier.
 static inline void cn1BibopStampMarked(JAVA_OBJECT obj, int markVal) {
-    if(obj->__heapPosition == CN1_BIBOP_HEAP_POS) {
+    // Stamp for a normal BiBOP slot AND a MATURED (-4) slot: a live matured object's
+    // memory is still in this page, so its page must not be O(1) all-dead reclaimed.
+    if(obj->__heapPosition == CN1_BIBOP_HEAP_POS || obj->__heapPosition == CN1_BIBOP_ADOPTED) {
         CN1BibopPage* pg = (CN1BibopPage*)(((uintptr_t)obj) & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1));
         atomic_store_explicit(&pg->gcLastMarkedEpoch, markVal, memory_order_relaxed);
     }
@@ -3353,7 +3409,24 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
         gcBeltDiagCount++;
     }
 #endif
-    if(obj->__codenameOneParentClsReference->markFunction != 0) {
+    gcMarkFunctionPointer __markFn = obj->__codenameOneParentClsReference->markFunction;
+#if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
+    // Poor-man's generational adoption: a reachable, non-leaf (markFunction != 0) BiBOP
+    // object graduates into the legacy mark/sweep, which traces it unconditionally =
+    // complete (the split-reachability bug only affects non-leaf BiBOP objects whose
+    // subtree the overflow-gated BiBOP rescan can drop). Leaf objects have no subtree, so
+    // they stay in the fast BiBOP path. TENURE waits for one survival (markSnapshot > 0)
+    // but cascades (gcCurrentlyMaturing) so a maturing subtree matures WHOLE, never half a
+    // tree. Stamp already fired above (heapPosition still -3), so ordering is fine.
+    if(__markFn != 0 && obj->__heapPosition == CN1_BIBOP_HEAP_POS
+#if CN1_ADOPT_POLICY == 1
+       && (markSnapshot > 0 || gcCurrentlyMaturing)
+#endif
+       ) {
+        cn1MatureObject(obj);
+    }
+#endif
+    if(__markFn != 0) {
         gcMarkWorklistPush(obj, force);
     }
 }
@@ -3736,7 +3809,7 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
                     ((__fpv > __anchor ? __fpv - __anchor : __anchor - __fpv) > (256ULL << 20));
                 if(obj == JAVA_NULL || CN1_IS_TAGGED(obj) ||
                    obj->__codenameOneParentClsReference == 0 ||
-                   (__vhp != CN1_BIBOP_HEAP_POS && __vhp < -1) ||
+                   (__vhp != CN1_BIBOP_HEAP_POS && __vhp != CN1_BIBOP_ADOPTED && __vhp < -1) ||
                    (__vmark != currentGcMarkValue && __vmark != -1) ||
                    __fpBad) {
                     fprintf(stderr, "CN1BIBOP MARKDRAIN CORRUPT: obj=%p tagged=%d parentCls=%p "
@@ -3755,7 +3828,17 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
 #ifdef CN1_BIBOP_VALIDATE
                 gcMarkCurrentDrainObj = obj;
 #endif
+#if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
+                // Cascade: if this object has been MATURED, mature the children its mark
+                // function is about to mark, so the whole reachable subtree graduates
+                // together (never half a tree). Restored after the call.
+                JAVA_BOOLEAN __savedMaturing = gcCurrentlyMaturing;
+                gcCurrentlyMaturing = (obj->__heapPosition == CN1_BIBOP_ADOPTED) ? JAVA_TRUE : __savedMaturing;
+#endif
                 fp(threadStateData, obj, force);
+#if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
+                gcCurrentlyMaturing = __savedMaturing;
+#endif
             }
         }
         int total = currentSizeOfAllObjectsInHeap;

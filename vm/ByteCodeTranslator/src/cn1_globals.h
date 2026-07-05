@@ -1196,6 +1196,15 @@ const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 #ifndef CN1_BIBOP_HEAP_POS
 #define CN1_BIBOP_HEAP_POS (-3)
 #endif
+// A MATURED (graduated) object: memory still lives in its BiBOP slot, but its
+// lifecycle now belongs to the legacy mark/sweep -- it is registered in
+// allObjectsInHeap and traced by the unconditional legacy rescan (always complete),
+// while the BiBOP page sweep SKIPS it (no double-clearing) and its slot is reclaimed
+// only after the legacy sweep hands it back (flips it to -3 on death). Poor-man's
+// generational: BiBOP = fast young path; survivors mature into the real GC.
+#ifndef CN1_BIBOP_ADOPTED
+#define CN1_BIBOP_ADOPTED (-4)
+#endif
 // Slot sizes (16-aligned); a size maps to the smallest class >= size.
 #define CN1_BIBOP_NUM_CLASSES 15
 // Compile-time size -> class-index. With a constant `sz` (sizeof(...)) clang
@@ -1238,6 +1247,15 @@ typedef struct CN1BibopPage {
                                           //  EVERY page whenever any monitor existed
                                           //  (e.g. java.lang.System.LOCK, permanently).
                                           //  (recomputed at every full walk)
+    JAVA_BOOLEAN gcHasAdopted;            // STICKY: an object on this page was ever MATURED
+                                          //  into the legacy mark/sweep (heapPosition==-4).
+                                          //  Suppresses the O(1) all-dead page reclaim for
+                                          //  THIS page so its slots always reach the full
+                                          //  per-slot walk, which correctly SKIPS live -4
+                                          //  slots (owned by legacy) instead of resetting the
+                                          //  whole page out from under them (set by
+                                          //  cn1MatureObject, cleared only by
+                                          //  cn1BibopFormatPage).
     _Atomic int gcLastMarkedEpoch;        // currentGcMarkValue stamped by gcMarkObject when
                                           //  a slot on this page is marked live (relaxed;
                                           //  idempotent across parallel markers)
