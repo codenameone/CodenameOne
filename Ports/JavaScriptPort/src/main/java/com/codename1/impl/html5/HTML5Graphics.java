@@ -440,6 +440,16 @@ public class HTML5Graphics {
         dispatchOp(new com.codename1.impl.html5.graphics.BlurRegion(x, y, width, height, radius, cornerRadius));
     }
 
+    /**
+     * In-place selection-drop lens (magnify + tint); see
+     * {@link com.codename1.impl.html5.graphics.LensRegion}.
+     */
+    public void lensRegion(int x, int y, int width, int height, float cornerRadius, float magnify,
+            int tintColor, float tintStrength) {
+        dispatchOp(new com.codename1.impl.html5.graphics.LensRegion(x, y, width, height, cornerRadius,
+                magnify, tintColor, tintStrength));
+    }
+
     public void clearRect(int x, int y, int width, int height) {
         primitiveRenderAdapter.clearRect(x, y, width, height);
     }

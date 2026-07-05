@@ -6205,6 +6205,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean lensRegion(Object graphics, int x, int y, int width, int height, float cornerRadius,
+            float magnify, float aberration, int tintColor, float tintStrength) {
+        // The iOS-26 tab selection drop: magnify the content bulge + accent
+        // tint. Chromatic aberration (the iOS Metal shader's extra) is dropped
+        // on the web; magnify + tint carries the recognisable effect.
+        g(graphics).lensRegion(x, y, width, height, cornerRadius, magnify, tintColor, tintStrength);
+        return true;
+    }
+
+    @Override
     public Image gaussianBlurImage(Image image, float radius) {
         if (image == null) {
             return image;

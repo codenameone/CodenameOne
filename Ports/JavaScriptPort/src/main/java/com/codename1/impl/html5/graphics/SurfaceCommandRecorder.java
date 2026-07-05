@@ -119,6 +119,14 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
     // side-channel host call would race the flush.
     public static final int OP_BLUR_SELF_REGION = 80;  // 6 nums (x, y, w, h, sigmaPx, cornerRadius)
 
+    // In-place iOS 26 selection-DROP lens: MAGNIFY the surface's own pixels in
+    // the region (content bulge) then optionally wash them toward an accent
+    // tint. The full chromatic aberration of the native Metal shader is
+    // dropped on the web; magnify + tint carries the recognisable "drop".
+    // 6 nums (x, y, w, h, cornerRadius, magnify) + 1 obj (tint css color or
+    // null when tintStrength<=0).
+    public static final int OP_LENS_SELF_REGION = 81;
+
     private int[] ops = new int[64];
     private int opCount;
     private double[] nums = new double[256];
@@ -270,6 +278,11 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
     /** Records an in-place backdrop blur of this surface's own pixels; see OP_BLUR_SELF_REGION. */
     public void blurSelfRegion(double x, double y, double w, double h, double sigmaPx, double cornerRadius) {
         op(OP_BLUR_SELF_REGION); num(x); num(y); num(w); num(h); num(sigmaPx); num(cornerRadius);
+    }
+
+    /** Records an in-place selection-drop lens; see OP_LENS_SELF_REGION. tintCss null = no tint. */
+    public void lensSelfRegion(double x, double y, double w, double h, double cornerRadius, double magnify, String tintCss) {
+        op(OP_LENS_SELF_REGION); num(x); num(y); num(w); num(h); num(cornerRadius); num(magnify); obj(tintCss);
     }
     @Override public String getFilter() { return "none"; }
     @Override public void clearRect(double x, double y, double width, double height) {

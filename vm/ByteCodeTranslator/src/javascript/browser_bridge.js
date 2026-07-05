@@ -932,7 +932,7 @@
     CREATE_PATTERN_SURFACE: 57,
     DRAW_IMAGE_XY: 60, DRAW_IMAGE_XYWH: 61, DRAW_IMAGE_SRCDST: 62,
     BLIT_SURFACE_XY: 70, BLIT_SURFACE_XYWH: 71, BLIT_SURFACE_SRCDST: 72,
-    BLUR_SELF_REGION: 80
+    BLUR_SELF_REGION: 80, LENS_SELF_REGION: 81
   };
   // The display surface id. Mirrors HTML5Implementation.DISPLAY_SURFACE_ID.
   var SURF_DISPLAY_ID = 1;
@@ -1117,6 +1117,49 @@
             } catch (_ebr) {
             } finally {
               try { ctx.restore(); } catch (_ebr2) {}
+            }
+          }
+          break;
+        }
+        case SURF.LENS_SELF_REGION: {
+          // iOS-26 selection DROP: magnify this surface's own pixels in the
+          // region (content bulge), then optionally wash them toward an accent
+          // tint. drawImage(self) snapshots the source bitmap per the HTML
+          // spec. cornerRadius: 0 = rect, -1 = capsule, >0 = rounded px.
+          var _lx = nums[ni++], _ly = nums[ni++], _lw = nums[ni++], _lh = nums[ni++];
+          var _lcr = nums[ni++], _lmag = nums[ni++];
+          var _ltint = objs[oi++];
+          if (_lw > 0 && _lh > 0 && ctx.canvas) {
+            try {
+              ctx.save();
+              ctx.beginPath();
+              if (_lcr) {
+                var _lrr = _lcr < 0 ? Math.min(_lw, _lh) / 2
+                                    : Math.min(_lcr, Math.min(_lw, _lh) / 2);
+                ctx.moveTo(_lx + _lrr, _ly);
+                ctx.arcTo(_lx + _lw, _ly, _lx + _lw, _ly + _lh, _lrr);
+                ctx.arcTo(_lx + _lw, _ly + _lh, _lx, _ly + _lh, _lrr);
+                ctx.arcTo(_lx, _ly + _lh, _lx, _ly, _lrr);
+                ctx.arcTo(_lx, _ly, _lx + _lw, _ly, _lrr);
+                ctx.closePath();
+              } else {
+                ctx.rect(_lx, _ly, _lw, _lh);
+              }
+              ctx.clip();
+              // Magnify: draw the region's own pixels scaled about its centre.
+              // Source rect = region shrunk by 1/mag around centre; dest = the
+              // full region -> the content bulges outward like the native lens.
+              var _lm = _lmag > 1 ? _lmag : 1;
+              var _lsw = _lw / _lm, _lsh = _lh / _lm;
+              var _lsx = _lx + (_lw - _lsw) / 2, _lsy = _ly + (_lh - _lsh) / 2;
+              ctx.drawImage(ctx.canvas, _lsx, _lsy, _lsw, _lsh, _lx, _ly, _lw, _lh);
+              if (_ltint) {
+                ctx.fillStyle = _ltint;
+                ctx.fillRect(_lx, _ly, _lw, _lh);
+              }
+            } catch (_elr) {
+            } finally {
+              try { ctx.restore(); } catch (_elr2) {}
             }
           }
           break;
