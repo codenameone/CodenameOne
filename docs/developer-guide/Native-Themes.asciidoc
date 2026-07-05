@@ -53,6 +53,20 @@ legacy alias `cn1.nativeTheme` is still honored for back-compat.
 The legacy `and.hololight=true` hint still works and maps to
 `and.themeMode=hololight`.
 
+[IMPORTANT]
+====
+The modern theme `.res` files require the Codename One runtime they
+ship with (8.0 or newer). They carry resource-format entries older
+runtimes do not understand -- per-UIID `letterSpacing`, CSS gradient
+descriptors and `backdrop-filter` blur values -- and
+`Resources.loadTheme` on a released pre-8.0 framework fails the whole
+load with `IOException: Error while trying to read theme property`
+at the first such entry (there is no skip-unknown-key path in shipped
+readers). Do not copy these `.res` files into projects pinned to an
+older `cn1.version`; the theme will not load at all, and the app
+silently falls back to whatever base theme it had.
+====
+
 === Light and dark mode
 
 Both modern themes ship a dark variant via a
