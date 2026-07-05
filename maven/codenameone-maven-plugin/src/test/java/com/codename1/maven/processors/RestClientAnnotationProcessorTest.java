@@ -95,6 +95,14 @@ public class RestClientAnnotationProcessorTest {
                 implSrc.contains("_rb.header(\"Authorization\", AuthorizationHeader)"));
         assertTrue("getPetById should fetch as mapped Pet",
                 implSrc.contains("_rb.fetchAsMapped(com.example.Pet.class, callback)"));
+        assertTrue("HTTP error statuses should be delivered to the callback",
+                implSrc.contains("_rb.onErrorCodeString(new com.codename1.io.rest.ErrorCodeHandler<String>()"));
+        assertTrue("generated clients should consume transport exceptions through the existing error listener API",
+                implSrc.contains("_rb.onError(new com.codename1.ui.events.ActionListener<com.codename1.io.NetworkEvent>()"));
+        assertTrue("transport exceptions should be delivered to the callback",
+                implSrc.contains("callback.completed(null)"));
+        assertTrue("error response should be forwarded without falling through to the default dialog",
+                implSrc.contains("callback.completed((com.codename1.io.rest.Response)_r)"));
 
         assertTrue("addPet should call Rest.post",
                 implSrc.contains("com.codename1.io.rest.Rest.post(_url)"));

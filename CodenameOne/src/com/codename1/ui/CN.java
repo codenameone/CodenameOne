@@ -1129,6 +1129,20 @@ public class CN extends CN1Constants {
         Display.impl.openGallery(response, type);
     }
 
+    /// Opens a file chooser for arbitrary user-selected files.
+    ///
+    /// The callback source is a `String` path readable by
+    /// `FileSystemStorage.openInputStream()`, or `null` if cancelled. `accept`
+    /// is a comma-separated list of extensions or MIME types.
+    ///
+    /// #### Parameters
+    ///
+    /// - `response`: callback receiving the selected file path
+    /// - `accept`: comma-separated extensions or MIME types, or `null` for all files
+    public static void openFileChooser(ActionListener response, String accept) {
+        Display.impl.openFileChooser(response, accept);
+    }
+
     /// Returns a 2-3 letter code representing the platform name for the platform override
     ///
     /// #### Returns

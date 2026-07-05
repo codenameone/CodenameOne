@@ -346,6 +346,7 @@ public final class RestClientAnnotationProcessor extends AbstractAnnotationProce
 
         sb.append("        com.codename1.io.rest.RequestBuilder _rb = com.codename1.io.rest.Rest.")
                 .append(rm.verb).append("(_url);\n");
+        emitExceptionHandler(sb, rm);
 
         // Query params.
         for (RestParam p : rm.params) {
@@ -386,6 +387,7 @@ public final class RestClientAnnotationProcessor extends AbstractAnnotationProce
         }
 
         // Fetch.
+        emitErrorCodeHandler(sb, rm);
         switch (rm.fetchKind) {
             case MAPPED:
                 sb.append("        _rb.fetchAsMapped(").append(rm.payloadBinaryName).append(".class, callback);\n");
@@ -404,6 +406,35 @@ public final class RestClientAnnotationProcessor extends AbstractAnnotationProce
                 break;
         }
         sb.append("    }\n\n");
+    }
+
+    private static void emitErrorCodeHandler(StringBuilder sb, RestMethod rm) {
+        if (rm.callbackIndex >= 0) {
+            sb.append("        _rb.onErrorCodeString(new com.codename1.io.rest.ErrorCodeHandler<String>() {\n");
+            sb.append("            public void onError(com.codename1.io.rest.Response<String> _r) {\n");
+            sb.append("                callback.completed((com.codename1.io.rest.Response)_r);\n");
+            sb.append("            }\n");
+            sb.append("        });\n");
+            return;
+        }
+        sb.append("        _rb.onErrorCodeString(new com.codename1.io.rest.ErrorCodeHandler<String>() {\n");
+        sb.append("            public void onError(com.codename1.io.rest.Response<String> _r) { }\n");
+        sb.append("        });\n");
+    }
+
+    private static void emitExceptionHandler(StringBuilder sb, RestMethod rm) {
+        if (rm.callbackIndex >= 0) {
+            sb.append("        _rb.onError(new com.codename1.ui.events.ActionListener<com.codename1.io.NetworkEvent>() {\n");
+            sb.append("            public void actionPerformed(com.codename1.io.NetworkEvent _evt) {\n");
+            sb.append("                _evt.consume();\n");
+            sb.append("                callback.completed(null);\n");
+            sb.append("            }\n");
+            sb.append("        }, false);\n");
+            return;
+        }
+        sb.append("        _rb.onError(new com.codename1.ui.events.ActionListener<com.codename1.io.NetworkEvent>() {\n");
+        sb.append("            public void actionPerformed(com.codename1.io.NetworkEvent _evt) { _evt.consume(); }\n");
+        sb.append("        }, false);\n");
     }
 
     /// Builds the Java expression that resolves the URL path with `{name}`

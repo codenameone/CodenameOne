@@ -5094,6 +5094,68 @@ void cn1_addSelectedImagePath(NSString* path) {
 #endif
 #endif
 
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+static NSString *cn1CopyPickedDocumentToTemp(NSURL *url) {
+    if (url == nil) {
+        return nil;
+    }
+    BOOL securityScoped = [url startAccessingSecurityScopedResource];
+    @try {
+        NSString *fileName = [url lastPathComponent];
+        if (fileName == nil || [fileName length] == 0) {
+            fileName = @"selected-file";
+        }
+        NSString *destinationName = [NSString stringWithFormat:@"%@-%@", [[NSUUID UUID] UUIDString], fileName];
+        NSString *destinationPath = [NSTemporaryDirectory() stringByAppendingPathComponent:destinationName];
+        NSURL *destinationURL = [NSURL fileURLWithPath:destinationPath];
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        [fileManager removeItemAtURL:destinationURL error:nil];
+
+        NSError *error = nil;
+        if ([url isFileURL] && [fileManager copyItemAtURL:url toURL:destinationURL error:&error]) {
+            return destinationPath;
+        }
+
+        NSData *data = [NSData dataWithContentsOfURL:url options:0 error:&error];
+        if (data != nil && [data writeToURL:destinationURL options:NSDataWritingAtomic error:&error]) {
+            return destinationPath;
+        }
+        NSLog(@"Codename One file chooser failed to copy selected document: %@", error);
+        return nil;
+    } @finally {
+        if (securityScoped) {
+            [url stopAccessingSecurityScopedResource];
+        }
+    }
+}
+
+- (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
+    NSString *path = nil;
+    if ([urls count] > 0) {
+        path = cn1CopyPickedDocumentToTemp([urls objectAtIndex:0]);
+    }
+    com_codename1_impl_ios_IOSImplementation_fileChooserResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG path == nil ? nil : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path));
+    if (controller.presentingViewController != nil) {
+        [controller dismissViewControllerAnimated:YES completion:nil];
+    }
+}
+
+- (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentAtURL:(NSURL *)url {
+    NSString *path = cn1CopyPickedDocumentToTemp(url);
+    com_codename1_impl_ios_IOSImplementation_fileChooserResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG path == nil ? nil : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path));
+    if (controller.presentingViewController != nil) {
+        [controller dismissViewControllerAnimated:YES completion:nil];
+    }
+}
+
+- (void)documentPickerWasCancelled:(UIDocumentPickerViewController *)controller {
+    com_codename1_impl_ios_IOSImplementation_fileChooserResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
+    if (controller.presentingViewController != nil) {
+        [controller dismissViewControllerAnimated:YES completion:nil];
+    }
+}
+#endif
+
 #if !TARGET_OS_TV
 -(void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
     //[self dismissModalViewControllerAnimated:YES];

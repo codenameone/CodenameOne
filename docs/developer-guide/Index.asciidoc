@@ -520,20 +520,26 @@ You need 4 files for signing. Two certificates and two provisioning profiles:
 
 . *Development:* The development certificate/provisioning is used to install on your development devices
 
-The certificate wizard automatically creates these 4 files and configures them for you.
+The standalone Certificate Wizard can automatically create these files and configure the current Maven project.
 
-.Using the iOS Certificate Wizard Steps 1 and 2
-image::img/ios-certificate-wizard-1.png[Using the iOS Certificate Wizard Steps 1 and 2]
+Run the wizard from the project directory:
 
-.Using the iOS Certificate Wizard Steps 3 and 4
-image::img/ios-certificate-wizard-2.png[Using the iOS Certificate Wizard Steps 3 and 4]
+[source,bash]
+----
+mvn cn1:certificatewizard
+----
 
-.Using the iOS Certificate Wizard Steps 5 and 6
-image::img/ios-certificate-wizard-3.png[Using the iOS Certificate Wizard Steps 5 and 6]
+After storing an App Store Connect API key, click *Auto Setup* in the toolbar. The wizard reads the project package and display name, creates or reuses the Bundle ID with push enabled, creates/reuses development and App Store signing assets, and writes the debug/release signing settings back into `codenameone_settings.properties`.
+
+.Certificate wizard overview with mocked signing assets
+image::img/certificate-wizard-overview-mock.svg[Certificate wizard overview with mocked signing assets,scaledwidth=70%]
+
+.Certificate wizard profiles screen with mocked values
+image::img/certificate-wizard-profiles-mock.svg[Certificate wizard profiles screen with mocked values,scaledwidth=70%]
 
 [TIP]
 ====
-If you have more than one project you should use the same iOS P12 certificate files in all the projects and regenerate the provisioning. In this situation the certificate wizard asks you if you want to revoke the existing certificate which you shouldn't revoke in such a case. You can update the provisioning profile in Apple's iOS developer website.
+If you have more than one project you should use the same iOS P12 certificate files in all the projects and regenerate the provisioning. In this situation the Certificate Wizard asks you if you want to revoke the existing certificate which you shouldn't revoke in such a case. You can update the provisioning profile in Apple's iOS developer website.
 ====
 
 One important aspect of provisioning on iOS is the device list in the provisioning step. Apple allows you to install the app on 100 devices during development. This blocks developers from skipping the App Store altogether. It's important you list the correct UDID for the device in the list otherwise install will fail.
