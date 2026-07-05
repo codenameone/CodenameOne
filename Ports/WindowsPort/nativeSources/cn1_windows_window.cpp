@@ -753,16 +753,31 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
         return;
     }
     cn1WindowsLog("initDisplay: render target created");
-    cn1Win.windowGraphics = cn1WinCreateGraphics((ID2D1RenderTarget*) g_hwndTarget);
+    if (cn1Win.offscreenCapture) {
+        /* Render into an offscreen WIC bitmap sized to the real client area, so
+         * captureWindowToPngBytes reads back the proven WIC frame instead of a
+         * per-screenshot mutable-image repaint. The HWND target stays created
+         * (the window is valid, just never shown or drawn to). */
+        cn1Win.windowGraphics = cn1WinCreateOffscreenGraphics(cn1Win.width, cn1Win.height);
+        cn1WindowsLog(cn1Win.windowGraphics != NULL
+                ? "initDisplay: offscreen capture target created"
+                : "initDisplay: offscreen capture target FAILED");
+    } else {
+        cn1Win.windowGraphics = cn1WinCreateGraphics((ID2D1RenderTarget*) g_hwndTarget);
+    }
 
     /* WIC factory for the image layer. The DirectWrite factory is created lazily
      * inside the C++ text layer (cn1_windows_dwrite.cpp), not here. */
     CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER,
             IID_IWICImagingFactory, (void**) &cn1Win.wicFactory);
 
-    ShowWindow(cn1Win.hwnd, SW_SHOW);
-    UpdateWindow(cn1Win.hwnd);
-    cn1WindowsLog("initDisplay: window shown");
+    if (!cn1Win.offscreenCapture) {
+        ShowWindow(cn1Win.hwnd, SW_SHOW);
+        UpdateWindow(cn1Win.hwnd);
+        cn1WindowsLog("initDisplay: window shown");
+    } else {
+        cn1WindowsLog("initDisplay: offscreen capture -- window kept hidden");
+    }
 }
 
 JAVA_INT com_codename1_impl_windows_WindowsNative_getDisplayWidth___R_int(CODENAME_ONE_THREAD_STATE) {

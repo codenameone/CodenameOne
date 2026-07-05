@@ -217,6 +217,16 @@ typedef struct {
     JAVA_INT shotW;
     JAVA_INT shotH;
 
+    /* Offscreen-capture mode (the cn1ss WebSocket screenshot suite): a real
+     * (hidden) window is still created so the message pump, DPI and exact client
+     * size are identical to a normal run, but windowGraphics is pointed at an
+     * offscreen WIC bitmap of that same client size instead of the HWND target.
+     * That makes captureWindowToPngBytes read back real frames (the proven WIC
+     * path) instead of falling back to a fresh per-screenshot mutable-image
+     * repaint -- which is the expensive step that stalled the slow windows-11-arm
+     * runner mid-suite. Unlike `headless` there is no single-shot auto-exit. */
+    volatile LONG offscreenCapture;
+
     /* Pending window resize. WM_SIZE (main thread) records the new size here and
      * the EDT applies the Direct2D Resize between its own frames -- resizing the
      * HWND render target from another thread while the EDT is mid-BeginDraw is

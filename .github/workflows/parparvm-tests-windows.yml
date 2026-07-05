@@ -366,6 +366,22 @@ jobs:
           mvn -B clean package -pl JavaAPI -am -DskipTests
           mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesHelloSuiteOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false'
 
+      # Preserve the native cn1WindowsLog output so the offscreen-capture path is
+      # confirmable on the green x64 gate too (compare against the arm64 leg).
+      - name: Collect native windows log (x64)
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/windows-port/raw | Out-Null
+          $log = Join-Path $env:TEMP 'cn1windows.log'
+          if (Test-Path $log) {
+            Copy-Item $log artifacts/windows-port/raw/cn1windows-native.log -Force
+            Write-Host "collected native log ($((Get-Item $log).Length) bytes)"
+          } else {
+            "no native cn1windows.log found at $log" | Out-File artifacts/windows-port/raw/cn1windows-native.log
+            Write-Host "no native log at $log"
+          }
+
       - name: Upload screenshot artifact (x64)
         if: always()
         uses: actions/upload-artifact@v4
@@ -473,6 +489,24 @@ jobs:
         run: |
           mvn -B clean package -pl JavaAPI -am -DskipTests
           mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesHelloSuiteOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false'
+
+      # Preserve the native cn1WindowsLog output (%TEMP%\cn1windows.log) so an
+      # offscreen-target / capture failure is diagnosable from the artifact, and
+      # so the raw dir is never empty (the arm64 artifact would otherwise not be
+      # produced when the suite stalls before writing any PNG).
+      - name: Collect native windows log (arm64)
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/windows-port/raw | Out-Null
+          $log = Join-Path $env:TEMP 'cn1windows.log'
+          if (Test-Path $log) {
+            Copy-Item $log artifacts/windows-port/raw/cn1windows-native.log -Force
+            Write-Host "collected native log ($((Get-Item $log).Length) bytes)"
+          } else {
+            "no native cn1windows.log found at $log" | Out-File artifacts/windows-port/raw/cn1windows-native.log
+            Write-Host "no native log at $log"
+          }
 
       - name: Upload screenshot artifact (arm64)
         if: always()

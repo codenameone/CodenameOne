@@ -260,7 +260,19 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_captureWindowToPngBytes___R
         CODENAME_ONE_THREAD_STATE) {
     CN1Graphics* g = cn1Win.windowGraphics;
     if (g == NULL || g->wicBitmap == NULL) {
-        cn1WindowsLog("captureWindowToPngBytes: window target is not WIC-backed");
+        /* Detailed reason so a capture miss is diagnosable from the log rather
+         * than a bare "not WIC-backed" (which read as an every-run condition in
+         * the old windowed WebSocket path). */
+        if (g == NULL) {
+            cn1WindowsLog("captureWindowToPngBytes: windowGraphics is NULL "
+                    "(initDisplay never created a target)");
+        } else {
+            cn1WindowsLog(cn1Win.offscreenCapture
+                    ? "captureWindowToPngBytes: offscreen capture requested but wicBitmap is NULL "
+                      "(offscreen target creation failed at initDisplay)"
+                    : "captureWindowToPngBytes: window target is not WIC-backed "
+                      "(HWND target -- caller falls back to mutable-image capture)");
+        }
         return JAVA_NULL;
     }
     cn1WinEndFrame(g);
@@ -282,6 +294,21 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_enableHeadlessScreenshot___ja
     cn1Win.shotW = __cn1Arg2;
     cn1Win.shotH = __cn1Arg3;
     cn1Win.headless = 1;
+}
+
+/*
+ * Enables offscreen-capture mode for the long-running cn1ss WebSocket screenshot
+ * suite (call before initDisplay). A hidden window is still created -- so the
+ * message pump, DPI and exact client size match a normal run -- but the EDT
+ * paints into an offscreen WIC bitmap of that client size, so
+ * captureWindowToPngBytes returns a real rendered frame every time instead of
+ * falling back to a per-screenshot mutable-image repaint. Unlike
+ * enableHeadlessScreenshot there is no shotPath and no single-shot auto-exit; the
+ * process stays alive for the whole suite.
+ */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_enableOffscreenCapture__(
+        CODENAME_ONE_THREAD_STATE) {
+    cn1Win.offscreenCapture = 1;
 }
 
 } /* extern "C" */

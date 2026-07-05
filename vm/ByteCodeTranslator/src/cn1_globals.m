@@ -1852,6 +1852,16 @@ void cn1BibopNoteMonitorAttached(JAVA_OBJECT obj) {
         p->gcHasMonitors = JAVA_TRUE;
     }
 }
+#else
+// When the O(live-pages) fast sweep is disabled there is no all-dead shortcut to
+// suppress: every retired page is full-walked and every dead slot reaches
+// cn1BibopReclaimSlot (which releases the native peer) regardless. The header
+// declares cn1BibopNoteNativePeer unconditionally and toNSString() (Apple/ObjC
+// builds) calls it unconditionally, so provide a no-op definition here to keep
+// the symbol resolvable in the CN1_BIBOP_NO_FASTSWEEP configuration.
+// (cn1BibopNoteMonitorAttached is declared and called only under !NO_FASTSWEEP,
+// so it needs no counterpart here.)
+void cn1BibopNoteNativePeer(JAVA_OBJECT obj) { (void)obj; }
 #endif
 
 // Sweep all retired pages. Runs on the GC thread AFTER mark completes; the

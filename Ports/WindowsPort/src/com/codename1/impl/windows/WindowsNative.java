@@ -200,6 +200,18 @@ public final class WindowsNative {
     public static native void enableHeadlessScreenshot(String path, int width, int height);
 
     /**
+     * Enables offscreen-capture mode for the long-running cn1ss WebSocket
+     * screenshot suite (call before {@code initDisplay}). A hidden window is
+     * still created -- so the message pump, DPI and exact client size match a
+     * normal run -- but the EDT paints into an offscreen WIC bitmap of that
+     * client size, so {@link #captureWindowToPngBytes()} returns a real rendered
+     * frame every time instead of falling back to a per-screenshot mutable-image
+     * repaint (the expensive step that stalled the slow windows-11-arm runner
+     * mid-suite). Unlike {@link #enableHeadlessScreenshot} there is no auto-exit.
+     */
+    public static native void enableOffscreenCapture();
+
+    /**
      * Encodes a {@code width*height} block of straight-alpha ARGB pixels (CN1
      * getRGB layout) to PNG and returns the bytes. Backs the port's ImageIO.
      */
