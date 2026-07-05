@@ -92,3 +92,18 @@ Apple M2, best-of-5 interleaved, ThinLTO, vs warmed Azul JDK 25
 **Geomean 1.00x.** int/long run at exact pure-C parity (same-flags C controls
 measured identical); the residual is C2-vs-clang scheduling of the dependency
 chain. recursion is HotSpot's speculative inlining — accepted.
+
+### SATB write-barrier cost (concurrent-mark correctness fix)
+
+The concurrent collector gained a Yuasa snapshot-at-the-beginning (SATB) deletion
+write barrier on every heap object-reference store, to close a cross-thread mark
+race (a released/native mutator moving or nulling the last snapshot-time reference
+to a live object before mark completes — the intermittent Linux mid-suite crash).
+Off-mark the barrier is a single predicted-not-taken `gcSatbActive` load; the
+old-value read + enqueue runs only during the (infrequent) mark. Measured cost is
+within run-to-run noise — a same-machine A/B (`-DCN1_DISABLE_SATB` vs default,
+best-of-5 interleaved) moved the geomean by **+0.01x (1.00x → 1.01x)**, with the
+store-heavy shapes flat or non-monotonic (hashMapChurn 0.96→0.95,
+objectAllocation 1.18→1.17, stringBuilding 0.64→0.66 — deltas at the noise floor
+of a barrier-free control such as recursion). The barrier can be compiled out with
+`-DCN1_DISABLE_SATB` for A/B measurement or as a fallback.

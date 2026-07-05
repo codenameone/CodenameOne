@@ -894,6 +894,9 @@ public class ByteCodeClass {
                         // A static field is a GC root outside any nursery -> a nursery
                         // value stored here always escapes and must be promoted.
                         b.append("CN1_WRITE_BARRIER(JAVA_NULL, __cn1StaticVal);\n    ");
+                        // SATB deletion barrier: preserve the overwritten static reference.
+                        b.append("CN1_SATB_DELETE(&STATIC_FIELD_").append(bf.getClsName())
+                         .append("_").append(bf.getFieldName()).append(");\n    ");
                     } else {
                         b.append("(getThreadLocalData());\n    ");
                     }
@@ -974,6 +977,10 @@ public class ByteCodeClass {
                 // field, so a nursery value escapes and must be promoted. No-op unless
                 // -DCN1_NURSERY.
                 b.append("CN1_WRITE_BARRIER(__cn1T, __cn1Val); ");
+                // SATB deletion barrier: preserve the reference being overwritten for the
+                // current mark cycle. No-op (single flag load) outside GC.
+                b.append("CN1_SATB_DELETE(&((struct obj__").append(clsName).append("*)__cn1T)->")
+                 .append(fld.getClsName()).append("_").append(fld.getFieldName()).append("); ");
             } else {
                 b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n  ").append(nullCheck).append("  ");
             }

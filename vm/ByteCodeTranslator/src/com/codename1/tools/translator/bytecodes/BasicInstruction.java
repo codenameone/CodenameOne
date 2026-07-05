@@ -358,6 +358,8 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 }
                 b.append("{ /* BC_AASTORE */\n" +
                         "    JAVA_OBJECT aastoreTmp = SP[-3].data.o; \n" +
+                        "    CN1_WRITE_BARRIER(aastoreTmp, SP[-1].data.o); \n" +
+                        "    CN1_SATB_DELETE(&((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i]); \n" +
                         "    ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i] = SP[-1].data.o; \n" +
                         "    SP -= 3; }\n");
                 break;

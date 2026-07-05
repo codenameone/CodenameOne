@@ -897,6 +897,40 @@ static inline JAVA_BOOLEAN cn1InNursery(void* p) {
 #define CN1_WRITE_BARRIER(target, value)
 #endif
 
+// ---- Snapshot-at-the-beginning (Yuasa) DELETION write barrier ---------------
+// The concurrent collector marks each thread's roots while that thread is paused,
+// then RELEASES the thread before the others are scanned (cn1_globals.m:963), and
+// never pauses native threads at all. With no barrier, a mutator that moves or
+// nulls the last snapshot-time reference to a live object -- in the window between
+// its own scan and the end of mark -- makes that object unreachable to the
+// collector, so it is swept while still live; a surviving stale reference then
+// crashes the NEXT cycle in gcMarkObject. This is the intermittent Linux mid-suite
+// SIGSEGV, reproducible only with the live GTK/WebKit/Gallium threads that do such
+// concurrent mutation (GcStress/MtStress have none).
+//
+// The fix: while a mark is in progress (gcSatbActive), every store that OVERWRITES
+// an object reference in a heap location first hands the collector the OLD value,
+// so a reference present in the start-of-cycle snapshot is preserved for this cycle
+// no matter where the mutator moves it. Off-mark the barrier is a single relaxed
+// flag load (gcSatbActive is 0), so store-heavy code pays nothing outside GC. The
+// old value is read from the field address ONLY when marking, so there is no extra
+// load on the common path. Covers native threads too (they take the barrier on any
+// heap ref store), which thread-pausing structurally cannot.
+extern volatile int gcSatbActive;
+extern void cn1SatbEnqueue(JAVA_OBJECT old);
+#if defined(CN1_DISABLE_SATB)
+// Escape hatch to A/B the barrier cost or fall back if a regression appears. When
+// disabled, gcSatbActive is never armed (see codenameOneGCMark) AND the per-store
+// barrier compiles out entirely, so there is zero footprint on the store hot path.
+#define CN1_SATB_DELETE(fieldAddr) do { } while(0)
+#else
+#define CN1_SATB_DELETE(fieldAddr) \
+    do { if(__builtin_expect(gcSatbActive, 0)) { \
+             JAVA_OBJECT cn1__old = *(JAVA_OBJECT volatile*)(fieldAddr); \
+             if(cn1__old != JAVA_NULL && !CN1_IS_TAGGED(cn1__old)) cn1SatbEnqueue(cn1__old); \
+         } } while(0)
+#endif
+
 extern const char* volatile cn1LastNamSetter; // diagnosis: last bracket toucher
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
 // The bracket's purpose was to suppress GC interaction while native C code
@@ -1662,6 +1696,7 @@ static inline JAVA_VOID cn1_set_array_element_object(CODENAME_ONE_THREAD_STATE, 
         return;
     }
     CN1_WRITE_BARRIER(array, value); // nursery: storing a ref into a (heap) array escapes
+    CN1_SATB_DELETE(&((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)array).data)[index]); // SATB: preserve overwritten ref
     ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)array).data)[index] = value;
 }
 

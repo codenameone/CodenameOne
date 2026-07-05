@@ -847,6 +847,16 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
     }
     struct clazz* cls = (*srcArr).__codenameOneParentClsReference;
     int byteSize = byteSizeForArray(cls);
+    // SATB deletion barrier: an object arraycopy overwrites dst[dstOffset..+length)
+    // with a bulk memmove that bypasses the per-element setter, so preserve those
+    // overwritten references for the current mark cycle. No-op (one flag load) off-GC.
+    if(__builtin_expect(gcSatbActive, 0) && !cls->primitiveType) {
+        JAVA_ARRAY_OBJECT* dstData = (JAVA_ARRAY_OBJECT*)(*dstArr).data;
+        for(int i = 0 ; i < length ; i++) {
+            JAVA_OBJECT o = dstData[dstOffset + i];
+            if(o != JAVA_NULL && !CN1_IS_TAGGED(o)) cn1SatbEnqueue(o);
+        }
+    }
     /* java.lang.System.arraycopy is contractually overlap-safe (the spec defines
      * it as if copying via a temporary), and callers such as ArrayList.remove
      * shift elements within a single array (overlapping src/dst). memcpy is
@@ -2119,6 +2129,7 @@ JAVA_OBJECT java_util_HashMap_put___java_lang_Object_java_lang_Object_R_java_lan
     if(idx >= 0) {
         JAVA_OBJECT old = vals[idx];
         CN1_WRITE_BARRIER(valsObj, value);
+        CN1_SATB_DELETE(&vals[idx]); // preserve the overwritten value for this mark cycle
         vals[idx] = value;
         return old;
     }
@@ -2157,6 +2168,8 @@ JAVA_OBJECT java_util_HashMap_remove___java_lang_Object_R_java_lang_Object(CODEN
     JAVA_ARRAY_OBJECT* keys = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Keys)->data;
     JAVA_ARRAY_OBJECT* vals = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Vals)->data;
     JAVA_OBJECT old = vals[idx];
+    CN1_SATB_DELETE(&keys[idx]); // preserve the removed key/value for this mark cycle
+    CN1_SATB_DELETE(&vals[idx]);
     meta[idx] = 1; // META_TOMB
     keys[idx] = JAVA_NULL;
     vals[idx] = JAVA_NULL;
@@ -2170,6 +2183,16 @@ JAVA_VOID java_util_HashMap_clear__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1
     if(t->java_util_HashMap_elementCount > 0 || t->java_util_HashMap_cn1Occupied > 0) {
         JAVA_ARRAY metaArr = (JAVA_ARRAY)t->java_util_HashMap_cn1Meta;
         int len = metaArr->length;
+        // SATB deletion barrier: the memsets below bulk-null every live key/value ref,
+        // so preserve them for the current mark cycle first. No-op (one flag load) off-GC.
+        if(__builtin_expect(gcSatbActive, 0)) {
+            JAVA_ARRAY_OBJECT* ck = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Keys)->data;
+            JAVA_ARRAY_OBJECT* cv = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Vals)->data;
+            for(int i = 0 ; i < len ; i++) {
+                JAVA_OBJECT k = ck[i]; if(k != JAVA_NULL && !CN1_IS_TAGGED(k)) cn1SatbEnqueue(k);
+                JAVA_OBJECT v = cv[i]; if(v != JAVA_NULL && !CN1_IS_TAGGED(v)) cn1SatbEnqueue(v);
+            }
+        }
         memset(metaArr->data, 0, (size_t)len * sizeof(JAVA_ARRAY_INT));
         memset(((JAVA_ARRAY)t->java_util_HashMap_cn1Keys)->data, 0, (size_t)len * sizeof(JAVA_ARRAY_OBJECT));
         memset(((JAVA_ARRAY)t->java_util_HashMap_cn1Vals)->data, 0, (size_t)len * sizeof(JAVA_ARRAY_OBJECT));

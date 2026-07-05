@@ -745,6 +745,52 @@ static void cn1GcSelfCheckThreadStack(struct ThreadLocalData* t, int stackSize);
  * A simple concurrent mark algorithm that traverses the currently running threads
  */
 extern int recursionKey; // force-mark pass epoch (defined below, near gcMarkObject)
+
+// ---- SATB (snapshot-at-the-beginning) deletion-barrier log -------------------
+// gcSatbActive is set for the whole concurrent mark and read by CN1_SATB_DELETE on
+// every heap object-reference store (all mutators, including native threads). The
+// barrier pushes the OVERWRITTEN reference here; codenameOneGCMark drains it to a
+// fixpoint before sweep, so a reference present at the start of the cycle is never
+// lost to a concurrent move/null between a thread's scan and the end of mark.
+volatile int gcSatbActive = 0;
+static JAVA_OBJECT* gcSatbStack = 0;
+static long gcSatbTop = 0;                 // guarded by gcSatbMutex
+static long gcSatbCap = 0;
+static pthread_mutex_t gcSatbMutex = PTHREAD_MUTEX_INITIALIZER;
+// Monotonic count of objects transitioned unmarked->marked this process; the SATB
+// drain snapshots it around a batch to detect "marked nothing new" (fixpoint).
+long gcMarkNewObjectCount = 0;
+
+void cn1SatbEnqueue(JAVA_OBJECT old) {
+    pthread_mutex_lock(&gcSatbMutex);
+    if(gcSatbTop >= gcSatbCap) {
+        long ncap = gcSatbCap ? gcSatbCap * 2 : 8192;
+        JAVA_OBJECT* n = (JAVA_OBJECT*)realloc(gcSatbStack, (size_t)ncap * sizeof(JAVA_OBJECT));
+        if(n == 0) { pthread_mutex_unlock(&gcSatbMutex); return; } // OOM: drop (rare; only re-opens the original race)
+        gcSatbStack = n; gcSatbCap = ncap;
+    }
+    gcSatbStack[gcSatbTop++] = old;
+    pthread_mutex_unlock(&gcSatbMutex);
+}
+
+// Atomically take the current SATB batch (swap the log empty) into *out (caller owns
+// the returned buffer contents until the next take). Returns the count taken.
+static long cn1SatbTake(JAVA_OBJECT** out) {
+    pthread_mutex_lock(&gcSatbMutex);
+    long n = gcSatbTop;
+    static JAVA_OBJECT* scratch = 0; static long scratchCap = 0;
+    if(n > scratchCap) {
+        long nc = n < 8192 ? 8192 : n;
+        scratch = (JAVA_OBJECT*)realloc(scratch, (size_t)nc * sizeof(JAVA_OBJECT));
+        scratchCap = nc;
+    }
+    if(n > 0 && scratch != 0) memcpy(scratch, gcSatbStack, (size_t)n * sizeof(JAVA_OBJECT));
+    gcSatbTop = 0;
+    pthread_mutex_unlock(&gcSatbMutex);
+    *out = scratch;
+    return (scratch != 0) ? n : 0;
+}
+
 void codenameOneGCMark() {
     currentGcMarkValue++;
     // Bump the force-mark pass epoch so the force-visited side table's prior-cycle entries
@@ -757,6 +803,13 @@ void codenameOneGCMark() {
 #endif
     init_gc_thresholds();
     hasAgressiveAllocator = JAVA_FALSE;
+    // Arm the SATB deletion barrier for the whole mark (drained to a fixpoint + cleared
+    // before sweep, below). Released mutators and native threads take the barrier on any
+    // heap ref store, preserving snapshot-time references they concurrently overwrite.
+    // The release fence orders this ahead of any thread being unblocked (963).
+#if !defined(CN1_DISABLE_SATB)
+    __atomic_store_n(&gcSatbActive, 1, __ATOMIC_RELEASE);
+#endif
     struct ThreadLocalData* d = getThreadLocalData();
     //int marked = 0;
     
@@ -984,6 +1037,35 @@ void codenameOneGCMark() {
     // Drain the worklist that the calls above populated. gcMarkObject no longer recurses
     // through reference fields, so we need an explicit drain pass before sweep runs.
     gcMarkDrain(d);
+
+    // SATB termination: mark everything the deletion barrier logged during this mark,
+    // to a fixpoint. gcMarkObject is idempotent, so once a full take-and-drain marks
+    // nothing new the start-of-cycle snapshot is CLOSED: every reference is marked, so
+    // any reference a mutator overwrites from here on can only point to an already-marked
+    // object -- safe to stop logging even though mutators still run. Bounded by the live
+    // set (finite) since only genuinely-new marks reset the fixpoint.
+    for(;;) {
+        JAVA_OBJECT* batch;
+        long n = cn1SatbTake(&batch);
+        if(n == 0) break;                    // log empty at this instant
+        long before = gcMarkNewObjectCount;
+        for(long i = 0 ; i < n ; i++) {
+            gcMarkObject(d, batch[i], JAVA_FALSE);
+        }
+        gcMarkDrain(d);
+        if(gcMarkNewObjectCount == before) break; // processed a batch, marked nothing new -> closed
+    }
+    // Snapshot is closed; stop logging. A store racing this clear either logged already
+    // (drained just below) or overwrites an already-marked reference (harmless).
+    __atomic_store_n(&gcSatbActive, 0, __ATOMIC_RELEASE);
+    {
+        JAVA_OBJECT* batch;
+        long n = cn1SatbTake(&batch);        // final catch of anything logged during the loop's tail
+        for(long i = 0 ; i < n ; i++) {
+            gcMarkObject(d, batch[i], JAVA_FALSE);
+        }
+        if(n > 0) gcMarkDrain(d);
+    }
 }
 
 #ifdef DEBUG_GC_OBJECTS_IN_HEAP
@@ -3162,6 +3244,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     obj->__codenameOneGcMark = markVal;
     CN1_BIBOP_STAMP_MARKED(obj, markVal);
     gcMarkFoundUnmarkedChildInPass = JAVA_TRUE;
+    gcMarkNewObjectCount++;   // SATB fixpoint detection (mark-thread only)
     if(obj->__codenameOneParentClsReference->markFunction != 0) {
         gcMarkWorklistPush(obj, force);
     }
