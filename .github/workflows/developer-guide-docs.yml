@@ -117,6 +117,13 @@ jobs:
           mkdir -p "${ARTIFACT_DIR}"
           scripts/developer-guide/compare-guide-screenshots.sh "${ARTIFACT_DIR}"
 
+      - name: Upload guide screenshot comparison artifacts
+        if: steps.compare_guide_screenshots.outcome == 'failure'
+        uses: actions/upload-artifact@v7
+        with:
+          name: guide-screenshot-comparison
+          path: build/developer-guide/guide-screenshots
+
       - name: Fail when guide screenshots differ
         if: steps.compare_guide_screenshots.outcome == 'failure'
         run: |
