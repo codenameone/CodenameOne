@@ -1608,6 +1608,20 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         // benefit from the cache, it is never wrong.
         writer.write("    private static final java.util.Map<Class<?>, Integer> INSTANCE_HANDLER_CACHE = "
                 + "new java.util.Hashtable<Class<?>, Integer>();\n\n");
+        // Package-name -> handler-index map so instance dispatch can route by
+        // the receiver's own package chain instead of scanning the world.
+        writer.write("    private static final java.util.Map<String, Integer> PACKAGE_HANDLER_INDEX = "
+                + "buildPackageHandlerIndex();\n\n");
+        writer.write("    private static java.util.Map<String, Integer> buildPackageHandlerIndex() {\n");
+        writer.write("        java.util.Map<String, Integer> m = new java.util.Hashtable<String, Integer>();\n");
+        int idx = 0;
+        for (GeneratedPackage generatedPackage : packages) {
+            writer.write("        m.put(\"" + generatedPackage.packageName + "\", Integer.valueOf(" + idx + "));\n");
+            idx++;
+        }
+        writer.write("        return m;\n");
+        writer.write("    }\n\n");
+        writer.write("    private static final int PACKAGE_HANDLER_COUNT = " + packages.size() + ";\n\n");
         writer.write("    @Override\n");
         writer.write("    public Object invoke(Object target, String name, Object[] args) throws Exception {\n");
         writer.write("        if (interceptShownForm(target, name, args)) {\n");
@@ -1622,18 +1636,51 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         writer.write("                // method resolves in another package for this class; fall back\n");
         writer.write("            }\n");
         writer.write("        }\n");
+        // Package-first dispatch. The legacy linear chain tried every package
+        // handler in list order with a thrown CN1AccessException per miss; on
+        // the ParparVM JavaScript port each miss ALSO class-initialised that
+        // package's (huge) generated handler, so a call-heavy script's first
+        // few statements forced most of the registry's static string tables
+        // into the worker heap at once and OOM-crashed the page (the Playground
+        // tabs/showcase samples). The per-package handlers enumerate INHERITED
+        // methods for each of their classes, so routing by the receiver's own
+        // package prefix chain resolves virtually every real call against one
+        // handler (no Class.getSuperclass - it is outside the CN1 subset and
+        // the bytecode-compliance gate rejects it). The full scan below
+        // survives only as a terminal fallback so behaviour on exotic
+        // receivers is unchanged.
         writer.write("        CN1AccessException unsupported = null;\n");
-        int idx = 0;
-        for (GeneratedPackage generatedPackage : packages) {
-            writer.write("        try {\n");
-            writer.write("            Object __r = " + generatedPackage.helperClassName + ".invoke(target, name, args);\n");
-            writer.write("            INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(" + idx + "));\n");
-            writer.write("            return __r;\n");
-            writer.write("        } catch (CN1AccessException ex) {\n");
-            writer.write("            unsupported = ex;\n");
-            writer.write("        }\n");
-            idx++;
-        }
+        writer.write("        java.util.Set<Integer> __tried = new java.util.HashSet<Integer>();\n");
+        writer.write("        if (__ci != null) {\n");
+        writer.write("            __tried.add(__ci);\n");
+        writer.write("        }\n");
+        writer.write("        String candidate = packageName(__tc);\n");
+        writer.write("        while (candidate != null) {\n");
+        writer.write("            Integer __pi = PACKAGE_HANDLER_INDEX.get(candidate);\n");
+        writer.write("            if (__pi != null && __tried.add(__pi)) {\n");
+        writer.write("                try {\n");
+        writer.write("                    Object __r = dispatchInstance(__pi.intValue(), target, name, args);\n");
+        writer.write("                    INSTANCE_HANDLER_CACHE.put(__tc, __pi);\n");
+        writer.write("                    return __r;\n");
+        writer.write("                } catch (CN1AccessException ex) {\n");
+        writer.write("                    unsupported = ex;\n");
+        writer.write("                }\n");
+        writer.write("            }\n");
+        writer.write("            int __d = candidate.lastIndexOf('.');\n");
+        writer.write("            candidate = __d < 0 ? null : candidate.substring(0, __d);\n");
+        writer.write("        }\n");
+        writer.write("        for (int __i = 0; __i < PACKAGE_HANDLER_COUNT; __i++) {\n");
+        writer.write("            if (__tried.contains(Integer.valueOf(__i))) {\n");
+        writer.write("                continue;\n");
+        writer.write("            }\n");
+        writer.write("            try {\n");
+        writer.write("                Object __r = dispatchInstance(__i, target, name, args);\n");
+        writer.write("                INSTANCE_HANDLER_CACHE.put(__tc, Integer.valueOf(__i));\n");
+        writer.write("                return __r;\n");
+        writer.write("            } catch (CN1AccessException ex) {\n");
+        writer.write("                unsupported = ex;\n");
+        writer.write("            }\n");
+        writer.write("        }\n");
         writer.write("        if (unsupported != null) {\n");
         writer.write("            throw unsupported;\n");
         writer.write("        }\n");
