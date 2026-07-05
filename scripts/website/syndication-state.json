@@ -732,6 +732,13 @@
         "canonical_set": true,
         "syndicated_at": "2026-07-04T15:03:55+00:00"
       }
+    },
+    "rich-text-and-code-editing": {
+      "devto": {
+        "id": 4073308,
+        "url": "https://dev.to/codenameone/rich-text-and-code-editing-richtextarea-and-a-syntax-highlighting-codeeditor-4c82",
+        "syndicated_at": "2026-07-05T14:34:59+00:00"
+      }
     }
   }
 }
