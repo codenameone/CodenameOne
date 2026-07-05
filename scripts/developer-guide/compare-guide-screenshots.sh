@@ -42,7 +42,7 @@ mismatch_count=0
 
 for filename in "${EXPECTED_SCREENSHOTS[@]}"; do
   screenshot="${STORAGE_DIR}/${filename}"
-  base="${filename%.png}"
+  base="${filename%.*}"
 
   if [[ ! -f "${screenshot}" ]]; then
     echo "Expected guide screenshot was not captured: ${filename}" >&2

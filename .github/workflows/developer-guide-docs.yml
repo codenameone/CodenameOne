@@ -82,6 +82,12 @@ jobs:
           set -euo pipefail
           scripts/developer-guide/verify-guide-screenshot-manifest.sh
 
+      - name: Verify developer guide images are referenced
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+        run: |
+          set -euo pipefail
+          python3 scripts/developer-guide/find_unused_images.py docs/developer-guide
+
       - name: Verify guide screenshots were captured
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |

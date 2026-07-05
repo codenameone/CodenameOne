@@ -12,11 +12,13 @@ import com.codenameone.developerguide.animations.ReplaceTransitionDemo;
 import com.codenameone.developerguide.animations.SlideTransitionsDemo;
 import com.codenameone.developerguide.animations.SwipeBackSupportDemo;
 import com.codenameone.developerguide.animations.UnlayoutAnimationsDemo;
+import com.codenameone.developerguide.screenshots.GeneratedGuideScreenshotDemos;
 import com.codenameone.developerguide.screenshots.GuideStaticScreenshotDemos;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.layouts.BorderLayout;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -25,8 +27,11 @@ import java.util.List;
  * Registry of available demos so that the browser can enumerate them.
  */
 public final class DemoRegistry {
-    private static final List<Demo> DEMOS = Collections.unmodifiableList(
-            Arrays.asList(
+    private static final List<Demo> DEMOS = Collections.unmodifiableList(createDemos());
+    private static final List<GuideScreenshot> SCREENSHOTS = Collections.unmodifiableList(createScreenshots());
+
+    private static List<Demo> createDemos() {
+        List<Demo> demos = new ArrayList<>(Arrays.asList(
                     new LayoutAnimationsDemo(),
                     new UnlayoutAnimationsDemo(),
                     new HiddenComponentDemo(),
@@ -104,10 +109,13 @@ public final class DemoRegistry {
                     }),
                     GuideStaticScreenshotDemos.interactionDialogDemo(),
                     GuideStaticScreenshotDemos.centerLayoutDemo()
-            )
-    );
-    private static final List<GuideScreenshot> SCREENSHOTS = Collections.unmodifiableList(
-            Arrays.asList(
+            ));
+        demos.addAll(GeneratedGuideScreenshotDemos.demos());
+        return demos;
+    }
+
+    private static List<GuideScreenshot> createScreenshots() {
+        List<GuideScreenshot> screenshots = new ArrayList<>(Arrays.asList(
                     screenshot("layout-animations", "Layout Animations", "layout-animation-1.png"),
                     screenshot("layout-animations", "Layout Animations", "layout-animation-2.png"),
                     screenshot("layout-animations", "Layout Animations", "layout-animation-3.png"),
@@ -178,8 +186,10 @@ public final class DemoRegistry {
                     screenshot("components-dialog-blur-no-tint", "Dialog Blur No Tint", "components-dialog-blur-no-tint.png"),
                     screenshot("components-interaction-dialog", "Interaction Dialog", "components-interaction-dialog.png"),
                     screenshot("center-layout", "Center Layout", "center-layout.png")
-            )
-    );
+            ));
+        screenshots.addAll(GeneratedGuideScreenshotDemos.screenshots());
+        return screenshots;
+    }
 
     private DemoRegistry() {
         // utility class
