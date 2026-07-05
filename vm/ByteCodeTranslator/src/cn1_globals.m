@@ -1054,50 +1054,10 @@ void codenameOneGCMark() {
     // through reference fields, so we need an explicit drain pass before sweep runs.
     gcMarkDrain(d);
 
-    // === Stop-the-world for the final complete mark ===================================
-    // The concurrent drain deliberately returns before a true fixpoint to avoid
-    // livelocking active mutators, so a marked object's subtree can be left untraversed
-    // and swept while reachable (the intermittent crash). To close it, pause every running
-    // lightweight thread at a safepoint, then loop the grace pass + belt + SATB drain to a
-    // TRUE fixpoint -- with mutators frozen this converges (no livelock). Threads already
-    // held (aggressive allocators, released only after sweep) are left untouched. A thread
-    // that can't reach a cooperative safepoint quickly is either blocked on a monitor held
-    // by an already-paused thread (NOT mutating) or in a rare safepoint-free loop; the
-    // bounded wait then proceeds, so this never hangs. Native threads are not paused --
-    // the SATB barrier (still armed) captures their stores. Only the threads WE pause here
-    // are resumed afterwards.
-    JAVA_BOOLEAN cn1StwPaused[NUMBER_OF_SUPPORTED_THREADS];
-    for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
-        cn1StwPaused[iter] = JAVA_FALSE;
-        lockCriticalSection();
-        struct ThreadLocalData* t = allThreads[iter];
-        unlockCriticalSection();
-        if(t != 0 && t != d && t->lightweightThread && !t->threadBlockedByGC) {
-            t->threadBlockedByGC = JAVA_TRUE;
-            cn1StwPaused[iter] = JAVA_TRUE;
-        }
-    }
-    {
-        int __stwWait = 0;
-        for(;;) {
-            JAVA_BOOLEAN __running = JAVA_FALSE;
-            for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
-                if(!cn1StwPaused[iter]) continue;
-                lockCriticalSection();
-                struct ThreadLocalData* t = allThreads[iter];
-                unlockCriticalSection();
-                if(t != 0 && t->threadActive) { __running = JAVA_TRUE; break; }
-            }
-            if(!__running || __stwWait >= 200) break;   // ~100ms cap; blocked threads aren't "running"
-            usleep(500);
-            __stwWait++;
-        }
-    }
-
     // NOTE: the SATB log is drained + gcSatbActive cleared AFTER the grace pass and belt
-    // below, so the insertion/deletion barriers stay armed through them -- a native-thread
-    // store that links an object into a fresh grace object during those phases is still
-    // logged and marked, closing the residual window.
+    // below, so the insertion/deletion barriers stay armed through them -- a mutator that
+    // links an object into a fresh grace object DURING those phases still gets it logged
+    // and marked, closing the residual window.
 
     // Belt pass -- guaranteed drain completeness before sweep. gcMarkDrain triggers the
     // BiBOP page rescan only on a worklist OVERFLOW; if a marked object ever had its mark
@@ -1139,16 +1099,13 @@ void codenameOneGCMark() {
 #ifdef CN1_BIBOP_VALIDATE
         gcBeltDiagActive = 1;
 #endif
-        // Loop the forced full rescan+drain to a TRUE fixpoint. Safe now: the lightweight
-        // mutators are STW-paused above, so this converges (only genuinely-new marks reset
-        // the fixpoint, bounded by the live set) instead of livelocking against ongoing
-        // allocation. Recovers EVERY marked-but-untraversed subtree before sweep.
-        for(;;) {
-            long __beltPass = gcMarkNewObjectCount;
-            gcMarkWorklistOverflow = JAVA_TRUE;   // force the BiBOP page-rescan path on
-            gcMarkDrain(d);
-            if(gcMarkNewObjectCount == __beltPass) break;
-        }
+        // One forced full rescan+drain, recovering marked-but-undrained subtrees before
+        // sweep. NOTE: must NOT loop to convergence -- mutators are still active during
+        // this phase, so a "mark nothing new" fixpoint can livelock against ongoing
+        // allocation (observed hanging/breaking FusedTest). A single pass is bounded and
+        // safe; residual incompleteness is handled by the drain-gap fix, not by looping.
+        gcMarkWorklistOverflow = JAVA_TRUE;   // force the BiBOP page-rescan path on
+        gcMarkDrain(d);
 #ifdef CN1_BIBOP_VALIDATE
         gcBeltDiagActive = 0;
         if(gcMarkNewObjectCount != __beltBefore) {
@@ -1187,19 +1144,6 @@ void codenameOneGCMark() {
             gcMarkObject(d, batch[i], JAVA_FALSE);
         }
         if(n > 0) gcMarkDrain(d);
-    }
-
-    // === Resume the lightweight threads we STW-paused ================================
-    // Only release the ones WE paused above; aggressive-allocator threads (held before
-    // this point) stay held and are released after sweep (see hasAgressiveAllocator).
-    for(int iter = 0 ; iter < NUMBER_OF_SUPPORTED_THREADS ; iter++) {
-        if(!cn1StwPaused[iter]) continue;
-        lockCriticalSection();
-        struct ThreadLocalData* t = allThreads[iter];
-        unlockCriticalSection();
-        if(t != 0) {
-            t->threadBlockedByGC = JAVA_FALSE;
-        }
     }
 }
 
