@@ -630,6 +630,9 @@ public final class GeneratedAccess_com_codename1_push {
         if (type == com.codename1.ui.events.SelectionListener.class) {
             return true;
         }
+        if (type == com.codename1.printing.PrintResultListener.class) {
+            return true;
+        }
         return false;
     }
 
@@ -705,6 +708,17 @@ public final class GeneratedAccess_com_codename1_push {
                 public void selectionChanged(int arg0, int arg1) {
                     try {
                         lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.printing.PrintResultListener.class) {
+            return new com.codename1.printing.PrintResultListener() {
+                public void onResult(com.codename1.printing.PrintResult arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
                     } catch (bsh.EvalError ex) {
                         throw new RuntimeException(ex);
                     }

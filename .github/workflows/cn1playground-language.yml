@@ -40,6 +40,13 @@ jobs:
             sudo apt-get install -y xvfb
           fi
 
+      # The playground is pinned to the in-repo 8.0-SNAPSHOT (it previews the
+      # current framework + native themes), so the snapshot artifacts must be
+      # installed into the local Maven repo before the smoke build resolves
+      # them. Mirrors the website build's bootstrap.
+      - name: Bootstrap local Codename One snapshots
+        run: SKIP_CN1_ARCHETYPES=1 ./scripts/setup-workspace.sh -q -DskipTests
+
       - name: Run playground language smoke tests
         run: |
           set -euo pipefail

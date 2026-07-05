@@ -138,6 +138,11 @@ public final class GeneratedAccess_com_codename1_plugin_event {
                 return typedTarget.getPluginEventResponse();
             }
         }
+        if ("getPointerEvent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPointerEvent();
+            }
+        }
         if ("getProgress".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getProgress();
@@ -176,6 +181,12 @@ public final class GeneratedAccess_com_codename1_plugin_event {
         if ("isPointerPressedDuringDrag".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isPointerPressedDuringDrag();
+            }
+        }
+        if ("setPointerEvent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.PointerEvent.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.PointerEvent.class}, false);
+                typedTarget.setPointerEvent((com.codename1.ui.events.PointerEvent) adaptedArgs[0]); return null;
             }
         }
         if ("setPointerPressedDuringDrag".equals(name)) {
@@ -233,6 +244,11 @@ public final class GeneratedAccess_com_codename1_plugin_event {
                 return typedTarget.getPluginEventResponse();
             }
         }
+        if ("getPointerEvent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPointerEvent();
+            }
+        }
         if ("getProgress".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getProgress();
@@ -276,6 +292,12 @@ public final class GeneratedAccess_com_codename1_plugin_event {
         if ("isPointerPressedDuringDrag".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isPointerPressedDuringDrag();
+            }
+        }
+        if ("setPointerEvent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.PointerEvent.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.PointerEvent.class}, false);
+                typedTarget.setPointerEvent((com.codename1.ui.events.PointerEvent) adaptedArgs[0]); return null;
             }
         }
         if ("setPointerPressedDuringDrag".equals(name)) {
@@ -333,6 +355,11 @@ public final class GeneratedAccess_com_codename1_plugin_event {
                 return typedTarget.getPluginEventResponse();
             }
         }
+        if ("getPointerEvent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPointerEvent();
+            }
+        }
         if ("getProgress".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getProgress();
@@ -366,6 +393,12 @@ public final class GeneratedAccess_com_codename1_plugin_event {
         if ("isPointerPressedDuringDrag".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isPointerPressedDuringDrag();
+            }
+        }
+        if ("setPointerEvent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.PointerEvent.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.PointerEvent.class}, false);
+                typedTarget.setPointerEvent((com.codename1.ui.events.PointerEvent) adaptedArgs[0]); return null;
             }
         }
         if ("setPointerPressedDuringDrag".equals(name)) {
@@ -444,6 +477,9 @@ public final class GeneratedAccess_com_codename1_plugin_event {
         if (type == com.codename1.ui.events.SelectionListener.class) {
             return true;
         }
+        if (type == com.codename1.printing.PrintResultListener.class) {
+            return true;
+        }
         return false;
     }
 
@@ -519,6 +555,17 @@ public final class GeneratedAccess_com_codename1_plugin_event {
                 public void selectionChanged(int arg0, int arg1) {
                     try {
                         lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.printing.PrintResultListener.class) {
+            return new com.codename1.printing.PrintResultListener() {
+                public void onResult(com.codename1.printing.PrintResult arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
                     } catch (bsh.EvalError ex) {
                         throw new RuntimeException(ex);
                     }

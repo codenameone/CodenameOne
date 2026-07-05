@@ -20,7 +20,15 @@
 </modules>
   <properties>
     <cn1.plugin.version>${cn1.version}</cn1.plugin.version>
-    <cn1.version>7.0.255</cn1.version>
+    <!-- PINNED TO THE IN-REPO SNAPSHOT ON PURPOSE. The playground lives in
+         the framework repo and previews the CURRENT framework + native
+         themes (the bundled Themes/*.res use resource-format features a
+         released runtime cannot read). CI bootstraps these snapshots via
+         setup-workspace.sh; local runs need a source build in ~/.m2
+         (./scripts/setup-workspace.sh). The release version-bump workflow
+         must NOT touch this pin - update-cn1-version.sh refuses to change
+         a SNAPSHOT pin. -->
+    <cn1.version>8.0-SNAPSHOT</cn1.version>
     <!-- The bean-shell access registry is generated against the same
          Codename One sources the playground ships. The deployed
          JavaScript bundle now builds with the local ParparVM

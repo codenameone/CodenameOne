@@ -4,8 +4,12 @@ set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 
 cd "$ROOT"
-echo "Regenerating CN1 access registry from release sources..."
-CN1_ACCESS_USE_LOCAL_SOURCES=false bash "$ROOT/tools/generate-cn1-access-registry.sh"
+# The playground is pinned to the in-repo 8.0-SNAPSHOT (see pom.xml), so the
+# registry is generated from the LOCAL framework sources -- the same API the
+# playground builds against. Release-source mode would 404 on Central for a
+# SNAPSHOT version and would describe a different API anyway.
+echo "Regenerating CN1 access registry from local workspace sources..."
+CN1_ACCESS_USE_LOCAL_SOURCES=true bash "$ROOT/tools/generate-cn1-access-registry.sh"
 
 echo "Verifying Component is present in generated registry..."
 if ! grep -q 'index.put("com.codename1.ui.Component"' "$ROOT/common/src/main/java/bsh/cn1/GeneratedCN1Access.java"; then
