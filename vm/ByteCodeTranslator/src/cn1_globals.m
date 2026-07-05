@@ -1054,34 +1054,10 @@ void codenameOneGCMark() {
     // through reference fields, so we need an explicit drain pass before sweep runs.
     gcMarkDrain(d);
 
-    // SATB termination: mark everything the deletion barrier logged during this mark,
-    // to a fixpoint. gcMarkObject is idempotent, so once a full take-and-drain marks
-    // nothing new the start-of-cycle snapshot is CLOSED: every reference is marked, so
-    // any reference a mutator overwrites from here on can only point to an already-marked
-    // object -- safe to stop logging even though mutators still run. Bounded by the live
-    // set (finite) since only genuinely-new marks reset the fixpoint.
-    for(;;) {
-        JAVA_OBJECT* batch;
-        long n = cn1SatbTake(&batch);
-        if(n == 0) break;                    // log empty at this instant
-        long before = gcMarkNewObjectCount;
-        for(long i = 0 ; i < n ; i++) {
-            gcMarkObject(d, batch[i], JAVA_FALSE);
-        }
-        gcMarkDrain(d);
-        if(gcMarkNewObjectCount == before) break; // processed a batch, marked nothing new -> closed
-    }
-    // Snapshot is closed; stop logging. A store racing this clear either logged already
-    // (drained just below) or overwrites an already-marked reference (harmless).
-    __atomic_store_n(&gcSatbActive, 0, __ATOMIC_RELEASE);
-    {
-        JAVA_OBJECT* batch;
-        long n = cn1SatbTake(&batch);        // final catch of anything logged during the loop's tail
-        for(long i = 0 ; i < n ; i++) {
-            gcMarkObject(d, batch[i], JAVA_FALSE);
-        }
-        if(n > 0) gcMarkDrain(d);
-    }
+    // NOTE: the SATB log is drained + gcSatbActive cleared AFTER the grace pass and belt
+    // below, so the insertion/deletion barriers stay armed through them -- a mutator that
+    // links an object into a fresh grace object DURING those phases still gets it logged
+    // and marked, closing the residual window.
 
     // Belt pass -- guaranteed drain completeness before sweep. gcMarkDrain triggers the
     // BiBOP page rescan only on a worklist OVERFLOW; if a marked object ever had its mark
@@ -1139,6 +1115,35 @@ void codenameOneGCMark() {
             fflush(stderr);
         }
 #endif
+    }
+
+    // SATB termination (LAST, after grace+belt): mark everything the deletion+insertion
+    // barriers logged during the WHOLE mark (including the grace pass and belt above), to
+    // a fixpoint -- gcMarkObject is idempotent, so once a take-and-drain marks nothing new
+    // the start-of-cycle snapshot is closed. Draining it here (not before grace+belt) is
+    // what keeps the barrier armed through those phases and closes the residual grace
+    // window. Bounded by the live set (only genuinely-new marks reset the fixpoint).
+    for(;;) {
+        JAVA_OBJECT* batch;
+        long n = cn1SatbTake(&batch);
+        if(n == 0) break;                    // log empty at this instant
+        long before = gcMarkNewObjectCount;
+        for(long i = 0 ; i < n ; i++) {
+            gcMarkObject(d, batch[i], JAVA_FALSE);
+        }
+        gcMarkDrain(d);
+        if(gcMarkNewObjectCount == before) break; // processed a batch, marked nothing new -> closed
+    }
+    // Snapshot closed; stop logging. A store racing this clear either logged already
+    // (drained just below) or overwrites/adds an already-marked reference (harmless).
+    __atomic_store_n(&gcSatbActive, 0, __ATOMIC_RELEASE);
+    {
+        JAVA_OBJECT* batch;
+        long n = cn1SatbTake(&batch);        // final catch of anything logged during the tail
+        for(long i = 0 ; i < n ; i++) {
+            gcMarkObject(d, batch[i], JAVA_FALSE);
+        }
+        if(n > 0) gcMarkDrain(d);
     }
 }
 
