@@ -246,8 +246,12 @@ jobs:
               echo "=== post-mortem of $core (elf=$elf) ==="
               gdb "$elf" "$core" -batch -ex 'set pagination off' \
                 -ex 'thread apply all bt' \
+                -ex 'thread 1' -ex 'bt full' \
+                -ex 'frame 0' -ex 'info args' \
                 -ex 'frame 1' -ex 'info locals' -ex 'info args' \
                 -ex 'p/x batch' -ex 'p gcMarkWorklistTop' -ex 'p currentGcMarkValue' \
+                -ex 'p gcMarkCurrentDrainObj' \
+                -ex 'p (char*)((struct clazz*)(*(void**)gcMarkCurrentDrainObj))->clsName' \
                 2>&1
             } >> "$(dirname "$CN1_APP_LOG_TEE")/crash-stacks.txt" || true
           done
