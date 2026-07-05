@@ -1472,7 +1472,12 @@ JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     // points at it (observed: java.lang.System.LOCK freed under the GC thread's
     // own wait()). Deliver the intended semantics: register it as a permanent
     // GC root instead.
-    if(o != JAVA_NULL && !CN1_IS_TAGGED(o) && o->__heapPosition == CN1_BIBOP_HEAP_POS) {
+    // A MATURED (-4) object is also BiBOP-resident (its memory is a page slot). Removing
+    // its table entry would stop the legacy rescan from tracing its SUBTREE (children could
+    // then be swept). Deliver "immortal" the same way: register a permanent root and keep
+    // the table entry (idempotent double-trace), rather than fall through to entry removal.
+    if(o != JAVA_NULL && !CN1_IS_TAGGED(o) &&
+       (o->__heapPosition == CN1_BIBOP_HEAP_POS || o->__heapPosition == CN1_BIBOP_ADOPTED)) {
         cn1AddImmortalRoot(o);
         return JAVA_TRUE;
     }
@@ -2032,14 +2037,14 @@ static void cn1BibopReclaimSlot(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
 // cn1BibopReclaimSlot (which releases the peer) instead of the O(1) all-dead
 // page reclaim. Same sticky-flag visibility argument as monitors.
 void cn1BibopNoteNativePeer(JAVA_OBJECT obj) {
-    if(obj != JAVA_NULL && obj->__heapPosition == CN1_BIBOP_HEAP_POS) {
+    if(obj != JAVA_NULL && (obj->__heapPosition == CN1_BIBOP_HEAP_POS || obj->__heapPosition == CN1_BIBOP_ADOPTED)) {
         CN1BibopPage* p = (CN1BibopPage*)((uintptr_t)obj & ~((uintptr_t)(CN1_BIBOP_PAGE_SIZE - 1)));
         p->gcHasMonitors = JAVA_TRUE;
     }
 }
 
 void cn1BibopNoteMonitorAttached(JAVA_OBJECT obj) {
-    if(obj != JAVA_NULL && obj->__heapPosition == CN1_BIBOP_HEAP_POS) {
+    if(obj != JAVA_NULL && (obj->__heapPosition == CN1_BIBOP_HEAP_POS || obj->__heapPosition == CN1_BIBOP_ADOPTED)) {
         // STICKY per-page flag (plain store): visible to any sweep that could
         // legitimately take the all-dead shortcut for this page, because that
         // requires a full mark completed AFTER this (live) object died, and the
@@ -3358,14 +3363,17 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
         int __fpBad = (__cfp != 0) &&
             ((__fpv > __anchor ? __fpv - __anchor : __anchor - __fpv) > (256ULL << 20));
         int __hp = obj->__heapPosition;
-        if((__hp != CN1_BIBOP_HEAP_POS && __hp < -1) || __fpBad) {
+        // CN1_BIBOP_ADOPTED (-4) is a live MATURED slot (owned by the legacy sweep), not
+        // corruption -- accept it exactly like a normal BiBOP slot.
+        if((__hp != CN1_BIBOP_HEAP_POS && __hp != CN1_BIBOP_ADOPTED && __hp < -1) || __fpBad) {
             JAVA_OBJECT __p = gcMarkCurrentDrainObj;
             // Name the culprit: the drain parent is validated live below, so its class
             // name is safe to read and identifies WHICH object holds the lost reference.
             // markCallSite is the return address into the parent's generated mark
             // function -> addr2line / the gdb bt maps it to the exact field being marked.
             const char* __pcls = "?";
-            if(__p != JAVA_NULL && __p->__heapPosition == CN1_BIBOP_HEAP_POS
+            if(__p != JAVA_NULL
+               && (__p->__heapPosition == CN1_BIBOP_HEAP_POS || __p->__heapPosition == CN1_BIBOP_ADOPTED)
                && __p->__codenameOneParentClsReference != 0
                && __p->__codenameOneParentClsReference->clsName != 0) {
                 __pcls = __p->__codenameOneParentClsReference->clsName;
