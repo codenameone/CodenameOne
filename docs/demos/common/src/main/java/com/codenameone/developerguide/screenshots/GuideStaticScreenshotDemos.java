@@ -42,8 +42,11 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.table.TableLayout;
 import com.codenameone.developerguide.Demo;
+import com.codenameone.developerguide.advancedtopics.CenterLayoutDemo;
 import com.codenameone.developerguide.snippets.generated.BasicsJava026Snippet;
 import com.codenameone.developerguide.snippets.generated.BasicsJava033Snippet;
+import com.codenameone.developerguide.snippets.generated.BasicsJava034Snippet;
+import com.codenameone.developerguide.snippets.generated.BasicsJava035Snippet;
 
 import java.util.Date;
 
@@ -149,6 +152,18 @@ public final class GuideStaticScreenshotDemos {
 
     public static Demo gridBagLayoutDemo() {
         return formDemo("GridBagLayout", "GridBagLayout tutorial sample", BasicsJava033Snippet::createForm);
+    }
+
+    public static Demo groupLayoutDemo() {
+        return formDemo("GroupLayout", "GroupLayout Matisse sample", BasicsJava034Snippet::createForm);
+    }
+
+    public static Demo migLayoutDemo() {
+        return formDemo("MigLayout", "MigLayout sample", BasicsJava035Snippet::createForm);
+    }
+
+    public static Demo centerLayoutDemo() {
+        return formDemo("Center Layout", "Center layout staircase", CenterLayoutDemo::createForm);
     }
 
     public static Demo tableLayoutOverflow() {

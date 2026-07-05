@@ -31,7 +31,7 @@ import java.io.*;
 import java.util.*;
 
 
-class BasicsJava034Snippet {
+public class BasicsJava034Snippet {
 
     Object context;
     Object url;
@@ -55,8 +55,8 @@ class BasicsJava034Snippet {
     Label label;
     BrowserComponent browserComponent;
     Resources theme;
-    void snippet() throws Exception {
-        // tag::basics-java-034[]
+    // tag::basics-java-034[]
+    public static Form createForm() {
         Form hi = new Form("GroupLayout");
 
         Label label1 = new Label();
@@ -121,6 +121,11 @@ class BasicsJava034Snippet {
                     .add(label7, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE))
                 .addContainerGap(150, Short.MAX_VALUE))
         );
-        // end::basics-java-034[]
+        return hi;
+    }
+    // end::basics-java-034[]
+
+    void snippet() throws Exception {
+        createForm().show();
     }
 }

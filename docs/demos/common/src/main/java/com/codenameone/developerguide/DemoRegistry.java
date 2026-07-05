@@ -55,6 +55,8 @@ public final class DemoRegistry {
                     GuideStaticScreenshotDemos.gridAutoFit("Grid AutoFit Landscape", true),
                     GuideStaticScreenshotDemos.layeredLayoutDemo(),
                     GuideStaticScreenshotDemos.gridBagLayoutDemo(),
+                    GuideStaticScreenshotDemos.groupLayoutDemo(),
+                    GuideStaticScreenshotDemos.migLayoutDemo(),
                     GuideStaticScreenshotDemos.tableLayoutOverflow(),
                     GuideStaticScreenshotDemos.tableLayoutEnclose(),
                     GuideStaticScreenshotDemos.tableLayoutConstraints(),
@@ -100,7 +102,8 @@ public final class DemoRegistry {
                         dialog.setBlurBackgroundRadius(8);
                         dialog.showPacked(BorderLayout.CENTER, true);
                     }),
-                    GuideStaticScreenshotDemos.interactionDialogDemo()
+                    GuideStaticScreenshotDemos.interactionDialogDemo(),
+                    GuideStaticScreenshotDemos.centerLayoutDemo()
             )
     );
     private static final List<GuideScreenshot> SCREENSHOTS = Collections.unmodifiableList(
@@ -137,6 +140,8 @@ public final class DemoRegistry {
                     screenshot("grid-layout-autofit-landscape", "Grid AutoFit Landscape", "grid-layout-autofit-landscape.png"),
                     screenshot("layered-layout", "Layered Layout", "layered-layout.png"),
                     screenshot("gridbag-layout", "GridBagLayout", "gridbag-layout.png"),
+                    screenshot("group-layout", "GroupLayout", "group-layout.png"),
+                    screenshot("mig-layout", "MigLayout", "mig-layout.png"),
                     screenshot("table-layout-2x2", "TableLayout 2x2", "table-layout-2x2.png"),
                     screenshot("table-layout-enclose", "TableLayout Enclose", "table-layout-enclose.png"),
                     screenshot("table-layout-constraints", "TableLayout Constraints", "table-layout-constraints.png"),
@@ -171,7 +176,8 @@ public final class DemoRegistry {
                     screenshot("components-dialog-green-tint", "Dialog Green Tint", "components-dialog-green-tint.png"),
                     screenshot("components-dialog-blur", "Dialog Blur", "components-dialog-blur.png"),
                     screenshot("components-dialog-blur-no-tint", "Dialog Blur No Tint", "components-dialog-blur-no-tint.png"),
-                    screenshot("components-interaction-dialog", "Interaction Dialog", "components-interaction-dialog.png")
+                    screenshot("components-interaction-dialog", "Interaction Dialog", "components-interaction-dialog.png"),
+                    screenshot("center-layout", "Center Layout", "center-layout.png")
             )
     );
 

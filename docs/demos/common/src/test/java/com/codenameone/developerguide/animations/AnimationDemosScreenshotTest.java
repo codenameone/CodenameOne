@@ -349,6 +349,8 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
                 || fileName.startsWith("box-layout")
                 || "layered-layout.png".equals(fileName)
                 || "gridbag-layout.png".equals(fileName)
+                || "group-layout.png".equals(fileName)
+                || "mig-layout.png".equals(fileName)
                 || fileName.startsWith("table-layout")
                 || "components-button.png".equals(fileName)
                 || "components-link-button.png".equals(fileName)
@@ -360,7 +362,8 @@ public class AnimationDemosScreenshotTest extends AbstractTest {
                 || "components-spanlabel.png".equals(fileName)
                 || "components-onoffswitch.png".equals(fileName)
                 || "components-picker.png".equals(fileName)
-                || "components-accordion.png".equals(fileName);
+                || "components-accordion.png".equals(fileName)
+                || "center-layout.png".equals(fileName);
     }
 
     private Image trimBlankBottom(Image image, int margin) {

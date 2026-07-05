@@ -30,6 +30,8 @@ grid-layout-autofit-portrait.png
 grid-layout-autofit-landscape.png
 layered-layout.png
 gridbag-layout.png
+group-layout.png
+mig-layout.png
 table-layout-2x2.png
 table-layout-enclose.png
 table-layout-constraints.png
@@ -65,3 +67,4 @@ components-dialog-green-tint.png
 components-dialog-blur.png
 components-dialog-blur-no-tint.png
 components-interaction-dialog.png
+center-layout.png
