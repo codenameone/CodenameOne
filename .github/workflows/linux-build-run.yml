@@ -192,16 +192,7 @@ jobs:
           sudo tee /usr/local/bin/cn1-zig-cc >/dev/null << 'WRAP'
           #!/bin/sh
           ARCH=$(uname -m)
-          # TEMPORARY DIAGNOSTIC: -DCN1_BIBOP_VALIDATE compiles in the GC mark-drain
-          # and mark-object invariant checks (abort at the corruption source with the
-          # corrupt child + its drain parent) to pin the intermittent gcMarkObject
-          # SIGSEGV. -DCN1_BIBOP_NO_FASTSWEEP disables the O(1) all-dead page reclaim so
-          # EVERY dead slot is full-walked and stamped FREE_MARK: if that stops the crash,
-          # the O(1) reclaim (which pools dead pages without FREE_MARK, letting a dangling
-          # this$0 evade the resolver's FREE_MARK guard) is the crash amplifier.
-          # Remove both once the Linux mid-suite crash is root-caused/fixed.
           exec zig cc -target ${ARCH}-linux-gnu.2.28 -D_DEFAULT_SOURCE -Wno-macro-redefined \
-            -DCN1_BIBOP_VALIDATE \
             -L/usr/lib/${ARCH}-linux-gnu -L/lib/${ARCH}-linux-gnu "$@"
           WRAP
           sudo chmod +x /usr/local/bin/cn1-zig-cc
@@ -253,9 +244,7 @@ jobs:
                 -ex 'thread 1' -ex 'bt full' \
                 -ex 'frame 0' -ex 'info args' \
                 -ex 'frame 1' -ex 'info locals' -ex 'info args' \
-                -ex 'p/x batch' -ex 'p gcMarkWorklistTop' -ex 'p currentGcMarkValue' \
-                -ex 'p gcMarkCurrentDrainObj' \
-                -ex 'p (char*)((struct clazz*)(*(void**)gcMarkCurrentDrainObj))->clsName' \
+                -ex 'p gcMarkWorklistTop' -ex 'p currentGcMarkValue' \
                 2>&1
             } >> "$(dirname "$CN1_APP_LOG_TEE")/crash-stacks.txt" || true
           done
