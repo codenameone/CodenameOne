@@ -3225,9 +3225,22 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
         int __hp = obj->__heapPosition;
         if((__hp != CN1_BIBOP_HEAP_POS && __hp < -1) || __fpBad) {
             JAVA_OBJECT __p = gcMarkCurrentDrainObj;
-            fprintf(stderr, "CN1BIBOP MARKOBJ CORRUPT CHILD: child=%p parentCls=%p childMarkFn=%p "
+            // Name the culprit: the drain parent is validated live below, so its class
+            // name is safe to read and identifies WHICH object holds the lost reference.
+            // markCallSite is the return address into the parent's generated mark
+            // function -> addr2line / the gdb bt maps it to the exact field being marked.
+            const char* __pcls = "?";
+            if(__p != JAVA_NULL && __p->__heapPosition == CN1_BIBOP_HEAP_POS
+               && __p->__codenameOneParentClsReference != 0
+               && __p->__codenameOneParentClsReference->clsName != 0) {
+                __pcls = __p->__codenameOneParentClsReference->clsName;
+            }
+            void* __callSite = __builtin_return_address(0);
+            fprintf(stderr, "CN1BIBOP MARKOBJ CORRUPT CHILD: parentClass=%s markCallSite=%p :: "
+                    "child=%p parentCls=%p childMarkFn=%p "
                     "childHeapPos=%d childGcMark=%d curMark=%d FREE_MARK=%d :: drainParent=%p "
                     "parentCls=%p parentMarkFn=%p parentHeapPos=%d parentGcMark=%d\n",
+                    __pcls, __callSite,
                     (void*)obj, (void*)obj->__codenameOneParentClsReference, (void*)__cfp,
                     __hp, obj->__codenameOneGcMark, currentGcMarkValue, CN1_BIBOP_FREE_MARK,
                     (void*)__p,
