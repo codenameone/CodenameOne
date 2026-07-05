@@ -78,13 +78,15 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     private static final int TEST_POLL_INTERVAL_MS = 50;
 
     private static int testTimeoutMs(BaseTest testClass) {
-        // DualAppearanceBaseTest needs more wall time on HTML5 (light + dark
-        // phases serially, each paying registerReadyCallback's 1500ms + settle
-        // + capture). Other tests stay at the tighter HTML5 default so a hung
-        // test doesn't eat the suite-level budget.
+        // DualAppearanceBaseTest needs more wall time on HTML5: it runs FOUR
+        // serial capture phases there (Material light/dark plus the
+        // ios_light/ios_dark Liquid Glass pair), each paying
+        // registerReadyCallback's 1500ms + settle + capture. Other tests stay
+        // at the tighter HTML5 default so a hung test doesn't eat the
+        // suite-level budget.
         if ("HTML5".equals(Display.getInstance().getPlatformName())
                 && testClass instanceof DualAppearanceBaseTest) {
-            return TEST_TIMEOUT_MS_NATIVE;
+            return TEST_TIMEOUT_MS_NATIVE * 2;
         }
         return "HTML5".equals(Display.getInstance().getPlatformName())
                 ? TEST_TIMEOUT_MS_HTML5
@@ -674,10 +676,44 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     private static boolean matchesFilter(String testName) {
         String filter = System.getProperty("cn1ss.filter");
         if (filter == null || filter.length() == 0) {
+            // The JS port's translated runtime has no -D system properties, so
+            // subset runs there are driven by a ?cn1ssFilter=<substr> query
+            // param on the harness page URL instead (the HTML5 port exposes
+            // the host page's query string as a Display property; every other
+            // port returns null here and keeps the full suite).
+            filter = queryParamFilter();
+        }
+        if (filter == null || filter.length() == 0) {
             return true;
         }
         return testName != null
                 && testName.toLowerCase().indexOf(filter.toLowerCase()) >= 0;
+    }
+
+    private static String queryParamFilter() {
+        // Parse the full href rather than "browser.window.location.search":
+        // the app runs in a Web Worker and only the href is reliably
+        // forwarded from the host page by the bridge (the same reason the
+        // playground's ?sample= deep links read href; a first cut using the
+        // search property returned nothing and the filter silently no-oped).
+        String href = Display.getInstance().getProperty("browser.window.location.href", null);
+        if (href == null || href.length() == 0) {
+            return null;
+        }
+        int idx = href.indexOf("cn1ssFilter=");
+        if (idx < 0) {
+            return null;
+        }
+        String value = href.substring(idx + "cn1ssFilter=".length());
+        int amp = value.indexOf('&');
+        if (amp >= 0) {
+            value = value.substring(0, amp);
+        }
+        int hash = value.indexOf('#');
+        if (hash >= 0) {
+            value = value.substring(0, hash);
+        }
+        return value;
     }
 
     private static void log(String msg) {

@@ -306,6 +306,11 @@ Button {
     font-family: "native:MainRegular";
     font-size: 2.7mm;
     background-color: rgba(255,255,255,0.34);
+    /* Hairline rim: the native glass capsule always shows a faint darker
+       edge, and over a FLAT white/light app background the translucent
+       fill alone is invisible (the fidelity tiles' colourful backdrop
+       hid this - a real app over plain white showed bare text). */
+    border: 0.25mm solid rgba(0,0,0,0.10);
     /* iOS 26 glass buttons are capsules (fully rounded sides). */
     cn1-background-type: cn1-pill-border;
     /* Real Liquid Glass: blur the backdrop behind the capsule (no CEF), then the
@@ -315,8 +320,8 @@ Button {
     text-align: center;
 }
 /* Pressed (light): the frosted capsule dims slightly. */
-Button.pressed { color: #000000; background-color: rgba(235,235,240,0.6); cn1-background-type: cn1-pill-border; }
-Button.disabled { color: rgba(0,0,0,0.3); background-color: rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; }
+Button.pressed { color: #000000; background-color: rgba(235,235,240,0.6); border: 0.25mm solid rgba(0,0,0,0.12); cn1-background-type: cn1-pill-border; }
+Button.disabled { color: rgba(0,0,0,0.3); background-color: rgba(255,255,255,0.55); border: 0.25mm solid rgba(0,0,0,0.06); cn1-background-type: cn1-pill-border; }
 
 RaisedButton {
     cn1-derive: Button;
@@ -380,10 +385,13 @@ CheckBox {
     padding: 0;
     margin: 0;
     font-family: "native:MainRegular";
-    /* The glyph box follows the font height (the checkBoxIconSizeMM constant is
-       NOT honoured by the runtime). Measured: 5mm -> 89px ring, but the native
-       30pt SF symbol renders a 107px (5.9mm) ring -> bump to 6mm to overlay 1:1. */
-    font-size: 6mm;
+    /* LABEL font only - the glyph is sized independently by the
+       checkBoxIconSizeMM constant (5.9mm, calibrated to the native 30pt SF
+       symbol's 107px ring). 2.7mm matches the Button label (~16pt on a
+       460ppi device). This was 6mm for a while to inflate the glyph via its
+       font-height fallback, which made every checkbox LABEL render at
+       ~2x body size in real apps. */
+    font-size: 2.7mm;
     icon-gap: 2mm;
 }
 CheckBox.selected { color: #007aff; }
@@ -395,8 +403,8 @@ RadioButton {
     padding: 0;
     margin: 0;
     font-family: "native:MainRegular";
-    /* 6mm to match the native 30pt SF symbol ring (~107px); see CheckBox. */
-    font-size: 6mm;
+    /* Label font only - the ring is sized by radioIconSizeMM; see CheckBox. */
+    font-size: 2.7mm;
     icon-gap: 2mm;
 }
 RadioButton.selected { color: #007aff; }
@@ -962,9 +970,12 @@ PopupContent {
     /* Dark glass button: a translucent blue capsule with white text. */
     /* Dark .glass() button: a DARK translucent capsule (darkens the backdrop) with a
        white label -- not a blue fill. */
-    Button { color: #ffffff; background-color: rgba(20,20,24,0.36); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); }
-    Button.pressed { color: #ffffff; background-color: rgba(40,40,44,0.6); cn1-background-type: cn1-pill-border; }
-    Button.disabled { color: rgba(255,255,255,0.4); background-color: rgba(20,20,24,0.58); cn1-background-type: cn1-pill-border; }
+    /* Hairline light rim (see the light-mode Button comment): the native dark
+       glass capsule keeps a faint brighter edge, and over a FLAT black app
+       background the dark translucent fill alone disappears completely. */
+    Button { color: #ffffff; background-color: rgba(20,20,24,0.36); border: 0.25mm solid rgba(255,255,255,0.18); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); }
+    Button.pressed { color: #ffffff; background-color: rgba(40,40,44,0.6); border: 0.25mm solid rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; }
+    Button.disabled { color: rgba(255,255,255,0.4); background-color: rgba(20,20,24,0.58); border: 0.25mm solid rgba(255,255,255,0.10); cn1-background-type: cn1-pill-border; }
     /* Dark FlatButton matches light: iOS 26's flat glass button is a light cream
        pill with DARK text in BOTH appearances (native ref). White text flipped it
        to the dark "charcoal" material; dark text uses the light pass-through frost. */
