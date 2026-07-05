@@ -763,6 +763,13 @@ long gcMarkNewObjectCount = 0;
 // Forward (tentative) declaration -- the real definition is below near the worklist;
 // the belt pass in codenameOneGCMark forces it to trigger the full BiBOP rescan.
 static JAVA_BOOLEAN gcMarkWorklistOverflow;
+#ifdef CN1_BIBOP_VALIDATE
+// Belt diagnostic: while set, gcMarkObject logs the class of each newly-marked object
+// (a reachable object the main drain missed) and its drain parent, to name the
+// systematic drain-incompleteness pattern. Throttled by gcBeltDiagCount.
+static int gcBeltDiagActive = 0;
+static int gcBeltDiagCount = 0;
+#endif
 
 void cn1SatbEnqueue(JAVA_OBJECT old) {
     pthread_mutex_lock(&gcSatbMutex);
@@ -1081,8 +1088,12 @@ void codenameOneGCMark() {
     {
         long __beltBefore = gcMarkNewObjectCount;
         gcMarkWorklistOverflow = JAVA_TRUE;   // force the BiBOP page-rescan path on
+#ifdef CN1_BIBOP_VALIDATE
+        gcBeltDiagActive = 1;
+#endif
         gcMarkDrain(d);
 #ifdef CN1_BIBOP_VALIDATE
+        gcBeltDiagActive = 0;
         if(gcMarkNewObjectCount != __beltBefore) {
             fprintf(stderr, "CN1BIBOP DRAIN INCOMPLETE: belt pass recovered %ld "
                     "reachable-but-unmarked object(s) before sweep\n",
@@ -3283,6 +3294,22 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     CN1_BIBOP_STAMP_MARKED(obj, markVal);
     gcMarkFoundUnmarkedChildInPass = JAVA_TRUE;
     gcMarkNewObjectCount++;   // SATB fixpoint detection (mark-thread only)
+#ifdef CN1_BIBOP_VALIDATE
+    // Belt diagnostic: name what the main drain systematically MISSED. When set, every
+    // object the belt newly marks is a reachable-but-unmarked object; log its class and
+    // its drain parent's class (throttled) to identify the drain-incompleteness pattern.
+    if(gcBeltDiagActive && gcBeltDiagCount < 60) {
+        JAVA_OBJECT __p = gcMarkCurrentDrainObj;
+        const char* __cc = (obj->__codenameOneParentClsReference && obj->__codenameOneParentClsReference->clsName)
+            ? obj->__codenameOneParentClsReference->clsName : "?";
+        const char* __pc = (__p && __p->__heapPosition == CN1_BIBOP_HEAP_POS
+            && __p->__codenameOneParentClsReference && __p->__codenameOneParentClsReference->clsName)
+            ? __p->__codenameOneParentClsReference->clsName : "?";
+        fprintf(stderr, "CN1BIBOP BELT RECOVERED: child=%s <- drainParent=%s\n", __cc, __pc);
+        fflush(stderr);
+        gcBeltDiagCount++;
+    }
+#endif
     if(obj->__codenameOneParentClsReference->markFunction != 0) {
         gcMarkWorklistPush(obj, force);
     }
