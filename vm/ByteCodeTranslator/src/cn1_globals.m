@@ -763,6 +763,12 @@ long gcMarkNewObjectCount = 0;
 // Forward (tentative) declaration -- the real definition is below near the worklist;
 // the belt pass in codenameOneGCMark forces it to trigger the full BiBOP rescan.
 static JAVA_BOOLEAN gcMarkWorklistOverflow;
+#ifndef CN1_DISABLE_BIBOP
+// Forward declarations -- defined below; the grace-subtree pass in codenameOneGCMark
+// walks the page registry and its slots before their definitions.
+static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i);
+static CN1BibopPage* _Atomic bibopAllPages;
+#endif
 #ifdef CN1_BIBOP_VALIDATE
 // Belt diagnostic: while set, gcMarkObject logs the class of each newly-marked object
 // (a reachable object the main drain missed) and its drain parent, to name the
@@ -1085,6 +1091,33 @@ void codenameOneGCMark() {
     // unconditionally so EVERY marked object's mark function runs and all reachable children
     // are marked. gcMarkDrain re-pushes each marked slot and loops until a pass marks nothing
     // new -> O(reachable) and idempotent; recovers any marked-but-untraversed subtree.
+#ifndef CN1_DISABLE_BIBOP
+    // Grace-subtree marking (CORRECTNESS): a fresh BiBOP object (gcMark==-1) survives this
+    // cycle via grace, and the sweep promotes it to live (gcMark=V, cn1BibopSweep) or pools
+    // its whole grace page WITHOUT draining it -- so an OLD object reachable ONLY through a
+    // fresh, not-yet-linked object is left unmarked and swept. When a mutator later links
+    // that fresh object into the live graph, next cycle it is drained and marks the now
+    // dangling child -> the intermittent Property->Double / container->content crash. Drain
+    // every grace object here so a surviving grace object's subtree survives WITH it.
+    // parentCls==0 skips a mid-construction memset-elided slot (its class isn't published
+    // yet); such an object is reached again next cycle once fully built.
+    {
+        CN1BibopPage* gp = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
+        while(gp != 0) {
+            int gn = atomic_load_explicit(&gp->bumpIndex, memory_order_acquire);
+            for(int gi = 0 ; gi < gn ; gi++) {
+                JAVA_OBJECT go = cn1BibopSlot(gp, gi);
+                if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_ACQUIRE) == -1
+                   && go->__codenameOneParentClsReference != 0) {
+                    gcMarkObject(d, go, JAVA_FALSE);
+                }
+            }
+            gp = atomic_load_explicit(&gp->nextAll, memory_order_acquire);
+        }
+        gcMarkDrain(d);
+    }
+#endif
+
     {
         long __beltBefore = gcMarkNewObjectCount;
 #ifdef CN1_BIBOP_VALIDATE
