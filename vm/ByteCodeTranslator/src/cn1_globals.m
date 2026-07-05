@@ -1087,15 +1087,20 @@ void codenameOneGCMark() {
     // new -> O(reachable) and idempotent; recovers any marked-but-untraversed subtree.
     {
         long __beltBefore = gcMarkNewObjectCount;
-        gcMarkWorklistOverflow = JAVA_TRUE;   // force the BiBOP page-rescan path on
 #ifdef CN1_BIBOP_VALIDATE
         gcBeltDiagActive = 1;
 #endif
+        // One forced full rescan+drain, recovering marked-but-undrained subtrees before
+        // sweep. NOTE: must NOT loop to convergence -- mutators are still active during
+        // this phase, so a "mark nothing new" fixpoint can livelock against ongoing
+        // allocation (observed hanging/breaking FusedTest). A single pass is bounded and
+        // safe; residual incompleteness is handled by the drain-gap fix, not by looping.
+        gcMarkWorklistOverflow = JAVA_TRUE;   // force the BiBOP page-rescan path on
         gcMarkDrain(d);
 #ifdef CN1_BIBOP_VALIDATE
         gcBeltDiagActive = 0;
         if(gcMarkNewObjectCount != __beltBefore) {
-            fprintf(stderr, "CN1BIBOP DRAIN INCOMPLETE: belt pass recovered %ld "
+            fprintf(stderr, "CN1BIBOP DRAIN INCOMPLETE: belt recovered %ld "
                     "reachable-but-unmarked object(s) before sweep\n",
                     gcMarkNewObjectCount - __beltBefore);
             fflush(stderr);
