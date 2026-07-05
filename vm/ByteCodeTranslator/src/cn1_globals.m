@@ -666,17 +666,66 @@ extern int nThreadsToKill;
 // mark; mutators never touch allObjectsInHeap directly and nothing moves, so no reference
 // can dangle. placeObjectInHeapCollection sets heapPosition to the array index; we override
 // it to the -4 sentinel (the legacy sweep finds the object by walk-index, not heapPosition).
+#ifndef CN1_DISABLE_BIBOP
+// Objects matured during a mark are buffered here and registered into allObjectsInHeap
+// AFTER the mark completes (cn1DrainAdoptBuffer). placeObjectInHeapCollection reallocs +
+// frees that table, which is UNSAFE during the mark: the drain walks the same table, and
+// under parallel markers several threads would grow it at once. So maturation only FLAGS
+// the object (-4) during the mark and defers the table mutation to a single-threaded,
+// locked, post-mark pass.
+static pthread_mutex_t gcAdoptMutex = PTHREAD_MUTEX_INITIALIZER;
+static JAVA_OBJECT* gcAdoptStack = 0;
+static long gcAdoptTop = 0, gcAdoptCap = 0;
+#endif
+
 static void cn1MatureObject(JAVA_OBJECT obj) {
 #ifndef CN1_DISABLE_BIBOP
-    // Mark the host page STICKY-adopted BEFORE registering: its slots must now always
-    // take the full per-slot sweep walk (which skips live -4 slots) instead of the O(1)
-    // page reset, which would recycle this still-live object's memory out from under the
-    // legacy collector (dangling / gcMark==0 in the legacy sweep).
+    // Claim the object for adoption exactly ONCE with a CAS -3 -> -4. Under parallel
+    // markers two threads can both reach the same object; the CAS loser must not
+    // double-buffer/double-register. The -4 flag takes effect immediately so the cascade,
+    // the mark-stamp and the sweep-skip all see it during THIS mark.
+    int expected = CN1_BIBOP_HEAP_POS;
+    if(!__atomic_compare_exchange_n(&obj->__heapPosition, &expected, CN1_BIBOP_ADOPTED,
+                                    0, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+        return;
+    }
+    // Sticky-flag the host page so its slots always take the full per-slot sweep walk
+    // (which skips live -4 slots) instead of the O(1) page reset, which would recycle this
+    // still-live object's memory out from under the legacy collector.
     ((CN1BibopPage*)(((uintptr_t)obj) & ~((uintptr_t)CN1_BIBOP_PAGE_SIZE - 1)))->gcHasAdopted = JAVA_TRUE;
+    // Buffer for post-mark registration (NOT placeObjectInHeapCollection here -- see above).
+    pthread_mutex_lock(&gcAdoptMutex);
+    if(gcAdoptTop >= gcAdoptCap) {
+        long ncap = gcAdoptCap ? gcAdoptCap * 2 : 4096;
+        JAVA_OBJECT* n = (JAVA_OBJECT*)realloc(gcAdoptStack, (size_t)ncap * sizeof(JAVA_OBJECT));
+        if(n == 0) { pthread_mutex_unlock(&gcAdoptMutex); return; } // OOM: leave it flagged -4, unregistered (alive; retried next cycle it survives)
+        gcAdoptStack = n; gcAdoptCap = ncap;
+    }
+    gcAdoptStack[gcAdoptTop++] = obj;
+    pthread_mutex_unlock(&gcAdoptMutex);
 #endif
-    placeObjectInHeapCollection(obj);
-    obj->__heapPosition = CN1_BIBOP_ADOPTED;
 }
+
+#ifndef CN1_DISABLE_BIBOP
+// Register every object matured during the just-finished mark into allObjectsInHeap.
+// Runs on the GC thread AFTER the parallel mark has joined (single-threaded) and holds the
+// critical section -- the invariant placeObjectInHeapCollection's grow-and-free relies on.
+// Called before the sweep, so the legacy sweep sees these -4 objects (marked live) and
+// keeps them; from next cycle the complete legacy rescan traces them.
+static void cn1DrainAdoptBuffer() {
+    if(gcAdoptTop == 0) {
+        return;
+    }
+    lockCriticalSection();
+    for(long i = 0 ; i < gcAdoptTop ; i++) {
+        JAVA_OBJECT o = gcAdoptStack[i];
+        placeObjectInHeapCollection(o);      // sets heapPosition to the array index...
+        o->__heapPosition = CN1_BIBOP_ADOPTED; // ...restore the -4 sentinel (found by walk-index)
+    }
+    gcAdoptTop = 0;
+    unlockCriticalSection();
+}
+#endif
 
 JAVA_BOOLEAN hasAgressiveAllocator;
 
@@ -792,7 +841,9 @@ long gcMarkNewObjectCount = 0;
 #if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
 // Set by gcMarkDrain while running a MATURED object's mark function, so the children it
 // marks are matured too -- this is the cascade that keeps the whole subtree in one system.
-static JAVA_BOOLEAN gcCurrentlyMaturing = JAVA_FALSE;
+// THREAD-LOCAL: each parallel mark worker cascades within the subtree it is draining
+// without racing the others on this flag.
+static __thread JAVA_BOOLEAN gcCurrentlyMaturing = JAVA_FALSE;
 #endif
 // Forward (tentative) declaration -- the real definition is below near the worklist;
 // the belt pass in codenameOneGCMark forces it to trigger the full BiBOP rescan.
@@ -1179,6 +1230,11 @@ void codenameOneGCMark() {
         }
         if(n > 0) gcMarkDrain(d);
     }
+#if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
+    // Marking (incl. grace, belt and SATB) is fully done. Register the objects matured
+    // this cycle into allObjectsInHeap now -- single-threaded, locked, before the sweep.
+    cn1DrainAdoptBuffer();
+#endif
 }
 
 #ifdef DEBUG_GC_OBJECTS_IN_HEAP
@@ -3965,7 +4021,18 @@ static void gcMarkWorkerDrainLoop() {
                 JAVA_OBJECT obj = batch[i].obj;
                 gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
                 if(fp != 0) {
+#if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
+                    // Same cascade as the serial gcMarkDrain: a matured object's children
+                    // mature with it. gcCurrentlyMaturing is thread-local, so workers don't
+                    // race. (Registration is deferred + locked, so this is only about which
+                    // objects get flagged -- always safe.)
+                    JAVA_BOOLEAN __savedMaturing = gcCurrentlyMaturing;
+                    gcCurrentlyMaturing = (obj->__heapPosition == CN1_BIBOP_ADOPTED) ? JAVA_TRUE : __savedMaturing;
                     fp(d, obj, batch[i].force);
+                    gcCurrentlyMaturing = __savedMaturing;
+#else
+                    fp(d, obj, batch[i].force);
+#endif
                 }
             }
             gcMarkFlushLocal(&localBuf);
