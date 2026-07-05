@@ -894,7 +894,22 @@ static inline JAVA_BOOLEAN cn1InNursery(void* p) {
          if(cn1__bv != JAVA_NULL && cn1InNursery(cn1__bv)) { \
              cn1NurseryWriteBarrier((JAVA_OBJECT)(target), cn1__bv); } } while(0)
 #else
-#define CN1_WRITE_BARRIER(target, value)
+// No nursery: repurpose the (already-emitted-at-every-object-store) write barrier as the
+// SATB INSERTION half. During the mark, enqueue the NEW reference being stored so an
+// object linked into the graph mid-mark is kept alive even if the container it is stored
+// into is a fresh grace object not yet reachable (the residual Property->Double /
+// container->content crash). Pairs with CN1_SATB_DELETE (the deletion half) for a
+// complete snapshot + incremental barrier. Off-mark: one predicted-not-taken flag load.
+extern volatile int gcSatbActive;
+extern void cn1SatbEnqueue(JAVA_OBJECT old);
+#if defined(CN1_DISABLE_SATB)
+#define CN1_WRITE_BARRIER(target, value) do { } while(0)
+#else
+#define CN1_WRITE_BARRIER(target, value) \
+    do { if(__builtin_expect(gcSatbActive, 0)) { \
+             JAVA_OBJECT cn1__nv = (JAVA_OBJECT)(value); \
+             if(cn1__nv != JAVA_NULL && !CN1_IS_TAGGED(cn1__nv)) cn1SatbEnqueue(cn1__nv); } } while(0)
+#endif
 #endif
 
 // ---- Snapshot-at-the-beginning (Yuasa) DELETION write barrier ---------------
