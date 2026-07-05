@@ -1439,6 +1439,20 @@ void codenameOneGCSweep() {
 #endif
                     }
                     allObjectsInHeap[iter] = JAVA_NULL;
+#ifndef CN1_DISABLE_BIBOP
+                    // A MATURED (-4) object that died: its memory is a BiBOP slot, so its
+                    // DEATH belongs entirely to the BiBOP collector. The slot is already
+                    // deregistered (nulled above); revert it to a normal dead -3 slot and
+                    // let the next BiBOP sweep run cn1BibopReclaimSlot ONCE (finalizer +
+                    // native peer + monitor). Do NOT freeAndFinalize here: that runs the
+                    // finalizer a SECOND time (cn1BibopReclaimSlot runs it too), which
+                    // double-frees a native-resource finalizer's buffer -- the deterministic
+                    // mid-suite "corrupted unsorted chunks" heap abort.
+                    if(o->__heapPosition == CN1_BIBOP_ADOPTED) {
+                        o->__heapPosition = CN1_BIBOP_HEAP_POS;
+                        continue;
+                    }
+#endif
                     //if(o->__codenameOneReferenceCount > 0) {
                     #if defined(__OBJC__)
                     //    NSLog(@"Sweped %X", (int)o);
