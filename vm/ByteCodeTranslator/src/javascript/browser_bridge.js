@@ -931,7 +931,8 @@
     SET_FILL_GRADIENT: 53, SET_STROKE_GRADIENT: 54, CREATE_PATTERN: 55, SET_FILL_PATTERN: 56,
     CREATE_PATTERN_SURFACE: 57,
     DRAW_IMAGE_XY: 60, DRAW_IMAGE_XYWH: 61, DRAW_IMAGE_SRCDST: 62,
-    BLIT_SURFACE_XY: 70, BLIT_SURFACE_XYWH: 71, BLIT_SURFACE_SRCDST: 72
+    BLIT_SURFACE_XY: 70, BLIT_SURFACE_XYWH: 71, BLIT_SURFACE_SRCDST: 72,
+    BLUR_SELF_REGION: 80
   };
   // The display surface id. Mirrors HTML5Implementation.DISPLAY_SURFACE_ID.
   var SURF_DISPLAY_ID = 1;
@@ -1084,6 +1085,40 @@
         case SURF.DRAW_IMAGE_SRCDST: {
           var i3 = surfaceImageSource(objs[oi++]);
           if (i3) { ctx.drawImage(i3, nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++], nums[ni++]); } else { ni += 8; }
+          break;
+        }
+        case SURF.BLUR_SELF_REGION: {
+          // In-place backdrop blur (backdrop-filter): clip to the region and
+          // redraw this surface's own canvas through ctx.filter = blur(sigma).
+          // drawImage(self) snapshots the source bitmap per the HTML spec, so
+          // this is a well-defined self-referential draw. cornerRadius: 0 =
+          // rect, -1 = capsule (fully rounded sides), >0 = rounded rect px.
+          var _bx = nums[ni++], _by = nums[ni++], _bw = nums[ni++], _bh = nums[ni++];
+          var _bsig = nums[ni++], _bcr = nums[ni++];
+          if (_bw > 0 && _bh > 0 && ctx.canvas) {
+            try {
+              ctx.save();
+              ctx.beginPath();
+              if (_bcr) {
+                var _brr = _bcr < 0 ? Math.min(_bw, _bh) / 2
+                                    : Math.min(_bcr, Math.min(_bw, _bh) / 2);
+                ctx.moveTo(_bx + _brr, _by);
+                ctx.arcTo(_bx + _bw, _by, _bx + _bw, _by + _bh, _brr);
+                ctx.arcTo(_bx + _bw, _by + _bh, _bx, _by + _bh, _brr);
+                ctx.arcTo(_bx, _by + _bh, _bx, _by, _brr);
+                ctx.arcTo(_bx, _by, _bx + _bw, _by, _brr);
+                ctx.closePath();
+              } else {
+                ctx.rect(_bx, _by, _bw, _bh);
+              }
+              ctx.clip();
+              ctx.filter = 'blur(' + _bsig + 'px)';
+              ctx.drawImage(ctx.canvas, 0, 0);
+            } catch (_ebr) {
+            } finally {
+              try { ctx.restore(); } catch (_ebr2) {}
+            }
+          }
           break;
         }
         case SURF.BLIT_SURFACE_XY: {

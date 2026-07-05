@@ -111,6 +111,14 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
     public static final int OP_BLIT_SURFACE_XYWH = 71; // 1 num (srcSurfaceId) + 4 nums
     public static final int OP_BLIT_SURFACE_SRCDST = 72; // 1 num (srcSurfaceId) + 8 nums
 
+    // In-place backdrop blur of the surface's OWN pixels (backdrop-filter):
+    // the host clips to the region (rect / rounded / capsule via the
+    // cornerRadius num: 0 / >0 / -1) and redraws its canvas through
+    // ctx.filter = blur(sigma). Rides the command stream so it stays ordered
+    // between the draws it must blur and the tint painted above it - a
+    // side-channel host call would race the flush.
+    public static final int OP_BLUR_SELF_REGION = 80;  // 6 nums (x, y, w, h, sigmaPx, cornerRadius)
+
     private int[] ops = new int[64];
     private int opCount;
     private double[] nums = new double[256];
@@ -258,6 +266,11 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
     @Override public void setShadowOffsetY(double offset) { op(OP_SET_SHADOW_OFFY); num(offset); }
     @Override public double getShadowOffsetY() { return 0.0; }
     @Override public void setFilter(String filter) { op(OP_SET_FILTER); obj(filter); }
+
+    /** Records an in-place backdrop blur of this surface's own pixels; see OP_BLUR_SELF_REGION. */
+    public void blurSelfRegion(double x, double y, double w, double h, double sigmaPx, double cornerRadius) {
+        op(OP_BLUR_SELF_REGION); num(x); num(y); num(w); num(h); num(sigmaPx); num(cornerRadius);
+    }
     @Override public String getFilter() { return "none"; }
     @Override public void clearRect(double x, double y, double width, double height) {
         // Cull provable no-ops: a zero/negative-area rect paints nothing, so do
