@@ -93,6 +93,15 @@ public class VRStereoSceneScreenshotTest extends BaseTest {
         return com.codename1.ui.CN.isGpuSupported();
     }
 
+    /// Force a fresh, fully-presented frame before the capture. On the iOS
+    /// Metal backend a screenshot can otherwise read a previous form's still
+    /// current drawable (the late-present race); DesktopMode uses the same
+    /// mitigation. A no-op cost on the other backends.
+    @Override
+    protected long extraSettleBeforeCaptureMillis() {
+        return 700;
+    }
+
     /// Wait for landscape to settle, then force a fresh GPU frame to be
     /// rendered (and read back for capture) before the screenshot fires,
     /// mirroring the Gpu3D screenshot tests.
