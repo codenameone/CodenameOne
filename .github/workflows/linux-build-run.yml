@@ -216,11 +216,6 @@ jobs:
           # windowed demo ELF here (best-effort; never fails the suite).
           CN1_LINUX_DEMO_OUT: ${{ github.workspace }}/artifacts/linux-port/demo/codenameone-linux-demo-${{ matrix.arch }}
           LIBGL_ALWAYS_SOFTWARE: '1'
-          # TEMP experiment: force full-register signal-stop GC capture (ucontext) instead of
-          # the cooperative setjmp capture (callee-saved only). If this clears the arm64
-          # use-after-free (garbage 0x2000000xx deref while painting), the crash is a
-          # conservative-scan root-miss in the cooperative capture. Remove after reading.
-          CN1_GC_SIGNAL_STOP: '1'
         run: |
           set -e
           sudo apt-get install -y --no-install-recommends gdb >/dev/null 2>&1 || true
