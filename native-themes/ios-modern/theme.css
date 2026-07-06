@@ -302,7 +302,12 @@ Button {
     color: #000000;
     /* Compact glass capsule: very little padding. */
     padding: 1mm 2.5mm 1mm 2.5mm;
-    margin: 0;
+    /* Breathing room like a native iOS form: buttons aren't flush to the
+       screen edges or stacked edge-to-edge. The fidelity tiles zero this
+       out per-widget (Cn1WidgetRenderer) so the tight native-vs-CN1
+       comparison is unaffected; this margin is purely how apps should
+       look. */
+    margin: 1mm 2mm 1mm 2mm;
     font-family: "native:MainRegular";
     font-size: 2.7mm;
     background-color: rgba(255,255,255,0.34);

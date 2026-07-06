@@ -85,6 +85,12 @@ public final class Cn1WidgetRenderer {
             Button b = new Button(text);
             b.setUIID(uiid);
             applyButtonState(b, state);
+            // The iOS-modern theme gives buttons a form-like margin (so real apps
+            // aren't cramped edge-to-edge), but the fidelity tile pins the widget
+            // tight against the native reference -- zero the margin here so the
+            // theme's app-facing spacing doesn't shift the comparison. The native
+            // reference button has no surrounding margin either.
+            b.getAllStyles().setMargin(0, 0, 0, 0);
             // iOS 26 prominentGlass (RaisedButton) is a translucent fill -- the
             // backdrop shows faintly through the blue. Drop the fill alpha a touch
             // so the CN1 raised button reads as glass rather than a flat opaque blue.

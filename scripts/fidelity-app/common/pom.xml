@@ -154,6 +154,36 @@
                     <skipTests>true</skipTests>
                 </configuration>
             </plugin>
+            <!-- Copy the native theme .res from the single source of truth
+                 (repo-root Themes/) into the bundle at build time instead of
+                 committing a second copy under src/main/resources. The
+                 committed copies drifted from theme.css historically; keeping
+                 Themes/ as the only checked-in binary avoids that. The fidelity
+                 CI regenerates Themes/ from theme.css before this build, so the
+                 copy is always current. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-native-themes</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <copy todir="${project.build.outputDirectory}" verbose="true">
+                                    <fileset dir="${project.basedir}/../../../Themes">
+                                        <include name="iOSModernTheme.res"/>
+                                        <include name="AndroidMaterialTheme.res"/>
+                                    </fileset>
+                                </copy>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>

@@ -92,14 +92,16 @@ ensure_jar() {
 # truth: one run of this script refreshes every committed copy so a stale .res
 # can never silently regress the rendered theme. Paths are relative to REPO_ROOT.
 ios_modern_copies() {
+  # The fidelity-app copy is NOT listed: its common/pom.xml copies the .res
+  # from Themes/ at build time (process-resources), so Themes/ stays the only
+  # committed binary. Only the port staging copy remains a checked-in mirror.
   printf '%s\n' \
-    "Ports/iOSPort/nativeSources/iOSModernTheme.res" \
-    "scripts/fidelity-app/common/src/main/resources/iOSModernTheme.res"
+    "Ports/iOSPort/nativeSources/iOSModernTheme.res"
 }
 android_material_copies() {
+  # See ios_modern_copies: the fidelity-app copy is build-time, not committed.
   printf '%s\n' \
-    "Ports/Android/src/AndroidMaterialTheme.res" \
-    "scripts/fidelity-app/common/src/main/resources/AndroidMaterialTheme.res"
+    "Ports/Android/src/AndroidMaterialTheme.res"
 }
 
 compile_theme() {
