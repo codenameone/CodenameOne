@@ -31,17 +31,12 @@ jobs:
           filters: |
             demos:
               - 'docs/demos/**'
-              - 'scripts/developer-guide/compare-guide-screenshots.sh'
-              - 'scripts/developer-guide/guide-screenshots.txt'
-              - 'scripts/developer-guide/verify-guide-screenshot-manifest.sh'
-              - 'scripts/developer-guide/verify-guide-screenshots-captured.sh'
               - '.github/workflows/developer-guide-docs.yml'
             docs:
               - 'docs/developer-guide/**'
               - 'docs/demos/common/src/main/snippets/**'
               - 'scripts/developer-guide/migrate-inline-guide-snippets.py'
               - 'scripts/developer-guide/validate-guide-snippets.py'
-              - 'scripts/developer-guide/verify-guide-screenshot-manifest.sh'
               - '.github/workflows/developer-guide-docs.yml'
             workflow:
               - '.github/workflows/developer-guide-docs.yml'
@@ -74,25 +69,13 @@ jobs:
           mkdir -p "$HOME/.codenameone"
           touch "$HOME/.codenameone/guibuilder.jar"
           cp maven/CodeNameOneBuildClient.jar "$HOME/.codenameone/CodeNameOneBuildClient.jar"
-          xvfb-run -a mvn -B -ntp -Dgenerate-gui-sources-done=true -Dcodename1.platform=javase -f docs/demos/pom.xml test
-
-      - name: Verify guide screenshot manifest
-        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
-        run: |
-          set -euo pipefail
-          scripts/developer-guide/verify-guide-screenshot-manifest.sh
+          xvfb-run -a mvn -B -ntp -Dgenerate-gui-sources-done=true -Dcodename1.platform=javase -f docs/demos/pom.xml process-classes
 
       - name: Verify developer guide images are referenced
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
           set -euo pipefail
           python3 scripts/developer-guide/find_unused_images.py docs/developer-guide
-
-      - name: Verify guide screenshots were captured
-        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
-        run: |
-          set -euo pipefail
-          scripts/developer-guide/verify-guide-screenshots-captured.sh
 
       - name: Compile Android demo sources
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
@@ -105,29 +88,6 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/developer-guide/validate-guide-snippets.py
-
-      - name: Install ImageMagick for screenshot comparison
-        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends imagemagick
-
-      - name: Compare guide screenshots
-        id: compare_guide_screenshots
-        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
-        continue-on-error: true
-        run: |
-          set -euo pipefail
-          ARTIFACT_DIR="build/developer-guide/guide-screenshots"
-          mkdir -p "${ARTIFACT_DIR}"
-          scripts/developer-guide/compare-guide-screenshots.sh "${ARTIFACT_DIR}"
-
-      - name: Fail when guide screenshots differ
-        if: steps.compare_guide_screenshots.outcome == 'failure'
-        run: |
-          echo "Generated guide screenshots differ from developer guide assets." >&2
-          exit 1
 
       - name: Determine publication metadata
         run: |

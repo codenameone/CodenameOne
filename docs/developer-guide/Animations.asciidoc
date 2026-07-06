@@ -298,36 +298,36 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/animations
 
 
 .The slide transition moves both incoming and outgoing forms together
-image::img/transition-slide.png[The slide transition moves both incoming and outgoing forms together,scaledwidth=70%]
+image::img/transition-slide.jpg[The slide transition moves both incoming and outgoing forms together,scaledwidth=70%]
 
 .The slide transition can be applied vertically as well
-image::img/transition-slide-vertical.png[The slide transition can be applied vertically as well,scaledwidth=70%]
+image::img/transition-slide-vertical.jpg[The slide transition can be applied vertically as well,scaledwidth=70%]
 
 .Slide fade fades in the destination title while sliding the content pane it's the default on iOS
-image::img/transition-slide-fade.png[Slide fade fades in the destination title while sliding the content pane its the default on iOS,scaledwidth=70%]
+image::img/transition-slide-fade.jpg[Slide fade fades in the destination title while sliding the content pane its the default on iOS,scaledwidth=70%]
 
 TIP: `SlideFade` is problematic without a title area. If you have a `Form` that lacks a title area you would recommend to disable `SlideFade` at least for that `Form`.
 
 .With cover transitions the source form stays in place as it's covered by the destination. This transition can be played both horizontally and vertically
-image::img/transition-cover.png[With cover transitions the source form stays in place as it's covered by the destination. This transition can be played both horizontally and vertically,scaledwidth=70%]
+image::img/transition-cover.jpg[With cover transitions the source form stays in place as it's covered by the destination. This transition can be played both horizontally and vertically,scaledwidth=70%]
 
 
 .Uncover is the inverse of cover. The destination form stays in place while the departing form moves away
-image::img/transition-uncover.png[Uncover is the inverse of cover. The destination form stays in place while the departing form moves away,scaledwidth=70%]
+image::img/transition-uncover.jpg[Uncover is the inverse of cover. The destination form stays in place while the departing form moves away,scaledwidth=70%]
 
 ==== Fade and flip transitions
 
 The fade transition is pretty trivial and accepts a time value since it has no directional context.
 
 .Fade transition is probably the simplest one around
-image::img/transition-fade.png[Fade transition is probably the simplest one around,scaledwidth=70%]
+image::img/transition-fade.jpg[Fade transition is probably the simplest one around,scaledwidth=70%]
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/animations/FlipTransition.html[FlipTransition] is also pretty simple but unlike the others it isn't a part of the `CommonTransitions`. It has its own `FlipTransition` class.
 
 IMPORTANT: This transition looks different on devices as it uses native perspective transforms available there
 
 .Fade transition is probably the simplest one around
-image::img/transition-flip.png[Fade transition is probably the simplest one around,scaledwidth=70%]
+image::img/transition-flip.jpg[Fade transition is probably the simplest one around,scaledwidth=70%]
 
 ==== Bubble transition
 
