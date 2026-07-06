@@ -158,7 +158,7 @@ MODES=(single multi)
 ACTUAL_ENTRIES=()
 for mode in "${MODES[@]}"; do
   if [ "$mode" = "single" ]; then
-    scenarios=(default landscape component-inspector network-monitor test-recorder)
+    scenarios=(default landscape component-inspector network-monitor test-recorder ar-demo)
   else
     scenarios=(default landscape)
   fi

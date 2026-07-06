@@ -299,6 +299,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new Gpu3DTexturedCubeScreenshotTest(),
             new Gpu3DModelScreenshotTest(),
             new Gpu3DAnimationTest(),
+            // VR/360 render through the same GPU peer as the Gpu3D tests;
+            // both freeze head tracking so the captures are deterministic.
+            new VRStereoSceneScreenshotTest(),
+            new Media360PanoramaScreenshotTest(),
             // Keep this as the last screenshot test; orientation changes can leak into subsequent screenshots.
             new OrientationLockScreenshotTest(),
             new InPlaceEditViewTest(),
@@ -311,6 +315,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // prompts). Self-skips on iOS / Android / JS where the open
             // call would surface an OS dialog.
             new CameraApiTest(),
+            // Exercises com.codename1.ar end-to-end: the unsupported
+            // contract on the CI platforms (none has an AR runtime) and a
+            // full session round trip when a backend is present.
+            new ARApiTest(),
             new SimdLargeAllocaTest(),
             new StreamApiTest(),
             new StringApiTest(),

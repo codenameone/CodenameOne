@@ -71,6 +71,8 @@ f.show();
 
 `setStereo(false)` switches to a single centered viewpoint (`VREye.CENTER`) at runtime, useful for a non-headset preview of the same scene. `setPosition(x, y, z)` moves the viewer through the world; `setClearColor(argb)` sets the background.
 
+image::img/vr-stereo-scene.png[A stereo scene on an Android phone; the offset between the eye views is the depth cue,scaledwidth=30%]
+
 === Head tracking
 
 `VRView` starts its `HeadTracker` when the component appears and stops it when it leaves the screen; the sensors draw power only between the two. The tracker fuses the gyroscope with the accelerometer (tilt reference) and, when present, the magnetometer (yaw reference) through a complementary filter - tune the blend via `getHeadTracker().getFilter().setGyroWeight(float)`.

@@ -147,6 +147,8 @@ Every listener fires on the EDT and every getter reflects the state as of the ev
 
 The Codename One simulator ships a simulated AR backend modeled on the Android emulator's virtual scene, so the full AR loop is debuggable with breakpoints without a device. When a session opens, the simulator "detects" the floor (and, when requested, a wall) of a virtual room after a short startup delay, mimicking real AR initialization. The AR view renders the room and every anchored model; drive the virtual device camera with the mouse (drag to look around) and keyboard (`W`/`A`/`S`/`D` or the arrow keys to move, `Q`/`E` for up and down).
 
+image::img/ar-simulator-model.png[A model placed on the virtual room floor in the simulator,scaledwidth=30%]
+
 The Simulate menu's *AR Simulation* window drives the paths that are hard to reproduce on demand with real hardware: force degraded tracking states and failure reasons, change the light estimate, re-run plane detection, trigger recognition of a registered reference image, and toggle a simulated face anchor for `FACE` sessions.
 
 On devices, use the standard native tools: the generated Xcode project debugs the ARKit session and SceneKit scene directly (including Instruments), and Android Studio attaches to the Gradle project for ARCore logging. Note that Apple's iOS Simulator has no ARKit support - real ARKit behavior needs a physical device - while the Android emulator can run ARCore against its own virtual scene.

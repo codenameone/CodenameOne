@@ -88,6 +88,25 @@ class SpherePrimitiveTest {
     }
 
     @Test
+    void insideOutSphereReversesUSoPanoramasReadCorrectly() {
+        int lat = 4;
+        int lon = 6;
+        float[] in = Primitives.sphere(1.0f, lat, lon, true).getVertices().getData();
+        float[] out = Primitives.sphere(1.0f, lat, lon, false).getVertices().getData();
+        int row = 2 * (lon + 1) * 8;
+        // Same positions, mirrored u: viewed from inside the sphere the
+        // horizontal direction flips, so u runs 1 -> 0 along the row.
+        assertEquals(1f, in[row + 6], EPS);
+        assertEquals(0f, in[row + lon * 8 + 6], EPS);
+        for (int c = 0; c <= lon; c++) {
+            int o = row + c * 8;
+            assertEquals(out[o], in[o], 1e-4f, "positions must match");
+            assertEquals(1f - out[o + 6], in[o + 6], EPS, "u mirrored at column " + c);
+            assertEquals(out[o + 7], in[o + 7], EPS, "v unchanged at column " + c);
+        }
+    }
+
+    @Test
     void outwardNormalsPointAwayFromCenter() {
         Mesh sphere = Primitives.sphere(2.0f, 5, 7, false);
         assertNormalOrientation(sphere, true);

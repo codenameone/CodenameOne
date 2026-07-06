@@ -114,7 +114,9 @@ public final class Primitives {
     /// coordinates: `u` wraps the longitude from 0 to 1 and `v` runs from 0 at
     /// the north pole (+Y) to 1 at the south pole. This is the mapping used by
     /// 360 degree panorama images. The seam column and the pole rows duplicate
-    /// vertices so texture coordinates stay continuous.
+    /// vertices so texture coordinates stay continuous. For an inside-out
+    /// sphere the `u` direction is reversed so a panorama viewed from the
+    /// center reads correctly instead of mirror-imaged.
     ///
     /// #### Parameters
     ///
@@ -195,7 +197,10 @@ public final class Primitives {
                     v[o + 4] = ny;
                     v[o + 5] = nz;
                 }
-                v[o + 6] = (float) lon / lonBands;
+                // Looking outward from inside the sphere reverses the
+                // apparent horizontal direction, so flip u for inside-out
+                // spheres to keep panorama content un-mirrored.
+                v[o + 6] = insideOut ? 1f - (float) lon / lonBands : (float) lon / lonBands;
                 v[o + 7] = (float) lat / latBands;
                 o += 8;
             }
