@@ -71,6 +71,51 @@ jobs:
           cp maven/CodeNameOneBuildClient.jar "$HOME/.codenameone/CodeNameOneBuildClient.jar"
           xvfb-run -a mvn -B -ntp -Dgenerate-gui-sources-done=true -Dcodename1.platform=javase -f docs/demos/pom.xml process-classes
 
+      - name: Install demo common module for screenshot generation
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+        run: |
+          set -euo pipefail
+          mvn -B -ntp \
+            -Dgenerate-gui-sources-done=true \
+            -Dcodename1.platform=javase \
+            -f docs/demos/pom.xml \
+            -pl common \
+            -am \
+            install \
+            -DskipTests
+
+      - name: Verify pre-Advanced Theming screenshots are current
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+        run: |
+          set -euo pipefail
+          GENERATED_DIR="$RUNNER_TEMP/pre-advanced-theming-screenshots"
+          rm -rf "$GENERATED_DIR"
+          mkdir -p "$GENERATED_DIR"
+          xvfb-run -a mvn -B -ntp \
+            -Dgenerate-gui-sources-done=true \
+            -Dcodename1.platform=javase \
+            -f docs/demos/javase/pom.xml \
+            -P guide-screenshot-generator \
+            -Dguide.screenshot.output="$GENERATED_DIR" \
+            verify
+          COUNT="$(find "$GENERATED_DIR" -maxdepth 1 -type f -name '*.png' | wc -l | tr -d ' ')"
+          if [ "$COUNT" != "24" ]; then
+            echo "::error::Expected 24 generated pre-Advanced Theming screenshots, found $COUNT"
+            exit 1
+          fi
+          for generated in "$GENERATED_DIR"/*.png; do
+            name="$(basename "$generated")"
+            committed="docs/developer-guide/img/$name"
+            if [ ! -f "$committed" ]; then
+              echo "::error::Generated screenshot has no committed counterpart: $name"
+              exit 1
+            fi
+            if ! cmp -s "$generated" "$committed"; then
+              echo "::error::Committed screenshot is stale: $name"
+              exit 1
+            fi
+          done
+
       - name: Verify developer guide images are referenced
         if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
