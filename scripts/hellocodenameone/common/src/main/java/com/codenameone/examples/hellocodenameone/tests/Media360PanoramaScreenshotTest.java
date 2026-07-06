@@ -38,19 +38,28 @@ public class Media360PanoramaScreenshotTest extends BaseTest {
         view.setYaw(30f);
         view.setPitch(10f);
         LandscapeCapture.lock();
-        // This is the last of the landscape VR / 360 tests, so it restores
-        // portrait once its capture is done - leaving the device as the rest
-        // of the suite (which runs in portrait) expects. A plain Form is used
-        // instead of createForm() so the capture completion can run that
-        // restore before done().
+        // This is the last of the landscape VR / 360 tests. Once its capture
+        // is done it detaches the 3D peer and restores portrait, leaving the
+        // device as the rest of the suite (which runs in portrait) expects.
+        // Detaching matters on the iOS Metal backends: a full-screen 3D view
+        // that stays mounted leaves a stale Metal drawable that a later test's
+        // screenshot grabs under the late-present race (DesktopMode captured
+        // this "360 Panorama" form's black drawable). Only this test detaches
+        // (VRStereoScene keeps createForm) so the detach cannot perturb the GPU
+        // state that feeds this test's own capture. A plain Form is used
+        // instead of createForm() so the capture completion can run the
+        // teardown before done().
         Form form = new Form("360 Panorama", new BorderLayout()) {
             @Override
             protected void onShowCompleted() {
                 LandscapeCapture.awaitLandscape(this, () -> UITimer.timer(1000, false, this, () -> {
                     view.getRenderView().requestRender();
-                    UITimer.timer(500, false, this, () -> captureWhenSettled(this, "Media360Panorama",
-                            () -> LandscapeCapture.restorePortrait(this,
-                                    Media360PanoramaScreenshotTest.this::done)));
+                    UITimer.timer(500, false, this, () -> captureWhenSettled(this, "Media360Panorama", () -> {
+                        removeAll();
+                        revalidate();
+                        LandscapeCapture.restorePortrait(this,
+                                Media360PanoramaScreenshotTest.this::done);
+                    }));
                 }));
             }
         };
