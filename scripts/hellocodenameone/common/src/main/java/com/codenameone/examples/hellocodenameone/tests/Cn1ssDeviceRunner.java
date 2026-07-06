@@ -301,6 +301,18 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new Gpu3DAnimationTest(),
             // Keep this as the last portrait screenshot test; orientation changes can leak into subsequent screenshots.
             new OrientationLockScreenshotTest(),
+            // VR / 360 immersive views, captured in landscape (where a stereo
+            // scene / panorama reads naturally) via LandscapeCapture, which
+            // locks landscape on phones and no-ops on desktop/browser/tv.
+            // Placed right after the orientation test and away from the
+            // video tests (which are sensitive to orientation and to a
+            // GPU-heavy neighbor): they render through their own GPU peer,
+            // freeze head tracking for determinism, and the last of them
+            // restores portrait so everything after runs portrait as before.
+            // VRStereoScene self-skips on tvOS (stereo has no use without a
+            // headset); Media360Panorama still runs there.
+            new VRStereoSceneScreenshotTest(),
+            new Media360PanoramaScreenshotTest(),
             new InPlaceEditViewTest(),
             new BytecodeTranslatorRegressionTest(),
             new SimdApiTest(),
@@ -345,17 +357,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // on the Mac native build it enables desktop mode (commands move to the native menu
             // bar, interactive always-visible scrollbar), reverting its global toggles after capture.
             new DesktopModeScreenshotTest(),
-            // VR / 360 immersive views. Placed after the orientation test and
-            // all portrait screenshots, and captured in landscape (where a
-            // stereo scene / panorama reads naturally) via LandscapeCapture,
-            // which locks landscape on phones and no-ops on desktop/browser/tv.
-            // They render through their own GPU peer, freeze head tracking for
-            // determinism, and leave the device in landscape - fine because the
-            // VideoIO tests that follow capture off-screen grids (or nothing).
-            // VRStereoScene self-skips on tvOS (stereo has no use without a
-            // headset); Media360Panorama still runs there.
-            new VRStereoSceneScreenshotTest(),
-            new Media360PanoramaScreenshotTest(),
             // VideoIO animation screenshot: encodes a 6-frame counting clip (digits
             // 1..6), decodes it back with the video decoder, and lays the decoded
             // frames out as a 2x3 grid -- so a decode regression is visible. Placed

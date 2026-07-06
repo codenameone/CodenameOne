@@ -22,7 +22,6 @@ public class Media360PanoramaScreenshotTest extends BaseTest {
 
     @Override
     public boolean runTest() {
-        Form form = createForm("360 Panorama", new BorderLayout(), "Media360Panorama");
         view = new Media360View();
         if (!view.isSupported()) {
             done();
@@ -39,6 +38,22 @@ public class Media360PanoramaScreenshotTest extends BaseTest {
         view.setYaw(30f);
         view.setPitch(10f);
         LandscapeCapture.lock();
+        // This is the last of the landscape VR / 360 tests, so it restores
+        // portrait once its capture is done - leaving the device as the rest
+        // of the suite (which runs in portrait) expects. A plain Form is used
+        // instead of createForm() so the capture completion can run that
+        // restore before done().
+        Form form = new Form("360 Panorama", new BorderLayout()) {
+            @Override
+            protected void onShowCompleted() {
+                LandscapeCapture.awaitLandscape(this, () -> UITimer.timer(1000, false, this, () -> {
+                    view.getRenderView().requestRender();
+                    UITimer.timer(500, false, this, () -> captureWhenSettled(this, "Media360Panorama",
+                            () -> LandscapeCapture.restorePortrait(this,
+                                    Media360PanoramaScreenshotTest.this::done)));
+                }));
+            }
+        };
         form.add(BorderLayout.CENTER, view);
         form.show();
         return true;
@@ -76,24 +91,5 @@ public class Media360PanoramaScreenshotTest extends BaseTest {
     @Override
     public boolean shouldTakeScreenshot() {
         return com.codename1.ui.CN.isGpuSupported();
-    }
-
-    /// Wait for landscape to settle, then force a fresh GPU frame (with the
-    /// uploaded panorama texture) before the capture fires, mirroring the
-    /// Gpu3D screenshot tests.
-    @Override
-    protected void registerReadyCallback(final Form parent, final Runnable run) {
-        LandscapeCapture.awaitLandscape(parent, new Runnable() {
-            public void run() {
-                UITimer.timer(1000, false, parent, new Runnable() {
-                    public void run() {
-                        if (view != null) {
-                            view.getRenderView().requestRender();
-                        }
-                        UITimer.timer(500, false, parent, run);
-                    }
-                });
-            }
-        });
     }
 }

@@ -11,9 +11,11 @@ import com.codename1.ui.util.UITimer;
 /// orientation - desktop, browser, tvOS - it is a no-op and the fixed window
 /// aspect is captured as-is.
 ///
-/// Orientation is intentionally left in landscape afterwards: these run as the
-/// last screenshot tests and the tests that follow them capture off-screen
-/// images (or make no capture at all), so nothing needs it restored.
+/// The last of the VR / 360 tests calls {@link #restorePortrait} once its
+/// capture is done, so the rest of the suite runs in portrait exactly as it
+/// does on master (in particular the video tests, which are sensitive to both
+/// orientation and to a GPU-heavy neighbor - hence these tests sit right after
+/// the orientation test, far from them).
 final class LandscapeCapture {
     private static final int POLL_INTERVAL_MS = 100;
     // ~4s is comfortably longer than an emulator rotate + layout pass while
@@ -36,6 +38,33 @@ final class LandscapeCapture {
     /// immediately on platforms that cannot rotate (or are already landscape).
     static void awaitLandscape(Form form, Runnable onReady) {
         awaitLandscape(form, POLL_ATTEMPTS, onReady);
+    }
+
+    /// Restores portrait (where the platform can rotate) and invokes
+    /// {@code onDone} once the rotation has landed, so the next test starts in
+    /// the same orientation the rest of the suite expects. A no-op that runs
+    /// {@code onDone} immediately on platforms that cannot rotate.
+    static void restorePortrait(Form form, Runnable onDone) {
+        if (!CN.canForceOrientation()) {
+            onDone.run();
+            return;
+        }
+        CN.lockOrientation(true); // true == portrait
+        awaitPortrait(form, POLL_ATTEMPTS, onDone);
+    }
+
+    private static void awaitPortrait(final Form form, final int attemptsLeft, final Runnable onDone) {
+        form.revalidate();
+        boolean portrait = form.getHeight() >= form.getWidth();
+        if (portrait || attemptsLeft <= 0) {
+            onDone.run();
+            return;
+        }
+        UITimer.timer(POLL_INTERVAL_MS, false, form, new Runnable() {
+            public void run() {
+                awaitPortrait(form, attemptsLeft - 1, onDone);
+            }
+        });
     }
 
     private static void awaitLandscape(final Form form, final int attemptsLeft, final Runnable onReady) {
