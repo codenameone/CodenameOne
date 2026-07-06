@@ -19,10 +19,16 @@ import java.util.Arrays;
  */
 public final class LoggingListener implements DeviceConnection.DeviceListener {
 
-    private final SymbolTable symbols;
+    // Delivered by the device via onSymbols before onHello; null until then.
+    private SymbolTable symbols;
 
-    public LoggingListener(SymbolTable symbols) {
+    public LoggingListener() {
+    }
+
+    @Override public void onSymbols(SymbolTable symbols) {
         this.symbols = symbols;
+        System.out.println("[event] SYMBOLS classes=" + symbols.allClasses().size()
+                + " methods=" + symbols.allMethods().size());
     }
 
     @Override public void onHello(int version) {
@@ -81,6 +87,7 @@ public final class LoggingListener implements DeviceConnection.DeviceListener {
     @Override public void onDisconnected() { System.out.println("[event] DISCONNECTED"); }
 
     private String describeLocation(int methodId, int line) {
+        if (symbols == null) return "method=" + methodId + " line=" + line;
         SymbolTable.MethodInfo m = symbols.methodById(methodId);
         if (m == null) return "method=" + methodId + " line=" + line;
         SymbolTable.ClassInfo c = symbols.classById(m.classId);
