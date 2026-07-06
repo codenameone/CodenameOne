@@ -86,11 +86,23 @@ if [ -z "$SIM_SKIN_PATH" ] || [ ! -f "$SIM_SKIN_PATH" ]; then
   SKIN_ARCHIVE="$SKIN_CACHE_DIR/skins.tar.gz"
   SKIN_EXTRACT_DIR="$SKIN_CACHE_DIR/extracted"
   if [ ! -s "$SKIN_ARCHIVE" ]; then
-    SKIN_URL="$(python3 - <<'PY'
+    # Authenticate the release lookup when a token is available. The
+    # unauthenticated api.github.com quota is 60 requests/hour per IP, which
+    # a PR that fans out many jobs (plus re-runs) can exhaust on a shared
+    # runner IP, failing skin resolution with "HTTP Error 403: rate limit
+    # exceeded". A token raises the quota to 5000/hour and removes the flake.
+    SKIN_GH_TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+    SKIN_URL="$(GH_API_TOKEN="$SKIN_GH_TOKEN" python3 - <<'PY'
 import json
+import os
 import urllib.request
 
-with urllib.request.urlopen('https://api.github.com/repos/codenameone/codenameone-skins/releases/latest') as response:
+req = urllib.request.Request(
+    'https://api.github.com/repos/codenameone/codenameone-skins/releases/latest')
+token = os.environ.get('GH_API_TOKEN', '')
+if token:
+    req.add_header('Authorization', 'Bearer ' + token)
+with urllib.request.urlopen(req) as response:
     data = json.load(response)
 
 assets = data.get('assets') or []
