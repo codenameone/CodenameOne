@@ -18,14 +18,23 @@ import com.codename1.vr.VRView;
 /// A {@link VRView} renders a fixed scene - three Phong-lit cubes over a grey
 /// floor - in side-by-side stereo. Head tracking is disabled so the capture is
 /// deterministic on every platform regardless of sensor availability; the
-/// stereo parallax between the two eye views is the feature under test. On
+/// stereo parallax between the two eye views is the feature under test. The
+/// view is captured in landscape, where a stereo scene reads naturally. On
 /// platforms without a 3D backend the view shows its placeholder and the
-/// screenshot is skipped.
+/// screenshot is skipped, and on tvOS side-by-side stereo has no use (no
+/// headset), so the test is skipped there.
 public class VRStereoSceneScreenshotTest extends BaseTest {
     private VRView view;
 
     @Override
     public boolean runTest() {
+        if (com.codename1.ui.CN.isTV()) {
+            // Stereo VR targets a headset/cardboard viewer; on a TV it is
+            // redundant, so skip rather than baseline a nonsensical capture.
+            System.out.println("CN1SS:INFO:test=VRStereoScene status=SKIPPED reason=tv-no-stereo-vr");
+            done();
+            return true;
+        }
         Form form = createForm("VR Stereo", new BorderLayout(), "VRStereoScene");
         view = new VRView(new VRRenderer() {
             private Mesh cube;
@@ -73,6 +82,7 @@ public class VRStereoSceneScreenshotTest extends BaseTest {
             done();
             return true;
         }
+        LandscapeCapture.lock();
         form.add(BorderLayout.CENTER, view);
         form.show();
         return true;
@@ -83,16 +93,21 @@ public class VRStereoSceneScreenshotTest extends BaseTest {
         return com.codename1.ui.CN.isGpuSupported();
     }
 
-    /// Force a fresh GPU frame to be rendered (and read back for capture)
-    /// before the screenshot fires, mirroring the Gpu3D screenshot tests.
+    /// Wait for landscape to settle, then force a fresh GPU frame to be
+    /// rendered (and read back for capture) before the screenshot fires,
+    /// mirroring the Gpu3D screenshot tests.
     @Override
-    protected void registerReadyCallback(Form parent, final Runnable run) {
-        UITimer.timer(1000, false, parent, new Runnable() {
+    protected void registerReadyCallback(final Form parent, final Runnable run) {
+        LandscapeCapture.awaitLandscape(parent, new Runnable() {
             public void run() {
-                if (view != null) {
-                    view.requestRender();
-                }
-                UITimer.timer(500, false, parent, run);
+                UITimer.timer(1000, false, parent, new Runnable() {
+                    public void run() {
+                        if (view != null) {
+                            view.requestRender();
+                        }
+                        UITimer.timer(500, false, parent, run);
+                    }
+                });
             }
         });
     }

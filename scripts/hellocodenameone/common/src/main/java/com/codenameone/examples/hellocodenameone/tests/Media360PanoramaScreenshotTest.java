@@ -12,9 +12,11 @@ import com.codename1.vr.Media360View;
 /// sky and ground bands, a sun disc and meridian stripes - is generated in
 /// code so no asset is needed, then shown in side-by-side stereo at a fixed
 /// look angle with head tracking off, making the capture deterministic. The
+/// view is captured in landscape, where a panorama reads naturally. The
 /// vertical color transitions also verify the sphere's u direction: the
 /// stripes must appear in their generated order, not mirrored. On platforms
-/// without a 3D backend the screenshot is skipped.
+/// without a 3D backend the screenshot is skipped; unlike the stereo VR test
+/// this one still runs on tvOS, where panning a 360 image is a sensible use.
 public class Media360PanoramaScreenshotTest extends BaseTest {
     private Media360View view;
 
@@ -36,6 +38,7 @@ public class Media360PanoramaScreenshotTest extends BaseTest {
         // the straight-ahead default.
         view.setYaw(30f);
         view.setPitch(10f);
+        LandscapeCapture.lock();
         form.add(BorderLayout.CENTER, view);
         form.show();
         return true;
@@ -75,16 +78,21 @@ public class Media360PanoramaScreenshotTest extends BaseTest {
         return com.codename1.ui.CN.isGpuSupported();
     }
 
-    /// Force a fresh GPU frame (with the uploaded panorama texture) before
-    /// the capture fires, mirroring the Gpu3D screenshot tests.
+    /// Wait for landscape to settle, then force a fresh GPU frame (with the
+    /// uploaded panorama texture) before the capture fires, mirroring the
+    /// Gpu3D screenshot tests.
     @Override
-    protected void registerReadyCallback(Form parent, final Runnable run) {
-        UITimer.timer(1000, false, parent, new Runnable() {
+    protected void registerReadyCallback(final Form parent, final Runnable run) {
+        LandscapeCapture.awaitLandscape(parent, new Runnable() {
             public void run() {
-                if (view != null) {
-                    view.getRenderView().requestRender();
-                }
-                UITimer.timer(500, false, parent, run);
+                UITimer.timer(1000, false, parent, new Runnable() {
+                    public void run() {
+                        if (view != null) {
+                            view.getRenderView().requestRender();
+                        }
+                        UITimer.timer(500, false, parent, run);
+                    }
+                });
             }
         });
     }
