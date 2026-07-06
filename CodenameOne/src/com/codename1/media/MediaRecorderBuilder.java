@@ -30,9 +30,6 @@ import java.io.IOException;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public class MediaRecorderBuilder {
     private int audioChannels = 1,
             bitRate = 64000,

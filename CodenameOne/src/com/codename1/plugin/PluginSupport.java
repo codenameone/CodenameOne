@@ -32,9 +32,6 @@ import java.util.List;
 ///
 /// @author Steve Hannah
 ///
-/// #### Since
-///
-/// 8.0
 public class PluginSupport {
     private final List<Plugin> plugins = new ArrayList<Plugin>();
 
@@ -44,9 +41,6 @@ public class PluginSupport {
     ///
     /// - `plugin`: The plugin to register.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void registerPlugin(Plugin plugin) {
         synchronized (this) {
             plugins.add(plugin);
@@ -60,9 +54,6 @@ public class PluginSupport {
     ///
     /// - `plugin`: The plugin to deregister
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public void deregisterPlugin(Plugin plugin) {
         synchronized (this) {
             plugins.remove(plugin);

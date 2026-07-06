@@ -39,7 +39,6 @@ package com.codename1.io.oidc;
 /// `redirectScheme` is the scheme half of the registered redirect URI (e.g.
 /// the `"com.example.app"` part of `"com.example.app:/oauth2redirect"`).
 ///
-/// @since 7.0.245
 public interface OidcBrowserNative {
 
     /// `true` if this implementation is usable on the current device / OS

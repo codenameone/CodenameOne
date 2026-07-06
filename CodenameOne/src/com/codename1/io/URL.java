@@ -190,9 +190,6 @@ public class URL {
         ///
         /// - `value`: The value of the request property.
         ///
-        /// #### Since
-        ///
-        /// 7.0
         public void setRequestProperty(String key,
                                        String value) {
             properties.put(key, value);

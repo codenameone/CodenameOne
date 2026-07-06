@@ -28,9 +28,6 @@ package com.codename1.ui;
 ///
 /// @author Shai Almog
 ///
-/// #### Since
-///
-/// 7.0
 public interface TextHolder {
     /// The text of the component
     ///

@@ -212,10 +212,6 @@ public class RequestBuilder {
     ///
     /// RequestBuilder instance.
     ///
-    /// #### Since
-    ///
-    /// 8.0
-    ///
     /// #### See also
     ///
     /// - ConnectionRequest#setPriority(byte)
@@ -235,9 +231,6 @@ public class RequestBuilder {
     ///
     /// RequestBuilder instance.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public RequestBuilder cookiesEnabled(boolean cookiesEnabled) {
         checkFetched();
         this.cookiesEnabled = cookiesEnabled;
@@ -293,9 +286,6 @@ public class RequestBuilder {
     ///
     /// RequestBuilder instance
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public RequestBuilder queryParam(String key, String[] values) {
         checkFetched();
         queryParams.put(key, values);
@@ -344,10 +334,6 @@ public class RequestBuilder {
     /// #### Returns
     ///
     /// RequestBuilder instances
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -471,9 +457,6 @@ public class RequestBuilder {
     ///
     /// RequestBuilder instance
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public RequestBuilder onError(ActionListener<NetworkEvent> error, boolean replace) {
         checkFetched();
         if (replace) {
@@ -1060,7 +1043,7 @@ public class RequestBuilder {
         if (contentType != null) {
             req.setContentType(contentType);
         }
-        req.setFailSilently(false);
+        req.setFailSilently(hasErrorCodeHandler());
         if (cache != null) {
             req.setCacheMode(cache);
         }
@@ -1108,6 +1091,13 @@ public class RequestBuilder {
         }
 
         return req;
+    }
+
+    private boolean hasErrorCodeHandler() {
+        return byteArrayErrorCallback != null
+                || stringErrorCallback != null
+                || jsonErrorCallback != null
+                || propertyErrorCallback != null;
     }
 
     private static class FetchAsPropertyListActionListener implements ActionListener<NetworkEvent> {

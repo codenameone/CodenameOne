@@ -1,0 +1,1185 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Codename One Apple Signing Service",
+    "version": "1.1.0",
+    "description": "REST API for managing Apple code-signing assets across iOS, Mac, Mac Catalyst and Developer ID, replacing the legacy JRuby/fastlane \"certificate wizard\". All Apple communication goes through the official App Store Connect API (JWT/ES256) using a per-user App Store Connect API key that the developer stores once (encrypted) via the `/credential` endpoints — there is no Apple ID, password, or 2FA.\nSigning certificates (and the private keys generated for them) are persisted with their expiry, so a still-valid certificate never has to be regenerated. Provisioning profiles are regenerable; their metadata is persisted. Push is handled via token-based APNs `.p8` auth keys, stored only (no push sending yet).\nEvery operation is scoped to the authenticated caller (their email, from the bearer JWT). Private key material leaves the service only through the explicit `/certificates/{id}/p12` download.\n"
+  },
+  "servers": [
+    {
+      "url": "https://cloud.codenameone.com",
+      "description": "Production"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Credential",
+      "description": "The developer's App Store Connect API key"
+    },
+    {
+      "name": "Certificates",
+      "description": "iOS signing certificates"
+    },
+    {
+      "name": "Bundle IDs",
+      "description": "App identifiers and their capabilities"
+    },
+    {
+      "name": "Devices",
+      "description": "Registered test devices"
+    },
+    {
+      "name": "Profiles",
+      "description": "Provisioning profiles"
+    },
+    {
+      "name": "APNs Keys",
+      "description": "Token-based APNs auth keys (store-only)"
+    }
+  ],
+  "paths": {
+    "/appsec/7.0/apple/credential": {
+      "get": {
+        "tags": [
+          "Credential"
+        ],
+        "summary": "Get ASC API key status",
+        "description": "Returns whether an App Store Connect API key is configured, plus the non-secret identifiers. The `.p8` is never returned.",
+        "operationId": "getCredential",
+        "responses": {
+          "200": {
+            "description": "Credential status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AscCredentialStatus"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Credential"
+        ],
+        "summary": "Store or replace the ASC API key",
+        "operationId": "putCredential",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AscCredentialRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Stored"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/VaultUnavailable"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Credential"
+        ],
+        "summary": "Delete the ASC API key",
+        "operationId": "deleteCredential",
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "No credential stored"
+          }
+        }
+      }
+    },
+    "/appsec/7.0/apple/notarization/credentials": {
+      "get": {
+        "tags": [
+          "Credential"
+        ],
+        "summary": "Get notarization credentials for xcrun notarytool",
+        "description": "Returns the caller's own ASC key material (key id, issuer id, and the `.p8`) for `xcrun notarytool submit --key <.p8> --key-id <keyId> --issuer <issuerId> --wait` on a Mac build VM. This is the only endpoint that returns the `.p8` — a deliberate, owner-only exposure of the caller's own key; the credential status endpoint never leaks it. 409 if no ASC key is configured.\n",
+        "operationId": "getNotarizationCredentials",
+        "responses": {
+          "200": {
+            "description": "Notarization credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotarizationCredentials"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "description": "No ASC API key configured"
+          }
+        }
+      }
+    },
+    "/appsec/7.0/apple/certificates": {
+      "get": {
+        "tags": [
+          "Certificates"
+        ],
+        "summary": "List signing certificates",
+        "operationId": "listCertificates",
+        "responses": {
+          "200": {
+            "description": "The caller's certificates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CertDTO"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Certificates"
+        ],
+        "summary": "Generate a signing certificate",
+        "description": "Generates an RSA keypair + CSR locally, has Apple sign it, and persists the private key + certificate + expiry. Returns the certificate metadata; download the `.p12` separately.\n",
+        "operationId": "createCertificate",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Certificate created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertDTO"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/NotConfigured"
+          },
+          "502": {
+            "$ref": "#/components/responses/AppleError"
+          }
+        }
+      }
+    },
+    "/appsec/7.0/apple/certificates/reconcile": {
+      "post": {
+        "tags": [
+          "Certificates"
+        ],
+        "summary": "Reconcile local state with Apple",
+        "description": "Marks locally-known certificates Apple no longer lists as REVOKED and imports certificates Apple has that we don't (metadata only, no private key).",
+        "operationId": "reconcileCertificates",
+        "responses": {
+          "200": {
+            "description": "Certificates after reconciliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CertDTO"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/NotConfigured"
+          },
+          "502": {
+            "$ref": "#/components/responses/AppleError"
+          }
+        }
+      }
+    },
+    "/appsec/7.0/apple/certificates/{id}/p12": {
+      "get": {
+        "tags": [
+          "Certificates"
+        ],
+        "summary": "Download the certificate as a PKCS#12 (.p12)",
+        "description": "Materialises the private key + certificate into a password-protected `.p12`. Only available for certificates we generated (those with a stored private key); imported/reconciled certificates return 409.\n",
+        "operationId": "downloadP12",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "password",
+            "in": "query",
+            "required": false,
+            "description": "Password to protect the .p12 (empty if omitted).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The .p12 bytes",
+            "content": {
+              "application/x-pkcs12": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "description": "No private key stored for this certificate"
+          }
+        }
+      }
+    },
+    "/appsec/7.0/apple/certificates/{id}": {
+      "delete": {
+        "tags": [
+          "Certificates"
+        ],
+        "summary": "Revoke a certificate",
+        "description": "Revokes the certificate at Apple and marks the local row REVOKED.",
+        "operationId": "revokeCertificate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Revoked"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "No such certificate"
+          },
+          "502": {
+            "$ref": "#/components/responses/AppleError"
+          }
+        }
+      }
+    },
+    "/appsec/7.0/apple/bundle-ids": {
+      "get": {
+        "tags": [
+          "Bundle IDs"
+        ],
+        "summary": "List bundle IDs",
+        "operationId": "listBundleIds",
+        "responses": {
+          "200": {
+            "description": "Bundle IDs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BundleIdDTO"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/NotConfigured"
+          },
+          "502": {
+            "$ref": "#/components/responses/AppleError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Bundle IDs"
+        ],
+        "summary": "Register a bundle ID",
+        "operationId": "createBundleId",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBundleIdRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Bundle ID created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundleIdDTO"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/NotConfigured"
+          },
+          "502": {
+            "$ref": "#/components/responses/AppleError"
+          }
+        }
+      }
+    },
+    "/appsec/7.0/apple/bundle-ids/{id}/capabilities": {
+      "post": {
+        "tags": [
+          "Bundle IDs"
+        ],
+        "summary": "Enable a capability on a bundle ID",
+        "description": "`id` is Apple's bundle-id resource id (not the reverse-DNS string). Use capabilityType PUSH_NOTIFICATIONS to enable push.",
+        "operationId": "enableCapability",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CapabilityRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Capability enabled"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/NotConfigured"
+          },
+          "502": {
+            "$ref": "#/components/responses/AppleError"
+          }
+        }
+      }
+    },
+    "/appsec/7.0/apple/devices": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "List registered devices",
+        "operationId": "listDevices",
+        "responses": {
+          "200": {
+            "description": "Devices",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceDTO"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/NotConfigured"
+          },
+          "502": {
+            "$ref": "#/components/responses/AppleError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Register a device",
+        "operationId": "registerDevice",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDeviceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Device registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceDTO"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/NotConfigured"
+          },
+          "502": {
+            "$ref": "#/components/responses/AppleError"
+          }
+        }
+      }
+    },
+    "/appsec/7.0/apple/profiles": {
+      "get": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "List provisioning profiles",
+        "operationId": "listProfiles",
+        "responses": {
+          "200": {
+            "description": "Profiles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProfileDTO"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Create a provisioning profile",
+        "operationId": "createProfile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProfileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Profile created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileDTO"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/NotConfigured"
+          },
+          "502": {
+            "$ref": "#/components/responses/AppleError"
+          }
+        }
+      }
+    },
+    "/appsec/7.0/apple/profiles/{id}/download": {
+      "get": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Download the .mobileprovision",
+        "description": "Fetches the current provisioning-profile bytes fresh from Apple.",
+        "operationId": "downloadProfile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The .mobileprovision bytes",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/NotConfigured"
+          },
+          "502": {
+            "$ref": "#/components/responses/AppleError"
+          }
+        }
+      }
+    },
+    "/appsec/7.0/apple/profiles/{id}": {
+      "delete": {
+        "tags": [
+          "Profiles"
+        ],
+        "summary": "Delete a provisioning profile",
+        "operationId": "deleteProfile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "No such profile"
+          },
+          "502": {
+            "$ref": "#/components/responses/AppleError"
+          }
+        }
+      }
+    },
+    "/appsec/7.0/apple/apns-keys": {
+      "get": {
+        "tags": [
+          "APNs Keys"
+        ],
+        "summary": "List APNs auth keys",
+        "description": "Returns key metadata only; the `.p8` is never returned.",
+        "operationId": "listApnsKeys",
+        "responses": {
+          "200": {
+            "description": "APNs keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ApnsKeyStatus"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "APNs Keys"
+        ],
+        "summary": "Store or replace an APNs auth key",
+        "operationId": "putApnsKey",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApnsKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Stored"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "$ref": "#/components/responses/VaultUnavailable"
+          }
+        }
+      }
+    },
+    "/appsec/7.0/apple/apns-keys/{keyId}": {
+      "delete": {
+        "tags": [
+          "APNs Keys"
+        ],
+        "summary": "Delete an APNs auth key",
+        "operationId": "deleteApnsKey",
+        "parameters": [
+          {
+            "name": "keyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "No such key"
+          }
+        }
+      }
+    },
+    "/appsec/7.0/apple/signing-data": {
+      "delete": {
+        "tags": [
+          "Credential"
+        ],
+        "summary": "Clear cached Apple signing data",
+        "description": "Deletes all Codename One cloud-side Apple signing data owned by the authenticated caller, including stored certificates, provisioning profiles, APNs keys, notarization credentials and cached metadata. This does not delete assets from Apple, but the user will need to regenerate or re-import signing data before cloud builds can use it again.\n",
+        "operationId": "clearSigningData",
+        "responses": {
+          "204": {
+            "description": "Cleared"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Keycloak-issued JWT. The service resolves the caller's email from the token and scopes all data to it."
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Missing or invalid parameters (plain-text reason in the body).",
+        "content": {
+          "text/plain": {
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Caller is anonymous / not authenticated."
+      },
+      "NotConfigured": {
+        "description": "No App Store Connect API key configured for this account yet.",
+        "content": {
+          "text/plain": {
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "VaultUnavailable": {
+        "description": "Secrets vault is not configured on this deployment (no master key), so credentials cannot be stored."
+      },
+      "AppleError": {
+        "description": "The App Store Connect API rejected the call or was unreachable (upstream failure).",
+        "content": {
+          "text/plain": {
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "AscCredentialRequest": {
+        "type": "object",
+        "description": "Write-only. The developer's App Store Connect API key.",
+        "required": [
+          "keyId",
+          "issuerId",
+          "privateKeyP8"
+        ],
+        "properties": {
+          "keyId": {
+            "type": "string",
+            "description": "The key ID from App Store Connect (Users & Access → Integrations → Keys)."
+          },
+          "issuerId": {
+            "type": "string",
+            "description": "The issuer ID for the account's API keys."
+          },
+          "privateKeyP8": {
+            "type": "string",
+            "description": "The .p8 EC private key",
+            "PEM-encoded. Never returned by any endpoint.": null
+          }
+        }
+      },
+      "AscCredentialStatus": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean"
+          },
+          "keyId": {
+            "type": "string",
+            "nullable": true
+          },
+          "issuerId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NotarizationCredentials": {
+        "type": "object",
+        "description": "Owner-only. Everything xcrun notarytool needs; the only response that carries the .p8.\n",
+        "properties": {
+          "keyId": {
+            "type": "string"
+          },
+          "issuerId": {
+            "type": "string"
+          },
+          "privateKeyP8": {
+            "type": "string",
+            "description": "The .p8 EC private key",
+            "PEM-encoded.": null
+          }
+        }
+      },
+      "CreateCertRequest": {
+        "type": "object",
+        "required": [
+          "certificateType"
+        ],
+        "properties": {
+          "certificateType": {
+            "type": "string",
+            "enum": [
+              "IOS_DEVELOPMENT",
+              "IOS_DISTRIBUTION",
+              "DEVELOPMENT",
+              "DISTRIBUTION",
+              "MAC_APP_DEVELOPMENT",
+              "MAC_APP_DISTRIBUTION",
+              "MAC_INSTALLER_DISTRIBUTION",
+              "DEVELOPER_ID_APPLICATION",
+              "DEVELOPER_ID_INSTALLER"
+            ]
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Optional friendly name; also used as the .p12 alias and CSR common name."
+          }
+        }
+      },
+      "CertDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "appleCertId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Apple's /v1/certificates resource id."
+          },
+          "certificateType": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "serialNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true,
+            "description": "Expiry in epoch millis (from the X.509 notAfter)."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "REVOKED",
+              "EXPIRED"
+            ]
+          },
+          "privateKeyPresent": {
+            "type": "boolean",
+            "description": "True if we hold the private key (a .p12 can be downloaded); false for imported/reconciled certs."
+          }
+        }
+      },
+      "BundleIdDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Apple's bundle-id resource id."
+          },
+          "identifier": {
+            "type": "string",
+            "description": "The reverse-DNS identifier",
+            "e.g. com.example.app.": null
+          },
+          "name": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateBundleIdRequest": {
+        "type": "object",
+        "required": [
+          "identifier",
+          "name"
+        ],
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "description": "Reverse-DNS identifier",
+            "e.g. com.example.app.": null
+          },
+          "name": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true,
+            "description": "Apple BundleIdPlatform; defaults to IOS."
+          }
+        }
+      },
+      "CapabilityRequest": {
+        "type": "object",
+        "required": [
+          "capabilityType"
+        ],
+        "properties": {
+          "capabilityType": {
+            "type": "string",
+            "description": "e.g. PUSH_NOTIFICATIONS."
+          }
+        }
+      },
+      "DeviceDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "udid": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "RegisterDeviceRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "udid"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "udid": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string",
+            "nullable": true,
+            "description": "Apple BundleIdPlatform; defaults to IOS."
+          }
+        }
+      },
+      "CreateProfileRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "profileType",
+          "bundleIdAppleId",
+          "certificateIds"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "profileType": {
+            "type": "string",
+            "enum": [
+              "IOS_APP_DEVELOPMENT",
+              "IOS_APP_STORE",
+              "IOS_APP_ADHOC",
+              "MAC_APP_DEVELOPMENT",
+              "MAC_APP_STORE",
+              "MAC_APP_DIRECT",
+              "MAC_CATALYST_APP_DEVELOPMENT",
+              "MAC_CATALYST_APP_STORE",
+              "MAC_CATALYST_APP_DIRECT"
+            ]
+          },
+          "bundleIdAppleId": {
+            "type": "string",
+            "description": "Apple's bundle-id resource id (not the reverse-DNS string)."
+          },
+          "certificateIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Apple certificate resource ids to embed."
+          },
+          "deviceIds": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            },
+            "description": "Apple device resource ids (development / ad-hoc profiles only)."
+          }
+        }
+      },
+      "ProfileDTO": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "appleProfileId": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "profileType": {
+            "type": "string"
+          },
+          "bundleId": {
+            "type": "string",
+            "description": "Reverse-DNS bundle identifier (best-effort; falls back to Apple's resource id)."
+          },
+          "uuid": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "ApnsKeyRequest": {
+        "type": "object",
+        "description": "Write-only. A token-based APNs auth key.",
+        "required": [
+          "keyId",
+          "teamId",
+          "privateKeyP8"
+        ],
+        "properties": {
+          "keyId": {
+            "type": "string",
+            "description": "The 10-char APNs Key ID."
+          },
+          "teamId": {
+            "type": "string"
+          },
+          "privateKeyP8": {
+            "type": "string",
+            "description": "The .p8 auth key",
+            "PEM-encoded. Never returned.": null
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ApnsKeyStatus": {
+        "type": "object",
+        "properties": {
+          "keyId": {
+            "type": "string"
+          },
+          "teamId": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      }
+    }
+  }
+}

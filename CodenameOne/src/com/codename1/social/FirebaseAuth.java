@@ -63,7 +63,6 @@ import java.util.Map;
 /// They are **not** encrypted-at-rest by default -- bring your own
 /// [com.codename1.io.oidc.TokenStore] strategy if that matters to you.
 ///
-/// @since 7.0.245
 public final class FirebaseAuth {
 
     private static final String PREF_ID = "cn1.firebase.idToken";
@@ -175,7 +174,6 @@ public final class FirebaseAuth {
     /// passkeys enabled in the console. The classic Firebase Auth tier does
     /// not expose passkey endpoints.
     ///
-    /// @since 7.0.245
     public AsyncResource<FirebaseUser> registerPasskey(final String name) {
         final AsyncResource<FirebaseUser> out = new AsyncResource<FirebaseUser>();
         if (apiKey == null) {
@@ -237,7 +235,6 @@ public final class FirebaseAuth {
     ///
     /// Available wherever [WebAuthnClient#isSupported()] returns `true`.
     ///
-    /// @since 7.0.245
     public AsyncResource<FirebaseUser> signInWithPasskey() {
         final AsyncResource<FirebaseUser> out = new AsyncResource<FirebaseUser>();
         if (apiKey == null) {

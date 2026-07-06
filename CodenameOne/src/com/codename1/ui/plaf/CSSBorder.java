@@ -55,9 +55,6 @@ import static com.codename1.ui.Component.TOP;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public class CSSBorder extends Border {
     /// Constant indicating no-repeat for background images.
     public static final byte REPEAT_NONE = 0;
@@ -869,10 +866,6 @@ public class CSSBorder extends Border {
     ///
     /// Self for chaining.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - #borderImageWithName(java.lang.String, double...)
@@ -908,10 +901,6 @@ public class CSSBorder extends Border {
     /// #### Returns
     ///
     /// Self for chaining.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///

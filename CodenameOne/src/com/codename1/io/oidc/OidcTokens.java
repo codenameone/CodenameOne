@@ -39,7 +39,6 @@ import java.util.Map;
 /// To bridge into the older [AccessToken] API used by [com.codename1.social.Login],
 /// call [#toAccessToken()].
 ///
-/// @since 7.0.245
 public final class OidcTokens {
 
     private final String accessToken;

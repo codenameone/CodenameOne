@@ -28,9 +28,6 @@ import com.codename1.ui.Transform;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public class AffineTransform {
     private double m00;
     private double m10;

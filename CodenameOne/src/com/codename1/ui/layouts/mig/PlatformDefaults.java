@@ -966,9 +966,6 @@ public final class PlatformDefaults {
     ///
     /// The current value. Default is `true`.
     ///
-    /// #### Since
-    ///
-    /// 3.5
     public static boolean getDefaultRowAlignmentBaseline() {
         return dra;
     }
@@ -980,9 +977,6 @@ public final class PlatformDefaults {
     ///
     /// - `b`: The new value. Default is `true` from v3.5.
     ///
-    /// #### Since
-    ///
-    /// 3.5
     public static void setDefaultRowAlignmentBaseline(boolean b) {
         dra = b;
     }

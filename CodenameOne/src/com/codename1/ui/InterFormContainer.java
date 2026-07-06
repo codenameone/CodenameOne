@@ -41,9 +41,6 @@ import static com.codename1.ui.ComponentSelector.$;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public class InterFormContainer extends Container {
     private final Component content;
 

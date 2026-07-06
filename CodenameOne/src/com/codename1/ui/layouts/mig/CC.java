@@ -301,9 +301,6 @@ public final class CC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new ComponentConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public CC growPrio(int... widthHeight) {
         if (widthHeight.length == 0 || widthHeight.length > 2) {
             throw new IllegalArgumentException("Illegal argument count: " + widthHeight.length);
@@ -359,9 +356,6 @@ public final class CC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new ComponentConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public CC grow(float... widthHeight) {
         if (widthHeight.length == 0 || widthHeight.length > 2) {
             throw new IllegalArgumentException("Illegal argument count: " + widthHeight.length);
@@ -401,9 +395,6 @@ public final class CC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new ComponentConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public CC shrinkPrio(int... widthHeight) {
         if (widthHeight.length == 0 || widthHeight.length > 2) {
             throw new IllegalArgumentException("Illegal argument count: " + widthHeight.length);
@@ -443,9 +434,6 @@ public final class CC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new ComponentConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public CC shrink(float... widthHeight) {
         if (widthHeight.length == 0 || widthHeight.length > 2) {
             throw new IllegalArgumentException("Illegal argument count: " + widthHeight.length);
@@ -485,9 +473,6 @@ public final class CC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new ComponentConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public CC endGroup(String... xy) {
         if (xy.length > 2 || xy.length == 0) {
             throw new IllegalArgumentException("Illegal argument count: " + xy.length);
@@ -527,9 +512,6 @@ public final class CC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new ComponentConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public CC sizeGroup(String... xy) {
         if (xy.length > 2 || xy.length == 0) {
             throw new IllegalArgumentException("Illegal argument count: " + xy.length);
@@ -786,10 +768,6 @@ public final class CC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new LayoutConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2. Replacing cell(int, int) and cell(int, int, int, int)
-    ///
     /// #### See also
     ///
     /// - #setCellX(int)
@@ -822,10 +800,6 @@ public final class CC {
     /// #### Returns
     ///
     /// `this` so it is possible to chain calls. E.g. `new LayoutConstraint().noGrid().gap().fill()`.
-    ///
-    /// #### Since
-    ///
-    /// 3.7.2 Replaces span(int, int).
     ///
     /// #### See also
     ///
@@ -860,9 +834,6 @@ public final class CC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new LayoutConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public CC gap(String... args) {
         if (INVOKERS.length < args.length) {
             throw new IllegalArgumentException("Illegal argument count: " + args.length);
@@ -885,9 +856,6 @@ public final class CC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new LayoutConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public CC gapBefore(String boundsSize) {
         hor.setGapBefore(ConstraintParser.parseBoundSize(boundsSize, true, true));
         return this;
@@ -905,9 +873,6 @@ public final class CC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new LayoutConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public CC gapAfter(String boundsSize) {
         hor.setGapAfter(ConstraintParser.parseBoundSize(boundsSize, true, true));
         return this;
@@ -923,9 +888,6 @@ public final class CC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new LayoutConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public CC gapTop(String boundsSize) {
         ver.setGapBefore(ConstraintParser.parseBoundSize(boundsSize, true, false));
         return this;
@@ -941,9 +903,6 @@ public final class CC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new LayoutConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public CC gapLeft(String boundsSize) {
         hor.setGapBefore(ConstraintParser.parseBoundSize(boundsSize, true, true));
         return this;
@@ -959,9 +918,6 @@ public final class CC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new LayoutConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public CC gapBottom(String boundsSize) {
         ver.setGapAfter(ConstraintParser.parseBoundSize(boundsSize, true, false));
         return this;
@@ -977,9 +933,6 @@ public final class CC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new LayoutConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
     public CC gapRight(String boundsSize) {
         hor.setGapAfter(ConstraintParser.parseBoundSize(boundsSize, true, true));
         return this;
@@ -1212,10 +1165,6 @@ public final class CC {
     ///
     /// `this` so it is possible to chain calls. E.g. `new ComponentConstraint().noGrid().gap().fill()`.
     ///
-    /// #### Since
-    ///
-    /// 3.7.2
-    ///
     /// #### See also
     ///
     /// - #setSplit(int)
@@ -1251,10 +1200,6 @@ public final class CC {
     /// #### Returns
     ///
     /// `this` so it is possible to chain calls. E.g. `new ComponentConstraint().noGrid().gap().fill()`.
-    ///
-    /// #### Since
-    ///
-    /// 3.7.2
     ///
     /// #### See also
     ///
@@ -2285,10 +2230,6 @@ public final class CC {
     ///
     /// The custom gap size. NOTE! Will return `null` for both no wrap **and** default wrap.
     ///
-    /// #### Since
-    ///
-    /// 2.4.2
-    ///
     /// #### See also
     ///
     /// - #isWrap()
@@ -2304,10 +2245,6 @@ public final class CC {
     ///
     /// - `s`: @param s The custom gap size. NOTE! `null` will not turn on or off wrap, it will only set the wrap gap size to "default".
     /// A non-null value will turn on wrap though.
-    ///
-    /// #### Since
-    ///
-    /// 2.4.2
     ///
     /// #### See also
     ///
@@ -2347,10 +2284,6 @@ public final class CC {
     ///
     /// The custom gap size. NOTE! Will return `null` for both no newline **and** default newline.
     ///
-    /// #### Since
-    ///
-    /// 2.4.2
-    ///
     /// #### See also
     ///
     /// - #isNewline()
@@ -2366,10 +2299,6 @@ public final class CC {
     ///
     /// - `s`: @param s The custom gap size. NOTE! `null` will not turn on or off newline, it will only set the newline gap size to "default".
     /// A non-null value will turn on newline though.
-    ///
-    /// #### Since
-    ///
-    /// 2.4.2
     ///
     /// #### See also
     ///

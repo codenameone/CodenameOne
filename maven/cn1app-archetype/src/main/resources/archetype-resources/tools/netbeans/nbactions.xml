@@ -43,6 +43,13 @@
         </goals>
     </action>
     <action>
+        <actionName>CUSTOM-Open Certificate Wizard</actionName>
+        <displayName>Open Certificate Wizard</displayName>
+        <goals>
+            <goal>cn1:certificatewizard</goal>
+        </goals>
+    </action>
+    <action>
         <actionName>build</actionName>
         <packagings>
             <packaging>*</packaging>

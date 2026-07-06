@@ -1110,10 +1110,6 @@ public class Picker extends Button {
     ///
     /// - `max`: The maximum hour to display (0-24) or -1 for no limit
     ///
-    /// #### Since
-    ///
-    /// 6.0
-    ///
     /// #### See also
     ///
     /// - #getMinHour()
@@ -1134,10 +1130,6 @@ public class Picker extends Button {
     ///
     /// The minimum hour.  0-24, or -1 for no limit.
     ///
-    /// #### Since
-    ///
-    /// 6.0
-    ///
     /// #### See also
     ///
     /// - #getMaxHour()
@@ -1153,10 +1145,6 @@ public class Picker extends Button {
     /// #### Returns
     ///
     /// The minimum hour.  0-24, or -1 for no limit.
-    ///
-    /// #### Since
-    ///
-    /// 6.0
     ///
     /// #### See also
     ///
@@ -1175,10 +1163,6 @@ public class Picker extends Button {
     /// @return The start date or null if there is none set.
     ///
     /// This does not apply to the time.  Only the date.  You can set the hour range using `int)`.
-    ///
-    /// #### Since
-    ///
-    /// 6.0
     ///
     /// #### See also
     ///
@@ -1200,10 +1184,6 @@ public class Picker extends Button {
     ///
     /// - `start`: The start date.
     ///
-    /// #### Since
-    ///
-    /// 6.0
-    ///
     /// #### See also
     ///
     /// - #getStartDate()
@@ -1221,10 +1201,6 @@ public class Picker extends Button {
     /// @return The end date or null if there is none set.
     ///
     /// This does not apply to the time.  Only the date.  You can set the hour range using `int)`.
-    ///
-    /// #### Since
-    ///
-    /// 6.0
     ///
     /// #### See also
     ///
@@ -1245,10 +1221,6 @@ public class Picker extends Button {
     /// #### Parameters
     ///
     /// - `end`: The end date.
-    ///
-    /// #### Since
-    ///
-    /// 6.0
     ///
     /// #### See also
     ///

@@ -694,9 +694,6 @@ class TBigDecimal {
     ///
     /// The number of trailing zeros.
     ///
-    /// #### Since
-    ///
-    /// 1.5
     static int numberOfTrailingZeros(long lng) {
         return bitCount((lng & -lng) - 1);
     }
@@ -712,9 +709,6 @@ class TBigDecimal {
     ///
     /// The number of leading zeros.
     ///
-    /// #### Since
-    ///
-    /// 1.5
     public static int numberOfLeadingZeros(long lng) {
         lng |= lng >> 1;
         lng |= lng >> 2;
@@ -736,9 +730,6 @@ class TBigDecimal {
     ///
     /// The number of 1 bits.
     ///
-    /// #### Since
-    ///
-    /// 1.5
     static int bitCount(long lng) {
         lng = (lng & 0x5555555555555555L) + ((lng >> 1) & 0x5555555555555555L);
         lng = (lng & 0x3333333333333333L) + ((lng >> 2) & 0x3333333333333333L);
@@ -762,9 +753,6 @@ class TBigDecimal {
     ///
     /// -1 if negative, 1 if positive otherwise 0.
     ///
-    /// #### Since
-    ///
-    /// 1.5
     static int signum(long lng) {
         return (lng == 0 ? 0 : (lng < 0 ? -1 : 1));
     }
@@ -788,9 +776,6 @@ class TBigDecimal {
     ///
     /// The bit mask indicating the highest 1 bit.
     ///
-    /// #### Since
-    ///
-    /// 1.5
     static int highestOneBit(int i) {
         i |= (i >> 1);
         i |= (i >> 2);

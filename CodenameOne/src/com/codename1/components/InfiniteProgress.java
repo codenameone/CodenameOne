@@ -241,9 +241,6 @@ public class InfiniteProgress extends Component {
     ///
     /// True if it animated and should be repainted.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public boolean animate(boolean force) {
         if (!force && (!isVisible() || Display.getInstance().getCurrent() != this.getComponentForm())) { // PMD Fix: CollapsibleIfStatements merged visibility checks //NOPMD CompareObjectsWithEquals
             return false;

@@ -37,10 +37,6 @@ import com.codename1.util.AsyncResource;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
-///
 /// #### See also
 ///
 /// - MediaManager#getAsyncMedia(com.codename1.media.Media)
@@ -104,9 +100,6 @@ public interface AsyncMedia extends Media {
 
     /// Enum encapsulating the different types of media errors that can occur.
     ///
-    /// #### Since
-    ///
-    /// type.
     enum MediaErrorType {
         /// The fetching of the associated resource was aborted by the user's request.
         Aborted("The fetching of the associated resource was aborted by the user's request"),
@@ -132,9 +125,6 @@ public interface AsyncMedia extends Media {
 
     /// Encapsulates a state-change event on a Media object.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     class MediaStateChangeEvent extends ActionEvent {
 
         private final State oldState;
@@ -176,9 +166,6 @@ public interface AsyncMedia extends Media {
 
     /// Encapsulates a media exception.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     class MediaException extends RuntimeException {
         private final MediaErrorType mediaErrorType;
 
@@ -225,9 +212,6 @@ public interface AsyncMedia extends Media {
 
     /// Encapsulates a media error event.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     class MediaErrorEvent extends ActionEvent {
         private final MediaException mediaException;
 
@@ -251,10 +235,6 @@ public interface AsyncMedia extends Media {
 
     /// An async resource used to track the progress of a playAsync() request.  It will
     /// resolve when the media has started playing, or if an error occurs first.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///

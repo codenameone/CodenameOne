@@ -27,9 +27,6 @@ package com.codename1.plugin.event;
 ///
 /// @author Steve Hannah
 ///
-/// #### Since
-///
-/// 8.0
 public class IsGalleryTypeSupportedEvent extends PluginEvent<Boolean> {
     private final int type;
 
@@ -48,10 +45,6 @@ public class IsGalleryTypeSupportedEvent extends PluginEvent<Boolean> {
     /// #### Returns
     ///
     /// The type of gallery to open.  This is one of the constants defined in `Display`.
-    ///
-    /// #### Since
-    ///
-    /// 8.0
     ///
     /// #### See also
     ///

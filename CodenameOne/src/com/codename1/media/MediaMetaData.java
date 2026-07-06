@@ -29,9 +29,6 @@ import com.codename1.ui.Image;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public class MediaMetaData {
 
     private String title;

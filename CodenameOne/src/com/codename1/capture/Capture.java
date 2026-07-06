@@ -182,9 +182,6 @@ public abstract class Capture {
     ///
     /// the audio file location or null if the user canceled
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static String captureAudio(MediaRecorderBuilder recordingOptions) {
         CallBack c = new CallBack();
         captureAudio(recordingOptions, c);
@@ -216,9 +213,6 @@ public abstract class Capture {
     ///
     /// A video file location or null if the user canceled.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static String captureVideo(VideoCaptureConstraints constraints) {
         CallBack c = new CallBack();
         captureVideo(constraints, c);
@@ -333,9 +327,6 @@ public abstract class Capture {
     ///
     /// - `RuntimeException`: if this feature failed or unsupported on the platform
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static void captureAudio(MediaRecorderBuilder recorderOptions, ActionListener<ActionEvent> response) {
         Display.getInstance().captureAudio(recorderOptions, response);
     }
@@ -351,9 +342,6 @@ public abstract class Capture {
     ///
     /// - `response`: a callback Object to retrieve the file path
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static void captureVideo(VideoCaptureConstraints constraints, ActionListener<ActionEvent> response) {
         Display.getInstance().captureVideo(constraints, response);
     }

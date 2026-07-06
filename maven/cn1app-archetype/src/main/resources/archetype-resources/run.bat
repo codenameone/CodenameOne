@@ -23,6 +23,10 @@ goto :EOF
 !MVNW! cn1:settings -e
 
 goto :EOF
+:certificatewizard
+!MVNW! cn1:certificatewizard -e
+
+goto :EOF
 :update
 !MVNW! cn1:update -U -e
 
@@ -36,5 +40,7 @@ echo   desktop
 echo     Runs app as a desktop app.
 echo   settings
 echo     Opens Codename One settings
+echo   certificatewizard
+echo     Opens the Certificate Wizard
 echo   update
 echo     Update Codename One libraries

@@ -165,6 +165,7 @@
   {{- end }}
 
   <footer class="post-footer">
+    {{- partial "blog-post-nav.html" . -}}
     {{- $tags := .Language.Params.Taxonomies.tag | default "tags" }}
     <ul class="post-tags">
       {{- range ($.GetTerms $tags) }}

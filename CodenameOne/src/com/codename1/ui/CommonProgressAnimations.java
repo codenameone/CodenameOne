@@ -31,16 +31,10 @@ import com.codename1.ui.plaf.Style;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 7.0
 public class CommonProgressAnimations {
 
     /// Base class for ProgressAnimations
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static abstract class ProgressAnimation extends Component {
         private static final String PROGRESS_KEY = "$$ProgressAnimation";
         protected Component cmp;
@@ -159,9 +153,6 @@ public class CommonProgressAnimations {
 
     /// A progress animation that shows an animated circle.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static class CircleProgress extends ProgressAnimation {
         int stepSize = (int) Math.round(360.0 / Display.getInstance().getFrameRate() / 1.5);
         int step = 0;
@@ -214,9 +205,6 @@ public class CommonProgressAnimations {
 
     /// An empty progress animation.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static class EmptyAnimation extends ProgressAnimation {
         /// Replaces the given component with an EmptyAnimation until its content is ready.
         /// When the component's content is ready, then make sure to call {@link ProgressAnimation#markComponentReady(com.codename1.ui.Component)}
@@ -239,9 +227,6 @@ public class CommonProgressAnimations {
     /// are rendered as filled rectangles instead of actual glyphs.  This is appropriate
     /// where a paragraph of text is scheduled to appear, but is not ready to show yet.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public static class LoadingTextAnimation extends ProgressAnimation {
 
         private static final String loremIpsum = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";

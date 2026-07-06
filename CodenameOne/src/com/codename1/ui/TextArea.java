@@ -2279,9 +2279,6 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     ///
     /// - `sel`: The TextSelection
     ///
-    /// #### Since
-    ///
-    /// 7.0
     protected Spans calculateTextSelectionSpan(TextSelection sel) {
         return getUIManager().getLookAndFeel().calculateTextAreaSpan(sel, this);
     }
@@ -2289,10 +2286,6 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// Returns true if text selection is enabled on this label.  Default is false.  To enable text selection,
     /// you must enable text selection on the Form with `Form#getTextSelection()` and `TextSelection#setEnabled(boolean)`,
     /// and also ensure that the label's text selection is enabled via `#setTextSelectionEnabled(boolean)`.
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///
@@ -2307,10 +2300,6 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// #### Parameters
     ///
     /// - `enabled`
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///

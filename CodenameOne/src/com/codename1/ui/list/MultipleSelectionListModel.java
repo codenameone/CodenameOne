@@ -26,9 +26,6 @@ package com.codename1.ui.list;
 ///
 /// @author Steve Hannah
 ///
-/// #### Since
-///
-/// 6.0
 public interface MultipleSelectionListModel<T> extends ListModel<T> {
     /// Adds indices to set of selected indices.
     ///

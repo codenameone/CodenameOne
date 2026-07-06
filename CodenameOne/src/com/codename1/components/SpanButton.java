@@ -208,9 +208,6 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
     ///
     /// The component used for styling font icons on this SpanLabel.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public Component getIconStyleComponent() {
         return actualButton.getIconStyleComponent();
@@ -313,9 +310,6 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
     ///
     /// - `l`
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public void addLongPressListener(ActionListener l) {
         actualButton.addLongPressListener(l);
@@ -327,9 +321,6 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
     ///
     /// - `l`
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public void removeLongPressListener(ActionListener l) {
         actualButton.removeLongPressListener(l);
@@ -643,9 +634,6 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public Image getRolloverPressedIcon() {
         return actualButton.getRolloverIcon();
@@ -653,9 +641,6 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
 
     /// {@inheritDoc}
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public void setRolloverPressedIcon(Image arg0) {
         actualButton.setRolloverPressedIcon(arg0);
@@ -663,9 +648,6 @@ public class SpanButton extends Container implements ActionSource<ActionEvent>, 
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public Image getIconFromState() {
         return actualButton.getIconFromState();

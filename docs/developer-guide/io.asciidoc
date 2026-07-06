@@ -108,6 +108,32 @@ You can use this directory to place an image to share as you did in the <<shareb
 
 WARNING: A common Android hack is to write files to the SDCard storage to share them among apps. Android 4.x disabled the ability to write to arbitrary directories on the SDCard even when the appropriate permission was requested.
 
+==== Native file chooser
+
+Use `Display.openFileChooser()` or the shorter `CN.openFileChooser()` when the user needs to select a general document such as a PDF, text file, private key, or import file. This is different from `Display.openGallery()`, which is intended for photo and video library media.
+
+The callback source is a `String` path that can be read with `FileSystemStorage.openInputStream()`. If the user cancels the picker the event source is `null`.
+
+[source,java]
+----
+CN.openFileChooser(evt -> {
+    if(evt == null || evt.getSource() == null) {
+        return;
+    }
+    String path = (String)evt.getSource();
+    try(InputStream in = FileSystemStorage.getInstance().openInputStream(path)) {
+        String text = Util.readToString(in, "UTF-8");
+        // import the selected file
+    } catch(IOException err) {
+        Log.e(err);
+    }
+}, "pdf,txt");
+----
+
+The second argument is a comma-separated accept list. It can contain filename extensions such as `pdf,txt,p8`, MIME types such as `application/pdf`, or `null`/`*/*` for any file. JavaSE uses the native AWT file dialog. Android uses the system document picker and copies content URIs into an app-readable file path when needed. Ports without a native document picker fall back to a Codename One file tree.
+
+No photo-library or media permissions are added by this API. On Android the system document picker grants read access to the selected document. On iOS this API should be implemented with a document picker, not the photo library; `ios.NSPhotoLibraryUsageDescription` is only needed for `openGallery()`.
+
 A more advanced usage of the `FileSystemStorage` API can be a `FileSystemStorage` `Tree`:
 
 

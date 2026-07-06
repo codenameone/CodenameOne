@@ -288,9 +288,6 @@ public abstract class StringUtil {
     ///
     /// The joined string.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static String join(Iterable strings, String delimiter) {
         StringBuilder sb = new StringBuilder();
         for (Object obj : strings) {
@@ -314,9 +311,6 @@ public abstract class StringUtil {
     ///
     /// The joined string.
     ///
-    /// #### Since
-    ///
-    /// 8.0
     public static String join(Object[] strings, String delimiter) {
         StringBuilder sb = new StringBuilder();
         for (Object obj : strings) {

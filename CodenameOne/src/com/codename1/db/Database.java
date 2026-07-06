@@ -178,10 +178,6 @@ public abstract class Database {
     ///
     /// - `IOException`
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - RowExt#wasNull()
@@ -207,10 +203,6 @@ public abstract class Database {
     /// #### Throws
     ///
     /// - `IOException`
-    ///
-    /// #### Since
-    ///
-    /// 7.0
     ///
     /// #### See also
     ///

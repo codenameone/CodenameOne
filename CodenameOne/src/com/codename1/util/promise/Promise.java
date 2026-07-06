@@ -52,10 +52,6 @@ import static com.codename1.ui.CN.invokeAndBlock;
 ///
 /// @author shannah
 ///
-/// #### Since
-///
-/// 8.0
-///
 /// #### See also
 ///
 /// - [MDN documentation for Promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)

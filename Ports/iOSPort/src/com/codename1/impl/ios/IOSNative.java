@@ -477,6 +477,7 @@ public final class IOSNative {
     // capture
     native void captureCamera(boolean movie, int quality, int duration);
     native void openGallery(int type);
+    native void openFileChooser(String accept);
 
     // Low-level camera API (com.codename1.camera). Backed by CN1Camera.m
     // which wraps AVCaptureSession. The IOSCameraImpl class on the Java side

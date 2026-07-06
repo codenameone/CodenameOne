@@ -176,9 +176,6 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     ///
     /// The component used for styling font icons on this SpanLabel.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public Component getIconStyleComponent() {
         return icon.getIconStyleComponent();
@@ -294,9 +291,6 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     ///
     /// The alignment.  One of `#TOP`, `#BOTTOM`, or `#CENTER`.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public int getIconValign() {
         return ((FlowLayout) iconWrapper.getLayout()).getValign();
     }
@@ -307,9 +301,6 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     ///
     /// - `align`: One of `#TOP`, `#BOTTOM`, or `#CENTER`.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setIconValign(int align) {
         ((FlowLayout) iconWrapper.getLayout()).setValign(align);
     }
@@ -539,10 +530,6 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     ///
     /// True if text selection is enabled on this element.
     ///
-    /// #### Since
-    ///
-    /// 7.0
-    ///
     /// #### See also
     ///
     /// - Form#getTextSelection()
@@ -558,9 +545,6 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     ///
     /// - `enabled`: True to enable text selection on this label.
     ///
-    /// #### Since
-    ///
-    /// 7.0
     public void setTextSelectionEnabled(boolean enabled) {
         text.setTextSelectionEnabled(enabled);
     }
@@ -590,9 +574,6 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public int getGap() {
         return gap;
@@ -600,9 +581,6 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public void setGap(int gap) {
         if (gap != this.gap) {
@@ -613,9 +591,6 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public int getTextPosition() {
         String iconPosition = getIconPosition();
@@ -637,9 +612,6 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
 
     /// {@inheritDoc }
     ///
-    /// #### Since
-    ///
-    /// 7.0
     @Override
     public void setTextPosition(int textPosition) {
         switch (textPosition) {
