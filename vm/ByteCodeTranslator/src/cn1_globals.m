@@ -518,6 +518,32 @@ void cn1ComputeNativeStackLimit(CODENAME_ONE_THREAD_STATE) {
     threadStateData->nativeStackLimit = (JAVA_LONG)(intptr_t)stackBase
             - (JAVA_LONG)stackSize
             + (JAVA_LONG)CN1_FRAMELESS_STACK_GUARD_BAND;
+#elif defined(__linux__)
+    // Linux DOES expose the real stack bounds (pthread_getattr_np + attr_getstack,
+    // same call cn1GcStackBase uses). The old 8MB-below-current-frame heuristic put the
+    // limit BELOW the real stack bottom whenever this first frameless call ran deep, or
+    // whenever the thread's stack was not ~8MB (GLib/GTK worker threads, etc.) -- so the
+    // guard never tripped and a genuine overflow SIGSEGV'd raw at the next frameless
+    // frame's first stack access (observed: arm64 dies in drawArc's SOE guard mid-suite;
+    // arm64's larger frames overflow the deep theme-render recursion that x64 survives).
+    // attr_getstack returns the LOW end (stack bottom); the guard band sits just above it.
+    JAVA_LONG __lim = 0;
+    pthread_attr_t __attr;
+    if (pthread_getattr_np(pthread_self(), &__attr) == 0) {
+        void* __addr = 0; size_t __ssz = 0;
+        if (pthread_attr_getstack(&__attr, &__addr, &__ssz) == 0 && __addr != 0 && __ssz != 0) {
+            __lim = (JAVA_LONG)(intptr_t)__addr + (JAVA_LONG)CN1_FRAMELESS_STACK_GUARD_BAND;
+        }
+        pthread_attr_destroy(&__attr);
+    }
+    if (__lim != 0) {
+        threadStateData->nativeStackLimit = __lim;
+    } else {
+        // Only if introspection genuinely failed: the old anchor-off-current-frame guess.
+        threadStateData->nativeStackLimit = (JAVA_LONG)(intptr_t)__builtin_frame_address(0)
+                - (JAVA_LONG)(8L * 1024L * 1024L)
+                + (JAVA_LONG)CN1_FRAMELESS_STACK_GUARD_BAND;
+    }
 #else
     // Portable fallback: pthread stack introspection is unavailable, so anchor off
     // the current frame and assume an 8MB stack below it.
