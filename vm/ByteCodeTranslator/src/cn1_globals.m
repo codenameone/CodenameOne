@@ -532,41 +532,6 @@ void cn1ComputeNativeStackLimit(CODENAME_ONE_THREAD_STATE) {
     }
 }
 
-#if defined(CN1_STACK_DEPTH_DIAG) && defined(__linux__)
-#include <execinfo.h>
-// TEMP forensic (CI-only): the deterministic arm64 mid-suite crash is a native C-stack
-// overflow whose runaway recursion the corrupt post-overflow unwind can't show. This
-// fires EARLY -- while the stack is still intact -- from the frameless SOE guard: once a
-// thread has descended past a large threshold, dump a native backtrace ONCE. The repeating
-// frames in that backtrace are the recursion. Bounds are cached so the per-call cost is a
-// single compare. Remove once the recursion is pinned.
-static __thread char* cn1DiagStackTop = 0;
-static __thread int cn1DiagDumped = 0;
-void cn1DeepStackCheck(void) {
-    if (cn1DiagDumped) return;
-    if (cn1DiagStackTop == 0) {
-        pthread_attr_t a;
-        if (pthread_getattr_np(pthread_self(), &a) != 0) { cn1DiagStackTop = (char*)-1; return; }
-        void* addr = 0; size_t sz = 0;
-        pthread_attr_getstack(&a, &addr, &sz);
-        pthread_attr_destroy(&a);
-        cn1DiagStackTop = (char*)addr + sz;
-    }
-    if (cn1DiagStackTop == (char*)-1) return;
-    size_t used = (size_t)(cn1DiagStackTop - (char*)__builtin_frame_address(0));
-    if (used > (size_t)(40UL * 1024 * 1024)) {
-        cn1DiagDumped = 1;
-        fprintf(stderr, "CN1DEEPSTACK: thread used ~%zuMB -- native backtrace (recursion = repeating frames):\n", used >> 20);
-        fflush(stderr);
-        void* bt[160];
-        int n = backtrace(bt, 160);
-        backtrace_symbols_fd(bt, n, 2);
-        fprintf(stderr, "CN1DEEPSTACK: end (%d frames)\n", n);
-        fflush(stderr);
-    }
-}
-#endif
-
 // memory map of all the heap objects which we can walk over to delete/deallocate
 // unused objects
 const char* volatile cn1LastNamSetter = 0;

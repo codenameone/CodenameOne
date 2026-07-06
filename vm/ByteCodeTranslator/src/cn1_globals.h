@@ -2152,16 +2152,8 @@ extern void cn1ComputeNativeStackLimit(CODENAME_ONE_THREAD_STATE);
 // stack essentially never maps into the 256KB band of another stack, while a
 // genuinely overflowing stack must descend THROUGH the band (no single
 // frameless frame approaches 256KB), so overflow detection is preserved.
-#if defined(CN1_STACK_DEPTH_DIAG) && defined(__linux__)
-extern void cn1DeepStackCheck(void);
-#define CN1_STACK_DEPTH_DIAG_CALL() cn1DeepStackCheck()
-#else
-#define CN1_STACK_DEPTH_DIAG_CALL() do {} while(0)
-#endif
-
 #define CN1_FRAMELESS_SOE_GUARD(retval) \
     do { \
-        CN1_STACK_DEPTH_DIAG_CALL(); \
         if (__builtin_expect(threadStateData->nativeStackLimit == 0, 0)) { cn1ComputeNativeStackLimit(threadStateData); } \
         JAVA_LONG __cn1FrameAddr = (JAVA_LONG)(intptr_t)__builtin_frame_address(0); \
         if (__builtin_expect(__cn1FrameAddr < threadStateData->nativeStackLimit \
