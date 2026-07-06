@@ -764,6 +764,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-07-06T15:01:20+00:00"
+      },
+      "devto": {
+        "id": 4081326,
+        "url": "https://dev.to/codenameone/a-privacy-first-analytics-api-one-facade-a-provider-spi-and-a-consent-gate-2l1l",
+        "syndicated_at": "2026-07-06T16:14:46+00:00"
       }
     }
   }
