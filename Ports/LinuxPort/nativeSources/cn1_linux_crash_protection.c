@@ -203,6 +203,34 @@ static void cn1_cp_write_dec(int fd, long v) {
 }
 
 static void cn1_cp_signal_handler(int sig, siginfo_t *info, void *ctx) {
+    /* Always dump the faulting thread's backtrace to stderr (fd 2 -> the app-output tee),
+     * not just to the BuildCloud pending file. This is how a STACK-OVERFLOW crash becomes
+     * legible: with the per-thread alt signal stack this handler now runs even on overflow,
+     * and the repeating ADDR/off= lines below are the recursion. Addresses only (async-
+     * signal-safe writes; no -rdynamic, so no codegen perturbation). off= is the address
+     * minus the load base = the binary's static address (matches addr2line / gdb symbols). */
+#if CN1_CP_HAVE_BACKTRACE
+    {
+        void *bt[96];
+        int bn = backtrace(bt, 96);
+        CN1_CP_W_STR(2, "\n===CN1CRASH sig=");
+        cn1_cp_write_dec(2, (long)sig);
+        CN1_CP_W_STR(2, " frames=");
+        cn1_cp_write_dec(2, (long)bn);
+        CN1_CP_W_STR(2, " base=");
+        cn1_cp_write_hex(2, cn1_cp_load_base);
+        if (info != NULL) { CN1_CP_W_STR(2, " fault="); cn1_cp_write_hex(2, (uintptr_t)info->si_addr); }
+        CN1_CP_W_STR(2, "===\n");
+        for (int i = 0; i < bn; i++) {
+            CN1_CP_W_STR(2, "CN1BT off=");
+            cn1_cp_write_hex(2, (uintptr_t)bt[i] - cn1_cp_load_base);
+            CN1_CP_W_STR(2, " abs=");
+            cn1_cp_write_hex(2, (uintptr_t)bt[i]);
+            CN1_CP_W_STR(2, "\n");
+        }
+        CN1_CP_W_STR(2, "===CN1CRASH END===\n");
+    }
+#endif
     if (cn1_cp_pending_path_set) {
         int fd = open(cn1_cp_pending_path,
                       O_WRONLY | O_CREAT | O_TRUNC, 0600);
