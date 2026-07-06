@@ -431,7 +431,7 @@ Run the wizard from the project directory:
 
 [source,bash]
 ----
-mvn cn1:certificatewizard
+include::../demos/common/src/main/snippets/developer-guide/index.sh[tag=index-bash-002,indent=0]
 ----
 
 After storing an App Store Connect API key, click *Auto Setup* in the toolbar. The wizard reads the project package and display name, creates or reuses the Bundle ID with push enabled, creates/reuses development and App Store signing assets, and writes the debug/release signing settings back into `codenameone_settings.properties`.

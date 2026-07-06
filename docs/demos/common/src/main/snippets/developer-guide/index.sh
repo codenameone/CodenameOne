@@ -11,3 +11,7 @@ mvn archetype:generate \
   -DmainName=YOUR_MAIN_NAME \
   -DinteractiveMode=false
 // end::index-bash-001[]
+
+// tag::index-bash-002[]
+mvn cn1:certificatewizard
+// end::index-bash-002[]

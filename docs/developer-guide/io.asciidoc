@@ -116,18 +116,7 @@ The callback source is a `String` path that can be read with `FileSystemStorage.
 
 [source,java]
 ----
-CN.openFileChooser(evt -> {
-    if(evt == null || evt.getSource() == null) {
-        return;
-    }
-    String path = (String)evt.getSource();
-    try(InputStream in = FileSystemStorage.getInstance().openInputStream(path)) {
-        String text = Util.readToString(in, "UTF-8");
-        // import the selected file
-    } catch(IOException err) {
-        Log.e(err);
-    }
-}, "pdf,txt");
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava089Snippet.java[tag=io-java-089,indent=0]
 ----
 
 The second argument is a comma-separated accept list. It can contain filename extensions such as `pdf,txt,p8`, MIME types such as `application/pdf`, or `null`/`*/*` for any file. JavaSE uses the native AWT file dialog. Android uses the system document picker and copies content URIs into an app-readable file path when needed. Ports without a native document picker fall back to a Codename One file tree.
