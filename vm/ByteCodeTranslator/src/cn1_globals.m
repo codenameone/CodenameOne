@@ -1525,6 +1525,9 @@ void codenameOneGCSweep() {
     //printObjectTypesInHeap(threadStateData);
     printObjectsPostSweep(threadStateData);
 #endif
+#ifdef CN1_RESOLVE_DIAG
+    { extern void cn1ResolveDiagReport(void); cn1ResolveDiagReport(); }
+#endif
 }
 
 JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
@@ -2549,6 +2552,29 @@ void cn1GcBuildRootSnapshots(void) {
     }
 }
 
+#ifdef CN1_RESOLVE_DIAG
+static long cn1ResolveDiagCounts[4] = {0,0,0,0};
+static const char* cn1ResolveDiagSampleCls[4] = {0,0,0,0};
+void cn1ResolveDiagNote(int reason, JAVA_OBJECT o) {
+    if(reason < 1 || reason > 3) return;
+    cn1ResolveDiagCounts[reason]++;
+    if(cn1ResolveDiagSampleCls[reason] == 0 && o->__codenameOneParentClsReference
+       && o->__codenameOneParentClsReference->clsName) {
+        cn1ResolveDiagSampleCls[reason] = o->__codenameOneParentClsReference->clsName;
+    }
+}
+void cn1ResolveDiagReport(void) {
+    if(cn1ResolveDiagCounts[1] || cn1ResolveDiagCounts[2] || cn1ResolveDiagCounts[3]) {
+        fprintf(stderr, "CN1RESOLVEDIAG idx>=bump=%ld(%s) FREE=%ld(%s) heapPosBad=%ld(%s)\n",
+            cn1ResolveDiagCounts[1], cn1ResolveDiagSampleCls[1] ? cn1ResolveDiagSampleCls[1] : "-",
+            cn1ResolveDiagCounts[2], cn1ResolveDiagSampleCls[2] ? cn1ResolveDiagSampleCls[2] : "-",
+            cn1ResolveDiagCounts[3], cn1ResolveDiagSampleCls[3] ? cn1ResolveDiagSampleCls[3] : "-");
+        fflush(stderr);
+    }
+    cn1ResolveDiagCounts[1] = cn1ResolveDiagCounts[2] = cn1ResolveDiagCounts[3] = 0;
+}
+#endif
+
 // (a) Resolve an arbitrary machine word to the base of the live heap object it points
 // into (interior pointers included), or JAVA_NULL.
 JAVA_OBJECT cn1ConservativeResolve(void* w) {
@@ -2568,6 +2594,24 @@ JAVA_OBJECT cn1ConservativeResolve(void* w) {
                 long off = (long)((char*)w - cand);
                 if(off < pg->firstSlotOffset) return JAVA_NULL;  // inside page header
                 int idx = (int)((off - pg->firstSlotOffset) / pg->slotSize);
+#ifdef CN1_RESOLVE_DIAG
+                // Forensic: count rejections of slot-region words whose slot LOOKS like a
+                // live object (plausible aligned parentCls in the app text) but is rejected.
+                // A nonzero count during the paint cycle = the conservative scan is dropping
+                // a live frameless root. Distinguishes "resolve rejects it" from "not scanned
+                // at all" (referenced from an untraced field elsewhere).
+                if(idx >= 0 && idx < pg->slotCount) {
+                    JAVA_OBJECT __o = (JAVA_OBJECT)(cand + pg->firstSlotOffset + (long)idx * pg->slotSize);
+                    struct clazz* __pc = __o->__codenameOneParentClsReference;
+                    extern void cn1ResolveDiagNote(int reason, JAVA_OBJECT o);
+                    if(__pc != 0 && (((uintptr_t)__pc & 7) == 0)) {
+                        int __m = __o->__codenameOneGcMark;
+                        if(idx >= pg->bumpIndex) cn1ResolveDiagNote(1, __o);         // idx >= snapshot bump
+                        else if(__m == CN1_BIBOP_FREE_MARK) cn1ResolveDiagNote(2, __o); // FREE_MARK
+                        else if(__o->__heapPosition != CN1_BIBOP_HEAP_POS && __o->__heapPosition != CN1_BIBOP_ADOPTED) cn1ResolveDiagNote(3, __o); // heapPos
+                    }
+                }
+#endif
                 if(idx < 0 || idx >= pg->bumpIndex || idx >= pg->slotCount) return JAVA_NULL;
                 JAVA_OBJECT o = (JAVA_OBJECT)(cand + pg->firstSlotOffset + (long)idx * pg->slotSize);
                 // ACQUIRE: the slot may be getting reused RIGHT NOW by a mutator
