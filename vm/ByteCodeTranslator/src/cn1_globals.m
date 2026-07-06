@@ -892,8 +892,14 @@ static long cn1SatbTake(JAVA_OBJECT** out) {
     return (scratch != 0) ? n : 0;
 }
 
+#ifdef CN1_ROOTMISS_FORENSIC
+void cn1FxReset(void); void cn1FxSort(void); void cn1FxCheckVictim(JAVA_OBJECT o); void cn1FxReport(void);
+#endif
 void codenameOneGCMark() {
     currentGcMarkValue++;
+#ifdef CN1_ROOTMISS_FORENSIC
+    cn1FxReset();
+#endif
     // Bump the force-mark pass epoch so the force-visited side table's prior-cycle entries
     // read as not-visited (relocated from the old per-object __codenameOneReferenceCount).
     recursionKey++;
@@ -1408,6 +1414,9 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE);
 #endif
 void codenameOneGCSweep() {
     struct ThreadLocalData* threadStateData = getThreadLocalData();
+#ifdef CN1_ROOTMISS_FORENSIC
+    cn1FxSort();   // freeze + sort the raw scanned-word set captured during the mark
+#endif
 #ifndef CN1_DISABLE_BIBOP
     // Reclaim dead slots on retired BiBOP pages (rebuild per-page free-lists from
     // the header epoch marks). Runs first, on the GC thread, with no marking in
@@ -1452,6 +1461,9 @@ void codenameOneGCSweep() {
                         o->__heapPosition = CN1_BIBOP_HEAP_POS;
                         continue;
                     }
+#endif
+#ifdef CN1_ROOTMISS_FORENSIC
+                    cn1FxCheckVictim(o);   // legacy-heap victim: reachable from a scanned word?
 #endif
                     //if(o->__codenameOneReferenceCount > 0) {
                     #if defined(__OBJC__)
@@ -1527,6 +1539,9 @@ void codenameOneGCSweep() {
 #endif
 #ifdef CN1_RESOLVE_DIAG
     { extern void cn1ResolveDiagReport(void); cn1ResolveDiagReport(); }
+#endif
+#ifdef CN1_ROOTMISS_FORENSIC
+    cn1FxReport();
 #endif
 }
 
@@ -2263,6 +2278,9 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                    o->__codenameOneParentClsReference->finalizerFunction != 0) needsReclaim = JAVA_TRUE;
 #endif
             } else if(m < V - 1) {
+#ifdef CN1_ROOTMISS_FORENSIC
+                cn1FxCheckVictim(o);   // was a scanned stack word pointing at this dead slot?
+#endif
                 cn1BibopReclaimSlot(threadStateData, o);
                 o->__codenameOneGcMark = CN1_BIBOP_FREE_MARK;
                 *(void**)o = fl; fl = o; freeCount++;
@@ -2646,6 +2664,67 @@ JAVA_OBJECT cn1ConservativeResolve(void* w) {
     return JAVA_NULL;
 }
 
+#ifdef CN1_ROOTMISS_FORENSIC
+// ---- Root-miss forensic (gated, cold-path, ZERO mutator-codegen perturbation) ----------
+// Hypothesis: a live object held only in a frameless native-stack local is FREED while
+// reachable on arm64. To prove it without perturbing the (heisenbug-sensitive) mutator
+// codegen, we snapshot every RAW aligned word the mark actually scanned (here, in the one
+// place the scan reads them), then at each real free-site ask: does a scanned stack word
+// equal this victim's address? If yes, the mark SAW a pointer to the object but did not
+// mark it -> cn1ConservativeResolve rejected a valid root. We then re-run resolve on the
+// victim to print WHY. Captures raw words (incl. resolve-rejected ones) -- that is the
+// whole point. Reset at mark start, sorted once before sweep.
+static uintptr_t* cn1FxWords = 0;
+static size_t cn1FxWordN = 0, cn1FxWordCap = 0;
+static long long cn1FxHits = 0, cn1FxFreed = 0;
+void cn1FxReset(void) { cn1FxWordN = 0; cn1FxHits = 0; cn1FxFreed = 0; }
+static void cn1FxAddWord(uintptr_t w) {
+    if(w < 0x10000) return;                 // drop obvious non-pointers (null / small ints)
+    if(cn1FxWordN >= (size_t)8*1024*1024) return;  // 64MB cap: diagnostic safety valve
+    if(cn1FxWordN == cn1FxWordCap) {
+        size_t nc = cn1FxWordCap ? cn1FxWordCap * 2 : 65536;
+        uintptr_t* nw = (uintptr_t*)realloc(cn1FxWords, nc * sizeof(uintptr_t));
+        if(nw == 0) return;                 // diagnostic build: drop on OOM rather than crash
+        cn1FxWords = nw; cn1FxWordCap = nc;
+    }
+    cn1FxWords[cn1FxWordN++] = w;
+}
+static int cn1FxCmp(const void* a, const void* b) {
+    uintptr_t x = *(const uintptr_t*)a, y = *(const uintptr_t*)b;
+    return x < y ? -1 : (x > y ? 1 : 0);
+}
+void cn1FxSort(void) { if(cn1FxWordN > 1) qsort(cn1FxWords, cn1FxWordN, sizeof(uintptr_t), cn1FxCmp); }
+static int cn1FxContains(uintptr_t v) {
+    long lo = 0, hi = (long)cn1FxWordN - 1;
+    while(lo <= hi) { long mid = (lo + hi) >> 1; uintptr_t m = cn1FxWords[mid];
+        if(m == v) return 1; if(m < v) lo = mid + 1; else hi = mid - 1; }
+    return 0;
+}
+// Called at each real free-site (BiBOP reclaim + legacy sweep) with the victim object.
+void cn1FxCheckVictim(JAVA_OBJECT o) {
+    if(o == 0) return;
+    cn1FxFreed++;
+    if(cn1FxContains((uintptr_t)o)) {
+        struct clazz* pc = o->__codenameOneParentClsReference;
+        const char* cn = (pc && (((uintptr_t)pc & 7) == 0) && pc->clsName) ? pc->clsName : "?";
+        JAVA_OBJECT r = cn1ConservativeResolve((void*)o);
+        fprintf(stderr, "[ROOTMISS] FREEING REACHABLE obj=%p class=%s heapPos=%d mark=%d "
+                        "resolve=%p V=%d\n",
+                (void*)o, cn, o->__heapPosition, o->__codenameOneGcMark, (void*)r,
+                currentGcMarkValue);
+        fflush(stderr);
+        cn1FxHits++;
+    }
+}
+void cn1FxReport(void) {
+    if(cn1FxHits > 0)
+        fprintf(stderr, "[ROOTMISS] cycle V=%d: %lld reachable objects freed of %lld swept "
+                        "(scanned-word set=%zu)\n",
+                currentGcMarkValue, cn1FxHits, cn1FxFreed, cn1FxWordN);
+    fflush(stderr);
+}
+#endif
+
 // (b) Conservative range scan: read every aligned word in [lo,hi), resolve it, and MARK
 // it for real. gcMarkObject in the GC-thread serial context just pushes to the worklist
 // (no lock, no malloc), so this is safe to run while mutator threads are stopped.
@@ -2661,7 +2740,11 @@ void cn1ConservativeMarkRange(CODENAME_ONE_THREAD_STATE, char* lo, char* hi) {
     if(lo == 0 || hi == 0 || hi <= lo) return;
     char* p = (char*)(((uintptr_t)lo + (sizeof(void*) - 1)) & ~((uintptr_t)(sizeof(void*) - 1)));
     for(; p + sizeof(void*) <= hi ; p += sizeof(void*)) {
-        JAVA_OBJECT o = cn1ConservativeResolve(*(void**)p);
+        void* w = *(void**)p;
+#ifdef CN1_ROOTMISS_FORENSIC
+        cn1FxAddWord((uintptr_t)w);          // record EVERY scanned raw word (incl. rejects)
+#endif
+        JAVA_OBJECT o = cn1ConservativeResolve(w);
         if(o != JAVA_NULL) {
             gcMarkObject(threadStateData, o, JAVA_FALSE);
         }
