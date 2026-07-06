@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable, List, Set
 
 ASCIIDOC_EXTENSIONS = {".adoc", ".asciidoc"}
 IMAGE_EXTENSIONS = {
@@ -29,6 +30,25 @@ def iter_text_files(root: Path) -> Iterable[Path]:
             yield path
 
 
+IMAGE_MACRO_PATTERN = re.compile(r"(?:^|[\s(])image::?([^\[\s]+)")
+
+
+def image_references(doc_root: Path, image_dir: Path) -> Set[str]:
+    references: Set[str] = set()
+    for path in iter_text_files(doc_root):
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        for match in IMAGE_MACRO_PATTERN.finditer(text):
+            reference = match.group(1).strip()
+            if not reference:
+                continue
+            if reference.startswith("img/"):
+                references.add(reference)
+                continue
+            if (image_dir / reference).exists():
+                references.add(f"img/{reference}")
+    return references
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("doc_root", type=Path, help="Path to the developer guide root directory")
@@ -44,6 +64,13 @@ def main() -> None:
         default=None,
         help="Optional path to write a JSON report",
     )
+    parser.add_argument(
+        "--allow-unused",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help="Image path relative to the document root that is allowed to remain unreferenced",
+    )
     args = parser.parse_args()
 
     doc_root = args.doc_root.resolve()
@@ -52,8 +79,8 @@ def main() -> None:
     if not image_dir.exists():
         raise SystemExit(f"Image directory '{image_dir}' does not exist")
 
-    adoc_files = list(iter_text_files(doc_root))
-    contents = [path.read_text(encoding="utf-8", errors="ignore") for path in adoc_files]
+    references = image_references(doc_root, image_dir)
+    allowed_unused = set(args.allow_unused)
 
     unused: List[str] = []
     for image_path in sorted(image_dir.rglob("*")):
@@ -65,11 +92,9 @@ def main() -> None:
         if image_path.suffix.lower() not in IMAGE_EXTENSIONS:
             continue
         rel_path = image_path.relative_to(doc_root).as_posix()
-        if any(rel_path in text for text in contents):
+        if rel_path in references:
             continue
-        # Also fall back to checking just the file name to catch references that rely on imagesdir.
-        filename = image_path.name
-        if any(filename in text for text in contents):
+        if rel_path in allowed_unused:
             continue
         unused.append(rel_path)
 

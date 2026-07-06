@@ -37,22 +37,14 @@ For example, you can bind an event callback for a https://www.codenameone.com/ja
 
 [source,java]
 ----
-Button b = new Button("Click Me");
-b.addActionListener(new ActionListener() {
-    public void actionPerformed(ActionEvent ev) {
-        // button was clicked, you can do anything you want here...
-    }
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EventsJava001Snippet.java[tag=events-java-001,indent=0]
 ----
 
 Or thanks to the Java 8 lambdas you can write it as:
 
 [source,java]
 ----
-Button b = new Button("Click Me");
-b.addActionListener((ev) ->
-    // button was clicked, you can do anything you want here...
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EventsJava002Snippet.java[tag=events-java-002,indent=0]
 ----
 
 Notice that the click will work whether the button was touched using a mouse, finger or keypad shortcut seamlessly with an action listener. Many components work with action events for example, buttons, text components, slider etc.
@@ -84,10 +76,7 @@ For example, the event dispatch thread allows you to listen to errors on the EDT
 
 [source,java]
 ----
-Display.getInstance().addEdtErrorHandler((e) -> {
-    Exception err = (Exception)e.getSource();
-    // ...
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EventsJava003Snippet.java[tag=events-java-003,indent=0]
 ----
 
 This will work great but you will still get the default error message from the EDT over that exception. To prevent the event from proceeding to the default error handling you can do this:
@@ -95,11 +84,7 @@ This will work great but you will still get the default error message from the E
 
 [source,java]
 ----
-Display.getInstance().addEdtErrorHandler((e) -> {
-    e.consume();
-    Exception err = (Exception)e.getSource();
-    // ...
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EventsJava004Snippet.java[tag=events-java-004,indent=0]
 ----
 
 Notice that you can check if an event was already consumed using the `isConsumed()` method but it's pretty unlikely that you will receive a consumed event as the system will stop sending it.
@@ -110,43 +95,28 @@ https://www.codenameone.com/javadoc/com/codename1/io/NetworkEvent.html[NetworkEv
 
 [source,java]
 ----
-NetworkManager.getInstance().addErrorListener(new ActionListener<NetworkEvent>() {
-    public void actionPerformed(NetworkEvent ev) {
-        // now we have access to the methods on NetworkEvent that provide more information about the network specific flags
-    }
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EventsJava005Snippet.java[tag=events-java-005,indent=0]
 ----
 
 Or with Java 8 lambdas:
 
 [source,java]
 ----
-NetworkManager.getInstance().addErrorListener((ev) -> {
-    // now we have access to the methods on NetworkEvent that provide more information about the network specific flags
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EventsJava006Snippet.java[tag=events-java-006,indent=0]
 ----
 
 The `NetworkEvent` allows the networking code to reuse the `EventDispatcher` infrastructure and to simplify event firing through the EDT. But you should notice that some code might not be equivalent for example, you could do this to read the input stream:
 
 [source,java]
 ----
-ConnectionRequest r = new ConnectionRequest() {
-    @Override
-    protected void readResponse(InputStream input) throws IOException {
-        // read the input stream
-    }
-};
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EventsJava007Snippet.java[tag=events-java-007,indent=0]
 ----
 
 Or you can do something similar using this code:
 
 [source,java]
 ----
-ConnectionRequest r = new ConnectionRequest();
-r.addResponseListener((e) -> {
-    byte[] data = (byte[])e.getMetaData();
-    // work with the byte data
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EventsJava008Snippet.java[tag=events-java-008,indent=0]
 ----
 
 These seem similar but they have one important distinction. The latter code is invoked on the EDT, so if `data` is big it might slow down processing. The `ConnectionRequest` is invoked on the network thread and so can process any amount of data without slowing down the UI.
@@ -190,25 +160,7 @@ For example, in this code from the `Flickr` demo the https://www.codenameone.com
 
 [source,java]
 ----
-public class CustomToolbar extends Toolbar implements ScrollListener {
-    private int alpha;
-
-    public CustomToolbar() {
-    }
-
-    public void paintComponentBackground(Graphics g) {
-        int a = g.getAlpha();
-        g.setAlpha(alpha);
-        super.paintComponentBackground(g);
-        g.setAlpha(a);
-    }
-
-    public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
-        alpha = scrollY;
-        alpha = Math.max(alpha, 0);
-        alpha = Math.min(alpha, 255);
-    }
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EventsJava009Snippet.java[tag=events-java-009,indent=0]
 ----
 
 // HTML_ONLY_START
@@ -229,10 +181,6 @@ The https://www.codenameone.com/javadoc/com/codename1/ui/events/SelectionListene
 
 https://www.codenameone.com/javadoc/com/codename1/ui/events/StyleListener.html[StyleListener] allows components to track changes to the style objects. For example, if the developer does something like:
 
-[source,java]
-----
-cmp.getUnselectedStyle().setFgColor(0xffffff);
-----
 
 This will trigger a style event that will eventually lead to the component being repainted. This is quite important
 for the component class but not an important event for general user code. It's recommended that developers don't bind a style listener.
@@ -249,24 +197,11 @@ For example, if you wish to provide an https://www.codenameone.com/javadoc/com/c
 
 [source,java]
 ----
-private final EventDispatcher listeners = new EventDispatcher();
-
-public void addActionListener(ActionListener a) {
-    listeners.addListener(a);
-}
-public void removeActionListener(ActionListener a) {
-    listeners.removeListener(a);
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EventsJava011Snippet.java[tag=events-java-011,indent=0]
 ----
 
 Then when you need to broadcast the event use:
 
-[source,java]
-----
-private void fireEvent(ActionEvent ev) {
-    listeners.fireActionEvent(ev);
-}
-----
 
 
 === Low-level events
@@ -317,22 +252,6 @@ IMPORTANT: Key events are relevant to physical keys and won't trigger on virtual
 
 The pointer events (touch events) can be intercepted by overriding one or more of these methods in `Component` or `Form`. Notice that unless you want to block functionality you should probably invoke `super` when overriding:
 
-[source,java]
-----
-public void pointerDragged(int[] x, int[] y)
-public void pointerDragged(final int x, final int y)
-public void pointerPressed(int[] x, int[] y)
-public void pointerPressed(int x, int y)
-public void pointerReleased(int[] x, int[] y)
-public void pointerReleased(int x, int y)
-public void pointerHover(int[] x, int[] y)
-public void pointerHoverPressed(int[] x, int[] y)
-public void pointerHoverReleased(int[] x, int[] y)
-public void longPointerPress(int x, int y)
-public void keyPressed(int keyCode)
-public void keyReleased(int keyCode)
-public void keyRepeated(int keyCode)
-----
 
 Notice that most pointer events have a version that accepts an array as an argument, this allows for multi-touch event handling by sending all the touched coordinates. Desktop and pen-enabled devices can also trigger hover events without a press. To respond to those you can override the `pointerHover*` callbacks on `Form` or `Component`, which are invoked before a button receives focus or a drag begins on those platforms.
 
@@ -350,11 +269,7 @@ For example, if your component is a painting app where you're trying to draw usi
 
 [source,java]
 ----
-public class MyComponent extends Component {
-    protected int getDragRegionStatus(int x, int y) {
-        return DRAG_REGION_LIKELY_DRAG_XY;
-    }
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/EventsJava014Snippet.java[tag=events-java-014,indent=0]
 ----
 
 This indicates that you want all drag events on both AXIS to be sent as soon as possible. Notice that this doesn't disable event sanitation.
@@ -366,16 +281,3 @@ The https://www.codenameone.com/javadoc/com/codename1/ui/events/BrowserNavigatio
 IMPORTANT: The callback method of this interface is invoked off the EDT! You must **NEVER** block this method and must not access UI or Codename One sensitive elements in this method!
 
 The browser navigation callback is invoked directly from the native web component as it navigates to a new page. Because of that it's invoked on the native OS thread and gives you a unique opportunity to handle the navigation ourselves as you see fit. That's why it MUST be invoked on the native thread, since the native browser is pending on your response to that method, spanning an invokeAndBlock/callSerially would be to slow and would bog down the browser.
-
-You can use the browser navigation callback to change the UI or even to invoke Java code from JavaScript code e.g.:
-
-[source,java]
-----
-bc.setBrowserNavigationCallback((url) -> {
-    if(url.startsWith("http://click")) {
-        Display.getInstance().callSerially(() -> bc.execute("fnc('<p>You clicked!</p>')"));
-        return false;
-    }
-    return true;
-});
-----

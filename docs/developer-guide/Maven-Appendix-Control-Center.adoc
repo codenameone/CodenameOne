@@ -13,7 +13,7 @@ Use the `run.sh` (or run.bat, if on Windows) to open Codename One settings:
 
 [source,bash]
 ----
-./run.sh settings
+include::../demos/common/src/main/snippets/developer-guide/maven-appendix-control-center.sh[tag=maven-appendix-control-center-bash-001,indent=0]
 ----
 
 ==== Opening Codename One settings from IntelliJ

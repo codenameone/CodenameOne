@@ -8,7 +8,7 @@ For example:
 
 [source,bash]
 ----
-mvn cn:update
+include::../demos/common/src/main/snippets/developer-guide/maven-updating-codename-one.sh[tag=maven-updating-codename-one-bash-001,indent=0]
 ----
 
 [discrete]
@@ -18,7 +18,7 @@ Or you can use the `run.sh/run.bat` script to run this goal as follows:
 
 [source,bash]
 ----
-./run.sh update
+include::../demos/common/src/main/snippets/developer-guide/maven-updating-codename-one.sh[tag=maven-updating-codename-one-bash-002,indent=0]
 ----
 
 NOTE: Use `run.bat update` instead on Windows
@@ -50,8 +50,7 @@ For example, Open the `pom.xml` file, and look for the following:
 
 [source,xml,subs="+attributes"]
 ----
-<cn1.plugin.version>{cn1-plugin-release-version}</cn1.plugin.version>
-<cn1.version>{cn1-release-version}</cn1.version>
+include::../demos/common/src/main/snippets/developer-guide/maven-updating-codename-one.xml[tag=maven-updating-codename-one-xml-001,indent=0]
 ----
 
 Change these values to reflect the latest version of the `codenameone-maven-plugin` found https://search.maven.org/artifact/com.codenameone/codenameone-maven-plugin[here].

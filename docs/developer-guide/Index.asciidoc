@@ -222,15 +222,7 @@ To create a new Codename One project visit https://www.codenameone.com/initializ
 
 [source,bash]
 ----
-mvn archetype:generate \
-  -DarchetypeGroupId=com.codenameone \
-  -DarchetypeArtifactId=cn1app-archetype \
-  -DarchetypeVersion=LATEST \
-  -DgroupId=YOUR_GROUP_ID \
-  -DartifactId=YOUR_ARTIFACT_ID \
-  -Dversion=1.0-SNAPSHOT \
-  -DmainName=YOUR_MAIN_NAME \
-  -DinteractiveMode=false
+include::../demos/common/src/main/snippets/developer-guide/index.sh[tag=index-bash-001,indent=0]
 ----
 
 This command generates a project in the current directory. The folder name matches the `artifactId` value. For example, specifying `-DartifactId=myapp` produces a project inside a new `myapp` directory.
@@ -302,12 +294,7 @@ After clicking finish in the new project wizard you have a `HelloWorld` project 
 
 [source,java,title='HelloWorld Class']
 ----
-public class HelloWorld { // <1>
-    private Form current; // <2>
-    private Resources theme; // <3>
-
-    // ... class methods ...
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IndexJava001Snippet.java[tag=index-java-001,indent=0]
 ----
 
 <1> This is the main class, it's the entry point to the app, notice it doesn't have a `main` method but rather callback which this guide covers soon
@@ -318,72 +305,11 @@ public class HelloWorld { // <1>
 
 Next consider the first lifecycle method `init(Object)`. The <<ApplicationLifecycle,Application Lifecycle Sidebar>> discusses the lifecycle in depth:
 
-[source,java,title='HelloWorld init(Object)']
-----
-public void init(Object context) { // <1>
-    updateNetworkThreadCount(2); // <2>
-    theme = UIManager.initFirstTheme("/theme"); // <3>
-    Toolbar.setGlobalToolbar(true); // <4>
-    Log.bindCrashProtection(true); // <5>
-    addNetworkErrorListener(err -> { // <6>
-        err.consume(); // <7>
-        if(err.getError() != null) { // <8>
-            Log.e(err.getError());
-        }
-        Log.sendLogAsync(); // <9>
-        Dialog.show("Connection Error", // <10>
-            "There was a networking error in the connection to " +
-            err.getConnectionRequest().getUrl(), "OK", null);
-    });
-}
-----
-
-<1> `init` is the first of the four lifecycle methods. It's responsible for initialization of variables and values
-
-<2> By default Codename One has one thread that performs all the networking, you set the default to two which provides better performance
-
-<3> The theme determines the appearance of the application. You will discuss this in the next chapter
-
-<4> This enables the `Toolbar` API by default, it allows finer control over the title bar area
-
-<5> Crash protection automatically sends device crash logs through the cloud
-
-<6> In case of a network error the code in this block would run, you can customize it to handle networking errors effectively
-
-<7> `consume()` swallows the event so it doesn't trigger other alerts, it means "`you got this`"
-
-<8> Not all errors include an exception, if you have an exception you can log it with this code
-
-<9> This will email the log from the device to you if you have a pro subscription
-
-<10> This shows an error dialog to the user, in production you might want to remove that code
 
 `init(Object)` works as a constructor to some degree. Recommend avoiding the constructor for the main class and placing logic in the init method instead. This isn't crucial but recommend it since the constructor might happen too early in the application lifecycle.
 
 In a cold start `init(Object)` is invoked followed by the `start()` method. For example, `start()` can be invoked more than once if an app is minimized and restored, see the sidebar <<ApplicationLifecycle,Application Lifecycle>>:
 
-[source,java,title='HelloWorld start()']
-----
-public void start() {
-    if(current != null){ // <1>
-        current.show(); // <2>
-        return;
-    }
-    Form hi = new Form("Hi World", BoxLayout.y()); // <3>
-    hi.add(new Label("Hi World")); // <4>
-    hi.show(); // <5>
-}
-----
-
-<1> If the app was minimized you don't want to do much, show the last `Form` of the application
-
-<2> `current` is a `Form` which is the top most visual element. You can have one `Form` showing and you enforce that by using the `show()` method
-
-<3> You create a new simple `Form` instance. It has the title "`Hello World`" and arranges elements vertically (on the Y axis)
-
-<4> You add another `Label` below the title, see figure <<TitleAndLabelImage>>. You will discuss component hierarchy later
-
-<5> The `show()` method places the `Form` on the screen. Only one `Form` can be shown at a time
 
 [[TitleAndLabelImage]]
 .Title and Label in the UI
@@ -422,27 +348,6 @@ IMPORTANT: `destroy()` is optional there is no guarantee that it will be invoked
 
 Now that you have a general sense of the lifecycle lets look at the last two lifecycle methods:
 
-[source,java,title='HelloWorld stop() and destroy()']
-----
-public void stop() { // <1>
-    current = getCurrentForm(); // <2>
-    if(current instanceof Dialog) { // <3>
-        ((Dialog)current).dispose();
-        current = getCurrentForm();
-    }
-}
-
-public void destroy() { // <4>
-}
-----
-
-<1> `stop()` is invoked when the app is minimized or a different app is opened
-
-<2> As the app is stopped you save the current `Form` so you can restore it back in `start()` if the app is restored
-
-<3> `Dialog` is a bit of a special case restoring a `Dialog` might block the proper flow of application execution so you dispose them and then get the parent `Form`
-
-<4> `destroy()` is a special case. Under normal circumstances you shouldn't write code in `destroy()`. `stop()` should work for most cases
 
 That's it. You should now have a general sense of the code. It's time to run on the device.
 
@@ -526,7 +431,7 @@ Run the wizard from the project directory:
 
 [source,bash]
 ----
-mvn cn1:certificatewizard
+include::../demos/common/src/main/snippets/developer-guide/index.sh[tag=index-bash-002,indent=0]
 ----
 
 After storing an App Store Connect API key, click *Auto Setup* in the toolbar. The wizard reads the project package and display name, creates or reuses the Bundle ID with push enabled, creates/reuses development and App Store signing assets, and writes the debug/release signing settings back into `codenameone_settings.properties`.
@@ -599,127 +504,15 @@ Due to the way Kotlin works you can create a regular Java project and convert so
 
 The hello world Java source file looks like this (removed some comments and whitespace):
 
-[source,java]
-----
-public class MyApplication {
-    private Form current;
-    private Resources theme;
 
-    public void init(Object context) {
-        theme = UIManager.initFirstTheme("/theme");
-        Toolbar.setGlobalToolbar(true);
-        Log.bindCrashProtection(true);
-    }
+When you select that file and select the menu option #Code# -> #Convert Java file to Kotlin File# you should get a familiar structure. The problem is that there are two bugs in the automatic conversion... That's the code for Kotlin behaves differently from standard Java.
 
-    public void start() {
-        if(current != null){
-            current.show();
-            return;
-        }
-        Form hi = new Form("Hi World", BoxLayout.y());
-        hi.add(new Label("Hi World"));
-        hi.show();
-    }
-
-    public void stop() {
-        current = getCurrentForm();
-        if(current instanceof Dialog) {
-            ((Dialog)current).dispose();
-            current = getCurrentForm();
-        }
-    }
-
-    public void destroy() {
-    }
-}
-----
-
-When you select that file and select the menu option #Code# -> #Convert Java file to Kotlin File# you should get this:
-
-[source,kotlin]
-----
-class MyApplication {
-    private var current: Form? = null
-    private var theme: Resources? = null
-
-    fun init(context: Any) {
-        theme = UIManager.initFirstTheme("/theme")
-        Toolbar.setGlobalToolbar(true)
-        Log.bindCrashProtection(true)
-    }
-
-    fun start() {
-        if (current != null) {
-            current!!.show()
-            return
-        }
-        val hi = Form("Hi World", BoxLayout.y())
-        hi.add(Label("Hi World"))
-        hi.show()
-    }
-
-    fun stop() {
-        current = getCurrentForm()
-        if (current is Dialog) {
-            (current as Dialog).dispose()
-            current = getCurrentForm()
-        }
-    }
-
-    fun destroy() {
-    }
-}
-----
-
-That's pretty familiar. The problem is that there are two bugs in the automatic conversion... That's the code for Kotlin behaves differently from standard Java.
-
-The first problem is that Kotlin classes are final unless declared otherwise so you need to add the open keyword before the class declaration as such:
-
-[source,kotlin]
-----
-open class MyApplication
-----
+The first problem is that Kotlin classes are final unless declared otherwise so you need to add the open keyword before the class declaration.
 
 This is essential as the build server will fail with weird errors related to instanceof.
 
 NOTE: This applies to the main class of the project, other classes in Codename One can remain `final`
 
 The second problem is that arguments are non-null by default. The `init` method might have a null argument. This fails with an exception. The solution is to add a question mark to the end of the call: `fun init(context: Any?)`.
-
-The full working sample is:
-
-[source,kotlin]
-----
-open class MyApplication {
-    private var current: Form? = null
-    private var theme: Resources? = null
-    fun init(context: Any?) {
-        theme = UIManager.initFirstTheme("/theme")
-        Toolbar.setGlobalToolbar(true)
-        Log.bindCrashProtection(true)
-    }
-
-    fun start() {
-        if (current != null) {
-            current!!.show()
-            return
-        }
-        val hi = Form("Hi World", BoxLayout.y())
-        hi.add(Label("Hi World"))
-        hi.show()
-    }
-
-    fun stop() {
-        current = getCurrentForm()
-        if (current is Dialog) {
-            (current as Dialog).dispose()
-            current = getCurrentForm()
-        }
-    }
-
-    fun destroy() {
-    }
-}
-----
 
 Once all that's in place Kotlin should work. This should be possible for more JVM languages in the future.

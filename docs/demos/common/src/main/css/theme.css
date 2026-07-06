@@ -50,5 +50,5 @@ SideCommand {
     color: black;
     font-family: "native:MainLight";
     font-size: 4mm;
-    border-bottom: 2px solid #cccccc;
+    border: 1px solid #cccccc;
 }

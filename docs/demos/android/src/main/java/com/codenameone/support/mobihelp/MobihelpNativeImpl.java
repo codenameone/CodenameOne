@@ -3,7 +3,6 @@ package com.codenameone.support.mobihelp;
 import android.content.Context;
 import com.codename1.impl.android.AndroidNativeUtil;
 
-// tag::mobihelpNativeImplContext[]
 class MobihelpNativeImpl {
     // tag::mobihelpNativeContext[]
     private static Context context() {
@@ -11,11 +10,9 @@ class MobihelpNativeImpl {
     }
     // end::mobihelpNativeContext[]
 
-    // tag::mobihelpNativeClearUserData[]
     public void clearUserData() {
         com.freshdesk.mobihelp.Mobihelp.clearUserData(context());
     }
-    // end::mobihelpNativeClearUserData[]
 
     private static AndroidActivityWrapper activity() {
         return new AndroidActivityWrapper();
@@ -47,7 +44,6 @@ class MobihelpNativeImpl {
     }
     // end::mobihelpNativeGetUnreadCountAsync[]
 }
-// end::mobihelpNativeImplContext[]
 
 // Helper wrapper to simulate Android Activity runOnUiThread for compilation
 class AndroidActivityWrapper {

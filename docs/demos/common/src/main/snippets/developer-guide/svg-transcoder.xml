@@ -1,0 +1,11 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::svg-transcoder-xml-001[]
+<execution>
+    <id>transcode-svg</id>
+    <phase>generate-sources</phase>
+    <goals>
+        <goal>transcode-svg</goal>
+    </goals>
+</execution>
+// end::svg-transcoder-xml-001[]

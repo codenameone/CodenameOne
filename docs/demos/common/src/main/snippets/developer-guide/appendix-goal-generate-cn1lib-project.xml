@@ -1,0 +1,10 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::appendix-goal-generate-cn1lib-project-xml-001[]
+<dependency>
+  <groupId>com.example</groupId>
+  <artifactId>my-maven-lib-lib</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <type>pom</type>
+</dependency>
+// end::appendix-goal-generate-cn1lib-project-xml-001[]

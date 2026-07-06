@@ -5,7 +5,7 @@ import com.codename1.contacts.Contact;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.list.MultiButton;
+import com.codename1.components.MultiButton;
 import com.codename1.impl.android.AndroidNativeUtil;
 import com.codename1.impl.android.PermissionPromptCallback;
 

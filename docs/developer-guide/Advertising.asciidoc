@@ -62,23 +62,14 @@ per-platform classifier jars:
 
 [source,xml]
 ----
-<dependency>
-    <groupId>com.codenameone</groupId>
-    <artifactId>cn1-admob-lib</artifactId>
-    <version>${cn1.version}</version>
-    <type>pom</type>
-</dependency>
+include::../demos/common/src/main/snippets/developer-guide/advertising.xml[tag=advertising-xml-001,indent=0]
 ----
 
 `cn1-ads-mock` is a single cross-platform jar, so it needs no classifier:
 
 [source,xml]
 ----
-<dependency>
-    <groupId>com.codenameone</groupId>
-    <artifactId>cn1-ads-mock</artifactId>
-    <version>${cn1.version}</version>
-</dependency>
+include::../demos/common/src/main/snippets/developer-guide/advertising.xml[tag=advertising-xml-002,indent=0]
 ----
 
 === Enabling a provider
@@ -86,13 +77,6 @@ per-platform classifier jars:
 Enable a provider once at startup. Each library exposes a static `install()`
 method that registers its provider with `AdManager`:
 
-[source,java]
-----
-AdMobProvider.install();    // from cn1-admob
-// AppLovinProvider.install();  // from cn1-applovin
-// LevelPlayProvider.install(); // from cn1-unity-levelplay
-// MockAdProvider.install();    // from cn1-ads-mock (tests / simulator)
-----
 
 That single call binds the provider; the rest of your code uses only the
 framework API in `com.codename1.ads`. If no provider is registered the API
@@ -108,16 +92,6 @@ wrap Google's User Messaging Platform or an equivalent), and on iOS the App
 Tracking Transparency prompt must be presented to access the advertising
 identifier. The recommended order is to initialize, gather consent, then load:
 
-[source,java]
-----
-AdMobProvider.install();
-AdManager.initialize(new AdConfig().testMode(true), ready ->
-    AdConsent.requestConsent(status -> {
-        if (AdConsent.canRequestAds()) {
-            // safe to load ads now
-        }
-    }));
-----
 
 `AdConfig` also carries the global compliance flags every network requires:
 test mode, test device ids, child directed treatment, under-age-of-consent
@@ -132,12 +106,6 @@ unit ids while developing.
 `BannerAd` is a regular Codename One component. Add it to a form (typically
 anchored at the top or bottom) and call `load()`:
 
-[source,java]
-----
-BannerAd banner = new BannerAd("ca-app-pub-xxx/yyy");
-form.add(BorderLayout.SOUTH, banner);
-banner.load();
-----
 
 The default `SIZE_ADAPTIVE` requests an anchored adaptive banner sized to the
 available width, which is the recommended modern banner type.
@@ -147,40 +115,16 @@ available width, which is the recommended modern banner type.
 Interstitials are event driven - load, then show when loaded, and preload the
 next one when the current ad is dismissed:
 
-[source,java]
-----
-InterstitialAd ad = new InterstitialAd("ca-app-pub-xxx/yyy");
-ad.setAdListener(new AdListener() {
-    public void onLoaded() { ad.show(); }
-    public void onDismissed() { ad.load(); } // preload the next
-});
-ad.load();
-----
 
 You can also let Codename One show an interstitial automatically on screen
 transitions, no more often than a given interval:
 
-[source,java]
-----
-AdManager.bindInterstitialOnTransition(new InterstitialAd("ca-app-pub-xxx/yyy"), 60000);
-----
 
 === Rewarded and rewarded interstitial ads
 
 Register a reward listener and grant the reward when it fires. For valuable
 rewards, verify server side rather than trusting the client:
 
-[source,java]
-----
-RewardedAd ad = new RewardedAd("ca-app-pub-xxx/yyy");
-ad.setServerSideVerificationOptions(new ServerSideVerificationOptions(userId, "level=7"));
-ad.setAdListener(new AdListener() {
-    public void onLoaded() {
-        ad.show(reward -> grantCoins(reward.getAmount()));
-    }
-});
-ad.load();
-----
 
 `RewardedInterstitialAd` has the same API but is shown on a transition rather
 than opt-in.
@@ -190,10 +134,6 @@ than opt-in.
 App open ads are shown while the app is brought to the foreground. Let the
 manager and provider handle the foreground hook and freshness window for you:
 
-[source,java]
-----
-AdManager.enableAppOpenAds(new AppOpenAd("ca-app-pub-xxx/yyy"));
-----
 
 === Native ads
 
@@ -204,14 +144,6 @@ chat or a search results screen - where a banner feels bolted on but a row
 styled like the others fits in. The ad must still be clearly labelled
 (for example "Sponsored"):
 
-[source,java]
-----
-if (NativeAdLoader.isSupported()) {
-    new NativeAdLoader("ca-app-pub-xxx/yyy").load(null,
-        ad -> feed.addComponent(buildSponsoredRow(ad)),  // your own layout
-        err -> Log.p(err.toString()));
-}
-----
 
 `NativeAd` exposes the headline, body, call-to-action, advertiser and rating
 that you bind to your own components. Native ad support is an optional provider
@@ -226,8 +158,7 @@ standard build hints in your project's `codenameone_settings.properties`:
 
 [source,properties]
 ----
-codename1.arg.android.xapplication=<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-XXXXXXXX~YYYYYYYY"/>
-codename1.arg.ios.plistInject=<key>GADApplicationIdentifier</key><string>ca-app-pub-XXXXXXXX~YYYYYYYY</string>
+include::../demos/common/src/main/snippets/developer-guide/advertising.properties[tag=advertising-properties-001,indent=0]
 ----
 
 The SDK dependencies themselves (the GMA pod / Gradle dependency and the
@@ -243,9 +174,4 @@ method. No framework or build-tool changes are required.
 
 For tests and screenshots the framework ships a deterministic, network-free
 provider, `MockAdProvider` (in `cn1-ads-mock`), that renders fixed, labelled ads
-with stable sizes and colours. Enable it the same way:
-
-[source,java]
-----
-MockAdProvider.install();
-----
+with stable sizes and colours.

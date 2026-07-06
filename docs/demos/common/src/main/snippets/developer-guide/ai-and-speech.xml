@@ -1,0 +1,10 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::ai-and-speech-xml-001[]
+<dependency>
+    <groupId>com.codenameone</groupId>
+    <artifactId>cn1-ai-mlkit-barcode-lib</artifactId>
+    <version>${cn1.version}</version>
+    <type>pom</type>
+</dependency>
+// end::ai-and-speech-xml-001[]

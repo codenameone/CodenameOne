@@ -46,11 +46,7 @@ the archetype generated:
 
 [source,properties]
 ----
-codename1.arg.ios.onDeviceDebug=true
-codename1.arg.ios.onDeviceDebug.proxyHost=127.0.0.1
-codename1.arg.ios.onDeviceDebug.proxyPort=55333
-# Optional: block the app at startup until the IDE attaches.
-codename1.arg.ios.onDeviceDebug.waitForAttach=true
+include::../demos/common/src/main/snippets/developer-guide/on-device-debugging.properties[tag=on-device-debugging-properties-001,indent=0]
 ----
 
 For a physical device, set `proxyHost` to the laptop's LAN IP (run
@@ -106,11 +102,7 @@ two terminals:
 
 [source,bash]
 ----
-# Terminal 1 — start the proxy
-mvn cn1:ios-on-device-debugging
-
-# Terminal 2 — attach jdb
-jdb -attach localhost:8000
+include::../demos/common/src/main/snippets/developer-guide/on-device-debugging.sh[tag=on-device-debugging-bash-001,indent=0]
 ----
 
 For VS Code (Debugger for Java extension), add a launch
@@ -127,8 +119,7 @@ is manual:
 
 [source,bash]
 ----
-jdb -attach localhost:8000 \
-    -sourcepath src/main/java:$HOME/.m2/repository/com/codenameone/codenameone-core/8.0-SNAPSHOT/codenameone-core-8.0-SNAPSHOT-sources.jar
+include::../demos/common/src/main/snippets/developer-guide/on-device-debugging.sh[tag=on-device-debugging-bash-002,indent=0]
 ----
 
 The `-sourcepath` is required for `list` / `where` to render framework

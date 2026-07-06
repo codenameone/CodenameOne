@@ -7,7 +7,7 @@ The `guibuilder` goal opens the Codename One GUI builder to edit a specified GUI
 
 [source,bash]
 ----
-mvn cn1:guibuilder -DclassName=com.example.MyForm
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-guibuilder.sh[tag=appendix-goal-guibuilder-bash-001,indent=0]
 ----
 
 This will open the GUI builder to edit the form whose class is `com.example.MyForm`.

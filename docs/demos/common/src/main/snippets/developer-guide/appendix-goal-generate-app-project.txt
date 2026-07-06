@@ -1,0 +1,17 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::appendix-goal-generate-app-project-rpf-001[]
+template.mainName=MyApp
+template.packageName=com.example
+template.type=maven
+
+[dependencies]
+====
+<dependency>
+  <groupId>com.codenameone</groupId>
+  <artifactId>googlemaps-lib</artifactId>
+  <version>1.0.1</version>
+  <type>pom</type>
+</dependency>
+====
+// end::appendix-goal-generate-app-project-rpf-001[]

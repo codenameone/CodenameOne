@@ -19,19 +19,7 @@ its notifications are shown. Request it through `Display`:
 
 [source,java]
 ----
-import com.codename1.notifications.NotificationPermissionRequest;
-import com.codename1.notifications.NotificationPermissionResult.AuthorizationLevel;
-
-NotificationPermissionRequest req = new NotificationPermissionRequest()
-        .provisional(true)      // iOS: deliver quietly without an explicit prompt
-        .timeSensitive(true);   // iOS: allow the time-sensitive interruption level
-
-Display.getInstance().requestNotificationPermission(req, result -> {
-    if (result.isGranted()) {
-        // schedule notifications
-    }
-    AuthorizationLevel level = result.getAuthorizationLevel();
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/NotificationsAndBackgroundExecutionJava001Snippet.java[tag=notifications-and-background-execution-java-001,indent=0]
 ----
 
 `NotificationPermissionResult.getAuthorizationLevel()` returns an `AuthorizationLevel`
@@ -59,21 +47,6 @@ provisioning profile doesn't carry breaks code signing).
 `LocalNotification` is scheduled through `Display.scheduleLocalNotification(...)` as
 before; the bean has been extended with fluent, backward-compatible setters:
 
-[source,java]
-----
-LocalNotification n = new LocalNotification()
-        .setChannelId("messages")                 // Android channel (see below)
-        .setGroup("chat-42")                       // bundle related notifications
-        .setProgress(100, 40)                      // determinate progress bar (Android)
-        .setTimeSensitive(true);                   // break through Focus / elevated importance
-n.setId("msg-42");
-n.setAlertTitle("New message");
-n.setAlertBody("Tap to reply");
-n.addAction("open", "Open");
-n.addInputAction("reply", "Reply", "Type a message", "Send");  // inline quick reply
-Display.getInstance().scheduleLocalNotification(n, System.currentTimeMillis() + 1000,
-        LocalNotification.REPEAT_NONE);
-----
 
 When the user taps an action, the selected action id (and any quick-reply text) are
 delivered through `com.codename1.push.PushContent` -- `getActionId()`, `getActionTitle()`
@@ -117,16 +90,6 @@ Channels let the user control importance, sound, vibration, lights, lock screen
 visibility and badge display for a group of notifications. Build and register one at startup,
 then reference it from a notification with `setChannelId(...)`:
 
-[source,java]
-----
-new NotificationChannelBuilder("messages", "Messages")
-        .description("Incoming chat messages")
-        .importance(NotificationChannelBuilder.IMPORTANCE_HIGH)
-        .sound("/notification_sound_ping.mp3")
-        .enableVibration(true)
-        .lightColor(0xff0000)
-        .register();
-----
 
 Channels are an Android concept. On iOS and the simulator `register()` is a no-op (the
 simulator stores the channel so its name can be shown in the notification panel); the
@@ -138,16 +101,6 @@ channel id you assign is still carried so the notification behaves consistently.
 Implement `BackgroundWorker` in a class with a public no-argument constructor (it's
 reconstructed after a cold launch -- pass state through the input data, not fields):
 
-[source,java]
-----
-WorkRequest req = WorkRequest.builder("sync", SyncWorker.class)
-        .setRequiresNetwork(true)
-        .setRequiresCharging(true)
-        .setPeriodic(6 * 60 * 60 * 1000L)
-        .putInputData("account", "primary")
-        .build();
-BackgroundWork.schedule(req);
-----
 
 [options="header"]
 |===
@@ -169,17 +122,6 @@ and links `BackgroundTasks.framework` automatically.
 
 `ForegroundService` runs a long task while a persistent notification is shown:
 
-[source,java]
-----
-ForegroundService svc = ForegroundService.start("downloads", "Downloading", "Please wait",
-        null, service -> {
-            for (int i = 0; i <= 100; i++) {
-                service.updateNotification("Downloading", i + "%");
-                // ... do a chunk of work ...
-            }
-        });
-// auto-stops when the task returns, or call svc.stop()
-----
 
 [options="header"]
 |===
@@ -196,18 +138,6 @@ Override the type with the `android.foregroundServiceType` build hint (default `
 Override `onReceivedSharedContent(SharedContent)` on your `Lifecycle` subclass to receive
 text, URLs, files or images shared into your app from other apps:
 
-[source,java]
-----
-public class MyApp extends Lifecycle {
-    public void onReceivedSharedContent(SharedContent content) {
-        for (SharedContent.Item item : content.getItems()) {
-            if (item.getType() == SharedContent.TYPE_IMAGE) {
-                importImage(item.getFilePath()); // a FileSystemStorage path
-            }
-        }
-    }
-}
-----
 
 [options="header"]
 |===
@@ -236,7 +166,7 @@ Server-side topic delivery is handled by the Codename One push server.
 
 === Simulator
 
-The JavaSE simulator implements all of the above so you can develop without a device. Use
+The JavaSE simulator implements all the above so you can develop without a device. Use
 the *Simulate -> Notifications and Background* menu to toggle the background constraints
 (network / charging / idle / battery), run scheduled work immediately, inspect registered
 channels, and inject shared content. Posted notifications appear in a panel at the top

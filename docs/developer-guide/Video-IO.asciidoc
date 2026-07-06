@@ -26,12 +26,7 @@ As with other optional platform features, always gate usage with `isSupported()`
 
 [source,java]
 ----
-if (!VideoIO.isSupported()) {
-    // Video encoding / decoding is not available on this platform
-    // (for example TV, Watch or Car), so fall back gracefully.
-    return;
-}
-VideoIO io = VideoIO.getVideoIO();
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/VideoIoJava001Snippet.java[tag=video-io-java-001,indent=0]
 ----
 
 NOTE: On the desktop simulator `VideoIO` is backed by an `ffmpeg`/`ffprobe` binary. The
@@ -49,25 +44,7 @@ frames, generated animation, anything.
 
 [source,java]
 ----
-String out = FileSystemStorage.getInstance().getAppHomePath() + "/generated.mp4";
-int w = 640, h = 480;
-float fps = 30;
-
-VideoWriter writer = new VideoWriterBuilder()
-        .path(out)
-        .width(w).height(h).frameRate(fps)
-        .videoCodec(VideoIO.CODEC_H264).videoBitRate(4_000_000)
-        .build();
-
-// Each frame is just an Image you fully control: draw whatever you like.
-for (int i = 0; i < 90; i++) {                 // 3 seconds at 30fps
-    Image frame = Image.createImage(w, h, 0xff000000);
-    Graphics g = frame.getGraphics();
-    g.setColor(0xffffff);
-    g.fillRect((i * 8) % w, h / 2 - 20, 60, 40);
-    writer.writeFrame(frame, Math.round(i * 1000f / fps));
-}
-writer.close();
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/VideoIoJava001Snippet.java[tag=video-io-java-002,indent=0]
 ----
 
 To add an audio track, enable it on the builder (`.hasAudio(true)`) and push interleaved
@@ -82,40 +59,14 @@ that walks the whole clip emitting evenly spaced frames:
 
 [source,java]
 ----
-VideoReader reader = VideoIO.getVideoIO().openReader(videoPath);
-System.out.println(reader.getWidth() + "x" + reader.getHeight()
-        + " " + reader.getFrameRate() + "fps, "
-        + reader.getDurationMillis() + "ms");
-
-List<Image> thumbnails = new ArrayList<>();
-
-// Frame accurate single frame (unlike Media.setTime which snaps to key frames):
-VideoFrame oneSecond = reader.frameAt(1000);
-if (oneSecond != null) {
-    thumbnails.add(oneSecond.toImage());
-}
-
-// Resample the (possibly variable frame rate) clip to a constant 10fps stream:
-reader.readFrames(10, f -> {
-    // f.getARGB() / f.toImage() give you the decoded RGBA pixels
-    thumbnails.add(f.toImage());
-    return thumbnails.size() < 50;   // stop after 50 frames
-});
-reader.close();
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/VideoIoJava001Snippet.java[tag=video-io-java-003,indent=0]
 ----
 
 The audio track, when present, is decoded to interleaved PCM:
 
 [source,java]
 ----
-VideoReader reader = VideoIO.getVideoIO().openReader(videoPath);
-if (reader.hasAudio()) {
-    AudioBuffer pcm = reader.readAudio();
-    System.out.println("Decoded " + pcm.getSize() + " PCM samples at "
-            + reader.getAudioSampleRate() + "Hz, "
-            + reader.getAudioChannels() + " channels");
-}
-reader.close();
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/VideoIoJava001Snippet.java[tag=video-io-java-004,indent=0]
 ----
 
 === Discovering available codecs
@@ -125,13 +76,7 @@ hardware accelerated encoders):
 
 [source,java]
 ----
-VideoIO io = VideoIO.getVideoIO();
-for (VideoCodec codec : io.getAvailableEncoders()) {
-    System.out.println(codec.getId()
-            + " (" + codec.getName() + ")"
-            + (codec.isHardwareAccelerated() ? " [hardware]" : ""));
-}
-boolean canEncodeH264 = io.isEncoderSupported(VideoIO.CODEC_H264);
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/VideoIoJava001Snippet.java[tag=video-io-java-005,indent=0]
 ----
 
 === Platform support

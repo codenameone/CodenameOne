@@ -18,37 +18,11 @@ Annotate the target `Form` class:
 
 [source,java]
 ----
-package com.example;
-
-import com.codename1.annotations.Route;
-import com.codename1.annotations.RouteParam;
-import com.codename1.ui.Form;
-
-@Route("/users/:id")
-public class ProfileForm extends Form {
-    public ProfileForm(@RouteParam("id") String id) {
-        setTitle("Profile " + id);
-        // ...
-    }
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DeepLinksRoutingJava001Snippet.java[tag=deep-links-routing-java-001,indent=0]
 ----
 
 Or annotate a static factory method:
 
-[source,java]
-----
-public class Routes {
-    @Route("/home")
-    public static Form home() {
-        return new HomeForm();
-    }
-
-    @Route("/users/:id")
-    public static Form profile(@RouteParam("id") String id) {
-        return new ProfileForm(id);
-    }
-}
-----
 
 Both forms are supported and a project can mix them. Path variables in
 the pattern (`:id`, `*`, `**`) are matched by name against parameters
@@ -78,21 +52,6 @@ resolves the URL through the same generated route table that handles
 incoming deep links, builds the matching `Form`, pushes it onto the
 navigation stack, and shows it.
 
-[source,java]
-----
-Navigation.navigate("/users/42");
-
-// Go back one step:
-Navigation.back();
-
-// Inspect the stack for a breadcrumb UI:
-Container breadcrumbs = new Container(BoxLayout.x());
-for (final NavigationEntry e : Navigation.getStack()) {
-    Button crumb = new Button(e.getTitle());
-    crumb.addActionListener(evt -> Navigation.popTo(e));
-    breadcrumbs.add(crumb);
-}
-----
 
 The five-method surface (`navigate`, `back`, `getCurrent`, `getStack`,
 `popTo`) is everything the application sees -- the rest of the URL-to-
@@ -122,16 +81,6 @@ Host an `apple-app-site-association` JSON file at
 `https://your.domain/.well-known/apple-app-site-association` over HTTPS
 without redirects. The plugin's `AasaBuilder` produces the payload:
 
-[source,java]
-----
-String json = new com.codename1.maven.routing.AasaBuilder()
-    .appId("ABCD1234.com.example.app")
-    .addRouterPattern("/users/:id")
-    .addRouterPattern("/share/**")
-    .addPath("NOT /admin/*")
-    .build();
-// Write `json` to https://example.com/.well-known/apple-app-site-association
-----
 
 Tell iOS which domains your app claims by setting the
 `ios.associatedDomains` build hint -- a comma-separated list of
@@ -141,7 +90,7 @@ automatically.
 
 [source,properties]
 ----
-codename1.arg.ios.associatedDomains=applinks:example.com,applinks:www.example.com
+include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.properties[tag=deep-links-routing-properties-001,indent=0]
 ----
 
 === Android App Links
@@ -150,14 +99,6 @@ Host an `assetlinks.json` file at
 `https://your.domain/.well-known/assetlinks.json`. The plugin's
 `AssetLinksBuilder` produces the payload:
 
-[source,java]
-----
-String json = new com.codename1.maven.routing.AssetLinksBuilder()
-    .addApp("com.example.app",
-            "14:6D:E9:83:C5:73:06:50:D8:EE:B9:95:2F:34:FC:64:16:A0:83:42:E6:1D:BE:A8:8A:04:96:B2:3F:CF:44:E5")
-    .addFingerprint("AB:CD:..." /* Play App Signing upload cert */)
-    .build();
-----
 
 Tell Android which URLs to intercept by setting the
 `android.xintent_filter` build hint with a verified intent filter for
@@ -173,15 +114,14 @@ App Signing.
 
 [source,sh]
 ----
-xcrun simctl openurl booted "https://example.com/users/42"
+include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.sh[tag=deep-links-routing-sh-001,indent=0]
 ----
 
 ==== Android Emulator
 
 [source,sh]
 ----
-adb shell am start -a android.intent.action.VIEW \
-    -d "https://example.com/users/42" com.example.app
+include::../demos/common/src/main/snippets/developer-guide/deep-links-routing.sh[tag=deep-links-routing-sh-002,indent=0]
 ----
 
 ==== Desktop Simulator
@@ -194,22 +134,6 @@ the simulator's URL-injection helper.
 Independent of deep linking, individual forms can intercept back / pop
 attempts so they can confirm before discarding unsaved work:
 
-[source,java]
-----
-import com.codename1.router.PopGuard;
-import com.codename1.router.PopReason;
-
-editForm.setPopGuard(new PopGuard() {
-    public boolean canPop(Form form, PopReason reason) {
-        if (!isDirty()) {
-            return true;
-        }
-        Dialog.show("Discard changes?", "You have unsaved edits.",
-                    "Stay", "Discard");
-        return false;
-    }
-});
-----
 
 The guard fires for the toolbar back button, the Android hardware back
 key, the iOS edge-swipe gesture, and any programmatic back navigation.

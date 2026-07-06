@@ -5,6 +5,7 @@ on:
     paths:
       - 'docs/developer-guide/**'
       - 'docs/demos/**'
+      - 'scripts/developer-guide/**'
       - '.github/workflows/developer-guide-docs.yml'
   release:
     types: [published]
@@ -33,6 +34,9 @@ jobs:
               - '.github/workflows/developer-guide-docs.yml'
             docs:
               - 'docs/developer-guide/**'
+              - 'docs/demos/common/src/main/snippets/**'
+              - 'scripts/developer-guide/migrate-inline-guide-snippets.py'
+              - 'scripts/developer-guide/validate-guide-snippets.py'
               - '.github/workflows/developer-guide-docs.yml'
             workflow:
               - '.github/workflows/developer-guide-docs.yml'
@@ -44,7 +48,7 @@ jobs:
           java-version: '17'
 
       - name: Install local Codename One Maven artifacts
-        if: github.event_name != 'pull_request' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
           set -euo pipefail
           xvfb-run -a mvn -B -ntp -f maven/pom.xml \
@@ -59,13 +63,34 @@ jobs:
             -Dcheckstyle.skip=true
 
       - name: Build Codename One demos
-        if: github.event_name != 'pull_request' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
         run: |
           set -euo pipefail
           mkdir -p "$HOME/.codenameone"
           touch "$HOME/.codenameone/guibuilder.jar"
           cp maven/CodeNameOneBuildClient.jar "$HOME/.codenameone/CodeNameOneBuildClient.jar"
           xvfb-run -a mvn -B -ntp -Dgenerate-gui-sources-done=true -Dcodename1.platform=javase -f docs/demos/pom.xml process-classes
+
+      - name: Verify developer guide images are referenced
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+        run: |
+          set -euo pipefail
+          python3 scripts/developer-guide/find_unused_images.py docs/developer-guide \
+            --allow-unused img/autocomplete.png \
+            --allow-unused img/native-theme-menu.png \
+            --allow-unused img/tabs.png
+
+      - name: Compile Android demo sources
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+        run: |
+          set -euo pipefail
+          scripts/developer-guide/compile-android-demo-sources.sh
+
+      - name: Validate developer guide snippets
+        if: github.event_name != 'pull_request' || steps.changes.outputs.docs == 'true' || steps.changes.outputs.demos == 'true' || steps.changes.outputs.workflow == 'true'
+        run: |
+          set -euo pipefail
+          python3 scripts/developer-guide/validate-guide-snippets.py
 
       - name: Determine publication metadata
         run: |
@@ -319,7 +344,11 @@ jobs:
           TEXT_REPORT="${REPORT_DIR}/unused-images.txt"
           mkdir -p "$REPORT_DIR"
           set +e
-          python3 scripts/developer-guide/find_unused_images.py docs/developer-guide --output "$JSON_REPORT" | tee "$TEXT_REPORT"
+          python3 scripts/developer-guide/find_unused_images.py docs/developer-guide \
+            --allow-unused img/autocomplete.png \
+            --allow-unused img/native-theme-menu.png \
+            --allow-unused img/tabs.png \
+            --output "$JSON_REPORT" | tee "$TEXT_REPORT"
           STATUS=${PIPESTATUS[0]}
           set -e
           echo "UNUSED_IMAGES_JSON=$JSON_REPORT" >> "$GITHUB_ENV"
@@ -391,7 +420,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload AsciiDoc linter report
-        if: always()
+        if: always() && env.ASCII_DOC_LINT_REPORT != ''
         uses: actions/upload-artifact@v7
         with:
           name: developer-guide-asciidoc-lint
@@ -419,7 +448,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload paragraph capitalization report
-        if: always()
+        if: always() && env.PARAGRAPH_CAP_REPORT != ''
         uses: actions/upload-artifact@v7
         with:
           name: developer-guide-paragraph-capitalization
@@ -427,7 +456,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload LanguageTool report
-        if: always()
+        if: always() && env.LANGUAGETOOL_REPORT != ''
         uses: actions/upload-artifact@v7
         with:
           name: developer-guide-languagetool
