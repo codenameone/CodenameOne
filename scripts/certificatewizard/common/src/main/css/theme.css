@@ -1,0 +1,863 @@
+/*
+ * Certificate Wizard theme adapted from the iOS Signing mock design.
+ * CN1 CSS uses UIIDs, not web selectors; sizes are density-independent mm.
+ */
+
+Form, CWForm {
+    background-color: #F3F4F7;
+    color: #112247;
+    font-family: "native:MainRegular";
+    font-size: 2.75mm;
+}
+Label, Button, TextField, TextArea, CheckBox {
+    color: #112247;
+    font-family: "native:MainRegular";
+    font-size: 2.75mm;
+}
+CWChrome {
+    background-color: #FFFFFF;
+    border-bottom: 0.25mm solid #D9DEE8;
+    padding: 1.5mm 2.8mm 1.5mm 2.8mm;
+}
+CWTitle {
+    background-color: transparent;
+    color: #112247;
+    font-family: "native:MainBold";
+    font-size: 3.0mm;
+    padding: 0.6mm 1.5mm 0.6mm 1.5mm;
+}
+CWLogo {
+    background-color: transparent;
+    color: #112247;
+    font-family: "native:MainBold";
+    font-size: 3.1mm;
+    padding: 0.8mm 1mm 0.8mm 0;
+}
+CWStatus {
+    background: cn1-pill-border;
+    background-color: #E7F4EC;
+    color: #2E8B57;
+    padding: 1.0mm 2.5mm 1.0mm 2.5mm;
+    margin: 0.3mm;
+    font-family: "native:MainBold";
+    font-size: 2.45mm;
+}
+CWStatusOff {
+    background: cn1-pill-border;
+    background-color: #FDF1DC;
+    color: #B26A00;
+    padding: 1.0mm 2.5mm 1.0mm 2.5mm;
+    margin: 0.3mm;
+    font-family: "native:MainBold";
+    font-size: 2.45mm;
+}
+CWToolbarButton {
+    background-color: #FFFFFF;
+    color: #7F8AA3;
+    border: 0.25mm solid #D9DEE8;
+    border-radius: 1.6mm;
+    padding: 1.2mm;
+    margin: 0.45mm;
+}
+CWToolbarActions {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+CWEmail {
+    background-color: transparent;
+    color: #7F8AA3;
+    font-size: 2.45mm;
+    padding: 1mm;
+}
+CWBody {
+    background-color: #F3F4F7;
+}
+CWSidebar {
+    background-color: #FFFFFF;
+    border-right: 0.25mm solid #D9DEE8;
+    padding: 2.0mm 1.5mm 2.0mm 1.5mm;
+}
+CWNavLabel {
+    background-color: transparent;
+    color: #A0A8BA;
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    padding: 2.2mm 1.4mm 0.8mm 1.4mm;
+}
+CWNav {
+    background-color: #FFFFFF;
+    color: #7F8AA3;
+    padding: 1.7mm 1.8mm 1.7mm 1.8mm;
+    margin: 0.25mm 0 0.25mm 0;
+    border-radius: 1.6mm;
+    font-size: 2.65mm;
+}
+CWNavSelected {
+    background-color: #E8F0FF;
+    color: #2F6BFF;
+    padding: 1.7mm 1.8mm 1.7mm 1.8mm;
+    margin: 0.25mm 0 0.25mm 0;
+    border-radius: 1.6mm;
+    font-family: "native:MainBold";
+    font-size: 2.65mm;
+}
+CWPage {
+    background-color: #F3F4F7;
+    padding: 4.0mm 5.0mm 6.0mm 5.0mm;
+}
+CWPageTitle {
+    background-color: transparent;
+    color: #112247;
+    font-family: "native:MainBold";
+    font-size: 4.5mm;
+    padding: 0 0 0.5mm 0;
+}
+CWSub {
+    background-color: transparent;
+    color: #7F8AA3;
+    font-size: 2.55mm;
+    padding: 0 0 2.2mm 0;
+}
+CWCard {
+    background-color: #FFFFFF;
+    border: 0.25mm solid #D9DEE8;
+    border-radius: 1.8mm;
+    padding: 2.4mm;
+    margin: 1.0mm 0 1.4mm 0;
+}
+CWCardTitle {
+    background-color: transparent;
+    color: #112247;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    padding: 0.5mm 0 0.4mm 0;
+}
+CWCardMeta {
+    background-color: transparent;
+    color: #7F8AA3;
+    font-size: 2.35mm;
+    padding: 0.2mm 0 0.2mm 0;
+}
+CWCardRow {
+    background-color: #FFFFFF;
+    border-top: 0.25mm solid #D9DEE8;
+    padding: 1.0mm 0 1.0mm 0;
+    margin: 0;
+}
+CWMetric {
+    background-color: #FFFFFF;
+    border: 0.25mm solid #D9DEE8;
+    border-radius: 1.8mm;
+    padding: 2.5mm;
+    margin: 0.8mm;
+}
+CWMetricNumber {
+    background-color: transparent;
+    color: #112247;
+    font-family: "native:MainBold";
+    font-size: 5.2mm;
+}
+CWMetricLabel {
+    background-color: transparent;
+    color: #7F8AA3;
+    font-size: 2.35mm;
+    padding: 0.4mm 0 0 0;
+}
+CWActionRow {
+    background-color: transparent;
+    padding: 0;
+    margin: 0.8mm 0 0.8mm 0;
+}
+CWActionGrid {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+CWPrimary {
+    background: cn1-pill-border;
+    background-color: #B8D532;
+    color: #FFFFFF;
+    padding: 1.35mm 3.1mm 1.35mm 3.1mm;
+    margin: 0.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.45mm;
+    border-radius: 3.2mm;
+    text-align: center;
+}
+CWAccent {
+    background: cn1-pill-border;
+    background-color: #2F6BFF;
+    color: #FFFFFF;
+    padding: 1.35mm 3.1mm 1.35mm 3.1mm;
+    margin: 0.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.45mm;
+    border-radius: 3.2mm;
+    text-align: center;
+}
+CWOutline {
+    background: cn1-pill-border;
+    background-color: #FFFFFF;
+    color: #112247;
+    border: 0.25mm solid #D9DEE8;
+    border-radius: 3.2mm;
+    padding: 1.25mm 2.8mm 1.25mm 2.8mm;
+    margin: 0.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.45mm;
+    text-align: center;
+}
+CWDanger {
+    background: cn1-pill-border;
+    background-color: #FFFFFF;
+    color: #D64545;
+    border: 0.25mm solid #D9DEE8;
+    border-radius: 3.2mm;
+    padding: 1.25mm 2.8mm 1.25mm 2.8mm;
+    margin: 0.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.45mm;
+    text-align: center;
+}
+CWDisabled {
+    background: cn1-pill-border;
+    background-color: #EEF1F6;
+    color: #A0A8BA;
+    border: 0.25mm solid #D9DEE8;
+    border-radius: 3.2mm;
+    padding: 1.35mm 3.1mm 1.35mm 3.1mm;
+    margin: 0.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.45mm;
+    text-align: center;
+}
+CWField {
+    background-color: #FFFFFF;
+    color: #112247;
+    border: 0.25mm solid #D9DEE8;
+    border-radius: 1.4mm;
+    padding: 1.4mm;
+    margin: 0.5mm 0 1.2mm 0;
+}
+CWFieldHint {
+    background-color: transparent;
+    color: #A0A8BA;
+    padding: 1.4mm;
+    font-size: 2.75mm;
+}
+CWFieldLabel {
+    background-color: transparent;
+    color: #7F8AA3;
+    font-size: 2.35mm;
+    padding: 0.7mm 0 0.4mm 0;
+}
+CWFilterRow {
+    background-color: transparent;
+    padding: 0 0 1.2mm 0;
+}
+CWFilterWrap {
+    background-color: #FFFFFF;
+    border: 0.25mm solid #D9DEE8;
+    border-radius: 1.4mm;
+    padding: 0;
+    margin: 0.4mm 0.8mm 0.4mm 0;
+}
+CWFilterField {
+    background-color: #FFFFFF;
+    color: #112247;
+    border: none;
+    padding: 1.1mm 1.4mm 1.1mm 1.4mm;
+    margin: 0;
+    font-size: 2.45mm;
+}
+CWFilterClear {
+    background-color: transparent;
+    color: #7F8AA3;
+    padding: 1.0mm;
+    margin: 0;
+}
+CWTableBody {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+CWTableHeader {
+    background-color: transparent;
+    color: #7F8AA3;
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    padding: 1.0mm 1.2mm 1.2mm 1.2mm;
+}
+CWRow {
+    background-color: #FFFFFF;
+    border-top: 0.25mm solid #D9DEE8;
+    padding: 1.5mm 1.2mm 1.5mm 1.2mm;
+}
+CWTableCell {
+    background-color: transparent;
+    padding: 0.2mm 0.4mm 0.2mm 0.4mm;
+}
+CWCellMain {
+    background-color: transparent;
+    color: #112247;
+    font-family: "native:MainBold";
+    font-size: 2.65mm;
+}
+CWCellSub {
+    background-color: transparent;
+    color: #7F8AA3;
+    font-size: 2.25mm;
+}
+CWPillOk {
+    background-color: #E7F4EC;
+    color: #2E8B57;
+    padding: 0.8mm 1.9mm 0.8mm 1.9mm;
+    border-radius: 1.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+}
+CWPillWarn {
+    background-color: #FDF1DC;
+    color: #B26A00;
+    padding: 0.8mm 1.9mm 0.8mm 1.9mm;
+    border-radius: 1.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+}
+CWPillBad {
+    background-color: #FBE9E9;
+    color: #D64545;
+    padding: 0.8mm 1.9mm 0.8mm 1.9mm;
+    border-radius: 1.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+}
+CWPillMuted {
+    background-color: #F7F8FB;
+    color: #7F8AA3;
+    padding: 0.8mm 1.9mm 0.8mm 1.9mm;
+    border-radius: 1.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+}
+CWBanner {
+    background-color: #E8F0FF;
+    color: #112247;
+    border-radius: 1.8mm;
+    padding: 2.0mm;
+    margin: 0 0 2.2mm 0;
+}
+CWBannerWarn {
+    background-color: #FDF1DC;
+    color: #112247;
+    border: 0.25mm solid #F0D9A8;
+    border-radius: 1.8mm;
+    padding: 2.0mm;
+    margin: 0 0 2.2mm 0;
+}
+CWModal {
+    background-color: #FFFFFF;
+    border: 0.25mm solid #D9DEE8;
+    border-radius: 2.2mm;
+    padding: 2.6mm;
+}
+CWDialogContent {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+CWModalTitle {
+    background-color: transparent;
+    color: #112247;
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    padding: 0 0 1.4mm 0;
+}
+CWDialogActions {
+    background-color: transparent;
+    padding: 1.2mm 0 0 0;
+    margin: 1.0mm 0 0 0;
+}
+CWChoice {
+    background-color: #FFFFFF;
+    color: #112247;
+    border: 0.25mm solid #D9DEE8;
+    border-radius: 1.8mm;
+    padding: 1.8mm;
+    margin: 0.7mm 0 0.7mm 0;
+    font-size: 2.55mm;
+}
+CWChoiceSelected {
+    background-color: #E8F0FF;
+    color: #112247;
+    border: 0.25mm solid #2F6BFF;
+    border-radius: 1.8mm;
+    padding: 1.8mm;
+    margin: 0.7mm 0 0.7mm 0;
+    font-size: 2.55mm;
+}
+CWSegment {
+    background: cn1-pill-border;
+    background-color: #FFFFFF;
+    color: #112247;
+    border: 0.25mm solid #D9DEE8;
+    border-radius: 3.2mm;
+    padding: 1.15mm 2.4mm 1.15mm 2.4mm;
+    margin: 0.25mm;
+    font-family: "native:MainBold";
+    font-size: 2.35mm;
+    text-align: center;
+}
+CWSegmentSelected {
+    background: cn1-pill-border;
+    background-color: #2F6BFF;
+    color: #FFFFFF;
+    border-radius: 3.2mm;
+    padding: 1.15mm 2.4mm 1.15mm 2.4mm;
+    margin: 0.25mm;
+    font-family: "native:MainBold";
+    font-size: 2.35mm;
+    text-align: center;
+}
+
+CWDarkToggle {
+    background-color: #FFFFFF;
+    color: #112247;
+    border: 0.25mm solid #D9DEE8;
+    border-radius: 1.6mm;
+    padding: 1.0mm 2.0mm 1.0mm 2.0mm;
+    margin: 0.3mm;
+    font-family: "native:MainBold";
+    font-size: 2.45mm;
+    text-align: center;
+}
+
+DarkForm, DarkCWForm {
+    background-color: #071B4D;
+    color: #F5F8FF;
+    font-family: "native:MainRegular";
+    font-size: 2.75mm;
+}
+DarkLabel, DarkButton, DarkTextField, DarkTextArea, DarkCheckBox {
+    color: #F5F8FF;
+    font-family: "native:MainRegular";
+    font-size: 2.75mm;
+}
+DarkCWChrome {
+    background-color: #102B66;
+    border-bottom: 0.25mm solid #33518C;
+    padding: 1.5mm 2.8mm 1.5mm 2.8mm;
+}
+DarkCWTitle {
+    background-color: transparent;
+    color: #F5F8FF;
+    font-family: "native:MainBold";
+    font-size: 3.0mm;
+    padding: 0.6mm 1.5mm 0.6mm 1.5mm;
+}
+DarkCWLogo {
+    background-color: transparent;
+    color: #F5F8FF;
+    font-family: "native:MainBold";
+    font-size: 3.1mm;
+    padding: 0.8mm 1mm 0.8mm 0;
+}
+DarkCWStatus {
+    background: cn1-pill-border;
+    background-color: #143B66;
+    color: #5FD08A;
+    padding: 1.0mm 2.5mm 1.0mm 2.5mm;
+    margin: 0.3mm;
+    font-family: "native:MainBold";
+    font-size: 2.45mm;
+}
+DarkCWStatusOff {
+    background: cn1-pill-border;
+    background-color: #173A7A;
+    color: #A8B8DA;
+    padding: 1.0mm 2.5mm 1.0mm 2.5mm;
+    margin: 0.3mm;
+    font-family: "native:MainBold";
+    font-size: 2.45mm;
+}
+DarkCWToolbarButton {
+    background-color: #102B66;
+    color: #F5F8FF;
+    border: 0.25mm solid #33518C;
+    border-radius: 1.6mm;
+    padding: 1.2mm;
+    margin: 0.45mm;
+}
+DarkCWToolbarActions {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+DarkCWEmail {
+    background-color: transparent;
+    color: #A8B8DA;
+    font-size: 2.45mm;
+    padding: 1mm;
+}
+DarkCWBody {
+    background-color: #071B4D;
+}
+DarkCWSidebar {
+    background-color: #102B66;
+    border-right: 0.25mm solid #33518C;
+    padding: 2.0mm 1.5mm 2.0mm 1.5mm;
+}
+DarkCWNavLabel {
+    background-color: transparent;
+    color: #7E93BC;
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    padding: 2.2mm 1.4mm 0.8mm 1.4mm;
+}
+DarkCWNav {
+    background-color: #102B66;
+    color: #A8B8DA;
+    padding: 1.7mm 1.8mm 1.7mm 1.8mm;
+    margin: 0.25mm 0 0.25mm 0;
+    border-radius: 1.6mm;
+    font-size: 2.65mm;
+}
+DarkCWNavSelected {
+    background-color: #173A7A;
+    color: #4D86FF;
+    padding: 1.7mm 1.8mm 1.7mm 1.8mm;
+    margin: 0.25mm 0 0.25mm 0;
+    border-radius: 1.6mm;
+    font-family: "native:MainBold";
+    font-size: 2.65mm;
+}
+DarkCWPage {
+    background-color: #071B4D;
+    padding: 4.0mm 5.0mm 6.0mm 5.0mm;
+}
+DarkCWPageTitle {
+    background-color: transparent;
+    color: #F5F8FF;
+    font-family: "native:MainBold";
+    font-size: 4.5mm;
+    padding: 0 0 0.5mm 0;
+}
+DarkCWSub {
+    background-color: transparent;
+    color: #A8B8DA;
+    font-size: 2.55mm;
+    padding: 0 0 2.2mm 0;
+}
+DarkCWCard {
+    background-color: #102B66;
+    border: 0.25mm solid #33518C;
+    border-radius: 1.8mm;
+    padding: 2.4mm;
+    margin: 1.0mm 0 1.4mm 0;
+}
+DarkCWCardTitle {
+    background-color: transparent;
+    color: #F5F8FF;
+    font-family: "native:MainBold";
+    font-size: 2.8mm;
+    padding: 0.5mm 0 0.4mm 0;
+}
+DarkCWCardMeta {
+    background-color: transparent;
+    color: #A8B8DA;
+    font-size: 2.35mm;
+    padding: 0.2mm 0 0.2mm 0;
+}
+DarkCWCardRow {
+    background-color: #102B66;
+    border-top: 0.25mm solid #33518C;
+    padding: 1.0mm 0 1.0mm 0;
+    margin: 0;
+}
+DarkCWMetric {
+    background-color: #102B66;
+    border: 0.25mm solid #33518C;
+    border-radius: 1.8mm;
+    padding: 2.5mm;
+    margin: 0.8mm;
+}
+DarkCWMetricNumber {
+    background-color: transparent;
+    color: #F5F8FF;
+    font-family: "native:MainBold";
+    font-size: 5.2mm;
+}
+DarkCWMetricLabel {
+    background-color: transparent;
+    color: #A8B8DA;
+    font-size: 2.35mm;
+    padding: 0.4mm 0 0 0;
+}
+DarkCWActionRow {
+    background-color: transparent;
+    padding: 0;
+    margin: 0.8mm 0 0.8mm 0;
+}
+DarkCWActionGrid {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+DarkCWPrimary {
+    background: cn1-pill-border;
+    background-color: #B8D532;
+    color: #FFFFFF;
+    padding: 1.35mm 3.1mm 1.35mm 3.1mm;
+    margin: 0.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.45mm;
+    border-radius: 3.2mm;
+    text-align: center;
+}
+DarkCWAccent {
+    background: cn1-pill-border;
+    background-color: #4D86FF;
+    color: #FFFFFF;
+    padding: 1.35mm 3.1mm 1.35mm 3.1mm;
+    margin: 0.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.45mm;
+    border-radius: 3.2mm;
+    text-align: center;
+}
+DarkCWOutline {
+    background: cn1-pill-border;
+    background-color: #102B66;
+    color: #F5F8FF;
+    border: 0.25mm solid #33518C;
+    border-radius: 3.2mm;
+    padding: 1.25mm 2.8mm 1.25mm 2.8mm;
+    margin: 0.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.45mm;
+    text-align: center;
+}
+DarkCWDanger {
+    background: cn1-pill-border;
+    background-color: #102B66;
+    color: #FF7A7A;
+    border: 0.25mm solid #33518C;
+    border-radius: 3.2mm;
+    padding: 1.25mm 2.8mm 1.25mm 2.8mm;
+    margin: 0.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.45mm;
+    text-align: center;
+}
+DarkCWDisabled {
+    background: cn1-pill-border;
+    background-color: #163575;
+    color: #7890C0;
+    border: 0.25mm solid #33518C;
+    border-radius: 3.2mm;
+    padding: 1.35mm 3.1mm 1.35mm 3.1mm;
+    margin: 0.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.45mm;
+    text-align: center;
+}
+DarkCWField {
+    background-color: #0E2A61;
+    color: #F5F8FF;
+    border: 0.25mm solid #33518C;
+    border-radius: 1.4mm;
+    padding: 1.4mm;
+    margin: 0.5mm 0 1.2mm 0;
+}
+DarkCWFieldHint {
+    background-color: transparent;
+    color: #A8B8DA;
+    padding: 1.4mm;
+    font-size: 2.75mm;
+}
+DarkCWFieldLabel {
+    background-color: transparent;
+    color: #A8B8DA;
+    font-size: 2.35mm;
+    padding: 0.7mm 0 0.4mm 0;
+}
+DarkCWFilterRow {
+    background-color: transparent;
+    padding: 0 0 1.2mm 0;
+}
+DarkCWFilterWrap {
+    background-color: #0E2A61;
+    border: 0.25mm solid #33518C;
+    border-radius: 1.4mm;
+    padding: 0;
+    margin: 0.4mm 0.8mm 0.4mm 0;
+}
+DarkCWFilterField {
+    background-color: #0E2A61;
+    color: #F5F8FF;
+    border: none;
+    padding: 1.1mm 1.4mm 1.1mm 1.4mm;
+    margin: 0;
+    font-size: 2.45mm;
+}
+DarkCWFilterClear {
+    background-color: transparent;
+    color: #A8B8DA;
+    padding: 1.0mm;
+    margin: 0;
+}
+DarkCWTableBody {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+DarkCWTableHeader {
+    background-color: transparent;
+    color: #A8B8DA;
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    padding: 1.0mm 1.2mm 1.2mm 1.2mm;
+}
+DarkCWRow {
+    background-color: #102B66;
+    border-top: 0.25mm solid #33518C;
+    padding: 1.5mm 1.2mm 1.5mm 1.2mm;
+}
+DarkCWTableCell {
+    background-color: transparent;
+    padding: 0.2mm 0.4mm 0.2mm 0.4mm;
+}
+DarkCWCellMain {
+    background-color: transparent;
+    color: #F5F8FF;
+    font-family: "native:MainBold";
+    font-size: 2.65mm;
+}
+DarkCWCellSub {
+    background-color: transparent;
+    color: #A8B8DA;
+    font-size: 2.25mm;
+}
+DarkCWPillOk {
+    background-color: #143B66;
+    color: #5FD08A;
+    padding: 0.8mm 1.9mm 0.8mm 1.9mm;
+    border-radius: 1.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+}
+DarkCWPillWarn {
+    background-color: #173A7A;
+    color: #A8B8DA;
+    padding: 0.8mm 1.9mm 0.8mm 1.9mm;
+    border-radius: 1.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+}
+DarkCWPillBad {
+    background-color: #3A2442;
+    color: #FF7A7A;
+    padding: 0.8mm 1.9mm 0.8mm 1.9mm;
+    border-radius: 1.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+}
+DarkCWPillMuted {
+    background-color: #163575;
+    color: #A8B8DA;
+    padding: 0.8mm 1.9mm 0.8mm 1.9mm;
+    border-radius: 1.4mm;
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+}
+DarkCWBanner {
+    background-color: #173A7A;
+    color: #F5F8FF;
+    border-radius: 1.8mm;
+    padding: 2.0mm;
+    margin: 0 0 2.2mm 0;
+}
+DarkCWBannerWarn {
+    background-color: #34355E;
+    color: #E0A94E;
+    border: 0.25mm solid #735F38;
+    border-radius: 1.8mm;
+    padding: 2.0mm;
+    margin: 0 0 2.2mm 0;
+}
+DarkCWModal {
+    background-color: #102B66;
+    border: 0.25mm solid #33518C;
+    border-radius: 2.2mm;
+    padding: 2.6mm;
+}
+DarkCWDialogContent {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+DarkCWModalTitle {
+    background-color: transparent;
+    color: #F5F8FF;
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    padding: 0 0 1.4mm 0;
+}
+DarkCWDialogActions {
+    background-color: transparent;
+    padding: 1.2mm 0 0 0;
+    margin: 1.0mm 0 0 0;
+}
+DarkCWChoice {
+    background-color: #102B66;
+    color: #F5F8FF;
+    border: 0.25mm solid #33518C;
+    border-radius: 1.8mm;
+    padding: 1.8mm;
+    margin: 0.7mm 0 0.7mm 0;
+    font-size: 2.55mm;
+}
+DarkCWChoiceSelected {
+    background-color: #173A7A;
+    color: #F5F8FF;
+    border: 0.25mm solid #33518C;
+    border-radius: 1.8mm;
+    padding: 1.8mm;
+    margin: 0.7mm 0 0.7mm 0;
+    font-size: 2.55mm;
+}
+DarkCWSegment {
+    background: cn1-pill-border;
+    background-color: #102B66;
+    color: #F5F8FF;
+    border: 0.25mm solid #33518C;
+    border-radius: 3.2mm;
+    padding: 1.15mm 2.4mm 1.15mm 2.4mm;
+    margin: 0.25mm;
+    font-family: "native:MainBold";
+    font-size: 2.35mm;
+    text-align: center;
+}
+DarkCWSegmentSelected {
+    background: cn1-pill-border;
+    background-color: #4D86FF;
+    color: #FFFFFF;
+    border-radius: 3.2mm;
+    padding: 1.15mm 2.4mm 1.15mm 2.4mm;
+    margin: 0.25mm;
+    font-family: "native:MainBold";
+    font-size: 2.35mm;
+    text-align: center;
+}
+DarkCWDarkToggle {
+    background-color: #102B66;
+    color: #F5F8FF;
+    border: 0.25mm solid #33518C;
+    border-radius: 1.6mm;
+    padding: 1.0mm 2.0mm 1.0mm 2.0mm;
+    margin: 0.3mm;
+    font-family: "native:MainBold";
+    font-size: 2.45mm;
+    text-align: center;
+}

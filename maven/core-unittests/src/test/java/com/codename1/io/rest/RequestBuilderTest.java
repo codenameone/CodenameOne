@@ -40,6 +40,7 @@ class RequestBuilderTest extends UITestBase {
 
         ConnectionRequest executed = findRequest(BASE_URL + "/items/42");
         assertNotNull(executed);
+        assertFalse(executed.isFailSilently());
         assertEquals(ConnectionRequest.CachingMode.MANUAL, executed.getCacheMode());
         assertEquals(1500, executed.getTimeout());
         assertEquals(3000, executed.getReadTimeout());
@@ -86,6 +87,9 @@ class RequestBuilderTest extends UITestBase {
         });
 
         builder.getAsString();
+        ConnectionRequest executed = findRequest(BASE_URL);
+        assertNotNull(executed);
+        assertTrue(executed.isFailSilently());
         Response<String> response = holder[0];
         assertNotNull(response);
         assertEquals(500, response.getResponseCode());
@@ -111,6 +115,9 @@ class RequestBuilderTest extends UITestBase {
                 });
 
         builder.getAsJsonMap();
+        ConnectionRequest executed = findRequest(BASE_URL);
+        assertNotNull(executed);
+        assertTrue(executed.isFailSilently());
         Response<Map> response = holder[0];
         assertNotNull(response);
         Map data = response.getResponseData();

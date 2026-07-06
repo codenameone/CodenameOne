@@ -24,6 +24,9 @@ package com.codename1.maven;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.artifact.repository.ArtifactRepository;
+import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
+import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
@@ -33,6 +36,8 @@ import org.apache.tools.ant.taskdefs.Java;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -42,9 +47,8 @@ import java.util.UUID;
  * <p>It writes a binding descriptor to {@code ~/.gameBuilder/gamebuilder.input} (the
  * project's games directory, settings and an output channel) and forks the editor app.
  * The editor is delivered through Maven &mdash; the artifact
- * {@code com.codenameone:codenameone-gamebuilder:jar-with-dependencies} is resolved from
- * Maven Central (the same mechanism that ships the Designer/CSS-compiler jar), so there
- * is no separate install step. The editor reads/writes
+ * {@code com.codenameone:codenameone-gamebuilder} and its runtime dependencies are
+ * resolved from Maven Central, so there is no separate install step. The editor reads/writes
  * {@code src/main/resources/games/*.game} in this project.</p>
  *
  * <p>The goal only applies to Java 17 Codename One projects (the editor uses Java 17
@@ -78,7 +82,7 @@ public class OpenGameBuilderMojo extends AbstractCN1Mojo {
         File outputFile = new File(runtimeDir, uuid + ".output");
         writeBinding(new File(runtimeDir, "gamebuilder.input"), projectDir, gamesDir, outputFile);
 
-        File jar = getGameBuilderJar();
+        ToolClasspath toolClasspath = getGameBuilderClasspath();
 
         getLog().info("Launching game builder bound to " + projectDir);
         Java java = createJava();
@@ -86,7 +90,8 @@ public class OpenGameBuilderMojo extends AbstractCN1Mojo {
         if ("true".equals(System.getProperty("spawn", "true"))) {
             java.setSpawn(true);
         }
-        java.setJar(jar);
+        java.setClassname("com.codename1.gamebuilder.GameBuilderStub");
+        java.createClasspath().setPath(joinClasspath(toolClasspath.files));
         // The forked editor reads the binding path from this system property.
         java.createJvmarg().setValue("-Dgamebuilder.input="
                 + new File(runtimeDir, "gamebuilder.input").getAbsolutePath());
@@ -133,31 +138,73 @@ public class OpenGameBuilderMojo extends AbstractCN1Mojo {
     }
 
     /**
-     * Resolves the game-builder editor through Maven &mdash; the self-contained artifact
-     * {@code com.codenameone:codenameone-gamebuilder:jar-with-dependencies}. This mirrors
-     * {@link AbstractCN1Mojo#getDesignerJar()}: in a released build the artifact is a
-     * declared dependency of the plugin (found via {@link #getArtifact}); otherwise it is
-     * resolved from the configured repositories at the plugin's own version. There is no
-     * install script &mdash; the editor ships with the plugin from Maven Central.
+     * Resolves the game-builder editor and runtime dependencies through Maven.
      */
-    private File getGameBuilderJar() throws MojoExecutionException, MojoFailureException {
-        Artifact artifact = getArtifact("com.codenameone", "codenameone-gamebuilder", "jar-with-dependencies");
+    private ToolClasspath getGameBuilderClasspath() throws MojoExecutionException, MojoFailureException {
+        Artifact artifact = getArtifact("com.codenameone", "codenameone-gamebuilder");
         if (artifact == null) {
-            artifact = repositorySystem.createArtifactWithClassifier(
-                    "com.codenameone", "codenameone-gamebuilder", pluginVersion(), "jar", "jar-with-dependencies");
+            artifact = repositorySystem.createArtifact(
+                    "com.codenameone", "codenameone-gamebuilder", pluginVersion(), "jar");
         }
-        File jar = getJar(artifact);
-        if (jar == null || !jar.exists()) {
+        ToolClasspath classpath = resolveToolClasspath(artifact);
+        if (classpath.files.isEmpty()) {
             throw new MojoFailureException(
                     "Could not resolve the game builder editor "
-                    + "(com.codenameone:codenameone-gamebuilder:" + pluginVersion() + ":jar-with-dependencies).\n"
+                    + "(com.codenameone:codenameone-gamebuilder:" + pluginVersion() + ").\n"
                     + "It is distributed through Maven Central alongside the Codename One plugin; make sure "
                     + "your build can reach Maven Central and is using a released plugin version.\n"
                     + "To work on the editor itself, run it straight from its module:\n"
                     + "    cd scripts/gamebuilder && mvn -Pexecutable-jar -pl javase -am package -Dcodename1.platform=javase\n"
-                    + "    java -jar javase/target/codenameone-gamebuilder-*-jar-with-dependencies.jar");
+                    + "    java -cp \"javase/target/codenameone-gamebuilder-*.jar:javase/target/libs/*\" "
+                    + "com.codename1.gamebuilder.GameBuilderStub");
         }
-        return jar;
+        return classpath;
+    }
+
+    private ToolClasspath resolveToolClasspath(Artifact artifact) {
+        List<File> files = new ArrayList<File>();
+        ArtifactResolutionResult result = repositorySystem.resolve(new ArtifactResolutionRequest()
+                .setLocalRepository(localRepository)
+                .setRemoteRepositories(new ArrayList<ArtifactRepository>(remoteRepositories))
+                .setResolveTransitively(true)
+                .setArtifact(artifact));
+        addArtifactFile(files, artifact);
+        if (result != null && result.getArtifacts() != null) {
+            for (Artifact resolved : result.getArtifacts()) {
+                addArtifactFile(files, resolved);
+            }
+        }
+        return new ToolClasspath(files);
+    }
+
+    private static void addArtifactFile(List<File> files, Artifact artifact) {
+        if (artifact == null || artifact.getFile() == null || !"jar".equals(artifact.getType())) {
+            return;
+        }
+        File file = artifact.getFile().getAbsoluteFile();
+        if (!file.exists() || files.contains(file)) {
+            return;
+        }
+        files.add(file);
+    }
+
+    private static String joinClasspath(List<File> files) {
+        StringBuilder out = new StringBuilder();
+        for (File file : files) {
+            if (out.length() > 0) {
+                out.append(File.pathSeparator);
+            }
+            out.append(file.getAbsolutePath());
+        }
+        return out.toString();
+    }
+
+    private static final class ToolClasspath {
+        final List<File> files;
+
+        ToolClasspath(List<File> files) {
+            this.files = files;
+        }
     }
 
     /** The Codename One plugin's own version, used as the game-builder editor's version. */

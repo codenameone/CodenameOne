@@ -3929,6 +3929,25 @@ public class IOSImplementation extends CodenameOneImplementation {
             captureCallback = null;
         }
     }
+
+    /**
+     * Callback for the native document picker.
+     */
+    public static void fileChooserResult(String r) {
+        dropEvents = false;
+        if(fileChooserCallback != null) {
+            if(r != null) {
+                if(r.startsWith("file:")) {
+                    fileChooserCallback.fireActionEvent(new ActionEvent(r));
+                } else {
+                    fileChooserCallback.fireActionEvent(new ActionEvent("file:" + r));
+                }
+            } else {
+                fileChooserCallback.fireActionEvent(new ActionEvent(null));
+            }
+            fileChooserCallback = null;
+        }
+    }
     
     
     public void captureAudio(ActionListener response) {
@@ -3971,6 +3990,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
     
     private static EventDispatcher captureCallback;
+    private static EventDispatcher fileChooserCallback;
     
     /**
      * Captures a photo and notifies with the image data when available
@@ -4357,6 +4377,14 @@ public class IOSImplementation extends CodenameOneImplementation {
         captureCallback = new EventDispatcher();
         captureCallback.addListener(response);
         nativeInstance.openGallery(type);
+    }
+
+    @Override
+    public void openFileChooser(ActionListener response, String accept) {
+        fileChooserCallback = new EventDispatcher();
+        fileChooserCallback.addListener(response);
+        nativeInstance.openFileChooser(accept);
+        dropEvents = true;
     }
     
     

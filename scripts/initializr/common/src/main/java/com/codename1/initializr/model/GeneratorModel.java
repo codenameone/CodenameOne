@@ -680,7 +680,13 @@ public class GeneratorModel {
                     .append("https://github.com/codenameone/CodenameOne/issues/3724\n\n");
         }
 
-        out.append("## Help and Support\n\n")
+        out.append("## Signing\n\n")
+                .append("Use the Certificate Wizard to configure Apple signing assets, Android keystores, and desktop signing settings:\n\n")
+                .append("```\n")
+                .append("mvn cn1:certificatewizard\n")
+                .append("```\n\n")
+                .append("Generated IDE projects include a Certificate Wizard action under their tools/favorites area.\n\n")
+                .append("## Help and Support\n\n")
                 .append("- Codename One website: https://www.codenameone.com\n")
                 .append("- Codename One GitHub: https://github.com/codenameone/CodenameOne\n");
         return out.toString();

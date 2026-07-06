@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="700" viewBox="0 0 1120 700">
+  <rect width="1120" height="700" fill="#071b4d"/>
+  <rect width="1120" height="70" fill="#102b66"/>
+  <text x="34" y="43" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#f5f8ff">Codename One</text>
+  <text x="218" y="43" font-family="Arial, sans-serif" font-size="22" fill="#f5f8ff">Signing</text>
+  <rect x="620" y="18" width="168" height="34" rx="17" fill="#143b66"/>
+  <text x="641" y="41" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#5fd08a">ASC API Key configured</text>
+  <rect x="800" y="18" width="138" height="34" rx="17" fill="#173a7a"/>
+  <polygon points="823,25 814,38 823,38 818,48 832,33 823,33" fill="#a8b8da"/>
+  <text x="846" y="40" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#a8b8da">Auto Setup</text>
+  <rect x="0" y="70" width="230" height="630" fill="#102b66"/>
+  <text x="28" y="268" font-family="Arial, sans-serif" font-size="12" font-weight="700" fill="#a8b8da">SIGNING ASSETS</text>
+  <text x="44" y="309" font-family="Arial, sans-serif" font-size="16" fill="#a8b8da">Certificates  2</text>
+  <text x="44" y="359" font-family="Arial, sans-serif" font-size="16" fill="#a8b8da">Bundle IDs  1</text>
+  <text x="44" y="409" font-family="Arial, sans-serif" font-size="16" fill="#a8b8da">Devices  2</text>
+  <rect x="18" y="432" width="194" height="42" rx="8" fill="#173a7a"/>
+  <text x="44" y="459" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#4d86ff">Profiles  2</text>
+  <text x="280" y="132" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#f5f8ff">Provisioning Profiles</text>
+  <text x="280" y="166" font-family="Arial, sans-serif" font-size="16" fill="#a8b8da">Create and install fresh .mobileprovision files.</text>
+  <rect x="280" y="205" width="760" height="405" rx="8" fill="#102b66" stroke="#33518c"/>
+  <rect x="306" y="230" width="704" height="42" rx="6" fill="#0e2a61" stroke="#33518c"/>
+  <text x="324" y="257" font-family="Arial, sans-serif" font-size="15" fill="#a8b8da">Filter</text>
+  <text x="306" y="318" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#a8b8da">Profile</text>
+  <text x="492" y="318" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#a8b8da">Type</text>
+  <text x="626" y="318" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#a8b8da">Bundle ID</text>
+  <text x="790" y="318" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#a8b8da">Expires</text>
+  <line x1="306" y1="338" x2="1010" y2="338" stroke="#33518c"/>
+  <text x="306" y="376" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#f5f8ff">My App App Store</text>
+  <text x="306" y="400" font-family="Arial, sans-serif" font-size="13" fill="#a8b8da">PRF_STORE</text>
+  <rect x="492" y="360" width="88" height="28" rx="8" fill="#143b66"/>
+  <text x="514" y="379" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#5fd08a">STORE</text>
+  <text x="626" y="376" font-family="Arial, sans-serif" font-size="15" fill="#f5f8ff">com.example.myapp</text>
+  <text x="790" y="376" font-family="Arial, sans-serif" font-size="15" fill="#f5f8ff">312 days</text>
+  <rect x="866" y="352" width="68" height="34" rx="17" fill="#102b66" stroke="#33518c"/>
+  <text x="882" y="374" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#f5f8ff">Install</text>
+  <rect x="944" y="352" width="66" height="34" rx="17" fill="#102b66" stroke="#33518c"/>
+  <text x="958" y="374" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#ff7a7a">Delete</text>
+  <rect x="306" y="448" width="704" height="1" fill="#33518c"/>
+  <text x="306" y="486" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#f5f8ff">My App Development</text>
+  <text x="306" y="510" font-family="Arial, sans-serif" font-size="13" fill="#a8b8da">PRF_DEV</text>
+  <rect x="492" y="470" width="128" height="28" rx="8" fill="#173a7a"/>
+  <text x="512" y="489" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#a8b8da">DEVELOPMENT</text>
+  <text x="626" y="486" font-family="Arial, sans-serif" font-size="15" fill="#f5f8ff">com.example.myapp</text>
+  <text x="790" y="486" font-family="Arial, sans-serif" font-size="15" fill="#f5f8ff">27 days</text>
+  <rect x="866" y="462" width="68" height="34" rx="17" fill="#102b66" stroke="#33518c"/>
+  <text x="882" y="484" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#f5f8ff">Install</text>
+  <rect x="944" y="462" width="66" height="34" rx="17" fill="#102b66" stroke="#33518c"/>
+  <text x="958" y="484" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#ff7a7a">Delete</text>
+</svg>

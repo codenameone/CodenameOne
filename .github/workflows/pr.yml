@@ -155,6 +155,11 @@ jobs:
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: |
           set -euo pipefail
+          # This job runs inside the pr-ci-container, where GitHub's
+          # checkout safe.directory entry can be written under a different
+          # HOME than this shell step uses. Mark the workspace safe before
+          # diffing the PR so unrelated cn1libs are not rebuilt.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
           all_libs=(
             cn1-ai-mlkit-text
@@ -283,6 +288,7 @@ jobs:
           CN1LIB_MODULES: ${{ steps.cn1libs.outputs.modules }}
         run: |
           set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           python3 ../scripts/gen-ai-cn1libs.py > /tmp/gen-ai.log
           # Capture a list of changed files instead of using --exit-code/--quiet,
           # which interacted poorly with the surrounding `set -e -o pipefail`.
