@@ -90,6 +90,8 @@ pano.setImage(EncodedImage.create("/panorama.jpg"));
 f.add(BorderLayout.CENTER, pano);
 ----
 
+image::img/vr-360-panorama.png[An equirectangular panorama in side-by-side stereo,scaledwidth=40%]
+
 Dragging looks around with the grab-the-world gesture; `setHeadTrackingEnabled(true)` adds gyroscope look composed with the drag, and `setStereo(true)` renders side by side for cardboard-style viewers. Photo spheres are captured from a single point, so stereo intentionally uses zero eye separation - there is no parallax information in the image to reproduce. `setYaw`/`setPitch` position the view programmatically and `reset()` returns to straight ahead.
 
 === 360 video and dynamic content
