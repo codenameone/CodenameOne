@@ -36,11 +36,15 @@
  * host -- see Ports/LinuxPort/status.md.
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE   /* pthread_getattr_np + ucontext REG_* gregs; before any libc include */
+#endif
 #include "cn1_linux_gfx.h"
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
 #include <signal.h>
+#include <ucontext.h>
 #ifdef __GLIBC__
 #include <execinfo.h> /* backtrace() -- glibc only; musl has no execinfo.h */
 #endif
@@ -433,12 +437,52 @@ static gboolean cn1OnDelete(GtkWidget* widget, GdkEvent* e, gpointer data) {
  * even on a STACK OVERFLOW; the repeating frames are the recursion. Called from both the
  * SIGABRT path and the wild-address SIGSEGV path (stack-overflow guard-page faults land
  * there), so an overflow is finally legible instead of a bare, corrupt-unwind core. */
-static void cn1LinuxDumpNativeBacktrace(const char* label) {
+/* async-signal-safe "KEY=0xHEX\n" */
+static void cn1LinuxWriteHexKV(const char* key, unsigned long v) {
+    char buf[64]; int i = 0;
+    while (key[i]) { buf[i] = key[i]; i++; }
+    buf[i++] = '='; buf[i++] = '0'; buf[i++] = 'x';
+    char hx[16]; int h = 0;
+    if (v == 0) hx[h++] = '0';
+    while (v) { int d = v & 0xf; hx[h++] = (char)(d < 10 ? '0' + d : 'a' + d - 10); v >>= 4; }
+    while (h > 0) buf[i++] = hx[--h];
+    buf[i++] = '\n';
+    write(2, buf, i);
+}
+
+static void cn1LinuxDumpNativeBacktrace(const char* label, siginfo_t* si, void* ucv) {
     signal(SIGSEGV, SIG_DFL);
     signal(SIGBUS, SIG_DFL);
     write(2, "\n=====CN1 ", 10);
     write(2, label, strlen(label));
     write(2, " BACKTRACE=====\n", 16);
+    if (si != NULL) cn1LinuxWriteHexKV("faultAddr", (unsigned long)(uintptr_t)si->si_addr);
+    /* faulting PC + SP from the ucontext, and this thread's real stack bounds -- if the
+     * used span (top - sp) is a fraction of a MB, this is a SMALL-STACK thread overflow
+     * (e.g. CN1 rendering on a WebKit/Gallium/GLib worker thread), not deep recursion. */
+    if (ucv != NULL) {
+        ucontext_t* uc = (ucontext_t*)ucv;
+        unsigned long sp = 0, pc = 0;
+#if defined(__aarch64__)
+        sp = (unsigned long)uc->uc_mcontext.sp;
+        pc = (unsigned long)uc->uc_mcontext.pc;
+#elif defined(__x86_64__)
+        sp = (unsigned long)uc->uc_mcontext.gregs[REG_RSP];
+        pc = (unsigned long)uc->uc_mcontext.gregs[REG_RIP];
+#endif
+        if (pc) cn1LinuxWriteHexKV("faultPC", pc);
+        if (sp) cn1LinuxWriteHexKV("faultSP", sp);
+        pthread_attr_t at;
+        if (pthread_getattr_np(pthread_self(), &at) == 0) {
+            void* base = 0; size_t sz = 0;
+            if (pthread_attr_getstack(&at, &base, &sz) == 0) {
+                cn1LinuxWriteHexKV("stackLo", (unsigned long)(uintptr_t)base);
+                cn1LinuxWriteHexKV("stackSz", (unsigned long)sz);
+                if (sp) cn1LinuxWriteHexKV("stackUsed", (unsigned long)(((uintptr_t)base + sz) - sp));
+            }
+            pthread_attr_destroy(&at);
+        }
+    }
 #ifdef __GLIBC__
     void* bt[96];
     int n = backtrace(bt, 96);
@@ -461,7 +505,7 @@ static void cn1LinuxFaultToException(int sig, siginfo_t* si, void* ucv) {
      * dump, instead of being masked as a recoverable NPE that silently corrupts state. */
     if ((sig == SIGSEGV || sig == SIGBUS) && si != NULL &&
             (uintptr_t) si->si_addr >= 0x10000) {
-        cn1LinuxDumpNativeBacktrace("FAULT");
+        cn1LinuxDumpNativeBacktrace("FAULT", si, ucv);
         signal(sig, SIG_DFL);
         return;
     }
@@ -478,7 +522,7 @@ static void cn1LinuxFaultToException(int sig, siginfo_t* si, void* ucv) {
  * even where an interactive debugger is unavailable (CI containers). Enabled only
  * when CN1_LINUX_ABORT_BACKTRACE is set so it never interferes with normal runs. */
 static void cn1LinuxAbortBacktrace(int sig) {
-    cn1LinuxDumpNativeBacktrace("ABORT");
+    cn1LinuxDumpNativeBacktrace("ABORT", NULL, NULL);
     signal(sig, SIG_DFL);
     raise(sig);
 }
