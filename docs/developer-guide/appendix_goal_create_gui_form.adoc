@@ -7,7 +7,7 @@ The `create-gui-form` goal will generate a GUI form that can be edited in the GU
 
 [source,bash]
 ----
-mvn cn1:create-gui-form -DclassName=com.example.MyForm
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-create-gui-form.sh[tag=appendix-goal-create-gui-form-bash-001,indent=0]
 ----
 
 The above example will generate a GUIBuilder form with the provided class name. It effectively generates two files:
@@ -21,7 +21,7 @@ You can then open the GUI builder to edit this form using the `cn1:guibuilder` g
 
 [source,bash]
 ----
-mvn cn1:guibuilder -DclassName=com.example.MyForm
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-create-gui-form.sh[tag=appendix-goal-create-gui-form-bash-002,indent=0]
 ----
 
 ==== Parameters

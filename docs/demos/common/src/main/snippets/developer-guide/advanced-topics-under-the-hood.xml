@@ -1,0 +1,178 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::advanced-topics-under-the-hood-xml-001[]
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.bulsy.smstalk1">
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.SEND_SMS"/>
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+        <activity android:name=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <receiver android:name="com.bulsy.smstalk1.SmsListener"
+               android:enabled="true"
+               android:permission="android.permission.BROADCAST_SMS"
+               android:exported="true">
+            <intent-filter android:priority="2147483647">//this doesnt work
+                <category android:name="android.intent.category.DEFAULT" />
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
+// end::advanced-topics-under-the-hood-xml-001[]
+
+// tag::advanced-topics-under-the-hood-xml-002[]
+android.xpermissions=<uses-permission android:name="android.permission.RECEIVE_SMS" />
+// end::advanced-topics-under-the-hood-xml-002[]
+
+// tag::advanced-topics-under-the-hood-xml-003[]
+android.xapplication=<receiver android:name="com.codename1.sms.intercept.SMSListener"  android:enabled="true" android:permission="android.permission.BROADCAST_SMS"  android:exported="true">                    <intent-filter android:priority="2147483647"><category android:name="android.intent.category.DEFAULT" />        <action android:name="android.provider.Telephony.SMS_RECEIVED" />                 </intent-filter>             </receiver>
+// end::advanced-topics-under-the-hood-xml-003[]
+
+// tag::advanced-topics-under-the-hood-xml-004[]
+<receiver android:name="com.codename1.sms.intercept.SMSListener"
+              android:enabled="true"
+              android:permission="android.permission.BROADCAST_SMS"
+              android:exported="true">
+                   <intent-filter android:priority="2147483647">
+                          <category android:name="android.intent.category.DEFAULT" />
+                          <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+                   </intent-filter>
+</receiver>
+// end::advanced-topics-under-the-hood-xml-004[]
+
+// tag::advanced-topics-under-the-hood-xml-005[]
+<dependency>
+    <groupId>com.example</groupId>
+    <artifactId>mylib-lib</artifactId>
+    <version>1.0.0</version>
+    <type>pom</type>
+</dependency>
+// end::advanced-topics-under-the-hood-xml-005[]
+
+// tag::advanced-topics-under-the-hood-xml-006[]
+<resources>
+   <color name="colorPrimary">#ff00ff00</color>
+   <color name="colorPrimaryDark">#80ff0000</color>
+   <color name="colorAccent">#800000ff</color>
+</resources>
+// end::advanced-topics-under-the-hood-xml-006[]
+
+// tag::advanced-topics-under-the-hood-xml-007[]
+android.xintent_filter=<intent-filter>   <action android:name="android.intent.action.VIEW" />    <category android:name="android.intent.category.DEFAULT" />    <category android:name="android.intent.category.BROWSABLE" />    <data android:scheme="myapp" />  </intent-filter>
+// end::advanced-topics-under-the-hood-xml-007[]
+
+// tag::advanced-topics-under-the-hood-xml-008[]
+ios.plistInject=<key>CFBundleURLTypes</key>     <array>         <dict>             <key>CFBundleURLName</key>             <string>com.yourcompany.myapp</string>         </dict>         <dict>             <key>CFBundleURLSchemes</key>             <array>                 <string>myapp</string>             </array>         </dict>     </array>
+// end::advanced-topics-under-the-hood-xml-008[]
+
+// tag::advanced-topics-under-the-hood-xml-009[]
+ios.urlScheme=<string>myapp</string>
+// end::advanced-topics-under-the-hood-xml-009[]
+
+// tag::advanced-topics-under-the-hood-xml-010[]
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.freshdesk.mobihelp"
+    android:versionCode="1"
+    android:versionName="1.0" >
+
+     <uses-sdk
+        android:minSdkVersion="10" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.READ_LOGS" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+    <application>
+        <activity
+            android:name="com.freshdesk.mobihelp.activity.SolutionArticleListActivity"
+            android:configChanges="orientation|screenSize"
+            android:theme="@style/Theme.Mobihelp"
+            android:windowSoftInputMode="adjustPan" >
+        </activity>
+        <activity
+            android:name="com.freshdesk.mobihelp.activity.FeedbackActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:theme="@style/Theme.Mobihelp"
+            android:windowSoftInputMode="adjustResize|stateVisible" >
+        </activity>
+        <activity
+            android:name="com.freshdesk.mobihelp.activity.InterstitialActivity"
+            android:configChanges="orientation|screenSize"
+            android:theme="@style/Theme.AppCompat">
+		</activity>
+        <activity
+            android:name="com.freshdesk.mobihelp.activity.TicketListActivity"
+            android:parentActivityName="com.freshdesk.mobihelp.activity.SolutionArticleListActivity"
+            android:theme="@style/Theme.Mobihelp" >
+
+            <!-- Parent activity meta-data to support 4.0 and lower -->
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.freshdesk.mobihelp.activity.SolutionArticleListActivity" />
+        </activity>
+        <activity
+            android:name="com.freshdesk.mobihelp.activity.SolutionArticleActivity"
+            android:parentActivityName="com.freshdesk.mobihelp.activity.SolutionArticleListActivity"
+            android:theme="@style/Theme.Mobihelp"
+            android:configChanges="orientation|screenSize|keyboard|keyboardHidden" >
+
+            <!-- Parent activity meta-data to support 4.0 and lower -->
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.freshdesk.mobihelp.activity.SolutionArticleListActivity" />
+        </activity>
+        <activity
+            android:name="com.freshdesk.mobihelp.activity.ConversationActivity"
+            android:parentActivityName="com.freshdesk.mobihelp.activity.SolutionArticleListActivity"
+            android:theme="@style/Theme.Mobihelp"
+            android:windowSoftInputMode="adjustResize|stateHidden" >
+
+            <!-- Parent activity meta-data to support 4.0 and lower -->
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.freshdesk.mobihelp.activity.SolutionArticleListActivity" />
+        </activity>
+        <activity
+            android:name="com.freshdesk.mobihelp.activity.AttachmentHandlerActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:parentActivityName="com.freshdesk.mobihelp.activity.SolutionArticleListActivity"
+            android:theme="@style/Theme.Mobihelp" >
+
+            <!-- Parent activity meta-data to support 4.0 and lower -->
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.freshdesk.mobihelp.activity.SolutionArticleListActivity" />
+        </activity>
+
+        <service android:name="com.freshdesk.mobihelp.service.MobihelpService" />
+
+        <receiver android:name="com.freshdesk.mobihelp.receiver.ConnectivityReceiver" >
+            <intent-filter>
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>
+
+// end::advanced-topics-under-the-hood-xml-010[]
+
+// tag::advanced-topics-under-the-hood-xml-011[]
+<withKotlin/>
+// end::advanced-topics-under-the-hood-xml-011[]

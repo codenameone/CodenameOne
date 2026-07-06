@@ -54,16 +54,21 @@ class CenterLayout extends Layout {
 }
 
 public class CenterLayoutDemo {
-    public void show() {
+    public static Form createForm() {
         Form hi = new Form("Center Layout", new CenterLayout());
         for (int iter = 1; iter < 10; iter++) {
             Label l = new Label("Label: " + iter);
-            l.getUnselectedStyle().setMarginLeft(iter * 3);
+            l.getUnselectedStyle().setMarginUnit(Style.UNIT_TYPE_DIPS);
+            l.getUnselectedStyle().setMarginLeft(iter * 4);
             l.getUnselectedStyle().setMarginRight(0);
             hi.add(l);
         }
         hi.add(new Label("Really Wide Label Text!!!"));
-        hi.show();
+        return hi;
+    }
+
+    public void show() {
+        createForm().show();
     }
 }
 // end::centerLayout[]

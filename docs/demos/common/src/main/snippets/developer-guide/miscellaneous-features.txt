@@ -1,0 +1,5 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::miscellaneous-features-text-001[]
+cn1_icon_<lang>[_<country>].png
+// end::miscellaneous-features-text-001[]

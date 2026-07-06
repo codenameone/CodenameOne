@@ -24,29 +24,12 @@ snapshot. There are two ways to read it.
 
 Any pointer listener receives an `ActionEvent`; call `getPointerEvent()` on it:
 
-[source,java]
-----
-myComponent.addPointerPressedListener(e -> {
-    PointerEvent pe = e.getPointerEvent();
-    if (pe.isSecondaryButton()) {
-        showContextMenu(pe.getX(), pe.getY());
-    }
-    System.out.println("pressure=" + pe.getPressure() + " type=" + pe.getPointerType());
-});
-----
 
 ==== By polling
 
 When you're inside a pointer callback you can also poll the current values directly from `CN`
 (or `Display`), mirroring the existing `CN.isShiftKeyDown()` family:
 
-[source,java]
-----
-int button = CN.getPointerButton();      // PointerEvent.BUTTON_PRIMARY, BUTTON_SECONDARY, ...
-float pressure = CN.getPointerPressure(); // 0.0 - 1.0, defaults to 1.0
-boolean pen = CN.isStylusPointer();
-PointerEvent current = CN.getCurrentPointerEvent();
-----
 
 TIP: Values have safe defaults. On a plain touch screen the button is `BUTTON_PRIMARY`, the pressure
 is `1.0` and the type is `TYPE_TOUCH` (or `TYPE_UNKNOWN` on ports that don't classify the device).
@@ -65,13 +48,6 @@ For the common case of a context menu, use the unified `addContextMenuListener`.
 secondary (right) mouse click, a stylus barrel button click and a long press, so the same code
 handles desktop and touch:
 
-[source,java]
-----
-label.addContextMenuListener(e -> {
-    e.consume(); // suppress the normal click/long-press handling
-    showMyContextMenu(e.getX(), e.getY());
-});
-----
 
 === Mouse wheel and trackpad scrolling
 
@@ -81,16 +57,6 @@ the wheel yourself - for example control plus wheel to zoom, or horizontal scrol
 https://www.codenameone.com/javadoc/com/codename1/ui/events/WheelEvent.html[`WheelEvent`];
 consuming it prevents the default scroll.
 
-[source,java]
-----
-canvas.addMouseWheelListener(e -> {
-    WheelEvent w = (WheelEvent) e;
-    if (w.isControlDown()) {
-        zoom(w.getDeltaY());
-        w.consume(); // do not scroll, we zoomed instead
-    }
-});
-----
 
 A positive `getDeltaY()` reveals content above (the user scrolled down); a positive `getDeltaX()`
 reveals content to the left. `isPrecise()` is true for high resolution devices such as trackpads.
@@ -120,19 +86,6 @@ NOTE: A Windows precision touchpad usually reports a pinch as control plus wheel
 gesture, so it also arrives through the universal wheel API. Handle that case with a
 `addMouseWheelListener` that checks `isControlDown()` (shown above) if you target those devices.
 
-[source,java]
-----
-Container photo = new Container() {
-    protected boolean pinch(float scale) {
-        zoom(scale);                 // trackpad pinch or two finger pinch
-        return true;
-    }
-    protected boolean rotation(float radians) {
-        rotate(radians);             // trackpad two finger rotate
-        return true;
-    }
-};
-----
 
 === Stylus and pen support
 
@@ -146,18 +99,6 @@ When a stylus is used (Apple Pencil, S-Pen, Surface Pen) the pointer type is `TY
 For drawing surfaces a dedicated `addStylusListener` fires on press, drag and release only when the
 pointer is a stylus or eraser:
 
-[source,java]
-----
-drawingArea.addStylusListener(e -> {
-    PointerEvent pe = e.getPointerEvent();
-    float width = 1f + pe.getPressure() * 9f; // pressure controls stroke width
-    if (pe.isEraser()) {
-        erase(pe.getX(), pe.getY());
-    } else {
-        drawPoint(pe.getX(), pe.getY(), width);
-    }
-});
-----
 
 Pen hover (the pen moving above the screen without touching, available on devices such as the S-Pen
 and the M2 iPad with Apple Pencil) flows through the existing `pointerHover` callbacks; the snapshot
@@ -174,14 +115,6 @@ Foldable and dual screen devices (Galaxy Fold, Galaxy Flip, Pixel Fold, Surface 
 at runtime. Query the live posture through
 https://www.codenameone.com/javadoc/com/codename1/ui/DevicePosture.html[`DevicePosture`]:
 
-[source,java]
-----
-DevicePosture p = CN.getDevicePosture();
-if (p.isFoldable() && p.isTableTop()) {
-    // half-opened, hinge horizontal: put media on top, controls on the bottom half
-    layoutForTableTop(p.getFoldBounds(null));
-}
-----
 
 * `getPosture()` - `POSTURE_FLAT`, `POSTURE_HALF_OPENED`, `POSTURE_CLOSED` or `POSTURE_UNKNOWN`.
 * `getHingeAngle()` - hinge angle in degrees (`-1` when unknown).
@@ -192,10 +125,6 @@ if (p.isFoldable() && p.isTableTop()) {
 
 React to fold changes with a posture listener:
 
-[source,java]
-----
-CN.addPostureListener(e -> relayoutForPosture(CN.getDevicePosture()));
-----
 
 To exercise this in the desktop simulator, use the *Simulate -> Foldable* menu: enable foldable
 mode, then pick a posture (flat, half-opened or closed), the fold orientation (vertical or

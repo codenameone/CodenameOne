@@ -1,0 +1,20 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::network-connectivity-xml-001[]
+<!-- in YOUR app's pom, NOT in the framework / common pom that gets shipped
+     to the device. The cn1app archetype's executable-jar profile is the
+     right place because it only applies when launching the simulator. -->
+<dependency>
+    <groupId>org.jmdns</groupId>
+    <artifactId>jmdns</artifactId>
+    <version>3.5.9</version>
+    <scope>runtime</scope>
+</dependency>
+// end::network-connectivity-xml-001[]
+
+// tag::network-connectivity-xml-002[]
+<!-- native/android/res/xml/device_filter.xml -->
+<resources>
+    <usb-device vendor-id="1027" product-id="24577" />
+</resources>
+// end::network-connectivity-xml-002[]

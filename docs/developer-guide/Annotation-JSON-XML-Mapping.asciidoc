@@ -22,28 +22,7 @@ or any mix:
 
 [source,java]
 ----
-package com.example;
-
-import com.codename1.annotations.*;
-import com.codename1.properties.*;
-
-@Mapped
-@XmlRoot("user")
-public class User {
-
-    @JsonProperty("first_name")
-    @XmlElement("first")
-    public String firstName;
-
-    public int age;
-
-    // Renders as <user role="admin"/> in XML; omitted from JSON.
-    @XmlAttribute
-    @JsonIgnore
-    public String role;
-
-    public User() { }                                  // <1>
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AnnotationJsonXmlMappingJava001Snippet.java[tag=annotation-json-xml-mapping-java-001,indent=0]
 ----
 <1> Every `@Mapped` class must declare a public no-arg constructor --
     the generated mapper calls it from `fromJson` / `fromXml`.
@@ -53,21 +32,6 @@ For `PropertyBusinessObject`-style classes the same annotations work on
 `Property#set` so subscribers (`addChangeListener`) still see the
 mutation:
 
-[source,java]
-----
-@Mapped
-public class Item implements PropertyBusinessObject {
-    public final Property<String, Item>  name = new Property<>("name");
-    public final Property<Integer, Item> qty  = new Property<>("qty");
-
-    private final PropertyIndex idx =
-            new PropertyIndex(this, "Item", name, qty);
-
-    public PropertyIndex getPropertyIndex() { return idx; }
-
-    public Item() { }
-}
-----
 
 ==== Field-level annotations
 
@@ -101,24 +65,6 @@ public class Item implements PropertyBusinessObject {
 
 === Round-trip
 
-[source,java]
-----
-import com.codename1.mapping.Mappers;
-
-User u = new User();
-u.firstName = "Alice";
-u.age = 30;
-
-String json = Mappers.toJson(u);
-//  -> {"first_name":"Alice","age":30}
-
-User restored = Mappers.fromJson(json, User.class);
-
-String xml = Mappers.toXml(u);
-//  -> <user><first>Alice</first><age>30</age></user>
-
-User fromXml = Mappers.fromXml(xml, User.class);
-----
 
 `Mappers.fromJson` and `Mappers.fromXml` both accept either a `String`
 or a `java.io.Reader`, so streamed responses (network, file, resource)
@@ -169,27 +115,6 @@ persisted across builds.
 Sometimes a class lives in a third-party JAR the build can't annotate.
 Hand-write a `Mapper<T>` and register it at startup:
 
-[source,java]
-----
-Mappers.register(new Mapper<UUID>() {
-    public Class<UUID> type() { return UUID.class; }
-    public Map<String, Object> toMap(UUID u) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("uuid", u.toString());
-        return m;
-    }
-    public UUID fromMap(Map<String, Object> m) {
-        return UUID.fromString((String) m.get("uuid"));
-    }
-    public String xmlRootName() { return "uuid"; }
-    public void writeXml(UUID u, Element root) {
-        root.addChild(new Element(u.toString(), true));
-    }
-    public UUID readXml(Element root) {
-        return UUID.fromString(textOf(root));
-    }
-});
-----
 
 Hand-written mappers take precedence over generated ones for the same
 class.

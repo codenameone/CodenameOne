@@ -11,11 +11,7 @@ Because there is no existing project, you will need to provide the full maven pa
 
 [source,bash]
 ----
-mvn com.codenameone:codenameone-maven-plugin:$CN1VERSION:generate-app-project \
-  -DsourceProject=/path/to/my/ProjectTemplate \
-  -DgroupId=com.example \
-  -DartifactId=myapp \
-  -Dcn1Version=$CN1VERSION
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-app-project.sh[tag=appendix-goal-generate-app-project-bash-001,indent=0]
 ----
 
 NOTE: Substitute the https://search.maven.org/artifact/com.codenameone/codenameone-maven-plugin[latest Codename One plugin version] for the `$CN1VERSION` in the above example.
@@ -93,19 +89,7 @@ An XML snippet containing any more Maven dependencies that should be added to th
 
 [source,rpf]
 ----
-template.mainName=MyApp
-template.packageName=com.example
-template.type=maven
-
-[dependencies]
-====
-<dependency>
-  <groupId>com.codenameone</groupId>
-  <artifactId>googlemaps-lib</artifactId>
-  <version>1.0.1</version>
-  <type>pom</type>
-</dependency>
-====
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-app-project.txt[tag=appendix-goal-generate-app-project-rpf-001,indent=0]
 ----
 
 ==== Sample: The bare-bones Kotlin app project

@@ -20,24 +20,11 @@ Class1.java
 
 [source,java]
 ----
-import com.codename1.io.Log;
-class Class1 {
-    public static int getValue() {
-        Log.p("Hello world");
-        return 1;
-    }
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptJava001Snippet.java[tag=working-with-javascript-java-001,indent=0]
 ----
 
 Class2.java
 
-[source,java]
-----
-class Class2 {
-    public static int value = Class1.getValue();
-
-}
-----
 
 This fails because `Class2` calls Class1.getValue() in its static initializer, and `getValue()` calls `Log.p()`, which, underneath the covers, writes to Storage - which involves some synchronous network access in the JavaScript port (that is, it uses `wait()` and `notify()` under the hood.
 
@@ -45,9 +32,7 @@ If you remove the call to `Log.p()` from `getValue()`, as follows:
 
 [source,java]
 ----
-    public static int getValue() {
-        return 1;
-    }
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptJava003Snippet.java[tag=working-with-javascript-java-003,indent=0]
 ----
 
 Then everything would be fine.
@@ -225,7 +210,7 @@ By default, the CORS proxy is used for HTTP requests to URLS at a different doma
 
 [source,java]
 ----
-Display.getInstance().setProperty("javascript.useProxyForSameDomain", "true");
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptJava004Snippet.java[tag=working-with-javascript-java-004,indent=0]
 ----
 
 *Why would you want to do this?*
@@ -265,12 +250,7 @@ You can customize this splash screen by modifying the HTML source inside the *cn
 
 [source,html]
 ----
-<div id="cn1-splash">
-    <img class="icon" src="icon.png"/>
-
-    <img class="progress" src="progress.gif"/>
-    <p>...Loading...</p>
-</div>
+include::../demos/javascript/src/main/snippets/developer-guide/working-with-javascript.html[tag=working-with-javascript-html-001,indent=0]
 ----
 
 [id="debugging", reftext="Debugging in Chrome"]
@@ -447,20 +427,14 @@ The solution for this is to add a *variable* into the URL as follows:
 
 [source,javascript]
 ----
-{
-    "JavaScript" : {
-        "libs" : [
-            "//maps.googleapis.com/maps/api/js?v=3.exp&key={{javascript.googlemaps.key}}"
-        ]
-    }
-}
+include::../demos/javascript/src/main/snippets/developer-guide/working-with-javascript.js[tag=working-with-javascript-javascript-001,indent=0]
 ----
 
 The `{{javascript.googlemaps.key}}` variable will be replaced with the value of the `javascript.googlemaps.key` build hint by the build server, so the resulting include you see in the index.html page will be something like:
 
 [source,html]
 ----
-<script src="//maps.googleapis.com/maps/api/js?v=3.exp&key=XYZ"></script>
+include::../demos/javascript/src/main/snippets/developer-guide/working-with-javascript.html[tag=working-with-javascript-html-002,indent=0]
 ----
 
 [id="environment_variables", reftext="Browser Environment Variables"]
@@ -543,10 +517,7 @@ Then in your app's `init()` method, add the following:
 
 [source,java]
 ----
-Display d = Display.getInstance();
-if (d.getProperty("User-Agent", "Unknown").indexOf("Android") != -1) {
-    d.setProperty("javascript.native.theme", "/androidTheme.res");
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptJava005Snippet.java[tag=working-with-javascript-java-005,indent=0]
 ----
 
 === Disabling the 'OnBeforeUnload' handler
@@ -564,18 +535,7 @@ NOTE: Some browsers don't allow you to specify the message that's displayed in t
 
 [source,java]
 ----
-Form f = new Form("Test Before Unload", BoxLayout.y());
-CheckBox enableBeforeUnload = new CheckBox("Enable Before Unload");
-enableBeforeUnload.setSelected(true);
-enableBeforeUnload.addActionListener(e->{
-    if (enableBeforeUnload.isSelected()) {
-        CN.setProperty("platformHint.javascript.beforeUnloadMessage", "Are you sure you want to leave this page?  It might be bad");
-    } else {
-        CN.setProperty("platformHint.javascript.beforeUnloadMessage", null);
-    }
-});
-f.add(enableBeforeUnload);
-f.show();
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptJava006Snippet.java[tag=working-with-javascript-java-006,indent=0]
 ----
 
 [id="pwa_deployment", reftext="Deploying as a Progressive Web App"]
@@ -656,16 +616,7 @@ For example:
 
 [source,java]
 ----
-CN.setProperty("platformHint.javascript.backsideHooksInterval", "1000");
-
-// Now your app will process media.play() and Display.execute(...) calls
-// once per second (1000ms). If play() or execute() has been called anytime
-// in that second (since the last poll), it will seamlessly process the
-// request.
-
-
-// To disable polling, just set it to an interval 0 or lower.
-// for example, CN.setProperty("platformHint.javascript.backsideHooksInterval", "0");
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptJava007Snippet.java[tag=working-with-javascript-java-007,indent=0]
 ----
 
 WARNING: Don't abuse this feature. You should enable this polling when necessary. For example, If your app enables the user to listen for voice commands, enable polling for the period of time that it's listening. When the user wants to stop listening, you should also stop the polling by setting the interval to "0."
@@ -694,8 +645,7 @@ To preserve the iframe and its JavaScript state across deinitialization cycles, 
 
 [source,java]
 ----
-BrowserComponent browser = new BrowserComponent();
-browser.putClientProperty("HTML5Peer.removeOnDeinitialize", Boolean.FALSE);
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptJava008Snippet.java[tag=working-with-javascript-java-008,indent=0]
 ----
 
 This keeps the iframe in the DOM even when the component is deinitialized, preserving all JavaScript state.

@@ -18,28 +18,7 @@ by side.
 
 [source,java]
 ----
-package com.example;
-
-import com.codename1.annotations.*;
-
-@Entity(table = "users")
-public class User {
-
-    @Id(autoIncrement = true)
-    public long id;
-
-    @Column(name = "full_name", nullable = false)
-    public String name;
-
-    public int age;
-
-    public java.util.Date createdAt;
-
-    @DbTransient
-    public String cacheKey;                            // <1>
-
-    public User() { }
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AnnotationSqliteOrmJava001Snippet.java[tag=annotation-sqlite-orm-java-001,indent=0]
 ----
 <1> Excluded from the generated table.
 
@@ -67,55 +46,11 @@ public class User {
 
 === Use the dao
 
-[source,java]
-----
-import com.codename1.orm.EntityManager;
-import com.codename1.orm.Dao;
-
-EntityManager em = EntityManager.open("MyApp.db");
-Dao<User> users = em.dao(User.class);
-
-users.createTable();                                   // <1>
-
-User u = new User();
-u.name = "Alice";
-u.age = 30;
-users.insert(u);                                       // <2>
-
-User found = users.findById(u.id);                     // <3>
-
-for (User x : users.find("age > ?", 18)) {             // <4>
-    // ...
-}
-
-u.age = 31;
-users.update(u);                                       // <5>
-users.delete(u);
-em.close();
-----
-<1> Idempotent -- `CREATE TABLE IF NOT EXISTS`.
-<2> The autoincrement `id` is filled in via
-    `SELECT last_insert_rowid()` after the insert.
-<3> `findById` returns `null` when no row matches.
-<4> Free-form `WHERE` clause; positional `?` parameters bind in order.
-<5> `update` and `delete` key off the entity's `@Id` value.
 
 `EntityManager` is a thin façade over `Database`. The underlying
 connection is reachable through `em.database()` for raw SQL when the
 dao surface isn't enough. Transactions:
 
-[source,java]
-----
-em.beginTransaction();
-try {
-    users.insert(u1);
-    users.insert(u2);
-    em.commitTransaction();
-} catch (IOException e) {
-    em.rollbackTransaction();
-    throw e;
-}
-----
 
 === Relationships
 

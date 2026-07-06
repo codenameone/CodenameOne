@@ -57,8 +57,7 @@ applies for you. In `codenameone_settings.properties`:
 
 [source,properties]
 -----
-codename1.arg.desktop.titleBar=native
-codename1.arg.desktop.interactiveScrollbars=true
+include::../demos/common/src/main/snippets/developer-guide/desktop-integration.properties[tag=desktop-integration-properties-001,indent=0]
 -----
 
 Newly generated projects already contain these lines. The generated `<MainName>Stub` reads them
@@ -74,8 +73,7 @@ first `Form` is shown:
 
 [source,java]
 -----
-Display.getInstance().setProperty("desktop.titleBar", "native");
-Display.getInstance().setProperty("desktop.interactiveScrollbars", "true");
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopIntegrationJava001Snippet.java[tag=desktop-integration-java-001,indent=0]
 -----
 
 NOTE: The native title bar and native menu bar on macOS require iOS 13 / macOS 10.15 (Catalyst)
@@ -95,21 +93,7 @@ and the `Command.DESKTOP_MENU_*` constants:
 
 [source,java]
 -----
-Form hi = new Form("My App", BoxLayout.y());
-
-Command about = new Command("About My App");
-about.setDesktopMenu(Command.DESKTOP_MENU_ABOUT);   // application menu
-
-Command open = new Command("Open File...");
-open.setDesktopMenu(Command.DESKTOP_MENU_FILE);     // File menu
-
-Command quit = new Command("Quit");
-quit.setDesktopMenu(Command.DESKTOP_MENU_QUIT);     // application menu
-
-hi.addCommand(about);
-hi.addCommand(open);
-hi.addCommand(quit);
-hi.show();
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopIntegrationJava002Snippet.java[tag=desktop-integration-java-002,indent=0]
 -----
 
 The recognised values are (case-insensitive):
@@ -138,14 +122,7 @@ next to the menu item and triggers the command from the keyboard:
 
 [source,java]
 -----
-Command save = new Command("Save");
-save.setDesktopMenu(Command.DESKTOP_MENU_FILE);
-save.setDesktopShortcut('S');   // Cmd+S on macOS, Ctrl+S on Windows/Linux
-
-Command saveAs = new Command("Save As...");
-saveAs.setDesktopMenu(Command.DESKTOP_MENU_FILE);
-saveAs.setDesktopShortcut('S',
-        Command.DESKTOP_SHORTCUT_MODIFIER_PRIMARY | Command.DESKTOP_SHORTCUT_MODIFIER_SHIFT);
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/DesktopIntegrationJava003Snippet.java[tag=desktop-integration-java-003,indent=0]
 -----
 
 The single-argument form uses the platform's *primary* modifier - Command on macOS, Control on
@@ -205,17 +182,6 @@ macOS / Mac Catalyst build it goes through the same `UNUserNotificationCenter` p
 the notification delivers it to your app's `LocalNotificationCallback`, exactly as on mobile, so the
 same scheduling and handling code is shared across phone and desktop:
 
-[source,java]
------
-LocalNotification n = new LocalNotification();
-n.setId("reminder-1");
-n.setAlertTitle("Reminder");
-n.setAlertBody("Your export has finished.");
-
-// fire in 5 seconds, no repeat
-Display.getInstance().scheduleLocalNotification(
-        n, System.currentTimeMillis() + 5000, LocalNotification.REPEAT_NONE);
------
 
 NOTE: On the Java SE build desktop notifications require an OS with system-tray support
 (`java.awt.SystemTray`); where it's unavailable the notification is logged and skipped.

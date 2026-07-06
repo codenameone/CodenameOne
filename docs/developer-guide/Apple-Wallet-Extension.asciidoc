@@ -31,42 +31,18 @@ Add these build hints to the iOS build:
 
 [source,properties]
 ----
-codename1.arg.ios.wallet.extension=true
-codename1.arg.ios.wallet.appGroup=group.com.mybank.app
-codename1.arg.ios.wallet.issuerEndpoint=https://api.mybank.com/wallet/provision
+include::../demos/common/src/main/snippets/developer-guide/apple-wallet-extension.properties[tag=apple-wallet-extension-properties-001,indent=0]
 ----
 
 That generates the non-UI extension, wires it into the Xcode project as an embedded extension target and injects the App Group into the app and extension entitlements. To also generate the login UI extension add:
 
 [source,properties]
 ----
-codename1.arg.ios.wallet.includeUI=true
-codename1.arg.ios.wallet.authEndpoint=https://api.mybank.com/wallet/login
+include::../demos/common/src/main/snippets/developer-guide/apple-wallet-extension.properties[tag=apple-wallet-extension-properties-002,indent=0]
 ----
 
 In Java, publish the user's cards whenever they change (typically after login) and keep a fresh token published so Wallet can skip the login screen:
 
-[source,java]
-----
-import com.codename1.payment.WalletExtension;
-import com.codename1.payment.WalletPassEntry;
-
-if (WalletExtension.isSupported()) {
-    WalletExtension.setPassEntries(new WalletPassEntry[] {
-        new WalletPassEntry()
-            .identifier(card.getPrimaryAccountIdentifier())
-            .title("My Bank Debit Card")
-            .cardholderName(user.getFullName())
-            .primaryAccountSuffix(card.getLast4())
-            .paymentNetwork("Visa")
-            .localizedDescription("My Bank Debit Card")
-            .artPng(cardArt.getImageData())
-    });
-    WalletExtension.setRemotePassEntries(sameEntries); // Apple Watch list
-    WalletExtension.setAuthToken(session.getToken());
-    WalletExtension.setRequiresAuthentication(false);
-}
-----
 
 Call `WalletExtension.clear()` on logout. The card art must be a PNG without personally identifiable information (Apple requires square corners and no full card number). The extension automatically filters out cards that are already provisioned on the device or the paired watch.
 
@@ -76,24 +52,14 @@ When the user adds a card, the generated extension POSTs JSON to the `ios.wallet
 
 [source,json]
 ----
-{
-  "certificates": ["base64...", "base64..."],
-  "nonce": "base64...",
-  "nonceSignature": "base64...",
-  "cardIdentifier": "the WalletPassEntry identifier",
-  "authToken": "the token published via setAuthToken"
-}
+include::../demos/common/src/main/snippets/developer-guide/apple-wallet-extension.json[tag=apple-wallet-extension-json-001,indent=0]
 ----
 
 The token is also sent as an `Authorization: Bearer` header. Your backend performs the network-specific encryption (this always happens server side - the keys never live on the device) and responds with:
 
 [source,json]
 ----
-{
-  "activationData": "base64...",
-  "encryptedPassData": "base64...",
-  "ephemeralPublicKey": "base64..."
-}
+include::../demos/common/src/main/snippets/developer-guide/apple-wallet-extension.json[tag=apple-wallet-extension-json-002,indent=0]
 ----
 
 For the RSA_V2 scheme return `wrappedKey` instead of `ephemeralPublicKey`.
@@ -114,8 +80,7 @@ Cloud device builds sign each extension with its own profile. Either place the `
 
 [source,properties]
 ----
-codename1.arg.ios.wallet.nonuiProvisioningProfile=WalletNonUI.mobileprovision
-codename1.arg.ios.wallet.uiProvisioningProfile=WalletUI.mobileprovision
+include::../demos/common/src/main/snippets/developer-guide/apple-wallet-extension.properties[tag=apple-wallet-extension-properties-003,indent=0]
 ----
 
 Alternatively, host them at URLs the build server can reach and supply `ios.wallet.nonuiProvisioningURL` / `ios.wallet.uiProvisioningURL` instead. Profiles contain no private keys, so bundling them in resources is safe; the build keeps them out of the final app bundle. The build validates that each profile matches your distribution certificate and actually carries the payment-pass-provisioning entitlement, and fails with an actionable message when it doesn't.

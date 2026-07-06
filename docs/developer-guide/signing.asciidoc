@@ -52,7 +52,7 @@ Run the wizard from a Codename One Maven project:
 
 [source,bash]
 ----
-mvn cn1:certificatewizard
+include::../demos/common/src/main/snippets/developer-guide/signing.sh[tag=signing-bash-001,indent=0]
 ----
 
 The Maven goal resolves the wizard artifact and its runtime dependencies from Maven, then launches it with the current project's settings path. The wizard uses the Codename One cloud signing API for Apple assets and local `keytool` for Android keystores. On a first run the overview shows that the App Store Connect API key isn't configured and links to the API key page. This is an Apple credential that allows the cloud service to create and manage certificates, bundle IDs, devices, provisioning profiles, APNs keys and Mac signing assets for your Apple Developer Program team.

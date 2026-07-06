@@ -108,9 +108,7 @@ asset entry from the `platformer` pack -- the player:
 
 [source,json]
 ----
-{ "id": "player", "name": "Player", "kind": "actor",
-  "w": 28, "h": 32, "color": "#4D86FF", "unique": true,
-  "defaults": { "lives": 3, "jumpHeight": 96 } }
+include::../demos/common/src/main/snippets/developer-guide/game-assets.json[tag=game-assets-json-001,indent=0]
 ----
 
 Each JSON key maps onto an `AssetDef` field (see `AssetDef.fromMap`): `kind` is
@@ -180,16 +178,7 @@ example, a collectible key:
 
 [source,json]
 ----
-{
-  "id": "key",
-  "name": "Key",
-  "kind": "actor",
-  "w": 24,
-  "h": 24,
-  "color": "#E0C040",
-  "unique": false,
-  "defaults": { "opens": "door", "value": 1 }
-}
+include::../demos/common/src/main/snippets/developer-guide/game-assets.json[tag=game-assets-json-002,indent=0]
 ----
 
 Field by field:
@@ -235,11 +224,6 @@ Materials are resolved through `MaterialRegistry`, a process-wide registry that 
 built-ins (`MaterialRegistry.GRASS`, `ROAD`, `STONE`, `SAND`, `WATER`, `DIRT`). `WATER`
 is registered as solid. Applications add their own without changing the level format:
 
-[source,java]
-----
-MaterialRegistry.register(new Material("lava", "Lava", 0xc0392b).setSolid(true));
-Material m = MaterialRegistry.get("lava");   // never null; unknown ids return gray
-----
 
 Unknown ids resolve to a neutral gray placeholder, so a level that references a
 not-yet-registered material still loads. Materials cover terrain cells and
