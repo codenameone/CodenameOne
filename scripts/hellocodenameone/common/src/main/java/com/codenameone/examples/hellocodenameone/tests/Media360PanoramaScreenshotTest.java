@@ -52,15 +52,25 @@ public class Media360PanoramaScreenshotTest extends BaseTest {
         Form form = new Form("360 Panorama", new BorderLayout()) {
             @Override
             protected void onShowCompleted() {
-                LandscapeCapture.awaitLandscape(this, () -> UITimer.timer(1000, false, this, () -> {
+                LandscapeCapture.awaitLandscape(this, () -> {
+                    // Warm the panorama texture with an early render, then give
+                    // the iOS/tvOS Metal simulator ample time to upload the
+                    // 1024x512 texture and present a textured frame before the
+                    // capture. Without this the screenshot reads the previous
+                    // landscape frame (the OrientationLock form) - the plain 3D
+                    // cubes of VRStereoScene present fast enough, but this
+                    // texture-laden view does not, so it needs a longer settle.
                     view.getRenderView().requestRender();
-                    UITimer.timer(500, false, this, () -> captureWhenSettled(this, "Media360Panorama", () -> {
-                        removeAll();
-                        revalidate();
-                        LandscapeCapture.restorePortrait(this,
-                                Media360PanoramaScreenshotTest.this::done);
-                    }));
-                }));
+                    UITimer.timer(2500, false, this, () -> {
+                        view.getRenderView().requestRender();
+                        UITimer.timer(1000, false, this, () -> captureWhenSettled(this, "Media360Panorama", () -> {
+                            removeAll();
+                            revalidate();
+                            LandscapeCapture.restorePortrait(this,
+                                    Media360PanoramaScreenshotTest.this::done);
+                        }));
+                    });
+                });
             }
         };
         form.add(BorderLayout.CENTER, view);
