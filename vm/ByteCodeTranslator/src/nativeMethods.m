@@ -44,6 +44,9 @@
 #else
 #include <pthread.h>
 #include <unistd.h>
+#if defined(__linux__)
+#include <signal.h>   /* sigaltstack / stack_t for the per-thread alt signal stack */
+#endif
 #include <sys/time.h>
 #endif
 #include "java_util_Date.h"
@@ -1843,8 +1846,29 @@ void markDeadThread(struct ThreadLocalData *d)
     }
 
 }
+// Register a per-thread alternate signal stack (Linux). The crash-protection SIGSEGV
+// handler is installed with SA_ONSTACK, but SA_ONSTACK only takes effect if THIS thread
+// has an alt stack registered (sigaltstack is per-thread). Without it, a STACK-OVERFLOW
+// SIGSEGV re-faults immediately on the already-exhausted stack and the process dies
+// SILENTLY -- no handler, no backtrace, no StackOverflowError. That is exactly why the
+// deep-recursion overflow produced only an opaque core. With an alt stack the handler
+// runs and dumps the faulting thread's backtrace (the recursion). Runtime-only, so it
+// does not perturb codegen.
+void cn1InstallThreadAltStack(void) {
+#if defined(__linux__)
+    static const size_t CN1_ALTSTACK_SZ = 512 * 1024;
+    stack_t ss;
+    ss.ss_sp = malloc(CN1_ALTSTACK_SZ);
+    if (ss.ss_sp == NULL) return;
+    ss.ss_size = CN1_ALTSTACK_SZ;
+    ss.ss_flags = 0;
+    sigaltstack(&ss, NULL); // intentionally leaked: lives for the thread's lifetime
+#endif
+}
+
 void* threadRunner(void *x)
 {
+    cn1InstallThreadAltStack();
     JAVA_OBJECT t = (JAVA_OBJECT)x;
     struct ThreadLocalData* d = getThreadLocalData();
     d->lightweightThread = JAVA_TRUE;

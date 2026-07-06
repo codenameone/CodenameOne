@@ -4081,7 +4081,9 @@ static void gcMarkWorkerDrainLoop() {
 // Helper-thread entry point. Sleeps on the control condition until the GC thread bumps
 // the generation to dispatch a drain, participates, then reports completion. Lives for
 // the lifetime of the process (like the GC thread itself).
+extern void cn1InstallThreadAltStack(void);
 static void* gcMarkWorkerMain(void* arg) {
+    cn1InstallThreadAltStack();  // so a fault in the GC mark dumps a backtrace, not a silent die
     unsigned long myGen = 0;
     for(;;) {
         pthread_mutex_lock(&gcMarkCtlMutex);

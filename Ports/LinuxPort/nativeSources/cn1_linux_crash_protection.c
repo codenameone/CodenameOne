@@ -285,6 +285,19 @@ void cn1_crash_protection_install(void) {
     cn1_cp_resolve_pending_path();
     cn1_cp_log_install();
     cn1_cp_install_signal_handlers();
+    /* Alternate signal stack for THIS (main) thread, so the SA_ONSTACK handler runs even
+     * on a stack-overflow SIGSEGV when the main stack is exhausted. Per-thread; the CN1
+     * worker/EDT/GC threads register their own in threadRunner/gcMarkWorkerMain. Without
+     * it a stack overflow dies silently instead of dumping the recursion backtrace. */
+    {
+        stack_t ss;
+        ss.ss_sp = malloc(512 * 1024);
+        if (ss.ss_sp != NULL) {
+            ss.ss_size = 512 * 1024;
+            ss.ss_flags = 0;
+            sigaltstack(&ss, NULL);
+        }
+    }
 }
 
 /* ----------------------------------------------------------------------
