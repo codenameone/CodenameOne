@@ -2119,11 +2119,34 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 // no callStackOffset bump. The method body (PUSH/POP/SP ops, arithmetic, calls)
 // is emitted byte-for-byte unchanged; it just operates on this local SP. Frame
 // elimination is GC-trivial here -- it changes nothing the collector sees.
+// --- GC-visibility anchor for OBJECT-bearing frameless frames --------------------
+// cn1_frameless_frame holds this method's object locals + object operand-stack slots,
+// and those are GC roots discovered ONLY by the conservative native-C-stack scan. But
+// the array's address never escapes to any function the C optimizer can see (the GC
+// reads it out-of-band, through the raw thread stack pointer), so the optimizer is free
+// to scalar-replace the array / keep object slots in registers / dead-store-eliminate the
+// `locals[i].data.o = arg` writes and NEVER touch the stack memory. When it does, at a GC
+// safepoint (a call, e.g. an allocation) a live object lives only in a register and the
+// conservative STACK scan reads an unwritten slot -> MISSES the root -> the object is swept
+// while reachable (observed: an arm64 heap use-after-free painting a themed component; the
+// wide arm64 register file makes register-residency far likelier than x86-64, hence
+// arch-specific). Anchor the array so it stays MATERIALIZED in memory: make its address
+// escape and clobber memory, which both forbids scalar replacement and forces pending
+// object stores to be flushed before every call. Costs zero instructions -- it only
+// defeats the unsafe optimization. Primitive-only frameless frames hold no roots -> no
+// anchor (see the FAST_PRIMITIVE macros above).
+#if defined(__GNUC__) || defined(__clang__)
+#define CN1_FRAMELESS_GC_ANCHOR(frame) __asm__ __volatile__("" : : "r"(frame))
+#else
+#define CN1_FRAMELESS_GC_ANCHOR(frame) do { void* volatile __cn1anchor = (void*)(frame); (void)__cn1anchor; } while(0)
+#endif
+
 #define DEFINE_METHOD_STACK_FRAMELESS(stackSize, localsStackSize, spPosition) \
     struct elementStruct cn1_frameless_frame[(localsStackSize) + (stackSize)]; \
     struct elementStruct* locals = &cn1_frameless_frame[0]; \
     struct elementStruct* stack = &cn1_frameless_frame[localsStackSize]; \
-    struct elementStruct* SP = &stack[spPosition];
+    struct elementStruct* SP = &stack[spPosition]; \
+    CN1_FRAMELESS_GC_ANCHOR(cn1_frameless_frame)
 
 // Headroom (bytes) kept below the end of the native C stack: enough to detect the
 // overflow and still build + throw the StackOverflowError without overrunning.
