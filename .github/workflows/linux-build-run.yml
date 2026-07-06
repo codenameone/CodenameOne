@@ -248,6 +248,19 @@ jobs:
                 2>&1
             } >> "$(dirname "$CN1_APP_LOG_TEE")/crash-stacks.txt" || true
           done
+          # Resolve the CN1 FAULT/ABORT backtrace addresses (LinuxHelloMain[0x...]) that the
+          # SA_ONSTACK handler dumped to app-output.log into function names -- the faulting
+          # frames (e.g. a stack overflow's recursion / the caller that ran CN1 on a small
+          # native stack). The suite binary is not stripped, so addr2line resolves them.
+          elf="$(/usr/bin/find /tmp -maxdepth 4 -name LinuxHelloMain -type f 2>/dev/null | head -1)"
+          if [ -n "$elf" ] && [ -f "$CN1_APP_LOG_TEE" ]; then
+            {
+              echo "=== addr2line of CN1 backtrace addresses (from app log) ==="
+              grep -oE "LinuxHelloMain\[0x[0-9a-f]+\]" "$CN1_APP_LOG_TEE" | grep -oE "0x[0-9a-f]+" | while read a; do
+                echo "$a -> $(addr2line -f -C -e "$elf" "$a" 2>/dev/null | tr '\n' ' ')"
+              done
+            } >> "$(dirname "$CN1_APP_LOG_TEE")/crash-stacks.txt" 2>&1 || true
+          fi
           exit $rc
 
       - name: Upload screenshot artifact (${{ matrix.arch }})
