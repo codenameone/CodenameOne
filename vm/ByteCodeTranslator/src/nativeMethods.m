@@ -1899,13 +1899,9 @@ JAVA_VOID java_lang_Thread_start__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT th) {
     // musl's default thread stack is only 128KB (glibc defaults to 8MB). ParparVM's
     // recursive C interpreter painting a deep component tree (e.g. a Replace/Fade
     // transition) easily overflows 128KB, corrupting the thread stack and crashing
-    // at a varying site. Pin a large stack so CN1 threads behave the same as on every
-    // other port regardless of the linked libc. 64MB, not 16MB: the EDT painting a deep
-    // theme (TextFieldTheme_dark) blew 16MB on arm64 -- whose larger per-Java-frame
-    // native footprint uses more stack than x64 for the same recursion, so 16MB caught
-    // x64 but not arm64. Stacks are lazily committed (reserved virtual, only touched
-    // pages cost RAM), so the larger reservation is effectively free.
-    pthread_attr_setstacksize(&attr, 64 * 1024 * 1024);
+    // at a varying site. Pin a JVM-sized 16MB stack so CN1 threads behave the same
+    // as on every other port regardless of the linked libc.
+    pthread_attr_setstacksize(&attr, 16 * 1024 * 1024);
 #endif
     int rc = pthread_create(&pt, &attr, threadRunner, (void *)th);
     if (rc != 0) {
