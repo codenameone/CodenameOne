@@ -753,6 +753,18 @@
         "canonical_set": true,
         "syndicated_at": "2026-07-05T15:02:58+00:00"
       }
+    },
+    "privacy-first-analytics": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmr9cl9gw00000ahw2bs78qqb",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a4bc30710bbf9b4a2c14266",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-06T15:01:20+00:00"
+      }
     }
   }
 }
