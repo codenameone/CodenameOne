@@ -3493,6 +3493,41 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
         return;
     }
 #endif
+#ifdef CN1_ROOTMISS_FORENSIC
+    // Forensic + defensive: the arm64 crash is gcMarkObject dereferencing a GARBAGE
+    // parentCls (observed 0x200000000, unmapped -> fault at +0x20). It passes the null /
+    // Class-singleton guard below because garbage is neither. A real clazz is a static in
+    // the binary's data segment, within a few hundred MB of code; a free-list / dangling
+    // value points into the mmap'd heap, far away. Validate the POINTER VALUE (no deref, so
+    // this cannot itself fault) and, if implausible, dump the drain parent + the call site
+    // (addr2line -> exact field / whether it came from the root scan vs a mark function),
+    // then SKIP it instead of crashing. Skipping a genuinely-garbage slot is correct (it is
+    // not a live object); if a real object were ever skipped that would surface as a later
+    // root-miss, which this same run would also reveal.
+    {
+        uintptr_t __pc = (uintptr_t)obj->__codenameOneParentClsReference;
+        uintptr_t __anchor = (uintptr_t)(void*)&gcMarkObject;
+        uintptr_t __d = __pc > __anchor ? __pc - __anchor : __anchor - __pc;
+        if(__pc != 0 && (((__pc & 7) != 0) || __d > (512ULL << 20))) {
+            JAVA_OBJECT __p = gcMarkCurrentDrainObj;
+            const char* __pcls = (__p != JAVA_NULL
+                && (__p->__heapPosition == CN1_BIBOP_HEAP_POS || __p->__heapPosition == CN1_BIBOP_ADOPTED)
+                && __p->__codenameOneParentClsReference != 0
+                && (((uintptr_t)__p->__codenameOneParentClsReference & 7) == 0)
+                && __p->__codenameOneParentClsReference->clsName != 0)
+                ? __p->__codenameOneParentClsReference->clsName : "?";
+            static long __mg = 0;
+            if(__mg++ < 80) {
+                fprintf(stderr, "[MARKGARBAGE] obj=%p parentCls=%p heapPos=%d mark=%d snap=%d V=%d "
+                                "drainParent=%s callSite=%p\n",
+                        (void*)obj, (void*)__pc, obj->__heapPosition, obj->__codenameOneGcMark,
+                        markSnapshot, currentGcMarkValue, __pcls, __builtin_return_address(0));
+                fflush(stderr);
+            }
+            return;   // skip the garbage slot rather than dereferencing parentCls
+        }
+    }
+#endif
     if(obj->__codenameOneParentClsReference == 0 || obj->__codenameOneParentClsReference == (&class__java_lang_Class)) {
         return;
     }
