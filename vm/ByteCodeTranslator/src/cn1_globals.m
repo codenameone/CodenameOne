@@ -3302,7 +3302,7 @@ static JAVA_BOOLEAN gcMarkWorklistOverflow = JAVA_FALSE;
 // writing it from many workers would be a benign-value-but-still-reported data race.
 static JAVA_BOOLEAN gcMarkFoundUnmarkedChildInPass = JAVA_FALSE;
 
-#ifdef CN1_BIBOP_VALIDATE
+#if defined(CN1_BIBOP_VALIDATE) || defined(CN1_ROOTMISS_FORENSIC)
 // Forensic (serial mark): the object gcMarkDrain is currently tracing -- i.e. the
 // PARENT whose mark function is marking children. The gcMarkObject child-side
 // validation dumps this so a corrupt child tells us WHO referenced it, which
@@ -4068,7 +4068,7 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
 #endif
             gcMarkFunctionPointer fp = obj->__codenameOneParentClsReference->markFunction;
             if(fp != 0) {
-#ifdef CN1_BIBOP_VALIDATE
+#if defined(CN1_BIBOP_VALIDATE) || defined(CN1_ROOTMISS_FORENSIC)
                 gcMarkCurrentDrainObj = obj;
 #endif
 #if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
