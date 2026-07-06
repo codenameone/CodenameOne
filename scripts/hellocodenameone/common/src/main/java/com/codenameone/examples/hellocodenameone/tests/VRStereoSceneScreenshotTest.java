@@ -35,7 +35,6 @@ public class VRStereoSceneScreenshotTest extends BaseTest {
             done();
             return true;
         }
-        Form form = createForm("VR Stereo", new BorderLayout(), "VRStereoScene");
         view = new VRView(new VRRenderer() {
             private Mesh cube;
             private Mesh floor;
@@ -83,6 +82,23 @@ public class VRStereoSceneScreenshotTest extends BaseTest {
             return true;
         }
         LandscapeCapture.lock();
+        // Plain Form (rather than createForm) so the GPU peer can be detached
+        // right after the capture: on the iOS Metal backend a lingering 3D
+        // layer is what a later test's screenshot grabs under the late-present
+        // race, so we remove it before finishing.
+        final Form form = new Form("VR Stereo", new BorderLayout()) {
+            @Override
+            protected void onShowCompleted() {
+                LandscapeCapture.awaitLandscape(this, () -> UITimer.timer(1000, false, this, () -> {
+                    view.requestRender();
+                    UITimer.timer(500, false, this, () -> captureWhenSettled(this, "VRStereoScene", () -> {
+                        removeAll();
+                        revalidate();
+                        done();
+                    }));
+                }));
+            }
+        };
         form.add(BorderLayout.CENTER, view);
         form.show();
         return true;
@@ -91,24 +107,5 @@ public class VRStereoSceneScreenshotTest extends BaseTest {
     @Override
     public boolean shouldTakeScreenshot() {
         return com.codename1.ui.CN.isGpuSupported();
-    }
-
-    /// Wait for landscape to settle, then force a fresh GPU frame to be
-    /// rendered (and read back for capture) before the screenshot fires,
-    /// mirroring the Gpu3D screenshot tests.
-    @Override
-    protected void registerReadyCallback(final Form parent, final Runnable run) {
-        LandscapeCapture.awaitLandscape(parent, new Runnable() {
-            public void run() {
-                UITimer.timer(1000, false, parent, new Runnable() {
-                    public void run() {
-                        if (view != null) {
-                            view.requestRender();
-                        }
-                        UITimer.timer(500, false, parent, run);
-                    }
-                });
-            }
-        });
     }
 }

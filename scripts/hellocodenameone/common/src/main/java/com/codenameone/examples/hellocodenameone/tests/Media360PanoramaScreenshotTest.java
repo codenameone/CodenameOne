@@ -38,19 +38,24 @@ public class Media360PanoramaScreenshotTest extends BaseTest {
         view.setYaw(30f);
         view.setPitch(10f);
         LandscapeCapture.lock();
-        // This is the last of the landscape VR / 360 tests, so it restores
-        // portrait once its capture is done - leaving the device as the rest
-        // of the suite (which runs in portrait) expects. A plain Form is used
-        // instead of createForm() so the capture completion can run that
-        // restore before done().
-        Form form = new Form("360 Panorama", new BorderLayout()) {
+        // This is the last of the landscape VR / 360 tests, so once its
+        // capture is done it detaches the 3D peer (so no lingering Metal layer
+        // is grabbed by a later test's screenshot under the iOS late-present
+        // race) and restores portrait - leaving the device as the rest of the
+        // suite (which runs in portrait) expects. A plain Form is used instead
+        // of createForm() so the capture completion can run that teardown
+        // before done().
+        final Form form = new Form("360 Panorama", new BorderLayout()) {
             @Override
             protected void onShowCompleted() {
                 LandscapeCapture.awaitLandscape(this, () -> UITimer.timer(1000, false, this, () -> {
                     view.getRenderView().requestRender();
-                    UITimer.timer(500, false, this, () -> captureWhenSettled(this, "Media360Panorama",
-                            () -> LandscapeCapture.restorePortrait(this,
-                                    Media360PanoramaScreenshotTest.this::done)));
+                    UITimer.timer(500, false, this, () -> captureWhenSettled(this, "Media360Panorama", () -> {
+                        removeAll();
+                        revalidate();
+                        LandscapeCapture.restorePortrait(this,
+                                Media360PanoramaScreenshotTest.this::done);
+                    }));
                 }));
             }
         };
