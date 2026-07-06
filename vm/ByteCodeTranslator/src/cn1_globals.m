@@ -2612,25 +2612,7 @@ JAVA_OBJECT cn1ConservativeResolve(void* w) {
                     }
                 }
 #endif
-                if(idx < 0 || idx >= pg->slotCount) return JAVA_NULL;
-                if(idx >= pg->bumpIndex) {
-                    // The word lands past the SNAPSHOT bump. On arm64 the snapshot's
-                    // acquire-load of bumpIndex can lag a mutator's release-store (an object
-                    // allocated after the snapshot, whose reference is a live root on the
-                    // scanned stack), so a live object -- observed: a RadialGradient created
-                    // during theme painting, held in a frameless frame -- was wrongly
-                    // rejected here and swept while reachable (garbage-ptr UAF in fillRoundRect,
-                    // arm64 only). Re-validate against the page's LIVE bumpIndex: if the slot
-                    // is now within the live bump AND the geometry is unchanged since the
-                    // snapshot (the page was not reformatted -- which would invalidate idx),
-                    // it is a freshly-allocated live slot; accept it. Otherwise it is genuinely
-                    // beyond the frontier (uninitialized) -- reject.
-                    CN1BibopPage* lp = (CN1BibopPage*)pg->base;
-                    int liveBump = atomic_load_explicit(&lp->bumpIndex, memory_order_acquire);
-                    if(idx >= liveBump ||
-                       lp->slotSize != pg->slotSize ||
-                       lp->firstSlotOffset != pg->firstSlotOffset) return JAVA_NULL;
-                }
+                if(idx < 0 || idx >= pg->bumpIndex || idx >= pg->slotCount) return JAVA_NULL;
                 JAVA_OBJECT o = (JAVA_OBJECT)(cand + pg->firstSlotOffset + (long)idx * pg->slotSize);
                 // ACQUIRE: the slot may be getting reused RIGHT NOW by a mutator
                 // (freelist pop -> header stores -> mark=-1 RELEASE). Pairing with
