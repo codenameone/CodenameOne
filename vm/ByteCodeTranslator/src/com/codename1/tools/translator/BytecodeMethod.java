@@ -107,34 +107,21 @@ public class BytecodeMethod implements SignatureSet {
     // legacy frame code byte-for-byte identical to before.
     private static final boolean FRAMELESS_ENABLED =
             "true".equalsIgnoreCase(System.getProperty("cn1.frameless", "true"));
-    // PHASE 3b: extend frameless codegen to OBJECT-BEARING methods (-Dcn1.frameless.objects).
-    // Such a method keeps its object operand stack + object locals in a method-local C array
-    // on the native stack; the C runtime (built with -DCN1_CONSERVATIVE_GC_ROOTS) finds those
-    // roots by conservatively scanning each stopped thread's native stack.
-    //
-    // *** DEFAULT OFF -- object-bearing frameless is UNSOUND under conservative GC on
-    // register-rich targets (arm64). The frame's address is never observed by any function the
-    // C optimizer can see (the GC reads it out-of-band via the raw stack pointer), so on arm64
-    // clang keeps object slots in registers across safepoint calls; the conservative STACK scan
-    // then misses a live root and the object is swept while reachable -> use-after-free during
-    // painting (wild 0x2000000xx deref, deterministic mid-suite on Linux/arm64). x86-64 is
-    // immune only by luck (register pressure spills the frame to the scanned stack). A memory-
-    // materialization anchor + frame zeroing (see DEFINE_METHOD_STACK_FRAMELESS in cn1_globals.h)
-    // fixed x86-64/musl but only moved arm64 from 101/139 to 107/139 -- clang still proves some
-    // callees don't alias the frame and keeps those slots in registers. The only sound cures are
-    // `volatile` on the frame (negates the entire frameless benefit) or precise object-slot
-    // tracking (Tier 3.2, object-only operand stack) -- both out of scope here. Primitive-only
-    // methods stay frameless via usePrimitiveFastFrame (they hold NO object roots, so there is
-    // nothing for the scan to miss); that is where the recursion/arithmetic wins live and it is
-    // unaffected by this flag. Re-enable only alongside precise object-root tracking.
+    // PHASE 3b: extend frameless codegen to OBJECT-BEARING methods (-Dcn1.frameless.objects,
+    // default off). Such a method keeps its object operand stack + object locals in a
+    // method-local C array on the native stack; the C runtime (built with
+    // -DCN1_CONSERVATIVE_GC_ROOTS) finds those roots by conservatively scanning each
+    // stopped thread's native stack. With this OFF, only primitive-only methods are
+    // frameless (identical to the prior phase). Requires the conservative-GC runtime.
     private static final boolean FRAMELESS_OBJECTS_ENABLED =
-            "true".equalsIgnoreCase(System.getProperty("cn1.frameless.objects", "false"));
+            "true".equalsIgnoreCase(System.getProperty("cn1.frameless.objects", "true"));
     // PHASE 3b: extend object-frameless to INSTANCE methods (receiver `this` becomes a
-    // conservatively-scanned C parameter). DEFAULT OFF for the same arm64 conservative-scan
-    // root-miss reason as FRAMELESS_OBJECTS_ENABLED above (and it implies it -- see the guard
-    // at the obj/instance check below).
+    // conservatively-scanned C parameter). Now DEFAULT ON: the intermittent multi-threaded
+    // failure that previously gated this off was a pre-existing Thread.start/join visibility
+    // race (alive set on the worker thread async after start() returned), fixed in
+    // java_lang_Thread_start__ (993331107); with it fixed, MtStress is 50/50 deterministic.
     private static final boolean FRAMELESS_INSTANCE_ENABLED =
-            "true".equalsIgnoreCase(System.getProperty("cn1.frameless.instance", "false"));
+            "true".equalsIgnoreCase(System.getProperty("cn1.frameless.instance", "true"));
     private int methodOffset;
     private boolean forceVirtual;
     private boolean virtualOverriden;

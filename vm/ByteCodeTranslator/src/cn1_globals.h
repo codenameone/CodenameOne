@@ -2119,45 +2119,11 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 // no callStackOffset bump. The method body (PUSH/POP/SP ops, arithmetic, calls)
 // is emitted byte-for-byte unchanged; it just operates on this local SP. Frame
 // elimination is GC-trivial here -- it changes nothing the collector sees.
-// --- GC-visibility anchor for OBJECT-bearing frameless frames --------------------
-// NOTE: object-bearing frameless is DISABLED BY DEFAULT (cn1.frameless.objects/instance,
-// see FRAMELESS_OBJECTS_ENABLED in BytecodeMethod.java), so this macro is normally not
-// emitted. It is retained -- with the anchor + frame zeroing below -- as the best partial
-// mitigation for anyone re-enabling the flag alongside precise object-root tracking. It is
-// NOT sufficient on its own: see the failure analysis below.
-//
-// cn1_frameless_frame holds this method's object locals + object operand-stack slots,
-// and those are GC roots discovered ONLY by the conservative native-C-stack scan. But
-// the array's address never escapes to any function the C optimizer can see (the GC
-// reads it out-of-band, through the raw thread stack pointer), so the optimizer is free
-// to scalar-replace the array / keep object slots in registers / dead-store-eliminate the
-// `locals[i].data.o = arg` writes and NEVER touch the stack memory. When it does, at a GC
-// safepoint (a call, e.g. an allocation) a live object lives only in a register and the
-// conservative STACK scan reads an unwritten slot -> MISSES the root -> the object is swept
-// while reachable (observed: an arm64 heap use-after-free painting a themed component; the
-// wide arm64 register file makes register-residency far likelier than x86-64, hence
-// arch-specific). The anchor makes the array's address escape so it cannot be scalar-
-// replaced, and the memset zeros unwritten slots so a materialized-but-unused slot reads
-// back as a clean null instead of stack garbage that resolves to a mid-init BiBOP slot.
-// This FIXED x86-64/musl (139/139) but only moved arm64 from 101/139 to 107/139: clang
-// still proves some safepoint callees do not alias the frame and keeps THOSE object slots
-// in registers across the call. Fully closing it needs `volatile` on the frame (which
-// negates the whole frameless benefit) or precise object-slot tracking -- hence the flag
-// defaults off. Primitive-only frameless frames hold no roots -> no anchor needed (see the
-// FAST_PRIMITIVE macros above).
-#if defined(__GNUC__) || defined(__clang__)
-#define CN1_FRAMELESS_GC_ANCHOR(frame) __asm__ __volatile__("" : : "r"(frame))
-#else
-#define CN1_FRAMELESS_GC_ANCHOR(frame) do { void* volatile __cn1anchor = (void*)(frame); (void)__cn1anchor; } while(0)
-#endif
-
 #define DEFINE_METHOD_STACK_FRAMELESS(stackSize, localsStackSize, spPosition) \
     struct elementStruct cn1_frameless_frame[(localsStackSize) + (stackSize)]; \
     struct elementStruct* locals = &cn1_frameless_frame[0]; \
     struct elementStruct* stack = &cn1_frameless_frame[localsStackSize]; \
-    struct elementStruct* SP = &stack[spPosition]; \
-    memset(cn1_frameless_frame, 0, sizeof(cn1_frameless_frame)); \
-    CN1_FRAMELESS_GC_ANCHOR(cn1_frameless_frame)
+    struct elementStruct* SP = &stack[spPosition];
 
 // Headroom (bytes) kept below the end of the native C stack: enough to detect the
 // overflow and still build + throw the StackOverflowError without overrunning.
