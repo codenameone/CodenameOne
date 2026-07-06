@@ -2146,6 +2146,7 @@ static inline void cn1InitMethodStackInline(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     struct elementStruct* locals = &cn1_frameless_frame[0]; \
     struct elementStruct* stack = &cn1_frameless_frame[localsStackSize]; \
     struct elementStruct* SP = &stack[spPosition]; \
+    memset(cn1_frameless_frame, 0, sizeof(cn1_frameless_frame)); \
     CN1_FRAMELESS_GC_ANCHOR(cn1_frameless_frame)
 
 // Headroom (bytes) kept below the end of the native C stack: enough to detect the
