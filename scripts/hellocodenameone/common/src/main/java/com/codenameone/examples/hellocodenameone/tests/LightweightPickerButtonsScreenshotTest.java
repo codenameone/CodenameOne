@@ -171,9 +171,11 @@ public class LightweightPickerButtonsScreenshotTest extends BaseTest {
                     current.revalidate();
                     current.repaint();
                 }
-                // Second wait: give the wheels a couple of frames to settle
-                // at the new month/day/year before the capture chain below.
-                UITimer.timer(400, false, form, new Runnable() {
+                // Second wait: give the wheels time to settle at the new
+                // month/day/year before the capture chain below. CI watchOS
+                // simulators can still be mid-scroll after a few frames,
+                // which leaves the selected row shifted in the screenshot.
+                UITimer.timer(1200, false, form, new Runnable() {
                     @Override
                     public void run() {
                         // Three nested callSerially hops before capture so
