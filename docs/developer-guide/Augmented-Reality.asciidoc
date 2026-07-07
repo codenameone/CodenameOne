@@ -49,28 +49,7 @@ The canonical AR loop is: open a session, show its view, wait for a plane, hit t
 
 [source,java]
 ----
-if (!AR.isSupported()) {
-    ToastBar.showInfoMessage("AR is not supported on this device");
-    return;
-}
-ARSession session = AR.open(new ARSessionOptions());
-ARView view = session.createView();
-
-Form f = new Form("AR", new BorderLayout());
-f.add(BorderLayout.CENTER, view);
-f.show();
-
-byte[] modelBytes = ...; // a .glb asset, e.g. from getResourceAsStream
-view.addPointerReleasedListener(e -> {
-    float xn = (e.getX() - view.getAbsoluteX()) / (float) view.getWidth();
-    float yn = (e.getY() - view.getAbsoluteY()) / (float) view.getHeight();
-    session.hitTest(xn, yn).ready(hits -> {
-        if (hits.length > 0) {
-            ARAnchor anchor = hits[0].createAnchor();
-            anchor.setNode(new ARNode(ARModel.fromGltf(modelBytes)));
-        }
-    });
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/ar/ArSnippets.java[tag=placeModel,indent=0]
 ----
 
 `ARSessionOptions` configures the session before it opens: the tracking mode (`WORLD` or `FACE`), which plane orientations to detect, whether to estimate lighting, and the reference images to recognize. The defaults open a world tracking session with horizontal plane detection and light estimation, which suits the place-content-on-a-surface use case above.
@@ -81,11 +60,7 @@ Planes are delivered through `ARPlaneListener` as immutable snapshots: an `ADDED
 
 [source,java]
 ----
-session.addPlaneListener(ev -> {
-    ARPlane p = ev.getPlane();
-    System.out.println(ev.getKind() + " " + p.getType()
-            + " " + p.getExtentX() + "x" + p.getExtentZ() + "m");
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/ar/ArSnippets.java[tag=planeListener,indent=0]
 ----
 
 The plane's local frame has X/Z spanning the surface and Y along the normal; `getCenterPose()` positions that frame in the world. `ARPlane.Type` distinguishes upward-facing horizontal surfaces (floors, tables), downward-facing ones (ceilings) and vertical surfaces (walls) - request vertical detection with `ARSessionOptions.planeDetection(ARPlaneDetection.HORIZONTAL_AND_VERTICAL)`.
@@ -98,10 +73,7 @@ Anchors survive tracking refinements: the session updates `getPose()` over time 
 
 [source,java]
 ----
-ARNode root = new ARNode(ARModel.fromMesh(
-        Primitives.sphere(0.15f, 24, 32, false), 0xffdd4433));
-root.setLocalPosition(0, 0.15f, 0); // rest on the surface, not in it
-anchor.setNode(root);
+include::../demos/common/src/main/java/com/codenameone/developerguide/ar/ArSnippets.java[tag=anchorContent,indent=0]
 ----
 
 Node transforms are relative to the anchor, in meters. Nodes may nest (`addChild`), carry glTF assets (`ARModel.fromGltf`) or portable meshes (`ARModel.fromMesh`), and any mutation after attachment - position, rotation, scale, visibility, children - re-syncs the platform renderer automatically.
@@ -116,18 +88,7 @@ Register printed images - posters, game boards, product labels - and the session
 
 [source,java]
 ----
-ARSessionOptions opts = new ARSessionOptions().referenceImages(new ARReferenceImage[]{
-    new ARReferenceImage("poster", posterPngBytes, 0.42f) // physical width in meters
-});
-ARSession session = AR.open(opts);
-session.addAnchorListener(ev -> {
-    if (ev.getKind() == ARAnchorEvent.Kind.ADDED
-            && ev.getAnchor() instanceof ARImageAnchor) {
-        ARImageAnchor img = (ARImageAnchor) ev.getAnchor();
-        System.out.println("Recognized " + img.getReferenceImageName());
-        img.setNode(new ARNode(ARModel.fromGltf(overlayModel)));
-    }
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/ar/ArSnippets.java[tag=imageTracking,indent=0]
 ----
 
 The physical width matters: the platform uses it to estimate the image's distance, so measure the real print. The anchor pose is centered on the physical image with local X/Z spanning its surface.

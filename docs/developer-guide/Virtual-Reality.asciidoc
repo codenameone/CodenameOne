@@ -47,26 +47,7 @@ A `VRRenderer` draws the same scene for every eye; the camera differences produc
 
 [source,java]
 ----
-VRView vr = new VRView(new VRRenderer() {
-    Mesh cube;
-    Material material;
-
-    public void onInit(GraphicsDevice device) {
-        cube = Primitives.cube(device, 0.5f);
-        material = new Material(Material.Type.PHONG).setColor(0xff3366ff);
-    }
-
-    public void onEyeFrame(GraphicsDevice device, VREye eye, Camera camera) {
-        device.draw(cube, material, Matrix4.translation(0, 0, -2));
-    }
-
-    public void onDispose(GraphicsDevice device) { }
-});
-vr.setContinuous(true); // head tracked scenes want continuous rendering
-
-Form f = new Form("VR", new BorderLayout());
-f.add(BorderLayout.CENTER, vr);
-f.show();
+include::../demos/common/src/main/java/com/codenameone/developerguide/vr/VrSnippets.java[tag=stereoScene,indent=0]
 ----
 
 `setStereo(false)` switches to a single centered viewpoint (`VREye.CENTER`) at runtime, useful for a non-headset preview of the same scene. `setPosition(x, y, z)` moves the viewer through the world; `setClearColor(argb)` sets the background.
@@ -85,9 +66,7 @@ Call `recenter()` to make the current view direction the new "straight ahead," k
 
 [source,java]
 ----
-Media360View pano = new Media360View();
-pano.setImage(EncodedImage.create("/panorama.jpg"));
-f.add(BorderLayout.CENTER, pano);
+include::../demos/common/src/main/java/com/codenameone/developerguide/vr/VrSnippets.java[tag=photoViewer,indent=0]
 ----
 
 image::img/vr-360-panorama.png[An equirectangular panorama in side-by-side stereo,scaledwidth=40%]
@@ -100,16 +79,7 @@ There is no platform path from media frames to GPU textures yet, so 360 video is
 
 [source,java]
 ----
-pano.setTextureSource(new TextureSource() {
-    public Texture createTexture(GraphicsDevice device) {
-        return device.createTexture(1024, 512, initialPixels);
-    }
-    public boolean updateTexture(GraphicsDevice device, Texture texture) {
-        // mutate pixels and re-upload as needed; return true when changed
-        return false;
-    }
-    public void dispose(GraphicsDevice device) { }
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/vr/VrSnippets.java[tag=textureSource,indent=0]
 ----
 
 === The simulator
