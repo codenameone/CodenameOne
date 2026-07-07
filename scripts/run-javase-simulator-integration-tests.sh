@@ -88,9 +88,21 @@ if [ -z "$SIM_SKIN_PATH" ] || [ ! -f "$SIM_SKIN_PATH" ]; then
   if [ ! -s "$SKIN_ARCHIVE" ]; then
     SKIN_URL="$(python3 - <<'PY'
 import json
+import os
 import urllib.request
 
-with urllib.request.urlopen('https://api.github.com/repos/codenameone/codenameone-skins/releases/latest') as response:
+request = urllib.request.Request(
+    'https://api.github.com/repos/codenameone/codenameone-skins/releases/latest',
+    headers={
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'codenameone-javase-simulator-tests'
+    }
+)
+token = os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN')
+if token:
+    request.add_header('Authorization', 'Bearer ' + token)
+
+with urllib.request.urlopen(request) as response:
     data = json.load(response)
 
 assets = data.get('assets') or []
