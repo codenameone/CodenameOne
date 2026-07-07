@@ -486,7 +486,31 @@ static inline void cn1ReleaseStringPeer(JAVA_OBJECT o) {
 void freeAndFinalize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     finalizerFunctionPointer ptr = (finalizerFunctionPointer)obj->__codenameOneParentClsReference->finalizerFunction;
     if(ptr != 0) {
-        ptr(threadStateData, obj);
+        // Per the Java spec, an exception thrown by finalize() is IGNORED -- and it must
+        // NEVER escape the collector. This runs during sweep on the GC thread; if a
+        // finalizer throws (observed on iOS: a native peer finalizer during DrawGradientStops)
+        // and the exception is allowed to unwind, it propagates out through codenameOneGCSweep
+        // -> java_lang_System_gcMarkSweep__ (whose gcCurrentlyRunning=FALSE reset is then
+        // SKIPPED, leaving the flag stuck TRUE) -> the GC thread's run loop, which only catches
+        // InterruptedException -> the GC thread dies WITHOUT clearing gcThreadInstance. The EDT
+        // then deadlocks forever in cn1BibopMaybeGc's allocation backpressure spin (it can never
+        // trigger a GC because gcCurrentlyRunning is stuck true, and spins because the dead GC
+        // thread's instance is still non-null) -> deterministic mid-suite hang. Run the finalizer
+        // inside a catch-all try block and swallow anything it throws.
+        int __savedTryBlock = threadStateData->tryBlockOffset;
+        jmp_buf __finTryJmp;
+        if(setjmp(__finTryJmp) == 0) {
+            threadStateData->blocks[threadStateData->tryBlockOffset].monitor = 0;
+            threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = 0; // catch-all
+            memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, __finTryJmp, sizeof(jmp_buf));
+            threadStateData->tryBlockOffset++;
+            ptr(threadStateData, obj);
+            threadStateData->tryBlockOffset = __savedTryBlock;
+        } else {
+            // finalizer threw -> restore the try-block stack and drop the exception
+            threadStateData->tryBlockOffset = __savedTryBlock;
+            threadStateData->exception = JAVA_NULL;
+        }
     }
     cn1ReleaseStringPeer(obj);
     codenameOneGcFree(threadStateData, obj);

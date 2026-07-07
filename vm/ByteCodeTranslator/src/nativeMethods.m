@@ -1536,6 +1536,22 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
         pthread_setschedparam(pthread_self(), policy, &param);
     }
     flushReleaseQueue();
+    // Defense in depth: a collection cycle must NEVER let an exception escape to the GC
+    // thread's run loop (System$1.run only catches InterruptedException, so anything else
+    // kills the collector -- and because the gcCurrentlyRunning=FALSE reset below would be
+    // skipped and gcThreadInstance stays non-null, every allocating thread then deadlocks in
+    // cn1BibopMaybeGc's backpressure spin). Individual hazards are contained at their source
+    // (throwing finalizers are swallowed in freeAndFinalize), but wrap the whole cycle as a
+    // backstop: on any throw, drop it, and still clear gcCurrentlyRunning so the collector
+    // stays healthy and the next cycle retries. If MARK threw, SWEEP is skipped -- correct,
+    // sweeping a partial mark would free reachable objects.
+    int __gcSavedTryBlock = threadStateData->tryBlockOffset;
+    jmp_buf __gcTryJmp;
+    if(setjmp(__gcTryJmp) == 0) {
+        threadStateData->blocks[threadStateData->tryBlockOffset].monitor = 0;
+        threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = 0; // catch-all
+        memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, __gcTryJmp, sizeof(jmp_buf));
+        threadStateData->tryBlockOffset++;
 #ifdef CN1_GC_INSTRUMENT
     extern long long cn1_instr_allocCount; extern int currentSizeOfAllObjectsInHeap;
     static long long markNs=0, sweepNs=0; static int gcCount=0;
@@ -1554,6 +1570,11 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
     codenameOneGCMark();
     codenameOneGCSweep();
 #endif
+        threadStateData->tryBlockOffset = __gcSavedTryBlock;
+    } else {
+        threadStateData->tryBlockOffset = __gcSavedTryBlock;
+        threadStateData->exception = JAVA_NULL;
+    }
     flushReleaseQueue();
     lowMemoryMode = JAVA_FALSE;
     gcCurrentlyRunning = JAVA_FALSE;
