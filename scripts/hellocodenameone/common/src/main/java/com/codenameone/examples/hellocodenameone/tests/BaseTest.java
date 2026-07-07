@@ -79,7 +79,13 @@ public abstract class BaseTest extends AbstractTest {
             captureStage = "settle-timer-fired";
         }
         AnimationManager am = form.getAnimationManager();
-        boolean animating = (am != null && am.isAnimating())
+        // Do not capture until the form we are meant to shoot is actually the current form.
+        // On the slow watchOS/tvOS simulators a form switch can lag onShowCompleted, so
+        // Display.screenshot() would grab the PREVIOUS test's form (observed: css-gradients
+        // capturing PaletteOverrideTheme_dark -> a "duplicate_image_with" wrong-form flake).
+        boolean wrongForm = Display.getInstance().getCurrent() != form;
+        boolean animating = wrongForm
+                || (am != null && am.isAnimating())
                 || Display.getInstance().isInTransition();
         if (!animating || waitedMs >= 5000) {
             long extra = extraSettleBeforeCaptureMillis();

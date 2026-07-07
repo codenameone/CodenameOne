@@ -96,4 +96,12 @@ public class CssGradientsScreenshotTest extends BaseTest {
     private String shortName(String uiid) {
         return uiid.startsWith("CssGradient") ? uiid.substring("CssGradient".length()) : uiid;
     }
+
+    @Override
+    protected long extraSettleBeforeCaptureMillis() {
+        // The 8-tile CSS-gradient grid is a heavy first paint on the slow watchOS/tvOS Core
+        // Graphics backend; force a repaint + delay so the freshly-presented gradient form is
+        // captured rather than the previous test's leftover framebuffer.
+        return 700;
+    }
 }
