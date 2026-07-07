@@ -436,6 +436,7 @@ public class AndroidGradleBuilder extends Executor {
     private boolean useAndroidX;
     private boolean migrateToAndroidX;
     private boolean shouldIncludeGoogleImpl;
+    private boolean arSupport;
 
     static {
         isMac = System.getProperty("os.name").toLowerCase().contains("mac");
@@ -1304,6 +1305,12 @@ public class AndroidGradleBuilder extends Executor {
                 @Override
                 public void usesClass(String cls) {
                     aiAcc.consume(cls);
+                    if (cls.indexOf("com/codename1/ar/") == 0) {
+                        // Keeps the ARCore-backed impl sources (deleted for
+                        // non-AR apps below) and bumps minSdk to the ARCore
+                        // floor.
+                        arSupport = true;
+                    }
                     if (cls.indexOf("com/codename1/notifications") == 0) {
                         recieveBootCompletedPermission = true;
                         if (targetSDKVersionInt >= 33) {
@@ -1560,15 +1567,38 @@ public class AndroidGradleBuilder extends Executor {
         // aiExtraGradleDependencies and appended just before
         // additionalDependencies is written to build.gradle below.
         StringBuilder aiExtraGradleDependencies = new StringBuilder();
+        String aiApplicationMetaData = "";
         for (AiDependencyTable.Entry entry : aiAcc.hits()) {
             for (String perm : entry.androidPermissions()) {
                 String addString = "    <uses-permission android:name=\"" + perm + "\" />\n";
                 xPermissions += permissionAdd(request, perm, addString);
             }
             for (String feat : entry.androidFeatures()) {
-                String addString = "    <uses-feature android:name=\"" + feat + "\" android:required=\"false\" />\n";
+                String required = "false";
+                if ("android.hardware.camera.ar".equals(feat)
+                        && "true".equals(request.getArg("android.ar.required", "false"))) {
+                    // The app opts into being AR-only: the store then hides it
+                    // from devices without ARCore support.
+                    required = "true";
+                }
+                String addString = "    <uses-feature android:name=\"" + feat + "\" android:required=\"" + required + "\" />\n";
                 if (!xPermissions.contains("<uses-feature android:name=\"" + feat + "\"")) {
                     xPermissions += addString;
+                }
+            }
+            for (String[] md : entry.androidMetaDataEntries()) {
+                String name = md[0];
+                String value = md[1];
+                if ("com.google.ar.core".equals(name)
+                        && "true".equals(request.getArg("android.ar.required", "false"))) {
+                    value = "required";
+                }
+                // Skip when the developer already declared the same meta-data
+                // through android.xapplication.
+                if (!userXapplication.contains(name)
+                        && !aiApplicationMetaData.contains("\"" + name + "\"")) {
+                    aiApplicationMetaData += "        <meta-data android:name=\"" + name
+                            + "\" android:value=\"" + value + "\" />\n";
                 }
             }
             for (String gav : entry.androidGradleDeps()) {
@@ -1577,6 +1607,10 @@ public class AndroidGradleBuilder extends Executor {
         }
         if (aiAcc.anyRequiresBigUpload()) {
             request.putArgument("cn1.ai.requiresBigUpload", "true");
+        }
+        if (arSupport) {
+            // ARCore requires API 24.
+            minSDK = maxInt("24", minSDK);
         }
 
         // Inject USE_BIOMETRIC / USE_FINGERPRINT only when the app actually
@@ -2127,6 +2161,22 @@ public class AndroidGradleBuilder extends Executor {
         if (!shouldIncludeGoogleImpl) {
             File fb = new File(srcDir, "com/codename1/social/GoogleImpl.java");
             fb.delete();
+        }
+
+        if (!arSupport) {
+            // The ARCore-backed impl package compiles against com.google.ar
+            // classes that only exist when the AR gradle dependency is added,
+            // so it must be removed for apps that never touch
+            // com.codename1.ar (AndroidImplementation reaches it through
+            // reflection only).
+            File arPackage = new File(srcDir, "com/codename1/impl/android/ar");
+            File[] arFiles = arPackage.listFiles();
+            if (arFiles != null) {
+                for (File f : arFiles) {
+                    f.delete();
+                }
+            }
+            arPackage.delete();
         }
 
         final String moPubAdUnitId = request.getArg("android.mopubId", null);
@@ -3113,6 +3163,7 @@ public class AndroidGradleBuilder extends Executor {
                 + pushManifestEntries
                 + billingServiceData
                 + wearApplicationMetaData
+                + aiApplicationMetaData
                 + "  " + request.getArg("android.xapplication", "")
                 + mopubActivities
                 + alarmRecevier

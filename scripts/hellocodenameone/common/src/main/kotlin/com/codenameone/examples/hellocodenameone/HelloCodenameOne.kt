@@ -1,5 +1,6 @@
 package com.codenameone.examples.hellocodenameone
 
+import com.codename1.ar.AR
 import com.codename1.camera.Camera
 import com.codename1.car.Car
 import com.codename1.car.CarApplication
@@ -36,6 +37,22 @@ open class HelloCodenameOne : Lifecycle() {
             System.out.println("CN1SS:CAMERA_DIAG supported=$cameraSupported cameras=$cameraCount")
         } catch (t: Throwable) {
             System.out.println("CN1SS:CAMERA_DIAG:EXCEPTION " + t.javaClass.name + ": " + t.message)
+        }
+        // Reference the AR API (com.codename1.ar.*) so the build's bytecode
+        // scanner flips IPhoneBuilder.usesCn1Ar / AndroidGradleBuilder.arSupport:
+        // this compiles the CN1AR ARKit natives on iOS (INCLUDE_CN1_AR +
+        // ARKit/SceneKit linking) and keeps the ARCore-backed impl sources +
+        // gradle dependency on Android. isSupported()/getCapabilities() never
+        // open a session, so no camera permission prompt is triggered (and both
+        // report unsupported on simulators without AR hardware).
+        try {
+            val arSupported = AR.isSupported()
+            val arCaps = AR.getCapabilities()
+            System.out.println("CN1SS:AR_DIAG supported=" + arSupported
+                    + " world=" + arCaps.isWorldTrackingSupported
+                    + " face=" + arCaps.isFaceTrackingSupported)
+        } catch (t: Throwable) {
+            System.out.println("CN1SS:AR_DIAG:EXCEPTION " + t.javaClass.name + ": " + t.message)
         }
         // Reference the in-car API (com.codename1.car.*) so the build's bytecode scanner flips
         // usesCar: this compiles the CarPlay natives on iOS/Mac (CN1_USE_CARPLAY +

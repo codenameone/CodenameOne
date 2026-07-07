@@ -895,6 +895,41 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return cameraImpl;
     }
 
+    private com.codename1.impl.ARImpl arImpl;
+
+    /**
+     * Installs the {@link com.codename1.impl.ARImpl} backend that
+     * {@link com.codename1.ar.AR} sees through {@code Display.getARBackend()}.
+     * Pass {@code null} (the default) to model a platform with no AR support.
+     */
+    public void setARImpl(com.codename1.impl.ARImpl arImpl) {
+        this.arImpl = arImpl;
+    }
+
+    @Override
+    public com.codename1.impl.ARImpl createARImpl() {
+        return arImpl;
+    }
+
+    private com.codename1.sensors.MotionSensorManager motionSensorManager;
+
+    /**
+     * Installs the {@link com.codename1.sensors.MotionSensorManager} returned
+     * by {@code Display.getMotionSensorManager()}. Pass {@code null} (the
+     * default) to fall back to the base implementation's unsupported manager.
+     */
+    public void setMotionSensorManager(com.codename1.sensors.MotionSensorManager mgr) {
+        this.motionSensorManager = mgr;
+    }
+
+    @Override
+    public com.codename1.sensors.MotionSensorManager getMotionSensorManager() {
+        if (motionSensorManager != null) {
+            return motionSensorManager;
+        }
+        return super.getMotionSensorManager();
+    }
+
     @Override
     public PeerComponent createBrowserComponent(Object browserComponent) {
         if(this.browserComponent == null) {
@@ -1235,6 +1270,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         largerTextEnabled = false;
         largerTextScale = 1f;
         cameraImpl = null;
+        arImpl = null;
+        motionSensorManager = null;
         platformName = "test";
     }
 

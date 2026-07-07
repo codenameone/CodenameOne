@@ -774,6 +774,23 @@
         "url": "https://medium.com/p/ccdfc4c8ecb5/edit",
         "syndicated_at": "2026-07-06T17:01:33+00:00"
       }
+    },
+    "apple-tv-and-android-tv": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmras133g000009kwd2r11z0x",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a4d1485d0cbc4b047603df5",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-07T15:01:19+00:00"
+      },
+      "devto": {
+        "id": 4089775,
+        "url": "https://dev.to/codenameone/apple-tv-and-android-tv-one-codebase-and-css-media-for-the-living-room-bb0",
+        "syndicated_at": "2026-07-07T15:40:58+00:00"
+      }
     }
   }
 }

@@ -671,3 +671,7 @@ foldables?
 bitmask
 DeX
 Siri
+
+# AR / VR terms (Augmented-Reality.asciidoc, Virtual-Reality.asciidoc)
+raycasts?
+equirectangular

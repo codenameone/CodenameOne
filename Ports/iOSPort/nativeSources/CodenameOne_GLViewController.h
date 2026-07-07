@@ -110,6 +110,19 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 #undef INCLUDE_CN1_CAMERA
 #endif
 
+// INCLUDE_CN1_AR gates the com.codename1.ar native bridge (CN1AR.{h,m}:
+// ARKit ARSession world/image/face tracking composited through an ARSCNView).
+// IPhoneBuilder uncomments this only when the classpath scanner saw
+// com.codename1.ar.*, so apps that never touch AR ship without any ARKit or
+// SceneKit symbols and pass Apple's API-usage scan.
+//#define INCLUDE_CN1_AR
+// ARKit is unavailable on watchOS and tvOS; undo the define on those slices
+// from this central header (included first by every AR TU) so the whole AR
+// path compiles out consistently.
+#if TARGET_OS_WATCH || TARGET_OS_TV
+#undef INCLUDE_CN1_AR
+#endif
+
 // CN1_USE_CARPLAY gates the Apple CarPlay native bridge
 // (CodenameOne_CarPlaySceneDelegate.{h,m} + the IOSNative carPlay* trampolines:
 // CarPlay.framework, the CPTemplate translation). IPhoneBuilder uncomments this

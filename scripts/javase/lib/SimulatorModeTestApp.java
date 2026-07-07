@@ -1,5 +1,15 @@
 package com.codenameone.examples.javase.tests;
 
+import com.codename1.ar.AR;
+import com.codename1.ar.ARAnchor;
+import com.codename1.ar.ARModel;
+import com.codename1.ar.ARNode;
+import com.codename1.ar.ARPlane;
+import com.codename1.ar.ARPlaneDetection;
+import com.codename1.ar.ARPlaneEvent;
+import com.codename1.ar.ARSession;
+import com.codename1.ar.ARSessionOptions;
+import com.codename1.gpu.Primitives;
 import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
@@ -55,6 +65,11 @@ public class SimulatorModeTestApp {
 
     public void start() {
         if (current != null) {
+            current.show();
+            return;
+        }
+        if (Boolean.getBoolean("cn1.test.arDemo")) {
+            current = createArDemoForm();
             current.show();
             return;
         }
@@ -139,6 +154,76 @@ public class SimulatorModeTestApp {
     }
 
     /**
+     * Exercises the simulated AR backend ({@code JavaSEARImpl}) end to end
+     * the way an application would: open a world-tracking session with
+     * plane detection, wait for the virtual room's floor plane to be
+     * "detected", hit-test a fixed screen point against it and anchor a
+     * red sphere at the hit. Every step is deterministic - the simulated
+     * camera starts at the origin and the planes appear on fixed delays -
+     * so the resulting screenshot doubles as a rendering baseline for the
+     * simulator's AR view. The result line is written to stdout and to the
+     * sentinel configured by {@code cn1.test.arResultFile} so the outer
+     * verifier can assert the full pipeline (open, plane events on the EDT,
+     * hit test, anchor, node attachment) actually ran.
+     */
+    private Form createArDemoForm() {
+        Form form = new Form("AR Simulator Test", new BorderLayout());
+        final Label status = new Label("Waiting for AR planes...");
+        form.add(BorderLayout.SOUTH, status);
+        if (!AR.isSupported()) {
+            status.setText("AR unsupported");
+            reportArResult("result=FAIL reason=unsupported");
+            return form;
+        }
+        final ARSession session = AR.open(new ARSessionOptions()
+                .planeDetection(ARPlaneDetection.HORIZONTAL_AND_VERTICAL)
+                .lightEstimation(true));
+        form.add(BorderLayout.CENTER, session.createView());
+        final boolean[] placed = new boolean[1];
+        session.addPlaneListener(evt -> {
+            if (placed[0] || evt.getKind() != ARPlaneEvent.Kind.ADDED
+                    || evt.getPlane().getType() != ARPlane.Type.HORIZONTAL_UP) {
+                return;
+            }
+            placed[0] = true;
+            // (0.5, 0.95) aims below the view center so the ray strikes the
+            // floor in front of the virtual room's back wall regardless of
+            // whether the wall plane has been detected yet.
+            session.hitTest(0.5f, 0.95f).ready(hits -> {
+                if (hits.length == 0) {
+                    status.setText("AR FAIL: hit test returned no results");
+                    reportArResult("result=FAIL reason=no-hits");
+                    return;
+                }
+                ARAnchor anchor = hits[0].createAnchor();
+                ARNode node = new ARNode(ARModel.fromMesh(
+                        Primitives.sphere(0.25f, 16, 24, false), 0xffdd4433));
+                // Rest the sphere on the plane instead of half-sunk into it.
+                node.setLocalPosition(0f, 0.25f, 0f);
+                anchor.setNode(node);
+                status.setText("AR PASS: model anchored on detected floor plane");
+                reportArResult("result=PASS hits=" + hits.length
+                        + " hitType=" + hits[0].getType()
+                        + " plane=" + (hits[0].getPlane() != null ? hits[0].getPlane().getType() : "(none)")
+                        + " anchors=" + session.getAnchors().length);
+            });
+        });
+        CN.setTimeout(15000, () -> {
+            if (!placed[0]) {
+                status.setText("AR FAIL: no floor plane detected");
+                reportArResult("result=FAIL reason=no-plane");
+            }
+        });
+        return form;
+    }
+
+    private void reportArResult(String detail) {
+        String line = "[ar-test] " + detail;
+        System.out.println(line);
+        writeSentinel(System.getProperty("cn1.test.arResultFile"), line);
+    }
+
+    /**
      * Reports whether the active native theme matches {@code expected}.
      *
      * <p>The current Simulator path stores the user's "Native Theme" menu
@@ -192,22 +277,26 @@ public class SimulatorModeTestApp {
         // Optional sentinel file so harnesses that can't tail stdout in
         // realtime can still read the result. The path is configured by
         // the verifier; absence is fine.
-        String sentinel = System.getProperty("cn1.test.nativeThemeResultFile");
-        if (sentinel != null && !sentinel.isEmpty()) {
-            try {
-                Path p = Paths.get(sentinel);
-                Path parent = p.getParent();
-                if (parent != null) {
-                    Files.createDirectories(parent);
-                }
-                Files.write(p, (line + System.lineSeparator()).getBytes(StandardCharsets.UTF_8),
-                        StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
-        }
+        writeSentinel(System.getProperty("cn1.test.nativeThemeResultFile"), line);
         return "Native theme " + result + ": expected=" + expected
                 + " loaded=" + (resolvedKey != null ? resolvedKey : "(none)");
+    }
+
+    private static void writeSentinel(String sentinel, String line) {
+        if (sentinel == null || sentinel.isEmpty()) {
+            return;
+        }
+        try {
+            Path p = Paths.get(sentinel);
+            Path parent = p.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            Files.write(p, (line + System.lineSeparator()).getBytes(StandardCharsets.UTF_8),
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
     }
 
     public void stop() {

@@ -1,0 +1,6 @@
+# The AR view renders a 3D scene (grid room + anchored sphere) through the
+# JavaSE software rasterizer; antialiased sphere edges can shift by a pixel
+# between JVM builds. Small tolerance so that noise does not fail the build
+# while still catching a real rendering or layout regression.
+maxChannelDelta=8
+maxMismatchPercent=2.0

@@ -245,6 +245,31 @@ warm_catalyst_destination() {
   return 1
 }
 
+# The Catalyst destination of an SDKROOT=iphoneos target also needs the iOS
+# platform content installed in the active Xcode. Some runner instances ship
+# Xcode without it (the same provisioning gap run-ios-native-tests.sh handles),
+# and no amount of destination warming helps -- the scheme lists only
+# watchOS/tvOS destinations. Detect the missing iphoneos SDK and download the
+# platform, restarting a wedged CoreSimulator service when the download fails
+# with "Unable to connect to simulator".
+ensure_ios_platform() {
+  if xcodebuild -showsdks 2>/dev/null | grep -q "iphoneos"; then
+    return 0
+  fi
+  rm_log "The active Xcode has no iOS platform (required for the Mac Catalyst destination); downloading via xcodebuild -downloadPlatform iOS"
+  local out
+  out="$(xcodebuild -downloadPlatform iOS 2>&1)" || true
+  printf '%s\n' "$out"
+  if printf '%s' "$out" | grep -qi "Unable to connect to simulator"; then
+    rm_log "CoreSimulator not responding; restarting the service and retrying the platform download"
+    killall -9 com.apple.CoreSimulator.CoreSimulatorService 2>/dev/null || true
+    sleep 5
+    xcrun simctl list runtimes >/dev/null 2>&1 || true
+    xcodebuild -downloadPlatform iOS || true
+  fi
+}
+ensure_ios_platform
+
 BUILD_OK=0
 for attempt in 1 2 3; do
   if [ "$attempt" -gt 1 ]; then

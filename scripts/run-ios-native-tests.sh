@@ -82,7 +82,19 @@ if ! xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$TEST_SCHEME"
      | grep -q "platform:iOS Simulator"; then
   if [ "$DOWNLOAD_PLATFORMS" = "true" ]; then
     ri_log "No iOS simulator platform for the active Xcode; downloading via xcodebuild -downloadPlatform iOS"
-    xcodebuild -downloadPlatform iOS || true
+    # On some runner instances the CoreSimulator service is wedged and the
+    # download fails with "Unable to connect to simulator", leaving the job
+    # to fail minutes later with the misleading "Unable to find a
+    # destination". Detect that, restart the service and retry once.
+    DOWNLOAD_OUT="$(xcodebuild -downloadPlatform iOS 2>&1)" || true
+    printf '%s\n' "$DOWNLOAD_OUT"
+    if printf '%s' "$DOWNLOAD_OUT" | grep -qi "Unable to connect to simulator"; then
+      ri_log "CoreSimulator not responding; restarting the service and retrying the platform download"
+      killall -9 com.apple.CoreSimulator.CoreSimulatorService 2>/dev/null || true
+      sleep 5
+      xcrun simctl list runtimes >/dev/null 2>&1 || true
+      xcodebuild -downloadPlatform iOS || true
+    fi
   else
     ri_log "No iOS simulator platform for the active Xcode. Set XCODE_DOWNLOAD_PLATFORMS=true to attempt auto-download."
   fi
@@ -102,15 +114,23 @@ DESTINATION="$(xcodebuild "$XCODE_CONTAINER_FLAG" "$WORKSPACE_PATH" -scheme "$TE
 # we don't fail with "Unable to find a device" before tests can even run.
 if [ -z "$DESTINATION" ]; then
   ri_log "No concrete iOS Simulator destination from -showdestinations; querying simctl"
+  # Prefer a device on the NEWEST iOS runtime: a simctl-available device from
+  # an older Xcode's runtime is still rejected by xcodebuild destination
+  # matching ("Unable to find a destination matching ...").
   EXISTING_ID="$(xcrun simctl list -j devices available 2>/dev/null \
-    | python3 -c 'import json,sys
+    | python3 -c 'import json,sys,re
 data=json.load(sys.stdin)
+best=None
 for runtime, devs in data.get("devices", {}).items():
     if "iOS" not in runtime:
         continue
+    ver=[int(x) for x in re.findall(r"\d+", runtime)]
     for d in devs:
         if d.get("isAvailable") and "iPhone" in d.get("name",""):
-            print(d["udid"]); sys.exit(0)' 2>/dev/null || true)"
+            if best is None or ver > best[0]:
+                best=(ver, d["udid"])
+if best:
+    print(best[1])' 2>/dev/null || true)"
   if [ -n "$EXISTING_ID" ]; then
     ri_log "Reusing existing iPhone simulator $EXISTING_ID"
     DESTINATION="platform=iOS Simulator,id=$EXISTING_ID"

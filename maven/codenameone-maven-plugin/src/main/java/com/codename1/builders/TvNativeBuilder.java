@@ -87,7 +87,10 @@ class TvNativeBuilder {
             "WebKit.framework;OpenGLES.framework;GLKit.framework;"
             // CarPlay.framework is iOS-only (absent on tvOS); it is linked on the iOS slice when the
             // app references com.codename1.car, so weak-link it for the tvOS slice.
-            + "CarPlay.framework";
+            + "CarPlay.framework;"
+            // ARKit is iOS-only; it is linked on the iOS slice when the app references
+            // com.codename1.ar, so weak-link it for the tvOS slice.
+            + "ARKit.framework";
 
     TvNativeBuilder(IPhoneBuilder owner) {
         this.owner = owner;

@@ -110,10 +110,16 @@
             <src path="../../CodenameOne/src" />
         </javac>        
         <delete file="build/tmp/com/codename1/impl/CodenameOneThread.class" />
+        <!-- The ARCore-backed AR impl compiles against com.google.ar.core
+             which is not in cn1-binaries; it is compiled inside user app
+             builds where the Android builder adds the ARCore gradle
+             dependency. Mirrors the excludes= entry in
+             nbproject/project.properties. -->
         <javac destdir="build/tmp"
-            classpath="${javac.classpath}:build/tmp">
+            classpath="${javac.classpath}:build/tmp"
+            excludes="com/codename1/impl/android/ar/**">
             <src path="${src.dir}" />
-        </javac>        
+        </javac>
         <jar jarfile="${dist.jar}" basedir="build/tmp">
             <fileset dir="src" includes="*.res" />
             <fileset dir="../../CodenameOne/src" includes="*.res" />

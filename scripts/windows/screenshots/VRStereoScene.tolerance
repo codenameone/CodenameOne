@@ -1,0 +1,5 @@
+# GPU 3D render: rasterizers vary slightly between GPUs / CI runners (the
+# x64 and arm64 D3D backends differ by well under this); widen tolerance so
+# noise does not fail the build.
+maxChannelDelta=8
+maxMismatchPercent=3.0

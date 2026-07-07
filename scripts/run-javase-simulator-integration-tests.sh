@@ -86,7 +86,13 @@ if [ -z "$SIM_SKIN_PATH" ] || [ ! -f "$SIM_SKIN_PATH" ]; then
   SKIN_ARCHIVE="$SKIN_CACHE_DIR/skins.tar.gz"
   SKIN_EXTRACT_DIR="$SKIN_CACHE_DIR/extracted"
   if [ ! -s "$SKIN_ARCHIVE" ]; then
-    SKIN_URL="$(python3 - <<'PY'
+    # Authenticate the release lookup when a token is available. The
+    # unauthenticated api.github.com quota is 60 requests/hour per IP, which
+    # a PR that fans out many jobs (plus re-runs) can exhaust on a shared
+    # runner IP, failing skin resolution with "HTTP Error 403: rate limit
+    # exceeded". A token raises the quota to 5000/hour and removes the flake.
+    SKIN_GH_TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+    SKIN_URL="$(GH_API_TOKEN="$SKIN_GH_TOKEN" python3 - <<'PY'
 import json
 import os
 import urllib.request
@@ -98,7 +104,7 @@ request = urllib.request.Request(
         'User-Agent': 'codenameone-javase-simulator-tests'
     }
 )
-token = os.environ.get('GITHUB_TOKEN') or os.environ.get('GH_TOKEN')
+token = os.environ.get('GH_API_TOKEN', '')
 if token:
     request.add_header('Authorization', 'Bearer ' + token)
 
@@ -170,7 +176,7 @@ MODES=(single multi)
 ACTUAL_ENTRIES=()
 for mode in "${MODES[@]}"; do
   if [ "$mode" = "single" ]; then
-    scenarios=(default landscape component-inspector network-monitor test-recorder)
+    scenarios=(default landscape component-inspector network-monitor test-recorder ar-demo)
   else
     scenarios=(default landscape)
   fi

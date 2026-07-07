@@ -191,6 +191,24 @@ public final class AiDependencyTable {
                 .markBigUpload()
                 .description("On-device Stable Diffusion (local-build only)"));
 
+        // Cross-platform augmented reality (com.codename1.ar): ARKit +
+        // SceneKit on iOS (linked explicitly by IPhoneBuilder, gated by
+        // the INCLUDE_CN1_AR define since neither is default-linked),
+        // Google Play Services for AR (ARCore) on Android. The camera
+        // permission and plist string ride along because AR always
+        // drives the camera. The com.google.ar.core meta-data marks
+        // ARCore optional so the app still installs on non-AR devices;
+        // the android.ar.required=true build hint flips it to required.
+        e.add(new Entry("com/codename1/ar/")
+                .iosFrameworks("ARKit", "SceneKit")
+                .iosPlist("NSCameraUsageDescription",
+                         "Used to display augmented reality content.")
+                .androidGradle("com.google.ar:core:1.44.0")
+                .androidPermissions("android.permission.CAMERA")
+                .androidFeatures("android.hardware.camera.ar")
+                .androidMetaData("com.google.ar.core", "optional")
+                .description("Cross-platform augmented reality (world/image/face tracking)"));
+
         ENTRIES = Collections.unmodifiableList(e);
     }
 
@@ -262,6 +280,7 @@ public final class AiDependencyTable {
         private final List<String> androidGradle = new ArrayList<String>();
         private final List<String> androidPermissions = new ArrayList<String>();
         private final List<String> androidFeatures = new ArrayList<String>();
+        private final List<String[]> androidMetaData = new ArrayList<String[]>();
         private boolean requiresBigUpload;
         private String description = "";
 
@@ -318,6 +337,11 @@ public final class AiDependencyTable {
             return this;
         }
 
+        Entry androidMetaData(String name, String value) {
+            androidMetaData.add(new String[]{name, value});
+            return this;
+        }
+
         Entry markBigUpload() {
             this.requiresBigUpload = true;
             return this;
@@ -361,6 +385,13 @@ public final class AiDependencyTable {
 
         public List<String> androidFeatures() {
             return Collections.unmodifiableList(androidFeatures);
+        }
+
+        /** Each entry is {name, value}: an application-level manifest
+         * &lt;meta-data&gt; element the Android builder injects unless the
+         * app already declares the same name. */
+        public List<String[]> androidMetaDataEntries() {
+            return Collections.unmodifiableList(androidMetaData);
         }
 
         public boolean requiresBigUpload() {

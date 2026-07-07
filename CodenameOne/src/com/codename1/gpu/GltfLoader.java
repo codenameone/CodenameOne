@@ -95,8 +95,43 @@ public final class GltfLoader {
     ///
     /// the loaded mesh
     public static Mesh load(GraphicsDevice device, byte[] data) {
+        return load(data);
+    }
+
+    /// Loads a model from in-memory `.glb` or `.gltf` bytes without a
+    /// `GraphicsDevice`, allocating the buffers directly. Behaves exactly like
+    /// `load(GraphicsDevice, byte[])`; useful for parsing geometry off the
+    /// render thread or handing meshes to non GPU consumers such as the AR
+    /// content pipeline.
+    ///
+    /// #### Parameters
+    ///
+    /// - `data`: the raw model bytes (binary `.glb` or JSON `.gltf`)
+    ///
+    /// #### Returns
+    ///
+    /// the loaded mesh
+    public static Mesh load(byte[] data) {
         Object[] parsed = parse(data);
-        return build(device, (Map) parsed[0], (byte[]) parsed[1]);
+        return build((Map) parsed[0], (byte[]) parsed[1]);
+    }
+
+    /// Reads all bytes from the stream and loads the model without a
+    /// `GraphicsDevice`. The stream is closed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: a stream over `.glb` or `.gltf` bytes
+    ///
+    /// #### Returns
+    ///
+    /// the loaded mesh
+    public static Mesh load(InputStream in) throws IOException {
+        try {
+            return load(readFully(in));
+        } finally {
+            Util.cleanup(in);
+        }
     }
 
     /// Loads a model together with its base-color texture from in-memory `.glb`
@@ -117,7 +152,7 @@ public final class GltfLoader {
         Object[] parsed = parse(data);
         Map root = (Map) parsed[0];
         byte[] binChunk = (byte[]) parsed[1];
-        Mesh mesh = build(device, root, binChunk);
+        Mesh mesh = build(root, binChunk);
         Texture baseColor = loadBaseColorTexture(device, root, binChunk);
         return new GltfModel(mesh, baseColor);
     }
@@ -127,6 +162,38 @@ public final class GltfLoader {
     public static GltfModel loadModel(GraphicsDevice device, InputStream in) throws IOException {
         try {
             return loadModel(device, readFully(in));
+        } finally {
+            Util.cleanup(in);
+        }
+    }
+
+    /// Loads a model together with its base-color image from in-memory `.glb`
+    /// or `.gltf` bytes without a `GraphicsDevice`. The image is decoded but not
+    /// uploaded to the GPU, so this works off the render thread and on non GPU
+    /// consumers such as the AR content pipeline.
+    ///
+    /// #### Parameters
+    ///
+    /// - `data`: the raw model bytes
+    ///
+    /// #### Returns
+    ///
+    /// the loaded mesh plus its decoded base-color image (null image if the
+    /// model has none)
+    public static GltfImageModel loadImageModel(byte[] data) {
+        Object[] parsed = parse(data);
+        Map root = (Map) parsed[0];
+        byte[] binChunk = (byte[]) parsed[1];
+        Mesh mesh = build(root, binChunk);
+        Image baseColor = readBaseColorImage(root, binChunk);
+        return new GltfImageModel(mesh, baseColor);
+    }
+
+    /// Reads all bytes from the stream and loads the model with its base-color
+    /// image without a `GraphicsDevice`. The stream is closed.
+    public static GltfImageModel loadImageModel(InputStream in) throws IOException {
+        try {
+            return loadImageModel(readFully(in));
         } finally {
             Util.cleanup(in);
         }
@@ -182,7 +249,7 @@ public final class GltfLoader {
         return bin;
     }
 
-    private static Mesh build(GraphicsDevice device, Map root, byte[] binChunk) {
+    private static Mesh build(Map root, byte[] binChunk) {
         List meshes = (List) root.get("meshes");
         if (meshes == null || meshes.isEmpty()) {
             throw new IllegalArgumentException("glTF has no meshes");
@@ -246,9 +313,9 @@ public final class GltfLoader {
             }
         }
 
-        VertexBuffer vb = device.createVertexBuffer(VertexFormat.POSITION_NORMAL_TEXCOORD, vertexCount);
+        VertexBuffer vb = new VertexBuffer(VertexFormat.POSITION_NORMAL_TEXCOORD, vertexCount);
         vb.setData(interleaved);
-        IndexBuffer ib = device.createIndexBuffer(indices.length);
+        IndexBuffer ib = new IndexBuffer(indices.length);
         ib.setData(indices);
         return new Mesh(vb, ib, PrimitiveType.TRIANGLES);
     }
@@ -393,6 +460,20 @@ public final class GltfLoader {
     /// texture. Only embedded images (a glTF `bufferView` or a `data:` URI) are
     /// supported; external image files are not fetched.
     private static Texture loadBaseColorTexture(GraphicsDevice device, Map root, byte[] binChunk) {
+        Image img = readBaseColorImage(root, binChunk);
+        if (img == null) {
+            return null;
+        }
+        Texture result = device.createTexture(img);
+        result.setFilter(Texture.Filter.LINEAR);
+        return result;
+    }
+
+    /// Decodes the base-color image of the first primitive's material. Returns
+    /// null when the model carries no base-color texture. Only embedded images
+    /// (a glTF `bufferView` or a `data:` URI) are supported; external image
+    /// files are not fetched.
+    private static Image readBaseColorImage(Map root, byte[] binChunk) {
         List materials = (List) root.get("materials");
         if (materials == null || materials.isEmpty()) {
             return null;
@@ -421,10 +502,7 @@ public final class GltfLoader {
         if (imageBytes == null) {
             return null;
         }
-        Image img = Image.createImage(imageBytes, 0, imageBytes.length);
-        Texture result = device.createTexture(img);
-        result.setFilter(Texture.Filter.LINEAR);
-        return result;
+        return Image.createImage(imageBytes, 0, imageBytes.length);
     }
 
     private static byte[] readImageBytes(Map image, Map root, byte[] binChunk) {
@@ -514,6 +592,29 @@ public final class GltfLoader {
         /// The base-color texture, or null when the model has none.
         public Texture getBaseColorTexture() {
             return baseColorTexture;
+        }
+    }
+
+    /// A loaded glTF model in device-free form: its geometry plus the decoded
+    /// base-color image extracted from the model's first material, if any.
+    /// Returned by `loadImageModel`.
+    public static final class GltfImageModel {
+        private final Mesh mesh;
+        private final Image baseColorImage;
+
+        GltfImageModel(Mesh mesh, Image baseColorImage) {
+            this.mesh = mesh;
+            this.baseColorImage = baseColorImage;
+        }
+
+        /// The model geometry.
+        public Mesh getMesh() {
+            return mesh;
+        }
+
+        /// The decoded base-color image, or null when the model has none.
+        public Image getBaseColorImage() {
+            return baseColorImage;
         }
     }
 }

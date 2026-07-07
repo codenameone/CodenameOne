@@ -114,6 +114,7 @@ public class IPhoneBuilder extends Executor {
     private boolean usesBiometrics;
     private boolean usesNfc;
     private boolean usesCn1Camera;
+    private boolean usesCn1Ar;
     // Set when the app references com.codename1.car.* (Apple CarPlay support). Gates the
     // CN1_USE_CARPLAY native define, CarPlay.framework linkage, the carplay entitlement and the
     // CarPlay scene in the Info.plist scene manifest. Apps that never touch the API see no change.
@@ -828,6 +829,12 @@ public class IPhoneBuilder extends Executor {
                     // AVFoundation-based CN1Camera natives.
                     if (!usesCn1Camera && cls.indexOf("com/codename1/camera/") == 0) {
                         usesCn1Camera = true;
+                    }
+                    // Augmented reality (com.codename1.ar.*). Gated on actual
+                    // usage so ARKit/SceneKit and the CN1AR natives are only
+                    // built for apps that reference the AR API.
+                    if (!usesCn1Ar && cls.indexOf("com/codename1/ar/") == 0) {
+                        usesCn1Ar = true;
                     }
                     // Apple CarPlay (com.codename1.car.*). Gated on actual usage so the
                     // CarPlay scene/entitlement/framework are only added for apps that
@@ -2286,6 +2293,31 @@ public class IPhoneBuilder extends Executor {
                 } catch (IOException ex) {
                     throw new BuildException(
                             "Failed to enable INCLUDE_CN1_CAMERA", ex);
+                }
+            }
+
+            // Augmented reality: uncomment INCLUDE_CN1_AR so the CN1AR
+            // natives (ARKit + ARSCNView) compile in, and link ARKit /
+            // SceneKit explicitly -- neither is default-linked and the
+            // AiDependencyTable iosFrameworks field is documentation-only.
+            // Apps that never reference com.codename1.ar leave the define
+            // commented out so no ARKit symbol is referenced, which keeps
+            // Apple's API-usage scan quiet and tvOS/watchOS slices clean.
+            if (usesCn1Ar) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define INCLUDE_CN1_AR",
+                            "#define INCLUDE_CN1_AR");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable INCLUDE_CN1_AR", ex);
+                }
+                String arLibs = "ARKit.framework;SceneKit.framework";
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = arLibs;
+                } else if (!addLibs.toLowerCase().contains("arkit.framework")) {
+                    addLibs = addLibs + ";" + arLibs;
                 }
             }
 
