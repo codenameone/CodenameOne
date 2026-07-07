@@ -116,7 +116,7 @@ jobs:
       - name: Set up xvfb for headless JavaScript bundle builds
         run: |
           set -euo pipefail
-          sudo apt-get update
+          bash scripts/ci/apt-get-update.sh
           sudo apt-get install -y --no-install-recommends xvfb
 
       - name: Set up Java 25 for website build

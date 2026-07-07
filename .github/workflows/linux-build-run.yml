@@ -62,7 +62,7 @@ jobs:
       - name: Install Xvfb
         run: |
           set -e
-          sudo apt-get update
+          bash scripts/ci/apt-get-update.sh
           # The CN1 CSS compiler renders via CEF/AWT and throws HeadlessException
           # without a display, so the common build runs under a virtual X server.
           sudo apt-get install -y --no-install-recommends xvfb
@@ -135,7 +135,7 @@ jobs:
       - name: Install the GTK build stack + toolchain
         run: |
           set -e
-          sudo apt-get update
+          bash scripts/ci/apt-get-update.sh
           sudo apt-get install -y --no-install-recommends \
             cmake ninja-build pkg-config unzip xvfb fonts-dejavu-core \
             libgtk-3-dev libcairo2-dev libpango1.0-dev libgdk-pixbuf-2.0-dev libglib2.0-dev \

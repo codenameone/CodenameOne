@@ -40,7 +40,7 @@ jobs:
 
       - name: Install native build tools
         run: |
-          sudo apt-get update
+          bash scripts/ci/apt-get-update.sh
           sudo apt-get install -y clang
 
       # Install JDKs and export their paths

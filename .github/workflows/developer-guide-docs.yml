@@ -139,7 +139,7 @@ jobs:
       - name: Render publication cover artwork
         run: |
           set -euo pipefail
-          sudo apt-get update
+          bash scripts/ci/apt-get-update.sh
           sudo apt-get install -y --no-install-recommends librsvg2-bin
           SOURCE="docs/developer-guide/book-cover.svg"
           GENERATED_SVG="docs/developer-guide/book-cover.generated.svg"
