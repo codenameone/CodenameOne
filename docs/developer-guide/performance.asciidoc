@@ -89,15 +89,7 @@ pointer indirection between the object and its buffer.
 
 [source,java]
 ----
-@com.codename1.annotations.Fused
-class RgbImage {
-    private final int[] pixels;   // laid out INSIDE the RgbImage allocation
-    private final byte[] flags;
-    RgbImage(int w, int h) {
-        pixels = new int[w * h];  // computed sizes (w * h) fuse too
-        flags = new byte[16];
-    }
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJavaFusedSnippet.java[tag=performance-java-fused,indent=0]
 ----
 
 The contract you accept by annotating:
