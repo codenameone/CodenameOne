@@ -37,6 +37,28 @@ let FILL_KINDS: Set<String> = [
     "ios_uitextfield", "ios_uislider", "ios_uiprogress",
     "ios_uinavbar", "ios_uitabbar", "ios_uitabbar_one", "ios_alert_view", "ios_uipickerview",
 ]
+
+// Button kinds whose "pressed" reference should model the SUSTAINED held-down
+// look. On iOS 26 a Liquid Glass button, while a finger stays on it, holds a
+// slightly scaled-down + dimmed appearance and springs back only on release.
+// That held look is produced by the interactive press gesture (scale + the
+// glass lens), NOT by `isHighlighted` -- setting isHighlighted on an offscreen
+// button changes nothing for the glass configurations, so a plain capture makes
+// "pressed" equal "normal". We therefore model the held dim explicitly.
+//
+// We model ONLY the dim, not the ~0.96 held scale: the host comparator crops
+// each render to its content bbox and overlays the two 1:1 with NO scaling, so a
+// scale applied to just the native side would shrink its bbox and misalign
+// against the (un-scaled, not-themeable) CN1 pressed pill -- a false mismatch.
+// The dim is the part that is both metric-compatible and reproducible in the CN1
+// theme, and it is what reads as "pressed" in the un-cropped showcase.
+let PRESS_DIM_KINDS: Set<String> = [
+    "ios_uibutton_system", "ios_uibutton_filled", "ios_uibutton_plain",
+]
+// Black overlay alpha applied over the held button capsule. Tuned against the
+// CN1 Button.pressed / RaisedButton.pressed / FlatButton.pressed fills so the
+// bbox-cropped fidelity comparison matches.
+let PRESS_DIM_ALPHA: CGFloat = 0.12
 let BACKDROP: UIImage? = {
     if let p = Bundle.main.path(forResource: "glass-backdrop", ofType: "png") {
         return UIImage(contentsOfFile: p)
@@ -515,6 +537,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                         }
                         RunLoop.current.run(until: Date().addingTimeInterval(0.15))
                         container.layoutIfNeeded()
+                        // isHighlighted alone leaves the iOS 26 glass buttons
+                        // looking identical to normal (the real press feedback is
+                        // the interactive scale + lens, absent offscreen). Model
+                        // the sustained held DIM so the reference reflects what a
+                        // finger-down button actually looks like. Capsule-clipped
+                        // overlay so it follows the pill, not a rectangle.
+                        if PRESS_DIM_KINDS.contains(spec.kind) {
+                            let dim = UIView(frame: control.bounds)
+                            dim.backgroundColor = UIColor(white: 0.0, alpha: PRESS_DIM_ALPHA)
+                            dim.layer.cornerRadius = control.bounds.height / 2.0
+                            dim.clipsToBounds = true
+                            dim.isUserInteractionEnabled = false
+                            dim.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+                            control.addSubview(dim)
+                            container.layoutIfNeeded()
+                        }
                     }
 
                     let fmt = UIGraphicsImageRendererFormat()

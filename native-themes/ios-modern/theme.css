@@ -77,8 +77,12 @@
          tabsMorphSpringPct         scales the settle overshoot around 100
          tabsAnimatedIndicatorDurationInt   the morph duration (ms), below */
     tabsMorphPreset: "ios26";
-    --accent-pressed-color: #0064d1;
-    --accent-pressed-color-dark: #64b1ff;
+    /* Pressed = the SUSTAINED held-down look: iOS 26 dims a Liquid Glass button
+       by ~12% while a finger stays on it (modeled in the native reference as a
+       0.12 black overlay). 0.88 x the accent fill matches that dim. (The old
+       dark value brightened the accent -- the wrong direction for a held dim.) */
+    --accent-pressed-color: #006be0;
+    --accent-pressed-color-dark: #0874e0;
     --accent-disabled-color: #b3d4ff;
     --accent-disabled-color-dark: #004a99;
     --accent-on-color: #ffffff;
@@ -325,7 +329,11 @@ Button {
     text-align: center;
 }
 /* Pressed (light): the frosted capsule dims slightly. */
-Button.pressed { color: #000000; background-color: rgba(235,235,240,0.6); border: 0.25mm solid rgba(0,0,0,0.12); cn1-background-type: cn1-pill-border; }
+/* Held-down dim: 0.88 x the normal glass render. Matching the native 0.12 black
+   overlay on both the fill and the backdrop-through gives alpha_p = 0.12 + 0.88
+   x 0.34 = 0.42 and fill_p = 0.88 x 0.34 x 255 / 0.42 ~= 182. Reads as a clearly
+   pressed grey pill in the showcase; matches the held native reference. */
+Button.pressed { color: #000000; background-color: rgba(182,182,190,0.42); border: 0.25mm solid rgba(0,0,0,0.12); cn1-background-type: cn1-pill-border; }
 Button.disabled { color: rgba(0,0,0,0.3); background-color: rgba(255,255,255,0.55); border: 0.25mm solid rgba(0,0,0,0.06); cn1-background-type: cn1-pill-border; }
 
 RaisedButton {
@@ -346,7 +354,10 @@ RaisedButton.disabled { background-color: rgba(255,255,255,0.5); color: rgba(60,
    by its rim; 0.32 white read as a solid pill. Padding trimmed to the native
    text inset (2.1mm). */
 FlatButton { cn1-derive: Button; color: #000000; background-color: rgba(255,255,255,0.16); border: 0.25mm solid rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); padding: 1mm 2.1mm 1mm 2.1mm; }
-FlatButton.pressed { color: #000000; background-color: rgba(255,255,255,0.34); border: 0.25mm solid rgba(255,255,255,0.7); cn1-background-type: cn1-pill-border; padding: 1mm 2.1mm 1mm 2.1mm; }
+/* Held-down dim (clear-glass): alpha_p = 0.12 + 0.88 x 0.16 = 0.26, fill_p =
+   0.88 x 0.16 x 255 / 0.26 ~= 138. (Was 0.34 white -- a BRIGHTEN, the wrong way
+   for a held press.) */
+FlatButton.pressed { color: #000000; background-color: rgba(138,138,144,0.26); border: 0.25mm solid rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; padding: 1mm 2.1mm 1mm 2.1mm; }
 
 TextField {
     color: #000000;
@@ -987,13 +998,16 @@ PopupContent {
        glass capsule keeps a faint brighter edge, and over a FLAT black app
        background the dark translucent fill alone disappears completely. */
     Button { color: #ffffff; background-color: rgba(20,20,24,0.36); border: 0.25mm solid rgba(255,255,255,0.18); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); }
-    Button.pressed { color: #ffffff; background-color: rgba(40,40,44,0.6); border: 0.25mm solid rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; }
+    /* Held-down dim (dark glass): 0.88 x the normal render. alpha_p = 0.12 +
+       0.88 x 0.36 = 0.44, fill_p = 0.88 x 0.36 x 20 / 0.44 ~= 14. (Was 40,40,44
+       0.6 -- a BRIGHTEN, the wrong direction for a held dim.) */
+    Button.pressed { color: #ffffff; background-color: rgba(14,14,17,0.44); border: 0.25mm solid rgba(255,255,255,0.18); cn1-background-type: cn1-pill-border; }
     Button.disabled { color: rgba(255,255,255,0.4); background-color: rgba(20,20,24,0.58); border: 0.25mm solid rgba(255,255,255,0.10); cn1-background-type: cn1-pill-border; }
     /* Dark FlatButton matches light: iOS 26's flat glass button is a light cream
        pill with DARK text in BOTH appearances (native ref). White text flipped it
        to the dark "charcoal" material; dark text uses the light pass-through frost. */
     FlatButton { color: #000000; background-color: rgba(255,255,255,0.16); border: 0.25mm solid rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); padding: 1mm 2.1mm 1mm 2.1mm; }
-    FlatButton.pressed { color: #000000; background-color: rgba(255,255,255,0.34); border: 0.25mm solid rgba(255,255,255,0.7); cn1-background-type: cn1-pill-border; padding: 1mm 2.1mm 1mm 2.1mm; }
+    FlatButton.pressed { color: #000000; background-color: rgba(138,138,144,0.26); border: 0.25mm solid rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; padding: 1mm 2.1mm 1mm 2.1mm; }
 
     RaisedButton { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
     RaisedButton.pressed { color: #ffffff; background-color: var(--accent-pressed-color-dark, #64b1ff); cn1-background-type: cn1-pill-border; }
