@@ -7435,10 +7435,29 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
 #if TARGET_OS_WATCH
     // Capture the Core Graphics surface. Drain any pending ops first so the
     // snapshot reflects the latest painted frame, then PNG-encode the bitmap.
-    [[CodenameOne_GLViewController instance] drawFrame:CGRectZero];
-    CN1WatchRenderingView *wv = [CN1WatchHost sharedHost].renderingView;
-    UIImage *wimg = wv != nil ? [wv currentFrame] : nil;
-    NSData *wpng = wimg != nil ? UIImagePNGRepresentation(wimg) : nil;
+    __block CN1WatchRenderingView *wv = nil;
+    __block UIImage *wimg = nil;
+    __block NSData *wpng = nil;
+    void (^captureWatchFrame)(void) = ^{
+        [[CodenameOne_GLViewController instance] drawFrame:CGRectZero];
+        wv = [CN1WatchHost sharedHost].renderingView;
+        wimg = wv != nil ? [wv currentFrame] : nil;
+        wpng = wimg != nil ? UIImagePNGRepresentation(wimg) : nil;
+#ifndef CN1_USE_ARC
+        [wpng retain];
+#endif
+    };
+    if ([NSThread isMainThread]) {
+        captureWatchFrame();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), captureWatchFrame);
+    }
+    if (wpng == nil || [wpng length] == 0) {
+        int logicalW = wv != nil ? [wv logicalWidth] : -1;
+        int logicalH = wv != nil ? [wv logicalHeight] : -1;
+        NSLog(@"CN1SS:ERR:native watch screenshot failed renderingView=%@ image=%@ logical=%dx%d",
+              wv, wimg, logicalW, logicalH);
+    }
     JAVA_OBJECT wbyteArr = JAVA_NULL;
     if (wpng != nil && [wpng length] > 0) {
         int wlen = (int)[wpng length];
@@ -7462,6 +7481,9 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
         wbyteArr = warr;
 #endif
     }
+#ifndef CN1_USE_ARC
+    [wpng release];
+#endif
     com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG wbyteArr);
     return;
 #else

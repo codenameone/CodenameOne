@@ -457,6 +457,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                     try {
                         Image image = Image.createImage(imageData, 0, imageData.length);
                         if (image != null) {
+                            // Some ports, notably the watchOS Core Graphics path,
+                            // decode screenshots as immutable native images. A
+                            // screenshot is still valid in that form: callers that
+                            // need readback will exercise getRGB() themselves.
                             if (image.getGraphics() == null) {
                                 int width = Math.max(1, image.getWidth());
                                 int height = Math.max(1, image.getHeight());
@@ -464,7 +468,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                                     int[] rgb = image.getRGB();
                                     if (rgb != null && rgb.length >= width * height) {
                                         Image mutable = Image.createImage(rgb, width, height);
-                                        if (mutable != null && mutable.getGraphics() != null) {
+                                        if (mutable != null) {
                                             image = mutable;
                                         }
                                     }
@@ -475,7 +479,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                                 }
                             }
 
-                            if (image != null && image.getGraphics() != null) {
+                            if (image != null) {
                                 callback.onSucess(image);
                                 return;
                             }
