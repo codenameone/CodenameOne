@@ -2103,6 +2103,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl finished");
 }
 
+void Java_com_codename1_impl_ios_IOSImplementation_flushBufferForReadbackImpl
+(int x, int y, int width, int height) {
+    [[CodenameOne_GLViewController instance] flushBufferForReadback:x y:y width:width height:height];
+}
+
 
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMutableImpl
 (int x, int y, int width, int height, int clipApplied) {
@@ -2580,7 +2585,7 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
             // encoders so the texture is up-to-date. The bounding rect
             // doesn't matter for the queue drain (drawFrame uses it only
             // for ClipRect.setDrawRect on screen ops).
-            [[CodenameOne_GLViewController instance] flushBuffer:nil x:0 y:0 width:displayWidth height:displayHeight];
+            [[CodenameOne_GLViewController instance] flushBufferForReadback:0 y:0 width:displayWidth height:displayHeight];
             CN1MetalReadMutableImagePixels(gl, arr, x, y, width, height, imgWidth, imgHeight);
             if (stillDrawing) {
                 Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl(imgWidth, imgHeight, peer);
@@ -4219,6 +4224,11 @@ BOOL prefersStatusBarHidden = NO;
 
 - (void)drawFrame:(CGRect)rect
 {
+    [self drawFrame:rect allowInactive:NO];
+}
+
+- (void)drawFrame:(CGRect)rect allowInactive:(BOOL)allowInactive
+{
 #if TARGET_OS_MACCATALYST
     // A Mac app keeps rendering its window while it isn't the focused
     // application -- only a truly backgrounded/occluded app stops. iOS, by
@@ -4229,11 +4239,11 @@ BOOL prefersStatusBarHidden = NO;
     // screenTexture (which Display.screenshot() reads back) would freeze on the
     // last-active frame for the rest of the suite. Allow rendering whenever the
     // app isn't backgrounded so the screen texture stays current.
-    if([UIApplication sharedApplication].applicationState == UIApplicationStateBackground) {
+    if(!allowInactive && [UIApplication sharedApplication].applicationState == UIApplicationStateBackground) {
         return;
     }
 #else
-    if([UIApplication sharedApplication].applicationState != UIApplicationStateActive) {
+    if(!allowInactive && [UIApplication sharedApplication].applicationState != UIApplicationStateActive) {
         return;
     }
 #endif
@@ -4617,6 +4627,25 @@ BOOL prefersStatusBarHidden = NO;
      sleep(5);
      timeout--;
      }*/
+}
+
+-(void)flushBufferForReadback:(int)x y:(int)y width:(int)width height:(int)height {
+    CGRect rect = CGRectMake(x, y, width, height);
+    painted = NO;
+    void (^flushBlock)(void) = ^{
+        @synchronized([CodenameOne_GLViewController instance]) {
+            if([currentTarget count] > 0) {
+                [currentTarget addObjectsFromArray:upcomingTarget];
+                [upcomingTarget removeAllObjects];
+            } else {
+                NSMutableArray* tmp = currentTarget;
+                currentTarget = upcomingTarget;
+                upcomingTarget = tmp;
+            }
+        }
+        [self drawFrame:rect allowInactive:YES];
+    };
+    cn1RunSyncOnMainQueue(flushBlock);
 }
 
 -(void)drawString:(int)color alpha:(int)alpha font:(UIFont*)font str:(NSString*)str x:(int)x y:(int)y {

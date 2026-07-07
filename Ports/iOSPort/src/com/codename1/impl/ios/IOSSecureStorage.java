@@ -42,16 +42,16 @@ import java.util.Map;
  */
 public final class IOSSecureStorage extends SecureStorage {
 
+    private static final Map<Integer, AsyncResource<?>> REQUESTS =
+            new HashMap<Integer, AsyncResource<?>>();
+    private static int nextRequestId = 1;
+
     static {
         // Prevents the iOS VM optimizer from eliding these callbacks.
         nativeStorageStringResult(-1, null);
         nativeStorageBooleanResult(-1, false);
         nativeStorageError(-1, 0, null);
     }
-
-    private static final Map<Integer, AsyncResource<?>> REQUESTS =
-            new HashMap<Integer, AsyncResource<?>>();
-    private static int nextRequestId = 1;
 
     private final IOSNative nativeInstance;
     private String accessGroup;

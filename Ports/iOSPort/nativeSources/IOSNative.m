@@ -419,6 +419,9 @@ extern int isPainted();
 extern void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 (void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight);
 
+extern void Java_com_codename1_impl_ios_IOSImplementation_flushBufferForReadbackImpl
+(int x, int y, int width, int height);
+
 extern void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl
 (int* arr, int width, int height);
 
@@ -810,6 +813,13 @@ void com_codename1_impl_ios_IOSNative_flushBuffer___long_int_int_int_int(CN1_THR
     Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl((void *)n1, n2, n3, n4, n5);
     POOL_END();
     //XMLVM_END_WRAPPER
+}
+
+void com_codename1_impl_ios_IOSNative_flushBufferForReadback___int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4)
+{
+    POOL_BEGIN();
+    Java_com_codename1_impl_ios_IOSImplementation_flushBufferForReadbackImpl(n1, n2, n3, n4);
+    POOL_END();
 }
 
 
@@ -12285,18 +12295,24 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
         UNUserNotificationCenter* center = [UNUserNotificationCenter currentNotificationCenter];
         // Request notification authorization on first schedule so local-notification-only
         // apps still get prompted (the launch-time prompt was removed for issue #4876).
-        // The system shows the dialog at most once; later calls are a no-op.
+        // Add the request only after the authorization result is known; adding
+        // immediately races fresh simulators and can leave no pending request.
         [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert + UNAuthorizationOptionSound + UNAuthorizationOptionBadge)
             completionHandler:^(BOOL granted, NSError * _Nullable authError) {
                 if (authError != nil) {
                     CN1Log(@"Local notification authorization request failed: %@", authError.localizedDescription);
+                    return;
                 }
-        }];
-        cn1CancelScheduledLocalNotificationById(notificationIdString);
-        [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
-            if (error != nil) {
-                CN1Log(@"Failed to schedule local notification: %@", error.localizedDescription);
-            }
+                if (!granted) {
+                    CN1Log(@"Local notification authorization was not granted");
+                    return;
+                }
+                cn1CancelScheduledLocalNotificationById(notificationIdString);
+                [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
+                    if (error != nil) {
+                        CN1Log(@"Failed to schedule local notification: %@", error.localizedDescription);
+                    }
+                }];
         }];
     } else {
         CN1Log(@"Ignoring local notification request on iOS versions below 10");
@@ -13912,11 +13928,21 @@ static NSString *cn1_getAppName(CN1_THREAD_STATE_SINGLE_ARG) {
     return toNSString(CN1_THREAD_STATE_PASS_ARG res);
 }
 
+static NSString *cn1_secureStorageServiceName(NSString *appName) {
+    if (appName == nil || [appName length] == 0) {
+        appName = [[NSBundle mainBundle] bundleIdentifier];
+    }
+    if (appName == nil || [appName length] == 0) {
+        appName = @"CodenameOne";
+    }
+    return appName;
+}
+
 void com_codename1_impl_ios_IOSNative_secureStorageGet___int_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason, JAVA_OBJECT account) {
     POOL_BEGIN();
     NSString *nsReason = (reason == JAVA_NULL) ? @"Authenticate" : toNSString(CN1_THREAD_STATE_PASS_ARG reason);
     NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
-    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *appName = cn1_secureStorageServiceName(cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG));
     NSString *accessGroup = cn1_keychainAccessGroup;
     [nsReason retain];
     [nsAccount retain];
@@ -13981,7 +14007,7 @@ void com_codename1_impl_ios_IOSNative_secureStorageSet___int_java_lang_String_ja
     NSString *nsReason = (reason == JAVA_NULL) ? @"Authenticate" : toNSString(CN1_THREAD_STATE_PASS_ARG reason);
     NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
     NSString *nsValue = (value == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG value);
-    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *appName = cn1_secureStorageServiceName(cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG));
     NSString *accessGroup = cn1_keychainAccessGroup;
     [nsReason retain];
     [nsAccount retain];
@@ -14031,7 +14057,7 @@ void com_codename1_impl_ios_IOSNative_secureStorageSet___int_java_lang_String_ja
 void com_codename1_impl_ios_IOSNative_secureStorageRemove___int_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason, JAVA_OBJECT account) {
     POOL_BEGIN();
     NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
-    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *appName = cn1_secureStorageServiceName(cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG));
     NSString *accessGroup = cn1_keychainAccessGroup;
     [nsAccount retain];
     [appName retain];
@@ -14064,6 +14090,7 @@ void com_codename1_impl_ios_IOSNative_secureStorageRemove___int_java_lang_String
 
 static NSMutableDictionary *cn1_secureStoragePlainQuery(NSString *account, NSString *appName, NSString *accessGroup) {
     NSMutableDictionary *q = [NSMutableDictionary dictionary];
+    appName = cn1_secureStorageServiceName(appName);
     [q setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
     [q setObject:account forKey:(__bridge id)kSecAttrAccount];
     [q setObject:appName forKey:(__bridge id)kSecAttrService];

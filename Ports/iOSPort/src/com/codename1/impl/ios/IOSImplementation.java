@@ -410,21 +410,17 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
-    /// On Mac Catalyst (desktop) the native capture reads pixels back from the
-    /// Metal screenTexture (see cn1_copyMetalScreenTextureImage in IOSNative.m),
-    /// which is the genuine on-screen render target. On the headless Catalyst
-    /// window a static form's show() doesn't reliably re-drive a screen frame
-    /// (no display-link present), so the screenTexture can still hold an earlier
-    /// form. Animated screens flush continuously and are fine; static ones are
-    /// not. Force the current form through the real EDT screen-render pipeline
-    /// -- the same paintComponent-to-screen + flushGraphics that paintDirty()
-    /// runs -- so the texture reflects the live UI before we capture it. This
-    /// renders through the actual Metal draw path (not an off-screen re-paint),
-    /// so the screenshot remains a genuine test of the display pipeline.
+    /// The native capture reads back the renderer's real screen target (Metal
+    /// screenTexture on Metal builds; see cn1_copyMetalScreenTextureImage in
+    /// IOSNative.m). A static form's show()/repaint() doesn't always re-drive a
+    /// screen frame before a test requests Display.screenshot(), so the capture
+    /// can still hold an earlier or blank frame. Force the current form through
+    /// the real EDT screen-render pipeline -- the same paintComponent-to-screen
+    /// + flushGraphics that paintDirty() runs -- so the texture reflects the
+    /// live UI before we capture it. This renders through the actual display
+    /// path (not an off-screen repaint), so the screenshot remains a genuine
+    /// test of the display pipeline.
     private void forceScreenRenderForCapture() {
-        if (!isDesktop()) {
-            return;
-        }
         final Runnable paintAndFlush = new Runnable() {
             @Override
             public void run() {
@@ -437,7 +433,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 wrapper.resetAffine();
                 wrapper.setClip(0, 0, getDisplayWidth(), getDisplayHeight());
                 f.paintComponent(wrapper, true);
-                flushGraphics();
+                nativeInstance.flushBufferForReadback(0, 0, getDisplayWidth(), getDisplayHeight());
             }
         };
         if (Display.getInstance().isEdt()) {
@@ -1665,6 +1661,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             Object graph = getNativeGraphics(mute);
             drawImage(graph, nimg, 0, 0);
             nimg = (NativeImage)mute;
+        }
+        if (currentlyDrawingOn != null && currentlyDrawingOn.associatedImage != nimg) {
+            currentlyDrawingOn.associatedImage.peer = finishDrawingOnImage();
+            currentlyDrawingOn = null;
         }
         imageRgbToIntArray(nimg.peer, arr, x, y, width, height, nimg.width, nimg.height);
     }
@@ -6316,8 +6316,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                     // stale (often full-screen) scissor. That makes a clip set
                     // before the mutable-image draw silently not apply to the
                     // draw after it -> content drawn outside its clip (#5171).
-                    // Invalidate so the screen clip is re-applied for the next draw.
+                    // Invalidate so the screen state is re-applied for the next draw.
                     clipApplied = false;
+                    transformApplied = false;
                 }
                 currentlyDrawingOn = null;
             }

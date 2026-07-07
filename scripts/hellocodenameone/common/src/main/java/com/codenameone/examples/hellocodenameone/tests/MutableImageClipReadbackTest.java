@@ -39,6 +39,10 @@ import com.codename1.ui.util.UITimer;
 public class MutableImageClipReadbackTest extends BaseTest {
 
     private static final int PAINTER_RED = 0xff2020;
+    private static final int RETRY_INTERVAL_MS = 250;
+    private static final int RETRY_TIMEOUT_MS = 5000;
+    private Form form;
+    private long retryDeadline;
 
     @Override
     public boolean shouldTakeScreenshot() {
@@ -66,11 +70,12 @@ public class MutableImageClipReadbackTest extends BaseTest {
         holder.getAllStyles().setPadding(0, 0, 0, 0);
         holder.add(painter);
 
-        Form form = new Form("Mutable Image Clip", new BorderLayout()) {
+        form = new Form("Mutable Image Clip", new BorderLayout()) {
             @Override
             protected void onShowCompleted() {
                 super.onShowCompleted();
                 repaint();
+                retryDeadline = System.currentTimeMillis() + RETRY_TIMEOUT_MS;
                 UITimer.timer(1500, false, this, () -> captureAndVerify());
             }
         };
@@ -127,8 +132,18 @@ public class MutableImageClipReadbackTest extends BaseTest {
         int insideX = (int) ((pAbsX + pW / 2) * sx);
         int insideY = (int) ((pAbsY + pH / 2) * sy);
         if (!isRed(sample(rgb, imgW, imgH, insideX, insideY))) {
+            if (System.currentTimeMillis() < retryDeadline && form != null) {
+                form.repaint();
+                UITimer.timer(RETRY_INTERVAL_MS, false, form, () -> captureAndVerify());
+                return;
+            }
+            RedBounds redBounds = findRedBounds(rgb, imgW, imgH);
             fail("painter centre was not red (" + insideX + "," + insideY
                     + ") = 0x" + Integer.toHexString(sample(rgb, imgW, imgH, insideX, insideY))
+                    + ", paintCount=" + OverflowPainter.paintCount
+                    + ", painterAbs=(" + pAbsX + "," + pAbsY + ") size=" + pW + "x" + pH
+                    + ", screenshot=" + imgW + "x" + imgH + ", scale=(" + sx + "," + sy + ")"
+                    + ", redPixels=" + redBounds
                     + " -- repro setup did not paint, cannot judge clipping");
             return;
         }
@@ -174,6 +189,42 @@ public class MutableImageClipReadbackTest extends BaseTest {
         return r > 180 && g < 90 && b < 90;
     }
 
+    private static RedBounds findRedBounds(int[] rgb, int w, int h) {
+        RedBounds out = new RedBounds();
+        for (int y = 0; y < h; y++) {
+            int row = y * w;
+            for (int x = 0; x < w; x++) {
+                if (isRed(rgb[row + x])) {
+                    out.add(x, y);
+                }
+            }
+        }
+        return out;
+    }
+
+    private static final class RedBounds {
+        int count;
+        int minX = Integer.MAX_VALUE;
+        int minY = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int maxY = Integer.MIN_VALUE;
+
+        void add(int x, int y) {
+            count++;
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+        }
+
+        public String toString() {
+            if (count == 0) {
+                return "0";
+            }
+            return count + "@(" + minX + "," + minY + ")-(" + maxX + "," + maxY + ")";
+        }
+    }
+
     /**
      * Paints itself by first drawing into a screen-sized mutable image (the
      * detour) and then filling red across an area larger than its own bounds.
@@ -182,6 +233,7 @@ public class MutableImageClipReadbackTest extends BaseTest {
      */
     private static final class OverflowPainter extends Component {
         static volatile OverflowPainter last;
+        static volatile int paintCount;
         private final int prefW;
         private final int prefH;
         private final int dispW;
@@ -202,6 +254,7 @@ public class MutableImageClipReadbackTest extends BaseTest {
 
         @Override
         public void paint(Graphics g) {
+            paintCount++;
             super.paint(g);
             // (1) The detour: draw into a screen-sized mutable image. On Metal
             // this runs on its own encoder and leaves the shared native scissor

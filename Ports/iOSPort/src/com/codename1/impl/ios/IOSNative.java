@@ -65,6 +65,7 @@ public final class IOSNative {
             boolean returnExitsEditing);
     native void resizeNativeTextView(int x, int y, int w, int h, int padTop, int padRight, int padBottom, int padLeft);
     native void flushBuffer(long peer, int x, int y, int width, int height);
+    native void flushBufferForReadback(int x, int y, int width, int height);
     native void imageRgbToIntArray(long imagePeer, int[] arr, int x, int y, int width, int height, int imgWidth, int imgHeight);
     native long createImageFromARGB(int[] argb, int width, int height);
     native long createImage(byte[] data, int[] widthHeight);

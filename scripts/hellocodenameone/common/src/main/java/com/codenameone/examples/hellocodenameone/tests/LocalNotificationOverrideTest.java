@@ -28,7 +28,7 @@ public class LocalNotificationOverrideTest extends BaseTest {
             schedule(notificationId, "first");
             schedule(notificationId, "second");
 
-            int count = waitForScheduledCount(nativeInterface, notificationId, 1, 3000);
+            int count = waitForScheduledCount(nativeInterface, notificationId, 1, 8000);
             nativeInterface.clearScheduledLocalNotifications(notificationId);
 
             if (count != 1) {
