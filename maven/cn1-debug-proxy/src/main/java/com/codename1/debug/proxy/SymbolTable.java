@@ -11,9 +11,9 @@ package com.codename1.debug.proxy;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -21,10 +21,12 @@ import java.util.Map;
 import java.util.TreeSet;
 
 /**
- * In-memory model of the cn1-symbols.txt sidecar emitted by the translator
- * when {@code -Dcn1.onDeviceDebug=true} is set. Resolves device-sent
- * integer IDs back to JVM-style class/method names so the proxy can answer
- * JDWP queries like AllClasses, ClassesBySignature, Method.LineTable, etc.
+ * In-memory model of the symbol table the translator emits when
+ * {@code -Dcn1.onDeviceDebug=true} is set. The table is gzip-compressed into
+ * the iOS binary and streamed to this proxy over the wire on connect (there
+ * is no local sidecar file). Resolves device-sent integer IDs back to
+ * JVM-style class/method names so the proxy can answer JDWP queries like
+ * AllClasses, ClassesBySignature, Method.LineTable, etc.
  *
  * The format intentionally trades cleverness for parseability — see
  * Parser.writeSymbolSidecar in the translator for the writer.
@@ -138,9 +140,14 @@ public final class SymbolTable {
     private final Map<String, ClassInfo> classesByJvmSig = new HashMap<>();
     private final Map<String, ClassInfo> classesBySourceFile = new HashMap<>();
 
-    public static SymbolTable load(Path file) throws IOException {
+    /**
+     * Parses the tab-delimited symbol table streamed off the device (already
+     * gzip-inflated by the caller). The proxy no longer reads a local sidecar
+     * file — the table travels over the wire via CMD_GET_SYMBOLS.
+     */
+    public static SymbolTable load(InputStream in) throws IOException {
         SymbolTable t = new SymbolTable();
-        try (BufferedReader r = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
             String line;
             while ((line = r.readLine()) != null) {
                 if (line.isEmpty() || line.startsWith("#")) continue;

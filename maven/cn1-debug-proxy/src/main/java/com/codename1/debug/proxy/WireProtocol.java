@@ -38,6 +38,12 @@ public final class WireProtocol {
     public static final int CMD_INVOKE_METHOD     = 0x0E;
     public static final int CMD_GET_ARRAY_LENGTH  = 0x0F;
     public static final int CMD_GET_ARRAY_VALUES  = 0x10;
+    // Pull the symbol table off the device. Payload: offset(4) maxLen(4).
+    // The device replies with EVT_SYMBOLS carrying one chunk; the proxy
+    // loops until it has assembled totalLen bytes. This replaces the old
+    // cn1-symbols.txt sidecar so a cloud-built app (Windows/Linux, where the
+    // translator ran on the build server) still yields symbols locally.
+    public static final int CMD_GET_SYMBOLS       = 0x11;
 
     public static final int EVT_HELLO            = 0x80;
     public static final int EVT_THREAD_LIST      = 0x81;
@@ -55,6 +61,9 @@ public final class WireProtocol {
     public static final int EVT_INVOKE_RESULT    = 0x8D;
     public static final int EVT_ARRAY_LENGTH     = 0x8E;
     public static final int EVT_ARRAY_VALUES     = 0x8F;
+    // Reply to CMD_GET_SYMBOLS. Payload: totalLen(4) offset(4) chunkLen(4)
+    // then chunkLen bytes of the gzip-compressed symbol table.
+    public static final int EVT_SYMBOLS          = 0x90;
 
     public static final int STEP_INTO = 0;
     public static final int STEP_OVER = 1;
