@@ -3,6 +3,7 @@ package com.codenameone.examples.hellocodenameone.tests;
 import com.codename1.components.ToastBar;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
@@ -39,19 +40,38 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
 
     @Override
     protected void registerReadyCallback(Form parent, Runnable run) {
-        ToastBar tb = ToastBar.getInstance();
-        tb.setPosition(Component.TOP);
+        ToastBar.getInstance().setPosition(Component.TOP);
+        showToast();
 
-        // Use a long timeout so the toast stays visible for the screenshot
+        // The toast is shown asynchronously and, on the slow iOS/tvOS/watchOS simulators, is
+        // intermittently NOT visible when a fixed timer fires -- the screenshot then captures
+        // the form WITHOUT the toast, a run-to-run "toast present vs absent" flake that no
+        // golden can reconcile (max_channel_delta 191). Rather than guess a timer, poll until
+        // the toast component is actually laid out + visible on the current form, re-issuing
+        // the show if it never took, then hand off to the base settle+capture. Bounded so a
+        // genuine show failure degrades to a capture instead of hanging the suite.
+        awaitToastShown(parent, run, 0);
+    }
+
+    private void showToast() {
+        // 30s timeout so the toast stays up for the (polled) capture window.
         ToastBar.showMessage("Info message at top", FontImage.MATERIAL_INFO, 30000);
+    }
 
-        // Wait for the toast slide-in to fully settle before capturing. The toast animates in
-        // the global layered pane, which the base capture's form-AnimationManager settle poll
-        // does NOT track, so the render is only deterministic once the slide has finished. The
-        // previous 2000ms was enough on fast native platforms but not on the slow iOS/tvOS/
-        // watchOS simulators, where the toast was captured mid-slide -> a delta-191 run-to-run
-        // flake. 6000ms comfortably exceeds the slide duration even on the slowest sim; the
-        // toast's 30000ms timeout keeps it up, so the captured frame is the settled toast.
-        UITimer.timer(6000, false, parent, run);
+    private void awaitToastShown(final Form parent, final Runnable run, final int waitedMs) {
+        Form f = Display.getInstance().getCurrent();
+        Object tbc = (f != null) ? f.getClientProperty("ToastBarComponent") : null;
+        boolean shown = (tbc instanceof Component)
+                && ((Component) tbc).isVisible()
+                && ((Component) tbc).getHeight() > 0;
+        if (shown || waitedMs >= 15000) {
+            run.run();
+            return;
+        }
+        if (waitedMs > 0 && (waitedMs % 3000) == 0) {
+            // the show did not take (toast left at height 0) -> re-issue it
+            showToast();
+        }
+        UITimer.timer(250, false, parent, () -> awaitToastShown(parent, run, waitedMs + 250));
     }
 }
