@@ -10,22 +10,21 @@
 package com.codename1.debug.proxy;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 
 /**
  * CLI entry point for the on-device-debug proxy.
  *
- * Usage: {@code java -jar cn1-debug-proxy.jar --symbols=path/to/cn1-symbols.txt
- *         --device-port=55333 --jdwp-port=8000 [--no-jdwp]}
+ * Usage: {@code java -jar cn1-debug-proxy.jar --device-port=55333
+ *         --jdwp-port=8000 [--no-jdwp]}
  *
- * - --symbols       : path to the sidecar emitted by the translator. Required.
  * - --device-port   : TCP port to listen on for the device. Default 55333.
  * - --jdwp-port     : TCP port to listen on for jdb / IDE. Default 8000.
  * - --no-jdwp       : skip the JDWP front-end; events are dumped to stdout.
  *                     Useful for shaking out the wire protocol before the
  *                     JDWP translation layer is ready.
  *
+ * The symbol table is streamed off the device when it connects (there is no
+ * local sidecar file), so nothing needs to be passed on the command line.
  * The proxy waits for both sides to connect, then forwards events from the
  * device to the JDWP listener (which translates them into JDWP events) and
  * commands from JDWP back to the device.
@@ -33,14 +32,12 @@ import java.nio.file.Paths;
 public final class ProxyMain {
 
     public static void main(String[] args) throws Exception {
-        String symbolsPath = null;
         int devicePort = 55333;
         int jdwpPort = 8000;
         boolean noJdwp = false;
 
         for (String a : args) {
-            if (a.startsWith("--symbols=")) symbolsPath = a.substring("--symbols=".length());
-            else if (a.startsWith("--device-port=")) devicePort = Integer.parseInt(a.substring("--device-port=".length()));
+            if (a.startsWith("--device-port=")) devicePort = Integer.parseInt(a.substring("--device-port=".length()));
             else if (a.startsWith("--jdwp-port=")) jdwpPort = Integer.parseInt(a.substring("--jdwp-port=".length()));
             else if (a.equals("--no-jdwp")) noJdwp = true;
             else if (a.equals("--trace-jdwp")) JdwpServer.traceJdwp = true;
@@ -51,24 +48,16 @@ public final class ProxyMain {
                 System.exit(2);
             }
         }
-        if (symbolsPath == null) {
-            System.err.println("--symbols=<path> is required");
-            printUsage();
-            System.exit(2);
-        }
 
-        SymbolTable symbols = SymbolTable.load(Paths.get(symbolsPath));
-        System.out.println("Loaded " + symbols.allClasses().size() + " classes, "
-                + symbols.allMethods().size() + " methods, "
-                + symbols.fieldCount() + " fields from " + symbolsPath);
-
+        // Symbols are pulled off the device over the wire (CMD_GET_SYMBOLS)
+        // once it dials in — see DeviceConnection#finishSymbols.
         final DeviceConnection.DeviceListener listener;
         final JdwpServer jdwpServer;
         if (noJdwp) {
-            listener = new LoggingListener(symbols);
+            listener = new LoggingListener();
             jdwpServer = null;
         } else {
-            jdwpServer = new JdwpServer(jdwpPort, symbols);
+            jdwpServer = new JdwpServer(jdwpPort);
             listener = jdwpServer;
             final JdwpServer js = jdwpServer;
             Thread t = new Thread(() -> {
@@ -93,6 +82,6 @@ public final class ProxyMain {
     }
 
     private static void printUsage() {
-        System.err.println("Usage: cn1-debug-proxy --symbols=<path> [--device-port=<p>] [--jdwp-port=<p>] [--no-jdwp]");
+        System.err.println("Usage: cn1-debug-proxy [--device-port=<p>] [--jdwp-port=<p>] [--no-jdwp]");
     }
 }

@@ -56,6 +56,7 @@
 #define CMD_INVOKE_METHOD    0x0E
 #define CMD_GET_ARRAY_LENGTH 0x0F
 #define CMD_GET_ARRAY_VALUES 0x10
+#define CMD_GET_SYMBOLS      0x11
 
 // Events (device -> proxy)
 #define EVT_HELLO            0x80
@@ -74,6 +75,16 @@
 #define EVT_INVOKE_RESULT    0x8D
 #define EVT_ARRAY_LENGTH     0x8E
 #define EVT_ARRAY_VALUES     0x8F
+#define EVT_SYMBOLS          0x90
+
+// The gzip-compressed on-device-debug symbol table, emitted as a generated
+// C source (cn1_debug_symbols.c) by the translator and linked into this
+// binary. Served to the desktop proxy in chunks via CMD_GET_SYMBOLS so the
+// proxy needs no local sidecar file — the crux of making on-device debugging
+// work for cloud builds. Weakly imported so the runtime still links (and
+// simply reports a zero-length table) if the generated source is absent.
+extern const unsigned char* cn1_debug_symbols_data(void) __attribute__((weak));
+extern int cn1_debug_symbols_length(void) __attribute__((weak));
 
 // java.lang.String's clazz struct is emitted by the translator; we reference
 // it by symbol so cn1_debugger.m doesn't depend on the generated
@@ -1207,6 +1218,39 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             free(buf);
             return 0;
         }
+        case CMD_GET_SYMBOLS: {
+            // Payload: offset(4) maxLen(4). Reply EVT_SYMBOLS:
+            // totalLen(4) offset(4) chunkLen(4) then chunkLen blob bytes.
+            uint32_t offset = 0, maxLen = 0;
+            if (len >= 8) {
+                uint32_t o, m;
+                memcpy(&o, payload, 4);
+                memcpy(&m, payload + 4, 4);
+                offset = ntohl(o);
+                maxLen = ntohl(m);
+            }
+            const unsigned char* data = (cn1_debug_symbols_data != NULL) ? cn1_debug_symbols_data() : NULL;
+            uint32_t total = (data != NULL && cn1_debug_symbols_length != NULL)
+                    ? (uint32_t)cn1_debug_symbols_length() : 0;
+            if (offset > total) offset = total;
+            uint32_t remaining = total - offset;
+            uint32_t chunk = (maxLen == 0 || maxLen > remaining) ? remaining : maxLen;
+            // Keep any single frame comfortably under the proxy's 1 MiB cap.
+            if (chunk > (256u * 1024u)) chunk = 256u * 1024u;
+            uint8_t* buf = (uint8_t*)malloc(12 + chunk);
+            if (!buf) {
+                uint8_t empty[12] = {0};
+                sendEvent(EVT_SYMBOLS, empty, 12);
+                return 0;
+            }
+            writeBE32(buf,     total);
+            writeBE32(buf + 4, offset);
+            writeBE32(buf + 8, chunk);
+            if (chunk > 0 && data != NULL) memcpy(buf + 12, data + offset, chunk);
+            sendEvent(EVT_SYMBOLS, buf, 12 + chunk);
+            free(buf);
+            return 0;
+        }
         case CMD_GET_THREADS:
         case CMD_SUSPEND:
             // Minimal viable: reply empty so the proxy doesn't hang.
@@ -1216,6 +1260,42 @@ static int handleCommand(uint8_t cmd, const uint8_t* payload, uint32_t len) {
             NSLog(@"cn1_debugger: unknown command 0x%02x", cmd);
             return 0;
     }
+}
+
+// Opens a single outbound TCP connection to the proxy. Returns a connected
+// fd, or -1 on any failure (caller decides whether to retry).
+static int cn1_debugger_connect_once(NSString* host, int port) {
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) return -1;
+    struct sockaddr_in sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons(port);
+    if (inet_pton(AF_INET, [host UTF8String], &sa.sin_addr) != 1) {
+        // Try resolving as a hostname.
+        struct addrinfo hints = {0}, *res = NULL;
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+        if (getaddrinfo([host UTF8String], NULL, &hints, &res) == 0 && res) {
+            sa.sin_addr = ((struct sockaddr_in*)res->ai_addr)->sin_addr;
+            freeaddrinfo(res);
+        } else {
+            close(fd);
+            return -1;
+        }
+    }
+    if (connect(fd, (struct sockaddr*)&sa, sizeof(sa)) == 0) {
+        return fd;
+    }
+    close(fd);
+    return -1;
+}
+
+static int cn1_debugger_is_attach_ready(void) {
+    pthread_mutex_lock(&g_attachMutex);
+    int r = g_attachReady;
+    pthread_mutex_unlock(&g_attachMutex);
+    return r;
 }
 
 static void* listenerThreadMain(void* arg) {
@@ -1229,86 +1309,77 @@ static void* listenerThreadMain(void* arg) {
             return NULL;
         }
 
-        // Retry a few times with backoff so launching slightly before the
-        // proxy is up still works.
-        int fd = -1;
-        for (int attempt = 0; attempt < 20; attempt++) {
-            fd = socket(AF_INET, SOCK_STREAM, 0);
-            if (fd < 0) { usleep(500000); continue; }
-            struct sockaddr_in sa;
-            memset(&sa, 0, sizeof(sa));
-            sa.sin_family = AF_INET;
-            sa.sin_port = htons(port);
-            if (inet_pton(AF_INET, [host UTF8String], &sa.sin_addr) != 1) {
-                // Try resolving as a hostname.
-                struct addrinfo hints = {0}, *res = NULL;
-                hints.ai_family = AF_INET;
-                hints.ai_socktype = SOCK_STREAM;
-                if (getaddrinfo([host UTF8String], NULL, &hints, &res) == 0 && res) {
-                    sa.sin_addr = ((struct sockaddr_in*)res->ai_addr)->sin_addr;
-                    freeaddrinfo(res);
-                } else {
-                    close(fd);
-                    fd = -1;
-                    usleep(500000);
-                    continue;
+        // Outer (re)connect loop. With waitForAttach the app is parked on the
+        // "Waiting for debugger" overlay and blocking must NEVER time out — so
+        // we retry the connect forever, and if the proxy drops before the IDE
+        // has attached we reconnect rather than booting the app. Without
+        // waitForAttach we retry only briefly (so launching a moment before
+        // the proxy is up still works) and then let the app boot normally.
+        for (;;) {
+            int fd = -1;
+            for (int attempt = 0; ; attempt++) {
+                fd = cn1_debugger_connect_once(host, port);
+                if (fd >= 0) break;
+                if (!g_waitForAttach && attempt >= 19) break; // ~10s, then give up
+                usleep(500000);
+            }
+            if (fd < 0) {
+                NSLog(@"cn1_debugger: could not connect to %@:%d, giving up", host, port);
+                // Non-wait builds boot even if the proxy never comes up.
+                cn1_debugger_fire_ready_block_if_pending();
+                return NULL;
+            }
+            int nodelay = 1;
+            setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay));
+            g_proxyFd = fd;
+
+            // Send HELLO.
+            uint8_t hello[3];
+            hello[0] = 0;
+            hello[1] = 0;
+            hello[2] = CN1_DBG_PROTOCOL_VERSION;
+            sendEvent(EVT_HELLO, hello, 3);
+            cn1DebuggerActive = 1;
+            NSLog(@"cn1_debugger: connected to proxy %@:%d (proto v%d)", host, port, CN1_DBG_PROTOCOL_VERSION);
+
+            for (;;) {
+                uint32_t lenBE;
+                if (readAll(fd, &lenBE, 4) < 0) break;
+                uint32_t plen = ntohl(lenBE);
+                if (plen > (1 << 20)) { // sanity cap
+                    NSLog(@"cn1_debugger: oversized payload %u, closing", plen);
+                    break;
                 }
+                uint8_t cmd;
+                if (readAll(fd, &cmd, 1) < 0) break;
+                uint8_t* payload = NULL;
+                if (plen > 0) {
+                    payload = (uint8_t*)malloc(plen);
+                    if (readAll(fd, payload, plen) < 0) { free(payload); break; }
+                }
+                int rc = handleCommand(cmd, payload, plen);
+                free(payload);
+                if (rc < 0) break;
             }
-            if (connect(fd, (struct sockaddr*)&sa, sizeof(sa)) == 0) {
-                break;
-            }
+
+            NSLog(@"cn1_debugger: proxy connection closed");
+            cn1DebuggerActive = 0;
+            resumeAll(/*preserveStep*/ 0);
             close(fd);
-            fd = -1;
-            usleep(500000);
-        }
-        if (fd < 0) {
-            NSLog(@"cn1_debugger: could not connect to %@:%d, giving up", host, port);
-            // Release the AppDelegate's deferred VM callback so the app
-            // boots even if the proxy never comes up.
+            g_proxyFd = -1;
+
+            // If we're still waiting for the IDE and it never attached, the
+            // proxy dropped prematurely — keep waiting (reconnect) instead of
+            // booting. Otherwise release the AppDelegate's deferred callback so
+            // the app boots after a normal/cancelled debug session.
+            if (g_waitForAttach && !cn1_debugger_is_attach_ready()) {
+                NSLog(@"cn1_debugger: proxy gone before attach; still waiting, will reconnect");
+                usleep(500000);
+                continue;
+            }
             cn1_debugger_fire_ready_block_if_pending();
             return NULL;
         }
-        int nodelay = 1;
-        setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay));
-        g_proxyFd = fd;
-
-        // Send HELLO.
-        uint8_t hello[3];
-        hello[0] = 0;
-        hello[1] = 0;
-        hello[2] = CN1_DBG_PROTOCOL_VERSION;
-        sendEvent(EVT_HELLO, hello, 3);
-        cn1DebuggerActive = 1;
-        NSLog(@"cn1_debugger: connected to proxy %@:%d (proto v%d)", host, port, CN1_DBG_PROTOCOL_VERSION);
-
-        for (;;) {
-            uint32_t lenBE;
-            if (readAll(fd, &lenBE, 4) < 0) break;
-            uint32_t plen = ntohl(lenBE);
-            if (plen > (1 << 20)) { // sanity cap
-                NSLog(@"cn1_debugger: oversized payload %u, closing", plen);
-                break;
-            }
-            uint8_t cmd;
-            if (readAll(fd, &cmd, 1) < 0) break;
-            uint8_t* payload = NULL;
-            if (plen > 0) {
-                payload = (uint8_t*)malloc(plen);
-                if (readAll(fd, payload, plen) < 0) { free(payload); break; }
-            }
-            int rc = handleCommand(cmd, payload, plen);
-            free(payload);
-            if (rc < 0) break;
-        }
-
-        NSLog(@"cn1_debugger: proxy connection closed");
-        cn1DebuggerActive = 0;
-        resumeAll(/*preserveStep*/ 0);
-        close(fd);
-        g_proxyFd = -1;
-        // If the AppDelegate is still waiting for an IDE attach, release it
-        // so the app can boot even after a failed/cancelled debug session.
-        cn1_debugger_fire_ready_block_if_pending();
     }
     return NULL;
 }
