@@ -493,32 +493,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         });
     }
 
-    static void onScreenshot(final int[] argb, final int width, final int height) {
-        final SuccessCallback<Image> callback = screenshotCallback;
-        screenshotCallback = null;
-        if (callback == null) {
-            return;
-        }
-
-        Display.getInstance().callSerially(new Runnable() {
-            @Override
-            public void run() {
-                if (argb != null && width > 0 && height > 0 && argb.length >= width * height) {
-                    try {
-                        Image image = Image.createImage(argb, width, height);
-                        if (image != null) {
-                            callback.onSucess(image);
-                            return;
-                        }
-                    } catch (Throwable t) {
-                        Log.e(t);
-                    }
-                }
-                callback.onSucess(null);
-            }
-        });
-    }
-
     /**
      * Used to enable/disable native cookies from native code.
      * @param cookiesArray 

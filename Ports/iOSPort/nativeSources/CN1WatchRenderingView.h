@@ -66,14 +66,9 @@
 // uses these to lay out the frame.
 - (int)logicalWidth;
 - (int)logicalHeight;
-- (int)pixelWidth;
-- (int)pixelHeight;
 
 // The most recent rendered frame, or nil before the first present.
 - (UIImage *)currentFrame;
-
-// Copies the current framebuffer pixels into `argb` as 0xAARRGGBB values.
-- (BOOL)copyARGBToBuffer:(int *)argb width:(int *)outWidth height:(int *)outHeight;
 
 @end
 

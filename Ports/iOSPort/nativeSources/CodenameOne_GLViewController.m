@@ -668,14 +668,59 @@ void screenSizeChangedC(int width, int height) {
 void* Java_com_codename1_impl_ios_IOSImplementation_createImageImpl
 (void* data, int dataLength, int* widthAndHeightReturnValue) {
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_createImageImpl started for dataLength %i", dataLength);
-    NSData* nd = [NSData dataWithBytes:data length:dataLength];
-    UIImage* img = [UIImage imageWithData:nd];
+    if (widthAndHeightReturnValue != NULL) {
+        widthAndHeightReturnValue[0] = 0;
+        widthAndHeightReturnValue[1] = 0;
+    }
+    NSData* nd = data != NULL && dataLength > 0 ? [NSData dataWithBytes:data length:dataLength] : nil;
+    __block UIImage* img = nil;
+#if TARGET_OS_WATCH
+    void (^decodeImageData)(void) = ^{
+        img = nd != nil ? [UIImage imageWithData:nd] : nil;
+#ifndef CN1_USE_ARC
+        [img retain];
+#endif
+    };
+    if ([NSThread isMainThread]) {
+        decodeImageData();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), decodeImageData);
+    }
+#else
+    img = nd != nil ? [UIImage imageWithData:nd] : nil;
+#endif
+    if (img == nil) {
+#if TARGET_OS_WATCH
+        const unsigned char *bytes = data;
+        unsigned int b0 = data != NULL && dataLength > 0 ? bytes[0] : 0;
+        unsigned int b1 = data != NULL && dataLength > 1 ? bytes[1] : 0;
+        unsigned int b2 = data != NULL && dataLength > 2 ? bytes[2] : 0;
+        unsigned int b3 = data != NULL && dataLength > 3 ? bytes[3] : 0;
+        NSLog(@"CN1SS:ERR:watch PNG decode failed length=%d magic=%02x%02x%02x%02x",
+              dataLength, b0, b1, b2, b3);
+#endif
+        return NULL;
+    }
     widthAndHeightReturnValue[0] = (int)img.size.width;
     widthAndHeightReturnValue[1] = (int)img.size.height;
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_createImageImpl finished width %i, height %i", (int)widthAndHeightReturnValue[0], (int)widthAndHeightReturnValue[1]);
-    
+    if (widthAndHeightReturnValue[0] <= 0 || widthAndHeightReturnValue[1] <= 0) {
+#if TARGET_OS_WATCH
+        NSLog(@"CN1SS:ERR:watch PNG decode produced invalid size length=%d size=%dx%d",
+              dataLength, widthAndHeightReturnValue[0], widthAndHeightReturnValue[1]);
+#endif
 #ifndef CN1_USE_ARC
-    return [[GLUIImage alloc] initWithImage:img];
+        [img release];
+#endif
+        return NULL;
+    }
+
+#ifndef CN1_USE_ARC
+    GLUIImage *result = [[GLUIImage alloc] initWithImage:img];
+#if TARGET_OS_WATCH
+    [img release];
+#endif
+    return result;
 #else
     return (__bridge void*)[[GLUIImage alloc] initWithImage:img];
 #endif
