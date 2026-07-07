@@ -101,7 +101,7 @@ let SPECS: [Spec] = [
     Spec(component: "Button",      kind: "ios_uibutton_system", states: ["normal","pressed","disabled"], wMM: 60, hMM: 14),
     Spec(component: "RaisedButton",kind: "ios_uibutton_filled", states: ["normal","pressed","disabled"], wMM: 60, hMM: 14),
     Spec(component: "FlatButton",  kind: "ios_uibutton_plain",  states: ["normal","pressed"],            wMM: 60, hMM: 14),
-    Spec(component: "TextField",   kind: "ios_uitextfield",     states: ["normal","disabled"],           wMM: 60, hMM: 14),
+    Spec(component: "TextField",   kind: "ios_uitextfield",     states: ["normal","disabled"],           wMM: 60, hMM: 14, backdrop: "grouped"),
     Spec(component: "CheckBox",    kind: "ios_check_glyph",     states: ["normal","selected","disabled"],wMM: 60, hMM: 14),
     Spec(component: "RadioButton", kind: "ios_radio_glyph",     states: ["normal","selected","disabled"],wMM: 60, hMM: 14),
     Spec(component: "Switch",      kind: "ios_uiswitch",        states: ["normal","selected","disabled"],wMM: 60, hMM: 14),
@@ -210,25 +210,30 @@ func buildControl(_ kind: String, _ state: String, _ wPt: CGFloat, _ hPt: CGFloa
     case "ios_uitextfield":
         let tf = UITextField(frame: CGRect(x: 0, y: 0, width: wPt, height: hPt))
         tf.borderStyle = .roundedRect
-        // The roundedRect default fill collapses to ~pure black in dark mode (the
-        // field becomes invisible). Use the system's elevated field fill so the
-        // field reads as a filled control in both appearances -- secondary system
-        // background is white in light and #1c1c1e in dark, matching CN1's field.
-        tf.backgroundColor = .secondarySystemBackground
+        // A grouped-list cell: the field CONTRASTS with the grouped form background
+        // (white on #f2f2f7 light, #2c2c2e on #1c1c1e dark) so it stays visible on
+        // a flat form -- matching CN1's contrasting-glass TextField. The old
+        // secondarySystemBackground was #f2f2f7 == the form and vanished. Dynamic
+        // colour resolves against the container's overrideUserInterfaceStyle.
+        tf.backgroundColor = UIColor { tc in
+            tc.userInterfaceStyle == .dark
+                ? UIColor(red: 44/255.0, green: 44/255.0, blue: 46/255.0, alpha: 1.0)
+                : UIColor.white
+        }
         tf.text = label
         tf.isEnabled = !disabled
         return tf
     case "ios_check_glyph":
         let b = UIButton(type: .system)
         let sym = selected ? "checkmark.circle.fill" : "circle"
-        let cfg = UIImage.SymbolConfiguration(pointSize: 30)
+        let cfg = UIImage.SymbolConfiguration(pointSize: 24)
         b.setImage(UIImage(systemName: sym, withConfiguration: cfg), for: .normal)
         b.isEnabled = !disabled
         return b
     case "ios_radio_glyph":
         let b = UIButton(type: .system)
         let sym = selected ? "largecircle.fill.circle" : "circle"
-        let cfg = UIImage.SymbolConfiguration(pointSize: 30)
+        let cfg = UIImage.SymbolConfiguration(pointSize: 24)
         b.setImage(UIImage(systemName: sym, withConfiguration: cfg), for: .normal)
         b.isEnabled = !disabled
         return b
@@ -488,6 +493,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                         gl.startPoint = CGPoint(x: 0.5, y: 0.0)   // blue at top
                         gl.endPoint = CGPoint(x: 0.5, y: 1.0)     // green at bottom
                         container.layer.addSublayer(gl)
+                    } else if backdrop == "grouped" {
+                        // The grouped-form background the field/cell sits on. A
+                        // white grouped cell is invisible on a plain white tile, so
+                        // render (and score) it over the grey grouped bg where the
+                        // cell genuinely contrasts -- matching the CN1 side.
+                        container.backgroundColor = (appearance == "dark")
+                            ? UIColor(red: 28/255.0, green: 28/255.0, blue: 30/255.0, alpha: 1.0)
+                            : UIColor(red: 242/255.0, green: 242/255.0, blue: 247/255.0, alpha: 1.0)
                     } else if let col = colorFromHex(backdrop) {
                         container.backgroundColor = col
                     }

@@ -716,6 +716,14 @@ public class FidelityDeviceRunner {
             s.setBgColor(parseHexColor(backdropSpec));
             s.setBgTransparency(255);
             return;
+        } else if ("grouped".equals(backdropSpec)) {
+            // The grouped-form background a field/cell actually sits on
+            // (systemGroupedBackground). A white grouped cell is invisible on a
+            // plain white tile, so score it over the grey grouped bg where it (and
+            // the native cell) genuinely contrast -- the real form context.
+            s.setBgColor("dark".equals(appearance) ? 0x1c1c1e : 0xf2f2f7);
+            s.setBgTransparency(255);
+            return;
         }
         s.setBgColor(bgColor(appearance));
         s.setBgTransparency(255);

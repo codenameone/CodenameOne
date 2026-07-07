@@ -93,6 +93,9 @@ components:
     native_android: material_textinput
     text: Hello
     states: normal,disabled
+    # The white grouped-cell field is invisible on a plain white tile; score it
+    # over the grey grouped-form background (iOS only) where the cell contrasts.
+    backdrop: grouped
 
   - id: CheckBox
     material: normal

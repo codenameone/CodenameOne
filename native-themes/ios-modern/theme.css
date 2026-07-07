@@ -215,8 +215,13 @@
        inflates it further, so a 5.05mm request lands the rendered circle at the
        native 108px @3x. Without these the font-height sizing (6mm -> 115px request)
        produced a 128px circle. */
-    radioIconSizeMM: "5.9";
-    checkBoxIconSizeMM: "5.9";
+    /* Glyph size: 4.72mm (was 5.9mm). 5.9 rendered the ring at ~108px @3x -- a
+       30pt SF symbol, which reads oversized next to the ~17pt list label. 4.72mm
+       lands ~86px (a ~24pt symbol), the size a checkbox/radio takes in a native
+       list cell. The native-ref glyphs drop to 24pt in lockstep so the isolated
+       fidelity tiles still overlay 1:1. */
+    radioIconSizeMM: "4.83";
+    checkBoxIconSizeMM: "4.83";
     /* iOS slider: a thin (~3px) track with a large round white knob. The thumb
        is drawn at the component height, so the runner sizes the slider tile to
        the knob diameter and the thumb width matches it -> a circle. */
@@ -314,12 +319,15 @@ Button {
     margin: 1mm 2mm 1mm 2mm;
     font-family: "native:MainRegular";
     font-size: 2.7mm;
-    background-color: rgba(255,255,255,0.34);
+    /* Real Liquid Glass is a THIN white tint (~0.1-0.2) over a blurred backdrop,
+       not a milky opaque fill. 0.34 read as a flat pill; 0.20 lets the blur carry
+       the look while the stronger hairline rim (below) keeps the capsule defined
+       over a flat app background. */
+    background-color: rgba(255,255,255,0.20);
     /* Hairline rim: the native glass capsule always shows a faint darker
-       edge, and over a FLAT white/light app background the translucent
-       fill alone is invisible (the fidelity tiles' colourful backdrop
-       hid this - a real app over plain white showed bare text). */
-    border: 0.25mm solid rgba(0,0,0,0.10);
+       edge, and over a FLAT white/light app background the thin translucent
+       fill alone is invisible -- the rim carries the shape there. */
+    border: 0.25mm solid rgba(0,0,0,0.16);
     /* iOS 26 glass buttons are capsules (fully rounded sides). */
     cn1-background-type: cn1-pill-border;
     /* Real Liquid Glass: blur the backdrop behind the capsule (no CEF), then the
@@ -329,12 +337,11 @@ Button {
     text-align: center;
 }
 /* Pressed (light): the frosted capsule dims slightly. */
-/* Held-down dim: 0.88 x the normal glass render. Matching the native 0.12 black
-   overlay on both the fill and the backdrop-through gives alpha_p = 0.12 + 0.88
-   x 0.34 = 0.42 and fill_p = 0.88 x 0.34 x 255 / 0.42 ~= 182. Reads as a clearly
-   pressed grey pill in the showcase; matches the held native reference. */
-Button.pressed { color: #000000; background-color: rgba(182,182,190,0.42); border: 0.25mm solid rgba(0,0,0,0.12); cn1-background-type: cn1-pill-border; }
-Button.disabled { color: rgba(0,0,0,0.3); background-color: rgba(255,255,255,0.55); border: 0.25mm solid rgba(0,0,0,0.06); cn1-background-type: cn1-pill-border; }
+/* Held-down dim: 0.88 x the normal glass render. With the thinner 0.20 fill,
+   alpha_p = 0.12 + 0.88 x 0.20 = 0.30 and fill_p = 0.88 x 0.20 x 255 / 0.30 ~=
+   150. Reads as a clearly pressed grey pill; matches the held native reference. */
+Button.pressed { color: #000000; background-color: rgba(150,150,158,0.30); border: 0.25mm solid rgba(0,0,0,0.16); cn1-background-type: cn1-pill-border; }
+Button.disabled { color: rgba(0,0,0,0.3); background-color: rgba(255,255,255,0.40); border: 0.25mm solid rgba(0,0,0,0.08); cn1-background-type: cn1-pill-border; }
 
 RaisedButton {
     cn1-derive: Button;
@@ -361,18 +368,32 @@ FlatButton.pressed { color: #000000; background-color: rgba(138,138,144,0.26); b
 
 TextField {
     color: #000000;
-    /* secondary system background: a rounded FILLED field, no border stroke (the
-       native field has no visible outline, just a tinted rounded fill). */
-    background-color: #f2f2f7;
-    padding: 2mm 3mm 2mm 1.5mm;
+    /* Grouped-list cell (secondarySystemGroupedBackground): a WHITE rounded cell
+       that CONTRASTS with the grouped form background (#f2f2f7). The old fill was
+       also #f2f2f7 == the form, so the field was invisible. A hairline edge +
+       backdrop blur give it the iOS 26 glass character while staying legible over
+       the flat form. */
+    background-color: #ffffff;
+    padding: 2mm 3mm 2mm 3mm;
     margin: 1mm 2mm 1mm 2mm;
     font-family: "native:MainRegular";
+    /* Very faint rim: the native rounded field has almost no visible stroke -- its
+       definition comes from the white-cell-vs-grey-form contrast, not a border. A
+       heavier rim diverged from the native roundedRect. */
+    border: 0.25mm solid rgba(0,0,0,0.04);
     border-radius: 1.4mm;
+    backdrop-filter: blur(20px);
 }
-TextField.pressed { background-color: #e5e5ea; }
-/* The native disabled field barely changes: same fill, still-black text (it does
-   NOT grey the text or the box). */
-TextField.disabled { color: #000000; background-color: #f2f2f7; }
+TextField.pressed { background-color: #f2f2f7; border: 0.25mm solid rgba(0,0,0,0.05); border-radius: 1.4mm; }
+/* The native disabled field barely changes: same cell, text dims slightly. */
+TextField.disabled { color: rgba(0,0,0,0.4); background-color: #ffffff; border: 0.25mm solid rgba(0,0,0,0.03); border-radius: 1.4mm; }
+
+/* The Picker BUTTON (the control that opens the wheel) had no rule at all, so it
+   rendered as a bare label. Give it the same contrasting-glass cell chrome as a
+   TextField so it reads as a tappable field. */
+Picker { cn1-derive: TextField; color: #000000; text-align: left; }
+Picker.pressed { cn1-derive: TextField; background-color: #f2f2f7; }
+Picker.disabled { cn1-derive: TextField; color: rgba(0,0,0,0.3); }
 
 TextArea {
     color: #000000;
@@ -399,7 +420,11 @@ CheckBox {
     color: #007aff;
     background-color: transparent;
     padding: 0;
-    margin: 0;
+    /* Left margin indents the glyph to the form's content column so the control
+       lines up with the section labels (which start inset), instead of sitting
+       flush against the screen edge. The fidelity renderer zeros this so the
+       isolated-glyph tile still overlays the native glyph 1:1. */
+    margin: 0.5mm 0 0.5mm 2mm;
     font-family: "native:MainRegular";
     /* LABEL font only - the glyph is sized independently by the
        checkBoxIconSizeMM constant (5.9mm, calibrated to the native 30pt SF
@@ -417,7 +442,8 @@ RadioButton {
     color: #007aff;
     background-color: transparent;
     padding: 0;
-    margin: 0;
+    /* Left margin: see CheckBox -- aligns the ring with the label column. */
+    margin: 0.5mm 0 0.5mm 2mm;
     font-family: "native:MainRegular";
     /* Label font only - the ring is sized by radioIconSizeMM; see CheckBox. */
     font-size: 2.7mm;
@@ -819,7 +845,12 @@ ListRenderer { cn1-derive: Label; padding: 2mm 3mm 2mm 3mm; }
    away from the next row, mimicking iOS 26 grouped-list cards. */
 MultiButton {
     cn1-derive: Button;
-    background-color: rgba(255,255,255,0.85);
+    /* Grouped-list cell: an opaque WHITE rounded cell (secondarySystemGrouped
+       Background) that contrasts with the #f2f2f7 grouped form, with a hairline
+       edge. The dark override (below) uses a lighter-than-form cell so the white
+       row text stays readable -- the old dark MultiButton was a light pill. */
+    background-color: #ffffff;
+    border: 0.25mm solid rgba(0,0,0,0.08);
     color: #000000;
     padding: 3mm 4mm 3mm 4mm;
     margin: 1mm 3mm 1mm 3mm;
@@ -829,7 +860,7 @@ MultiButton {
     icon-gap: 3mm;
     border-radius: 3mm;
 }
-MultiButton.pressed { background-color: #e5e5ea; }
+MultiButton.pressed { background-color: #e5e5ea; border: 0.25mm solid rgba(0,0,0,0.08); border-radius: 3mm; }
 
 MultiLine1 {
     cn1-derive: Label;
@@ -997,11 +1028,11 @@ PopupContent {
     /* Hairline light rim (see the light-mode Button comment): the native dark
        glass capsule keeps a faint brighter edge, and over a FLAT black app
        background the dark translucent fill alone disappears completely. */
-    Button { color: #ffffff; background-color: rgba(20,20,24,0.36); border: 0.25mm solid rgba(255,255,255,0.18); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); }
+    Button { color: #ffffff; background-color: rgba(20,20,24,0.24); border: 0.25mm solid rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); }
     /* Held-down dim (dark glass): 0.88 x the normal render. alpha_p = 0.12 +
        0.88 x 0.36 = 0.44, fill_p = 0.88 x 0.36 x 20 / 0.44 ~= 14. (Was 40,40,44
        0.6 -- a BRIGHTEN, the wrong direction for a held dim.) */
-    Button.pressed { color: #ffffff; background-color: rgba(14,14,17,0.44); border: 0.25mm solid rgba(255,255,255,0.18); cn1-background-type: cn1-pill-border; }
+    Button.pressed { color: #ffffff; background-color: rgba(13,13,16,0.33); border: 0.25mm solid rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; }
     Button.disabled { color: rgba(255,255,255,0.4); background-color: rgba(20,20,24,0.58); border: 0.25mm solid rgba(255,255,255,0.10); cn1-background-type: cn1-pill-border; }
     /* Dark FlatButton matches light: iOS 26's flat glass button is a light cream
        pill with DARK text in BOTH appearances (native ref). White text flipped it
@@ -1013,11 +1044,16 @@ PopupContent {
     RaisedButton.pressed { color: #ffffff; background-color: var(--accent-pressed-color-dark, #64b1ff); cn1-background-type: cn1-pill-border; }
     RaisedButton.disabled { color: rgba(235,235,245,0.45); background-color: rgba(0,0,0,0.32); cn1-background-type: cn1-pill-border; }
 
-    TextField { color: #ffffff; background-color: #1c1c1e; }
-    TextField.pressed { background-color: #2c2c2e; }
-    TextField.disabled { color: #ebebf5; background-color: #1c1c1e; }
-    TextArea { color: #ffffff; background-color: #1c1c1e; }
-    TextArea.pressed { background-color: #2c2c2e; }
+    /* Dark grouped cell: #2c2c2e contrasts with the #1c1c1e form (was #1c1c1e ==
+       form -> invisible field). Hairline + blur for the glass character. */
+    TextField { color: #ffffff; background-color: #2c2c2e; border: 0.25mm solid rgba(255,255,255,0.12); border-radius: 1.4mm; backdrop-filter: blur(20px); }
+    TextField.pressed { color: #ffffff; background-color: #3a3a3c; border: 0.25mm solid rgba(255,255,255,0.14); border-radius: 1.4mm; }
+    TextField.disabled { color: rgba(235,235,245,0.4); background-color: #2c2c2e; border: 0.25mm solid rgba(255,255,255,0.08); border-radius: 1.4mm; }
+    Picker { cn1-derive: TextField; color: #ffffff; text-align: left; }
+    Picker.pressed { cn1-derive: TextField; background-color: #3a3a3c; }
+    Picker.disabled { cn1-derive: TextField; color: rgba(235,235,245,0.3); }
+    TextArea { color: #ffffff; background-color: #2c2c2e; border: 0.25mm solid rgba(255,255,255,0.12); border-radius: 1.4mm; }
+    TextArea.pressed { background-color: #3a3a3c; }
     TextArea.disabled { color: #48484a; background-color: #2c2c2e; }
     TextHint { color: #8e8e93; }
 
@@ -1116,8 +1152,12 @@ PopupContent {
 
     List { background-color: #000000; }
     ListRenderer { color: #ffffff; background-color: transparent; }
-    MultiButton { background-color: #000000; color: #ffffff; }
-    MultiButton.pressed { background-color: #3a3a3c; }
+    /* Dark grouped-list cell: ONE STEP LIGHTER than the #1c1c1e form (tertiary
+       SystemGroupedBackground) so the white/light row text reads. Pure #000000
+       (the old value) is darker than the form and, with the light MultiButton
+       fill leaking through, the row rendered as a light pill. */
+    MultiButton { background-color: #2c2c2e; border: 0.25mm solid rgba(255,255,255,0.10); color: #ffffff; }
+    MultiButton.pressed { background-color: #3a3a3c; border: 0.25mm solid rgba(255,255,255,0.10); }
     MultiLine1 { color: #ffffff; }
     MultiLine2 { color: #ebebf5; }
     MultiLine3 { color: #8e8e93; }

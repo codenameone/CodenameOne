@@ -102,6 +102,10 @@ public final class Cn1WidgetRenderer {
             TextField tf = new TextField(text);
             tf.setUIID(uiid);
             tf.setEditable(false);
+            // Zero the theme's form margin for the tight tile: the native field
+            // fills its tile edge-to-edge, so the inset margin would leave a strip
+            // of grouped backdrop around the CN1 cell and misalign the bbox.
+            tf.getAllStyles().setMargin(0, 0, 0, 0);
             // Size to the actual text content. getTextAreaSize() reserves
             // columns*widestChar ('m') which overshoots the rendered string and
             // made the field box ~10px wider than the native content-sized field.
@@ -119,6 +123,10 @@ public final class Cn1WidgetRenderer {
             boolean iosGlyph = "ios".equals(com.codename1.ui.Display.getInstance().getPlatformName());
             CheckBox cb = new CheckBox(iosGlyph ? "" : text);
             cb.setUIID(uiid);
+            // The theme gives CheckBox a left margin so it aligns with the label
+            // column in a real form; zero it here so the isolated glyph tile still
+            // overlays the top-left-pinned native reference 1:1.
+            cb.getAllStyles().setMargin(0, 0, 0, 0);
             if ("selected".equals(state)) {
                 cb.setSelected(true);
             } else if ("disabled".equals(state)) {
@@ -129,6 +137,8 @@ public final class Cn1WidgetRenderer {
             boolean iosGlyph = "ios".equals(com.codename1.ui.Display.getInstance().getPlatformName());
             RadioButton rb = new RadioButton(iosGlyph ? "" : text);
             rb.setUIID(uiid);
+            // See CheckBox: zero the theme's alignment margin for the tight tile.
+            rb.getAllStyles().setMargin(0, 0, 0, 0);
             if ("selected".equals(state)) {
                 rb.setSelected(true);
             } else if ("disabled".equals(state)) {
