@@ -693,16 +693,36 @@ private void saveRecordingActionPerformed(java.awt.event.ActionEvent evt) {//GEN
 private void recordingActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_recordingActionPerformed
     if(isRecording()) {
         Form f = Display.getInstance().getCurrent();
-        if(f.getName() != null && f.getTitle().length() > 0) {
+        if (f == null) {
+            updateTestCode();
+            return;
+        }
+        if(f.getName() != null && f.getName().length() > 0) {
             generatedCode += "        waitForFormName(\"" + f.getName() + "\");\n";
         } else {
-            if(f.getTitle() != null && f.getTitle().length() > 0) {
-                generatedCode += "        waitForFormTitle(\"" + f.getTitle() + "\");\n";
+            String title = getFormTitle(f);
+            if(title.length() > 0) {
+                generatedCode += "        waitForFormTitle(\"" + title + "\");\n";
             }
         }
         updateTestCode();
     }
 }//GEN-LAST:event_recordingActionPerformed
+
+private String getFormTitle(Form f) {
+    if (f == null) {
+        return "";
+    }
+    if(f.getToolbar() != null) {
+        Component cmp = f.getToolbar().getTitleComponent();
+        if(cmp instanceof Label) {
+            String text = ((Label)cmp).getText();
+            return text == null ? "" : text;
+        }
+    }
+    String title = f.getTitle();
+    return title == null ? "" : title;
+}
 
 void startRecordingForAutomation() {
     if(!isRecording()) {
