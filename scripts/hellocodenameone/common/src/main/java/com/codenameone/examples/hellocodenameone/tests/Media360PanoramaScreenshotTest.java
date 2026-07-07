@@ -22,6 +22,12 @@ public class Media360PanoramaScreenshotTest extends BaseTest {
 
     @Override
     public boolean runTest() {
+        // Uses createForm (like VRStereoScene) rather than a hand-rolled Form:
+        // the immersive tests run at the suite tail, so nothing needs the peer
+        // detached or portrait restored afterwards, and the plain-Form capture
+        // path was what left the iOS Metal simulator reading a stale frame here
+        // while the identical createForm path worked for VRStereoScene.
+        Form form = createForm("360 Panorama", new BorderLayout(), "Media360Panorama");
         view = new Media360View();
         if (!view.isSupported()) {
             done();
@@ -38,41 +44,6 @@ public class Media360PanoramaScreenshotTest extends BaseTest {
         view.setYaw(30f);
         view.setPitch(10f);
         LandscapeCapture.lock();
-        // This is the last of the landscape VR / 360 tests. Once its capture
-        // is done it detaches the 3D peer and restores portrait, leaving the
-        // device as the rest of the suite (which runs in portrait) expects.
-        // Detaching matters on the iOS Metal backends: a full-screen 3D view
-        // that stays mounted leaves a stale Metal drawable that a later test's
-        // screenshot grabs under the late-present race (DesktopMode captured
-        // this "360 Panorama" form's black drawable). Only this test detaches
-        // (VRStereoScene keeps createForm) so the detach cannot perturb the GPU
-        // state that feeds this test's own capture. A plain Form is used
-        // instead of createForm() so the capture completion can run the
-        // teardown before done().
-        Form form = new Form("360 Panorama", new BorderLayout()) {
-            @Override
-            protected void onShowCompleted() {
-                LandscapeCapture.awaitLandscape(this, () -> {
-                    // Warm the panorama texture with an early render, then give
-                    // the iOS/tvOS Metal simulator ample time to upload the
-                    // 1024x512 texture and present a textured frame before the
-                    // capture. Without this the screenshot reads the previous
-                    // landscape frame (the OrientationLock form) - the plain 3D
-                    // cubes of VRStereoScene present fast enough, but this
-                    // texture-laden view does not, so it needs a longer settle.
-                    view.getRenderView().requestRender();
-                    UITimer.timer(2500, false, this, () -> {
-                        view.getRenderView().requestRender();
-                        UITimer.timer(1000, false, this, () -> captureWhenSettled(this, "Media360Panorama", () -> {
-                            removeAll();
-                            revalidate();
-                            LandscapeCapture.restorePortrait(this,
-                                    Media360PanoramaScreenshotTest.this::done);
-                        }));
-                    });
-                });
-            }
-        };
         form.add(BorderLayout.CENTER, view);
         form.show();
         return true;
@@ -119,5 +90,27 @@ public class Media360PanoramaScreenshotTest extends BaseTest {
     @Override
     protected long extraSettleBeforeCaptureMillis() {
         return 700;
+    }
+
+    /// Wait for landscape to settle, warm the panorama texture with an early
+    /// render, then force a fresh GPU frame before the capture fires - mirroring
+    /// VRStereoScene but with extra time for the 1024x512 texture upload.
+    @Override
+    protected void registerReadyCallback(final Form parent, final Runnable run) {
+        LandscapeCapture.awaitLandscape(parent, new Runnable() {
+            public void run() {
+                if (view != null) {
+                    view.getRenderView().requestRender();
+                }
+                UITimer.timer(1500, false, parent, new Runnable() {
+                    public void run() {
+                        if (view != null) {
+                            view.getRenderView().requestRender();
+                        }
+                        UITimer.timer(700, false, parent, run);
+                    }
+                });
+            }
+        });
     }
 }
