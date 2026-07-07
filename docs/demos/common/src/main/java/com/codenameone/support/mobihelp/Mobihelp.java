@@ -98,7 +98,6 @@ class MobihelpInitMethods {
 }
 // end::mobihelpInitMethods[]
 
-// tag::mobihelpSetUserFullName[]
 class MobihelpUserSupport {
     private static MobihelpNative peer;
 
@@ -134,4 +133,3 @@ class MobihelpUserSupport {
     }
     // end::mobihelpGetUnreadCountAsync[]
 }
-// end::mobihelpSetUserFullName[]

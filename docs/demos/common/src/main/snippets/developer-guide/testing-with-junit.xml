@@ -1,0 +1,26 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::testing-with-junit-xml-001[]
+<dependencies>
+    <dependency>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-javase</artifactId>
+        <scope>test</scope>
+    </dependency>
+    <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <version>5.9.3</version>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+// end::testing-with-junit-xml-001[]
+
+// tag::testing-with-junit-xml-002[]
+<dependency>
+    <groupId>org.junit.jupiter</groupId>
+    <artifactId>junit-jupiter</artifactId>
+    <version>5.9.3</version>
+    <scope>test</scope>
+</dependency>
+// end::testing-with-junit-xml-002[]

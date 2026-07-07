@@ -8,10 +8,6 @@ The native prompt is the store-sanctioned way to ask for a review, so prefer it 
 
 The simplest usage is a single call at a moment that makes sense in your app -- typically right after the user completed something rewarding (finished a level, saved a document, completed an order):
 
-[source,java]
-----
-AppReview.getInstance().requestReview();
-----
 
 `requestReview()` shows the native review sheet when the platform supports it. On platforms without a native prompt it shows the built-in rating widget instead. You decide the timing.
 
@@ -19,16 +15,6 @@ AppReview.getInstance().requestReview();
 
 Rather than picking the moment yourself, you can let `AppReview` decide based on simple engagement heuristics: how many times the app was launched, how long ago it was installed, and how long since it last asked. Configure it once (for example in your app's `init` or `start` method) and call `registerSession()` on every launch:
 
-[source,java]
-----
-AppReview.getInstance()
-        .setMinimumLaunches(5)          // at least 5 launches
-        .setMinimumDaysInstalled(3)     // and installed at least 3 days
-        .setDaysBetweenPrompts(30)      // never nag more than monthly
-        .setStoreUrl("https://apps.apple.com/app/id0000000000")
-        .setSupportEmail("support@example.com")
-        .registerSession();
-----
 
 `registerSession()` records the launch and, once the thresholds are met and the user hasn't already rated or opted out, prompts. The bookkeeping (launch count, install date, last-prompt time and a completion flag) is stored in https://www.codenameone.com/javadoc/com/codename1/io/Preferences.html[Preferences] so it survives restarts. Once the user rates the app or chooses to stop, `AppReview` stops prompting. Call `reset()` to clear this state.
 
@@ -43,21 +29,6 @@ image::img/app-review-sheet.png[Fallback rating sheet,scaledwidth=30%]
 
 By default the low-rating feedback is collected through an e-mail to the address passed to `setSupportEmail(String)`. To deliver feedback through your own backend, register a `FeedbackListener`:
 
-[source,java]
-----
-AppReview.getInstance().setFeedbackListener(new FeedbackListener() {
-    public boolean lowRating(int rating) {
-        // return true to present your own feedback UI and suppress the
-        // built-in e-mail composer
-        return false;
-    }
-
-    public void feedback(int rating, String text) {
-        // called with the free text the user typed in the built-in composer
-        myBackend.submitFeedback(rating, text);
-    }
-});
-----
 
 === How the platform decides
 

@@ -2058,6 +2058,9 @@ public final class Display extends CN1Constants {
         } catch (Throwable t) {
             cmp = null;
         }
+        if (cmp == null) {
+            cmp = f;
+        }
         while (cmp != null) {
             if (cmp.pinch(scale)) {
                 return;
@@ -4893,6 +4896,26 @@ public final class Display extends CN1Constants {
         }
 
         impl.openGallery(response, type);
+    }
+
+    /// Opens a file chooser for arbitrary user-selected files.
+    ///
+    /// The callback source is a `String` path that can be read with
+    /// `FileSystemStorage.openInputStream()`, or `null` if the user cancelled.
+    /// The `accept` argument is a comma-separated list of file extensions
+    /// (`"pdf,txt"`, `"p8"`) or MIME types (`"application/pdf"`). Platforms with
+    /// native document pickers use them; other ports fall back to a Codename One
+    /// file tree.
+    ///
+    /// Unlike `openGallery()`, this API is not for media-library access and does
+    /// not add photo/music build hints.
+    ///
+    /// #### Parameters
+    ///
+    /// - `response`: callback receiving the selected file path
+    /// - `accept`: comma-separated extensions or MIME types, or `null` for all files
+    public void openFileChooser(ActionListener response, String accept) {
+        impl.openFileChooser(response, accept);
     }
 
     /// Checks to see if the given gallery type is supported on the current platform.

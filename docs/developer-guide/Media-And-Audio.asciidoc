@@ -1,7 +1,7 @@
 [[media-and-audio-section]]
 = Media and Audio
 
-[[mediamanager-section]]
+[[media-audio-mediamanager-section]]
 == MediaManager and MediaPlayer
 
 // HTML_ONLY_START
@@ -22,26 +22,7 @@ In the demo code below you use the gallery functionality to pick a video from th
 
 [source,java]
 ----
-final Form hi = new Form("MediaPlayer", new BorderLayout());
-hi.setToolbar(new Toolbar());
-Style s = UIManager.getInstance().getComponentStyle("Title");
-FontImage icon = FontImage.createMaterial(FontImage.MATERIAL_VIDEO_LIBRARY, s);
-hi.getToolbar().addCommandToRightBar("", icon, (evt) -> {
-    Display.getInstance().openGallery((e) -> {
-        if(e != null && e.getSource() != null) {
-            String file = (String)e.getSource();
-            try {
-                Media video = MediaManager.createMedia(file, true);
-                hi.removeAll();
-                hi.add(BorderLayout.CENTER, new MediaPlayer(video));
-                hi.revalidate();
-            } catch(IOException err) {
-                Log.e(err);
-            }
-        }
-    }, Display.GALLERY_VIDEO);
-});
-hi.show();
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MediaAndAudioJava001Snippet.java[tag=media-and-audio-java-001,indent=0]
 ----
 
 .Video playback running on the simulator
@@ -61,85 +42,21 @@ The portable live PCM source in Codename One is microphone capture: create an `A
 
 [source,java]
 ----
-String bufferKey = "voice-buffer";
-AudioBuffer livePcm = MediaManager.getAudioBuffer(bufferKey, true, 8192);
-livePcm.addCallback(buffer -> {
-    float[] frame = new float[buffer.getSize()];
-    buffer.copyTo(frame);
-    // Process or copy this frame before the next callback arrives.
-});
-
-Media recorder = MediaManager.createMediaRecorder(
-        new MediaRecorderBuilder()
-                .path(bufferKey)
-                .samplingRate(44100)
-                .audioChannels(1)
-                .redirectToAudioBuffer(true));
-recorder.play();
-
-// Later:
-recorder.cleanup();
-MediaManager.releaseAudioBuffer(bufferKey);
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/MediaAndAudioJava002Snippet.java[tag=media-and-audio-java-002,indent=0]
 ----
 
 When the `VideoIO` API is available, it can also produce PCM from a prerecorded video file. `VideoIO.getVideoIO().openReader(path).readAudio()` returns the decoded audio track as an `AudioBuffer`, so video audio can be mixed or processed with the same APIs shown below. `VideoIO` support is platform-gated with `VideoIO.isSupported()`, and JavaScript currently reports no decoded audio track even though frame decoding and encoding are supported.
 
-[source,java]
-----
-if (VideoIO.isSupported()) {
-    VideoReader reader = VideoIO.getVideoIO().openReader(videoPath);
-    AudioBuffer videoPcm = reader.readAudio();
-    if (videoPcm != null) {
-        // Mix or process videoPcm.
-    }
-}
-----
 
 Codename One still doesn't expose a standalone portable decoder that converts an arbitrary prerecorded audio-only file, such as MP3 or AAC, into an `AudioBuffer` without going through a video container API. Use the normal `Media` APIs to play those files. If you need offline PCM editing for audio-only formats, decode them before passing samples to Codename One, or add a platform decoder API for that format.
 
 When you need to combine PCM clips before writing or playing them, use `AudioMixer`. It creates a sample-accurate timeline on one sample clock. Each track must use the same sample rate and channel count as the mixer. Track offsets are supplied in milliseconds and are rounded to the nearest sample frame on the mixer clock; if you already know the exact frame position, use `addTrackAtFrame(...)`.
 
-[source,java]
-----
-AudioBuffer music = new AudioBuffer(musicPcm.length);
-music.copyFrom(44100, 2, musicPcm);
-
-AudioBuffer effect = new AudioBuffer(effectPcm.length);
-effect.copyFrom(44100, 2, effectPcm);
-
-AudioMixer mixer = new AudioMixer(44100, 2);
-mixer.addTrack(music, 0, 0.75f);       // Start immediately at 75% gain
-mixer.addTrack(effect, 250, 1.0f);     // Start 250 ms into the timeline
-
-AudioBuffer mixed = mixer.mix();
-float[] pcm = new float[mixed.getSize()];
-mixed.copyTo(pcm);
-
-WAVWriter writer = new WAVWriter(new File("mix.wav"), mixed.getSampleRate(), mixed.getNumChannels(), 16);
-try {
-    writer.write(pcm, 0, mixed.getSize());
-} finally {
-    writer.close();
-}
-----
 
 The mixed buffer is clipped to the normalized PCM range `[-1, 1]`, so it can be passed directly to `WAVWriter`. The mixer doesn't resample or convert channel layouts; downsample or otherwise convert source buffers before adding them if they're not already on the target clock.
 
 `AudioEffects` provides small platform-neutral PCM transforms that compose with the mixer:
 
-[source,java]
-----
-AudioBuffer voice = AudioEffects.normalize(livePcm, 0.9f);
-AudioBuffer brighter = AudioEffects.equalize(voice,
-        0.8f,  // low band gain
-        1.0f,  // mid band gain
-        1.25f  // high band gain
-);
-
-AudioBuffer karaoke = AudioEffects.removeCenter(stereoMusic);
-AudioBuffer centeredSpeech = AudioEffects.isolateCenter(stereoInterview);
-AudioBuffer voiceEnhanced = AudioEffects.midSide(stereoInterview, 1.4f, 0.6f);
-----
 
 `equalize(...)` is a simple three-band tone shaper for lightweight cleanup and demos. `removeCenter(...)`, `isolateCenter(...)`, and `midSide(...)` use classic stereo mid/side processing. They can reduce, isolate, or enhance centered dialog only when the source is stereo and the voice is actually centered. These methods aren't source-separation, speech-isolation, or noise-reduction APIs.
 

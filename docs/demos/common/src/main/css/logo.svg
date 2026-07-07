@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="60" viewBox="0 0 160 60">
+  <rect width="160" height="60" rx="8" fill="#102a43"/>
+  <circle cx="32" cy="30" r="16" fill="#2d6cdf"/>
+  <path fill="#fff" d="M29 21h6v18h-6zM22 27h20v6H22z"/>
+  <text x="58" y="37" font-family="Arial" font-size="22" fill="#fff">CN1</text>
+</svg>

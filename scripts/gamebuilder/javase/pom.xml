@@ -42,6 +42,13 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <skipTests>true</skipTests>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 
@@ -68,13 +75,24 @@
             <artifactId>codenameone-javase</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <profiles>
-        <!-- Builds the self-contained editor jar that the cn1:gamebuilder goal launches.
-             The maven-assembly-plugin attaches a jar-with-dependencies artifact; the
-             editor is delivered through Maven (Maven Central in a release) and resolved by
-             the plugin the same way as the Designer / CSS-compiler jar, so there is no
+        <!-- Builds the editor jar that the cn1:gamebuilder goal launches with its
+             runtime dependency classpath. The editor is delivered through Maven
+             (Maven Central in a release) and resolved by the plugin, so there is no
              install script. To run the editor straight from this module:
                  cd scripts/gamebuilder
                  mvn -Pexecutable-jar -pl javase -am package -Dcodename1.platform=javase -->
@@ -143,6 +161,7 @@
                                 </goals>
                                 <configuration>
                                     <outputDirectory>${project.build.directory}/libs</outputDirectory>
+                                    <includeScope>runtime</includeScope>
                                 </configuration>
                             </execution>
                         </executions>
@@ -159,33 +178,6 @@
                                 </manifest>
                             </archive>
                         </configuration>
-                    </plugin>
-                    <!-- The single, self-contained editor jar resolved by cn1:gamebuilder.
-                         Attached with the `jar-with-dependencies` classifier so the plugin
-                         can resolve com.codenameone:codenameone-gamebuilder:jar-with-dependencies
-                         the same way it resolves the Designer jar. -->
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-assembly-plugin</artifactId>
-                        <configuration>
-                            <descriptorRefs>
-                                <descriptorRef>jar-with-dependencies</descriptorRef>
-                            </descriptorRefs>
-                            <archive>
-                                <manifest>
-                                    <mainClass>com.codename1.gamebuilder.GameBuilderStub</mainClass>
-                                </manifest>
-                            </archive>
-                        </configuration>
-                        <executions>
-                            <execution>
-                                <id>gamebuilder-fat-jar</id>
-                                <phase>package</phase>
-                                <goals>
-                                    <goal>single</goal>
-                                </goals>
-                            </execution>
-                        </executions>
                     </plugin>
                 </plugins>
             </build>

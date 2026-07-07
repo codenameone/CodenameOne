@@ -8,6 +8,10 @@
     "command": "\"cn1:settings\" \"-U\" \"-e\""
   },
   {
+    "alias": "Tools > Certificate Wizard",
+    "command": "\"cn1:certificatewizard\" \"-U\" \"-e\""
+  },
+  {
     "alias": "Run in Simulator",
     "command": "\"verify\" \"-Psimulator\" \"-DskipTests\" \"-Dcodename1.platform=javase\" \"-e\""
   },

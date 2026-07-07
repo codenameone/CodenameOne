@@ -1,0 +1,31 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::maven-appendix-rich-properties-rpf-001[]
+[keyname] <1>
+=== <2>
+Key value <3>
+=== <4>
+// end::maven-appendix-rich-properties-rpf-001[]
+
+// tag::maven-appendix-rich-properties-rpf-002[]
+firstName=Bob
+lastName=Smith
+[bio]
+====
+Bob is a hard worker.
+He attended Harvard and is looking for opportunities in the fast food industry.
+====
+age=23
+
+# A comment that it is ignored
+[xmldata]
+========
+<person>
+    <name>Bob Smith</name>
+    <age>23</age>
+</person>
+========
+
+favoriteColor=Brown
+
+// end::maven-appendix-rich-properties-rpf-002[]

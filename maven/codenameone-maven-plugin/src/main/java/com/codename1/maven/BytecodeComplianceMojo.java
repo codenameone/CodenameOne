@@ -63,6 +63,7 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
 
     private static final Map<String, String> SUGGESTED_REPLACEMENTS;
     private static final Set<String> SIMD_OWNER_NAMES;
+    private static final Set<String> PRIMITIVE_WRAPPER_INTERNAL_NAMES;
 
     static {
         Map<String, String> m = new HashMap<String, String>();
@@ -76,6 +77,16 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
         simdOwners.add("com/codename1/impl/ios/IOSSimd");
         simdOwners.add("com/codename1/impl/javase/JavaSESimd");
         SIMD_OWNER_NAMES = Collections.unmodifiableSet(simdOwners);
+        Set<String> primitiveWrappers = new HashSet<String>();
+        primitiveWrappers.add("java/lang/Boolean");
+        primitiveWrappers.add("java/lang/Byte");
+        primitiveWrappers.add("java/lang/Character");
+        primitiveWrappers.add("java/lang/Double");
+        primitiveWrappers.add("java/lang/Float");
+        primitiveWrappers.add("java/lang/Integer");
+        primitiveWrappers.add("java/lang/Long");
+        primitiveWrappers.add("java/lang/Short");
+        PRIMITIVE_WRAPPER_INTERNAL_NAMES = Collections.unmodifiableSet(primitiveWrappers);
     }
 
     private static final int MAX_CLASS_MAJOR_VERSION = Opcodes.V17;
@@ -503,7 +514,7 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
                 try {
                     ClassReader reader = new ClassReader(inputStream);
                     reader.accept(new ComplianceScanner(classFile, outputDir, allowedIndex, projectAndDependencyIndex, violations), ClassReader.SKIP_FRAMES);
-                    addSimdAllocaViolations(classFile, outputDir, reader, violations);
+                    addSemanticStackViolations(classFile, outputDir, reader, violations);
                 } finally {
                     inputStream.close();
                 }
@@ -514,7 +525,7 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
         return violations;
     }
 
-    private void addSimdAllocaViolations(File classFile, File outputDir, ClassReader reader, List<Violation> violations) throws IOException, MojoExecutionException {
+    private void addSemanticStackViolations(File classFile, File outputDir, ClassReader reader, List<Violation> violations) throws IOException, MojoExecutionException {
         ClassNode classNode = new ClassNode();
         reader.accept(classNode, ClassReader.EXPAND_FRAMES);
         for (MethodNode method : classNode.methods) {
@@ -526,7 +537,7 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
                 Analyzer<BasicValue> analyzer = new Analyzer<BasicValue>(new SimdAllocaInterpreter());
                 frames = analyzer.analyze(classNode.name, method);
             } catch (AnalyzerException ex) {
-                throw new MojoExecutionException("Failed to analyze SIMD alloca usage for " + classFile + " in " + classNode.name + "#" + method.name + method.desc, ex);
+                throw new MojoExecutionException("Failed to analyze bytecode semantics for " + classFile + " in " + classNode.name + "#" + method.name + method.desc, ex);
             }
             for (AbstractInsnNode instruction = method.instructions.getFirst(); instruction != null; instruction = instruction.getNext()) {
                 int index = method.instructions.indexOf(instruction);
@@ -535,27 +546,44 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
                     continue;
                 }
                 int opcode = instruction.getOpcode();
+                if (opcode == Opcodes.MONITORENTER) {
+                    BasicValue lockValue = frame.getStack(frame.getStackSize() - 1);
+                    if (isPrimitiveWrapperValue(lockValue)) {
+                        addSemanticViolation(violations, classFile, outputDir, classNode.name, method,
+                                "Synchronization on primitive wrapper " + lockValue.getType().getInternalName(),
+                                "Use a dedicated Object lock instead of synchronizing on primitive wrapper values.");
+                    }
+                    continue;
+                }
                 if (opcode == Opcodes.ARETURN) {
                     if (isAllocaValue(frame.getStack(frame.getStackSize() - 1))) {
-                        addViolation(violations, classFile, outputDir, classNode.name, method, "SIMD alloca value returned from method");
+                        addSemanticViolation(violations, classFile, outputDir, classNode.name, method,
+                                "SIMD alloca value returned from method",
+                                "Keep SIMD alloca scratch arrays method-local and only pass them to Simd methods.");
                     }
                     continue;
                 }
                 if (opcode == Opcodes.PUTSTATIC) {
                     if (isAllocaValue(frame.getStack(frame.getStackSize() - 1))) {
-                        addViolation(violations, classFile, outputDir, classNode.name, method, "SIMD alloca value stored into static field");
+                        addSemanticViolation(violations, classFile, outputDir, classNode.name, method,
+                                "SIMD alloca value stored into static field",
+                                "Keep SIMD alloca scratch arrays method-local and only pass them to Simd methods.");
                     }
                     continue;
                 }
                 if (opcode == Opcodes.PUTFIELD) {
                     if (isAllocaValue(frame.getStack(frame.getStackSize() - 1))) {
-                        addViolation(violations, classFile, outputDir, classNode.name, method, "SIMD alloca value stored into instance field");
+                        addSemanticViolation(violations, classFile, outputDir, classNode.name, method,
+                                "SIMD alloca value stored into instance field",
+                                "Keep SIMD alloca scratch arrays method-local and only pass them to Simd methods.");
                     }
                     continue;
                 }
                 if (opcode == Opcodes.AASTORE) {
                     if (isAllocaValue(frame.getStack(frame.getStackSize() - 1))) {
-                        addViolation(violations, classFile, outputDir, classNode.name, method, "SIMD alloca value stored into object array");
+                        addSemanticViolation(violations, classFile, outputDir, classNode.name, method,
+                                "SIMD alloca value stored into object array",
+                                "Keep SIMD alloca scratch arrays method-local and only pass them to Simd methods.");
                     }
                     continue;
                 }
@@ -575,8 +603,9 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
                         usesAlloca = true;
                     }
                     if (usesAlloca && !isSimdOwner(methodInsn.owner)) {
-                        addViolation(violations, classFile, outputDir, classNode.name, method,
-                                "SIMD alloca value passed to non-Simd method " + methodInsn.owner + "#" + methodInsn.name + methodInsn.desc);
+                        addSemanticViolation(violations, classFile, outputDir, classNode.name, method,
+                                "SIMD alloca value passed to non-Simd method " + methodInsn.owner + "#" + methodInsn.name + methodInsn.desc,
+                                "Keep SIMD alloca scratch arrays method-local and only pass them to Simd methods.");
                     }
                     continue;
                 }
@@ -584,7 +613,9 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
                     Type[] args = Type.getArgumentTypes(((InvokeDynamicInsnNode) instruction).desc);
                     for (int i = 0; i < args.length; i++) {
                         if (isAllocaValue(frame.getStack(frame.getStackSize() - 1 - i))) {
-                            addViolation(violations, classFile, outputDir, classNode.name, method, "SIMD alloca value passed to invokedynamic");
+                            addSemanticViolation(violations, classFile, outputDir, classNode.name, method,
+                                    "SIMD alloca value passed to invokedynamic",
+                                    "Keep SIMD alloca scratch arrays method-local and only pass them to Simd methods.");
                             break;
                         }
                     }
@@ -593,17 +624,24 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
         }
     }
 
-    private void addViolation(List<Violation> violations, File classFile, File outputDir, String sourceClass, MethodNode method, String referencedMember) {
+    private void addSemanticViolation(List<Violation> violations, File classFile, File outputDir, String sourceClass, MethodNode method, String referencedMember, String suggestion) {
         String relativePath = classFile.getAbsolutePath().replace(outputDir.getAbsolutePath(), "");
         if (relativePath.startsWith(File.separator)) {
             relativePath = relativePath.substring(1);
         }
         violations.add(new Violation(sourceClass, method.name + method.desc, referencedMember,
-                "Keep SIMD alloca scratch arrays method-local and only pass them to Simd methods.", relativePath));
+                suggestion, relativePath));
     }
 
     private static boolean isAllocaValue(BasicValue value) {
         return value instanceof SimdAllocaValue && ((SimdAllocaValue) value).alloca;
+    }
+
+    private static boolean isPrimitiveWrapperValue(BasicValue value) {
+        if (value == null || value.getType() == null || value.getType().getSort() != Type.OBJECT) {
+            return false;
+        }
+        return PRIMITIVE_WRAPPER_INTERNAL_NAMES.contains(value.getType().getInternalName());
     }
 
     private static final class SimdAllocaValue extends BasicValue {
@@ -645,11 +683,13 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
 
         @Override
         public BasicValue newValue(Type type) {
-            BasicValue base = super.newValue(type);
-            if (base == null || base == BasicValue.UNINITIALIZED_VALUE) {
-                return base;
+            if (type == null) {
+                return BasicValue.UNINITIALIZED_VALUE;
             }
-            return new SimdAllocaValue(base.getType(), false);
+            if (type == Type.VOID_TYPE) {
+                return null;
+            }
+            return new SimdAllocaValue(type, false);
         }
 
         @Override
@@ -708,12 +748,27 @@ public class BytecodeComplianceMojo extends AbstractCN1Mojo {
 
         @Override
         public BasicValue merge(BasicValue value1, BasicValue value2) {
+            boolean alloca = isAllocaValue(value1) || isAllocaValue(value2);
+            if (value1.equals(value2)) {
+                return new SimdAllocaValue(value1.getType(), alloca);
+            }
+            if (isReferenceValue(value1) && isReferenceValue(value2)) {
+                return new SimdAllocaValue(Type.getObjectType("java/lang/Object"), alloca);
+            }
             BasicValue base = super.merge(value1, value2);
             if (base == null) {
                 return null;
             }
-            return new SimdAllocaValue(base.getType(), isAllocaValue(value1) || isAllocaValue(value2));
+            return new SimdAllocaValue(base.getType(), alloca);
         }
+    }
+
+    private static boolean isReferenceValue(BasicValue value) {
+        if (value == null || value.getType() == null) {
+            return false;
+        }
+        int sort = value.getType().getSort();
+        return sort == Type.OBJECT || sort == Type.ARRAY;
     }
 
     private void collectClassFiles(File file, List<File> out) {

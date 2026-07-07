@@ -13,35 +13,6 @@ This API is *zero cost when unused*: simply referencing `com.codename1.car` is w
 
 Register a single `CarApplication` from your app's `init()` -- before a head unit connects -- and return a root `CarScreen` that builds a template:
 
-[source,java]
-----
-import com.codename1.car.*;
-
-public class MyApp {
-    public void init(Object context) {
-        // ... normal app init ...
-        Car.setApplication(new MyCarApplication());
-    }
-}
-
-class MyCarApplication extends CarApplication {
-    public CarScreen onCreateRootScreen(CarContext context) {
-        return new LibraryScreen();
-    }
-}
-
-class LibraryScreen extends CarScreen {
-    protected CarTemplate onCreateTemplate() {
-        return new CarListTemplate().setTitle("Library")
-            .addRow(new CarRow("Now Playing").setText("Daft Punk — Discovery")
-                .setOnAction(ctx -> play()))
-            .addRow(new CarRow("Albums").setBrowsable(true)
-                .setOnAction(ctx -> ctx.pushScreen(new AlbumsScreen())))
-            .addRow(new CarRow("Playlists").setBrowsable(true)
-                .setOnAction(ctx -> ctx.pushScreen(new PlaylistsScreen())));
-    }
-}
-----
 
 That single description renders natively on both platforms:
 
@@ -70,32 +41,14 @@ image::img/car-androidauto-grid.png[Android Auto grid template,640]
 
 Head units enforce a hard cap on the number of rows/items they display (driver-distraction rules). Query it and trim accordingly:
 
-[source,java]
-----
-int max = context.getListRowLimit(); // 0 when unknown
-----
 
 === Screen stack & lifecycle
 
 `CarContext` manages a back stack, mirroring `androidx.car.app`'s `ScreenManager` and CarPlay's `CPInterfaceController`:
 
-[source,java]
-----
-context.pushScreen(new DetailScreen());  // drill in
-context.popScreen();                     // back
-screen.invalidate();                     // rebuild this screen's template after a model change
-context.showToast("Added to queue");
-----
 
 `CarScreen` exposes optional lifecycle hooks -- `onCreate()`, `onResume()`, `onPause()`, `onDestroy()` -- and `CarApplication` is notified of connection changes via `onCarConnected(CarContext)` / `onCarDisconnected()`. You can also observe connection globally:
 
-[source,java]
-----
-Car.addConnectionListener(new CarConnectionListener() {
-    public void carConnected(CarContext ctx) { startLocationStream(); }
-    public void carDisconnected()           { stopLocationStream(); }
-});
-----
 
 === Now-playing (audio apps)
 

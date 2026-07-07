@@ -7394,6 +7394,41 @@ public abstract class CodenameOneImplementation {
 
     }
 
+    /// Opens a native file chooser when the platform provides one. The callback
+    /// source is a `String` path readable by `FileSystemStorage`, or `null` when
+    /// the user cancels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `response`: callback receiving the selected file path
+    /// - `accept`: comma-separated list of accepted file extensions or MIME types
+    public void openFileChooser(final ActionListener response, String accept) {
+        final Dialog d = new Dialog("Select a file");
+        d.setLayout(new BorderLayout());
+        FileTreeModel model = new FileTreeModel(true);
+        if (accept != null) {
+            Vector tokens = StringUtil.tokenizeString(accept, ',');
+            for (int iter = 0; iter < tokens.size(); iter++) {
+                String token = ((String) tokens.elementAt(iter)).trim();
+                int slash = token.indexOf('/');
+                if (token.length() > 0 && slash < 0 && !"*".equals(token)) {
+                    if (token.startsWith(".")) {
+                        token = token.substring(1);
+                    }
+                    model.addExtensionFilter(token);
+                }
+            }
+        }
+
+        FileTree t = new OpenGalleryFileTree(model, response, d);
+        d.addComponent(BorderLayout.CENTER, t);
+        d.placeButtonCommands(new Command[]{new Command("Cancel")});
+        Command c = d.showAtPosition(2, 2, 2, 2, true);
+        if (c != null) {
+            response.actionPerformed(null);
+        }
+    }
+
     /// Opens the device image gallery
     ///
     /// #### Parameters

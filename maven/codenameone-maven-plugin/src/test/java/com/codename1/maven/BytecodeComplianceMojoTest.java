@@ -322,6 +322,43 @@ class BytecodeComplianceMojoTest {
     }
 
     @Test
+    void rejectsSynchronizationOnPrimitiveWrapper(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Path allowedDir = tempDir.resolve("allowed");
+        Files.createDirectories(outputDir);
+        Files.createDirectories(allowedDir);
+
+        writeJavaLangObject(allowedDir);
+        writePrimitiveWrapperApi(allowedDir, "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;");
+        writePrimitiveWrapperSynchronizedClass(outputDir, "app/IntegerLockUser", "java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer;");
+
+        BytecodeComplianceMojo mojo = new BytecodeComplianceMojo();
+        Map<String, ?> allowedIndex = buildClassIndex(mojo, Collections.singletonList(allowedDir.toFile()));
+        List<?> violations = scanProjectClasses(mojo, outputDir, allowedIndex, Collections.<String, Object>emptyMap());
+
+        assertTrue(hasViolationForReferencePrefix(violations, "Synchronization on primitive wrapper java/lang/Integer"),
+                "Expected primitive wrapper synchronization to be rejected");
+    }
+
+    @Test
+    void allowsSynchronizationOnDedicatedObjectLock(@TempDir Path tempDir) throws Exception {
+        Path outputDir = tempDir.resolve("classes");
+        Path allowedDir = tempDir.resolve("allowed");
+        Files.createDirectories(outputDir);
+        Files.createDirectories(allowedDir);
+
+        writeJavaLangObject(allowedDir);
+        writeObjectSynchronizedClass(outputDir, "app/ObjectLockUser");
+
+        BytecodeComplianceMojo mojo = new BytecodeComplianceMojo();
+        Map<String, ?> allowedIndex = buildClassIndex(mojo, Collections.singletonList(allowedDir.toFile()));
+        List<?> violations = scanProjectClasses(mojo, outputDir, allowedIndex, Collections.<String, Object>emptyMap());
+
+        assertFalse(hasViolationForReferencePrefix(violations, "Synchronization on primitive wrapper"),
+                "Expected synchronization on a normal Object lock to remain allowed");
+    }
+
+    @Test
     void recognizesAllSimdAllocaHelperNames() throws Exception {
         Method method = BytecodeComplianceMojo.class.getDeclaredMethod("isSimdAllocaMethod", String.class, String.class, String.class);
         method.setAccessible(true);
@@ -673,6 +710,65 @@ class BytecodeComplianceMojoTest {
         writeBytes(root, className, writer.toByteArray());
     }
 
+    private void writePrimitiveWrapperSynchronizedClass(Path root, String className, String owner, String methodName, String descriptor) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+
+        MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(1, 1);
+        init.visitEnd();
+
+        MethodVisitor run = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "run", "()V", null, null);
+        run.visitCode();
+        run.visitInsn(Opcodes.ICONST_1);
+        run.visitMethodInsn(Opcodes.INVOKESTATIC, owner, methodName, descriptor, false);
+        run.visitInsn(Opcodes.DUP);
+        run.visitVarInsn(Opcodes.ASTORE, 0);
+        run.visitInsn(Opcodes.MONITORENTER);
+        run.visitVarInsn(Opcodes.ALOAD, 0);
+        run.visitInsn(Opcodes.MONITOREXIT);
+        run.visitInsn(Opcodes.RETURN);
+        run.visitMaxs(2, 1);
+        run.visitEnd();
+
+        writer.visitEnd();
+        writeBytes(root, className, writer.toByteArray());
+    }
+
+    private void writeObjectSynchronizedClass(Path root, String className) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC, className, null, "java/lang/Object", null);
+
+        MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(1, 1);
+        init.visitEnd();
+
+        MethodVisitor run = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "run", "()V", null, null);
+        run.visitCode();
+        run.visitTypeInsn(Opcodes.NEW, "java/lang/Object");
+        run.visitInsn(Opcodes.DUP);
+        run.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+        run.visitInsn(Opcodes.DUP);
+        run.visitVarInsn(Opcodes.ASTORE, 0);
+        run.visitInsn(Opcodes.MONITORENTER);
+        run.visitVarInsn(Opcodes.ALOAD, 0);
+        run.visitInsn(Opcodes.MONITOREXIT);
+        run.visitInsn(Opcodes.RETURN);
+        run.visitMaxs(2, 1);
+        run.visitEnd();
+
+        writer.visitEnd();
+        writeBytes(root, className, writer.toByteArray());
+    }
+
 
     private void writeSubclass(Path root, String className, String superName) throws Exception {
         ClassWriter writer = new ClassWriter(0);
@@ -685,6 +781,21 @@ class BytecodeComplianceMojoTest {
         init.visitInsn(Opcodes.RETURN);
         init.visitMaxs(1, 1);
         init.visitEnd();
+
+        writer.visitEnd();
+        writeBytes(root, className, writer.toByteArray());
+    }
+
+    private void writePrimitiveWrapperApi(Path root, String className, String methodName, String descriptor) throws Exception {
+        ClassWriter writer = new ClassWriter(0);
+        writer.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL, className, null, "java/lang/Object", null);
+
+        MethodVisitor valueOf = writer.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, methodName, descriptor, null, null);
+        valueOf.visitCode();
+        valueOf.visitInsn(Opcodes.ACONST_NULL);
+        valueOf.visitInsn(Opcodes.ARETURN);
+        valueOf.visitMaxs(1, 1);
+        valueOf.visitEnd();
 
         writer.visitEnd();
         writeBytes(root, className, writer.toByteArray());

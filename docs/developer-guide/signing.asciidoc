@@ -44,28 +44,114 @@ You would recommend it for all platforms for simplicity but some developers pref
 
 
 [[certificate-wizard]]
-=== iOS signing wizard
+=== Certificate Wizard
 
-Codename One features a wizard to generate certificates/provisioning for iOS without requiring a Mac or deep understanding of the signing process for iOS. Support still exists for manually generating the P12/provisioning files when necessary but for most intents and purposes using the wizard will simplify this error prone process.
+Codename One features a standalone Certificate Wizard to manage signing assets for Apple, Android and desktop targets. It replaces the old certificate wizard inside `CodenameOneSettings` and is launched as a Maven tool bound to the current project.
 
-To generate your certificates and profiles, open project's properties and click on "iOS" in the left menu. This will show the "iOS Signing" panel that includes fields to select your certificates and mobile provisioning profiles.
+Run the wizard from a Codename One Maven project:
 
-.Netbeans iOS Signing properties panel
-image::img/ios-cert-wizard-1-signing.png[Netbeans iOS Signing properties panel,scaledwidth=50%]
+[source,bash]
+----
+include::../demos/common/src/main/snippets/developer-guide/signing.sh[tag=signing-bash-001,indent=0]
+----
 
-If you already have valid certificates and profiles, you can enter their locations here. If you don't, then you can use the wizard by clicking the #Generate# button in the lower part of the form.
+The Maven goal resolves the wizard artifact and its runtime dependencies from Maven, then launches it with the current project's settings path. The wizard uses the Codename One cloud signing API for Apple assets and local `keytool` for Android keystores. On a first run the overview shows that the App Store Connect API key isn't configured and links to the API key page. This is an Apple credential that allows the cloud service to create and manage certificates, bundle IDs, devices, provisioning profiles, APNs keys and Mac signing assets for your Apple Developer Program team.
 
-==== Logging into the wizard
+==== Creating the App Store Connect API key
 
-After clicking #Generate# you'll be shown a login form. Log into this form using the *App Store Connect* Apple ID that's registered on your Apple Developer Program team. **NOT YOUR CODENAME ONE LOGIN**.
+Open https://appstoreconnect.apple.com/access/integrations/api[App Store Connect > Users and Access > Integrations > App Store Connect API]. If this is the first time your team uses the API, App Store Connect asks you to request API access first. Click *Request Access*, accept the terms, and submit the request.
 
-.Wizard login form
-image::img/ios-cert-wizard-2-login.png[Wizard login form,scaledwidth=20%]
+Once access is enabled, go to *Team Keys* and click *Generate API Key*. Give the key a recognizable name, such as `Codename One Signing`, and choose *Admin* access.
+
+IMPORTANT: Use *Admin* access for the Certificate Wizard. The wizard needs to create and list signing certificates, bundle IDs, devices, and provisioning profiles. App Manager or Developer access may not be sufficient for these operations.
+
+After creating the key, App Store Connect shows the *Issuer ID* above the table and the *Key ID* in the key row. Copy both values into the wizard. Download the API key file. Apple only allows the `.p8` file to be downloaded once, so store a backup in a secure location.
+
+In the Codename One Certificate Wizard, fill these fields:
+
+* *Key ID*: The value shown in the generated key row in App Store Connect. This isn't your Apple ID.
+* *Issuer ID*: The UUID shown above the Team Keys table on the App Store Connect API page.
+* *Private key .p8*: Click *Import .p8 file* to select the downloaded file with the native file chooser, or paste the full file contents, including the `BEGIN PRIVATE KEY` and `END PRIVATE KEY` lines.
+
+The `.p8` private key is sent to the Codename One cloud signing service and isn't returned by the API later. If you delete the key from App Store Connect or lose the local `.p8` backup, generate and store a new API key.
+
+When you download a generated `.p12` certificate from the wizard, the *P12 password* field is a new password that you choose for that downloaded file. It's not the App Store Connect Issuer ID, and it doesn't come from Apple.
+
+==== Recommended fast path: Auto Setup
+
+After the API key is stored, the top toolbar shows *Auto Setup* next to the API key status. This is the recommended path for a normal Codename One project. It creates the common Apple signing assets for the current project and installs the downloaded files into `codenameone_settings.properties`.
+
+.Certificate wizard overview with mocked signing assets
+image::img/certificate-wizard-overview-mock.svg[Certificate wizard overview with mocked signing assets,scaledwidth=80%]
+
+Click *Auto Setup*. The wizard reads the current project's `codenameone_settings.properties`, uses `codename1.packageName` as the bundle ID, uses `codename1.displayName` or `codename1.mainName` as the app name, enables push notifications for the bundle ID, and then creates or reuses the signing assets it needs.
+
+The fast path creates the common Apple signing setup:
+
+* A Bundle ID for the current project, if it doesn't already exist.
+* An iOS Development certificate, if no compatible active certificate exists.
+* An iOS Development provisioning profile, if at least one development device is registered.
+* An iOS Distribution certificate, if no compatible active certificate exists.
+* An App Store provisioning profile.
+* Debug signing settings for the development certificate/profile pair.
+* Release signing settings for the App Store certificate/profile pair.
+* Mac App Store or Developer ID assets when you use the Mac Signing page.
+
+Development provisioning requires at least one registered device. If no devices are registered, the wizard defers development profile creation and continues with the App Store signing assets. Register the device in the *Devices* section and run *Auto Setup* again to fill in the debug signing settings.
+
+.Certificate wizard API key screen with mocked values
+image::img/certificate-wizard-api-key-mock.svg[Certificate wizard API key screen with mocked values,scaledwidth=80%]
+
+.Certificate wizard profiles screen with mocked values
+image::img/certificate-wizard-profiles-mock.svg[Certificate wizard profiles screen with mocked values,scaledwidth=80%]
+
+The wizard writes downloaded Apple `.p12`, `.mobileprovision` and Mac `.provisionprofile` files into the current project signing configuration. For a development iOS profile it updates the iOS debug settings. For an App Store iOS profile it updates the iOS release settings. For Mac profiles it updates `codename1.mac.certificate`, `codename1.mac.certificatePassword`, `codename1.mac.provision` and the relevant `macNative.*` hints.
+
+==== Mac signing and notarization
+
+The *Mac* section uses the same App Store Connect API key and the unified Apple signing API. It supports Mac App Store certificates/profiles and Developer ID certificates for direct distribution. Developer ID builds can use notarization credentials derived from the stored App Store Connect key when the build server performs notarization.
+
+Mac native signing uses the project settings documented in the Mac native chapter:
+
+* `codename1.mac.certificate`: The generated or imported Mac `.p12`.
+* `codename1.mac.certificatePassword`: The password for that `.p12`.
+* `codename1.mac.provision`: The Mac `.provisionprofile`.
+* `codename1.arg.macNative.enabled=true`: Enables the Mac native signing path.
+* `codename1.arg.macNative.distribution=appStore` or `developerID`: Chooses the signing channel.
+
+==== Android signing
+
+The *Android* section generates a local self-signed Android keystore using the JDK `keytool` executable. It stores the file under `androidCerts/KeyChain.ks` in the project by default and writes:
+
+* `codename1.android.keystore`
+* `codename1.android.keystoreAlias`
+* `codename1.android.keystorePassword`
+
+WARNING: Back up the generated keystore and password. Android apps already published with one certificate can't be updated with a different certificate.
+
+==== Windows signing
+
+The *Windows* section doesn't issue certificates. Windows Authenticode certificates must come from a code-signing certificate authority or a managed signing service such as Azure Trusted Signing, DigiCert KeyLocker, GlobalSign GCC, Sectigo, or another OV/EV provider. Once you have a `.pfx` or `.p12`, configure:
+
+* `codename1.windows.signing.certificate`
+* `codename1.windows.signing.password`
+* `codename1.windows.signing.timestamp`
+
+==== Clearing cached signing data
+
+The *Clear Signing Data* section is a privacy tool, not a recommended part of normal signing setup or troubleshooting. Use it only when you need to delete cached signing data owned by the current Codename One account from the cloud signing service.
+
+It clears stored Apple API credentials, generated certificate private keys, provisioning profile metadata, APNs keys and notarization data. It doesn't delete assets from Apple, but future cloud builds will need signing data to be regenerated or re-imported.
+
+==== Manual asset management
+
+Use the individual wizard sections when you need to inspect assets, register a device, sync certificates with Apple, create an ad-hoc or Mac profile, install a specific certificate/profile pair, generate an Android keystore, or delete/revoke an obsolete asset.
+
+The asset tables are live-filterable and sortable. Click a row to show the values returned by the signing API. Existing Apple assets can't currently be edited through this API; for changes, create a new asset or delete/revoke the old one where Apple permits it. Destructive actions such as deleting a profile, deleting an APNs key, deleting the stored API key, or revoking a certificate prompt for confirmation.
 
 ==== Selecting devices
 
-Once you're logged in you will be shown a list of all the devices that you have registered on your
-Apple developer account.
+Development and ad-hoc provisioning profiles can only include devices that are registered on your Apple Developer account. In the standalone wizard, open the *Devices* section to register a device by name and UDID before creating a development or ad-hoc provisioning profile.
 
 .Devices form
 image::img/ios-cert-wizard-3-devices.png[Devices form,scaledwidth=20%]
@@ -127,8 +213,8 @@ Wildcard ids such as com.mycompany.\* or even \* allow you to create one generic
 
 You can set the global defaults for the IDE by going to IDE settings/preferences and setting default values e.g.:
 
-.Setting the development certificate and a global \* provisioning profile allows you to create a new app and built it to device without running the certificate wizard. Notice that you will need to run it when going into production
-image::img/ios-cert-global-settings.png[Setting the development certificate and a global \* provisioning profile allows you to create a new app and built it to device without running the certificate wizard. Notice that you will need to run it when going into production]
+.Setting the development certificate and a global \* provisioning profile allows you to create a new app and built it to device without running the Certificate Wizard. Notice that you will need to run it when going into production
+image::img/ios-cert-global-settings.png[Setting the development certificate and a global \* provisioning profile allows you to create a new app and built it to device without running the Certificate Wizard. Notice that you will need to run it when going into production]
 ****
 
 ==== Installing files locally
@@ -157,7 +243,7 @@ image::img/ios-cert-wizard-9-signing-panel.png[Filled in signing panel after wiz
 
 === Advanced iOS signing
 
-WARNING: You should use the certificate wizard, if you don't have a Mac. This section is here for reference and edge cases that don't work with the certificate wizard
+WARNING: You should use the Certificate Wizard, if you don't have a Mac. This section is here for reference and edge cases that don't work with the Certificate Wizard
 
 iOS signing has two distinct modes: App Store signing which is valid for distribution via App Store Connect (you won't be able to run the resulting application without submitting it to Apple) and development mode signing.
 
@@ -253,7 +339,7 @@ image::img/ios-project-settings.png[IOS Project Settings,scaledwidth=30%]
 
 ==== Configuring `codenameone_settings.properties` for manual signing
 
-The Codename One build servers read signing assets from `codenameone_settings.properties`. When you bypass the signing wizard, populate the following keys manually so the packaging process can locate your certificates, provisioning profiles, and keystores:
+The Codename One build servers read signing assets from `codenameone_settings.properties`. When you bypass the Certificate Wizard, populate the following keys manually so the packaging process can locate your certificates, provisioning profiles, and keystores:
 
 *iOS*
 
@@ -275,9 +361,9 @@ If the keystore fields are empty the Maven and Ant builders will create a defaul
 
 Below is a list of common issues when singing and a set of suggestions for things to check. Notice that some of these signing failures will sometimes manifest themselves during build and sometimes will manifest during the installation of the application.
 
-TIP: Most of these issues aren't applicable when using the wizard for example, a Mac isn't required for the certificate wizard as it uses the Codename One cloud
+TIP: Most of these issues aren't applicable when using the wizard for example, a Mac isn't required for the Certificate Wizard as it uses the Codename One cloud
 
--	*You must use a Mac to generate P12 certificates manually*. The workaround you found is the certificate wizard!
+-	*You must use a Mac to generate P12 certificates manually*. The workaround you found is the Certificate Wizard!
 +
 Notice that this is something you need to do once a year (generate P12), you will also need a Mac to upload your final app to the store now.
 
@@ -351,4 +437,3 @@ Password: [password] (we expect both passwords to be identical)
 Executing the command will produce a Keystore.ks file in that directory which you need to keep since if you lose it you will no longer be able to upgrade your applications! Fill in the appropriate details in the project properties or in the CodenameOne section in the Netbeans preferences dialog.
 
 For more details see http://developer.android.com/guide/publishing/app-signing.html
-

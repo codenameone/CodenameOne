@@ -7,7 +7,7 @@ Updates Codename One. This will update the Codename One tools that live inside `
 
 [source,bash]
 ----
-mvn cn1:update
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-update.sh[tag=appendix-goal-update-bash-001,indent=0]
 ----
 
 **Parameters**

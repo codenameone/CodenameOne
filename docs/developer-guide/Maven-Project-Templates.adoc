@@ -13,18 +13,7 @@ The contents of this file should look like:
 
 [source,rpf]
 ----
-template.mainName=$YOUR_PROJECT_MAIN_NAME
-template.packageName=$YOUR_PROJECT_PACKAGE_NAME
-
-[dependencies]
-====
-... YOUR PROJECT MAVEN DEPENDENCIES ...
-====
-
-[parentDependencies]
-====
-... YOUR PARENT PROJECT MAVEN DEPENDENCIES ...
-====
+include::../demos/common/src/main/snippets/developer-guide/maven-project-templates.txt[tag=maven-project-templates-rpf-001,indent=0]
 ----
 
 Where you make the following substitutions:

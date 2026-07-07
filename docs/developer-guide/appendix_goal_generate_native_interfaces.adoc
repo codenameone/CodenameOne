@@ -14,16 +14,14 @@ After creating this (and possibly other) native interfaces in your project, run 
 
 [source, bash]
 ----
-mvn cn1:generate-native-interfaces
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-native-interfaces.sh[tag=appendix-goal-generate-native-interfaces-bash-001,indent=0]
 ----
 
 By default this generates Java/Objective-C stubs. You can optionally include Swift and Kotlin stubs (both off by default):
 
 [source,bash]
 ----
-mvn cn1:generate-native-interfaces \
-  -Dcn1.generateNativeInterfaces.swift=true \
-  -Dcn1.generateNativeInterfaces.kotlin=true
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-native-interfaces.sh[tag=appendix-goal-generate-native-interfaces-bash-002,indent=0]
 ----
 
 This will generate the following files (if they don't exist yet).

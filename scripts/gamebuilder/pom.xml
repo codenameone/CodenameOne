@@ -96,6 +96,16 @@
                     <artifactId>exec-maven-plugin</artifactId>
                     <version>3.0.0</version>
                 </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.2.2</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <version>3.3.0</version>
+                </plugin>
             </plugins>
         </pluginManagement>
         <plugins>
@@ -127,9 +137,8 @@
              javadoc jars, GPG signatures and the central-publishing bundle). Off by
              default so ordinary dev builds are unaffected. The release workflow
              activates it together with -Pexecutable-jar so the editor is published as
-             com.codenameone:codenameone-gamebuilder:<version> (plus its
-             jar-with-dependencies classifier) and cn1:gamebuilder resolves it from
-             Central the same way it resolves the Designer jar. The parent pom and the
+             com.codenameone:codenameone-gamebuilder:<version> and cn1:gamebuilder
+             resolves it with its runtime dependencies from Central. The parent pom and the
              cn1-gamebuilder-common jar are published alongside it because the editor's
              pom references them, so they must resolve for the classifier lookup. -->
         <profile>

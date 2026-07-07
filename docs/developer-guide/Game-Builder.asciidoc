@@ -60,15 +60,6 @@ sets up the perspective camera, lights and a `Model` per element. Put game logic
 
 Loading and playing a level at runtime is three lines:
 
-[source,java]
-----
-GameLevel level = GameLevel.load(
-        Display.getInstance().getResourceAsStream(MyScene.class, "/games/Level1.game"));
-GameSceneView view = new GameSceneView(level, AssetCatalog.load(packsJson));
-form.add(BorderLayout.CENTER, view);
-form.show();
-view.start();
-----
 
 === Getting started
 
@@ -76,7 +67,7 @@ Create a scene from a *Java 17* Codename One project:
 
 [source,bash]
 ----
-mvn cn1:create-game-scene -DclassName=com.example.game.Level1 -Dmode=2d
+include::../demos/common/src/main/snippets/developer-guide/game-builder.sh[tag=game-builder-bash-001,indent=0]
 ----
 
 `-Dmode` is `2d` (default), `3d` or `board`. This writes
@@ -88,7 +79,7 @@ builder:
 
 [source,bash]
 ----
-mvn cn1:gamebuilder
+include::../demos/common/src/main/snippets/developer-guide/game-builder.sh[tag=game-builder-bash-002,indent=0]
 ----
 
 The editor itself is delivered through Maven: the goal resolves the
@@ -188,27 +179,6 @@ companion's `onUpdate(double dt)`. `GameSceneView` realizes every element into a
 whose `getUserData()` is the source `GameElement`, so you read the properties you set in
 the editor:
 
-[source,java]
-----
-@Override
-protected void onUpdate(double dt) {
-    GameInput in = getInput();
-    Scene scene = getScene();
-    for (int i = 0; i < scene.size(); i++) {
-        Sprite s = scene.get(i);
-        GameElement el = (GameElement) s.getUserData();
-        if (el == null) continue;
-        switch (el.getAssetId()) {
-            case "player" -> {
-                if (in.isGameKeyDown(Display.GAME_RIGHT)) s.setX(s.getX() + 200 * dt);
-                // jump height, lives, gravity... all read from el.getInt(...)/getDouble(...)
-            }
-            case "slime" -> s.setX(s.getX() + el.getDouble("speed", 1.5)); // patrol
-            case "coin"  -> { if (s.intersects(player)) score += el.getInt("value", 10); }
-        }
-    }
-}
-----
 
 Win/lose conditions, scoring, enemy AI and level transitions (using a door's `target`)
 are all decided here. For rigid-body games use
@@ -266,14 +236,6 @@ companion in your app, where the scene is rendered by the GPU-accelerated
 companion `<Scene>.java`. To show the scene in your app, instantiate the companion and
 `start()` it:
 
-[source,java]
-----
-Form game = new Form("Play", new BorderLayout());
-Level1 scene = new Level1(StarterPacks.loadCatalog());
-game.add(BorderLayout.CENTER, scene);
-game.show();
-scene.start();
-----
 
 The level is plain data, so you can ship many `.game` files and load whichever level the
 player selects.

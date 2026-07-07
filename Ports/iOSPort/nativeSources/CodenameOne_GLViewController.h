@@ -291,6 +291,9 @@ CLLocationManagerDelegate, AVAudioRecorderDelegate
 #if !TARGET_OS_TV
 , UIPickerViewDelegate, UIDocumentInteractionControllerDelegate
 #endif
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+, UIDocumentPickerDelegate
+#endif
 #ifdef INCLUDE_ZOOZ
         ,ZooZPaymentCallbackDelegate
 #endif

@@ -1,6 +1,5 @@
 package com.codename1.sms.intercept;
 
-// tag::smsInterceptor[]
 public final class SMSInterceptor {
     private SMSInterceptor() {
     }
@@ -9,4 +8,3 @@ public final class SMSInterceptor {
         // implementation omitted
     }
 }
-// end::smsInterceptor[]

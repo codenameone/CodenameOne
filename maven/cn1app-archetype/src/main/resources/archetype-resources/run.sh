@@ -13,6 +13,10 @@ function settings {
   
   "$MVNW" "cn1:settings" "-e"
 }
+function certificatewizard {
+
+  "$MVNW" "cn1:certificatewizard" "-e"
+}
 function update {
   
   "$MVNW" "cn1:update" "-U" "-e"
@@ -26,6 +30,8 @@ function help {
   "echo" "-e" "    Runs app as a desktop app."
   "echo" "-e" "  settings"
   "echo" "-e" "    Opens Codename One settings"
+  "echo" "-e" "  certificatewizard"
+  "echo" "-e" "    Opens the Certificate Wizard"
   "echo" "-e" "  update"
   "echo" "-e" "    Update Codename One libraries"
 }
@@ -34,4 +40,4 @@ CMD=$1
 if [ "$CMD" == "" ]; then
   CMD="simulator"
 fi
-"$CMD" 
+"$CMD"

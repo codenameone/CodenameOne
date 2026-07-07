@@ -8,10 +8,7 @@ The rich properties file (rpf) format is used to store configuration for the `ge
 
 [source,rpf]
 ----
-[keyname] <1>
-=== <2>
-Key value <3>
-=== <4>
+include::../demos/common/src/main/snippets/developer-guide/maven-appendix-rich-properties.txt[tag=maven-appendix-rich-properties-rpf-001,indent=0]
 ----
 <1> The property key appears on a new line wrapped in square brackets.
 <2> A separator consisting of 3 or more equals signs on the next line.
@@ -22,26 +19,7 @@ Key value <3>
 
 [source,rpf]
 ----
-firstName=Bob
-lastName=Smith
-[bio]
-====
-Bob is a hard worker.
-He attended Harvard and is looking for opportunities in the fast food industry.
-====
-age=23
-
-# A comment that it is ignored
-[xmldata]
-========
-<person>
-    <name>Bob Smith</name>
-    <age>23</age>
-</person>
-========
-
-favoriteColor=Brown
-
+include::../demos/common/src/main/snippets/developer-guide/maven-appendix-rich-properties.txt[tag=maven-appendix-rich-properties-rpf-002,indent=0]
 ----
 
 Many of the properties of this file are regular properties. Two rich properties exist: `bio` and `xmldata`.

@@ -27,9 +27,7 @@ ports) into your local Maven cache:
 
 [source,bash]
 ----
-$ git clone https://github.com/codenameone/CodenameOne
-$ cd CodenameOne/maven
-$ mvn install
+include::../demos/common/src/main/snippets/developer-guide/working-with-codenameone-sources.sh[tag=working-with-codenameone-sources-bash-001,indent=0]
 ----
 
 The default build runs every module and its unit tests. Append `-DskipTests`
@@ -46,9 +44,7 @@ can reference your locally built SDK artifacts:
 
 [source,bash]
 ----
-$ git clone https://github.com/shannah/cn1-maven-archetypes
-$ cd cn1-maven-archetypes
-$ mvn install
+include::../demos/common/src/main/snippets/developer-guide/working-with-codenameone-sources.sh[tag=working-with-codenameone-sources-bash-002,indent=0]
 ----
 
 === Running tests selectively
@@ -60,14 +56,14 @@ Run any of these from the `CodenameOne/maven` directory:
 +
 [source,bash]
 ----
-$ mvn -pl core-unittests test
+include::../demos/common/src/main/snippets/developer-guide/working-with-codenameone-sources.sh[tag=working-with-codenameone-sources-bash-003,indent=0]
 ----
 
 * Integration tests (simulator and build client):
 +
 [source,bash]
 ----
-$ mvn -pl tests -am verify
+include::../demos/common/src/main/snippets/developer-guide/working-with-codenameone-sources.sh[tag=working-with-codenameone-sources-bash-004,indent=0]
 ----
 
 Refer to the READMEs in `maven/core-unittests` and `maven/tests` for more
@@ -82,11 +78,7 @@ project), adjust the `pom.xml` properties to reference your snapshot version:
 
 [source,xml]
 ----
-<properties>
-    <!-- Replace with the snapshot printed during mvn install -->
-    <cn1.version>{cn1-snapshot-version}</cn1.version>
-    <cn1.plugin.version>{cn1-snapshot-version}</cn1.plugin.version>
-</properties>
+include::../demos/common/src/main/snippets/developer-guide/working-with-codenameone-sources.xml[tag=working-with-codenameone-sources-xml-001,indent=0]
 ----
 
 Open the project in your IDE and build or run it. Maven will resolve the local

@@ -333,20 +333,51 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     }
 
     private void assertIdeFiles(IDE ide, Map<String, byte[]> entries, String mainClassName) {
+        String runSh = getText(entries, "run.sh");
+        assertContains(runSh, "certificatewizard",
+                "Generated shell launcher should include Certificate Wizard command");
+        assertContains(runSh, "cn1:certificatewizard",
+                "Generated shell launcher should launch cn1:certificatewizard");
+
+        String runBat = getText(entries, "run.bat");
+        assertContains(runBat, "certificatewizard",
+                "Generated Windows launcher should include Certificate Wizard command");
+        assertContains(runBat, "cn1:certificatewizard",
+                "Generated Windows launcher should launch cn1:certificatewizard");
+
+        String readme = getText(entries, "README.md");
+        assertContains(readme, "mvn cn1:certificatewizard",
+                "Generated README should document the Certificate Wizard");
+
         if (ide == IDE.INTELLIJ) {
-            assertNotNull(entries.get(".idea/workspace.xml"), "Missing IntelliJ workspace file");
+            String workspaceXml = getText(entries, ".idea/workspace.xml");
+            assertContains(workspaceXml, "<configuration name=\"Certificate Wizard\"",
+                    "IntelliJ workspace should include Certificate Wizard run configuration");
+            assertContains(workspaceXml, "<option value=\"cn1:certificatewizard\"",
+                    "IntelliJ Certificate Wizard run configuration should launch cn1:certificatewizard");
             return;
         }
         if (ide == IDE.ECLIPSE) {
             assertNotNull(entries.get(mainClassName + " - Run Simulator.launch"), "Missing Eclipse launch file");
+            String launchXml = getText(entries, mainClassName + " - Certificate Wizard.launch");
+            assertContains(launchXml, "cn1:certificatewizard",
+                    "Eclipse launch files should include Certificate Wizard");
             return;
         }
         if (ide == IDE.NETBEANS) {
-            assertNotNull(entries.get("nbactions.xml"), "Missing NetBeans actions file");
+            String nbActions = getText(entries, "nbactions.xml");
+            assertContains(nbActions, "CUSTOM-Open Certificate Wizard",
+                    "NetBeans actions should include Certificate Wizard");
+            assertContains(nbActions, "<goal>cn1:certificatewizard</goal>",
+                    "NetBeans Certificate Wizard action should launch cn1:certificatewizard");
             return;
         }
         if (ide == IDE.VS_CODE) {
-            assertNotNull(entries.get(".vscode/settings.json"), "Missing VS Code settings");
+            String settingsJson = getText(entries, ".vscode/settings.json");
+            assertContains(settingsJson, "Tools > Certificate Wizard",
+                    "VS Code Maven favorites should include Certificate Wizard");
+            assertContains(settingsJson, "cn1:certificatewizard",
+                    "VS Code Certificate Wizard favorite should launch cn1:certificatewizard");
         }
     }
 

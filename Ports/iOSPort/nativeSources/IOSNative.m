@@ -5925,6 +5925,76 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean_int_int(CN1_THREAD
 #endif
 }
 
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+static void cn1AddFileChooserDocumentType(NSMutableArray *types, CFStringRef tagClass, NSString *tag) {
+    if (tag == nil || [tag length] == 0) {
+        return;
+    }
+    CFStringRef uti = UTTypeCreatePreferredIdentifierForTag(tagClass, (CFStringRef)tag, NULL);
+    if (uti != NULL) {
+#if __has_feature(objc_arc)
+        NSString *type = CFBridgingRelease(uti);
+#else
+        NSString *type = [(NSString *)uti autorelease];
+#endif
+        if (![types containsObject:type]) {
+            [types addObject:type];
+        }
+    }
+}
+
+static NSArray *cn1FileChooserDocumentTypes(NSString *accept) {
+    NSMutableArray *types = [NSMutableArray array];
+    if (accept != nil) {
+        NSArray *tokens = [accept componentsSeparatedByString:@","];
+        for (NSString *rawToken in tokens) {
+            NSString *token = [rawToken stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            if ([token length] == 0 || [token isEqualToString:@"*"] || [token isEqualToString:@"*/*"]) {
+                continue;
+            }
+            if ([token rangeOfString:@"/"].location != NSNotFound) {
+                cn1AddFileChooserDocumentType(types, kUTTagClassMIMEType, token);
+            } else {
+                if ([token hasPrefix:@"."]) {
+                    token = [token substringFromIndex:1];
+                }
+                cn1AddFileChooserDocumentType(types, kUTTagClassFilenameExtension, [token lowercaseString]);
+            }
+        }
+    }
+    if ([types count] == 0) {
+        [types addObject:(NSString *)kUTTypeItem];
+    }
+    return types;
+}
+#endif
+
+void com_codename1_impl_ios_IOSNative_openFileChooser___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT accept) {
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+    NSString *nsAccept = accept == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG accept);
+    NSArray *documentTypes = cn1FileChooserDocumentTypes(nsAccept);
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+#ifndef CN1_USE_ARC
+        UIDocumentPickerViewController *pickerController = [[[UIDocumentPickerViewController alloc] initWithDocumentTypes:documentTypes inMode:UIDocumentPickerModeImport] autorelease];
+#else
+        UIDocumentPickerViewController *pickerController = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:documentTypes inMode:UIDocumentPickerModeImport];
+#endif
+        pickerController.delegate = [CodenameOne_GLViewController instance];
+        if (@available(iOS 11.0, *)) {
+            pickerController.allowsMultipleSelection = NO;
+        }
+        if (popoverSupported()) {
+            pickerController.modalPresentationStyle = UIModalPresentationFormSheet;
+        }
+        [[CodenameOne_GLViewController instance] presentViewController:pickerController animated:YES completion:nil];
+        POOL_END();
+    });
+#else
+    com_codename1_impl_ios_IOSImplementation_fileChooserResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
+#endif
+}
+
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
 #ifdef ENABLE_GALLERY_MULTISELECT
 

@@ -120,6 +120,7 @@ appcompat
 Apache
 apache
 ATS
+Authenticode
 BLE
 CommonCrypto
 CodeMirror
@@ -197,6 +198,7 @@ SQLDemo
 SQLMap
 Smalltalk
 snapchat
+Sectigo
 Storyboard
 storyboards
 Temurin

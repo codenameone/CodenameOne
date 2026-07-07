@@ -1,0 +1,6 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::performance-text-001[]
+java.lang.IllegalArgumentException: SIMD array argument was not
+allocated using Simd.alloc*(). objectId=…
+// end::performance-text-001[]

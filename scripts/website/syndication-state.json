@@ -678,6 +678,102 @@
         "url": "https://medium.com/p/94089979c81e/edit",
         "syndicated_at": "2026-07-02T17:14:42+00:00"
       }
+    },
+    "funding-open-source-without-the-bait-and-switch": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmr529n7t00010aj1doxehjnp",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a47ce8483904781bbd1ecdd",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-03T15:01:17+00:00"
+      },
+      "devto": {
+        "id": 4061338,
+        "url": "https://dev.to/codenameone/funding-open-source-without-the-bait-and-switch-analytics-native-maps-tv-and-more-1h1j",
+        "syndicated_at": "2026-07-03T15:14:15+00:00"
+      },
+      "foojay": {
+        "id": 124679,
+        "url": "https://foojay.io/wp-admin/post.php?post=124679&action=edit",
+        "preview_url": "https://foojay.io/?p=124679",
+        "featured_media_id": 124678,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-07-03T15:15:12+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/437da890be1e/edit",
+        "syndicated_at": "2026-07-03T17:01:49+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3663930/edit.html",
+        "syndicated_at": "2026-07-03T17:03:20+00:00"
+      }
+    },
+    "vector-and-native-maps": {
+      "devto": {
+        "id": 4067568,
+        "url": "https://dev.to/codenameone/maps-you-control-a-pure-vector-mapview-and-pluggable-native-providers-409h",
+        "syndicated_at": "2026-07-04T14:24:26+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/4dedac270370/edit",
+        "syndicated_at": "2026-07-04T15:02:11+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmr6hsql4000009gnc01o05xl",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a49208815b0e51c16e88f06",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-04T15:03:55+00:00"
+      }
+    },
+    "rich-text-and-code-editing": {
+      "devto": {
+        "id": 4073308,
+        "url": "https://dev.to/codenameone/rich-text-and-code-editing-richtextarea-and-a-syntax-highlighting-codeeditor-4c82",
+        "syndicated_at": "2026-07-05T14:34:59+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/d42786886b6a/edit",
+        "syndicated_at": "2026-07-05T15:01:47+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmr7x7j15000009jf6n2a7kcx",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a4a71e9c5e3069d1a484688",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-05T15:02:58+00:00"
+      }
+    },
+    "privacy-first-analytics": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmr9cl9gw00000ahw2bs78qqb",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a4bc30710bbf9b4a2c14266",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-06T15:01:20+00:00"
+      },
+      "devto": {
+        "id": 4081326,
+        "url": "https://dev.to/codenameone/a-privacy-first-analytics-api-one-facade-a-provider-spi-and-a-consent-gate-2l1l",
+        "syndicated_at": "2026-07-06T16:14:46+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/ccdfc4c8ecb5/edit",
+        "syndicated_at": "2026-07-06T17:01:33+00:00"
+      }
     }
   }
 }
