@@ -75,6 +75,24 @@
 
                 <plugins>
                     <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <excludes>
+                                <!-- The ARCore-backed AR impl compiles against
+                                     com.google.ar.core which is not part of
+                                     cn1-binaries; it is compiled inside user
+                                     app builds where AndroidGradleBuilder adds
+                                     the ARCore gradle dependency (and deletes
+                                     the package for non-AR apps). The sources
+                                     still ship in android_port_sources.jar
+                                     below because that zip takes the whole
+                                     source dir. -->
+                                <exclude>com/codename1/impl/android/ar/**</exclude>
+                            </excludes>
+                        </configuration>
+                    </plugin>
+                    <plugin>
 
                         <artifactId>maven-antrun-plugin</artifactId>
                         <executions>

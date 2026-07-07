@@ -190,6 +190,48 @@ class AiDependencyTableTest {
         assertEquals(1, acc.hits().size());
     }
 
+    @Test
+    void arApiInjectsArKitCameraAndArCore() {
+        List<AiDependencyTable.Entry> hits = AiDependencyTable.matchesFor(
+                "com/codename1/ar/AR");
+        assertEquals(1, hits.size(), "expected the AR entry to fire");
+        AiDependencyTable.Entry e = hits.get(0);
+        // iOS: ARKit + SceneKit (linked explicitly by IPhoneBuilder) and the
+        // camera usage string, overridable via ios.NSCameraUsageDescription.
+        assertTrue(e.iosFrameworks().contains("ARKit"));
+        assertTrue(e.iosFrameworks().contains("SceneKit"));
+        assertNotNull(findPlistDefault(e, "NSCameraUsageDescription"));
+        // Android: the ARCore dependency, the camera permission and the
+        // optional AR feature/meta-data pair so non-AR devices still install.
+        assertEquals(1, e.androidGradleDeps().size());
+        assertTrue(e.androidGradleDeps().get(0).startsWith("com.google.ar:core"));
+        assertTrue(e.androidPermissions().contains("android.permission.CAMERA"));
+        assertTrue(e.androidFeatures().contains("android.hardware.camera.ar"));
+        assertEquals(1, e.androidMetaDataEntries().size());
+        assertEquals("com.google.ar.core", e.androidMetaDataEntries().get(0)[0]);
+        assertEquals("optional", e.androidMetaDataEntries().get(0)[1]);
+    }
+
+    @Test
+    void arEntryMatchesTheWholePackageButNothingElse() {
+        assertEquals(1, AiDependencyTable.matchesFor("com/codename1/ar/ARSession").size());
+        assertEquals(1, AiDependencyTable.matchesFor("com/codename1/ar/ARNode").size());
+        // The pure-core VR package must NOT pull the AR native dependencies.
+        assertTrue(AiDependencyTable.matchesFor("com/codename1/vr/VRView").isEmpty());
+    }
+
+    @Test
+    void nonArEntriesCarryNoMetaData() {
+        // The meta-data field is new; make sure the existing entries did not
+        // accidentally gain one.
+        for (AiDependencyTable.Entry e : AiDependencyTable.entries()) {
+            if (!e.classPrefix().startsWith("com/codename1/ar/")) {
+                assertTrue(e.androidMetaDataEntries().isEmpty(),
+                        e.classPrefix() + " should carry no manifest meta-data");
+            }
+        }
+    }
+
     private static String findPlistDefault(AiDependencyTable.Entry e, String key) {
         for (String[] entry : e.iosPlistEntries()) {
             if (key.equals(entry[0])) {
