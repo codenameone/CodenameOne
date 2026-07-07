@@ -51,7 +51,7 @@ final class InputValidationUITests: XCTestCase {
         Thread.sleep(forTimeInterval: stepDelaySeconds)
 
         try driveLongPress(app: app)
-        Thread.sleep(forTimeInterval: stepDelaySeconds)
+        Thread.sleep(forTimeInterval: max(stepDelaySeconds, 10.0))
     }
 
     private func driveTap(app: XCUIApplication) throws {
@@ -68,7 +68,7 @@ final class InputValidationUITests: XCTestCase {
     }
 
     private func driveLongPress(app: XCUIApplication) throws {
-        let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        center.press(forDuration: 1.5)
+        let target = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.56))
+        target.press(forDuration: 2.25)
     }
 }

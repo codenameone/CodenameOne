@@ -61,7 +61,9 @@ public class ValidatorLightweightPickerScreenshotTest extends BaseTest {
         }
         picker.setDate(fixedBirthDate);
         picker.startEditingAsync();
-        UITimer.timer(1000, false, parent, run);
+        parent.revalidate();
+        parent.repaint();
+        UITimer.timer(2000, false, parent, run);
     }
 
     @Override

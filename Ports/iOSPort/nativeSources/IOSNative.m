@@ -7434,57 +7434,60 @@ static UIImage* cn1_captureView(UIView *view) {
 void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
 #if TARGET_OS_WATCH
     // Capture the Core Graphics surface. Drain any pending ops first so the
-    // snapshot reflects the latest painted frame, then PNG-encode the bitmap.
+    // snapshot reflects the latest painted frame, then pass raw ARGB pixels to
+    // Java. This avoids a same-platform PNG encode/decode round trip on
+    // watchOS, where screenshot callbacks must not collapse to null.
     __block CN1WatchRenderingView *wv = nil;
-    __block UIImage *wimg = nil;
-    __block NSData *wpng = nil;
+    __block int wwidth = 0;
+    __block int wheight = 0;
+    __block int *wargb = NULL;
     void (^captureWatchFrame)(void) = ^{
         [[CodenameOne_GLViewController instance] drawFrame:CGRectZero];
         wv = [CN1WatchHost sharedHost].renderingView;
-        wimg = wv != nil ? [wv currentFrame] : nil;
-        wpng = wimg != nil ? UIImagePNGRepresentation(wimg) : nil;
-#ifndef CN1_USE_ARC
-        [wpng retain];
-#endif
+        if (wv != nil) {
+            int pixelW = 0;
+            int pixelH = 0;
+            int capacity = [wv pixelWidth] * [wv pixelHeight];
+            if (capacity > 0) {
+                wargb = (int *)malloc((size_t)capacity * sizeof(int));
+                if (wargb != NULL && ![wv copyARGBToBuffer:wargb width:&pixelW height:&pixelH]) {
+                    free(wargb);
+                    wargb = NULL;
+                }
+                if (wargb != NULL) {
+                    wwidth = pixelW;
+                    wheight = pixelH;
+                }
+            }
+        }
     };
     if ([NSThread isMainThread]) {
         captureWatchFrame();
     } else {
         dispatch_sync(dispatch_get_main_queue(), captureWatchFrame);
     }
-    if (wpng == nil || [wpng length] == 0) {
-        int logicalW = wv != nil ? [wv logicalWidth] : -1;
-        int logicalH = wv != nil ? [wv logicalHeight] : -1;
-        NSLog(@"CN1SS:ERR:native watch screenshot failed renderingView=%@ image=%@ logical=%dx%d",
-              wv, wimg, logicalW, logicalH);
-    }
-    JAVA_OBJECT wbyteArr = JAVA_NULL;
-    if (wpng != nil && [wpng length] > 0) {
-        int wlen = (int)[wpng length];
-#ifdef CN1_WATCH_DEBUG_DUMP_SHOTS
-        {
-            static int wshotIdx = 0;
-            NSArray *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
-            NSString *p = [[docs firstObject] stringByAppendingPathComponent:[NSString stringWithFormat:@"cn1ss_%03d.png", wshotIdx++]];
-            [wpng writeToFile:p atomically:YES];
-        }
-#endif
+    JAVA_OBJECT wargbArr = JAVA_NULL;
+    if (wargb != NULL && wwidth > 0 && wheight > 0) {
+        int wlen = wwidth * wheight;
 #ifndef NEW_CODENAME_ONE_VM
-        org_xmlvm_runtime_XMLVMArray* warr = XMLVMArray_createSingleDimension(__CLASS_byte, wlen);
-        memcpy(warr->fields.org_xmlvm_runtime_XMLVMArray.array_, [wpng bytes], wlen);
-        wbyteArr = warr;
+        org_xmlvm_runtime_XMLVMArray* warr = XMLVMArray_createSingleDimension(__CLASS_int, wlen);
+        memcpy(warr->fields.org_xmlvm_runtime_XMLVMArray.array_, wargb, wlen * sizeof(JAVA_INT));
+        wargbArr = warr;
 #else
         enteringNativeAllocations();
-        JAVA_OBJECT warr = __NEW_ARRAY_JAVA_BYTE(CN1_THREAD_STATE_PASS_ARG wlen);
-        memcpy(((JAVA_ARRAY)warr)->data, [wpng bytes], wlen);
+        JAVA_OBJECT warr = __NEW_ARRAY_JAVA_INT(CN1_THREAD_STATE_PASS_ARG wlen);
+        memcpy(((JAVA_ARRAY)warr)->data, wargb, wlen * sizeof(JAVA_INT));
         finishedNativeAllocations();
-        wbyteArr = warr;
+        wargbArr = warr;
 #endif
+    } else {
+        int logicalW = wv != nil ? [wv logicalWidth] : -1;
+        int logicalH = wv != nil ? [wv logicalHeight] : -1;
+        NSLog(@"CN1SS:ERR:native watch screenshot failed renderingView=%@ logical=%dx%d pixel=%dx%d",
+              wv, logicalW, logicalH, wwidth, wheight);
     }
-#ifndef CN1_USE_ARC
-    [wpng release];
-#endif
-    com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG wbyteArr);
+    free(wargb);
+    com_codename1_impl_ios_IOSImplementation_onScreenshot___int_1ARRAY_int_int(CN1_THREAD_STATE_PASS_ARG wargbArr, wwidth, wheight);
     return;
 #else
     __block NSData *capturedPng = nil;

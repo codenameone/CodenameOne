@@ -65,6 +65,14 @@
     return scale > 0 ? (int)(bufferHeight / scale) : bufferHeight;
 }
 
+- (int)pixelWidth {
+    return bufferWidth;
+}
+
+- (int)pixelHeight {
+    return bufferHeight;
+}
+
 - (void)setFramebuffer {
     // Bind the bitmap context to the CG backend for the upcoming op queue.
     CN1CGBeginFrame(bitmapContext, bufferWidth / scale, bufferHeight / scale);
@@ -103,6 +111,35 @@
     UIImage *frame = [UIImage imageWithCGImage:cgImage scale:scale orientation:UIImageOrientationUp];
     CGImageRelease(cgImage);
     return frame;
+}
+
+- (BOOL)copyARGBToBuffer:(int *)argb width:(int *)outWidth height:(int *)outHeight {
+    if (bitmapContext == NULL || argb == NULL) {
+        return NO;
+    }
+    unsigned char *data = (unsigned char *)CGBitmapContextGetData(bitmapContext);
+    size_t bytesPerRow = CGBitmapContextGetBytesPerRow(bitmapContext);
+    if (data == NULL || bytesPerRow == 0 || bufferWidth <= 0 || bufferHeight <= 0) {
+        return NO;
+    }
+    if (outWidth != NULL) {
+        *outWidth = bufferWidth;
+    }
+    if (outHeight != NULL) {
+        *outHeight = bufferHeight;
+    }
+    for (int y = 0; y < bufferHeight; y++) {
+        unsigned char *row = data + ((size_t)y * bytesPerRow);
+        for (int x = 0; x < bufferWidth; x++) {
+            unsigned char *px = row + (x * 4);
+            int r = px[0] & 0xff;
+            int g = px[1] & 0xff;
+            int b = px[2] & 0xff;
+            int a = px[3] & 0xff;
+            argb[(y * bufferWidth) + x] = (a << 24) | (r << 16) | (g << 8) | b;
+        }
+    }
+    return YES;
 }
 
 - (void)deleteFramebuffer {
