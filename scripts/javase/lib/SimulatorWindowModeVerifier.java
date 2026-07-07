@@ -123,11 +123,12 @@ public class SimulatorWindowModeVerifier {
             // real failure).
             BufferedImage image = captureDesktop();
             Instant renderDeadline = Instant.now().plusSeconds(30);
-            while (isBlankOrFlat(image) && Instant.now().isBefore(renderDeadline)) {
+            while ((isBlankOrFlat(image) || isSingleWindowDeviceMissing(parsed, image))
+                    && Instant.now().isBefore(renderDeadline)) {
                 Thread.sleep(500);
                 image = captureDesktop();
             }
-            validateScreenshotContent(image);
+            validateScreenshotContent(parsed, image);
 
             Path screenshotPath = Path.of(parsed.screenshotPath);
             Files.createDirectories(screenshotPath.getParent());
@@ -176,7 +177,7 @@ public class SimulatorWindowModeVerifier {
         return new Robot().createScreenCapture(bounds);
     }
 
-    private static void validateScreenshotContent(BufferedImage image) {
+    private static void validateScreenshotContent(Args args, BufferedImage image) {
         if (image.getWidth() < 120 || image.getHeight() < 120) {
             throw new AssertionError("Screenshot is unexpectedly small: " + image.getWidth() + "x" + image.getHeight());
         }
@@ -184,10 +185,45 @@ public class SimulatorWindowModeVerifier {
         if (samples < 3) {
             throw new AssertionError("Screenshot appears blank/flat (insufficient color variation): " + samples);
         }
+        int darkPixels = countSingleWindowDevicePixels(args, image);
+        if (darkPixels >= 0 && darkPixels < 5000) {
+            throw new AssertionError("Single-window simulator device content did not appear before capture; darkPixels="
+                    + darkPixels);
+        }
     }
 
     private static boolean isBlankOrFlat(BufferedImage image) {
         return sampleColorCount(image) < 3;
+    }
+
+    private static boolean isSingleWindowDeviceMissing(Args args, BufferedImage image) {
+        int darkPixels = countSingleWindowDevicePixels(args, image);
+        return darkPixels >= 0 && darkPixels < 5000;
+    }
+
+    private static int countSingleWindowDevicePixels(Args args, BufferedImage image) {
+        if (!"single".equals(args.mode)) {
+            return -1;
+        }
+        int xMax = Math.min(image.getWidth(), 560);
+        int yMin = Math.min(image.getHeight(), 70);
+        int yMax = Math.min(image.getHeight(), 560);
+        if (xMax <= 0 || yMax <= yMin) {
+            return 0;
+        }
+        int darkPixels = 0;
+        for (int y = yMin; y < yMax; y++) {
+            for (int x = 0; x < xMax; x++) {
+                int rgb = image.getRGB(x, y);
+                int r = (rgb >> 16) & 0xff;
+                int g = (rgb >> 8) & 0xff;
+                int b = rgb & 0xff;
+                if (r < 45 && g < 45 && b < 45) {
+                    darkPixels++;
+                }
+            }
+        }
+        return darkPixels;
     }
 
     private static int sampleColorCount(BufferedImage image) {

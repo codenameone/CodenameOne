@@ -30,23 +30,24 @@ import java.util.Date;
  *
  * Doubles as a regression test for issue #4897 (live propagation of
  * {@code setDate} to the visible spinner wheels). Each variant opens
- * the popup with {@code new Date()} (so the wheels start at whatever
- * day the test runs), then calls {@code picker.setDate(fixedDate)}
- * after the slide-up to spin them to a known calendar position before
- * the screenshot. The committed baselines all show April 11 2026 -
- * if the live-propagation regresses the wheels will keep showing the
- * runtime "today" instead and the diff will fail every day except by
- * coincidence.
+ * the popup with a deterministic non-target date, then calls
+ * {@code picker.setDate(fixedDate)} after the slide-up to spin them to
+ * a known calendar position before the screenshot. The committed
+ * baselines all show April 11 2026 - if the live-propagation regresses
+ * the wheels will keep showing the initial date instead and the diff
+ * will fail without depending on the day the test happens to run.
  */
 public class LightweightPickerButtonsScreenshotTest extends BaseTest {
     private Form form;
     private Picker picker;
+    private Date initialDate;
     private Date fixedDate;
     private Date fixedDatePlus7;
     private Variant[] variants;
 
     @Override
     public boolean runTest() {
+        initialDate = toDate(LocalDate.of(2026, 1, 10));
         fixedDate = toDate(LocalDate.of(2026, 4, 11));
         fixedDatePlus7 = toDate(LocalDate.of(2026, 4, 18));
         variants = buildVariants();
@@ -60,11 +61,10 @@ public class LightweightPickerButtonsScreenshotTest extends BaseTest {
         picker = new Picker();
         picker.setType(Display.PICKER_TYPE_DATE);
         picker.setUseLightweightPopup(true);
-        // Initial value is "today" so the wheels open at a per-run date; each
-        // variant cycle then spins them to fixedDate via the live-propagation
-        // path (#4897) before screenshot, which is what makes the baselines
-        // date-independent.
-        picker.setDate(new Date());
+        // Initial value is intentionally different from the baseline date;
+        // each variant cycle then spins to fixedDate via the live-propagation
+        // path (#4897) before screenshot.
+        picker.setDate(initialDate);
         form.add(picker);
         form.show();
         return true;
@@ -137,11 +137,11 @@ public class LightweightPickerButtonsScreenshotTest extends BaseTest {
         }
         final Variant variant = variants[index];
         picker.clearLightweightPopupButtons();
-        // Open at "today" so the wheels start somewhere date-dependent. The
-        // setDate(fixedDate) call below (post-show) then exercises the
-        // #4897 live-propagation path to drive the wheels to a stable
-        // calendar position before we capture.
-        picker.setDate(new Date());
+        // Open at a deterministic non-target date. The setDate(fixedDate)
+        // call below (post-show) then exercises the #4897 live-propagation
+        // path to drive the wheels to a stable calendar position before we
+        // capture.
+        picker.setDate(initialDate);
         variant.configure.run();
         picker.startEditingAsync();
         // First wait: InteractionDialog slide-up. <300ms in practice; 600ms

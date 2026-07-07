@@ -396,11 +396,14 @@ public class IOSImplementation extends CodenameOneImplementation {
 
         screenshotCallback = callback;
         try {
-            forceScreenRenderForCapture();
+            if (!isWatch()) {
+                forceScreenRenderForCapture();
+            }
             nativeInstance.screenshot();
         } catch (Throwable t) {
             screenshotCallback = null;
             Log.e(t);
+            System.out.println("CN1SS:ERR:ios screenshot capture failed " + t);
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
@@ -471,11 +474,17 @@ public class IOSImplementation extends CodenameOneImplementation {
                                         if (mutable != null) {
                                             image = mutable;
                                         }
+                                    } else {
+                                        System.out.println("CN1SS:ERR:ios screenshot readback returned "
+                                                + (rgb == null ? "null" : ("short length=" + rgb.length))
+                                                + " expected=" + (width * height));
                                     }
                                 } catch (OutOfMemoryError oom) {
                                     Log.e(oom);
+                                    System.out.println("CN1SS:ERR:ios screenshot readback OOM " + oom);
                                 } catch (Throwable t) {
                                     Log.e(t);
+                                    System.out.println("CN1SS:ERR:ios screenshot readback failed " + t);
                                 }
                             }
 
@@ -486,7 +495,12 @@ public class IOSImplementation extends CodenameOneImplementation {
                         }
                     } catch (Throwable t) {
                         Log.e(t);
+                        System.out.println("CN1SS:ERR:ios screenshot decode failed bytes=" + imageData.length
+                                + " error=" + t);
                     }
+                } else {
+                    System.out.println("CN1SS:ERR:ios screenshot native returned "
+                            + (imageData == null ? "null" : ("empty bytes=" + imageData.length)));
                 }
                 callback.onSucess(null);
             }
@@ -1689,7 +1703,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         return n;
     }
 
-    private static final int[] widthHeight = new int[2];
     public Object createImage(String path) throws IOException {
         long ns;
         if(path.startsWith("file:")) {
@@ -1697,6 +1710,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         } else {
             ns = getResourceNSData(path);
         }
+        int[] widthHeight = new int[2];
         NativeImage n = new NativeImage(path);
         n.peer = nativeInstance.createImageNSData(ns, widthHeight);
         n.width = widthHeight[0];
@@ -1824,7 +1838,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public Object createImage(InputStream i) throws IOException {
         long ns = getNSData(i);
         if(ns > 0) {
-            int[] wh = widthHeight;
+            int[] wh = new int[2];
             NativeImage n = new NativeImage("Image created from stream");
             n.peer = nativeInstance.createImageNSData(ns, wh);
             n.width = wh[0];
@@ -1862,7 +1876,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     
     public Object createImage(byte[] bytes, int offset, int len) {
-        int[] wh = widthHeight;
+        int[] wh = new int[2];
         if(offset != 0 || len != bytes.length) {
             byte[] b = new byte[len];
             System.arraycopy(bytes, offset, b, 0, len);
@@ -1871,6 +1885,8 @@ public class IOSImplementation extends CodenameOneImplementation {
         NativeImage n = new NativeImage("Native PNG of " + bytes.length);
         n.peer = createImage(bytes, wh);
         if (n.peer == 0 || wh[0] <= 0 || wh[1] <= 0) {
+            System.out.println("CN1SS:ERR:ios createImage(byte[]) failed len=" + bytes.length
+                    + " peer=" + n.peer + " width=" + wh[0] + " height=" + wh[1]);
             return null;
         }
         n.width = wh[0];
@@ -8348,7 +8364,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             if(nativePeer == 0) {
                 return new Dimension();
             }
-            int[] p = widthHeight;
+            int[] p = new int[2];
             nativeInstance.calcPreferredSize(nativePeer, getDisplayWidth(), getDisplayHeight(), p);
             return new Dimension(p[0], p[1]);
         }
@@ -8389,7 +8405,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         protected Image generatePeerImage() {
-            int[] wh = widthHeight;
+            int[] wh = new int[2];
             long imagePeer = nativeInstance.createPeerImage(this.nativePeer, wh);
             if(imagePeer == 0) {
                 return null;
