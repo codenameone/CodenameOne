@@ -45,7 +45,13 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
         // Use a long timeout so the toast stays visible for the screenshot
         ToastBar.showMessage("Info message at top", FontImage.MATERIAL_INFO, 30000);
 
-        // Wait for the toast animation to complete before taking the screenshot
-        UITimer.timer(2000, false, parent, run);
+        // Wait for the toast slide-in to fully settle before capturing. The toast animates in
+        // the global layered pane, which the base capture's form-AnimationManager settle poll
+        // does NOT track, so the render is only deterministic once the slide has finished. The
+        // previous 2000ms was enough on fast native platforms but not on the slow iOS/tvOS/
+        // watchOS simulators, where the toast was captured mid-slide -> a delta-191 run-to-run
+        // flake. 6000ms comfortably exceeds the slide duration even on the slowest sim; the
+        // toast's 30000ms timeout keeps it up, so the captured frame is the settled toast.
+        UITimer.timer(6000, false, parent, run);
     }
 }
