@@ -1,7 +1,6 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.ui.Form;
-import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.UITimer;
@@ -50,32 +49,74 @@ public class Media360PanoramaScreenshotTest extends BaseTest {
     }
 
     /// Sky gradient over ground, a sun disc and four meridian stripes of
-    /// distinct colors. Pure fills and lines - no text - so the pixels only
-    /// depend on the drawing primitives, not platform font rendering.
+    /// distinct colors, composed directly into an ARGB pixel array. The result
+    /// is an immutable, array-backed image (Image.createImage(int[], w, h)):
+    /// texturing it only reads the backing array, never a surface. A mutable
+    /// image built with a Graphics would instead force the GPU device to read
+    /// its pixels back (createTexture calls Image.getRGB), which on the iOS
+    /// Metal simulator returns white / drops the first present so the panorama
+    /// never appeared. Building the pixels by hand also keeps the texture
+    /// identical on every platform (no fillArc anti-aliasing variance).
     private static Image generatePanorama() {
         int w = 1024;
         int h = 512;
-        Image img = Image.createImage(w, h, 0xff000000);
-        Graphics g = img.getGraphics();
+        int[] px = new int[w * h];
+        // Sky gradient over the top half.
         for (int y = 0; y < h / 2; y++) {
             int t = 255 * y / (h / 2);
-            g.setColor((0x30 << 16) | ((0x60 + t / 3) << 8) | Math.min(255, 0xa0 + t / 2));
-            g.drawLine(0, y, w, y);
+            int color = 0xff000000 | (0x30 << 16)
+                    | ((0x60 + t / 3) << 8) | Math.min(255, 0xa0 + t / 2);
+            int row = y * w;
+            for (int x = 0; x < w; x++) {
+                px[row + x] = color;
+            }
         }
+        // Ground gradient over the bottom half.
         for (int y = h / 2; y < h; y++) {
             int t = 255 * (y - h / 2) / (h / 2);
-            g.setColor(((0x60 - t / 8) << 16) | ((0x50 - t / 8) << 8) | 0x30);
-            g.drawLine(0, y, w, y);
+            int color = 0xff000000 | ((0x60 - t / 8) << 16)
+                    | ((0x50 - t / 8) << 8) | 0x30;
+            int row = y * w;
+            for (int x = 0; x < w; x++) {
+                px[row + x] = color;
+            }
         }
-        g.setColor(0xffeeaa);
-        g.fillArc(w / 4 - 40, h / 4 - 40, 80, 80, 0, 360);
-        int[] stripeColors = {0xffffff, 0xdd4433, 0x33aa55, 0x3366ff};
+        // Sun disc centered at (w/4, h/4), radius 40, hard-edged.
+        int cx = w / 4;
+        int cy = h / 4;
+        int r2 = 40 * 40;
+        for (int y = cy - 40; y <= cy + 40; y++) {
+            if (y < 0 || y >= h) {
+                continue;
+            }
+            int dy = y - cy;
+            int row = y * w;
+            for (int x = cx - 40; x <= cx + 40; x++) {
+                if (x < 0 || x >= w) {
+                    continue;
+                }
+                int dx = x - cx;
+                if (dx * dx + dy * dy <= r2) {
+                    px[row + x] = 0xffffeeaa;
+                }
+            }
+        }
+        // Four meridian stripes, 8px wide and h/3 tall from y=h/3.
+        int[] stripeColors = {0xffffffff, 0xffdd4433, 0xff33aa55, 0xff3366ff};
         for (int i = 0; i < 4; i++) {
-            int x = (i * w / 4 + w / 2) % w;
-            g.setColor(stripeColors[i]);
-            g.fillRect(x - 4, h / 3, 8, h / 3);
+            int sx = (i * w / 4 + w / 2) % w;
+            int color = stripeColors[i];
+            for (int y = h / 3; y < h / 3 + h / 3; y++) {
+                int row = y * w;
+                for (int x = sx - 4; x < sx + 4; x++) {
+                    if (x < 0 || x >= w) {
+                        continue;
+                    }
+                    px[row + x] = color;
+                }
+            }
         }
-        return img;
+        return Image.createImage(px, w, h);
     }
 
     @Override
