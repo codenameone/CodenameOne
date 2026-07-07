@@ -66,15 +66,18 @@ public class MutableImageClipReadbackTest extends BaseTest {
         holder.getAllStyles().setPadding(0, 0, 0, 0);
         holder.add(painter);
 
-        Form form = new Form("Mutable Image Clip", new BorderLayout());
+        Form form = new Form("Mutable Image Clip", new BorderLayout()) {
+            @Override
+            protected void onShowCompleted() {
+                super.onShowCompleted();
+                repaint();
+                UITimer.timer(1500, false, this, () -> captureAndVerify());
+            }
+        };
         form.getAllStyles().setBgColor(0xffffff);
         form.getAllStyles().setBgTransparency(255);
         form.add(BorderLayout.CENTER, holder);
         form.show();
-
-        // Let the form lay out and paint at least once, then read the screen
-        // back. 1500ms mirrors BaseTest's settle for the screenshot tests.
-        UITimer.timer(1500, false, form, () -> captureAndVerify());
         return true;
     }
 

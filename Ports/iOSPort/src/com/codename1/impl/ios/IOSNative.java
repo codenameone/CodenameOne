@@ -994,6 +994,15 @@ public final class IOSNative {
     /** Async keychain delete; result via IOSSecureStorage.nativeStorageBooleanResult / nativeStorageError. */
     native void secureStorageRemove(int requestId, String reason, String account);
 
+    /** Synchronous keychain read without biometric prompting. */
+    native String secureStorageGetPlain(String account);
+
+    /** Synchronous keychain write without biometric prompting. */
+    native boolean secureStorageSetPlain(String account, String value);
+
+    /** Synchronous keychain delete without biometric prompting. */
+    native boolean secureStorageRemovePlain(String account);
+
     // --- NFC (Core NFC) -----------------------------------------------------
 
     /** True when NFCNDEFReaderSession is available (iOS 11+) and the device has NFC hardware. */

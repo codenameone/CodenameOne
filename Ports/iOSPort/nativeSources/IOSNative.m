@@ -14062,6 +14062,84 @@ void com_codename1_impl_ios_IOSNative_secureStorageRemove___int_java_lang_String
     POOL_END();
 }
 
+static NSMutableDictionary *cn1_secureStoragePlainQuery(NSString *account, NSString *appName, NSString *accessGroup) {
+    NSMutableDictionary *q = [NSMutableDictionary dictionary];
+    [q setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
+    [q setObject:account forKey:(__bridge id)kSecAttrAccount];
+    [q setObject:appName forKey:(__bridge id)kSecAttrService];
+    if (accessGroup != nil) {
+        [q setObject:accessGroup forKey:(__bridge id)kSecAttrAccessGroup];
+    }
+    return q;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_secureStorageGetPlain___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account) {
+    if (account == JAVA_NULL) {
+        return JAVA_NULL;
+    }
+    JAVA_OBJECT result = JAVA_NULL;
+    POOL_BEGIN();
+    NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
+    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, appName, cn1_keychainAccessGroup);
+    [q setObject:@YES forKey:(__bridge id)kSecReturnData];
+    [q setObject:(__bridge id)kSecMatchLimitOne forKey:(__bridge id)kSecMatchLimit];
+
+    CFTypeRef dataRef = NULL;
+    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)q, &dataRef);
+    if (status == errSecSuccess && dataRef != NULL) {
+        NSData *d = (__bridge NSData *)dataRef;
+        NSString *value = [[[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding] autorelease];
+        if (value != nil) {
+            result = fromNSString(CN1_THREAD_STATE_PASS_ARG value);
+        }
+        CFRelease(dataRef);
+    }
+    POOL_END();
+    return result;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_secureStorageSetPlain___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account, JAVA_OBJECT value) {
+    if (account == JAVA_NULL) {
+        return JAVA_FALSE;
+    }
+    JAVA_BOOLEAN result = JAVA_FALSE;
+    POOL_BEGIN();
+    NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
+    NSString *nsValue = (value == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG value);
+    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSData *data = [nsValue dataUsingEncoding:NSUTF8StringEncoding];
+
+    NSMutableDictionary *item = cn1_secureStoragePlainQuery(nsAccount, appName, cn1_keychainAccessGroup);
+    [item setObject:data forKey:(__bridge id)kSecValueData];
+    [item setObject:(__bridge id)kSecAttrAccessibleAfterFirstUnlock forKey:(__bridge id)kSecAttrAccessible];
+
+    OSStatus status = SecItemAdd((__bridge CFDictionaryRef)item, nil);
+    if (status == errSecDuplicateItem) {
+        NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, appName, cn1_keychainAccessGroup);
+        NSDictionary *changes = [NSDictionary dictionaryWithObject:data forKey:(__bridge id)kSecValueData];
+        status = SecItemUpdate((__bridge CFDictionaryRef)q, (__bridge CFDictionaryRef)changes);
+    }
+    result = (status == errSecSuccess) ? JAVA_TRUE : JAVA_FALSE;
+    POOL_END();
+    return result;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_secureStorageRemovePlain___java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account) {
+    if (account == JAVA_NULL) {
+        return JAVA_FALSE;
+    }
+    JAVA_BOOLEAN result = JAVA_FALSE;
+    POOL_BEGIN();
+    NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
+    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, appName, cn1_keychainAccessGroup);
+    OSStatus status = SecItemDelete((__bridge CFDictionaryRef)q);
+    result = (status == errSecSuccess || status == errSecItemNotFound) ? JAVA_TRUE : JAVA_FALSE;
+    POOL_END();
+    return result;
+}
+
 // ============================================================================
 // NFC natives (Core NFC)
 // ============================================================================

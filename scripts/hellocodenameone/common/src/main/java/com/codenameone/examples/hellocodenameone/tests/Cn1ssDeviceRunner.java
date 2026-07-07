@@ -553,8 +553,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         try {
             testClass.cleanup();
             if (timedOut) {
-                log("CN1SS:ERR:suite test=" + testName + " failed due to timeout waiting for DONE stage="
-                        + testClass.getCaptureStage());
+                String stage = testClass.getCaptureStage();
                 if (shouldRetryAfterSilentTimeout(index, testClass)) {
                     // The test timed out without EVER requesting a capture and
                     // without reporting a failure: the show -> settle-timer ->
@@ -568,7 +567,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                     // on a missing tile.
                     retriedTestIndex = index;
                     log("CN1SS:WARN:suite test=" + testName
-                            + " retrying once: timed out before any capture started");
+                            + " timed out waiting for DONE stage=" + stage
+                            + "; retrying once before any capture started");
                     testClass.resetForRetry();
                     runNextTest(index);
                     return;
@@ -576,11 +576,13 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 if (shouldRetryAfterCaptureTimeout(index, testClass)) {
                     retriedCaptureTimeoutTestIndex = index;
                     log("CN1SS:WARN:suite test=" + testName
-                            + " retrying once: capture was requested but did not complete");
+                            + " timed out waiting for DONE stage=" + stage
+                            + "; retrying once after capture was requested");
                     testClass.resetForRetry();
                     runNextTest(index);
                     return;
                 }
+                log("CN1SS:ERR:suite test=" + testName + " failed due to timeout waiting for DONE stage=" + stage);
             } else if (testClass.isFailed()) {
                 log("CN1SS:ERR:suite test=" + testName + " failed: " + testClass.getFailMessage());
             } else if (!testClass.shouldTakeScreenshot()) {

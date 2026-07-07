@@ -58,7 +58,11 @@
 }
 
 -(BOOL)isSupported{
+#if TARGET_OS_TV || TARGET_OS_WATCH
+    return NO;
+#else
     return YES;
+#endif
 }
 
 @end

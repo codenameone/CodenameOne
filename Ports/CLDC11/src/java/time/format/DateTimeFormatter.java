@@ -134,6 +134,10 @@ public final class DateTimeFormatter {
 
     LocalDateTime parseLocalDateTime(String text) {
         if (type == TYPE_PATTERN) {
+            LocalDateTime numeric = parseNumericLocalDateTime(text, pattern);
+            if (numeric != null) {
+                return numeric;
+            }
             ParsedPatternResult parsed = parsePattern(text, pattern, ZoneOffset.UTC, locale);
             return LocalDateTime.ofInstant(parsed.instant, ZoneOffset.UTC);
         }
@@ -256,6 +260,38 @@ public final class DateTimeFormatter {
 
     private static int parseInt(String text, int start, int end) {
         return Integer.parseInt(text.substring(start, end));
+    }
+
+    private static LocalDateTime parseNumericLocalDateTime(String text, String pattern) {
+        try {
+            if ("yyyy-MM-dd HH:mm:ss".equals(pattern) && text.length() == 19
+                    && text.charAt(4) == '-' && text.charAt(7) == '-'
+                    && text.charAt(10) == ' ' && text.charAt(13) == ':'
+                    && text.charAt(16) == ':') {
+                return LocalDateTime.of(
+                        parseInt(text, 0, 4),
+                        parseInt(text, 5, 7),
+                        parseInt(text, 8, 10),
+                        parseInt(text, 11, 13),
+                        parseInt(text, 14, 16),
+                        parseInt(text, 17, 19)
+                );
+            }
+            if ("yyyy-MM-dd HH:mm".equals(pattern) && text.length() == 16
+                    && text.charAt(4) == '-' && text.charAt(7) == '-'
+                    && text.charAt(10) == ' ' && text.charAt(13) == ':') {
+                return LocalDateTime.of(
+                        parseInt(text, 0, 4),
+                        parseInt(text, 5, 7),
+                        parseInt(text, 8, 10),
+                        parseInt(text, 11, 13),
+                        parseInt(text, 14, 16)
+                );
+            }
+        } catch (RuntimeException err) {
+            throw new DateTimeParseException(err.getMessage(), text, 0);
+        }
+        return null;
     }
 
     private static TimeZone toTimeZone(ZoneId zone) {

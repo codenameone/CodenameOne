@@ -61,6 +61,42 @@ public final class IOSSecureStorage extends SecureStorage {
     }
 
     @Override
+    public boolean set(String account, String value) {
+        if (account == null) {
+            return false;
+        }
+        try {
+            return nativeInstance.secureStorageSetPlain(account, value == null ? "" : value);
+        } catch (Throwable err) {
+            return false;
+        }
+    }
+
+    @Override
+    public String get(String account) {
+        if (account == null) {
+            return null;
+        }
+        try {
+            return nativeInstance.secureStorageGetPlain(account);
+        } catch (Throwable err) {
+            return null;
+        }
+    }
+
+    @Override
+    public boolean remove(String account) {
+        if (account == null) {
+            return false;
+        }
+        try {
+            return nativeInstance.secureStorageRemovePlain(account);
+        } catch (Throwable err) {
+            return false;
+        }
+    }
+
+    @Override
     public void setKeychainAccessGroup(String group) {
         this.accessGroup = (group != null && group.length() == 0) ? null : group;
         nativeInstance.setSecureStorageAccessGroup(this.accessGroup);

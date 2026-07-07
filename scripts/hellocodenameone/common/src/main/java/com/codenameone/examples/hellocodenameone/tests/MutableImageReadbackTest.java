@@ -2,7 +2,10 @@ package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.Form;
 import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.util.UITimer;
 
 /**
  * Phase 3 milestone test: round-trip through Image.getGraphics().drawXxx(...)
@@ -23,12 +26,25 @@ public class MutableImageReadbackTest extends BaseTest {
 
     @Override
     public boolean runTest() {
+        Form form = new Form("Mutable Image Readback", new BorderLayout()) {
+            @Override
+            protected void onShowCompleted() {
+                super.onShowCompleted();
+                repaint();
+                UITimer.timer(500, false, this, () -> runReadbackChecks());
+            }
+        };
+        form.show();
+        return true;
+    }
+
+    private void runReadbackChecks() {
         try {
             // Step 1: a fillRect-only mutable. The simplest case --
             // verifies that pixel readback sees the most recent solid
             // fill.
             if (!testFillRectReadback()) {
-                return false;
+                return;
             }
 
             // Step 2: a fillRect followed by a smaller fillRect inside it.
@@ -36,7 +52,7 @@ public class MutableImageReadbackTest extends BaseTest {
             // ops -- catches a 'commit only the first op' bug or any
             // out-of-order drain.
             if (!testStackedFillsReadback()) {
-                return false;
+                return;
             }
 
             // Step 3: a fillShape (alpha-mask Metal pipeline) into the
@@ -44,14 +60,12 @@ public class MutableImageReadbackTest extends BaseTest {
             // to readback. This is the path that was silently dead before
             // commit 1e2f6a2bd.
             if (!testFillShapeReadback()) {
-                return false;
+                return;
             }
 
             done();
-            return true;
         } catch (Throwable t) {
             fail("Unexpected exception: " + t.getMessage());
-            return false;
         }
     }
 
