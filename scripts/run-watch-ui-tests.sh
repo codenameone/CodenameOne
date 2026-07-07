@@ -178,6 +178,16 @@ while [ "$waited" -lt "$MAX_WAIT" ]; do
 done
 rw_log "Capture settled: $(/usr/bin/find "$WS_RAW_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ') of $EXPECTED screenshots after ${waited}s"
 
+WATCH_APP_LOG="$ARTIFACTS_DIR/watch-app-cn1ss.log"
+xcrun simctl spawn "$WATCH_UDID" \
+  log show --style syslog --last 30m \
+  --predicate '(composedMessage CONTAINS "CN1SS") OR (eventMessage CONTAINS "CN1SS")' \
+  > "$WATCH_APP_LOG" 2>/dev/null || true
+SUITE_FAILURE_LINES="$(cn1ss_collect_suite_failures "$WATCH_APP_LOG")"
+if [ -n "$SUITE_FAILURE_LINES" ]; then
+  rw_log "Detected DeviceRunner assertion/test failure(s); artifacts and screenshot report will still be collected before failing."
+fi
+
 # --- Compare against the watch golden set + emit report ---------------------
 REF_DIR="${SCREENSHOT_REF_DIR:-$SCRIPT_DIR/ios/screenshots-watch}"
 REF_DIR="$(cd "$REF_DIR" && pwd)"
@@ -223,6 +233,11 @@ if [ -f "$SUMMARY_OUT" ] && grep -q "^missing_expected|" "$SUMMARY_OUT"; then
   me="$(grep -c "^missing_expected|" "$SUMMARY_OUT" 2>/dev/null || echo 0)"
   rw_log "FATAL: $me screenshot(s) streamed with no stored golden (missing_expected) -- add them to scripts/ios/screenshots-watch."
   [ "$rc" -eq 0 ] && rc=17
+fi
+if [ -n "$SUITE_FAILURE_LINES" ]; then
+  rw_log "STAGE:DEVICE_RUNNER_TEST_FAILED -> assertion/test failure(s) are not allowed:"
+  printf '%s\n' "$SUITE_FAILURE_LINES" | sed 's/^/[CN1SS-FAIL] /'
+  [ "$rc" -eq 0 ] && rc=19
 fi
 # The suite must have produced something at all.
 [ "${#ACTUAL[@]}" -gt 0 ] || rc=1

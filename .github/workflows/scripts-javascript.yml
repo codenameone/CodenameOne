@@ -88,8 +88,8 @@ jobs:
       # stalled and the suite re-dispatched. That leak is fixed (dead canvas
       # host-refs are now released on the worker GC signal), so the suite
       # delivers every screenshot deterministically -- a missing capture is a
-      # real regression again. Keep at 0 like Android/JavaSE (iOS uses 2 for
-      # OrientationLock + MutableImageReadback, which don't apply here).
+      # real regression again. Keep at 0 like Android/JavaSE. Assertion failures
+      # are separate from screenshot coverage and must never be tolerated here.
       CN1SS_ALLOWED_MISSING: "0"
       BROWSER_CMD: "node \"$GITHUB_WORKSPACE/scripts/run-javascript-headless-browser.mjs\""
     steps:
