@@ -7216,6 +7216,15 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Factory for the `com.codename1.ar.AR` augmented reality API. Each call
+    /// returns a fresh per-session backend, or `null` on platforms without AR
+    /// support. Subclasses override to wire in their port.
+    ///
+    /// @hidden
+    public ARImpl createARImpl() {
+        return null;
+    }
+
     /// Captures a screenshot of the screen.
     ///
     /// #### Returns

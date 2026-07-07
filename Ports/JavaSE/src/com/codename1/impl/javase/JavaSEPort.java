@@ -884,6 +884,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static PerformanceMonitor perfMonitor;
     static LocationSimulation locSimulation;
     static MotionSimulation motionSimulation;
+    static ARSimulation arSimulation;
     private JavaSEMotionSensorManager motionSensorManager;
     static PushSimulator pushSimulation;
     private static boolean blockMonitors;
@@ -5959,6 +5960,18 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         });
         simulateMenu.add(motionSim);
+
+        JMenuItem arSim = new JMenuItem("AR Simulation");
+        arSim.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                if(arSimulation == null) {
+                        arSimulation = new ARSimulation();
+                }
+                arSimulation.setVisible(true);
+            }
+        });
+        simulateMenu.add(arSim);
 
         JMenuItem pushSim = new JMenuItem("Push Simulation");
         pushSim.addActionListener(new ActionListener() {
@@ -14707,6 +14720,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public com.codename1.impl.CameraImpl createCameraImpl() {
         return new JavaSECameraImpl();
+    }
+
+    @Override
+    public com.codename1.impl.ARImpl createARImpl() {
+        return new JavaSEARImpl();
     }
     
     private void captureMulti(final com.codename1.ui.events.ActionListener response, final String[] imageTypes, final String desc) {

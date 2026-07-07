@@ -299,7 +299,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new Gpu3DTexturedCubeScreenshotTest(),
             new Gpu3DModelScreenshotTest(),
             new Gpu3DAnimationTest(),
-            // Keep this as the last screenshot test; orientation changes can leak into subsequent screenshots.
+            // Keep this as the last portrait screenshot test; orientation changes can leak into subsequent screenshots.
             new OrientationLockScreenshotTest(),
             new InPlaceEditViewTest(),
             new BytecodeTranslatorRegressionTest(),
@@ -311,6 +311,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // prompts). Self-skips on iOS / Android / JS where the open
             // call would surface an OS dialog.
             new CameraApiTest(),
+            // Exercises com.codename1.ar end-to-end: the unsupported
+            // contract on the CI platforms (none has an AR runtime) and a
+            // full session round trip when a backend is present.
+            new ARApiTest(),
             new SimdLargeAllocaTest(),
             new StreamApiTest(),
             new StringApiTest(),
@@ -350,6 +354,20 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // SKIPs (no screenshot) where the platform cannot encode (iOS simulator,
             // unsupported targets). Pixel verification lives in VideoIORoundTripTest.
             new VideoIODecodedFramesScreenshotTest(),
+            // VR / 360 immersive views, captured in landscape (where a stereo
+            // scene / panorama reads naturally) via LandscapeCapture, which
+            // locks landscape on phones and no-ops on desktop/browser/tv.
+            // Placed near the end - after DesktopMode and the video screenshot,
+            // but before the media round-trip test - so nothing GPU-heavy or
+            // orientation-changing precedes those sensitive tests: on the iOS
+            // Metal backends DesktopMode's screenshot otherwise grabbed the
+            // lingering 3D form under the late-present race, and the video
+            // screenshot is GPU-neighbor sensitive. Nothing captures the screen
+            // after these, so their landscape state cannot leak. VRStereoScene
+            // self-skips on tvOS (stereo has no use without a headset);
+            // Media360Panorama still runs there.
+            new VRStereoSceneScreenshotTest(),
+            new Media360PanoramaScreenshotTest(),
             // VideoIO cross-platform coverage: encodes a 6-frame counting clip with audio,
             // decodes the frames back and verifies the count order + PCM levels. Assertion
             // test (no screenshot); SKIPs where the platform can't encode. Deliberately LAST:

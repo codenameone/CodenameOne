@@ -40,6 +40,8 @@ public class SimulatorWindowModeVerifier {
             Path nativeThemeSentinel = parsed.nativeTheme != null
                     ? projectDir.resolve("native-theme-result.txt")
                     : null;
+            boolean arDemo = "ar-demo".equals(parsed.scenario);
+            Path arSentinel = arDemo ? projectDir.resolve("ar-result.txt") : null;
 
             List<String> cmd = new ArrayList<String>();
             String javaExec = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
@@ -67,6 +69,10 @@ public class SimulatorWindowModeVerifier {
                 cmd.add("-Dcn1.test.expectedNativeTheme=" + parsed.nativeTheme);
                 cmd.add("-Dcn1.test.nativeThemeResultFile=" + nativeThemeSentinel.toAbsolutePath());
             }
+            if (arDemo) {
+                cmd.add("-Dcn1.test.arDemo=true");
+                cmd.add("-Dcn1.test.arResultFile=" + arSentinel.toAbsolutePath());
+            }
             if (parsed.skinPath != null && parsed.skinPath.length() > 0) {
                 cmd.add("-Dskin=" + parsed.skinPath);
                 cmd.add("-Ddskin=" + parsed.skinPath);
@@ -79,7 +85,7 @@ public class SimulatorWindowModeVerifier {
             ProcessBuilder pb = new ProcessBuilder(cmd);
             pb.directory(projectDir.toFile());
             pb.redirectErrorStream(true);
-            if (parsed.nativeTheme != null) {
+            if (parsed.nativeTheme != null || arDemo) {
                 // Capture output to a log so we can also confirm the
                 // result line on stdout if the sentinel file isn't
                 // written for some reason. Without the redirect the
@@ -94,7 +100,33 @@ public class SimulatorWindowModeVerifier {
 
             waitForSimulatorWarmup(Duration.ofSeconds("network-monitor".equals(parsed.scenario) ? 12 : 8));
 
+            if (arDemo) {
+                // The AR scenario reaches its steady state (model anchored on
+                // the detected floor plane) at its own pace; the sentinel file
+                // is written exactly then, so wait for it instead of guessing
+                // with a longer sleep. The post-capture assertion below still
+                // reports the real failure if the deadline passes.
+                Instant arDeadline = Instant.now().plusSeconds(30);
+                while (!Files.exists(arSentinel) && Instant.now().isBefore(arDeadline)) {
+                    Thread.sleep(250);
+                }
+                // One extra second so the EDT repaint that follows the anchor
+                // attachment is on screen before the Robot capture.
+                Thread.sleep(1000);
+            }
+
+            // The warmup above is a floor for the scenario to reach its
+            // steady state, but on slow runners the simulator window may not
+            // have painted yet, which used to fail the run with a blank/flat
+            // capture. Keep polling until the desktop shows actual content
+            // (or a generous deadline passes and validation reports the
+            // real failure).
             BufferedImage image = captureDesktop();
+            Instant renderDeadline = Instant.now().plusSeconds(30);
+            while (isBlankOrFlat(image) && Instant.now().isBefore(renderDeadline)) {
+                Thread.sleep(500);
+                image = captureDesktop();
+            }
             validateScreenshotContent(image);
 
             Path screenshotPath = Path.of(parsed.screenshotPath);
@@ -108,6 +140,10 @@ public class SimulatorWindowModeVerifier {
 
             if (parsed.nativeTheme != null) {
                 assertNativeThemeApplied(parsed, nativeThemeSentinel, projectDir);
+            }
+            if (arDemo) {
+                assertResultLinePass("[ar-test]", arSentinel, projectDir,
+                        "AR simulator demo (open session, detect plane, hit test, anchor model)");
             }
             exitCode = 0;
         } catch (Throwable t) {
@@ -144,6 +180,17 @@ public class SimulatorWindowModeVerifier {
         if (image.getWidth() < 120 || image.getHeight() < 120) {
             throw new AssertionError("Screenshot is unexpectedly small: " + image.getWidth() + "x" + image.getHeight());
         }
+        int samples = sampleColorCount(image);
+        if (samples < 3) {
+            throw new AssertionError("Screenshot appears blank/flat (insufficient color variation): " + samples);
+        }
+    }
+
+    private static boolean isBlankOrFlat(BufferedImage image) {
+        return sampleColorCount(image) < 3;
+    }
+
+    private static int sampleColorCount(BufferedImage image) {
         Set<Integer> samples = new HashSet<Integer>();
         int stepX = Math.max(1, image.getWidth() / 24);
         int stepY = Math.max(1, image.getHeight() / 24);
@@ -152,9 +199,7 @@ public class SimulatorWindowModeVerifier {
                 samples.add(image.getRGB(x, y));
             }
         }
-        if (samples.size() < 3) {
-            throw new AssertionError("Screenshot appears blank/flat (insufficient color variation): " + samples.size());
-        }
+        return samples.size();
     }
 
     /**
@@ -188,6 +233,38 @@ public class SimulatorWindowModeVerifier {
         if (!line.contains("result=PASS")) {
             throw new AssertionError("Native theme " + args.nativeTheme
                     + " was not loaded by the simulator: " + line);
+        }
+    }
+
+    /**
+     * Asserts a scenario result line (sentinel file preferred, captured
+     * stdout log as fallback) starts with {@code linePrefix} and reports
+     * {@code result=PASS}. Mirrors the native-theme assertion for
+     * scenarios that verify behavior in addition to the screenshot.
+     */
+    private static void assertResultLinePass(String linePrefix, Path sentinel, Path projectDir,
+            String description) throws Exception {
+        String line = null;
+        if (sentinel != null && Files.exists(sentinel)) {
+            line = new String(Files.readAllBytes(sentinel), StandardCharsets.UTF_8).trim();
+        }
+        if (line == null || line.isEmpty()) {
+            Path log = projectDir.resolve("simulator-output.log");
+            if (Files.exists(log)) {
+                for (String l : Files.readAllLines(log, StandardCharsets.UTF_8)) {
+                    if (l.startsWith(linePrefix)) {
+                        line = l.trim();
+                        break;
+                    }
+                }
+            }
+        }
+        if (line == null || line.isEmpty()) {
+            throw new AssertionError(description + " produced no result line (sentinel=" + sentinel + ")");
+        }
+        System.out.println("[javase-verifier] assertion: " + line);
+        if (!line.contains("result=PASS")) {
+            throw new AssertionError(description + " did not pass: " + line);
         }
     }
 

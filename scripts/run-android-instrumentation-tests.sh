@@ -203,7 +203,17 @@ if ! (
 fi
 
 END_MARKER="CN1SS:SUITE:FINISHED"
-TIMEOUT_SECONDS=60
+# The instrumentation @Test is a trivial launcher; the CN1SS suite runs
+# asynchronously in the app process, so this wait is effectively the suite's
+# completion budget (the DeviceRunner emits END_MARKER when the last test
+# finishes and its screenshot has been delivered). 60s left almost no margin:
+# adding a couple of GPU screenshot tests (each ~several seconds of readback on
+# the emulator's software rasterizer) pushed completion just past it, so the
+# marker never arrived in time and the final tests' screenshots were reported
+# missing. Wait long enough that suite growth and slow runners keep margin; a
+# suite that finishes sooner still breaks out immediately on marker detection,
+# and a genuine hang is still caught by the missing-screenshot count guard.
+TIMEOUT_SECONDS=240
 START_TIME="$(date +%s)"
 ra_log "Waiting for DeviceRunner completion marker ($END_MARKER)"
 while true; do

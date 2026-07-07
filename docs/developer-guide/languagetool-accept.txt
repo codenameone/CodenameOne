@@ -5,11 +5,9 @@
 # offsetInContext+errorLength]). The match must consume the full flagged
 # span; it is also bracketed by word boundaries so a bare "foo" matches
 # the standalone word "foo" but not "foobar".
-#
 # Use this for proper nouns, product names, class identifiers, file
 # extensions, and other technical terms that LanguageTool's English
 # dictionary does not recognize.
-#
 # Conventions:
 # - Entries are case-sensitive. Use a character class like [Ii] if both
 #   capitalizations should be accepted.
@@ -21,35 +19,24 @@
 # upper- and lower-case letters or includes digits is almost certainly a
 # class name, method name, variable, or other code-flavored identifier
 # that the dictionary will not know.)
-# -----------------------------------------------------------------------------
-
 # PascalCase (FooBar, FooBarBaz, FooBars). Stops at simple two-letter
 # starts like "Of" so it does not swallow real prose.
 [A-Z][a-z]+(?:[A-Z][a-zA-Z0-9]+)+s?
-
 # Class names with a leading acronym followed by mixed case
 # (URLImage, NSData, JSObject, HMACSHA, XMLWriter, ...).
 [A-Z]{2,}[a-z][A-Za-z0-9]*
-
 # camelCase (fooBar, fooBarBaz).
 [a-z]+[A-Z][a-zA-Z0-9]+
-
 # Any identifier-shaped token that contains a digit.
 [A-Za-z][A-Za-z0-9]*[0-9][A-Za-z0-9]*
-
 # Hyphenated technical tokens (cn1lib-archetype, mac-os-x-desktop, ...).
 [A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)+
-
 # Underscored identifiers (foo_bar, FOO_BAR).
 [A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+
-
 # All-caps tokens (acronyms: UIID, HMAC, URL, ...). Excludes single-letter
 # matches; those are handled by LanguageTool's default behavior.
 [A-Z]{2,}s?
-
-# -----------------------------------------------------------------------------
 # Codename One product, project, and contributor names
-# -----------------------------------------------------------------------------
 Codename
 CodenameOne
 codenameone
@@ -108,10 +95,7 @@ handcoded
 navigatable
 popover
 popovers
-
-# -----------------------------------------------------------------------------
 # Acronyms and product / framework names
-# -----------------------------------------------------------------------------
 AFNetworking
 AVKit
 AWT
@@ -155,7 +139,6 @@ iphone
 itunes
 gmail
 facebook
-JHLabs
 JRuby
 JSObject
 JSProxy
@@ -211,10 +194,7 @@ WebTV
 WinPhone
 XOR
 xor
-
-# -----------------------------------------------------------------------------
 # Short technical tokens that LanguageTool's dictionary does not include.
-# -----------------------------------------------------------------------------
 aar
 aarrggbb
 actool
@@ -256,7 +236,6 @@ ftp
 ftps
 ssh
 mvn
-ftp
 gpg
 nginx
 overridable
@@ -281,7 +260,6 @@ speedup
 sqlite
 SQLite
 tickering
-ttf
 uiswing
 untarring
 url
@@ -305,14 +283,10 @@ uncompiled
 Extra Extra
 Extra Small
 urls
-xor
 zlib
 \$number
-
-# -----------------------------------------------------------------------------
 # Technical terms that are commonly used in tech writing but not in the
 # default English dictionary
-# -----------------------------------------------------------------------------
 appstores
 archs
 asciidoc
@@ -331,7 +305,6 @@ Autosizing
 Autosnap
 barebones
 bitcode
-bool
 booleans
 broadcast
 bytecode
@@ -365,7 +338,6 @@ hardcoded
 homescreen
 honor
 honored
-imap
 init
 instanceof
 invokedynamic
@@ -375,11 +347,9 @@ janky
 jaxb
 json
 keypair
-keystore
 keystores
 keytool
 kitchensink
-ks
 lproj
 multidex
 Multidex
@@ -387,7 +357,6 @@ multibutton
 multiline
 Multiline
 multilist
-mvn
 myapp
 mycompany
 nestoria
@@ -409,7 +378,6 @@ Redeclare
 reparent
 reparented
 reparenting
-restful
 runtimes
 safetynet
 sanitised
@@ -438,20 +406,13 @@ unlayout
 Unlayout
 unselect
 unzip
-url
-urls
-viewbox
 webcredentials
 webserver
 webservers
-webservices
 xcode
 xpermissions
 xintent
-
-# -----------------------------------------------------------------------------
 # British spellings — accept either form to match the source's mix.
-# -----------------------------------------------------------------------------
 behaviour
 behaviours
 centimetres
@@ -469,7 +430,6 @@ realised
 recognise
 recognised
 sanitise
-sanitised
 unrecognised
 Unrecognised
 utilise
@@ -478,10 +438,7 @@ visualisation
 visualisations
 visualise
 visualised
-
-# -----------------------------------------------------------------------------
 # Domain-specific names from sample/demo apps and external services
-# -----------------------------------------------------------------------------
 admob
 Admob
 anapioficeandfire
@@ -492,14 +449,10 @@ googleProductLogo
 googleProductName
 googleservice
 googleservice-info
-nestoria
 twilio
 xapplication
-
-# -----------------------------------------------------------------------------
 # Java tooling / networking terms — standard names LanguageTool's English
 # dictionary doesn't recognise.
-# -----------------------------------------------------------------------------
 jdb
 loopback
 rethrow
@@ -509,25 +462,19 @@ Throwable
 Throwables
 javase
 Xvfb
-
-# -----------------------------------------------------------------------------
 # Android tooling — names from the Android SDK / platform-tools that the
 # English dictionary doesn't recognise.
-# -----------------------------------------------------------------------------
 adb
 logcat
 pidof
-
 # Identity-provider product names used in the Authentication & Identity chapter.
 Keycloak
 Cognito
 Authentik
-
 # Codename One router & JS port - technical identifiers used in the Routing
 # and Deep Links chapters.
 parparvm
 assetlinks
-
 # WebAuthn / passkey terminology used in the Authentication & Identity chapter.
 # IdP is the standard W3C abbreviation for "identity provider"; the
 # server-library names below appear verbatim in the recommended-libraries
@@ -536,26 +483,21 @@ IdP
 webauthn
 [Pp]asskey
 [Pp]asskeys
-
 # Build-time POJO annotation framework terminology used in the
 # Annotation-{JSON-XML-Mapping,Component-Binding,SQLite-ORM} chapters.
 # `dao` (data access object) and `daos` aren't in LanguageTool's en_US
 # dictionary.
 [Dd]ao
 [Dd]aos
-
-# -----------------------------------------------------------------------------
 # AI / LLM provider, product, and model names used in the AI, Chat UI, and
 # Speech chapter. LanguageTool's en_US dictionary either doesn't recognise
 # these or mis-spells them.
-# -----------------------------------------------------------------------------
 Ollama
 [Vv]LLM
 [Ll]lama
 [Aa]nthropic
 SAPI
 espeak
-
 # Protocol Buffers / gRPC technical terms used in the generate-grpc
 # appendix and the @ProtoMessage / @GrpcClient runtime docs. "protobuf"
 # is the de-facto short form of "Protocol Buffers"; "varint" is the
@@ -564,14 +506,11 @@ espeak
 [Pp]rotobuf
 [Vv]arint
 [Ee]nums
-
 # Windows Sockets API (the native Windows port uses it for raw sockets).
 Winsock
-
 # SSL.com's cloud code-signing service, named alongside Azure Trusted Signing
 # and DigiCert KeyLocker in the native Windows code-signing section.
 eSigner
-
 # 3D graphics / shader chapter (com.codename1.gpu). "Phong" is the
 # standard name of the Phong/Blinn-Phong lighting model. "Khronos" is the
 # standards body behind glTF/OpenGL, "BoomBox" is the Khronos glTF sample
@@ -591,7 +530,6 @@ billboarded
 Bezier
 subpath
 subpaths
-
 # Native Linux port chapter (Working-With-Linux). The standard names of the
 # GTK3/Cairo native stack and the libc/toolchain terms: "Pango" is the text
 # layout engine, "musl" and "glibc" are the two C libraries, "libc" is the C
@@ -607,18 +545,15 @@ libsecret
 libnotify
 sonames
 syscall
-
 # The POSIX dynamic-loader call used by the Linux port to load optional libs.
 dlopen
 # The zig toolchain (zig cc), used to pin an old glibc for the Linux port.
 zig
 transcoder
-
 # VideoIO chapter (com.codename1.media.VideoIO). A "resampler" converts a
 # variable-frame-rate clip to a constant frame rate; standard video term not in
 # LanguageTool's en_US dictionary.
 [Rr]esamplers?
-
 # Crash protection terminology.
 # "Symbolicated" / "symbolicate" is the term of art for resolving raw
 # stack frame addresses back to file:line via a build's symbols. Used
@@ -639,7 +574,6 @@ pseudonymous
 Plausible
 PostHog
 Piwik
-
 # Maps chapter: vector-map terminology. "basemap"/"basemaps" is the standard
 # one-word cartography term for the background reference map, and "Mapbox" is
 # the vendor whose Mapbox Vector Tiles (MVT) format the engine decodes.
@@ -651,7 +585,6 @@ MapTiler
 Protomaps
 TileServer
 TileJSON
-
 # Security chapter: device-integrity / RASP terminology and vendor / tool names.
 # RASP = Runtime Application Self-Protection; MTD = Mobile Threat Defense.
 RASP
@@ -665,10 +598,12 @@ dylibs?
 Zimperium
 Promon
 DeviceCheck
-
 # Device input / form-factor terms (Device-Input-And-Form-Factors.asciidoc)
 foldables?
 bitmask
 DeX
 Siri
 devirtualization
+# AR / VR terms (Augmented-Reality.asciidoc, Virtual-Reality.asciidoc)
+raycasts?
+equirectangular
