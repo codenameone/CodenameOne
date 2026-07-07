@@ -31,35 +31,53 @@ final class InputValidationUITests: XCTestCase {
         return 3.0
     }
 
+    private var syncDirectory: URL? {
+        if let raw = ProcessInfo.processInfo.environment["CN1IV_SYNC_DIR"], !raw.isEmpty {
+            return URL(fileURLWithPath: raw)
+        }
+        let fallback = "/tmp/cn1-input-validation-sync"
+        if FileManager.default.fileExists(atPath: fallback) {
+            return URL(fileURLWithPath: fallback)
+        }
+        return nil
+    }
+
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
 
     func testGestureSuite() throws {
         let app = XCUIApplication(bundleIdentifier: bundleIdentifier)
+        let syncDir = syncDirectory
         app.launch()
-        // Wait for the form to render before driving inputs. The CN1 EDT needs
-        // a moment after process launch to mount the GLViewController, run the
-        // first paint, and start dispatching pointer events. Without this delay
-        // taps fire into the splash screen.
-        Thread.sleep(forTimeInterval: 2.5)
+        if syncDir == nil {
+            // Local fallback when the shell harness is not coordinating from
+            // CN1IV:READY log markers.
+            Thread.sleep(forTimeInterval: 2.5)
+        }
 
-        try driveTap(app: app)
-        Thread.sleep(forTimeInterval: stepDelaySeconds)
+        try driveTap(app: app, syncDir: syncDir)
+        if syncDir == nil {
+            Thread.sleep(forTimeInterval: stepDelaySeconds)
+        }
 
-        try driveDrag(app: app)
-        Thread.sleep(forTimeInterval: stepDelaySeconds)
+        try driveDrag(app: app, syncDir: syncDir)
+        if syncDir == nil {
+            Thread.sleep(forTimeInterval: stepDelaySeconds)
+        }
 
-        try driveLongPress(app: app)
+        try driveLongPress(app: app, syncDir: syncDir)
         Thread.sleep(forTimeInterval: max(stepDelaySeconds, 10.0))
     }
 
-    private func driveTap(app: XCUIApplication) throws {
+    private func driveTap(app: XCUIApplication, syncDir: URL?) throws {
+        try waitForGate("tap", syncDir: syncDir)
         let center = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         center.tap()
     }
 
-    private func driveDrag(app: XCUIApplication) throws {
+    private func driveDrag(app: XCUIApplication, syncDir: URL?) throws {
+        try waitForGate("drag", syncDir: syncDir)
         // Sweep horizontally across the middle band so the CN1 drag detector
         // collects enough pointerDragged samples to exceed its 3-sample floor.
         let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.55))
@@ -67,8 +85,28 @@ final class InputValidationUITests: XCTestCase {
         start.press(forDuration: 0.05, thenDragTo: end)
     }
 
-    private func driveLongPress(app: XCUIApplication) throws {
+    private func driveLongPress(app: XCUIApplication, syncDir: URL?) throws {
+        try waitForGate("longpress", syncDir: syncDir)
         let target = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.56))
         target.press(forDuration: 2.25)
+    }
+
+    private func waitForGate(_ name: String, syncDir: URL?) throws {
+        guard let syncDir = syncDir else {
+            return
+        }
+        let gate = syncDir.appendingPathComponent("\(name).go")
+        let deadline = Date().addingTimeInterval(45.0)
+        while Date() < deadline {
+            if FileManager.default.fileExists(atPath: gate.path) {
+                return
+            }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        throw NSError(
+            domain: "CN1InputValidationUITests",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Timed out waiting for \(gate.path)"]
+        )
     }
 }
