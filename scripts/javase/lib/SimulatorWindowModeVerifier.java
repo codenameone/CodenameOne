@@ -186,7 +186,8 @@ public class SimulatorWindowModeVerifier {
             throw new AssertionError("Screenshot appears blank/flat (insufficient color variation): " + samples);
         }
         int darkPixels = countSingleWindowDevicePixels(args, image);
-        if (darkPixels >= 0 && darkPixels < 5000) {
+        int minDarkPixels = minimumSingleWindowDevicePixels(args);
+        if (darkPixels >= 0 && darkPixels < minDarkPixels) {
             throw new AssertionError("Single-window simulator device content did not appear before capture; darkPixels="
                     + darkPixels);
         }
@@ -198,7 +199,7 @@ public class SimulatorWindowModeVerifier {
 
     private static boolean isSingleWindowDeviceMissing(Args args, BufferedImage image) {
         int darkPixels = countSingleWindowDevicePixels(args, image);
-        return darkPixels >= 0 && darkPixels < 5000;
+        return darkPixels >= 0 && darkPixels < minimumSingleWindowDevicePixels(args);
     }
 
     private static int countSingleWindowDevicePixels(Args args, BufferedImage image) {
@@ -224,6 +225,17 @@ public class SimulatorWindowModeVerifier {
             }
         }
         return darkPixels;
+    }
+
+    private static int minimumSingleWindowDevicePixels(Args args) {
+        if ("test-recorder".equals(args.scenario)) {
+            // The recorder window intentionally covers most of the simulator
+            // device; its stored baseline has about 1900 dark device pixels.
+            // Keep this above the blank/partial failure (~229) without
+            // rejecting the expected recorder layout.
+            return 1000;
+        }
+        return 5000;
     }
 
     private static int sampleColorCount(BufferedImage image) {
