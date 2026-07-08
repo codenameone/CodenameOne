@@ -859,10 +859,6 @@ MultiButton {
     text-align: left;
     icon-gap: 3mm;
     border-radius: 3mm;
-    /* MultiButton is an OPAQUE grouped cell, not a glass button. Kill the
-       backdrop blur inherited from Button: with it, a borderless dark cell (the
-       round-2 dark override) rendered as a light wash instead of #2c2c2e. */
-    backdrop-filter: blur(0);
 }
 MultiButton.pressed { background-color: #e5e5ea; border: 0.25mm solid rgba(0,0,0,0.08); border-radius: 3mm; }
 
@@ -1163,12 +1159,12 @@ PopupContent {
        SystemGroupedBackground) so the white/light row text reads. Pure #000000
        (the old value) is darker than the form and, with the light MultiButton
        fill leaking through, the row rendered as a light pill. */
-    /* No rim on the dark cell: a plain border draws a SQUARE rectangle over the
-       rounded fill (the light cell's 0.08 rim is too faint to show it, but a
-       0.10 white rim on dark reads as square corners that fight the rounded
-       Liquid Glass cell). The #2c2c2e-on-#1c1c1e fill contrast carries it. */
-    MultiButton { background-color: #2c2c2e; color: #ffffff; }
-    MultiButton.pressed { background-color: #3a3a3c; }
+    /* A rim is REQUIRED for the JS port to render this cell's solid fill (a
+       borderless dark cell washed out to light grey). Keep it, but match the
+       light cell's faintness (0.08 -> ~0.05 white) so the square corners the
+       0.10 rim showed on dark fade out instead of fighting the rounded cell. */
+    MultiButton { background-color: #2c2c2e; border: 0.25mm solid rgba(255,255,255,0.05); color: #ffffff; }
+    MultiButton.pressed { background-color: #3a3a3c; border: 0.25mm solid rgba(255,255,255,0.05); }
     MultiLine1 { color: #ffffff; }
     MultiLine2 { color: #ebebf5; }
     MultiLine3 { color: #8e8e93; }
