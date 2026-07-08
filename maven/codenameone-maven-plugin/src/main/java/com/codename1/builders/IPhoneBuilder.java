@@ -2682,7 +2682,33 @@ public class IPhoneBuilder extends Executor {
                     // both the iOS app target and the tvOS target.
                     parparCmd.add(tvNativeBuilder.parparvmOptionalFrameworksArg());
                 }
-                parparCmd.add("-Xmx384m");
+                // Pass through extra translator JVM options (notably a larger
+                // -Xmx) from the CN1_TRANSLATOR_OPTS environment variable. The
+                // forked JVM does not inherit the Maven process's -D properties,
+                // so this is the only way to reach the translator for tuning.
+                String translatorOpts = System.getenv("CN1_TRANSLATOR_OPTS");
+                boolean heapOverridden = false;
+                if (translatorOpts != null && !translatorOpts.trim().isEmpty()) {
+                    for (String opt : translatorOpts.trim().split("\\s+")) {
+                        if (!opt.isEmpty()) {
+                            parparCmd.add(opt);
+                            if (opt.startsWith("-Xmx")) {
+                                heapOverridden = true;
+                            }
+                        }
+                    }
+                }
+                // Default heap; a -Xmx in CN1_TRANSLATOR_OPTS takes precedence.
+                // The dead-code cull builds an in-memory suffix automaton over
+                // all native symbols (NativeSymbolIndex, from #5236) to avoid the
+                // old O(N^2) substring scan that timed out on large apps -- that
+                // index trades time for memory, so the historical 384m cap now
+                // OOMs local iOS builds as the CN1 class count grows (issue
+                // #5344). The cloud builder already runs the same translator at
+                // 1024m; match it here so local and server builds behave alike.
+                if (!heapOverridden) {
+                    parparCmd.add("-Xmx1024m");
+                }
                 parparCmd.add("-jar");
                 parparCmd.add(parparVMCompilerJar);
                 parparCmd.add("ios");
