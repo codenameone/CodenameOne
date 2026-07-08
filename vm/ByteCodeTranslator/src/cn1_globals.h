@@ -1477,8 +1477,17 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
 #define CN1_THREAD_STATE_PASS_SINGLE_ARG threadStateData
 #define CN1_THREAD_GET_STATE_PASS_ARG getThreadLocalData(),
 #define CN1_THREAD_GET_STATE_PASS_SINGLE_ARG getThreadLocalData()
-#define CN1_YIELD_THREAD getThreadLocalData()->threadActive = JAVA_FALSE;
-#define CN1_RESUME_THREAD while (getThreadLocalData()->threadBlockedByGC){ usleep((JAVA_INT)1000);} getThreadLocalData()->threadActive = JAVA_TRUE;
+/* Park across a native blocking call. CRITICAL under CN1_CONSERVATIVE_GC_ROOTS: capture this
+ * thread's stack pointer + callee-saved registers FIRST (CN1_GC_PARK_CAPTURE), THEN publish
+ * threadActive=FALSE. The concurrent GC scans a parked lightweight thread ONLY through that
+ * cooperative capture -- and on Windows there is NO signal-stop fallback (see
+ * cn1GcScanThreadNativeStack), so without the capture the parked thread's native stack is
+ * never scanned and every root on it (e.g. the fresh read buffer in a socketRead) is swept
+ * mid-use -> the intermittent Windows WebSocket-reader use-after-free. On platforms with
+ * signal-stop this just makes the cheaper cooperative path usable; a no-op when conservative
+ * roots are off. */
+#define CN1_YIELD_THREAD do { struct ThreadLocalData* __cn1yts = getThreadLocalData(); CN1_GC_PARK_CAPTURE(__cn1yts); __cn1yts->threadActive = JAVA_FALSE; } while(0)
+#define CN1_RESUME_THREAD do { struct ThreadLocalData* __cn1rts = getThreadLocalData(); while (__cn1rts->threadBlockedByGC){ usleep((JAVA_INT)1000);} __cn1rts->threadActive = JAVA_TRUE; __cn1rts->gcParkCaptured = JAVA_FALSE; } while(0)
 
 extern struct ThreadLocalData* getThreadLocalData();
 
