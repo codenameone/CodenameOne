@@ -7447,6 +7447,9 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
         [wpng retain];
 #endif
     };
+    // The watch renderer and UIImagePNGRepresentation must run on the main
+    // queue. CN1SS screenshot requests originate from Java callbacks, so they
+    // are not guaranteed to already be on the watch UI thread.
     if ([NSThread isMainThread]) {
         captureWatchFrame();
     } else {
@@ -14122,6 +14125,10 @@ static NSMutableDictionary *cn1_secureStoragePlainQuery(NSString *account, NSStr
     return q;
 }
 
+// SecureStorage.set/get/remove are the non-biometric API. They must not invoke
+// LocalAuthentication or block on a prompt, so they use a plain generic-password
+// keychain item while the async biometric methods below continue to use their
+// existing SecAccessControl path.
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_secureStorageGetPlain___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account) {
     if (account == JAVA_NULL) {
         return JAVA_NULL;

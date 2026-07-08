@@ -230,15 +230,13 @@ public final class DateTimeFormatter {
         if (knownPattern != null) {
             return knownPattern;
         }
-        String effectivePattern = pattern;
-        SimpleDateFormat sdf = newFormat(effectivePattern, zone, locale);
+        SimpleDateFormat sdf = newFormat(pattern, zone, locale);
         TimeZone original = TimeZone.getDefault();
         try {
             if (zone != null) {
                 TimeZone.setDefault(TimeZoneSupport.toTimeZone(zone));
             }
-            String formatted = sdf.format(new Date(instant.toEpochMilli()));
-            return formatted;
+            return sdf.format(new Date(instant.toEpochMilli()));
         } finally {
             TimeZone.setDefault(original);
         }
@@ -311,6 +309,10 @@ public final class DateTimeFormatter {
 
     private static LocalDateTime parseNumericLocalDateTime(String text, String pattern) {
         try {
+            // These numeric patterns are parsed directly because the JavaAPI
+            // SimpleDateFormat subset does not reliably parse them. If the
+            // text has the exact shape but invalid values, fail at the bad
+            // field instead of falling through to the unrelated pattern parser.
             if ("yyyy-MM-dd HH:mm:ss".equals(pattern) && text.length() == 19
                     && text.charAt(4) == '-' && text.charAt(7) == '-'
                     && text.charAt(10) == ' ' && text.charAt(13) == ':'

@@ -675,6 +675,9 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createImageImpl
     NSData* nd = data != NULL && dataLength > 0 ? [NSData dataWithBytes:data length:dataLength] : nil;
     __block UIImage* img = nil;
 #if TARGET_OS_WATCH
+    // watchOS image decoding is main-thread-affine in this host. The CN1SS
+    // websocket callback can arrive off-main, so decode synchronously on the
+    // main queue instead of returning a zero-size GLUIImage.
     void (^decodeImageData)(void) = ^{
         img = nd != nil ? [UIImage imageWithData:nd] : nil;
 #ifndef CN1_USE_ARC
@@ -2630,6 +2633,10 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
             // encoders so the texture is up-to-date. The bounding rect
             // doesn't matter for the queue drain (drawFrame uses it only
             // for ClipRect.setDrawRect on screen ops).
+            // Mutable image readback can be requested while draw ops are still
+            // queued. Drain them synchronously before reading pixels so clip
+            // and transform assertions inspect the image that was actually
+            // drawn, not the previous renderer state.
             [[CodenameOne_GLViewController instance] flushBufferForReadback:0 y:0 width:displayWidth height:displayHeight];
             CN1MetalReadMutableImagePixels(gl, arr, x, y, width, height, imgWidth, imgHeight);
             if (stillDrawing) {
@@ -4674,6 +4681,10 @@ BOOL prefersStatusBarHidden = NO;
      }*/
 }
 
+// Readback callers need a completed renderer state before they touch pixels.
+// The normal flush path may leave work queued for the next frame; this helper
+// drains the queue on the main thread and allows the draw even when invoked from
+// a test readback path that is not tied to the app-active display loop.
 -(void)flushBufferForReadback:(int)x y:(int)y width:(int)width height:(int)height {
     CGRect rect = CGRectMake(x, y, width, height);
     painted = NO;

@@ -158,12 +158,17 @@ final class DateTimeSupport {
 
     static ZoneOffset offsetFromInstant(Instant instant, ZoneId zone) {
         TimeZone tz = zone.toTimeZone();
-        Calendar cal = newCalendar(tz);
+        Calendar cal = newCalendar(TimeZone.getTimeZone("GMT"));
         cal.setTime(new Date(instant.toEpochMilli()));
-        LocalDate localDate = LocalDate.of(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH));
-        LocalTime localTime = LocalTime.of(cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), cal.get(Calendar.SECOND));
-        long localEpochSecond = localDate.toEpochDay() * SECONDS_PER_DAY + localTime.toSecondOfDay();
-        return ZoneOffset.ofTotalSeconds((int) (localEpochSecond - instant.getEpochSecond()));
+        int offsetMillis = tz.getOffset(
+                1,
+                cal.get(Calendar.YEAR),
+                cal.get(Calendar.MONTH),
+                cal.get(Calendar.DAY_OF_MONTH),
+                cal.get(Calendar.DAY_OF_WEEK),
+                ((cal.get(Calendar.HOUR_OF_DAY) * 60 + cal.get(Calendar.MINUTE)) * 60 + cal.get(Calendar.SECOND)) * 1000
+                        + cal.get(Calendar.MILLISECOND));
+        return ZoneOffset.ofTotalSeconds(offsetMillis / 1000);
     }
 
     static SimpleDateFormat newFormat(String pattern, ZoneId zone, Locale locale) {

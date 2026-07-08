@@ -142,6 +142,7 @@ cn1ss_start_ws_server "$WS_RAW_DIR" || { rw_log "Failed to start Cn1ssScreenshot
 rw_log "WS sink on port ${CN1SS_WS_PORT:-8765} -> $WS_RAW_DIR"
 
 xcrun simctl terminate "$WATCH_UDID" "$BUNDLE_ID" 2>/dev/null || true
+WATCH_LOG_START="$(/bin/date -u '+%Y-%m-%d %H:%M:%S %z')"
 xcrun simctl install "$WATCH_UDID" "$APP_PATH"
 xcrun simctl launch "$WATCH_UDID" "$BUNDLE_ID" >/dev/null 2>&1 || { rw_log "launch failed"; exit 6; }
 rw_log "Launched watch app; waiting for the suite to stream screenshots..."
@@ -180,7 +181,7 @@ rw_log "Capture settled: $(/usr/bin/find "$WS_RAW_DIR" -name '*.png' 2>/dev/null
 
 WATCH_APP_LOG="$ARTIFACTS_DIR/watch-app-cn1ss.log"
 xcrun simctl spawn "$WATCH_UDID" \
-  log show --style syslog --last 30m \
+  log show --style syslog --start "$WATCH_LOG_START" \
   --predicate '(composedMessage CONTAINS "CN1SS") OR (eventMessage CONTAINS "CN1SS")' \
   > "$WATCH_APP_LOG" 2>/dev/null || true
 SUITE_FAILURE_LINES="$(cn1ss_collect_suite_failures "$WATCH_APP_LOG")"

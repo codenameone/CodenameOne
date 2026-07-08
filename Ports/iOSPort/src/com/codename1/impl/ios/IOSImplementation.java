@@ -396,9 +396,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
         screenshotCallback = callback;
         try {
-            if (!isWatch()) {
-                forceScreenRenderForCapture();
-            }
+            forceScreenRenderForCapture();
             nativeInstance.screenshot();
         } catch (Throwable t) {
             screenshotCallback = null;
@@ -413,17 +411,15 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
-    /// The native capture reads back the renderer's real screen target (Metal
-    /// screenTexture on Metal builds; see cn1_copyMetalScreenTextureImage in
-    /// IOSNative.m). A static form's show()/repaint() doesn't always re-drive a
-    /// screen frame before a test requests Display.screenshot(), so the capture
-    /// can still hold an earlier or blank frame. Force the current form through
-    /// the real EDT screen-render pipeline -- the same paintComponent-to-screen
-    /// + flushGraphics that paintDirty() runs -- so the texture reflects the
-    /// live UI before we capture it. This renders through the actual display
-    /// path (not an off-screen repaint), so the screenshot remains a genuine
-    /// test of the display pipeline.
+    /// Mac Catalyst test windows do not reliably schedule another display-link
+    /// frame before a static form calls Display.screenshot(). Force only that
+    /// desktop path through the normal screen paint + native flush so the Metal
+    /// screenTexture readback sees the current form. Phone, tablet, TV, and
+    /// watch captures stay on their normal production screenshot path.
     private void forceScreenRenderForCapture() {
+        if (!isDesktop()) {
+            return;
+        }
         final Runnable paintAndFlush = new Runnable() {
             @Override
             public void run() {
