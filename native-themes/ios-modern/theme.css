@@ -859,8 +859,13 @@ MultiButton {
     text-align: left;
     icon-gap: 3mm;
     border-radius: 3mm;
+    /* Opaque grouped cell -- kill the glass blur inherited from Button. With the
+       rim + cn1-round-border now forcing the solid fill (below), blur(0) drops
+       the light circular glass halo the inherited blur painted in each cell. */
+    backdrop-filter: blur(0);
+    cn1-background-type: cn1-round-border;
 }
-MultiButton.pressed { background-color: #e5e5ea; border: 0.25mm solid rgba(0,0,0,0.08); border-radius: 3mm; }
+MultiButton.pressed { background-color: #e5e5ea; border: 0.25mm solid rgba(0,0,0,0.08); border-radius: 3mm; backdrop-filter: blur(0); cn1-background-type: cn1-round-border; }
 
 MultiLine1 {
     cn1-derive: Label;
