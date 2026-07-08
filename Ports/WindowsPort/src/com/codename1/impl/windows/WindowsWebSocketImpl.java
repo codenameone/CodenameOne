@@ -32,7 +32,10 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -65,12 +68,22 @@ public final class WindowsWebSocketImpl extends WebSocketImpl {
     private InputStream in;
     private OutputStream out;
 
+    /// Strong-refs every impl whose reader thread is alive. The reader parks in a native
+    /// blocking recv (socketRead yields the thread), during which the concurrent GC runs;
+    /// the conservative native-stack scan can miss the frameless `this` receiver on that
+    /// parked thread and sweep the whole impl -> in -> read-buffer chain, so read() then
+    /// dereferences a freed buffer (the symbolized WindowsSocket.SocketInput.read
+    /// 0xC0000005). A static (a guaranteed GC root) pins the chain regardless of the scan.
+    private static final Set<WindowsWebSocketImpl> ACTIVE =
+            Collections.synchronizedSet(new HashSet<WindowsWebSocketImpl>());
+
     public WindowsWebSocketImpl(String url) {
         super(url);
     }
 
     @Override
     public void connect(final int connectTimeoutMs) {
+        ACTIVE.add(this);
         Thread t = new Thread(new Runnable() {
             public void run() {
                 try {
@@ -80,6 +93,8 @@ public final class WindowsWebSocketImpl extends WebSocketImpl {
                     readLoop();
                 } catch (Exception ex) {
                     fail(ex);
+                } finally {
+                    ACTIVE.remove(WindowsWebSocketImpl.this);
                 }
             }
         }, "WindowsWebSocket");
