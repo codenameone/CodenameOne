@@ -163,7 +163,16 @@ while [ "$waited" -lt "$MAX_WAIT" ]; do
     continue
   fi
   if [ "$cur" = "$prev" ] && [ "$cur" -gt 0 ]; then
-    stable=$((stable+1)); [ "$stable" -ge 10 ] && break
+    # No-progress guard: a genuinely hung suite emits neither SUITE:FINISHED nor a
+    # crash, so bail on a long stall as a last resort before MAX_WAIT. This must be
+    # well above the slowest LEGITIMATE single-test render gap: a heavy 4K frame or a
+    # network-backed map (VectorMapShapes) can take minutes on the tvOS simulator, and
+    # these tests bunch up at the end of the run. An 80s stall used to fire mid-run
+    # while such a test was still rendering, settling the capture early and dropping
+    # every frame delivered afterwards (11 "missing" screenshots that had in fact been
+    # produced). SUITE:FINISHED below remains the primary done-signal; this only trips
+    # when the suite is truly wedged. ~6 min >> the observed 2.5 min worst-case gap.
+    stable=$((stable+1)); [ "$stable" -ge 45 ] && { rt_log "No screenshot progress for ~6min (cur=$cur); assuming hung suite"; break; }
   else stable=0; fi
   prev="$cur"
   # The suite emits CN1SS:SUITE:FINISHED when done; bail early on that (covers
