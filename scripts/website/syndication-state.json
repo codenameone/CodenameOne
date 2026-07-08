@@ -795,6 +795,18 @@
         "url": "https://medium.com/p/9405e5ccbe89/edit",
         "syndicated_at": "2026-07-07T17:01:15+00:00"
       }
+    },
+    "device-integrity-and-app-review": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmrc7gx2z00000bjk0oam0ynq",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a4e6604718e4cea5fcbc44a",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-08T15:01:18+00:00"
+      }
     }
   }
 }
