@@ -174,8 +174,9 @@ wait_for_log_marker() {
 
 release_xcui_step() {
   local step="$1"
+  local timeout_seconds="${2:-240}"
   local marker="CN1IV:READY:$step"
-  if wait_for_log_marker "$marker" 45; then
+  if wait_for_log_marker "$marker" "$timeout_seconds"; then
     iv_log "Releasing XCUITest gesture after $marker"
     : > "$SYNC_DIR/$step.go"
     return 0
