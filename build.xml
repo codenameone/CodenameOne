@@ -83,7 +83,7 @@
         <arg value="codenameone-cli"/>
       </exec>
     </target>
-    <target name="test-javase" depends="javase,install-cli-se" description="Run Unit Tests on Simulator">
+    <target name="test-javase" depends="javase" description="Run Unit Tests on Simulator">
       <!-- echo>Codename One JavaSE Unit Tests</echo>
       <echo>This target will compile the Codename one sources, build the unit tests located in &quot;tests&quot; directory, and run them in the Codename One simulator.</echo>
       <echo>Requirements:</echo>

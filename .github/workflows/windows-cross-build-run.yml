@@ -57,7 +57,7 @@ jobs:
       - name: Install LLVM 19 + CMake/Ninja
         run: |
           set -e
-          sudo apt-get update
+          bash scripts/ci/apt-get-update.sh
           # xvfb: the CN1 CSS compiler (codenameone-maven-plugin css goal) renders
           # via CEF/AWT and throws HeadlessException without a display, so the
           # hellocodenameone-common build below runs under a virtual X server.

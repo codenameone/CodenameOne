@@ -65,6 +65,7 @@ public final class IOSNative {
             boolean returnExitsEditing);
     native void resizeNativeTextView(int x, int y, int w, int h, int padTop, int padRight, int padBottom, int padLeft);
     native void flushBuffer(long peer, int x, int y, int width, int height);
+    native void flushBufferForReadback(int x, int y, int width, int height);
     native void imageRgbToIntArray(long imagePeer, int[] arr, int x, int y, int width, int height, int imgWidth, int imgHeight);
     native long createImageFromARGB(int[] argb, int width, int height);
     native long createImage(byte[] data, int[] widthHeight);
@@ -1014,6 +1015,15 @@ public final class IOSNative {
 
     /** Async keychain delete; result via IOSSecureStorage.nativeStorageBooleanResult / nativeStorageError. */
     native void secureStorageRemove(int requestId, String reason, String account);
+
+    /** Synchronous keychain read without biometric prompting. */
+    native String secureStorageGetPlain(String account);
+
+    /** Synchronous keychain write without biometric prompting. */
+    native boolean secureStorageSetPlain(String account, String value);
+
+    /** Synchronous keychain delete without biometric prompting. */
+    native boolean secureStorageRemovePlain(String account);
 
     // --- NFC (Core NFC) -----------------------------------------------------
 

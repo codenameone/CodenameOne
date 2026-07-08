@@ -7372,6 +7372,37 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    private void startTestRecorderRecordingForAutomation() {
+        final int[] attempts = new int[1];
+        final Runnable[] retry = new Runnable[1];
+        retry[0] = new Runnable() {
+            public void run() {
+                final Form current = Display.getInstance().getCurrent();
+                if (current == null) {
+                    if (attempts[0]++ < 40) {
+                        javax.swing.Timer timer = new javax.swing.Timer(250, new ActionListener() {
+                            public void actionPerformed(ActionEvent e) {
+                                Display.getInstance().callSerially(retry[0]);
+                            }
+                        });
+                        timer.setRepeats(false);
+                        timer.start();
+                    }
+                    return;
+                }
+                if (testRecorder == null) {
+                    return;
+                }
+                testRecorder.startRecordingForAutomation();
+                int x = Math.max(5, current.getWidth() / 2);
+                int y = Math.max(5, current.getHeight() / 2);
+                testRecorder.eventPointerPressed(x, y);
+                testRecorder.eventPointerReleased(x, y);
+            }
+        };
+        Display.getInstance().callSerially(retry[0]);
+    }
+
 
 
     private void showNetworkMonitor() {
@@ -8447,19 +8478,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 public void run() {
                     showTestRecorder();
                     if (Boolean.getBoolean("cn1.simulator.autoTestRecorderRecord") && testRecorder != null) {
-                        testRecorder.startRecordingForAutomation();
-                        Display.getInstance().callSerially(new Runnable() {
-                            public void run() {
-                                Form current = Display.getInstance().getCurrent();
-                                if (current == null) {
-                                    return;
-                                }
-                                int x = Math.max(5, current.getWidth() / 2);
-                                int y = Math.max(5, current.getHeight() / 2);
-                                testRecorder.eventPointerPressed(x, y);
-                                testRecorder.eventPointerReleased(x, y);
-                            }
-                        });
+                        startTestRecorderRecordingForAutomation();
                     }
                 }
             });

@@ -40,7 +40,7 @@ jobs:
 
       - name: Install LLVM cross toolchain + CMake/Ninja
         run: |
-          sudo apt-get update
+          bash scripts/ci/apt-get-update.sh
           sudo apt-get install -y clang lld llvm cmake ninja-build
 
       # Ubuntu ships some LLVM driver names versioned; expose the unversioned

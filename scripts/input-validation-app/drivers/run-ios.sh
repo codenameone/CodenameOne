@@ -32,6 +32,7 @@ ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$APP_DIR}/artifacts/input-va
 mkdir -p "$ARTIFACTS_DIR"
 LOG_FILE="$ARTIFACTS_DIR/device.log"
 XCODEBUILD_LOG="$ARTIFACTS_DIR/xcodebuild-test.log"
+SYNC_DIR="${CN1IV_SYNC_DIR:-/tmp/cn1-input-validation-sync}"
 
 if ! command -v xcrun >/dev/null 2>&1; then iv_log "xcrun not on PATH" >&2; exit 3; fi
 if ! command -v xcodebuild >/dev/null 2>&1; then iv_log "xcodebuild not on PATH" >&2; exit 3; fi
@@ -150,16 +151,63 @@ fi
 # `** TEST FAILED **`).
 XCRESULT_BUNDLE="$ARTIFACTS_DIR/test.xcresult"
 rm -rf "$XCRESULT_BUNDLE"
+mkdir -p "$SYNC_DIR"
+rm -f "$SYNC_DIR/tap.go" "$SYNC_DIR/drag.go" "$SYNC_DIR/longpress.go"
+XCB_RC_FILE="$ARTIFACTS_DIR/xcodebuild.rc"
+rm -f "$XCB_RC_FILE"
+
+wait_for_log_marker() {
+  local needle="$1"
+  local timeout_seconds="${2:-45}"
+  local deadline=$((SECONDS + timeout_seconds))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if grep -q "$needle" "$LOG_FILE"; then
+      return 0
+    fi
+    if [ -f "$XCB_RC_FILE" ]; then
+      return 1
+    fi
+    sleep 0.2
+  done
+  return 1
+}
+
+release_xcui_step() {
+  local step="$1"
+  local timeout_seconds="${2:-240}"
+  local marker="CN1IV:READY:$step"
+  if wait_for_log_marker "$marker" "$timeout_seconds"; then
+    iv_log "Releasing XCUITest gesture after $marker"
+    : > "$SYNC_DIR/$step.go"
+    return 0
+  fi
+  iv_log "Timed out waiting for $marker before releasing XCUITest gesture"
+  return 1
+}
+
 iv_log "Running XCUITest"
 set +e
-xcodebuild test \
-  -project "$TESTS_DIR/CN1InputValidationUITests.xcodeproj" \
-  -scheme CN1InputValidationUITests \
-  -destination "platform=iOS Simulator,id=$SIM_UDID" \
-  -resultBundlePath "$XCRESULT_BUNDLE" \
-  CODE_SIGNING_ALLOWED=NO \
-  | tee -a "$XCODEBUILD_LOG"
-XCB_RC=${PIPESTATUS[0]}
+(
+  set +e
+  CN1IV_SYNC_DIR="$SYNC_DIR" xcodebuild test \
+    -project "$TESTS_DIR/CN1InputValidationUITests.xcodeproj" \
+    -scheme CN1InputValidationUITests \
+    -destination "platform=iOS Simulator,id=$SIM_UDID" \
+    -resultBundlePath "$XCRESULT_BUNDLE" \
+    CODE_SIGNING_ALLOWED=NO
+  echo "$?" > "$XCB_RC_FILE"
+) | tee -a "$XCODEBUILD_LOG" &
+XCB_PIPE_PID=$!
+SYNC_FAILED=0
+release_xcui_step tap || SYNC_FAILED=1
+release_xcui_step drag || SYNC_FAILED=1
+release_xcui_step longpress || SYNC_FAILED=1
+wait "$XCB_PIPE_PID" >/dev/null 2>&1 || true
+if [ -f "$XCB_RC_FILE" ]; then
+  XCB_RC="$(cat "$XCB_RC_FILE")"
+else
+  XCB_RC=1
+fi
 set -e
 iv_log "xcodebuild test exit=$XCB_RC"
 
@@ -207,6 +255,10 @@ fi
 
 if [ "$XCB_RC" -ne 0 ]; then
   iv_log "xcodebuild test failed (rc=$XCB_RC) -- see $XCODEBUILD_LOG"
+  FAILED=1
+fi
+if [ "$SYNC_FAILED" -ne 0 ]; then
+  iv_log "XCUITest synchronization failed -- see $LOG_FILE"
   FAILED=1
 fi
 

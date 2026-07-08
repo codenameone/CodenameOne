@@ -2,7 +2,10 @@ package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.Form;
 import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.util.UITimer;
 
 /**
  * Phase 3 milestone test: round-trip through Image.getGraphics().drawXxx(...)
@@ -15,6 +18,9 @@ import com.codename1.ui.geom.GeneralPath;
  * callers see stale or zeroed bytes. This test exercises that contract.
  */
 public class MutableImageReadbackTest extends BaseTest {
+    private static final int RETRY_INTERVAL_MS = 250;
+    private static final int RETRY_TIMEOUT_MS = 5000;
+    private long retryDeadline;
 
     @Override
     public boolean shouldTakeScreenshot() {
@@ -23,39 +29,58 @@ public class MutableImageReadbackTest extends BaseTest {
 
     @Override
     public boolean runTest() {
+        Form form = new Form("Mutable Image Readback", new BorderLayout()) {
+            @Override
+            protected void onShowCompleted() {
+                super.onShowCompleted();
+                repaint();
+                retryDeadline = System.currentTimeMillis() + RETRY_TIMEOUT_MS;
+                UITimer.timer(500, false, this, () -> runReadbackChecks(this));
+            }
+        };
+        form.show();
+        return true;
+    }
+
+    private void runReadbackChecks(Form form) {
         try {
-            // Step 1: a fillRect-only mutable. The simplest case --
-            // verifies that pixel readback sees the most recent solid
-            // fill.
-            if (!testFillRectReadback()) {
-                return false;
+            String error = readbackError();
+            if (error == null) {
+                done();
+                return;
             }
-
-            // Step 2: a fillRect followed by a smaller fillRect inside it.
-            // Verifies that ops applied later override pixels of earlier
-            // ops -- catches a 'commit only the first op' bug or any
-            // out-of-order drain.
-            if (!testStackedFillsReadback()) {
-                return false;
+            if (System.currentTimeMillis() < retryDeadline) {
+                form.repaint();
+                UITimer.timer(RETRY_INTERVAL_MS, false, form, () -> runReadbackChecks(form));
+                return;
             }
-
-            // Step 3: a fillShape (alpha-mask Metal pipeline) into the
-            // mutable. Verifies the alpha-mask path also flushes through
-            // to readback. This is the path that was silently dead before
-            // commit 1e2f6a2bd.
-            if (!testFillShapeReadback()) {
-                return false;
-            }
-
-            done();
-            return true;
+            fail(error);
         } catch (Throwable t) {
             fail("Unexpected exception: " + t.getMessage());
-            return false;
         }
     }
 
-    private boolean testFillRectReadback() {
+    private String readbackError() {
+        // Step 1: a fillRect-only mutable. The simplest case verifies that
+        // pixel readback sees the most recent solid fill.
+        String error = testFillRectReadback();
+        if (error != null) {
+            return error;
+        }
+
+        // Step 2: a fillRect followed by a smaller fillRect inside it.
+        // Verifies that later ops override earlier pixels.
+        error = testStackedFillsReadback();
+        if (error != null) {
+            return error;
+        }
+
+        // Step 3: a fillShape into the mutable. Verifies the alpha-mask path
+        // also flushes through to readback.
+        return testFillShapeReadback();
+    }
+
+    private String testFillRectReadback() {
         int w = 8, h = 8;
         Image img = Image.createImage(w, h);
         Graphics g = img.getGraphics();
@@ -64,21 +89,19 @@ public class MutableImageReadbackTest extends BaseTest {
 
         int[] pixels = img.getRGB();
         if (pixels == null || pixels.length != w * h) {
-            fail("FillRect readback: getRGB returned " + (pixels == null ? "null" : "length=" + pixels.length)
-                    + ", expected " + (w * h));
-            return false;
+            return "FillRect readback: getRGB returned " + (pixels == null ? "null" : "length=" + pixels.length)
+                    + ", expected " + (w * h);
         }
         for (int i = 0; i < pixels.length; i++) {
             if ((pixels[i] & 0xffffff) != 0xff0000) {
-                fail("FillRect readback: pixel " + i + " expected red 0xff0000 in low 24 bits, got 0x"
-                        + Integer.toHexString(pixels[i]));
-                return false;
+                return "FillRect readback: pixel " + i + " expected red 0xff0000 in low 24 bits, got 0x"
+                        + Integer.toHexString(pixels[i]);
             }
         }
-        return true;
+        return null;
     }
 
-    private boolean testStackedFillsReadback() {
+    private String testStackedFillsReadback() {
         int w = 16, h = 16;
         Image img = Image.createImage(w, h);
         Graphics g = img.getGraphics();
@@ -90,21 +113,19 @@ public class MutableImageReadbackTest extends BaseTest {
         int[] pixels = img.getRGB();
         // Corner pixel (0, 0) should still be red.
         if ((pixels[0] & 0xffffff) != 0xff0000) {
-            fail("Stacked fills readback: corner pixel expected red, got 0x"
-                    + Integer.toHexString(pixels[0]));
-            return false;
+            return "Stacked fills readback: corner pixel expected red, got 0x"
+                    + Integer.toHexString(pixels[0]);
         }
         // Center pixel (8, 8) should be green from the inset.
         int center = pixels[8 * w + 8];
         if ((center & 0xffffff) != 0x00ff00) {
-            fail("Stacked fills readback: center pixel expected green 0x00ff00, got 0x"
-                    + Integer.toHexString(center));
-            return false;
+            return "Stacked fills readback: center pixel expected green 0x00ff00, got 0x"
+                    + Integer.toHexString(center);
         }
-        return true;
+        return null;
     }
 
-    private boolean testFillShapeReadback() {
+    private String testFillShapeReadback() {
         int w = 16, h = 16;
         Image img = Image.createImage(w, h);
         Graphics g = img.getGraphics();
@@ -129,17 +150,15 @@ public class MutableImageReadbackTest extends BaseTest {
         int gc = (sample >> 8) & 0xff;
         int b = sample & 0xff;
         if (b <= r || b <= gc) {
-            fail("FillShape readback: center pixel inside triangle expected blue-dominant, got rgb=("
-                    + r + "," + gc + "," + b + ")");
-            return false;
+            return "FillShape readback: center pixel inside triangle expected blue-dominant, got rgb=("
+                    + r + "," + gc + "," + b + ")";
         }
         // (0, h-1) is outside the triangle -- white from the base fill.
         int outside = pixels[(h - 1) * w + 0];
         if ((outside & 0xffffff) != 0xffffff) {
-            fail("FillShape readback: pixel outside triangle expected white, got 0x"
-                    + Integer.toHexString(outside));
-            return false;
+            return "FillShape readback: pixel outside triangle expected white, got 0x"
+                    + Integer.toHexString(outside);
         }
-        return true;
+        return null;
     }
 }

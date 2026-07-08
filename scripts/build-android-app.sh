@@ -94,7 +94,7 @@ ba_log "Building Android gradle project ($APP_DIR) using Codename One port"
   # does for the iOS pipeline.
   export JAVA_HOME="$JAVA17_HOME"
   export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
-  xvfb-run -a ./mvnw package \
+  xvfb-run -a "$MAVEN_HOME/bin/mvn" -B package \
     -DskipTests \
     -Dcodename1.platform=android \
     -Dcodename1.buildTarget=android-source \

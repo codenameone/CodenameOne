@@ -762,6 +762,7 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
   }
   trap cleanup EXIT
 
+  RUN_LOG_START="$(date '+%Y-%m-%d %H:%M:%S')"
   ri_log "Streaming simulator logs to $TEST_LOG"
   if [ -n "$SIM_DEVICE_ID" ]; then
     xcrun simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
@@ -941,7 +942,7 @@ LOG_STREAM_PID=0
 
 FALLBACK_LOG="$ARTIFACTS_DIR/device-runner-fallback.log"
 xcrun simctl spawn "$SIM_DEVICE_ID" \
-  log show --style syslog --last 30m \
+  log show --style syslog --start "$RUN_LOG_START" \
   --predicate '(composedMessage CONTAINS "CN1SS") OR (eventMessage CONTAINS "CN1SS")' \
   > "$FALLBACK_LOG" 2>/dev/null || true
 
@@ -965,6 +966,11 @@ fi
 BASE64_BENCHMARK_FAILURE_LINE="$( (grep -h "CN1SS:ERR:suite test=Base64NativePerformanceTest failed" "$TEST_LOG" "$FALLBACK_LOG" || true) | tail -n 1 )"
 if [ -n "$BASE64_BENCHMARK_FAILURE_LINE" ]; then
   ri_log "Detected Base64 benchmark failure line: $BASE64_BENCHMARK_FAILURE_LINE"
+fi
+
+SUITE_FAILURE_LINES="$(cn1ss_collect_suite_failures "$TEST_LOG" "$FALLBACK_LOG")"
+if [ -n "$SUITE_FAILURE_LINES" ]; then
+  ri_log "Detected DeviceRunner assertion/test failure(s); artifacts and screenshot report will still be collected before failing."
 fi
 
 SWIFT_DIAG_LINE="$( (grep -h "CN1SS:INFO:swift_diag_status=" "$TEST_LOG" "$FALLBACK_LOG" || true) | tail -n 1 )"
@@ -1053,6 +1059,12 @@ cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner.log" 2>/dev/null || true
 if [ -n "$BASE64_BENCHMARK_FAILURE_LINE" ]; then
   ri_log "STAGE:BENCHMARK_FAILED -> $BASE64_BENCHMARK_FAILURE_LINE"
   exit 16
+fi
+
+if [ -n "$SUITE_FAILURE_LINES" ]; then
+  ri_log "STAGE:DEVICE_RUNNER_TEST_FAILED -> assertion/test failure(s) are not allowed:"
+  printf '%s\n' "$SUITE_FAILURE_LINES" | sed 's/^/[CN1SS-FAIL] /'
+  exit 19
 fi
 
 # Screenshot mismatch / count-regression guards are centralised in

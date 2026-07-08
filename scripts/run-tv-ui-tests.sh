@@ -178,6 +178,11 @@ while [ "$waited" -lt "$MAX_WAIT" ]; do
 done
 rt_log "Capture settled: $(/usr/bin/find "$WS_RAW_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ') of $EXPECTED screenshots after ${waited}s"
 
+SUITE_FAILURE_LINES="$(cn1ss_collect_suite_failures "$APP_CONSOLE")"
+if [ -n "$SUITE_FAILURE_LINES" ]; then
+  rt_log "Detected DeviceRunner assertion/test failure(s); artifacts and screenshot report will still be collected before failing."
+fi
+
 # Always surface the app console + any crash report so a zero-screenshot run is
 # diagnosable from the uploaded artifacts.
 rt_log "----- tvOS app console (tail) -----"
@@ -226,6 +231,11 @@ if [ -f "$SUMMARY_OUT" ] && grep -q "^missing_expected|" "$SUMMARY_OUT"; then
   me="$(grep -c "^missing_expected|" "$SUMMARY_OUT" 2>/dev/null || echo 0)"
   rt_log "FATAL: $me screenshot(s) streamed with no stored golden (missing_expected) -- add them to scripts/ios/screenshots-tv."
   [ "$rc" -eq 0 ] && rc=17
+fi
+if [ -n "$SUITE_FAILURE_LINES" ]; then
+  rt_log "STAGE:DEVICE_RUNNER_TEST_FAILED -> assertion/test failure(s) are not allowed:"
+  printf '%s\n' "$SUITE_FAILURE_LINES" | sed 's/^/[CN1SS-FAIL] /'
+  [ "$rc" -eq 0 ] && rc=19
 fi
 [ "${#ACTUAL[@]}" -gt 0 ] || rc=1
 rt_log "exit rc=$rc (gate_rc=$gate_rc, mismatch_fail=${CN1SS_FAIL_ON_MISMATCH}, allowed_missing=${CN1SS_ALLOWED_MISSING})"
