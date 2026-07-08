@@ -7555,26 +7555,32 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
 #if TARGET_OS_WATCH
     // Capture the Core Graphics surface. Drain any pending ops first so the
     // snapshot reflects the latest painted frame, then PNG-encode the bitmap.
-    // Both steps run under the drain lock on the CALLING thread: without the
-    // lock the pump thread can be mid-drain drawing into the bitmap while
-    // currentFrame reads it, and CGBitmapContextCreateImage intermittently
-    // returns nil under that contention (delivered as 1x1 placeholder
-    // screenshots by the harness). Do NOT hop onto the main queue to capture:
-    // dispatching to main while holding the drain lock starves the render pump
-    // (which paints on main), so the bitmap is never drawn and every frame
-    // comes back nil -- i.e. 1x1 placeholders for the whole suite.
-    CN1WatchRenderingView *wv = nil;
-    UIImage *wimg = nil;
-    NSData *wpng = nil;
-    @synchronized (CN1WatchDrainLockObject()) {
+    // watchOS render + PNG encode are main-thread-affine in this host (see the
+    // watch drawFrame / main-thread decode changes in
+    // CodenameOne_GLViewController.m), so the capture MUST run on the main
+    // queue. Do NOT wrap it in the old external drain lock: master's watch
+    // drawFrame drains on the main thread itself, so an extra lock around a
+    // main-queue dispatch only starves the render pump and every frame comes
+    // back nil -- 1x1 placeholders for the whole suite.
+    __block CN1WatchRenderingView *wv = nil;
+    __block UIImage *wimg = nil;
+    __block NSData *wpng = nil;
+    void (^captureWatchFrame)(void) = ^{
         [[CodenameOne_GLViewController instance] drawFrame:CGRectZero];
         wv = [CN1WatchHost sharedHost].renderingView;
         wimg = wv != nil ? [wv currentFrame] : nil;
         wpng = wimg != nil ? UIImagePNGRepresentation(wimg) : nil;
-    }
 #ifndef CN1_USE_ARC
-    [wpng retain];
+        [wpng retain];
 #endif
+    };
+    // CN1SS screenshot requests originate from Java callbacks and are not
+    // guaranteed to already be on the watch UI thread.
+    if ([NSThread isMainThread]) {
+        captureWatchFrame();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), captureWatchFrame);
+    }
     if (wpng == nil || [wpng length] == 0) {
         int logicalW = wv != nil ? [wv logicalWidth] : -1;
         int logicalH = wv != nil ? [wv logicalHeight] : -1;
