@@ -762,6 +762,7 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
   }
   trap cleanup EXIT
 
+  RUN_LOG_START="$(date '+%Y-%m-%d %H:%M:%S')"
   ri_log "Streaming simulator logs to $TEST_LOG"
   if [ -n "$SIM_DEVICE_ID" ]; then
     xcrun simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
@@ -941,7 +942,7 @@ LOG_STREAM_PID=0
 
 FALLBACK_LOG="$ARTIFACTS_DIR/device-runner-fallback.log"
 xcrun simctl spawn "$SIM_DEVICE_ID" \
-  log show --style syslog --last 30m \
+  log show --style syslog --start "$RUN_LOG_START" \
   --predicate '(composedMessage CONTAINS "CN1SS") OR (eventMessage CONTAINS "CN1SS")' \
   > "$FALLBACK_LOG" 2>/dev/null || true
 

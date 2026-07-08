@@ -7496,10 +7496,11 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
     void (^performCapture)(void) = ^{
         POOL_BEGIN();
         CodenameOne_GLViewController *controller = [CodenameOne_GLViewController instance];
-        // Display.screenshot() reads the Metal screenTexture below. Drain any
-        // already-queued screen ops first so a screenshot requested immediately
-        // after repaint()/Form.show() does not capture the previous frame.
-        [controller flushBuffer:nil x:0 y:0 width:displayWidth height:displayHeight];
+        // Display.screenshot() reads the Metal screenTexture below. Use the
+        // readback drain so queued screen ops are flushed even when the normal
+        // display-link/active-state path would skip a frame during synchronous
+        // test capture.
+        [controller flushBufferForReadback:0 y:0 width:displayWidth height:displayHeight];
         UIView *view = controller.view;
         UIImage *img = cn1_captureView(view);
         if (img != nil) {
