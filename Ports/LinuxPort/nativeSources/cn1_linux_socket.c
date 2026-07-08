@@ -46,6 +46,10 @@
 extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char* str);
 extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str);
 
+/* Sink that forces a socket buffer object to stay live across a parked blocking read
+ * so the conservative GC cannot sweep it mid-I/O (see socketRead). */
+static volatile void* cn1SocketReadKeepAlive;
+
 typedef struct {
     int fd;
     int lastError;
@@ -111,6 +115,11 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_socketRead___long_byte_1ARRAY_int_
     CN1_YIELD_THREAD;
     n = read(s->fd, data + offset, (size_t) length);
     CN1_RESUME_THREAD;
+    /* Keep the buffer array object reachable across the parked read: only `data` (an
+     * interior pointer) is used, so the optimizer may drop `buffer` and the concurrent GC
+     * -- scanning this parked thread -- can sweep it mid-read (a use-after-free; see the
+     * Windows port where this manifested on the cn1ss WebSocket reader). Force liveness. */
+    cn1SocketReadKeepAlive = (volatile void*) buffer;
     if (n <= 0) {
         s->lastError = n < 0 ? errno : 0;
         if (n == 0) {

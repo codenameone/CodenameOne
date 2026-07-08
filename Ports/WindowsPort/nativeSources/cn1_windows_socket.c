@@ -38,6 +38,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Sink that forces a socket read/write buffer object to stay live across a parked
+ * blocking call so the conservative GC can't sweep it mid-I/O (see socketRead). */
+static volatile void* cn1SocketReadKeepAlive;
+
 typedef struct CN1Socket {
     SOCKET s;
     int errorCode;
@@ -153,6 +157,13 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_socketRead___long_byte_1ARRAY_
     CN1_YIELD_THREAD;
     n = recv(peer->s, (char*) (data + __cn1Arg3), (int) __cn1Arg4, 0);
     CN1_RESUME_THREAD;
+    /* Keep the buffer ARRAY OBJECT reachable across the parked recv. Only `data` (an
+     * interior pointer to the array body) is used above, so the optimizer is free to drop
+     * __cn1Arg2; the concurrent GC scans this parked thread and, finding no root to the
+     * buffer, sweeps it mid-read -> the observed WindowsSocket_SocketInput use-after-free
+     * (0xC0000005 on the cn1ss WebSocket reader). The volatile sink forces __cn1Arg2 to stay
+     * live through the recv so the conservative stack/register scan resolves it. */
+    cn1SocketReadKeepAlive = (volatile void*) __cn1Arg2;
     if (n == 0) {
         return -1; /* peer closed */
     }
