@@ -415,6 +415,8 @@ extern void loadResourceFile(const char* name, int nameLen, const char* type, in
 extern int getResourceSize(const char* name, int nameLen, const char* type, int typeLen);
 
 extern int isPainted();
+extern int displayWidth;
+extern int displayHeight;
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 (void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight);
