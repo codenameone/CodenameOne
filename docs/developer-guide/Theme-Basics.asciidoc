@@ -21,25 +21,12 @@ Codename One themes are effectively a set of UIIDs mapped to a https://www.coden
 
 You can also add many resource files to a project and work with them. In code, initialize a theme like this in your main class:
 
-[source,java]
-----
-private Resources theme;
-
-public void init(Object context) {
-    theme = UIManager.initFirstTheme("/theme");
-}
-----
 
 The `initFirstTheme` method is a helper method that hides some `try`/`catch` logic and some verbosity. It could be expressed as:
 
 [source,java]
 ----
-try {
-    theme = Resources.openLayered("/theme");
-    UIManager.getInstance().setThemeProps(theme.getTheme(theme.getThemeResourceNames()[0]));
-} catch(IOException e){
-    e.printStackTrace();
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ThemeBasicsJava002Snippet.java[tag=theme-basics-java-002,indent=0]
 ----
 
 === Customizing your theme
@@ -386,10 +373,6 @@ Derive allows you to inherit the behavior of a UIID and extend it with some cust
 
 For example: Lets say you created a component that's supposed to look like a title, you could do something like:
 
-[source,java]
-----
-cmp.setUIID("Title");
-----
 
 However, title might sometimes be aligned to the left (based on theme) and you always want your component to be center aligned. For example, you don't want that to affect the actual titles in the app...
 
@@ -440,14 +423,6 @@ NOTE: You should notice that font sizing is inconsistent between platforms recom
 
 You can load a truetype font from code using:
 
-[source,java]
-----
-if(Font.isTrueTypeFileSupported()) {
-    Font myFont = Font.createTrueTypeFont(fontName, fontFileName);
-    myFont = myFont.derive(sizeInPixels, Font.STYLE_PLAIN);
-    // do something with the font
-}
-----
 
 Notice that, in code, pixel sizes are supported, so it’s up to you to decide how to convert that. Recommend using millimeters with the `convertToPixels` method. You also need to derive the font with the proper size, unless you want a 0 sized font which isn't useful.
 
@@ -459,98 +434,7 @@ The code below demonstrates all the major fonts available in Codename One with t
 
 [source,java]
 ----
-private Label createForFont(Font fnt, String s) {
-  Label l = new Label(s);
-  l.getUnselectedStyle().setFont(fnt);
-  return l;
-}
-
-public void showForm() {
-  GridLayout gr = new GridLayout(5);
-  gr.setAutoFit(true);
-  Form hi = new Form("Fonts", gr);
-
-  int fontSize = Display.getInstance().convertToPixels(3);
-
-  // requires Handlee-Regular.ttf in the src folder root!
-  Font ttfFont = Font.createTrueTypeFont("Handlee", "Handlee-Regular.ttf").
-                      derive(fontSize, Font.STYLE_PLAIN);
-
-  Font smallPlainSystemFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL);
-  Font mediumPlainSystemFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);
-  Font largePlainSystemFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_LARGE);
-  Font smallBoldSystemFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_SMALL);
-  Font mediumBoldSystemFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_MEDIUM);
-  Font largeBoldSystemFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_LARGE);
-  Font smallItalicSystemFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_ITALIC, Font.SIZE_SMALL);
-  Font mediumItalicSystemFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_ITALIC, Font.SIZE_MEDIUM);
-  Font largeItalicSystemFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_ITALIC, Font.SIZE_LARGE);
-
-  Font smallPlainMonospaceFont = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_PLAIN, Font.SIZE_SMALL);
-  Font mediumPlainMonospaceFont = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);
-  Font largePlainMonospaceFont = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_PLAIN, Font.SIZE_LARGE);
-  Font smallBoldMonospaceFont = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_SMALL);
-  Font mediumBoldMonospaceFont = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_MEDIUM);
-  Font largeBoldMonospaceFont = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_BOLD, Font.SIZE_LARGE);
-  Font smallItalicMonospaceFont = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_ITALIC, Font.SIZE_SMALL);
-  Font mediumItalicMonospaceFont = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_ITALIC, Font.SIZE_MEDIUM);
-  Font largeItalicMonospaceFont = Font.createSystemFont(Font.FACE_MONOSPACE, Font.STYLE_ITALIC, Font.SIZE_LARGE);
-
-  Font smallPlainProportionalFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_PLAIN, Font.SIZE_SMALL);
-  Font mediumPlainProportionalFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);
-  Font largePlainProportionalFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_PLAIN, Font.SIZE_LARGE);
-  Font smallBoldProportionalFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_BOLD, Font.SIZE_SMALL);
-  Font mediumBoldProportionalFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_BOLD, Font.SIZE_MEDIUM);
-  Font largeBoldProportionalFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_BOLD, Font.SIZE_LARGE);
-  Font smallItalicProportionalFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_ITALIC, Font.SIZE_SMALL);
-  Font mediumItalicProportionalFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_ITALIC, Font.SIZE_MEDIUM);
-  Font largeItalicProportionalFont = Font.createSystemFont(Font.FACE_PROPORTIONAL, Font.STYLE_ITALIC, Font.SIZE_LARGE);
-
-  String[] nativeFontTypes = {
-      "native:MainThin", "native:MainLight",
-      "native:MainRegular", "native:MainBold",
-      "native:MainBlack", "native:ItalicThin",
-      "native:ItalicLight", "native:ItalicRegular",
-      "native:ItalicBold", "native:ItalicBlack"};
-
-  for(String s : nativeFontTypes) {
-      Font tt  = Font.createTrueTypeFont(s, s).derive(fontSize, Font.STYLE_PLAIN);
-      hi.add(createForFont(tt, s));
-  }
-
-  hi.add(createForFont(ttfFont, "Handlee TTF Font")).
-          add(createForFont(smallPlainSystemFont, "smallPlainSystemFont")).
-          add(createForFont(mediumPlainSystemFont, "mediumPlainSystemFont")).
-          add(createForFont(largePlainSystemFont, "largePlainSystemFont")).
-          add(createForFont(smallBoldSystemFont, "smallBoldSystemFont")).
-          add(createForFont(mediumBoldSystemFont, "mediumBoldSystemFont")).
-          add(createForFont(largeBoldSystemFont, "largeBoldSystemFont")).
-          add(createForFont(smallPlainSystemFont, "smallItalicSystemFont")).
-          add(createForFont(mediumItalicSystemFont, "mediumItalicSystemFont")).
-          add(createForFont(largeItalicSystemFont, "largeItalicSystemFont")).
-
-          add(createForFont(smallPlainMonospaceFont, "smallPlainMonospaceFont")).
-          add(createForFont(mediumPlainMonospaceFont, "mediumPlainMonospaceFont")).
-          add(createForFont(largePlainMonospaceFont, "largePlainMonospaceFont")).
-          add(createForFont(smallBoldMonospaceFont, "smallBoldMonospaceFont")).
-          add(createForFont(mediumBoldMonospaceFont, "mediumBoldMonospaceFont")).
-          add(createForFont(largeBoldMonospaceFont, "largeBoldMonospaceFont")).
-          add(createForFont(smallItalicMonospaceFont, "smallItalicMonospaceFont")).
-          add(createForFont(mediumItalicMonospaceFont, "mediumItalicMonospaceFont")).
-          add(createForFont(largeItalicMonospaceFont, "largeItalicMonospaceFont")).
-
-          add(createForFont(smallPlainProportionalFont, "smallPlainProportionalFont")).
-          add(createForFont(mediumPlainProportionalFont, "mediumPlainProportionalFont")).
-          add(createForFont(largePlainProportionalFont, "largePlainProportionalFont")).
-          add(createForFont(smallBoldProportionalFont, "smallBoldProportionalFont")).
-          add(createForFont(mediumBoldProportionalFont, "mediumBoldProportionalFont")).
-          add(createForFont(largeBoldProportionalFont, "largeBoldProportionalFont")).
-          add(createForFont(smallItalicProportionalFont, "smallItalicProportionalFont")).
-          add(createForFont(mediumItalicProportionalFont, "mediumItalicProportionalFont")).
-          add(createForFont(largeItalicProportionalFont, "largeItalicProportionalFont"));
-
-  hi.show();
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/ThemeBasicsJava005Snippet.java[tag=theme-basics-java-005,indent=0]
 ----
 
 .The fonts running on the ipad simulator on a Mac, notice that this will look different on a PC

@@ -81,7 +81,7 @@ above. Trigger it like any other cloud target:
 
 [source,bash]
 ----
-mvn -pl common package -Dcodename1.platform=windows -Dcodename1.buildTarget=windows-device
+include::../demos/common/src/main/snippets/developer-guide/working-with-windows.sh[tag=working-with-windows-bash-001,indent=0]
 ----
 
 The convenience goal `mvn -pl common cn1:buildWin32` does the same thing. A regular
@@ -151,14 +151,7 @@ point your project settings at it:
 
 [source,properties]
 ----
-# codenameone_settings.properties
-codename1.windows.signing.certificate=/secure/path/codesign.p12
-codename1.windows.signing.password=your-pkcs12-password
-# optional signature metadata + timestamping (shown with their defaults):
-codename1.arg.windows.signing.name=Acme Corp
-codename1.arg.windows.signing.url=https://acme.example
-codename1.arg.windows.signing.timestampUrl=http://timestamp.digicert.com
-codename1.arg.windows.signing.digest=sha256
+include::../demos/common/src/main/snippets/developer-guide/working-with-windows.properties[tag=working-with-windows-properties-001,indent=0]
 ----
 
 You configure the certificate once and it's used for *both local and cloud

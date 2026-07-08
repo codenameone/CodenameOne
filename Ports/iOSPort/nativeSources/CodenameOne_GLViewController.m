@@ -669,14 +669,62 @@ void screenSizeChangedC(int width, int height) {
 void* Java_com_codename1_impl_ios_IOSImplementation_createImageImpl
 (void* data, int dataLength, int* widthAndHeightReturnValue) {
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_createImageImpl started for dataLength %i", dataLength);
-    NSData* nd = [NSData dataWithBytes:data length:dataLength];
-    UIImage* img = [UIImage imageWithData:nd];
+    if (widthAndHeightReturnValue != NULL) {
+        widthAndHeightReturnValue[0] = 0;
+        widthAndHeightReturnValue[1] = 0;
+    }
+    NSData* nd = data != NULL && dataLength > 0 ? [NSData dataWithBytes:data length:dataLength] : nil;
+    __block UIImage* img = nil;
+#if TARGET_OS_WATCH
+    // watchOS image decoding is main-thread-affine in this host. The CN1SS
+    // websocket callback can arrive off-main, so decode synchronously on the
+    // main queue instead of returning a zero-size GLUIImage.
+    void (^decodeImageData)(void) = ^{
+        img = nd != nil ? [UIImage imageWithData:nd] : nil;
+#ifndef CN1_USE_ARC
+        [img retain];
+#endif
+    };
+    if ([NSThread isMainThread]) {
+        decodeImageData();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), decodeImageData);
+    }
+#else
+    img = nd != nil ? [UIImage imageWithData:nd] : nil;
+#endif
+    if (img == nil) {
+#if TARGET_OS_WATCH
+        const unsigned char *bytes = data;
+        unsigned int b0 = data != NULL && dataLength > 0 ? bytes[0] : 0;
+        unsigned int b1 = data != NULL && dataLength > 1 ? bytes[1] : 0;
+        unsigned int b2 = data != NULL && dataLength > 2 ? bytes[2] : 0;
+        unsigned int b3 = data != NULL && dataLength > 3 ? bytes[3] : 0;
+        NSLog(@"CN1SS:ERR:watch PNG decode failed length=%d magic=%02x%02x%02x%02x",
+              dataLength, b0, b1, b2, b3);
+#endif
+        return NULL;
+    }
     widthAndHeightReturnValue[0] = (int)img.size.width;
     widthAndHeightReturnValue[1] = (int)img.size.height;
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_createImageImpl finished width %i, height %i", (int)widthAndHeightReturnValue[0], (int)widthAndHeightReturnValue[1]);
-    
+    if (widthAndHeightReturnValue[0] <= 0 || widthAndHeightReturnValue[1] <= 0) {
+#if TARGET_OS_WATCH
+        NSLog(@"CN1SS:ERR:watch PNG decode produced invalid size length=%d size=%dx%d",
+              dataLength, widthAndHeightReturnValue[0], widthAndHeightReturnValue[1]);
+#endif
 #ifndef CN1_USE_ARC
-    return [[GLUIImage alloc] initWithImage:img];
+        [img release];
+#endif
+        return NULL;
+    }
+
+#ifndef CN1_USE_ARC
+    GLUIImage *result = [[GLUIImage alloc] initWithImage:img];
+#if TARGET_OS_WATCH
+    [img release];
+#endif
+    return result;
 #else
     return (__bridge void*)[[GLUIImage alloc] initWithImage:img];
 #endif
@@ -2104,6 +2152,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl
     //CN1Log(@"Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl finished");
 }
 
+void Java_com_codename1_impl_ios_IOSImplementation_flushBufferForReadbackImpl
+(int x, int y, int width, int height) {
+    [[CodenameOne_GLViewController instance] flushBufferForReadback:x y:y width:width height:height];
+}
+
 
 void Java_com_codename1_impl_ios_IOSImplementation_setNativeClippingMutableImpl
 (int x, int y, int width, int height, int clipApplied) {
@@ -2614,7 +2667,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
             // encoders so the texture is up-to-date. The bounding rect
             // doesn't matter for the queue drain (drawFrame uses it only
             // for ClipRect.setDrawRect on screen ops).
-            [[CodenameOne_GLViewController instance] flushBuffer:nil x:0 y:0 width:displayWidth height:displayHeight];
+            // Mutable image readback can be requested while draw ops are still
+            // queued. Drain them synchronously before reading pixels so clip
+            // and transform assertions inspect the image that was actually
+            // drawn, not the previous renderer state.
+            [[CodenameOne_GLViewController instance] flushBufferForReadback:0 y:0 width:displayWidth height:displayHeight];
             CN1MetalReadMutableImagePixels(gl, arr, x, y, width, height, imgWidth, imgHeight);
             if (stillDrawing) {
                 Java_com_codename1_impl_ios_IOSImplementation_startDrawingOnImageImpl(imgWidth, imgHeight, peer);
@@ -4253,6 +4310,11 @@ BOOL prefersStatusBarHidden = NO;
 
 - (void)drawFrame:(CGRect)rect
 {
+    [self drawFrame:rect allowInactive:NO];
+}
+
+- (void)drawFrame:(CGRect)rect allowInactive:(BOOL)allowInactive
+{
 #if TARGET_OS_MACCATALYST
     // A Mac app keeps rendering its window while it isn't the focused
     // application -- only a truly backgrounded/occluded app stops. iOS, by
@@ -4263,11 +4325,11 @@ BOOL prefersStatusBarHidden = NO;
     // screenTexture (which Display.screenshot() reads back) would freeze on the
     // last-active frame for the rest of the suite. Allow rendering whenever the
     // app isn't backgrounded so the screen texture stays current.
-    if([UIApplication sharedApplication].applicationState == UIApplicationStateBackground) {
+    if(!allowInactive && [UIApplication sharedApplication].applicationState == UIApplicationStateBackground) {
         return;
     }
 #else
-    if([UIApplication sharedApplication].applicationState != UIApplicationStateActive) {
+    if(!allowInactive && [UIApplication sharedApplication].applicationState != UIApplicationStateActive) {
         return;
     }
 #endif
@@ -4651,6 +4713,29 @@ BOOL prefersStatusBarHidden = NO;
      sleep(5);
      timeout--;
      }*/
+}
+
+// Readback callers need a completed renderer state before they touch pixels.
+// The normal flush path may leave work queued for the next frame; this helper
+// drains the queue on the main thread and allows the draw even when invoked from
+// a test readback path that is not tied to the app-active display loop.
+-(void)flushBufferForReadback:(int)x y:(int)y width:(int)width height:(int)height {
+    CGRect rect = CGRectMake(x, y, width, height);
+    painted = NO;
+    void (^flushBlock)(void) = ^{
+        @synchronized([CodenameOne_GLViewController instance]) {
+            if([currentTarget count] > 0) {
+                [currentTarget addObjectsFromArray:upcomingTarget];
+                [upcomingTarget removeAllObjects];
+            } else {
+                NSMutableArray* tmp = currentTarget;
+                currentTarget = upcomingTarget;
+                upcomingTarget = tmp;
+            }
+        }
+        [self drawFrame:rect allowInactive:YES];
+    };
+    cn1RunSyncOnMainQueue(flushBlock);
 }
 
 -(void)drawString:(int)color alpha:(int)alpha font:(UIFont*)font str:(NSString*)str x:(int)x y:(int)y {
@@ -5126,6 +5211,68 @@ void cn1_addSelectedImagePath(NSString* path) {
 #endif
 
 #endif
+#endif
+
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+static NSString *cn1CopyPickedDocumentToTemp(NSURL *url) {
+    if (url == nil) {
+        return nil;
+    }
+    BOOL securityScoped = [url startAccessingSecurityScopedResource];
+    @try {
+        NSString *fileName = [url lastPathComponent];
+        if (fileName == nil || [fileName length] == 0) {
+            fileName = @"selected-file";
+        }
+        NSString *destinationName = [NSString stringWithFormat:@"%@-%@", [[NSUUID UUID] UUIDString], fileName];
+        NSString *destinationPath = [NSTemporaryDirectory() stringByAppendingPathComponent:destinationName];
+        NSURL *destinationURL = [NSURL fileURLWithPath:destinationPath];
+        NSFileManager *fileManager = [NSFileManager defaultManager];
+        [fileManager removeItemAtURL:destinationURL error:nil];
+
+        NSError *error = nil;
+        if ([url isFileURL] && [fileManager copyItemAtURL:url toURL:destinationURL error:&error]) {
+            return destinationPath;
+        }
+
+        NSData *data = [NSData dataWithContentsOfURL:url options:0 error:&error];
+        if (data != nil && [data writeToURL:destinationURL options:NSDataWritingAtomic error:&error]) {
+            return destinationPath;
+        }
+        NSLog(@"Codename One file chooser failed to copy selected document: %@", error);
+        return nil;
+    } @finally {
+        if (securityScoped) {
+            [url stopAccessingSecurityScopedResource];
+        }
+    }
+}
+
+- (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
+    NSString *path = nil;
+    if ([urls count] > 0) {
+        path = cn1CopyPickedDocumentToTemp([urls objectAtIndex:0]);
+    }
+    com_codename1_impl_ios_IOSImplementation_fileChooserResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG path == nil ? nil : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path));
+    if (controller.presentingViewController != nil) {
+        [controller dismissViewControllerAnimated:YES completion:nil];
+    }
+}
+
+- (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentAtURL:(NSURL *)url {
+    NSString *path = cn1CopyPickedDocumentToTemp(url);
+    com_codename1_impl_ios_IOSImplementation_fileChooserResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG path == nil ? nil : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG path));
+    if (controller.presentingViewController != nil) {
+        [controller dismissViewControllerAnimated:YES completion:nil];
+    }
+}
+
+- (void)documentPickerWasCancelled:(UIDocumentPickerViewController *)controller {
+    com_codename1_impl_ios_IOSImplementation_fileChooserResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
+    if (controller.presentingViewController != nil) {
+        [controller dismissViewControllerAnimated:YES completion:nil];
+    }
+}
 #endif
 
 #if !TARGET_OS_TV

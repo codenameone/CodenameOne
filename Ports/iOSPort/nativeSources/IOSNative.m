@@ -415,9 +415,14 @@ extern void loadResourceFile(const char* name, int nameLen, const char* type, in
 extern int getResourceSize(const char* name, int nameLen, const char* type, int typeLen);
 
 extern int isPainted();
+extern int displayWidth;
+extern int displayHeight;
 
 extern void Java_com_codename1_impl_ios_IOSImplementation_imageRgbToIntArrayImpl
 (void* peer, int* arr, int x, int y, int width, int height, int imgWidth, int imgHeight);
+
+extern void Java_com_codename1_impl_ios_IOSImplementation_flushBufferForReadbackImpl
+(int x, int y, int width, int height);
 
 extern void* Java_com_codename1_impl_ios_IOSImplementation_createImageFromARGBImpl
 (int* arr, int width, int height);
@@ -810,6 +815,13 @@ void com_codename1_impl_ios_IOSNative_flushBuffer___long_int_int_int_int(CN1_THR
     Java_com_codename1_impl_ios_IOSImplementation_flushBufferImpl((void *)n1, n2, n3, n4, n5);
     POOL_END();
     //XMLVM_END_WRAPPER
+}
+
+void com_codename1_impl_ios_IOSNative_flushBufferForReadback___int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4)
+{
+    POOL_BEGIN();
+    Java_com_codename1_impl_ios_IOSImplementation_flushBufferForReadbackImpl(n1, n2, n3, n4);
+    POOL_END();
 }
 
 
@@ -6043,6 +6055,76 @@ void com_codename1_impl_ios_IOSNative_captureCamera___boolean_int_int(CN1_THREAD
 #endif
 }
 
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+static void cn1AddFileChooserDocumentType(NSMutableArray *types, CFStringRef tagClass, NSString *tag) {
+    if (tag == nil || [tag length] == 0) {
+        return;
+    }
+    CFStringRef uti = UTTypeCreatePreferredIdentifierForTag(tagClass, (CFStringRef)tag, NULL);
+    if (uti != NULL) {
+#if __has_feature(objc_arc)
+        NSString *type = CFBridgingRelease(uti);
+#else
+        NSString *type = [(NSString *)uti autorelease];
+#endif
+        if (![types containsObject:type]) {
+            [types addObject:type];
+        }
+    }
+}
+
+static NSArray *cn1FileChooserDocumentTypes(NSString *accept) {
+    NSMutableArray *types = [NSMutableArray array];
+    if (accept != nil) {
+        NSArray *tokens = [accept componentsSeparatedByString:@","];
+        for (NSString *rawToken in tokens) {
+            NSString *token = [rawToken stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            if ([token length] == 0 || [token isEqualToString:@"*"] || [token isEqualToString:@"*/*"]) {
+                continue;
+            }
+            if ([token rangeOfString:@"/"].location != NSNotFound) {
+                cn1AddFileChooserDocumentType(types, kUTTagClassMIMEType, token);
+            } else {
+                if ([token hasPrefix:@"."]) {
+                    token = [token substringFromIndex:1];
+                }
+                cn1AddFileChooserDocumentType(types, kUTTagClassFilenameExtension, [token lowercaseString]);
+            }
+        }
+    }
+    if ([types count] == 0) {
+        [types addObject:(NSString *)kUTTypeItem];
+    }
+    return types;
+}
+#endif
+
+void com_codename1_impl_ios_IOSNative_openFileChooser___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT accept) {
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+    NSString *nsAccept = accept == JAVA_NULL ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG accept);
+    NSArray *documentTypes = cn1FileChooserDocumentTypes(nsAccept);
+    dispatch_async(dispatch_get_main_queue(), ^{
+        POOL_BEGIN();
+#ifndef CN1_USE_ARC
+        UIDocumentPickerViewController *pickerController = [[[UIDocumentPickerViewController alloc] initWithDocumentTypes:documentTypes inMode:UIDocumentPickerModeImport] autorelease];
+#else
+        UIDocumentPickerViewController *pickerController = [[UIDocumentPickerViewController alloc] initWithDocumentTypes:documentTypes inMode:UIDocumentPickerModeImport];
+#endif
+        pickerController.delegate = [CodenameOne_GLViewController instance];
+        if (@available(iOS 11.0, *)) {
+            pickerController.allowsMultipleSelection = NO;
+        }
+        if (popoverSupported()) {
+            pickerController.modalPresentationStyle = UIModalPresentationFormSheet;
+        }
+        [[CodenameOne_GLViewController instance] presentViewController:pickerController animated:YES completion:nil];
+        POOL_END();
+    });
+#else
+    com_codename1_impl_ios_IOSImplementation_fileChooserResult___java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG nil);
+#endif
+}
+
 #ifdef INCLUDE_PHOTOLIBRARY_USAGE
 #ifdef ENABLE_GALLERY_MULTISELECT
 
@@ -7473,17 +7555,38 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
 #if TARGET_OS_WATCH
     // Capture the Core Graphics surface. Drain any pending ops first so the
     // snapshot reflects the latest painted frame, then PNG-encode the bitmap.
-    // Both steps run under the drain lock: without it the pump thread can be
-    // mid-drain drawing into the bitmap while currentFrame reads it, and
-    // CGBitmapContextCreateImage intermittently returns nil under that
-    // contention (delivered as 1x1 placeholder screenshots by the harness).
-    UIImage *wimg = nil;
-    @synchronized (CN1WatchDrainLockObject()) {
-        [[CodenameOne_GLViewController instance] drawFrame:CGRectZero];
-        CN1WatchRenderingView *wv = [CN1WatchHost sharedHost].renderingView;
-        wimg = wv != nil ? [wv currentFrame] : nil;
+    __block CN1WatchRenderingView *wv = nil;
+    __block UIImage *wimg = nil;
+    __block NSData *wpng = nil;
+    void (^captureWatchFrame)(void) = ^{
+        // Both steps run under the drain lock: without it the pump thread can be
+        // mid-drain drawing into the bitmap while currentFrame reads it, and
+        // CGBitmapContextCreateImage intermittently returns nil under that
+        // contention (delivered as 1x1 placeholder screenshots by the harness).
+        @synchronized (CN1WatchDrainLockObject()) {
+            [[CodenameOne_GLViewController instance] drawFrame:CGRectZero];
+            wv = [CN1WatchHost sharedHost].renderingView;
+            wimg = wv != nil ? [wv currentFrame] : nil;
+            wpng = wimg != nil ? UIImagePNGRepresentation(wimg) : nil;
+        }
+#ifndef CN1_USE_ARC
+        [wpng retain];
+#endif
+    };
+    // The watch renderer and UIImagePNGRepresentation must run on the main
+    // queue. CN1SS screenshot requests originate from Java callbacks, so they
+    // are not guaranteed to already be on the watch UI thread.
+    if ([NSThread isMainThread]) {
+        captureWatchFrame();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), captureWatchFrame);
     }
-    NSData *wpng = wimg != nil ? UIImagePNGRepresentation(wimg) : nil;
+    if (wpng == nil || [wpng length] == 0) {
+        int logicalW = wv != nil ? [wv logicalWidth] : -1;
+        int logicalH = wv != nil ? [wv logicalHeight] : -1;
+        NSLog(@"CN1SS:ERR:native watch screenshot failed renderingView=%@ image=%@ logical=%dx%d",
+              wv, wimg, logicalW, logicalH);
+    }
     JAVA_OBJECT wbyteArr = JAVA_NULL;
     if (wpng != nil && [wpng length] > 0) {
         int wlen = (int)[wpng length];
@@ -7507,13 +7610,22 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
         wbyteArr = warr;
 #endif
     }
+#ifndef CN1_USE_ARC
+    [wpng release];
+#endif
     com_codename1_impl_ios_IOSImplementation_onScreenshot___byte_1ARRAY(CN1_THREAD_STATE_PASS_ARG wbyteArr);
     return;
 #else
     __block NSData *capturedPng = nil;
     void (^performCapture)(void) = ^{
         POOL_BEGIN();
-        UIView *view = [CodenameOne_GLViewController instance].view;
+        CodenameOne_GLViewController *controller = [CodenameOne_GLViewController instance];
+        // Display.screenshot() reads the Metal screenTexture below. Use the
+        // readback drain so queued screen ops are flushed even when the normal
+        // display-link/active-state path would skip a frame during synchronous
+        // test capture.
+        [controller flushBufferForReadback:0 y:0 width:displayWidth height:displayHeight];
+        UIView *view = controller.view;
         UIImage *img = cn1_captureView(view);
         if (img != nil) {
             NSData *png = UIImagePNGRepresentation(img);
@@ -12340,18 +12452,24 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_sendLocalNotification___java_lang_Str
         UNUserNotificationCenter* center = [UNUserNotificationCenter currentNotificationCenter];
         // Request notification authorization on first schedule so local-notification-only
         // apps still get prompted (the launch-time prompt was removed for issue #4876).
-        // The system shows the dialog at most once; later calls are a no-op.
+        // Add the request only after the authorization result is known; adding
+        // immediately races fresh simulators and can leave no pending request.
         [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert + UNAuthorizationOptionSound + UNAuthorizationOptionBadge)
             completionHandler:^(BOOL granted, NSError * _Nullable authError) {
                 if (authError != nil) {
                     CN1Log(@"Local notification authorization request failed: %@", authError.localizedDescription);
+                    return;
                 }
-        }];
-        cn1CancelScheduledLocalNotificationById(notificationIdString);
-        [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
-            if (error != nil) {
-                CN1Log(@"Failed to schedule local notification: %@", error.localizedDescription);
-            }
+                if (!granted) {
+                    CN1Log(@"Local notification authorization was not granted");
+                    return;
+                }
+                cn1CancelScheduledLocalNotificationById(notificationIdString);
+                [center addNotificationRequest:request withCompletionHandler:^(NSError * _Nullable error) {
+                    if (error != nil) {
+                        CN1Log(@"Failed to schedule local notification: %@", error.localizedDescription);
+                    }
+                }];
         }];
     } else {
         CN1Log(@"Ignoring local notification request on iOS versions below 10");
@@ -13967,11 +14085,21 @@ static NSString *cn1_getAppName(CN1_THREAD_STATE_SINGLE_ARG) {
     return toNSString(CN1_THREAD_STATE_PASS_ARG res);
 }
 
+static NSString *cn1_secureStorageServiceName(NSString *appName) {
+    if (appName == nil || [appName length] == 0) {
+        appName = [[NSBundle mainBundle] bundleIdentifier];
+    }
+    if (appName == nil || [appName length] == 0) {
+        appName = @"CodenameOne";
+    }
+    return appName;
+}
+
 void com_codename1_impl_ios_IOSNative_secureStorageGet___int_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason, JAVA_OBJECT account) {
     POOL_BEGIN();
     NSString *nsReason = (reason == JAVA_NULL) ? @"Authenticate" : toNSString(CN1_THREAD_STATE_PASS_ARG reason);
     NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
-    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *appName = cn1_secureStorageServiceName(cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG));
     NSString *accessGroup = cn1_keychainAccessGroup;
     [nsReason retain];
     [nsAccount retain];
@@ -14036,7 +14164,7 @@ void com_codename1_impl_ios_IOSNative_secureStorageSet___int_java_lang_String_ja
     NSString *nsReason = (reason == JAVA_NULL) ? @"Authenticate" : toNSString(CN1_THREAD_STATE_PASS_ARG reason);
     NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
     NSString *nsValue = (value == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG value);
-    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *appName = cn1_secureStorageServiceName(cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG));
     NSString *accessGroup = cn1_keychainAccessGroup;
     [nsReason retain];
     [nsAccount retain];
@@ -14086,7 +14214,7 @@ void com_codename1_impl_ios_IOSNative_secureStorageSet___int_java_lang_String_ja
 void com_codename1_impl_ios_IOSNative_secureStorageRemove___int_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_INT requestId, JAVA_OBJECT reason, JAVA_OBJECT account) {
     POOL_BEGIN();
     NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
-    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSString *appName = cn1_secureStorageServiceName(cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG));
     NSString *accessGroup = cn1_keychainAccessGroup;
     [nsAccount retain];
     [appName retain];
@@ -14115,6 +14243,89 @@ void com_codename1_impl_ios_IOSNative_secureStorageRemove___int_java_lang_String
         }
     });
     POOL_END();
+}
+
+static NSMutableDictionary *cn1_secureStoragePlainQuery(NSString *account, NSString *appName, NSString *accessGroup) {
+    NSMutableDictionary *q = [NSMutableDictionary dictionary];
+    appName = cn1_secureStorageServiceName(appName);
+    [q setObject:(__bridge id)kSecClassGenericPassword forKey:(__bridge id)kSecClass];
+    [q setObject:account forKey:(__bridge id)kSecAttrAccount];
+    [q setObject:appName forKey:(__bridge id)kSecAttrService];
+    if (accessGroup != nil) {
+        [q setObject:accessGroup forKey:(__bridge id)kSecAttrAccessGroup];
+    }
+    return q;
+}
+
+// SecureStorage.set/get/remove are the non-biometric API. They must not invoke
+// LocalAuthentication or block on a prompt, so they use a plain generic-password
+// keychain item while the async biometric methods below continue to use their
+// existing SecAccessControl path.
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_secureStorageGetPlain___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account) {
+    if (account == JAVA_NULL) {
+        return JAVA_NULL;
+    }
+    JAVA_OBJECT result = JAVA_NULL;
+    POOL_BEGIN();
+    NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
+    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, appName, cn1_keychainAccessGroup);
+    [q setObject:@YES forKey:(__bridge id)kSecReturnData];
+    [q setObject:(__bridge id)kSecMatchLimitOne forKey:(__bridge id)kSecMatchLimit];
+
+    CFTypeRef dataRef = NULL;
+    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)q, &dataRef);
+    if (status == errSecSuccess && dataRef != NULL) {
+        NSData *d = (__bridge NSData *)dataRef;
+        NSString *value = [[[NSString alloc] initWithData:d encoding:NSUTF8StringEncoding] autorelease];
+        if (value != nil) {
+            result = fromNSString(CN1_THREAD_STATE_PASS_ARG value);
+        }
+        CFRelease(dataRef);
+    }
+    POOL_END();
+    return result;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_secureStorageSetPlain___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account, JAVA_OBJECT value) {
+    if (account == JAVA_NULL) {
+        return JAVA_FALSE;
+    }
+    JAVA_BOOLEAN result = JAVA_FALSE;
+    POOL_BEGIN();
+    NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
+    NSString *nsValue = (value == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG value);
+    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSData *data = [nsValue dataUsingEncoding:NSUTF8StringEncoding];
+
+    NSMutableDictionary *item = cn1_secureStoragePlainQuery(nsAccount, appName, cn1_keychainAccessGroup);
+    [item setObject:data forKey:(__bridge id)kSecValueData];
+    [item setObject:(__bridge id)kSecAttrAccessibleAfterFirstUnlock forKey:(__bridge id)kSecAttrAccessible];
+
+    OSStatus status = SecItemAdd((__bridge CFDictionaryRef)item, nil);
+    if (status == errSecDuplicateItem) {
+        NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, appName, cn1_keychainAccessGroup);
+        NSDictionary *changes = [NSDictionary dictionaryWithObject:data forKey:(__bridge id)kSecValueData];
+        status = SecItemUpdate((__bridge CFDictionaryRef)q, (__bridge CFDictionaryRef)changes);
+    }
+    result = (status == errSecSuccess) ? JAVA_TRUE : JAVA_FALSE;
+    POOL_END();
+    return result;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_secureStorageRemovePlain___java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT account) {
+    if (account == JAVA_NULL) {
+        return JAVA_FALSE;
+    }
+    JAVA_BOOLEAN result = JAVA_FALSE;
+    POOL_BEGIN();
+    NSString *nsAccount = toNSString(CN1_THREAD_STATE_PASS_ARG account);
+    NSString *appName = cn1_getAppName(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+    NSMutableDictionary *q = cn1_secureStoragePlainQuery(nsAccount, appName, cn1_keychainAccessGroup);
+    OSStatus status = SecItemDelete((__bridge CFDictionaryRef)q);
+    result = (status == errSecSuccess || status == errSecItemNotFound) ? JAVA_TRUE : JAVA_FALSE;
+    POOL_END();
+    return result;
 }
 
 // ============================================================================

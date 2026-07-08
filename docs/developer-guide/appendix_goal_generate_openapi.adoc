@@ -19,9 +19,7 @@ bootstrap class (the same splice pattern as `@Mapped` mappers).
 
 [source, bash]
 ----
-mvn -pl common cn1:generate-openapi \
-    -Dcn1.openapi.spec=petstore.json \
-    -Dcn1.openapi.basePackage=com.example.petstore
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-openapi.sh[tag=appendix-goal-generate-openapi-bash-001,indent=0]
 ----
 
 Configuration:
@@ -74,25 +72,16 @@ and path; parameters are annotated `@Path` / `@Query` / `@Header` /
 `@Body` so the processor knows how to assemble the `Rest` call.  The
 emitted method shape:
 
-[source, java]
+[source,java]
 ----
-@RestClient
-public interface PetApi {
+include::../demos/common/src/main/java/com/example/petstore/PetApi.java[tag=appendix-goal-generate-openapi-java-001,indent=0]
+----
 
-    @GET("/pet/{petId}")
-    void getPetById(@Path("petId") Long petId,
-                    @Header("Authorization") String bearerToken,
-                    OnComplete<Response<com.example.petstore.model.Pet>> callback);
+The model type referenced by the generated API is emitted into the generated model package:
 
-    @POST("/pet")
-    void addPet(@Body com.example.petstore.model.Pet body,
-                @Header("Authorization") String bearerToken,
-                OnComplete<Response<com.example.petstore.model.Pet>> callback);
-
-    static PetApi of(String baseUrl) {
-        return RestClients.create(PetApi.class, baseUrl);
-    }
-}
+[source,java]
+----
+include::../demos/common/src/main/java/com/example/petstore/model/Pet.java[tag=appendix-goal-generate-openapi-java-002,indent=0]
 ----
 
 Model types are emitted as fully qualified names (the API interface
@@ -102,16 +91,6 @@ collisions between an API class name and a same-named model.
 
 Call sites use the static factory:
 
-[source, java]
-----
-PetApi api = PetApi.of("https://petstore3.swagger.io/api/v3");
-api.getPetById(123L, "MY_TOKEN", response -> {
-    if (response.getResponseCode() == 200) {
-        Pet pet = response.getResponseData();
-        renderPet(pet);
-    }
-});
-----
 
 The `<Tag>ApiImpl` class that actually performs the HTTP call lives
 in `target/generated-sources` -- the project source never references

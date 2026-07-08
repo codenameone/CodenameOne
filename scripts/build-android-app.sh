@@ -101,7 +101,7 @@ ba_log "Building Android gradle project ($APP_DIR) using Codename One port"
   if command -v xvfb-run >/dev/null 2>&1; then
     MVN_WRAP="xvfb-run -a"
   fi
-  $MVN_WRAP ./mvnw package \
+  $MVN_WRAP "$MAVEN_HOME/bin/mvn" -B package \
     -DskipTests \
     -Dcodename1.platform=android \
     -Dcodename1.buildTarget=android-source \

@@ -30,15 +30,7 @@ TV at runtime. This is the living-room analog of the existing `isTablet()`,
 
 [source,java]
 ----
-Form f = new Form(BoxLayout.y());
-if (CN.isTV()) {
-    // 10-foot UI: larger fonts, generous spacing, focus-driven navigation
-    f.add(new Label("Hello TV"));
-} else {
-    // Full phone/tablet layout
-    f.add(new Label("Hello"));
-}
-f.show();
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TvplatformsJava001Snippet.java[tag=tvplatforms-java-001,indent=0]
 ----
 
 Codename One's existing D-pad/arrow focus traversal (the same mechanism that
@@ -55,17 +47,7 @@ selected at runtime when `Display.isTV()` (respectively `isWatch()`) returns
 
 [source,css]
 ----
-Label {
-    color: black;
-}
-
-@media device-tv {
-    Label {
-        /* Larger type for the 10-foot UI */
-        font-size: 3mm;
-        color: white;
-    }
-}
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=tvplatforms-css-001,indent=0]
 ----
 
 === Building for Android TV / Google TV
@@ -75,7 +57,7 @@ Enable the Android TV manifest metadata with a single build hint in
 
 [source,properties]
 ----
-codename1.arg.android.tv=true
+include::../demos/common/src/main/snippets/developer-guide/tvplatforms.properties[tag=tvplatforms-properties-001,indent=0]
 ----
 
 This makes the build:
@@ -110,7 +92,7 @@ to the `watchNative.*` hints used for Apple Watch):
 
 [source,properties]
 ----
-codename1.arg.tvNative.enabled=true
+include::../demos/common/src/main/snippets/developer-guide/tvplatforms.properties[tag=tvplatforms-properties-002,indent=0]
 ----
 
 The tvOS build produces a standalone Apple TV app. Because tvOS uses a separate

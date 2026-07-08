@@ -266,10 +266,12 @@ public class PatchGradleFiles {
         String jacocoBlock = """
 apply plugin: 'jacoco'
 
+def cn1ssSkipCoverage = "1" == System.getenv("CN1SS_SKIP_COVERAGE")
+
 android {
     buildTypes {
         debug {
-            testCoverageEnabled true
+            testCoverageEnabled !cn1ssSkipCoverage
         }
     }
 }
@@ -335,8 +337,10 @@ jacoco {
 }
 
 afterEvaluate {
-    tasks.matching { it.name == "connectedDebugAndroidTest" }.configureEach {
-        finalizedBy(tasks.named("jacocoAndroidReport"))
+    if (!cn1ssSkipCoverage) {
+        tasks.matching { it.name == "connectedDebugAndroidTest" }.configureEach {
+            finalizedBy(tasks.named("jacocoAndroidReport"))
+        }
     }
 }
 """.stripTrailing();

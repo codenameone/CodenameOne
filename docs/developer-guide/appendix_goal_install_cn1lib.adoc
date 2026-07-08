@@ -10,7 +10,7 @@ NOTE: Using this goal explicitly is a last resort. The best solution for install
 
 [source,bash]
 ----
-mvn cn1:install-cn1lib -Dfile=/path/to/MyLegacyLib.cn1lib
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-install-cn1lib.sh[tag=appendix-goal-install-cn1lib-bash-001,indent=0]
 ----
 
 This will generate a Maven pom project for this lib inside the "cn1libs" directory, and it will add a dependency inside the common/pom.xml file.

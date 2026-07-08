@@ -1,0 +1,28 @@
+package com.codenameone.developerguide.snippets.generated;
+
+import com.codename1.ui.*;
+import com.codename1.ui.layouts.*;
+import com.codename1.ui.table.*;
+
+class TheComponentsOfCodenameOneJava068Snippet {
+    void snippet() {
+        // tag::the-components-of-codename-one-java-068[]
+        Form hi = new Form("Table", new BorderLayout());
+        TableModel model = new DefaultTableModel(
+                new String[] {"Col 1", "Col 2", "Col 3"},
+                new Object[][] {
+                    {"Row 1", "Row A", "Row X"},
+                    {"Row 2", "Row B", "Row Y"},
+                    {"Row 3", "Row C", "Row Z"},
+                    {"Row 4", "Row D", "Row K"},
+                }) {
+            public boolean isCellEditable(int row, int col) {
+                return col != 0;
+            }
+        };
+        Table table = new Table(model);
+        hi.add(BorderLayout.CENTER, table);
+        hi.show();
+        // end::the-components-of-codename-one-java-068[]
+    }
+}

@@ -245,6 +245,31 @@ warm_catalyst_destination() {
   return 1
 }
 
+# The Catalyst destination of an SDKROOT=iphoneos target also needs the iOS
+# platform content installed in the active Xcode. Some runner instances ship
+# Xcode without it (the same provisioning gap run-ios-native-tests.sh handles),
+# and no amount of destination warming helps -- the scheme lists only
+# watchOS/tvOS destinations. Detect the missing iphoneos SDK and download the
+# platform, restarting a wedged CoreSimulator service when the download fails
+# with "Unable to connect to simulator".
+ensure_ios_platform() {
+  if xcodebuild -showsdks 2>/dev/null | grep -q "iphoneos"; then
+    return 0
+  fi
+  rm_log "The active Xcode has no iOS platform (required for the Mac Catalyst destination); downloading via xcodebuild -downloadPlatform iOS"
+  local out
+  out="$(xcodebuild -downloadPlatform iOS 2>&1)" || true
+  printf '%s\n' "$out"
+  if printf '%s' "$out" | grep -qi "Unable to connect to simulator"; then
+    rm_log "CoreSimulator not responding; restarting the service and retrying the platform download"
+    killall -9 com.apple.CoreSimulator.CoreSimulatorService 2>/dev/null || true
+    sleep 5
+    xcrun simctl list runtimes >/dev/null 2>&1 || true
+    xcodebuild -downloadPlatform iOS || true
+  fi
+}
+ensure_ios_platform
+
 BUILD_OK=0
 for attempt in 1 2 3; do
   if [ "$attempt" -gt 1 ]; then
@@ -564,6 +589,11 @@ if [ -s "$BASE64_STATS_FILE" ]; then
   rm_log "Base64 benchmark stats captured at $BASE64_STATS_FILE"
 fi
 
+SUITE_FAILURE_LINES="$(cn1ss_collect_suite_failures "$TEST_LOG" "$FALLBACK_LOG" "$LATE_FALLBACK_LOG")"
+if [ -n "$SUITE_FAILURE_LINES" ]; then
+  rm_log "Detected DeviceRunner assertion/test failure(s); artifacts and screenshot report will still be collected before failing."
+fi
+
 # Tear down the app process if it's still running (it sometimes is,
 # especially when the test suite finishes but the NSApplication run loop
 # keeps the process alive until SIGTERM).
@@ -647,6 +677,12 @@ comment_rc=$?
 
 cp -f "$BUILD_LOG" "$ARTIFACTS_DIR/xcodebuild-build.log" 2>/dev/null || true
 cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner.log" 2>/dev/null || true
+
+if [ -n "$SUITE_FAILURE_LINES" ]; then
+  rm_log "STAGE:DEVICE_RUNNER_TEST_FAILED -> assertion/test failure(s) are not allowed:"
+  printf '%s\n' "$SUITE_FAILURE_LINES" | sed 's/^/[CN1SS-FAIL] /'
+  exit 19
+fi
 
 # Screenshot mismatch / count-regression guards are centralised in
 # cn1ss_process_and_report (scripts/lib/cn1ss.sh), which returns these

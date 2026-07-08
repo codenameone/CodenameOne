@@ -1,6 +1,7 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.CN;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.UITimer;
@@ -16,7 +17,7 @@ public class BrowserComponentScreenshotTest extends BaseTest {
 
     @Override
     public boolean runTest() throws Exception {
-        if (!BrowserComponent.isNativeBrowserSupported()) {
+        if (CN.isTV() || CN.isWatch() || !BrowserComponent.isNativeBrowserSupported()) {
             done();
             return true;
         }

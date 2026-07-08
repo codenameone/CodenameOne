@@ -79,7 +79,9 @@ import java.io.EOFException;
 import java.io.FilenameFilter;
 import java.lang.ref.SoftReference;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.net.URI;
 import java.sql.SQLException;
 import java.util.HashMap;
@@ -882,6 +884,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static PerformanceMonitor perfMonitor;
     static LocationSimulation locSimulation;
     static MotionSimulation motionSimulation;
+    static ARSimulation arSimulation;
     private JavaSEMotionSensorManager motionSensorManager;
     static PushSimulator pushSimulation;
     private static boolean blockMonitors;
@@ -2458,6 +2461,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         private Graphics2D g2dInstance;
         private java.awt.Dimension forcedSize;
         private boolean releaseLock;
+        private double magnificationAccumulator;
+        private Set<JComponent> nativeMagnificationTargets = Collections.newSetFromMap(new IdentityHashMap<JComponent, Boolean>());
+        private java.util.List<Object> nativeMagnificationListeners = new ArrayList<Object>();
+        private AWTEventListener magnificationWheelFallbackListener;
+        private boolean gestureDebug = Boolean.getBoolean("cn1.javase.gestureDebug");
         public int x, y;
 
         C() {
@@ -2470,7 +2478,155 @@ public class JavaSEPort extends CodenameOneImplementation {
             addHierarchyBoundsListener(this);
             setFocusable(true);
             setOpaque(false);
+            installNativeMagnificationListeners();
+            addHierarchyListener(new HierarchyListener() {
+                public void hierarchyChanged(HierarchyEvent e) {
+                    long flags = e.getChangeFlags();
+                    if ((flags & HierarchyEvent.DISPLAYABILITY_CHANGED) != 0 || (flags & HierarchyEvent.PARENT_CHANGED) != 0) {
+                        installNativeMagnificationListeners();
+                    }
+                }
+            });
             requestFocus();
+        }
+
+        private void installNativeMagnificationListeners() {
+            installMagnificationWheelFallbackListener();
+            installNativeMagnificationListener(this);
+            java.awt.Container parent = getParent();
+            while (parent != null) {
+                if (parent instanceof JComponent) {
+                    installNativeMagnificationListener((JComponent)parent);
+                }
+                parent = parent.getParent();
+            }
+            Window window = SwingUtilities.getWindowAncestor(this);
+            if (window instanceof JFrame) {
+                JFrame frame = (JFrame)window;
+                installNativeMagnificationListener(frame.getRootPane());
+                installNativeMagnificationListener(frame.getLayeredPane());
+                if (frame.getGlassPane() instanceof JComponent) {
+                    installNativeMagnificationListener((JComponent)frame.getGlassPane());
+                }
+                if (frame.getContentPane() instanceof JComponent) {
+                    installNativeMagnificationListener((JComponent)frame.getContentPane());
+                }
+            }
+        }
+
+        private void installNativeMagnificationListener(JComponent target) {
+            if (target == null || nativeMagnificationTargets.contains(target)) {
+                return;
+            }
+            try {
+                Class<?> utilities = Class.forName("com.apple.eawt.event.GestureUtilities");
+                Class<?> listenerType = Class.forName("com.apple.eawt.event.MagnificationListener");
+                Class<?> gestureListenerType = Class.forName("com.apple.eawt.event.GestureListener");
+                Object listener = Proxy.newProxyInstance(
+                        listenerType.getClassLoader() == null ? ClassLoader.getSystemClassLoader() : listenerType.getClassLoader(),
+                        new Class<?>[]{listenerType},
+                        new InvocationHandler() {
+                            public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+                                if ("magnify".equals(method.getName()) && args != null && args.length == 1) {
+                                    Method getMagnification = args[0].getClass().getMethod("getMagnification");
+                                    Object value = getMagnification.invoke(args[0]);
+                                    if (value instanceof Number) {
+                                        debugGesture("native magnification " + value);
+                                        handleMagnification(scaleCoordinateX(getWidth() / 2),
+                                                scaleCoordinateY(getHeight() / 2),
+                                                ((Number)value).doubleValue());
+                                    }
+                                }
+                                return null;
+                            }
+                        });
+                Method add = utilities.getMethod("addGestureListenerTo", JComponent.class, gestureListenerType);
+                add.invoke(null, target, listener);
+                nativeMagnificationTargets.add(target);
+                nativeMagnificationListeners.add(listener);
+                debugGesture("installed native magnification listener on " + target.getClass().getName());
+            } catch (Throwable err) {
+                debugGesture("native magnification listener failed on " + target.getClass().getName() + ": " + err);
+            }
+        }
+
+        private void installMagnificationWheelFallbackListener() {
+            if (magnificationWheelFallbackListener != null) {
+                return;
+            }
+            magnificationWheelFallbackListener = new AWTEventListener() {
+                public void eventDispatched(AWTEvent event) {
+                    if (!(event instanceof MouseWheelEvent)) {
+                        return;
+                    }
+                    MouseWheelEvent e = (MouseWheelEvent)event;
+                    if (!e.isControlDown() && !e.isMetaDown()) {
+                        return;
+                    }
+                    java.awt.Component source = e.getComponent();
+                    if (source == null) {
+                        return;
+                    }
+                    Window canvasWindow = SwingUtilities.getWindowAncestor(C.this);
+                    Window sourceWindow = SwingUtilities.getWindowAncestor(source);
+                    if (canvasWindow == null || sourceWindow != canvasWindow) {
+                        return;
+                    }
+                    java.awt.Point p = SwingUtilities.convertPoint(source, e.getPoint(), C.this);
+                    int gestureX = scaleCoordinateX(p.x);
+                    int gestureY = scaleCoordinateY(p.y);
+                    if (e.getPreciseWheelRotation() < 0 || e.getWheelRotation() < 0) {
+                        debugGesture("wheel magnification in " + e.getPreciseWheelRotation());
+                        fireMagnify(gestureX, gestureY, 1.14f);
+                        e.consume();
+                    } else if (e.getPreciseWheelRotation() > 0 || e.getWheelRotation() > 0) {
+                        debugGesture("wheel magnification out " + e.getPreciseWheelRotation());
+                        fireMagnify(gestureX, gestureY, 0.88f);
+                        e.consume();
+                    }
+                }
+            };
+            try {
+                Toolkit.getDefaultToolkit().addAWTEventListener(magnificationWheelFallbackListener, AWTEvent.MOUSE_WHEEL_EVENT_MASK);
+            } catch (Throwable ignored) {
+                magnificationWheelFallbackListener = null;
+            }
+        }
+
+        private void debugGesture(String message) {
+            if (gestureDebug) {
+                System.out.println("[JavaSEPort gesture] " + message);
+            }
+        }
+
+        private void disposeGestureListeners() {
+            if (magnificationWheelFallbackListener != null) {
+                try {
+                    Toolkit.getDefaultToolkit().removeAWTEventListener(magnificationWheelFallbackListener);
+                } catch (Throwable ignored) {
+                }
+                magnificationWheelFallbackListener = null;
+            }
+        }
+
+        private void handleMagnification(final int x, final int y, double magnification) {
+            magnificationAccumulator += magnification;
+            while (magnificationAccumulator >= 0.08d) {
+                fireMagnify(x, y, 1.14f);
+                magnificationAccumulator -= 0.08d;
+            }
+            while (magnificationAccumulator <= -0.08d) {
+                fireMagnify(x, y, 0.88f);
+                magnificationAccumulator += 0.08d;
+            }
+        }
+
+        private void fireMagnify(final int x, final int y, final float scale) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    Display.getInstance().fireMagnifyGesture(x, y, scale);
+                }
+            });
         }
         
         public void setForcedSize(Dimension d) {
@@ -3535,6 +3691,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             lastInputEvent = e;
             final int x = isScrollWheeling() ? lastX : scaleCoordinateX(e.getX());
             final int y = isScrollWheeling() ? lastY : scaleCoordinateY(e.getY());
+            if (e.isControlDown() || e.isMetaDown()) {
+                if (e.getPreciseWheelRotation() < 0 || e.getWheelRotation() < 0) {
+                    fireMagnify(x, y, 1.14f);
+                } else if (e.getPreciseWheelRotation() > 0 || e.getWheelRotation() > 0) {
+                    fireMagnify(x, y, 0.88f);
+                }
+                return;
+            }
             if (e.getScrollType() == MouseWheelEvent.WHEEL_UNIT_SCROLL) {
                 Form f = getCurrentForm();
                 if(f != null){
@@ -3607,6 +3771,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public void deinitialize() {
+        if (canvas != null) {
+            canvas.disposeGestureListeners();
+        }
         if (canvas.getParent() != null) {
             canvas.getParent().remove(canvas);
         }
@@ -5794,6 +5961,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
         simulateMenu.add(motionSim);
 
+        JMenuItem arSim = new JMenuItem("AR Simulation");
+        arSim.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                if(arSimulation == null) {
+                        arSimulation = new ARSimulation();
+                }
+                arSimulation.setVisible(true);
+            }
+        });
+        simulateMenu.add(arSim);
+
         JMenuItem pushSim = new JMenuItem("Push Simulation");
         pushSim.addActionListener(new ActionListener() {
             @Override
@@ -7193,6 +7372,37 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    private void startTestRecorderRecordingForAutomation() {
+        final int[] attempts = new int[1];
+        final Runnable[] retry = new Runnable[1];
+        retry[0] = new Runnable() {
+            public void run() {
+                final Form current = Display.getInstance().getCurrent();
+                if (current == null) {
+                    if (attempts[0]++ < 40) {
+                        javax.swing.Timer timer = new javax.swing.Timer(250, new ActionListener() {
+                            public void actionPerformed(ActionEvent e) {
+                                Display.getInstance().callSerially(retry[0]);
+                            }
+                        });
+                        timer.setRepeats(false);
+                        timer.start();
+                    }
+                    return;
+                }
+                if (testRecorder == null) {
+                    return;
+                }
+                testRecorder.startRecordingForAutomation();
+                int x = Math.max(5, current.getWidth() / 2);
+                int y = Math.max(5, current.getHeight() / 2);
+                testRecorder.eventPointerPressed(x, y);
+                testRecorder.eventPointerReleased(x, y);
+            }
+        };
+        Display.getInstance().callSerially(retry[0]);
+    }
+
 
 
     private void showNetworkMonitor() {
@@ -8268,19 +8478,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 public void run() {
                     showTestRecorder();
                     if (Boolean.getBoolean("cn1.simulator.autoTestRecorderRecord") && testRecorder != null) {
-                        testRecorder.startRecordingForAutomation();
-                        Display.getInstance().callSerially(new Runnable() {
-                            public void run() {
-                                Form current = Display.getInstance().getCurrent();
-                                if (current == null) {
-                                    return;
-                                }
-                                int x = Math.max(5, current.getWidth() / 2);
-                                int y = Math.max(5, current.getHeight() / 2);
-                                testRecorder.eventPointerPressed(x, y);
-                                testRecorder.eventPointerReleased(x, y);
-                            }
-                        });
+                        startTestRecorderRecordingForAutomation();
                     }
                 }
             });
@@ -14551,6 +14749,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     public com.codename1.impl.CameraImpl createCameraImpl() {
         return new JavaSECameraImpl();
     }
+
+    @Override
+    public com.codename1.impl.ARImpl createARImpl() {
+        return new JavaSEARImpl();
+    }
     
     private void captureMulti(final com.codename1.ui.events.ActionListener response, final String[] imageTypes, final String desc) {
         SwingUtilities.invokeLater(new Runnable() {
@@ -14649,6 +14852,75 @@ public class JavaSEPort extends CodenameOneImplementation {
                 });
             }
         });
+    }
+
+    @Override
+    public void openFileChooser(final com.codename1.ui.events.ActionListener response, final String accept) {
+        EventQueue.invokeLater(new Runnable() {
+            public void run() {
+                java.awt.Frame parent = null;
+                java.awt.Frame[] frames = java.awt.Frame.getFrames();
+                for (int iter = 0; iter < frames.length; iter++) {
+                    if (frames[iter].isShowing()) {
+                        parent = frames[iter];
+                        break;
+                    }
+                }
+                FileDialog picker = new FileDialog(parent, "Select File", FileDialog.LOAD);
+                final String[] filters = parseFileChooserAccept(accept);
+                if (filters.length > 0) {
+                    picker.setFilenameFilter(new FilenameFilter() {
+                        public boolean accept(File dir, String name) {
+                            if (name == null) {
+                                return false;
+                            }
+                            String lower = name.toLowerCase();
+                            for (int iter = 0; iter < filters.length; iter++) {
+                                if (lower.endsWith("." + filters[iter])) {
+                                    return true;
+                                }
+                            }
+                            return false;
+                        }
+                    });
+                }
+                picker.setVisible(true);
+                final File selected;
+                if (picker.getFile() == null) {
+                    selected = null;
+                } else {
+                    selected = new File(picker.getDirectory(), picker.getFile());
+                }
+                Display.getInstance().callSerially(new Runnable() {
+                    public void run() {
+                        if (selected == null) {
+                            response.actionPerformed(null);
+                        } else {
+                            response.actionPerformed(new com.codename1.ui.events.ActionEvent("file://" + selected.getAbsolutePath().replace('\\', '/')));
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    private String[] parseFileChooserAccept(String accept) {
+        if (accept == null || accept.trim().length() == 0 || "*/*".equals(accept.trim())) {
+            return new String[0];
+        }
+        java.util.ArrayList<String> out = new java.util.ArrayList<String>();
+        String[] tokens = accept.split(",");
+        for (int iter = 0; iter < tokens.length; iter++) {
+            String token = tokens[iter].trim().toLowerCase();
+            if (token.length() == 0 || token.indexOf('/') >= 0 || "*".equals(token)) {
+                continue;
+            }
+            if (token.startsWith(".")) {
+                token = token.substring(1);
+            }
+            out.add(token);
+        }
+        return out.toArray(new String[out.size()]);
     }
 
     @Override

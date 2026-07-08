@@ -9,12 +9,15 @@
  */
 package com.codename1.debug.proxy;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.zip.GZIPInputStream;
 
 /**
  * Manages the TCP connection from a Codename One iOS app's on-device-debug
@@ -33,6 +36,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class DeviceConnection implements AutoCloseable {
 
     public interface DeviceListener {
+        /**
+         * The device's symbol table, fetched over the wire and inflated,
+         * delivered before {@link #onHello} so downstream JDWP handling can
+         * rely on it. Replaces the old local cn1-symbols.txt sidecar.
+         */
+        void onSymbols(SymbolTable symbols);
         void onHello(int version);
         void onBreakpointHit(long threadId, int methodId, int line);
         void onStepComplete(long threadId, int methodId, int line);
@@ -65,6 +74,15 @@ public final class DeviceConnection implements AutoCloseable {
     private volatile DataInputStream in;
     private volatile DataOutputStream out;
     private final Object sendLock = new Object();
+
+    // Symbol-table streaming state (CMD_GET_SYMBOLS / EVT_SYMBOLS). The device
+    // dials in, we pull its gzip-compressed symbol table in chunks, inflate,
+    // parse, and hand it to the listener before firing onHello. The read loop
+    // is single-threaded so no locking is needed around these.
+    private static final int SYMBOL_CHUNK = 256 * 1024;
+    private ByteArrayOutputStream symbolsBuf;
+    private int symbolsTotal = -1;
+    private int helloVersion = 0;
 
     public DeviceConnection(int listenPort, DeviceListener listener) {
         this.listenPort = listenPort;
@@ -107,8 +125,21 @@ public final class DeviceConnection implements AutoCloseable {
     private void dispatch(int code, byte[] p) {
         switch (code) {
             case WireProtocol.EVT_HELLO: {
-                int ver = p.length >= 3 ? p[2] & 0xff : 0;
-                listener.onHello(ver);
+                helloVersion = p.length >= 3 ? p[2] & 0xff : 0;
+                // Don't fire onHello yet — first pull the symbol table off the
+                // device so the JDWP layer has it before any class/method query.
+                symbolsBuf = new ByteArrayOutputStream();
+                symbolsTotal = -1;
+                try {
+                    requestSymbols(0);
+                } catch (IOException e) {
+                    System.err.println("[device] symbol request failed: " + e.getMessage());
+                    finishSymbols(); // deliver whatever we have (possibly empty)
+                }
+                return;
+            }
+            case WireProtocol.EVT_SYMBOLS: {
+                onSymbolsChunk(p);
                 return;
             }
             case WireProtocol.EVT_BP_HIT: {
@@ -225,6 +256,59 @@ public final class DeviceConnection implements AutoCloseable {
             default:
                 listener.onUnknownEvent(code, p);
         }
+    }
+
+    /** Requests one symbol chunk starting at {@code offset}. */
+    private void requestSymbols(int offset) throws IOException {
+        byte[] p = new byte[8];
+        writeInt(p, 0, offset);
+        writeInt(p, 4, SYMBOL_CHUNK);
+        sendCommand(WireProtocol.CMD_GET_SYMBOLS, p);
+    }
+
+    /**
+     * Accumulates an EVT_SYMBOLS chunk. Payload: totalLen(4) offset(4)
+     * chunkLen(4) then chunkLen gzip bytes. Requests the next chunk until the
+     * whole blob is assembled, then inflates + parses it.
+     */
+    private void onSymbolsChunk(byte[] p) {
+        if (symbolsBuf == null) return; // stray chunk outside a fetch
+        if (p.length < 12) { finishSymbols(); return; }
+        int total = readInt(p, 0);
+        int chunkLen = readInt(p, 8);
+        if (symbolsTotal < 0) symbolsTotal = total;
+        if (chunkLen > 0 && 12 + chunkLen <= p.length) {
+            symbolsBuf.write(p, 12, chunkLen);
+        }
+        if (symbolsBuf.size() < symbolsTotal && chunkLen > 0) {
+            try {
+                requestSymbols(symbolsBuf.size());
+                return;
+            } catch (IOException e) {
+                System.err.println("[device] symbol request failed: " + e.getMessage());
+            }
+        }
+        finishSymbols();
+    }
+
+    /** Inflates + parses the accumulated blob and delivers it to the listener. */
+    private void finishSymbols() {
+        byte[] gz = symbolsBuf == null ? new byte[0] : symbolsBuf.toByteArray();
+        symbolsBuf = null;
+        symbolsTotal = -1;
+        SymbolTable table;
+        try (GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(gz))) {
+            table = SymbolTable.load(gis);
+            System.out.println("[device] loaded symbols: " + table.allClasses().size()
+                    + " classes, " + table.allMethods().size() + " methods, "
+                    + table.fieldCount() + " fields (" + gz.length + " gz bytes)");
+        } catch (IOException e) {
+            System.err.println("[device] failed to parse symbol table: " + e.getMessage()
+                    + " — debugging will be degraded");
+            table = new SymbolTable();
+        }
+        listener.onSymbols(table);
+        listener.onHello(helloVersion);
     }
 
     public void sendCommand(int cmd, byte[] payload) throws IOException {

@@ -16,12 +16,7 @@ You can run the `generate-cn1lib-project` goal as follows:
 
 [source,bash]
 ----
-mvn com.codenameone:codenameone-maven-plugin:$CN1VERSION:generate-cn1lib-project \
-  -DsourceProject=/path/to/MyLegacyAntLibraryProject \
-  -DgroupId=com.example \
-  -DartifactId=my-maven-lib \
-  -Dversion=1.0-SNAPSHOT \
-  -U
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-cn1lib-project.sh[tag=appendix-goal-generate-cn1lib-project-bash-001,indent=0]
 ----
 
 NOTE: Make sure you substitute the https://search.maven.org/search?q=a:codenameone-maven-plugin[latest codenameone-maven-plugin version] for the `$CN1VERSION` in this command.
@@ -39,20 +34,14 @@ For example:
 
 [source,bash]
 ----
-cd my-maven-lib
-mvn install
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-cn1lib-project.sh[tag=appendix-goal-generate-cn1lib-project-bash-002,indent=0]
 ----
 
 After running the "install" command, you should be able to add your library as a dependency to a <<cn1app-archetype>> project using the following dependency:
 
 [source,xml]
 ----
-<dependency>
-  <groupId>com.example</groupId>
-  <artifactId>my-maven-lib-lib</artifactId>
-  <version>1.0-SNAPSHOT</version>
-  <type>pom</type>
-</dependency>
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-generate-cn1lib-project.xml[tag=appendix-goal-generate-cn1lib-project-xml-001,indent=0]
 ----
 
 IMPORTANT: Notice that the `artifactId` has an extra "-lib" appended. That is, it's `<artifactId>my-maven-lib-lib</artifactId>` and not `<artifactId>my-maven-lib</artifactId>`. This is because the `artifactId` that you specify in the `generate-cn1lib-project` goal is used for the "root" module of the multimodule maven project. The actual "lib" project that you can use as a Maven dependency is the "lib" submodule, which uses the specified artifactId with a "-lib" suffix.

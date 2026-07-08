@@ -114,6 +114,7 @@ public class IPhoneBuilder extends Executor {
     private boolean usesBiometrics;
     private boolean usesNfc;
     private boolean usesCn1Camera;
+    private boolean usesCn1Ar;
     // Set when the app references com.codename1.car.* (Apple CarPlay support). Gates the
     // CN1_USE_CARPLAY native define, CarPlay.framework linkage, the carplay entitlement and the
     // CarPlay scene in the Info.plist scene manifest. Apps that never touch the API see no change.
@@ -828,6 +829,12 @@ public class IPhoneBuilder extends Executor {
                     // AVFoundation-based CN1Camera natives.
                     if (!usesCn1Camera && cls.indexOf("com/codename1/camera/") == 0) {
                         usesCn1Camera = true;
+                    }
+                    // Augmented reality (com.codename1.ar.*). Gated on actual
+                    // usage so ARKit/SceneKit and the CN1AR natives are only
+                    // built for apps that reference the AR API.
+                    if (!usesCn1Ar && cls.indexOf("com/codename1/ar/") == 0) {
+                        usesCn1Ar = true;
                     }
                     // Apple CarPlay (com.codename1.car.*). Gated on actual usage so the
                     // CarPlay scene/entitlement/framework are only added for apps that
@@ -2289,6 +2296,31 @@ public class IPhoneBuilder extends Executor {
                 }
             }
 
+            // Augmented reality: uncomment INCLUDE_CN1_AR so the CN1AR
+            // natives (ARKit + ARSCNView) compile in, and link ARKit /
+            // SceneKit explicitly -- neither is default-linked and the
+            // AiDependencyTable iosFrameworks field is documentation-only.
+            // Apps that never reference com.codename1.ar leave the define
+            // commented out so no ARKit symbol is referenced, which keeps
+            // Apple's API-usage scan quiet and tvOS/watchOS slices clean.
+            if (usesCn1Ar) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define INCLUDE_CN1_AR",
+                            "#define INCLUDE_CN1_AR");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable INCLUDE_CN1_AR", ex);
+                }
+                String arLibs = "ARKit.framework;SceneKit.framework";
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = arLibs;
+                } else if (!addLibs.toLowerCase().contains("arkit.framework")) {
+                    addLibs = addLibs + ";" + arLibs;
+                }
+            }
+
             // CarPlay: link CarPlay.framework (+ MediaPlayer for the now-playing template) and
             // inject the per-category carplay entitlement. The CarPlay entitlements are granted by
             // Apple per app category, so we only inject the ones the project opts into via the
@@ -2650,7 +2682,33 @@ public class IPhoneBuilder extends Executor {
                     // both the iOS app target and the tvOS target.
                     parparCmd.add(tvNativeBuilder.parparvmOptionalFrameworksArg());
                 }
-                parparCmd.add("-Xmx384m");
+                // Pass through extra translator JVM options (notably a larger
+                // -Xmx) from the CN1_TRANSLATOR_OPTS environment variable. The
+                // forked JVM does not inherit the Maven process's -D properties,
+                // so this is the only way to reach the translator for tuning.
+                String translatorOpts = System.getenv("CN1_TRANSLATOR_OPTS");
+                boolean heapOverridden = false;
+                if (translatorOpts != null && !translatorOpts.trim().isEmpty()) {
+                    for (String opt : translatorOpts.trim().split("\\s+")) {
+                        if (!opt.isEmpty()) {
+                            parparCmd.add(opt);
+                            if (opt.startsWith("-Xmx")) {
+                                heapOverridden = true;
+                            }
+                        }
+                    }
+                }
+                // Default heap; a -Xmx in CN1_TRANSLATOR_OPTS takes precedence.
+                // The dead-code cull builds an in-memory suffix automaton over
+                // all native symbols (NativeSymbolIndex, from #5236) to avoid the
+                // old O(N^2) substring scan that timed out on large apps -- that
+                // index trades time for memory, so the historical 384m cap now
+                // OOMs local iOS builds as the CN1 class count grows (issue
+                // #5344). The cloud builder already runs the same translator at
+                // 1024m; match it here so local and server builds behave alike.
+                if (!heapOverridden) {
+                    parparCmd.add("-Xmx1024m");
+                }
                 parparCmd.add("-jar");
                 parparCmd.add(parparVMCompilerJar);
                 parparCmd.add("ios");

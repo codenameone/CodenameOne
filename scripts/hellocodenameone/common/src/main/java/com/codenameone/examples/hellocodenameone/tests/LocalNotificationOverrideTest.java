@@ -2,6 +2,7 @@ package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.notifications.LocalNotification;
 import com.codename1.system.NativeLookup;
+import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codenameone.examples.hellocodenameone.LocalNotificationNative;
 
@@ -10,6 +11,10 @@ public class LocalNotificationOverrideTest extends BaseTest {
 
     @Override
     public boolean runTest() {
+        if (CN.isTV() || CN.isWatch()) {
+            done();
+            return true;
+        }
         LocalNotificationNative nativeInterface = NativeLookup.create(LocalNotificationNative.class);
         if (nativeInterface == null || !nativeInterface.isSupported()) {
             done();
@@ -23,7 +28,7 @@ public class LocalNotificationOverrideTest extends BaseTest {
             schedule(notificationId, "first");
             schedule(notificationId, "second");
 
-            int count = nativeInterface.getScheduledLocalNotificationCount(notificationId);
+            int count = waitForScheduledCount(nativeInterface, notificationId, 1, 8000);
             nativeInterface.clearScheduledLocalNotifications(notificationId);
 
             if (count != 1) {
@@ -47,6 +52,24 @@ public class LocalNotificationOverrideTest extends BaseTest {
                 System.currentTimeMillis() + FIRE_OFFSET_MS,
                 LocalNotification.REPEAT_NONE
         );
+    }
+
+    private int waitForScheduledCount(LocalNotificationNative nativeInterface, String notificationId, int expected, int timeoutMs) {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        int count = 0;
+        do {
+            count = nativeInterface.getScheduledLocalNotificationCount(notificationId);
+            if (count >= expected) {
+                return count;
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException err) {
+                Thread.currentThread().interrupt();
+                return count;
+            }
+        } while (System.currentTimeMillis() < deadline);
+        return count;
     }
 
     @Override

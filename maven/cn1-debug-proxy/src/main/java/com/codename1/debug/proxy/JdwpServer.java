@@ -78,7 +78,11 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
     private static final int SP_ALL          = 2;
 
     private final int port;
-    private final SymbolTable symbols;
+    // Delivered by the device over the wire (CMD_GET_SYMBOLS), not a local
+    // file. Null until the device dials in and streams its table. VM_START is
+    // gated on this being set, and JDWP clients don't enumerate classes until
+    // they see VM_START — so symbol-dependent handlers never run against null.
+    private volatile SymbolTable symbols;
     private volatile DeviceConnection device;
 
     private Socket socket;
@@ -136,13 +140,22 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         }
     }
 
-    public JdwpServer(int port, SymbolTable symbols) {
+    public JdwpServer(int port) {
         this.port = port;
-        this.symbols = symbols;
     }
 
     public void setDevice(DeviceConnection device) {
         this.device = device;
+    }
+
+    /**
+     * Receives the symbol table streamed off the device, just before onHello.
+     * onHello then fires VM_START (if an IDE is attached), which is the signal
+     * JDWP clients wait for before enumerating classes — so by the time any
+     * symbol-dependent query arrives, {@link #symbols} is set.
+     */
+    @Override public void onSymbols(SymbolTable symbols) {
+        this.symbols = symbols;
     }
 
     public void acceptAndServe() throws IOException {
@@ -165,8 +178,13 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                     continue;
                 }
                 System.out.println("[jdwp] handshake complete");
-                // If the device connected before this IDE attach, fire VM_START now.
-                if (deviceHelloReceived) {
+                // If the device already streamed its symbols (it connected
+                // before this IDE attach), fire VM_START now. Otherwise onHello
+                // will fire it once the device dials in and delivers symbols.
+                // Gating VM_START on symbols!=null means the IDE won't
+                // enumerate classes until the table is present. Idempotent, so
+                // onHello racing this is harmless.
+                if (symbols != null) {
                     sendVmStart();
                 }
                 // Auto-release the device-side waitForAttach gate after a
@@ -203,11 +221,21 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
         // Clear any pending step requests so a stale one from the previous
         // attach can't fire against the new debugger.
         stepRequests.clear();
+        // Re-arm VM_START for the next attach.
+        vmStartSent = false;
         // Breakpoints stay in bpRequests so the device keeps them set; the
         // next attaching IDE will see them via EventRequest semantics.
     }
 
-    private void sendVmStart() {
+    // Guards against sending VM_START twice per attach — the accept loop and
+    // onHello can both reach it depending on connect ordering.
+    private volatile boolean vmStartSent = false;
+
+    private synchronized void sendVmStart() {
+        if (vmStartSent || out == null) {
+            return;
+        }
+        vmStartSent = true;
         try {
             Buf b = new Buf();
             b.writeByte(SP_NONE);

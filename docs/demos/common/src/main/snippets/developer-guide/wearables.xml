@@ -1,0 +1,9 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::wearables-xml-001[]
+<uses-feature android:name="android.hardware.type.watch" android:required="true" />
+// end::wearables-xml-001[]
+
+// tag::wearables-xml-002[]
+<meta-data android:name="com.google.android.wearable.standalone" android:value="true" />
+// end::wearables-xml-002[]

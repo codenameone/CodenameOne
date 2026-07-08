@@ -45,7 +45,7 @@
         [center getPendingNotificationRequestsWithCompletionHandler:^(NSArray<UNNotificationRequest *> * _Nonnull requests) {
             for (UNNotificationRequest *request in requests) {
                 NSString *uid = [NSString stringWithFormat:@"%@", [request.content.userInfo valueForKey:@"__ios_id__"]];
-                if ([param isEqualToString:uid]) {
+                if ([param isEqualToString:uid] || [param isEqualToString:request.identifier]) {
                     count++;
                 }
             }
@@ -58,7 +58,35 @@
 }
 
 -(BOOL)isSupported{
+#if TARGET_OS_TV || TARGET_OS_WATCH
+    return NO;
+#else
+    if (@available(iOS 10.0, *)) {
+        UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+        dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+        __block BOOL supported = NO;
+        [center getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings * _Nonnull settings) {
+            if (settings.authorizationStatus == UNAuthorizationStatusAuthorized) {
+                supported = YES;
+                dispatch_semaphore_signal(sem);
+                return;
+            }
+            if (settings.authorizationStatus == UNAuthorizationStatusDenied) {
+                supported = NO;
+                dispatch_semaphore_signal(sem);
+                return;
+            }
+            [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert + UNAuthorizationOptionSound + UNAuthorizationOptionBadge)
+                completionHandler:^(BOOL granted, NSError * _Nullable error) {
+                    supported = granted && error == nil;
+                    dispatch_semaphore_signal(sem);
+            }];
+        }];
+        dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5 * NSEC_PER_SEC)));
+        return supported;
+    }
     return YES;
+#endif
 }
 
 @end

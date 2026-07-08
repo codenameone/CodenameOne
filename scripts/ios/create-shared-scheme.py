@@ -80,18 +80,46 @@ def _search_value(text: str, pattern: str) -> Optional[str]:
     return m.group("value") if m else None
 
 
-def choose_targets(targets: Iterable[Target]) -> tuple[Optional[Target], Optional[Target], Optional[Target]]:
-    app = None
+def _is_auxiliary_app_target(target: Target) -> bool:
+    lower_name = target.name.lower()
+    lower_product = (target.product_name or "").lower()
+    return (
+        lower_name.endswith("tv")
+        or lower_name.endswith("watch")
+        or lower_product.endswith("tv.app")
+        or lower_product.endswith("watch.app")
+    )
+
+
+def choose_app_target(targets: Iterable[Target], preferred_name: Optional[str]) -> Optional[Target]:
+    apps = [target for target in targets if target.product_type.endswith(".application")]
+    if not apps:
+        return None
+
+    if preferred_name:
+        for target in apps:
+            if target.name == preferred_name:
+                return target
+        for target in apps:
+            if target.product_name == f"{preferred_name}.app":
+                return target
+
+    for target in apps:
+        if not _is_auxiliary_app_target(target):
+            return target
+
+    return apps[0]
+
+
+def choose_test_targets(targets: Iterable[Target]) -> tuple[Optional[Target], Optional[Target]]:
     ui = None
     unit = None
     for target in targets:
-        if target.product_type.endswith(".application") and app is None:
-            app = target
-        elif target.product_type.endswith(".bundle.ui-testing") and ui is None:
+        if target.product_type.endswith(".bundle.ui-testing") and ui is None:
             ui = target
         elif target.product_type.endswith(".bundle.unit-test") and unit is None:
             unit = target
-    return app, unit, ui
+    return unit, ui
 
 
 def render_testable(target: Target, container: str) -> str:
@@ -238,12 +266,15 @@ def main(argv: List[str]) -> int:
         print(f"error: no build targets discovered in {project_file}", file=sys.stderr)
         return 1
 
-    app, unit, ui = choose_targets(targets)
+    scheme_name = args.scheme_name
+
+    app = choose_app_target(targets, scheme_name)
     if not app:
         print("error: unable to find application target", file=sys.stderr)
         return 1
 
-    scheme_name = args.scheme_name or app.name
+    scheme_name = scheme_name or app.name
+    unit, ui = choose_test_targets(targets)
 
     # Prefer UI tests only. Include unit tests only if there is no UI test target.
     testables: List[str] = []

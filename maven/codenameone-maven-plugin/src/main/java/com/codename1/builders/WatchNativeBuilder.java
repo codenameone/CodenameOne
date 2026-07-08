@@ -110,7 +110,10 @@ class WatchNativeBuilder {
             + "WebKit.framework;StoreKit.framework;"
             // CarPlay.framework is iOS-only (absent on watchOS); it is linked on the iOS slice when
             // the app references com.codename1.car, so weak-link it for the watch slice.
-            + "CarPlay.framework";
+            + "CarPlay.framework;"
+            // ARKit and SceneKit are absent on watchOS; they are linked on the iOS slice when the
+            // app references com.codename1.ar, so weak-link them for the watch slice.
+            + "ARKit.framework;SceneKit.framework";
 
     WatchNativeBuilder(IPhoneBuilder owner) {
         this.owner = owner;
@@ -528,9 +531,15 @@ class WatchNativeBuilder {
                 .append("  bs['SWIFT_OBJC_BRIDGING_HEADER'] = '")
                 .append(IPhoneBuilder.escapeRubyStr(mainClass + "-src/" + mainClass + "-Watch-Bridging-Header.h")).append("'\n")
                 // Resolve <GLKit/..> and <OpenGLES/..> to the watchOS stub
-                // headers (writeStubHeaders) since neither framework exists on
-                // watchOS; the stubs supply the GL types the shared decls use.
-                .append("  bs['HEADER_SEARCH_PATHS'] = '$(inherited) $(SRCROOT)/")
+                // headers (writeStubHeaders) only when Xcode is actually
+                // compiling the watch target for a watch SDK. If an old or
+                // implicit app dependency makes Xcode visit this target during
+                // an iOS Simulator build, these stubs must not shadow Apple's
+                // real OpenGLES headers.
+                .append("  bs.delete('HEADER_SEARCH_PATHS')\n")
+                .append("  bs['HEADER_SEARCH_PATHS[sdk=watchos*]'] = '$(inherited) $(SRCROOT)/")
+                .append(IPhoneBuilder.escapeRubyStr(mainClass)).append("-src/watchOSStubs'\n")
+                .append("  bs['HEADER_SEARCH_PATHS[sdk=watchsimulator*]'] = '$(inherited) $(SRCROOT)/")
                 .append(IPhoneBuilder.escapeRubyStr(mainClass)).append("-src/watchOSStubs'\n")
                 .append("  bs['SKIP_INSTALL'] = 'YES'\n");
         if (resolvedTeamId != null && !resolvedTeamId.isEmpty()) {
@@ -592,16 +601,25 @@ class WatchNativeBuilder {
 
         // Companion embedding is opt-in (watchNative.embedCompanion=true) and OFF
         // by default. Embedding adds the watch target as a build dependency of the
-        // iOS app, which makes building the iOS app also build the watch target --
-        // and Xcode builds that embedded dependency against the iOS app's
-        // iphonesimulator SDK, where the real OpenGLES framework collides with the
-        // watchOSStubs (duplicate EAGLContext) and breaks the iOS screenshot build.
-        // The watch slice is built + tested independently (build-ios-watch /
-        // run-watch-ui-tests.sh), so the test pipeline does not need the embed.
-        // Re-enabling companion packaging needs the embedded dependency pinned to
-        // the watchsimulator/watchos SDK; tracked as a follow-up.
+        // iOS app, which makes building the iOS app also build the watch target.
+        // Remove any dependency/copy phase that Xcode or an older generator run
+        // left behind unless the project explicitly asks for companion packaging.
         boolean embedCompanion = "true".equals(request.getArg("watchNative.embedCompanion", "false"));
-        if (embedCompanion && !isStandalone()) {
+        if (!embedCompanion || isStandalone()) {
+            s.append("app_target.dependencies.to_a.each do |dep|\n")
+                    .append("  proxy = dep.respond_to?(:target_proxy) ? dep.target_proxy : nil\n")
+                    .append("  remote = proxy && proxy.respond_to?(:remote_global_id) ? xcproj.objects_by_uuid[proxy.remote_global_id] : nil\n")
+                    .append("  dep_target = dep.respond_to?(:target) ? dep.target : nil\n")
+                    .append("  dep_target = remote if dep_target.nil?\n")
+                    .append("  next unless dep_target && dep_target.respond_to?(:name) && dep_target.name == watch_name\n")
+                    .append("  dep.remove_from_project\n")
+                    .append("  proxy.remove_from_project if proxy && proxy.respond_to?(:remove_from_project) && xcproj.objects.include?(proxy)\n")
+                    .append("end\n")
+                    .append("app_target.build_phases.to_a.each do |phase|\n")
+                    .append("  next unless phase.respond_to?(:display_name) && phase.display_name == 'Embed Watch Content'\n")
+                    .append("  phase.remove_from_project\n")
+                    .append("end\n");
+        } else {
             // Companion: embed the watch .app into the iOS app under
             // $(CONTENTS_FOLDER_PATH)/Watch and add a build dependency so the
             // pair archives together.

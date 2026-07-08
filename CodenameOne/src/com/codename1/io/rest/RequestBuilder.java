@@ -1043,7 +1043,7 @@ public class RequestBuilder {
         if (contentType != null) {
             req.setContentType(contentType);
         }
-        req.setFailSilently(false);
+        req.setFailSilently(hasErrorCodeHandler());
         if (cache != null) {
             req.setCacheMode(cache);
         }
@@ -1091,6 +1091,13 @@ public class RequestBuilder {
         }
 
         return req;
+    }
+
+    private boolean hasErrorCodeHandler() {
+        return byteArrayErrorCallback != null
+                || stringErrorCallback != null
+                || jsonErrorCallback != null
+                || propertyErrorCallback != null;
     }
 
     private static class FetchAsPropertyListActionListener implements ActionListener<NetworkEvent> {

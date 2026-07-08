@@ -65,6 +65,7 @@ public final class IOSNative {
             boolean returnExitsEditing);
     native void resizeNativeTextView(int x, int y, int w, int h, int padTop, int padRight, int padBottom, int padLeft);
     native void flushBuffer(long peer, int x, int y, int width, int height);
+    native void flushBufferForReadback(int x, int y, int width, int height);
     native void imageRgbToIntArray(long imagePeer, int[] arr, int x, int y, int width, int height, int imgWidth, int imgHeight);
     native long createImageFromARGB(int[] argb, int width, int height);
     native long createImage(byte[] data, int[] widthHeight);
@@ -490,6 +491,7 @@ public final class IOSNative {
     // capture
     native void captureCamera(boolean movie, int quality, int duration);
     native void openGallery(int type);
+    native void openFileChooser(String accept);
 
     // Low-level camera API (com.codename1.camera). Backed by CN1Camera.m
     // which wraps AVCaptureSession. The IOSCameraImpl class on the Java side
@@ -507,6 +509,27 @@ public final class IOSNative {
     native void cn1CameraPause(long sessionPeer);
     native void cn1CameraResume(long sessionPeer);
     native void cn1CameraClose(long sessionPeer);
+
+    // Augmented reality API (com.codename1.ar). Backed by CN1AR.m which wraps
+    // an ARKit ARSession composited through an ARSCNView. The IOSARImpl class
+    // on the Java side routes static callbacks delivered from the session and
+    // renderer queues. Sessions are referenced by the retained CN1AR pointer
+    // cast to long; configType is 0 for world tracking, 1 for face tracking;
+    // planeMask is bit 0 horizontal, bit 1 vertical.
+    native boolean cn1ArIsSupported(int configType);
+    native long cn1ArCreate();
+    native void cn1ArAddReferenceImage(long sessionPeer, byte[] encodedImage, String name, float physicalWidthMeters);
+    native boolean cn1ArStart(long sessionPeer, int configType, int planeMask, boolean lightEstimation);
+    native long cn1ArCreateView(long sessionPeer);
+    native String cn1ArHitTest(long sessionPeer, float xNorm, float yNorm);
+    native String cn1ArCreateAnchor(long sessionPeer, float tx, float ty, float tz, float qx, float qy, float qz, float qw);
+    native String cn1ArCreateAnchorFromHit(long sessionPeer, int hitId);
+    native void cn1ArRemoveAnchor(long sessionPeer, String anchorId);
+    native void cn1ArClearAnchorContent(long sessionPeer, String anchorId);
+    native void cn1ArAddAnchorMesh(long sessionPeer, String anchorId, float[] interleaved, int vertexCount, int[] indices, int indexCount, int argbColor, byte[] encodedTexture, float[] localTransform16);
+    native void cn1ArPause(long sessionPeer);
+    native void cn1ArResume(long sessionPeer);
+    native void cn1ArClose(long sessionPeer);
 
     // ---------------------------------------------------------------------
     // Portable 3D API (com.codename1.gpu) Metal backend. Backed by CN1GL3D.m.
@@ -1005,6 +1028,15 @@ public final class IOSNative {
 
     /** Async keychain delete; result via IOSSecureStorage.nativeStorageBooleanResult / nativeStorageError. */
     native void secureStorageRemove(int requestId, String reason, String account);
+
+    /** Synchronous keychain read without biometric prompting. */
+    native String secureStorageGetPlain(String account);
+
+    /** Synchronous keychain write without biometric prompting. */
+    native boolean secureStorageSetPlain(String account, String value);
+
+    /** Synchronous keychain delete without biometric prompting. */
+    native boolean secureStorageRemovePlain(String account);
 
     // --- NFC (Core NFC) -----------------------------------------------------
 

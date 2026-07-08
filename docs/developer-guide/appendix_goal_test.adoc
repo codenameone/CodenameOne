@@ -6,14 +6,14 @@ This goal is bound to the `test` phase of <<cn1app-archetype>> projects, so that
 
 [source,bash]
 ----
-mvn install
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-test.sh[tag=appendix-goal-test-bash-001,indent=0]
 ----
 
 or
 
 [source,bash]
 ----
-mvn package
+include::../demos/common/src/main/snippets/developer-guide/appendix-goal-test.sh[tag=appendix-goal-test-bash-002,indent=0]
 ----
 
 Then this goal will be executed automatically.

@@ -116,6 +116,16 @@ cn1ss_log() {
   echo "[cn1ss] $*"
 }
 
+cn1ss_collect_suite_failures() {
+  # Assertion-only tests do not emit screenshots, so screenshot count/mismatch
+  # gates cannot catch them. Treat runner-level test failures as fatal in the
+  # platform wrapper after logs have been collected.
+  {
+    grep -hE 'CN1SS:ERR:suite test=.*(failed=|failed:|failed due to timeout|forced timeout|finalize exception=)' "$@" 2>/dev/null || true
+    grep -hE 'CN1SS:ERR:(exception caught in EDT|testExecutionFinished exception=)' "$@" 2>/dev/null || true
+  } | awk '!seen[$0]++'
+}
+
 cn1ss_java_run() {
   local class_name="$1"; shift
   if [ -z "${CN1SS_JAVA_BIN:-}" ] || [ ! -x "$CN1SS_JAVA_BIN" ]; then
@@ -496,13 +506,14 @@ cn1ss_process_and_report() {
     # let suites silently shrink from 124 captures to 58 while still going green).
     #
     # We fail when expected - covered exceeds CN1SS_ALLOWED_MISSING (default 0:
-    # no uncovered goldens tolerated). A pipeline with a known, steady-state gap
-    # sets its own tolerance and documents why (e.g. the iOS jobs allow 2 for
-    # OrientationLock + MutableImageReadback, which do not render on the iOS
-    # backends). CN1SS_MIN_SCREENSHOTS can raise the floor above the on-disk
-    # golden count (useful before the reference set is fully seeded). The only
-    # bypass is CN1SS_SKIP_COUNT_CHECK=1, reserved for the deliberate, manual act
-    # of seeding a brand new reference set; it is loud in the log so it can never
+    # no uncovered goldens tolerated). A pipeline with a known, steady-state
+    # screenshot-only gap may set its own tolerance and document why. Assertion
+    # test failures are never covered by this tolerance; platform wrappers scan
+    # CN1SS:ERR:suite test=... failure lines separately and fail the run.
+    # CN1SS_MIN_SCREENSHOTS can raise the floor above the on-disk golden count
+    # (useful before the reference set is fully seeded). The only bypass is
+    # CN1SS_SKIP_COUNT_CHECK=1, reserved for the deliberate, manual act of
+    # seeding a brand new reference set; it is loud in the log so it can never
     # be mistaken for normal operation.
     # ------------------------------------------------------------------------
     if [ "${CN1SS_SKIP_COUNT_CHECK:-0}" = "1" ]; then

@@ -9707,6 +9707,56 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         this.getActivity().startActivityForResult(galleryIntent, multi ? OPEN_GALLERY_MULTI: OPEN_GALLERY);
     }
 
+    @Override
+    public void openFileChooser(final ActionListener response, String accept) {
+        if (getActivity() == null) {
+            throw new RuntimeException("Cannot open file chooser in background mode");
+        }
+        if(editInProgress()) {
+            stopEditing(true);
+        }
+        callback = new EventDispatcher();
+        callback.addListener(response);
+        Intent pickerIntent = new Intent();
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
+            pickerIntent.setAction(Intent.ACTION_OPEN_DOCUMENT);
+        } else {
+            pickerIntent.setAction(Intent.ACTION_GET_CONTENT);
+        }
+        pickerIntent.addCategory(Intent.CATEGORY_OPENABLE);
+        pickerIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
+            pickerIntent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        }
+        String[] mimeTypes = getFileChooserMimeTypes(accept);
+        pickerIntent.setType("*/*");
+        if (mimeTypes.length > 0) {
+            pickerIntent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+        }
+        this.getActivity().startActivityForResult(pickerIntent, OPEN_GALLERY);
+    }
+
+    private String[] getFileChooserMimeTypes(String accept) {
+        if (accept == null || accept.trim().length() == 0 || "*/*".equals(accept.trim())) {
+            return new String[0];
+        }
+        ArrayList<String> out = new ArrayList<String>();
+        String[] tokens = accept.split(",");
+        for (int iter = 0; iter < tokens.length; iter++) {
+            String token = tokens[iter].trim();
+            if (token.length() == 0 || "*".equals(token)) {
+                continue;
+            }
+            if (token.indexOf('/') > 0) {
+                out.add(token);
+            }
+        }
+        if (out.isEmpty()) {
+            out.add("*/*");
+        }
+        return out.toArray(new String[out.size()]);
+    }
+
     class NativeImage extends Image {
 
         public NativeImage(Bitmap nativeImage) {
@@ -10554,6 +10604,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         Activity act = getActivity();
         if (act == null) return null;
         return new AndroidCameraImpl(act);
+    }
+
+    @Override
+    public com.codename1.impl.ARImpl createARImpl() {
+        Activity act = getActivity();
+        if (act == null) {
+            return null;
+        }
+        // The ARCore-backed impl lives in a package the build deletes for
+        // apps that never reference com.codename1.ar (it compiles against
+        // com.google.ar.core which only exists when the AR gradle dependency
+        // was injected), so it must be reached reflectively.
+        try {
+            Class<?> clazz = Class.forName("com.codename1.impl.android.ar.AndroidARImpl");
+            return (com.codename1.impl.ARImpl) clazz
+                    .getConstructor(Activity.class).newInstance(act);
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     // Deeper-network connectivity platform factories. Each returns a small

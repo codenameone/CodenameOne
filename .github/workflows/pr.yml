@@ -155,6 +155,11 @@ jobs:
           BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: |
           set -euo pipefail
+          # This job runs inside the pr-ci-container, where GitHub's
+          # checkout safe.directory entry can be written under a different
+          # HOME than this shell step uses. Mark the workspace safe before
+          # diffing the PR so unrelated cn1libs are not rebuilt.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
           all_libs=(
             cn1-ai-mlkit-text
@@ -283,6 +288,7 @@ jobs:
           CN1LIB_MODULES: ${{ steps.cn1libs.outputs.modules }}
         run: |
           set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           python3 ../scripts/gen-ai-cn1libs.py > /tmp/gen-ai.log
           # Capture a list of changed files instead of using --exit-code/--quiet,
           # which interacted poorly with the surrounding `set -e -o pipefail`.
@@ -434,7 +440,16 @@ jobs:
           git -C "${tmp_dir}" commit -m "Publish quality report previews for run ${RUN_ID} (attempt ${RUN_ATTEMPT})" >/dev/null
           remote_url="${SERVER_URL}/${REPOSITORY}.git"
           token_remote_url="${remote_url/https:\/\//https://x-access-token:${GITHUB_TOKEN}@}"
-          git -C "${tmp_dir}" push --force "${token_remote_url}" previews:quality-report-previews >/dev/null
+          for push_attempt in 1 2 3 4 5; do
+            if git -C "${tmp_dir}" push --force "${token_remote_url}" previews:quality-report-previews >/dev/null; then
+              break
+            fi
+            if [ "${push_attempt}" -eq 5 ]; then
+              echo "Failed to publish quality report previews after ${push_attempt} attempts." >&2
+              exit 1
+            fi
+            sleep $((push_attempt * 3))
+          done
           commit_sha=$(git -C "${tmp_dir}" rev-parse HEAD)
           raw_base="https://raw.githubusercontent.com/${REPOSITORY}/${commit_sha}/${run_dir}"
           preview_base="https://htmlpreview.github.io/?${raw_base}"

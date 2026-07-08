@@ -1,0 +1,19 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::apple-wallet-extension-json-001[]
+{
+  "certificates": ["base64...", "base64..."],
+  "nonce": "base64...",
+  "nonceSignature": "base64...",
+  "cardIdentifier": "the WalletPassEntry identifier",
+  "authToken": "the token published via setAuthToken"
+}
+// end::apple-wallet-extension-json-001[]
+
+// tag::apple-wallet-extension-json-002[]
+{
+  "activationData": "base64...",
+  "encryptedPassData": "base64...",
+  "ephemeralPublicKey": "base64..."
+}
+// end::apple-wallet-extension-json-002[]

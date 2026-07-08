@@ -8,27 +8,9 @@ Gesture detection lives in the core rather than in each platform port. Any platf
 
 `MotionSensorManager.getInstance()` always returns a manager. On a device without motion hardware every sensor reports as unsupported, so application code can call the API without a null check on the manager itself. `getSensor(int)` returns `null` when the requested sensor isn't available on the current device:
 
-[source,java]
-----
-MotionSensorManager m = MotionSensorManager.getInstance();
-MotionSensor accelerometer = m.getSensor(MotionSensorManager.TYPE_ACCELEROMETER);
-if (accelerometer != null) {
-    accelerometer.addListener(new MotionSensorListener() {
-        public void motionReceived(MotionEvent evt) {
-            // x, y and z are in meters per second squared
-            label.setText(evt.getX() + ", " + evt.getY() + ", " + evt.getZ());
-            label.getParent().revalidate();
-        }
-    });
-}
-----
 
 Callbacks arrive on the EDT, so the listener can update the UI directly. Sampling is reference counted: the hardware sensor draws power only while at least one listener is registered. Remove the listener once the screen is no longer visible, typically from the form's `removeNotify`, so the sensor powers down:
 
-[source,java]
-----
-accelerometer.removeListener(listener);
-----
 
 === Sensor types
 
@@ -63,14 +45,6 @@ Readings use a single convention across every port: the x-axis points to the rig
 
 Register a `GestureListener` for one of the `GestureEvent.TYPE_*` gestures. The accelerometer powers on for the duration that a gesture listener stays registered:
 
-[source,java]
-----
-MotionSensorManager.getInstance().addGestureListener(GestureEvent.TYPE_SHAKE, new GestureListener() {
-    public void gestureDetected(GestureEvent evt) {
-        Dialog.show("Shaken", "You shook the device", "OK", null);
-    }
-});
-----
 
 The recognized gestures are:
 
@@ -82,13 +56,6 @@ The recognized gestures are:
 
 The detection thresholds suit most apps as shipped, and you can tune them when a gesture needs to be more or less sensitive:
 
-[source,java]
-----
-MotionSensorManager m = MotionSensorManager.getInstance();
-m.setShakeThreshold(15.0);     // require a more vigorous shake
-m.setTiltThreshold(0.5);       // tilt angle in radians
-m.setSamplingInterval(33);     // sample at about 30Hz for snappier gestures
-----
 
 A smaller sampling interval makes gestures more responsive at a higher battery cost. The value is clamped to the range 10ms through 1000ms.
 

@@ -230,10 +230,9 @@ jobs:
           # missing screenshots than the tolerance below. Enforced centrally
           # in scripts/lib/cn1ss.sh.
           CN1SS_FAIL_ON_MISMATCH: '1'
-          # OrientationLock and MutableImageReadback do not render on the iOS
-          # GL backend - the steady-state healthy run reports exactly these
-          # two as missing. Tolerate those two; any further missing
-          # screenshot (a hang/crash dropping the tail of the suite) fails CI.
+          # Screenshot-only tolerance for the iOS GL backend. Assertion test
+          # failures are scanned from CN1SS:ERR:suite lines by
+          # run-ios-ui-tests.sh and are never allowed by this value.
           CN1SS_ALLOWED_MISSING: '2'
         run: |
           set -euo pipefail

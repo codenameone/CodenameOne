@@ -36,8 +36,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class PrimitivesTest {
 
     /** Minimal device: only the abstract members are stubbed; the concrete
-     * {@code createVertexBuffer}/{@code createIndexBuffer} are inherited. */
-    private static final class HeadlessDevice extends GraphicsDevice {
+     * {@code createVertexBuffer}/{@code createIndexBuffer} are inherited.
+     * Package-visible so sibling primitive tests can reuse it. */
+    static final class HeadlessDevice extends GraphicsDevice {
         public GpuCapabilities getCapabilities() {
             return null;
         }

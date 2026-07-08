@@ -75,13 +75,6 @@ This is useful for platform abstraction classes where one implementation is guar
 
 For example, Codename One annotates:
 
-[source,java]
-----
-@Concrete(name = "com.codename1.impl.ios.IOSImplementation")
-public abstract class CodenameOneImplementation {
-    // ...
-}
-----
 
 NOTE: This hint is intended for ParparVM native translation and doesn't apply to the JavaScript back end.
 
@@ -172,13 +165,6 @@ speedup.
 
 `Simd` is accessed as a singleton:
 
-[source,java]
-----
-Simd simd = Simd.get(); // equivalent to CN.getSimd()
-if (simd.isSupported()) {
-    // native SIMD is wired up on this platform
-}
-----
 
 The returned object is safe to cache in a field as long as the cache is
 refreshed across simulator restarts (the simulator may swap the backing
@@ -198,12 +184,6 @@ arbitrary `new`-allocated arrays to `Simd` primitives.
 Every buffer used with a `Simd` primitive must so come from one of
 the allocation helpers on `Simd`:
 
-[source,java]
-----
-byte[]  bytes  = simd.allocByte(64);   // heap, 16-byte aligned, registered
-int[]   ints   = simd.allocInt(32);    // heap, 16-byte aligned, registered
-float[] floats = simd.allocFloat(32);  // heap, 16-byte aligned, registered
-----
 
 // vale-skip: write-good.TooWordy — 'minimum size' is a precise lower bound; 'least size' would be wrong.
 All three methods enforce a minimum size of 16 elements and throw
@@ -220,23 +200,6 @@ simulator or undefined results on device.
 
 ==== A minimal End-to-End example
 
-[source,java]
-----
-Simd simd = Simd.get();
-
-byte[] a   = simd.allocByte(64);
-byte[] b   = simd.allocByte(64);
-byte[] out = simd.allocByte(64);
-
-// fill a and b with your data (plain array writes are fine)
-for (int i = 0; i < 64; i++) {
-    a[i] = (byte) i;
-    b[i] = (byte) (64 - i);
-}
-
-// saturating byte add, one vector instruction per 16 bytes on NEON
-simd.add(a, b, out, 0, 64);
-----
 
 All `Simd` ops take explicit `offset` / `length` pairs so callers can
 chunk a large buffer through a small scratch array without reallocating.
@@ -257,16 +220,6 @@ solution is to let the compiler place these buffers on the call stack
 where they cost nothing to create and are reclaimed automatically when the
 method returns. This is what the `alloca*` family exposes:
 
-[source,java]
-----
-byte[]  scratchB = simd.allocaByte(64);
-int[]   scratchI = simd.allocaInt(32);
-float[] scratchF = simd.allocaFloat(32);
-
-// Deterministic initial contents:
-byte[]  zeroed   = simd.allocaByteZeroed(64);
-int[]   filled   = simd.allocaIntFilled(32, -1);
-----
 
 On the simulator (and on Android) these behave like heap allocations with
 registration. On ParparVM the translator intercepts each `alloca*` call
@@ -366,8 +319,7 @@ point validates its array arguments against the same set and throws
 
 [source,text]
 ----
-java.lang.IllegalArgumentException: SIMD array argument was not
-allocated using Simd.alloc*(). objectId=…
+include::../demos/common/src/main/snippets/developer-guide/performance.txt[tag=performance-text-001,indent=0]
 ----
 
 Combined with the build-time verifier, both static analysis and dynamic
@@ -486,7 +438,7 @@ This can be accomplished with a single line of code:
 
 [source,java]
 ----
-Log.bindCrashProtection(true);
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava006Snippet.java[tag=performance-java-006,indent=0]
 ----
 
 You place this in the `init(Object)` method so all future on-device errors are emailed to you. Internally this method uses the `Display.getInstance().addEdtErrorHandler()` API to bind error listeners to the EDT. When an exception is thrown there it's swallowed (using `ActionEvent.consume()`). The `Log` data is then sent using `Log.sendLog()`.
@@ -516,46 +468,17 @@ This led to the discovery that you're loading the same resource file over and ov
 
 In the new Contacts demo you have a share button for each contact, the code for constructing a `ShareButton` looks like this:
 
-[source,java]
-----
-public ShareButton() {
-    setUIID("ShareButton");
-    FontImage.setMaterialIcon(this, FontImage.MATERIAL_SHARE);
-    addActionListener(this);
-    shareServices.addElement(new SMSShare());
-    shareServices.addElement(new EmailShare());
-    shareServices.addElement(new FacebookShare());
-}
-----
 
 This seems reasonable until you realize that the constructors for `SMSShare`, `EmailShare` & `FacebookShare` load the icons for each of those...
 
 These icons are in a shared resource file that you load and don't cache. The initial workaround was to cache this resource but a better solution was to convert this code:
 
-[source,java]
-----
-public SMSShare() {
-    super("SMS", Resources.getSystemResource().getImage("sms.png"));
-}
-----
 
 Into this code:
 
 [source,java]
 ----
-public SMSShare() {
-    super("SMS", null);
-}
-
-@Override
-public Image getIcon() {
-    Image i = super.getIcon();
-    if(i == null) {
-        i = Resources.getSystemResource().getImage("sms.png");
-        setIcon(i);
-    }
-    return i;
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava009Snippet.java[tag=performance-java-009,indent=0]
 ----
 
 This way the resource uses lazy loading as needed.
@@ -582,21 +505,11 @@ Here you defined:
 
 [source,java]
 ----
-private long lastScroll;
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/PerformanceJava010Snippet.java[tag=performance-java-010,indent=0]
 ----
 
 Then you did this within the background loading thread:
 
-[source,java]
-----
-// don't do anything while we are scrolling or animating
-long idle = System.currentTimeMillis() - lastScroll;
-while(idle < 1500 || contactsDemo.getAnimationManager().isAnimating() || scrollY != contactsDemo.getScrollY()) {
-    scrollY = contactsDemo.getScrollY();
-    Util.sleep(Math.min(1500, Math.max(100, 2000 - ((int)idle))));
-    idle = System.currentTimeMillis() - lastScroll;
-}
-----
 
 This effectively sleeps when the user interacts with the UI and loads the images if the user hasn't touched the UI in a while.
 
@@ -604,27 +517,8 @@ Notice that you also check if the scroll changes, this allows you to notice case
 
 All you need to do now is update the `lastScroll` variable whenever user interaction is in place. This works for user touches:
 
-[source,java]
-----
-parentForm.addPointerDraggedListener(e -> lastScroll = System.currentTimeMillis());
-----
 
 This works for general scrolling:
 
-[source,java]
-----
-contactsDemo.addScrollListener(new ScrollListener() {
-    int initial = -1;
-    @Override
-    public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
-        // scrolling is sensitive on devices...
-        if(initial < 0) {
-            initial = scrollY;
-        }
-        lastScroll = System.currentTimeMillis();
-        ...
-    }
-});
-----
 
 NOTE: Due to technical constraints you can't use a lambda in this specific case...

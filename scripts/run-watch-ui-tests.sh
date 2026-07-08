@@ -142,6 +142,7 @@ cn1ss_start_ws_server "$WS_RAW_DIR" || { rw_log "Failed to start Cn1ssScreenshot
 rw_log "WS sink on port ${CN1SS_WS_PORT:-8765} -> $WS_RAW_DIR"
 
 xcrun simctl terminate "$WATCH_UDID" "$BUNDLE_ID" 2>/dev/null || true
+WATCH_LOG_START="$(/bin/date -u '+%Y-%m-%d %H:%M:%S %z')"
 xcrun simctl install "$WATCH_UDID" "$APP_PATH"
 xcrun simctl launch "$WATCH_UDID" "$BUNDLE_ID" >/dev/null 2>&1 || { rw_log "launch failed"; exit 6; }
 rw_log "Launched watch app; waiting for the suite to stream screenshots..."
@@ -177,6 +178,16 @@ while [ "$waited" -lt "$MAX_WAIT" ]; do
   prev="$cur"
 done
 rw_log "Capture settled: $(/usr/bin/find "$WS_RAW_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ') of $EXPECTED screenshots after ${waited}s"
+
+WATCH_APP_LOG="$ARTIFACTS_DIR/watch-app-cn1ss.log"
+xcrun simctl spawn "$WATCH_UDID" \
+  log show --style syslog --start "$WATCH_LOG_START" \
+  --predicate '(composedMessage CONTAINS "CN1SS") OR (eventMessage CONTAINS "CN1SS")' \
+  > "$WATCH_APP_LOG" 2>/dev/null || true
+SUITE_FAILURE_LINES="$(cn1ss_collect_suite_failures "$WATCH_APP_LOG")"
+if [ -n "$SUITE_FAILURE_LINES" ]; then
+  rw_log "Detected DeviceRunner assertion/test failure(s); artifacts and screenshot report will still be collected before failing."
+fi
 
 # --- Compare against the watch golden set + emit report ---------------------
 REF_DIR="${SCREENSHOT_REF_DIR:-$SCRIPT_DIR/ios/screenshots-watch}"
@@ -223,6 +234,11 @@ if [ -f "$SUMMARY_OUT" ] && grep -q "^missing_expected|" "$SUMMARY_OUT"; then
   me="$(grep -c "^missing_expected|" "$SUMMARY_OUT" 2>/dev/null || echo 0)"
   rw_log "FATAL: $me screenshot(s) streamed with no stored golden (missing_expected) -- add them to scripts/ios/screenshots-watch."
   [ "$rc" -eq 0 ] && rc=17
+fi
+if [ -n "$SUITE_FAILURE_LINES" ]; then
+  rw_log "STAGE:DEVICE_RUNNER_TEST_FAILED -> assertion/test failure(s) are not allowed:"
+  printf '%s\n' "$SUITE_FAILURE_LINES" | sed 's/^/[CN1SS-FAIL] /'
+  [ "$rc" -eq 0 ] && rc=19
 fi
 # The suite must have produced something at all.
 [ "${#ACTUAL[@]}" -gt 0 ] || rc=1
