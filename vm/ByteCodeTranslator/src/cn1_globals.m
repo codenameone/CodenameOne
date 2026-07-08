@@ -2738,19 +2738,41 @@ static void cn1GcSignalHandler(int sig, siginfo_t* info, void* ucv) {
 #if !defined(_WIN32)
     if(ucv != 0) {
         ucontext_t* uc = (ucontext_t*)ucv;
-#if defined(__APPLE__) && defined(__aarch64__)
-        if(uc->uc_mcontext) sp = (void*)uc->uc_mcontext->__ss.__sp;
-#elif defined(__APPLE__) && defined(__x86_64__)
-        if(uc->uc_mcontext) sp = (void*)uc->uc_mcontext->__ss.__rsp;
-#elif defined(__linux__) && defined(__x86_64__)
+#if defined(__APPLE__)
+        // CRITICAL (iOS/tvOS/macOS): on Apple, ucontext_t.uc_mcontext is a POINTER to the
+        // register file, NOT an inline struct like glibc. memcpy'ing sizeof(ucontext_t) from
+        // ucv here would capture only the ~56-byte ucontext header (the uc_mcontext pointer +
+        // sigmask/stack), NOT the interrupted GPRs -- so an object reference that is live only
+        // in a register (frameless codegen keeps hot object refs in callee-saved x19-x28 across
+        // the native draw calls made from paintComponent) is invisible when the EDT is
+        // signal-stopped mid-paint, and gets swept -> the intermittent paintComponent NPE /
+        // use-after-free on tvOS. Copy the POINTED-TO mcontext (holds __ss with x0-x28/fp/lr/
+        // sp/pc) so those registers are scanned by cn1ConservativeMarkRange below.
+        if(uc->uc_mcontext) {
+#if defined(__aarch64__)
+            sp = (void*)uc->uc_mcontext->__ss.__sp;
+#elif defined(__x86_64__)
+            sp = (void*)uc->uc_mcontext->__ss.__rsp;
+#endif
+            size_t mlen = (size_t)uc->uc_mcsize;
+            if(mlen == 0) mlen = sizeof(*uc->uc_mcontext);
+            if(mlen > sizeof(t->gcSigRegs)) mlen = sizeof(t->gcSigRegs);
+            memcpy(t->gcSigRegs, (const void*)uc->uc_mcontext, mlen); // the ACTUAL GPRs
+            t->gcSigRegsLen = (sig_atomic_t)mlen;
+        }
+#else
+        // Linux: uc_mcontext is inline in ucontext_t, and the GPRs (regs[]/gregs[]) sit at the
+        // start, so a bounded copy of the ucontext captures them as scannable data.
+#if defined(__x86_64__)
         sp = (void*)uc->uc_mcontext.gregs[REG_RSP];
-#elif defined(__linux__) && defined(__aarch64__)
+#elif defined(__aarch64__)
         sp = (void*)uc->uc_mcontext.sp;
 #endif
         size_t ulen = sizeof(ucontext_t);
         if(ulen > sizeof(t->gcSigRegs)) ulen = sizeof(t->gcSigRegs);
         memcpy(t->gcSigRegs, ucv, ulen);   // capture the interrupted GPRs as scannable data
         t->gcSigRegsLen = (sig_atomic_t)ulen;
+#endif
     }
 #endif
     t->gcSigStackPointer = sp;
