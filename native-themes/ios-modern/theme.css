@@ -436,7 +436,7 @@ CheckBox {
     icon-gap: 2mm;
 }
 CheckBox.selected { color: #007aff; }
-CheckBox.disabled { color: #c6c6c8; background-color: transparent; padding: 0; margin: 0; }
+CheckBox.disabled { color: #c6c6c8; background-color: transparent; padding: 0; margin: 0.5mm 0 0.5mm 2mm; }
 
 RadioButton {
     color: #007aff;
@@ -1049,9 +1049,12 @@ PopupContent {
     TextField { color: #ffffff; background-color: #2c2c2e; border: 0.25mm solid rgba(255,255,255,0.12); border-radius: 1.4mm; backdrop-filter: blur(20px); }
     TextField.pressed { color: #ffffff; background-color: #3a3a3c; border: 0.25mm solid rgba(255,255,255,0.14); border-radius: 1.4mm; }
     TextField.disabled { color: rgba(235,235,245,0.4); background-color: #2c2c2e; border: 0.25mm solid rgba(255,255,255,0.08); border-radius: 1.4mm; }
-    Picker { cn1-derive: TextField; color: #ffffff; text-align: left; }
-    Picker.pressed { cn1-derive: TextField; background-color: #3a3a3c; }
-    Picker.disabled { cn1-derive: TextField; color: rgba(235,235,245,0.3); }
+    /* Explicit dark cell -- do NOT derive TextField here: cn1-derive copies the
+       BASE (light) TextField's white fill, so a derived dark Picker rendered
+       white-on-white. Mirror the dark TextField values directly. */
+    Picker { background-color: #2c2c2e; color: #ffffff; border: 0.25mm solid rgba(255,255,255,0.12); border-radius: 1.4mm; text-align: left; padding: 2mm 3mm 2mm 3mm; font-family: "native:MainRegular"; }
+    Picker.pressed { background-color: #3a3a3c; color: #ffffff; border: 0.25mm solid rgba(255,255,255,0.14); border-radius: 1.4mm; }
+    Picker.disabled { background-color: #2c2c2e; color: rgba(235,235,245,0.3); border: 0.25mm solid rgba(255,255,255,0.08); border-radius: 1.4mm; }
     TextArea { color: #ffffff; background-color: #2c2c2e; border: 0.25mm solid rgba(255,255,255,0.12); border-radius: 1.4mm; }
     TextArea.pressed { background-color: #3a3a3c; }
     TextArea.disabled { color: #48484a; background-color: #2c2c2e; }
@@ -1059,7 +1062,7 @@ PopupContent {
 
     CheckBox { color: #0a84ff; background-color: transparent; }
     CheckBox.selected { color: #0a84ff; }
-    CheckBox.disabled { color: #48484a; background-color: transparent; padding: 0; margin: 0; }
+    CheckBox.disabled { color: #48484a; background-color: transparent; padding: 0; margin: 0.5mm 0 0.5mm 2mm; }
     RadioButton { color: #0a84ff; background-color: transparent; }
     RadioButton.selected { color: #0a84ff; }
     RadioButton.disabled { color: #48484a; background-color: transparent; }
@@ -1156,8 +1159,12 @@ PopupContent {
        SystemGroupedBackground) so the white/light row text reads. Pure #000000
        (the old value) is darker than the form and, with the light MultiButton
        fill leaking through, the row rendered as a light pill. */
-    MultiButton { background-color: #2c2c2e; border: 0.25mm solid rgba(255,255,255,0.10); color: #ffffff; }
-    MultiButton.pressed { background-color: #3a3a3c; border: 0.25mm solid rgba(255,255,255,0.10); }
+    /* No rim on the dark cell: a plain border draws a SQUARE rectangle over the
+       rounded fill (the light cell's 0.08 rim is too faint to show it, but a
+       0.10 white rim on dark reads as square corners that fight the rounded
+       Liquid Glass cell). The #2c2c2e-on-#1c1c1e fill contrast carries it. */
+    MultiButton { background-color: #2c2c2e; color: #ffffff; }
+    MultiButton.pressed { background-color: #3a3a3c; }
     MultiLine1 { color: #ffffff; }
     MultiLine2 { color: #ebebf5; }
     MultiLine3 { color: #8e8e93; }
@@ -1189,6 +1196,12 @@ PopupContent {
     ChatTypingIndicator { color: #8e8e93; }
     ChatInput { background-color: #1c1c1e; }
     ChatInputField { background-color: #2c2c2e; color: #ffffff; border-radius: 3mm; }
+    /* Attach (+) and voice (Mic) derive the LIGHT Button glass and had no dark
+       override, so in dark mode they rendered a pale grey glass halo around the
+       glyph. Give them the dark Button glass so they read as dark circular
+       affordances instead of a light patch on the dark bar. */
+    ChatAttachButton { background-color: rgba(20,20,24,0.24); border: 0.25mm solid rgba(255,255,255,0.22); color: #ffffff; padding: 1.5mm; margin: 0.5mm; }
+    ChatVoiceButton { background-color: rgba(20,20,24,0.24); border: 0.25mm solid rgba(255,255,255,0.22); color: #ffffff; padding: 1.5mm; margin: 0.5mm; }
 
     Separator { background-color: #38383a; }
 }
