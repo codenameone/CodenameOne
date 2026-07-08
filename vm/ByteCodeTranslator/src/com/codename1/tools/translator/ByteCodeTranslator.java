@@ -889,7 +889,10 @@ public class ByteCodeTranslator {
                 //   The WinRT ABI headers + this import lib ship in every Windows SDK the
                 //   port builds against, including the xwin-laid-out SDK the Linux
                 //   cross-compile uses, so it is linked unconditionally.
-                writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp ws2_32 user32 gdi32 ole32 oleaut32 uuid mf mfplat mfreadwrite mfuuid shell32 comdlg32 crypt32 winmm runtimeobject)\n");
+                // dbghelp: lets the last-resort unhandled-exception handler symbolize its
+                // own native backtrace in-process (SymFromAddr against the /Zi .pdb), so a
+                // native crash logs Java/C function names instead of bare RVAs.
+                writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp ws2_32 user32 gdi32 ole32 oleaut32 uuid mf mfplat mfreadwrite mfuuid shell32 comdlg32 crypt32 winmm runtimeobject dbghelp)\n");
                 // BrowserComponent is backed by WebView2 (cn1_windows_browser.cpp),
                 // gated on the SDK being present: when WEBVIEW2_SDK_DIR points at a
                 // Microsoft.Web.WebView2 build/native folder we link the static
