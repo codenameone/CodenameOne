@@ -2754,10 +2754,16 @@ static void cn1GcSignalHandler(int sig, siginfo_t* info, void* ucv) {
 #elif defined(__x86_64__)
             sp = (void*)uc->uc_mcontext->__ss.__rsp;
 #endif
-            size_t mlen = (size_t)uc->uc_mcsize;
-            if(mlen == 0) mlen = sizeof(*uc->uc_mcontext);
+            // Scan ONLY the general-purpose thread state (__ss: x0-x28/fp/lr/sp/pc on arm64,
+            // rax..r15/rip on x86_64). Object references only ever live in GPRs -- never in the
+            // NEON/FP vector state (__ns is 528 of the 816-byte arm64 mcontext) or the exception
+            // state (__es). Copying the whole mcontext would feed all that float data to the
+            // conservative scan as spurious "pointers", pinning garbage and bloating the live heap
+            // -> heavier/more-frequent GC on allocation-heavy paths (vector-tile rendering). __ss
+            // alone captures every object root with the minimum false-positive surface.
+            size_t mlen = sizeof(uc->uc_mcontext->__ss);
             if(mlen > sizeof(t->gcSigRegs)) mlen = sizeof(t->gcSigRegs);
-            memcpy(t->gcSigRegs, (const void*)uc->uc_mcontext, mlen); // the ACTUAL GPRs
+            memcpy(t->gcSigRegs, (const void*)&uc->uc_mcontext->__ss, mlen); // GPRs only
             t->gcSigRegsLen = (sig_atomic_t)mlen;
         }
 #else
