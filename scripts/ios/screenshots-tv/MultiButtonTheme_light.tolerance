@@ -1,6 +1,7 @@
-# tvOS renders the Liquid Glass surfaces (backdrop blur) with small run-to-run
-# GPU noise (channel deltas up to ~40 across the glass area); the default
-# channelDelta=4 gate can never settle on these. Real regressions still flag:
-# anything past the noise band or moving >1% of pixels fails.
-maxChannelDelta=48
-maxMismatchPercent=1.0
+# tvOS 4K FLAT (non-glass) tile: no backdrop-blur here, so none of the
+# run-to-run GPU glass noise that forces the lax glass gate -- hold it tight.
+# channelDelta 24 clears cross-runner text anti-aliasing while still catching a
+# real recolor or a border/shape change (e.g. square-vs-rounded cell borders);
+# mismatch 0.30% (~25k px of 8.3M) fails on any genuine structural drift.
+maxChannelDelta=24
+maxMismatchPercent=0.30
