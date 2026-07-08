@@ -80,7 +80,7 @@ public abstract class Base64 {
             return new byte[0];
         }
         int maxOutputLength = (len / 4) * 3 + 3;
-        byte[] out = allocByteForScalarCodec(maxOutputLength);
+        byte[] out = allocByteMaybeSimd(maxOutputLength);
         int outputLength = decode(in, len, out);
         if (outputLength < 0) {
             return null;
@@ -88,7 +88,7 @@ public abstract class Base64 {
         if (outputLength == out.length) {
             return out;
         }
-        byte[] trimmed = allocByteForScalarCodec(outputLength);
+        byte[] trimmed = allocByteMaybeSimd(outputLength);
         System.arraycopy(out, 0, trimmed, 0, outputLength);
         return trimmed;
     }
@@ -344,7 +344,7 @@ public abstract class Base64 {
             return "";
         }
         int outputLength = ((inputLength + 2) / 3) * 4;
-        byte[] out = allocByteForScalarCodec(outputLength);
+        byte[] out = allocByteMaybeSimd(outputLength);
         encodeNoNewline(in, out);
         return com.codename1.util.StringUtil.newString(out, 0, outputLength);
     }
@@ -352,8 +352,8 @@ public abstract class Base64 {
     /// URL-safe Base64 encoding per RFC 4648 sec5: `+` becomes `-`, `/` becomes
     /// `_`, and the trailing `=` padding is dropped. This is the encoding
     /// used by JWTs and most modern web token formats. Reuses the same
-    /// scalar encode path as [#encodeNoNewline(byte[])] under the hood, so it
-    /// is just as fast.
+    /// SIMD-optimized encode path as [#encodeNoNewline(byte[])] under the
+    /// hood, so it is just as fast.
     ///
     /// #### Parameters
     ///
@@ -368,7 +368,7 @@ public abstract class Base64 {
             return "";
         }
         int outputLength = ((inputLength + 2) / 3) * 4;
-        byte[] out = allocByteForScalarCodec(outputLength);
+        byte[] out = allocByteMaybeSimd(outputLength);
         encodeNoNewline(in, out);
         // Map standard alphabet to URL-safe alphabet and trim trailing '='
         int unpadded = outputLength;
@@ -835,7 +835,14 @@ public abstract class Base64 {
         return decodeNoWhitespaceSimd(in, 0, len, out, 0);
     }
 
-    private static byte[] allocByteForScalarCodec(int size) {
+    private static byte[] allocByteMaybeSimd(int size) {
+        if (size <= 0) {
+            return new byte[0];
+        }
+        Simd simd = Simd.get();
+        if (simd.isSupported() && size >= 16) {
+            return simd.allocByte(size);
+        }
         return new byte[size];
     }
 }
