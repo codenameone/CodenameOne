@@ -1159,12 +1159,12 @@ PopupContent {
        SystemGroupedBackground) so the white/light row text reads. Pure #000000
        (the old value) is darker than the form and, with the light MultiButton
        fill leaking through, the row rendered as a light pill. */
-    /* A rim is REQUIRED for the JS port to render this cell's solid fill (a
-       borderless dark cell washed out to light grey). Keep it, but match the
-       light cell's faintness (0.08 -> ~0.05 white) so the square corners the
-       0.10 rim showed on dark fade out instead of fighting the rounded cell. */
-    MultiButton { background-color: #2c2c2e; border: 0.25mm solid rgba(255,255,255,0.05); color: #ffffff; }
-    MultiButton.pressed { background-color: #3a3a3c; border: 0.25mm solid rgba(255,255,255,0.05); }
+    /* A rim is REQUIRED for the port to render this cell's solid fill (a
+       borderless dark cell washed out to light grey). The plain border drew a
+       SQUARE over the rounded fill; cn1-round-border draws the rim ALONG the
+       3mm corner radius so it follows the cell instead of boxing it. */
+    MultiButton { background-color: #2c2c2e; border: 0.25mm solid rgba(255,255,255,0.10); color: #ffffff; border-radius: 3mm; cn1-background-type: cn1-round-border; }
+    MultiButton.pressed { background-color: #3a3a3c; border: 0.25mm solid rgba(255,255,255,0.10); border-radius: 3mm; cn1-background-type: cn1-round-border; }
     MultiLine1 { color: #ffffff; }
     MultiLine2 { color: #ebebf5; }
     MultiLine3 { color: #8e8e93; }
