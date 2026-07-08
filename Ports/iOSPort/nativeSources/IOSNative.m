@@ -7555,32 +7555,26 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
 #if TARGET_OS_WATCH
     // Capture the Core Graphics surface. Drain any pending ops first so the
     // snapshot reflects the latest painted frame, then PNG-encode the bitmap.
-    __block CN1WatchRenderingView *wv = nil;
-    __block UIImage *wimg = nil;
-    __block NSData *wpng = nil;
-    void (^captureWatchFrame)(void) = ^{
-        // Both steps run under the drain lock: without it the pump thread can be
-        // mid-drain drawing into the bitmap while currentFrame reads it, and
-        // CGBitmapContextCreateImage intermittently returns nil under that
-        // contention (delivered as 1x1 placeholder screenshots by the harness).
-        @synchronized (CN1WatchDrainLockObject()) {
-            [[CodenameOne_GLViewController instance] drawFrame:CGRectZero];
-            wv = [CN1WatchHost sharedHost].renderingView;
-            wimg = wv != nil ? [wv currentFrame] : nil;
-            wpng = wimg != nil ? UIImagePNGRepresentation(wimg) : nil;
-        }
-#ifndef CN1_USE_ARC
-        [wpng retain];
-#endif
-    };
-    // The watch renderer and UIImagePNGRepresentation must run on the main
-    // queue. CN1SS screenshot requests originate from Java callbacks, so they
-    // are not guaranteed to already be on the watch UI thread.
-    if ([NSThread isMainThread]) {
-        captureWatchFrame();
-    } else {
-        dispatch_sync(dispatch_get_main_queue(), captureWatchFrame);
+    // Both steps run under the drain lock on the CALLING thread: without the
+    // lock the pump thread can be mid-drain drawing into the bitmap while
+    // currentFrame reads it, and CGBitmapContextCreateImage intermittently
+    // returns nil under that contention (delivered as 1x1 placeholder
+    // screenshots by the harness). Do NOT hop onto the main queue to capture:
+    // dispatching to main while holding the drain lock starves the render pump
+    // (which paints on main), so the bitmap is never drawn and every frame
+    // comes back nil -- i.e. 1x1 placeholders for the whole suite.
+    CN1WatchRenderingView *wv = nil;
+    UIImage *wimg = nil;
+    NSData *wpng = nil;
+    @synchronized (CN1WatchDrainLockObject()) {
+        [[CodenameOne_GLViewController instance] drawFrame:CGRectZero];
+        wv = [CN1WatchHost sharedHost].renderingView;
+        wimg = wv != nil ? [wv currentFrame] : nil;
+        wpng = wimg != nil ? UIImagePNGRepresentation(wimg) : nil;
     }
+#ifndef CN1_USE_ARC
+    [wpng retain];
+#endif
     if (wpng == nil || [wpng length] == 0) {
         int logicalW = wv != nil ? [wv logicalWidth] : -1;
         int logicalH = wv != nil ? [wv logicalHeight] : -1;
