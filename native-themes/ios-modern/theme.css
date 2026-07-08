@@ -859,6 +859,10 @@ MultiButton {
     text-align: left;
     icon-gap: 3mm;
     border-radius: 3mm;
+    /* MultiButton is an OPAQUE grouped cell, not a glass button. Kill the
+       backdrop blur inherited from Button: with it, a borderless dark cell (the
+       round-2 dark override) rendered as a light wash instead of #2c2c2e. */
+    backdrop-filter: blur(0);
 }
 MultiButton.pressed { background-color: #e5e5ea; border: 0.25mm solid rgba(0,0,0,0.08); border-radius: 3mm; }
 
