@@ -7493,7 +7493,12 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
     __block NSData *capturedPng = nil;
     void (^performCapture)(void) = ^{
         POOL_BEGIN();
-        UIView *view = [CodenameOne_GLViewController instance].view;
+        CodenameOne_GLViewController *controller = [CodenameOne_GLViewController instance];
+        // Display.screenshot() reads the Metal screenTexture below. Drain any
+        // already-queued screen ops first so a screenshot requested immediately
+        // after repaint()/Form.show() does not capture the previous frame.
+        [controller flushBuffer:nil x:0 y:0 width:displayWidth height:displayHeight];
+        UIView *view = controller.view;
         UIImage *img = cn1_captureView(view);
         if (img != nil) {
             NSData *png = UIImagePNGRepresentation(img);
