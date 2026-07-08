@@ -1200,8 +1200,8 @@ PopupContent {
        override, so in dark mode they rendered a pale grey glass halo around the
        glyph. Give them the dark Button glass so they read as dark circular
        affordances instead of a light patch on the dark bar. */
-    ChatAttachButton { background-color: rgba(20,20,24,0.24); border: 0.25mm solid rgba(255,255,255,0.22); color: #ffffff; padding: 1.5mm; margin: 0.5mm; }
-    ChatVoiceButton { background-color: rgba(20,20,24,0.24); border: 0.25mm solid rgba(255,255,255,0.22); color: #ffffff; padding: 1.5mm; margin: 0.5mm; }
+    ChatAttachButton { background-color: rgba(20,20,24,0.24); border: 0.25mm solid rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; color: #ffffff; padding: 1.5mm; margin: 0.5mm; }
+    ChatVoiceButton { background-color: rgba(20,20,24,0.24); border: 0.25mm solid rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; color: #ffffff; padding: 1.5mm; margin: 0.5mm; }
 
     Separator { background-color: #38383a; }
 }
