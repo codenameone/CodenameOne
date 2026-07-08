@@ -284,6 +284,7 @@ void CN1DismissLaunchPlaceholder(void);
 -(void)drawString:(int)color alpha:(int)alpha font:(UIFont*)font str:(NSString*)str x:(int)x y:(int)y;
 -(void)drawScreen;
 -(void)drawFrame:(CGRect)rect;
+-(void)drawFrame:(CGRect)rect allowInactive:(BOOL)allowInactive;
 @end
 #else
 @interface CodenameOne_GLViewController : UIViewController<
@@ -380,6 +381,7 @@ CLLocationManagerDelegate, AVAudioRecorderDelegate
 -(void)drawString:(int)color alpha:(int)alpha font:(UIFont*)font str:(NSString*)str x:(int)x y:(int)y;
 - (void)drawScreen;
 - (void)drawFrame:(CGRect)rect;
+- (void)drawFrame:(CGRect)rect allowInactive:(BOOL)allowInactive;
 
 -(void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event;
 -(void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event;

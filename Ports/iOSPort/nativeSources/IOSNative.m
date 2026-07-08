@@ -7566,7 +7566,12 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
     __block UIImage *wimg = nil;
     __block NSData *wpng = nil;
     void (^captureWatchFrame)(void) = ^{
-        [[CodenameOne_GLViewController instance] drawFrame:CGRectZero];
+        // Force the draw with allowInactive:YES. During a headless CN1SS test
+        // the watch app is not UIApplicationStateActive, and the default
+        // drawFrame: path (allowInactive:NO, added in the master merge) SKIPS
+        // the draw when inactive -- leaving an empty bitmap that the harness
+        // delivers as a 1x1 placeholder for every screenshot.
+        [[CodenameOne_GLViewController instance] drawFrame:CGRectZero allowInactive:YES];
         wv = [CN1WatchHost sharedHost].renderingView;
         wimg = wv != nil ? [wv currentFrame] : nil;
         wpng = wimg != nil ? UIImagePNGRepresentation(wimg) : nil;
