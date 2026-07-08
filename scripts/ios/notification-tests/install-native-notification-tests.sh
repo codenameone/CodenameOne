@@ -42,8 +42,11 @@ project = Xcodeproj::Project.open(project_path)
 test_target = project.targets.find { |t| t.product_type == 'com.apple.product-type.bundle.unit-test' } ||
               project.targets.find { |t| t.name.end_with?('Tests') }
 abort("No unit-test target found in #{project_path}") unless test_target
-app_target = project.targets.find { |t| t.product_type == 'com.apple.product-type.application' } ||
-             project.targets.find { |t| t.name == test_target.name.sub(/Tests$/, '') }
+app_target_name = test_target.name.sub(/Tests$/, '')
+app_target = project.targets.find { |t| t.name == app_target_name && t.product_type == 'com.apple.product-type.application' } ||
+             project.targets.find { |t| t.name == app_target_name } ||
+             project.targets.find { |t| t.product_type == 'com.apple.product-type.application' && !t.name.downcase.include?('tv') && !t.name.downcase.include?('watch') } ||
+             project.targets.find { |t| t.product_type == 'com.apple.product-type.application' }
 abort("No app target found in #{project_path}") unless app_target
 
 # Ensure the unit-test target has a concrete Info.plist file in generated projects.
@@ -88,6 +91,9 @@ test_target.build_configurations.each do |config|
   config.build_settings['TEST_HOST'] = host_path
   config.build_settings['BUNDLE_LOADER'] = host_path
   config.build_settings['INFOPLIST_FILE'] = plist_rel
+  config.build_settings['SDKROOT'] = 'iphoneos'
+  config.build_settings['SUPPORTED_PLATFORMS'] = 'iphoneos iphonesimulator'
+  config.build_settings['TARGETED_DEVICE_FAMILY'] = '1'
 end
 
 group = project.main_group.find_subpath('NativeNotificationTests', true)

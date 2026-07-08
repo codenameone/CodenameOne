@@ -42,6 +42,10 @@ import java.util.Map;
  */
 public final class IOSSecureStorage extends SecureStorage {
 
+    private static final Map<Integer, AsyncResource<?>> REQUESTS =
+            new HashMap<Integer, AsyncResource<?>>();
+    private static int nextRequestId = 1;
+
     static {
         // Prevents the iOS VM optimizer from eliding these callbacks.
         nativeStorageStringResult(-1, null);
@@ -49,15 +53,47 @@ public final class IOSSecureStorage extends SecureStorage {
         nativeStorageError(-1, 0, null);
     }
 
-    private static final Map<Integer, AsyncResource<?>> REQUESTS =
-            new HashMap<Integer, AsyncResource<?>>();
-    private static int nextRequestId = 1;
-
     private final IOSNative nativeInstance;
     private String accessGroup;
 
     IOSSecureStorage(IOSNative nativeInstance) {
         this.nativeInstance = nativeInstance;
+    }
+
+    @Override
+    public boolean set(String account, String value) {
+        if (account == null) {
+            return false;
+        }
+        try {
+            return nativeInstance.secureStorageSetPlain(account, value == null ? "" : value);
+        } catch (Throwable err) {
+            return false;
+        }
+    }
+
+    @Override
+    public String get(String account) {
+        if (account == null) {
+            return null;
+        }
+        try {
+            return nativeInstance.secureStorageGetPlain(account);
+        } catch (Throwable err) {
+            return null;
+        }
+    }
+
+    @Override
+    public boolean remove(String account) {
+        if (account == null) {
+            return false;
+        }
+        try {
+            return nativeInstance.secureStorageRemovePlain(account);
+        } catch (Throwable err) {
+            return false;
+        }
     }
 
     @Override

@@ -2340,7 +2340,9 @@ static void cn1_compute_timezone_dst(void* data) {
 
 typedef struct {
     int januaryOffset;
+    int januaryIsDst;
     int julyOffset;
+    int julyIsDst;
 } cn1_timezone_raw_ctx;
 
 static void cn1_compute_timezone_raw(void* data) {
@@ -2359,8 +2361,10 @@ static void cn1_compute_timezone_raw(void* data) {
     localtime_r(&january, &sample);
 #if defined(__APPLE__) || defined(__USE_MISC)
     ctx->januaryOffset = (int)sample.tm_gmtoff * 1000;
+    ctx->januaryIsDst = sample.tm_isdst > 0;
 #else
     ctx->januaryOffset = 0;
+    ctx->januaryIsDst = 0;
 #endif
     sample.tm_year = 124;
     sample.tm_mon = 6;
@@ -2373,8 +2377,10 @@ static void cn1_compute_timezone_raw(void* data) {
     localtime_r(&july, &sample);
 #if defined(__APPLE__) || defined(__USE_MISC)
     ctx->julyOffset = (int)sample.tm_gmtoff * 1000;
+    ctx->julyIsDst = sample.tm_isdst > 0;
 #else
     ctx->julyOffset = 0;
+    ctx->julyIsDst = 0;
 #endif
 }
 #endif
@@ -2409,9 +2415,17 @@ JAVA_INT java_util_TimeZone_getTimezoneRawOffset___java_lang_String_R_int(CODENA
     const char* buffer = stringToUTF8(threadStateData, name);
     cn1_timezone_raw_ctx ctx;
     ctx.januaryOffset = 0;
+    ctx.januaryIsDst = 0;
     ctx.julyOffset = 0;
+    ctx.julyIsDst = 0;
     cn1_with_timezone(buffer, cn1_compute_timezone_raw, &ctx);
-    return abs(ctx.januaryOffset) <= abs(ctx.julyOffset) ? ctx.januaryOffset : ctx.julyOffset;
+    if (!ctx.januaryIsDst) {
+        return ctx.januaryOffset;
+    }
+    if (!ctx.julyIsDst) {
+        return ctx.julyOffset;
+    }
+    return ctx.januaryOffset < ctx.julyOffset ? ctx.januaryOffset : ctx.julyOffset;
 }
 
 JAVA_BOOLEAN java_util_TimeZone_isTimezoneDST___java_lang_String_long_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT name, JAVA_LONG millis) {

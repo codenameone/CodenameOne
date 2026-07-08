@@ -401,6 +401,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         } catch (Throwable t) {
             screenshotCallback = null;
             Log.e(t);
+            System.out.println("CN1SS:ERR:ios screenshot capture failed " + t);
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {
@@ -410,17 +411,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
-    /// On Mac Catalyst (desktop) the native capture reads pixels back from the
-    /// Metal screenTexture (see cn1_copyMetalScreenTextureImage in IOSNative.m),
-    /// which is the genuine on-screen render target. On the headless Catalyst
-    /// window a static form's show() doesn't reliably re-drive a screen frame
-    /// (no display-link present), so the screenTexture can still hold an earlier
-    /// form. Animated screens flush continuously and are fine; static ones are
-    /// not. Force the current form through the real EDT screen-render pipeline
-    /// -- the same paintComponent-to-screen + flushGraphics that paintDirty()
-    /// runs -- so the texture reflects the live UI before we capture it. This
-    /// renders through the actual Metal draw path (not an off-screen re-paint),
-    /// so the screenshot remains a genuine test of the display pipeline.
+    /// Mac Catalyst test windows do not reliably schedule another display-link
+    /// frame before a static form calls Display.screenshot(). Force only that
+    /// desktop path through the normal screen paint + native flush so the Metal
+    /// screenTexture readback sees the current form. Phone, tablet, TV, and
+    /// watch captures stay on their normal production screenshot path.
     private void forceScreenRenderForCapture() {
         if (!isDesktop()) {
             return;
@@ -437,7 +432,7 @@ public class IOSImplementation extends CodenameOneImplementation {
                 wrapper.resetAffine();
                 wrapper.setClip(0, 0, getDisplayWidth(), getDisplayHeight());
                 f.paintComponent(wrapper, true);
-                flushGraphics();
+                nativeInstance.flushBufferForReadback(0, 0, getDisplayWidth(), getDisplayHeight());
             }
         };
         if (Display.getInstance().isEdt()) {
@@ -461,6 +456,10 @@ public class IOSImplementation extends CodenameOneImplementation {
                     try {
                         Image image = Image.createImage(imageData, 0, imageData.length);
                         if (image != null) {
+                            // Some ports, notably the watchOS Core Graphics path,
+                            // decode screenshots as immutable native images. A
+                            // screenshot is still valid in that form: callers that
+                            // need readback will exercise getRGB() themselves.
                             if (image.getGraphics() == null) {
                                 int width = Math.max(1, image.getWidth());
                                 int height = Math.max(1, image.getHeight());
@@ -468,25 +467,36 @@ public class IOSImplementation extends CodenameOneImplementation {
                                     int[] rgb = image.getRGB();
                                     if (rgb != null && rgb.length >= width * height) {
                                         Image mutable = Image.createImage(rgb, width, height);
-                                        if (mutable != null && mutable.getGraphics() != null) {
+                                        if (mutable != null) {
                                             image = mutable;
                                         }
+                                    } else {
+                                        System.out.println("CN1SS:ERR:ios screenshot readback returned "
+                                                + (rgb == null ? "null" : ("short length=" + rgb.length))
+                                                + " expected=" + (width * height));
                                     }
                                 } catch (OutOfMemoryError oom) {
                                     Log.e(oom);
+                                    System.out.println("CN1SS:ERR:ios screenshot readback OOM " + oom);
                                 } catch (Throwable t) {
                                     Log.e(t);
+                                    System.out.println("CN1SS:ERR:ios screenshot readback failed " + t);
                                 }
                             }
 
-                            if (image != null && image.getGraphics() != null) {
+                            if (image != null) {
                                 callback.onSucess(image);
                                 return;
                             }
                         }
                     } catch (Throwable t) {
                         Log.e(t);
+                        System.out.println("CN1SS:ERR:ios screenshot decode failed bytes=" + imageData.length
+                                + " error=" + t);
                     }
+                } else {
+                    System.out.println("CN1SS:ERR:ios screenshot native returned "
+                            + (imageData == null ? "null" : ("empty bytes=" + imageData.length)));
                 }
                 callback.onSucess(null);
             }
@@ -1666,6 +1676,10 @@ public class IOSImplementation extends CodenameOneImplementation {
             drawImage(graph, nimg, 0, 0);
             nimg = (NativeImage)mute;
         }
+        if (currentlyDrawingOn != null && currentlyDrawingOn.associatedImage != nimg) {
+            currentlyDrawingOn.associatedImage.peer = finishDrawingOnImage();
+            currentlyDrawingOn = null;
+        }
         imageRgbToIntArray(nimg.peer, arr, x, y, width, height, nimg.width, nimg.height);
     }
 
@@ -1685,7 +1699,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         return n;
     }
 
-    private static final int[] widthHeight = new int[2];
     public Object createImage(String path) throws IOException {
         long ns;
         if(path.startsWith("file:")) {
@@ -1693,6 +1706,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         } else {
             ns = getResourceNSData(path);
         }
+        int[] widthHeight = new int[2];
         NativeImage n = new NativeImage(path);
         n.peer = nativeInstance.createImageNSData(ns, widthHeight);
         n.width = widthHeight[0];
@@ -1820,7 +1834,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     public Object createImage(InputStream i) throws IOException {
         long ns = getNSData(i);
         if(ns > 0) {
-            int[] wh = widthHeight;
+            int[] wh = new int[2];
             NativeImage n = new NativeImage("Image created from stream");
             n.peer = nativeInstance.createImageNSData(ns, wh);
             n.width = wh[0];
@@ -1858,7 +1872,7 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     
     public Object createImage(byte[] bytes, int offset, int len) {
-        int[] wh = widthHeight;
+        int[] wh = new int[2];
         if(offset != 0 || len != bytes.length) {
             byte[] b = new byte[len];
             System.arraycopy(bytes, offset, b, 0, len);
@@ -1866,6 +1880,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         NativeImage n = new NativeImage("Native PNG of " + bytes.length);
         n.peer = createImage(bytes, wh);
+        if (n.peer == 0 || wh[0] <= 0 || wh[1] <= 0) {
+            System.out.println("CN1SS:ERR:ios createImage(byte[]) failed len=" + bytes.length
+                    + " peer=" + n.peer + " width=" + wh[0] + " height=" + wh[1]);
+            return null;
+        }
         n.width = wh[0];
         n.height = wh[1];
         return n;
@@ -6325,8 +6344,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                     // stale (often full-screen) scissor. That makes a clip set
                     // before the mutable-image draw silently not apply to the
                     // draw after it -> content drawn outside its clip (#5171).
-                    // Invalidate so the screen clip is re-applied for the next draw.
+                    // Invalidate so the screen state is re-applied for the next draw.
                     clipApplied = false;
+                    transformApplied = false;
                 }
                 currentlyDrawingOn = null;
             }
@@ -8340,7 +8360,7 @@ public class IOSImplementation extends CodenameOneImplementation {
             if(nativePeer == 0) {
                 return new Dimension();
             }
-            int[] p = widthHeight;
+            int[] p = new int[2];
             nativeInstance.calcPreferredSize(nativePeer, getDisplayWidth(), getDisplayHeight(), p);
             return new Dimension(p[0], p[1]);
         }
@@ -8381,7 +8401,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         protected Image generatePeerImage() {
-            int[] wh = widthHeight;
+            int[] wh = new int[2];
             long imagePeer = nativeInstance.createPeerImage(this.nativePeer, wh);
             if(imagePeer == 0) {
                 return null;

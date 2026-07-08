@@ -193,6 +193,15 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
           compression-level: 6
+      - name: Upload emulator screenshot for JDK matrix
+        if: always() && matrix.id != 'default'
+        uses: actions/upload-artifact@v7
+        with:
+          name: emulator-screenshot-${{ matrix.id }}
+          path: artifacts/*.png
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 6
       - name: Upload Android Gradle logs
         if: always() && matrix.id == 'default'
         uses: actions/upload-artifact@v7
@@ -213,6 +222,15 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: android-instrumentation-logs
+          path: artifacts/connectedAndroidTest*.log
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 6
+      - name: Upload Android instrumentation logs for JDK matrix
+        if: always() && matrix.id != 'default'
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-instrumentation-logs-${{ matrix.id }}
           path: artifacts/connectedAndroidTest*.log
           if-no-files-found: warn
           retention-days: 14

@@ -35,7 +35,7 @@ jobs:
         distribution: 'temurin'
         cache: 'maven'
     - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb
+      run: bash scripts/ci/apt-get-update.sh && sudo apt-get install -y --no-install-recommends xvfb
     - name: Build with Maven (core + in-tree archetypes)
       run: |
         # The cn1{app,lib}-archetype modules are part of the maven/ reactor,

@@ -141,6 +141,10 @@ public class Picker extends Button {
     /// so that setters propagate into the visible wheels and getters read the wheel
     /// position. Null whenever the popup is not showing.
     private InternalPickerWidget currentSpinner;
+    /// Container for `currentSpinner` while the lightweight popup is visible.
+    /// Public setters that stage a new live spinner value need to revalidate
+    /// this container so Spinner3D recalculates and paints the new wheel state.
+    private Container currentSpinnerContainer;
     /// Snapshot of `value` taken right before the lightweight popup is shown.
     /// Setter calls from custom popup buttons (e.g. a "+7 days" action that does
     /// `setDate(getDate() + 7d)`) stage their result into `value`, but if the user
@@ -224,6 +228,18 @@ public class Picker extends Button {
                 spinnerContainer.revalidate();
                 spinnerContainer.repaint();
             }
+        }
+    }
+
+    private void refreshCurrentSpinnerContainer() {
+        if (currentSpinnerContainer != null) {
+            currentSpinnerContainer.revalidate();
+            currentSpinnerContainer.repaint();
+        } else if (currentSpinner instanceof Container) {
+            ((Container) currentSpinner).revalidate();
+            ((Container) currentSpinner).repaint();
+        } else if (currentSpinner instanceof Component) {
+            ((Component) currentSpinner).repaint();
         }
     }
 
@@ -595,6 +611,7 @@ public class Picker extends Button {
                     // fireActionEvent see getDate() return the just-committed value
                     // rather than the (about-to-disappear) wheel state.
                     currentSpinner = null;
+                    currentSpinnerContainer = null;
                 }
                 restoreContentPane();
                 if (command == COMMAND_CANCEL) {
@@ -763,6 +780,7 @@ public class Picker extends Button {
                         .setMargin(0)
                         .setPaddingMillimeters(3f, 0);
                 final Container spinnerContainer = spinnerC instanceof Container ? (Container) spinnerC : null;
+                currentSpinnerContainer = spinnerContainer;
                 Container topCustomButtons = createLightweightPopupButtonRow(LightweightPopupButtonPlacement.ABOVE_SPINNER, isTablet, spinnerContainer);
                 Container bottomCustomButtons = createLightweightPopupButtonRow(LightweightPopupButtonPlacement.BELOW_SPINNER, isTablet, spinnerContainer);
                 if (topCustomButtons != null || bottomCustomButtons != null) {
@@ -1464,6 +1482,7 @@ public class Picker extends Button {
         dateValueExplicitlySet = true;
         if (currentSpinner != null) {
             currentSpinner.setValue(d);
+            refreshCurrentSpinnerContainer();
         }
         updateValue();
     }
@@ -1665,6 +1684,7 @@ public class Picker extends Button {
                         }
                         if (currentSpinner == spinner) { //NOPMD CompareObjectsWithEquals
                             currentSpinner = null;
+                            currentSpinnerContainer = null;
                         }
                         if (sizeChanged != null) {
                             f.removeSizeChangedListener(sizeChanged);
@@ -1817,6 +1837,7 @@ public class Picker extends Button {
         value = str;
         if (currentSpinner != null) {
             currentSpinner.setValue(str);
+            refreshCurrentSpinnerContainer();
         }
         updateValue();
     }
@@ -1862,6 +1883,7 @@ public class Picker extends Button {
         value = ((String[]) metaData)[index];
         if (currentSpinner != null) {
             currentSpinner.setValue(value);
+            refreshCurrentSpinnerContainer();
         }
         updateValue();
     }
@@ -1982,6 +2004,7 @@ public class Picker extends Button {
         value = Integer.valueOf(time);
         if (currentSpinner != null) {
             currentSpinner.setValue(value);
+            refreshCurrentSpinnerContainer();
         }
         updateValue();
     }
@@ -2056,6 +2079,7 @@ public class Picker extends Button {
         value = Long.valueOf(duration);
         if (currentSpinner != null) {
             currentSpinner.setValue(value);
+            refreshCurrentSpinnerContainer();
         }
         updateValue();
     }

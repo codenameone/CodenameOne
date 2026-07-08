@@ -167,7 +167,12 @@
                             <target>
                                 <echo>Installing iPhoneX.skin</echo>
                                 <mkdir dir="${project.build.directory}/skins"/>
-                                <get src="https://github.com/codenameone/codenameone-skins/archive/master.zip" dest="${project.build.directory}/skins/master.zip" skipexisting="true"/>
+                                <!-- The Windows screenshot-capture job builds JavaSE
+                                     from a clean workspace and needs this skin before
+                                     tests can run. GitHub archive fetches occasionally
+                                     fail at connection time, so retry the required
+                                     download instead of failing before assertions run. -->
+                                <get src="https://github.com/codenameone/codenameone-skins/archive/master.zip" dest="${project.build.directory}/skins/master.zip" skipexisting="true" retries="5"/>
                                 <unzip src="${project.build.directory}/skins/master.zip" dest="${project.build.directory}/skins"/>
                                 <move file="${project.build.directory}/skins/codenameone-skins-master" tofile="${project.build.directory}/skins/codenameone-skins" />
                                 <ant dir="${project.build.directory}/skins/codenameone-skins" inheritAll="false" useNativeBasedir="true">

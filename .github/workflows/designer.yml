@@ -43,7 +43,7 @@ jobs:
           cache: 'maven'
 
       - name: Install build dependencies
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb unzip
+        run: bash scripts/ci/apt-get-update.sh && sudo apt-get install -y --no-install-recommends xvfb unzip
 
       - name: Cache cn1-binaries
         uses: actions/cache@v5

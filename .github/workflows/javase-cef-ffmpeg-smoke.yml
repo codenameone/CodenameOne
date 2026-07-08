@@ -58,7 +58,7 @@ jobs:
       - name: Install ffmpeg and display deps on Linux
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
+          bash scripts/ci/apt-get-update.sh
           sudo apt-get install -y ffmpeg xvfb libgtk-3-0 libnss3 libxss1 libgbm1 libasound2t64
 
       - name: Install ffmpeg on macOS

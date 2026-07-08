@@ -589,6 +589,11 @@ if [ -s "$BASE64_STATS_FILE" ]; then
   rm_log "Base64 benchmark stats captured at $BASE64_STATS_FILE"
 fi
 
+SUITE_FAILURE_LINES="$(cn1ss_collect_suite_failures "$TEST_LOG" "$FALLBACK_LOG" "$LATE_FALLBACK_LOG")"
+if [ -n "$SUITE_FAILURE_LINES" ]; then
+  rm_log "Detected DeviceRunner assertion/test failure(s); artifacts and screenshot report will still be collected before failing."
+fi
+
 # Tear down the app process if it's still running (it sometimes is,
 # especially when the test suite finishes but the NSApplication run loop
 # keeps the process alive until SIGTERM).
@@ -672,6 +677,12 @@ comment_rc=$?
 
 cp -f "$BUILD_LOG" "$ARTIFACTS_DIR/xcodebuild-build.log" 2>/dev/null || true
 cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner.log" 2>/dev/null || true
+
+if [ -n "$SUITE_FAILURE_LINES" ]; then
+  rm_log "STAGE:DEVICE_RUNNER_TEST_FAILED -> assertion/test failure(s) are not allowed:"
+  printf '%s\n' "$SUITE_FAILURE_LINES" | sed 's/^/[CN1SS-FAIL] /'
+  exit 19
+fi
 
 # Screenshot mismatch / count-regression guards are centralised in
 # cn1ss_process_and_report (scripts/lib/cn1ss.sh), which returns these

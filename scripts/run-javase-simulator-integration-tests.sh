@@ -97,12 +97,18 @@ import json
 import os
 import urllib.request
 
-req = urllib.request.Request(
-    'https://api.github.com/repos/codenameone/codenameone-skins/releases/latest')
+request = urllib.request.Request(
+    'https://api.github.com/repos/codenameone/codenameone-skins/releases/latest',
+    headers={
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'codenameone-javase-simulator-tests'
+    }
+)
 token = os.environ.get('GH_API_TOKEN', '')
 if token:
-    req.add_header('Authorization', 'Bearer ' + token)
-with urllib.request.urlopen(req) as response:
+    request.add_header('Authorization', 'Bearer ' + token)
+
+with urllib.request.urlopen(request) as response:
     data = json.load(response)
 
 assets = data.get('assets') or []
