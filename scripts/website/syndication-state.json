@@ -806,6 +806,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-07-08T15:01:18+00:00"
+      },
+      "devto": {
+        "id": 4098406,
+        "url": "https://dev.to/codenameone/device-integrity-and-app-review-rasp-attestation-and-asking-for-ratings-right-2n1j",
+        "syndicated_at": "2026-07-08T15:12:56+00:00"
       }
     }
   }
