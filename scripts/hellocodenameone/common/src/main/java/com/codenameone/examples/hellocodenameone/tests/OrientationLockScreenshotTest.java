@@ -91,6 +91,18 @@ public class OrientationLockScreenshotTest extends BaseTest {
     /// test happens to run next. Proceeds to onDone regardless: the per-test
     /// orientation guard in BaseTest is the downstream safety net.
     private void restorePortrait(Form form, int attemptsLeft, Runnable onDone) {
+        // Fixed-orientation platforms (desktop, Linux/Mac windows, tvOS,
+        // browser) never rotated in the first place and can NEVER satisfy the
+        // portrait check (the window is landscape by construction), so polling
+        // would burn the whole 20s budget for nothing -- and on the Linux
+        // suite that silent 20s gap pushed the harness's no-new-screenshot
+        // stability window over its limit, truncating the suite's tail
+        // (DesktopMode/VRStereoScene/Media360Panorama went missing). Nothing
+        // to restore: finish immediately.
+        if (!CN.canForceOrientation()) {
+            onDone.run();
+            return;
+        }
         form.revalidate();
         if (isOrientationSettled(form, true)) {
             onDone.run();

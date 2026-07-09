@@ -406,7 +406,16 @@ class CleanTargetLinuxIntegrationTest {
             // for a stabilization window (the trailing non-rendering API tests burn
             // their per-test timeout after the last image). 40-minute hard cap.
             int minPngs = 100;
-            long stableMs = 150_000L;
+            // The stability window must outlast the suite's longest legitimate
+            // no-new-screenshot stretch: the ~30 non-rendering API tests between
+            // the last theme screenshot and DesktopMode produce no PNGs and ran
+            // ~140s on the slow arm64 runner -- 150s left single-digit margin,
+            // and any tail slowdown truncated the last three screenshot tests
+            // (the suite was force-killed mid-run, gate rc=17). Healthy runs
+            // never wait this out: SUITE:FINISHED breaks the loop first. Only a
+            // genuinely wedged suite pays the longer window, bounded by the
+            // 40-minute hard cap either way.
+            long stableMs = 300_000L;
             long deadline = System.currentTimeMillis() + 40L * 60 * 1000;
             int pngs = 0, lastPngs = -1;
             long lastChange = System.currentTimeMillis();
