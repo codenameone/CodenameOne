@@ -22,6 +22,7 @@ import com.codename1.ui.util.UITimer;
 public class ToastBarTopPositionScreenshotTest extends BaseTest {
     private Form form;
     private int originalPosition;
+    private ToastBar.Status status;
 
     @Override
     public boolean runTest() {
@@ -54,8 +55,40 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
     }
 
     private void showToast() {
-        // 30s timeout so the toast stays up for the (polled) capture window.
-        ToastBar.showMessage("Info message at top", FontImage.MATERIAL_INFO, 30000);
+        // Keep the returned Status and give it a practically-unexpiring timeout:
+        // on a starved metal runner the poll + settle + capture chain was observed
+        // outliving the old 30s expiry, so the capture shipped the form with the
+        // toast ALREADY DISMISSED ("toast absent" all over again, this time by
+        // timeout rather than by late show). Rendering is identical to before
+        // (same showMessage path the golden was captured with); the status is
+        // cleared explicitly in cleanup() so it can never leak into a later
+        // test's capture.
+        if (status != null) {
+            status.clear();
+        }
+        status = ToastBar.showMessage("Info message at top", FontImage.MATERIAL_INFO,
+                10 * 60 * 1000);
+    }
+
+    /// The toast animates in on the GLOBAL layered pane, which the base settle
+    /// poll does not track, and the metal backend can present the frame a beat
+    /// late -- force a fresh, fully-presented frame before capturing (same
+    /// mitigation as DesktopMode / the VR tests).
+    @Override
+    protected long extraSettleBeforeCaptureMillis() {
+        return 700;
+    }
+
+    /// Invoked by the runner after the test completes (pass or fail): dismiss the
+    /// unexpiring toast and restore the global ToastBar position so no state leaks
+    /// into subsequent tests.
+    @Override
+    public void cleanup() {
+        if (status != null) {
+            status.clear();
+            status = null;
+        }
+        ToastBar.getInstance().setPosition(originalPosition);
     }
 
     private void awaitToastShown(final Form parent, final Runnable run, final int waitedMs) {
