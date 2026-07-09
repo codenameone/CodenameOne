@@ -29,6 +29,9 @@
 #ifndef _WIN32
 #include <unistd.h>
 #endif
+#if defined(__APPLE__) && !defined(__OBJC__)
+#include <sys/sysctl.h>   // sysctlbyname for the non-OBJC get_free_memory headroom proxy
+#endif
 #define NSLog(...) printf(__VA_ARGS__); printf("\n")
 #endif
 
@@ -129,6 +132,37 @@ static JAVA_BOOLEAN isEdt(long threadId) {
    return mem_free;
 #else
    return 1024 * 1024 * 100; // Stub: 100MB
+#endif
+ }
+
+// AVAILABLE memory (not just free_count) -- used ONLY by the dynamic GC pacing cap, kept separate
+// from get_free_memory so the existing heap-threshold sizing (init_gc_thresholds) is unchanged.
+// iOS/macOS keep RAM full of reclaimable file cache, so free_count alone is always tiny (~100MB)
+// and badly under-reports what the process can still allocate; inactive + purgeable pages are
+// reclaimable under pressure, so free + inactive + purgeable ~= the real headroom the collector
+// can safely let a high-throughput thread run into. Non-OBJC Apple (bench/desktop) lacks the mach
+// vm_statistics headers here, so it falls back to half of physical RAM via sysctl.
+static long cn1_available_memory(void)
+ {
+#if defined(__APPLE__) && defined(__OBJC__)
+   mach_port_t host_port = mach_host_self();
+   mach_msg_type_number_t host_size = sizeof(vm_statistics_data_t) / sizeof(integer_t);
+   vm_size_t pagesize;
+   host_page_size(host_port, &pagesize);
+   vm_statistics_data_t vm_stat;
+   if (host_statistics(host_port, HOST_VM_INFO, (host_info_t)&vm_stat, &host_size) != KERN_SUCCESS) {
+     return 1024L * 1024 * 100;
+   }
+   return ((long)vm_stat.free_count + (long)vm_stat.inactive_count
+           + (long)vm_stat.purgeable_count) * (long)pagesize;
+#elif defined(__APPLE__)
+   uint64_t __total = 0; size_t __len = sizeof(__total);
+   if (sysctlbyname("hw.memsize", &__total, &__len, NULL, 0) == 0 && __total > 0) {
+     return (long)(__total / 2);
+   }
+   return 1024L * 1024 * 100;
+#else
+   return 1024L * 1024 * 100;
 #endif
  }
 
@@ -916,8 +950,11 @@ static long cn1SatbTake(JAVA_OBJECT** out) {
     return (scratch != 0) ? n : 0;
 }
 
+void cn1RefreshFreeMemCache(void);   // defined near cn1BibopMaybeGc; drives the dynamic pacing cap
+
 void codenameOneGCMark() {
     currentGcMarkValue++;
+    cn1RefreshFreeMemCache();   // snapshot free RAM once per cycle for the dynamic pacing cap
     // Bump the force-mark pass epoch so the force-visited side table's prior-cycle entries
     // read as not-visited (relocated from the old per-object __codenameOneReferenceCount).
     recursionKey++;
@@ -1872,6 +1909,49 @@ static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
 #ifndef CN1_BIBOP_GC_HARD_CAP
 #define CN1_BIBOP_GC_HARD_CAP (CN1_BIBOP_GC_TRIGGER_BYTES * 3)
 #endif
+// A thread with more than this many legacy allocations since the last GC (heapAllocationSize,
+// reset each cycle) is treated as high-throughput and gets the deeper pacing headroom below.
+#ifndef CN1_BIBOP_HIGH_THROUGHPUT_ALLOCS
+#define CN1_BIBOP_HIGH_THROUGHPUT_ALLOCS 50000
+#endif
+
+// Cached free-memory reading, refreshed once per GC cycle (cn1RefreshFreeMemCache, called from
+// codenameOneGCMark) so the dynamic pacing cap costs no per-page-acquire syscall.
+_Atomic long cn1CachedFreeMem = 0;
+void cn1RefreshFreeMemCache(void) {
+    atomic_store_explicit(&cn1CachedFreeMem, cn1_available_memory(), memory_order_relaxed);
+}
+
+// DYNAMIC PACING CAP (perf-tier1). The fixed 3x-trigger cap starves a high-throughput allocator:
+// a thread that allocates faster than the collector (e.g. the EDT decoding/parsing a heavy
+// vector-map tile) is parked in cn1BibopMaybeGc's backpressure spin for most of each GC cycle,
+// so the render is serialized behind the collector instead of overlapping it (~20% of wall on
+// the MvtBench repro, larger on device). Instead of a constant, allow the thread to run further
+// ahead of the collector when free RAM is ample (they overlap -> the fast thread is not starved)
+// and tighten toward the static cap as free memory shrinks (RSS stays bounded). The EDT -- the
+// thread we most want to keep responsive -- gets double headroom; it must never be throttled
+// unless memory is genuinely tight. Never returns LESS than the old static cap, so no workload
+// gets a tighter bound than before. -DCN1_BIBOP_NO_PACING still disables pacing entirely for A/B.
+static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
+    long base = (long)CN1_BIBOP_GC_HARD_CAP;                 // old static cap (3x trigger)
+    long fm = atomic_load_explicit(&cn1CachedFreeMem, memory_order_relaxed);
+    long cap = fm / 8;                                       // baseline: 1/8 of available RAM of slack
+    if(cap < base) cap = base;                              // never tighter than before
+    // High-throughput threads must not be starved by the collector. The EDT (UI/render thread)
+    // always qualifies; so does any thread allocating hard RIGHT NOW (heapAllocationSize is its
+    // legacy allocations since the last GC, reset each cycle) -- e.g. a worker decoding a heavy
+    // vector-map tile. Give them up to 1/2 of AVAILABLE RAM of headroom so they keep running
+    // while the concurrent GC catches up, instead of parking in the backpressure spin. Still
+    // bounded by real available memory (get_free_memory now reports reclaimable pages), so RSS
+    // stays safe and the collector reclaims the transient churn.
+    if(isEdt(threadStateData->threadId)
+       || threadStateData->heapAllocationSize > CN1_BIBOP_HIGH_THROUGHPUT_ALLOCS) {
+        long hi = fm / 2;
+        if(hi > cap) cap = hi;
+    }
+    return cap;
+}
+
 static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
     // LEVER A: flush this thread's plain-add byte accumulator into the global atomic
     // (once per page-acquire). No-op unless -DCN1_DEATOMIC_BYTES.
@@ -1922,12 +2002,13 @@ static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
     // inactive (as the legacy alloc-path park does) so the collector can scan/pass
     // it; restore on exit. Bounded spin with a safety cap so a dead/stuck GC
     // degrades to RSS growth, never a permanent hang.
-    if(atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed) > CN1_BIBOP_GC_HARD_CAP &&
+    long __pacingCap = cn1BibopPacingCap(threadStateData);
+    if(atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed) > __pacingCap &&
        get_static_java_lang_System_gcThreadInstance() != JAVA_NULL) {
         CN1_GC_PARK_CAPTURE(threadStateData);   // fresh capture for the coop conservative scan
         threadStateData->threadActive = JAVA_FALSE;
         int spins = 0;
-        while(atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed) > CN1_BIBOP_GC_HARD_CAP &&
+        while(atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed) > __pacingCap &&
               get_static_java_lang_System_gcThreadInstance() != JAVA_NULL &&
               spins++ < 200000) {
             usleep(50);
