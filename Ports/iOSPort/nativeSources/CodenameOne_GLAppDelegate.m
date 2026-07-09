@@ -43,6 +43,7 @@ int mallocWhileSuspended = 0;
 #endif
 
 extern BOOL isIOS10();
+extern void repaintUI();
 int pendingRemoteNotificationRegistrations = 0;
 
 BOOL isAppSuspended = NO;
@@ -290,6 +291,13 @@ static void installSignalHandlers() {
     com_codename1_impl_ios_IOSImplementation_applicationWillEnterForeground__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     CodenameOne_GLViewController* vc = [CodenameOne_GLViewController instance];
     if (vc != nil) {
+#ifdef CN1_USE_METAL
+        id renderingView = [vc eaglView];
+        if ([renderingView respondsToSelector:@selector(invalidateRetainedFramebuffer)]) {
+            [renderingView invalidateRetainedFramebuffer];
+            repaintUI();
+        }
+#endif
         // Defer to the next runloop so UIKit can settle the view bounds
         // after the snapshot rotation. updateCanvas itself also
         // orientation-validates the bounds for an extra safety net under

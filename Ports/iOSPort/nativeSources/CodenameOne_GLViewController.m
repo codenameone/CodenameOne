@@ -4299,7 +4299,22 @@ BOOL prefersStatusBarHidden = NO;
         return;
     }
 #endif
-    [[self eaglView] setFramebuffer];
+    id renderingView = [self eaglView];
+#ifdef CN1_USE_METAL
+    BOOL hasScreenOps = NO;
+    if (currentTarget != nil) {
+        for (ExecutableOp *ex in currentTarget) {
+            if ([ex target] == nil) {
+                hasScreenOps = YES;
+                break;
+            }
+        }
+    }
+    if (hasScreenOps && [renderingView respondsToSelector:@selector(prepareRetainedFramebufferForDrawRect:displayWidth:displayHeight:)]) {
+        [renderingView prepareRetainedFramebufferForDrawRect:rect displayWidth:displayWidth displayHeight:displayHeight];
+    }
+#endif
+    [renderingView setFramebuffer];
     GLErrorLog;
     BOOL drewContentOps = NO;
     if(currentTarget != nil) {
@@ -4446,7 +4461,7 @@ BOOL prefersStatusBarHidden = NO;
     }
     GLErrorLog;
 
-    [[self eaglView] presentFramebuffer];
+    [renderingView presentFramebuffer];
     GLErrorLog;
     if (drewContentOps && !cn1LaunchPlaceholderDone) {
         // First frame with real content is on screen -- fade out the launch
