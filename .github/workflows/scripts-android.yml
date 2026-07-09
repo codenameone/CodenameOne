@@ -136,6 +136,14 @@ jobs:
           echo "CN1SS_SKIP_COMMENT=1" >> $GITHUB_ENV
           echo "CN1SS_FAIL_ON_MISMATCH=1" >> $GITHUB_ENV
           echo "CN1SS_SKIP_COVERAGE=1" >> $GITHUB_ENV
+      # The default leg posts the PR comment -- but it must GATE too: with the
+      # gate only on the JDK matrix legs, a mismatch that reproduced everywhere
+      # still left this job green (observed: ButtonTheme/SwitchTheme differed on
+      # all three legs, only 17/21 went red). Same no-silent-mismatch rule as
+      # the Windows/Linux screenshot jobs.
+      - name: Configure CN1SS options (default leg gates too)
+        if: matrix.id == 'default'
+        run: echo "CN1SS_FAIL_ON_MISMATCH=1" >> $GITHUB_ENV
       - name: Cache codenameone-tools
         uses: actions/cache@v5
         with:

@@ -133,7 +133,22 @@ def install_runtime():
         "-Plocal-dev-javase",
         "install",
     ]
-    run(cmd, log_name="build-runtime.log", timeout=1800)
+    # Maven Central intermittently serves 403/5xx from the runner's CDN edge and
+    # Maven treats those as PERMANENT resolution failures (observed: junit-bom
+    # 403 killed the whole smoke 53s in, before any project code built). Retry
+    # the install a couple of times with a pause -- a genuine build failure
+    # fails identically on every attempt.
+    attempts = 3
+    for attempt in range(1, attempts + 1):
+        try:
+            run(cmd, log_name="build-runtime.log", timeout=1800)
+            return
+        except RuntimeError:
+            if attempt == attempts:
+                raise
+            log(f"runtime install failed (attempt {attempt}/{attempts}); "
+                "retrying in 30s in case Maven Central was throwing transient 403/5xx")
+            time.sleep(30)
 
 
 def run_smoke_app(video_file: Path, screenshot_path: Path, status_path: Path):
