@@ -625,6 +625,9 @@ extern void cn1ReleaseThreadLocalData(struct ThreadLocalData* head);
 // the array as a root set every cycle. Tiny and append-only.
 static JAVA_OBJECT* cn1ImmortalRoots = 0;
 static int cn1ImmortalRootsN = 0, cn1ImmortalRootsCap = 0;
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+void cn1GcRegisterImmortalObj(JAVA_OBJECT o); // defined near the clazz registry below
+#endif
 void cn1AddImmortalRoot(JAVA_OBJECT o) {
     if(o == JAVA_NULL) return;
     lockCriticalSection();
@@ -634,6 +637,11 @@ void cn1AddImmortalRoot(JAVA_OBJECT o) {
     }
     cn1ImmortalRoots[cn1ImmortalRootsN++] = o;
     unlockCriticalSection();
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+    // Recognizable to the mark guard even though most immortal roots are BiBOP
+    // slots (resolvable anyway) -- covers any legacy/off-heap registrant too.
+    cn1GcRegisterImmortalObj(o);
+#endif
 }
 pthread_mutex_t* memoryAccessMutex = NULL;
 
@@ -952,6 +960,16 @@ static long cn1SatbTake(JAVA_OBJECT** out) {
 
 void cn1RefreshFreeMemCache(void);   // defined near cn1BibopMaybeGc; drives the dynamic pacing cap
 
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+// Immortal object registry (defined near the clazz registry below): objects removed
+// from the heap table must be recognizable to the mark guard, which otherwise skips
+// unresolvable pointers as garbage. Forward-declared here for the sweep /
+// removeObjectFromHeapCollection / cn1AddImmortalRoot sites above the definitions.
+void cn1GcRegisterImmortalObj(JAVA_OBJECT o);
+static int cn1GcImmortalObjContains(JAVA_OBJECT o);
+static JAVA_BOOLEAN cn1SweepRemoving;
+#endif
+
 void codenameOneGCMark() {
     currentGcMarkValue++;
     cn1RefreshFreeMemCache();   // snapshot free RAM once per cycle for the dynamic pacing cap
@@ -962,6 +980,13 @@ void codenameOneGCMark() {
     // PHASE 3b: ensure the universal thread-stop signal handler is installed (idempotent,
     // first GC only). Used to stop+scan threads we cannot cooperatively park.
     cn1GcInstallSignalHandler();
+    // Build the page/extent snapshot BEFORE the first gcMarkObject of the cycle
+    // (immortal roots / currentThreadObject below): the mark guard resolves every
+    // pointer against it, and on the very first cycle no snapshot exists yet --
+    // an empty snapshot would make the guard skip every root (grace would save
+    // the objects, but their subtrees would go untraced for a cycle). Rebuilt
+    // per-thread below as before; this only guarantees a non-empty baseline.
+    cn1GcBuildRootSnapshots();
 #endif
     init_gc_thresholds();
     hasAgressiveAllocator = JAVA_FALSE;
@@ -1560,7 +1585,16 @@ void codenameOneGCSweep() {
 #endif
 #endif
                     
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+                    // Flag the ONE remove call whose intent is deletion, not
+                    // make-immortal, so removeObjectFromHeapCollection doesn't
+                    // register swept objects in the immortal registry.
+                    cn1SweepRemoving = JAVA_TRUE;
                     removeObjectFromHeapCollection(threadStateData, o);
+                    cn1SweepRemoving = JAVA_FALSE;
+#else
+                    removeObjectFromHeapCollection(threadStateData, o);
+#endif
                     freeAndFinalize(threadStateData, o);
                     //counter++;
                 }
@@ -1628,6 +1662,11 @@ JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
             JAVA_OBJECT obj = (JAVA_OBJECT)threadStateData->pendingHeapAllocations[heapTrav];
             if(obj == o) {
                 threadStateData->pendingHeapAllocations[heapTrav] = JAVA_NULL;
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+                if(!cn1SweepRemoving) {
+                    cn1GcRegisterImmortalObj(o);
+                }
+#endif
                 return JAVA_TRUE;
             }
         }
@@ -1636,7 +1675,17 @@ JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
     o->__heapPosition = -1;
 
     allObjectsInHeap[pos] = JAVA_NULL;
-    
+
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+    // Every caller except the sweep means "make this immortal" (interned constant-
+    // pool strings, static-final removal, VM caches). The object leaves the heap
+    // table -- and with it the conservative resolver's extents -- so the mark
+    // guard would treat it as garbage and skip tracing its children. Register it
+    // so the guard recognizes it and its subtree keeps getting marked.
+    if(!cn1SweepRemoving) {
+        cn1GcRegisterImmortalObj(o);
+    }
+#endif
     return JAVA_TRUE;
 }
 
@@ -2171,6 +2220,76 @@ void cn1GcRegisterClazz(struct clazz* c) {
     // side fast-path skip; the GC never reads it (it probes the table).
     c->cn1ClazzRegistered = JAVA_TRUE;
 }
+
+// ========================== Immortal object registry ==========================
+// Objects deliberately REMOVED from the heap table (interned constant-pool
+// strings, static-final removal values, VM cache singletons) are unresolvable
+// by cn1ConservativeResolve -- they live outside every BiBOP page and legacy
+// extent -- yet they must still be TRACED: a static-final java.lang value (a
+// Throwable, a String held in a field declared Object) can reference normal
+// heap children that would otherwise be swept from under it. The mark guard in
+// gcMarkObject therefore accepts a pointer when it resolves to itself OR when
+// it is a registered immortal. Same lock-free set pattern as the clazz
+// registry above; immortals are few (hundreds at most) and registered once.
+#define CN1_IMMORTAL_SET_BITS 13
+#define CN1_IMMORTAL_SET_SIZE (1 << CN1_IMMORTAL_SET_BITS)
+static _Atomic(uintptr_t) cn1ImmortalObjSet[CN1_IMMORTAL_SET_SIZE];
+static _Atomic(int) cn1ImmortalObjSetCount;
+
+static inline int cn1ImmortalObjSlot(uintptr_t v) {
+    uintptr_t h = (v >> 4) * (uintptr_t)2654435761u;
+    return (int)(h & (CN1_IMMORTAL_SET_SIZE - 1));
+}
+
+static int cn1GcImmortalObjContains(JAVA_OBJECT o) {
+    uintptr_t v = (uintptr_t)o;
+    int i = cn1ImmortalObjSlot(v);
+    for(;;) {
+        uintptr_t cur = atomic_load_explicit(&cn1ImmortalObjSet[i], memory_order_acquire);
+        if(cur == v) {
+            return 1;
+        }
+        if(cur == 0) {
+            return 0;
+        }
+        i = (i + 1) & (CN1_IMMORTAL_SET_SIZE - 1);
+    }
+}
+
+void cn1GcRegisterImmortalObj(JAVA_OBJECT o) {
+    uintptr_t v = (uintptr_t)o;
+    if(v == 0) {
+        return;
+    }
+    if(atomic_load_explicit(&cn1ImmortalObjSetCount, memory_order_relaxed) > (CN1_IMMORTAL_SET_SIZE / 2)) {
+        return; // safety valve; cannot fill from real immortal counts
+    }
+    int i = cn1ImmortalObjSlot(v);
+    for(;;) {
+        uintptr_t cur = atomic_load_explicit(&cn1ImmortalObjSet[i], memory_order_acquire);
+        if(cur == v) {
+            return;
+        }
+        if(cur == 0) {
+            uintptr_t expected = 0;
+            if(atomic_compare_exchange_strong_explicit(&cn1ImmortalObjSet[i], &expected, v,
+                    memory_order_release, memory_order_acquire)) {
+                atomic_fetch_add_explicit(&cn1ImmortalObjSetCount, 1, memory_order_relaxed);
+                return;
+            }
+            if(expected == v) {
+                return;
+            }
+        }
+        i = (i + 1) & (CN1_IMMORTAL_SET_SIZE - 1);
+    }
+}
+
+// TRUE while the sweep (GC thread) is removing a DEAD object from the heap
+// table prior to freeing it -- the one removeObjectFromHeapCollection caller
+// whose intent is NOT "make this immortal". Single-writer (the sweep runs on
+// the GC thread only), read in the same thread.
+static JAVA_BOOLEAN cn1SweepRemoving = JAVA_FALSE;
 #endif // CN1_CONSERVATIVE_GC_ROOTS
 
 // Allocate a small non-array object from the per-thread page for its size class.
@@ -3652,6 +3771,36 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     if(obj == JAVA_NULL || CN1_IS_TAGGED(obj)) {
         return;
     }
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+    // TOTAL pointer validation BEFORE ANY dereference. The drain follows the
+    // reference fields of conservatively-kept objects, and a conservatively-kept
+    // DEAD object's fields can dangle into memory whose child was freed -- and
+    // UNMAPPED -- in an EARLIER cycle. Reading even the mark word of such a
+    // pointer faults (the recurred arm64 suite SIGSEGV at the acquire-load below;
+    // the earlier clazz-registry guard fired too late because it already had to
+    // read the header). Accept a pointer only if the authoritative resolver maps
+    // it to itself (a CURRENT BiBOP slot or legacy extent -- never dereferences
+    // the suspect) or it is a REGISTERED IMMORTAL (removed from the heap table on
+    // purpose: interned strings, static-final removal values, VM cache roots --
+    // unresolvable but must still be traced, since a static-final Throwable/String
+    // can hold normal heap children).
+    //
+    // Skipping everything else is SOUND under snapshot-at-the-beginning:
+    //  - garbage/dangling pointers have no live fields to trace;
+    //  - a class static (java.lang.Class object) needs no marking (the old flow
+    //    also returned before pushing it);
+    //  - an object allocated AFTER the cycle's extent snapshot resolves as a miss,
+    //    but it is FRESH (mark == -1 -> the sweep's grace rule keeps it) and any
+    //    snapshot-live object reachable only through it is covered by the SATB
+    //    deletion barrier (its old path was cut during the mark -> logged);
+    //    BiBOP-fresh objects resolve anyway via the live-bump revalidation.
+    // Cost: one page/extent binary search per mark call, on the GC thread /
+    // workers only (the mutator never calls gcMarkObject) -- GC-side passes
+    // measured ~0% of wall time on this workload class.
+    if(cn1ConservativeResolve((void*)obj) != obj && !cn1GcImmortalObjContains(obj)) {
+        return;
+    }
+#endif
     // ACQUIRE-load the mark word (the object's publication point) BEFORE reading any
     // other header field. cn1BibopInitSlot writes parentClsReference/heapPosition and
     // THEN release-stores the mark word LAST, so the mark word is the single
