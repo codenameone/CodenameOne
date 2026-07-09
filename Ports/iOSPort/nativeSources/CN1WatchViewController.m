@@ -146,67 +146,46 @@ static CGRect watchFlushRect;
     [self drawFrame:CGRectZero];
 }
 
-// Serializes concurrent drains: the host pump drains on the main thread while
-// the screenshot path (IOSNative screenshot__) drains on the EDT. The CG
-// backend's active context (CN1CGBeginFrame/CN1CGEndFrame) is a single global,
-// so an unserialized overlap lets one drain's EndFrame NULL the context while
-// the other is mid-execution -- its remaining ops silently no-op and are lost
-// (they were already consumed from the queue), leaving partially painted or
-// permanently stale frames. The screenshot path also takes this lock around
-// its bitmap read (CN1WatchDrainLockObject below): CGBitmapContextCreateImage
-// against a context the pump is concurrently drawing into can return nil,
-// which surfaced as intermittent 1x1 placeholder captures in the CN1SS suite.
-NSObject *CN1WatchDrainLockObject(void) {
-    static NSObject *lock = nil;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        lock = [[NSObject alloc] init];
-    });
-    return lock;
-}
-
 // Drain the current op queue into the Core Graphics surface.
 - (void)drawFrame:(CGRect)rect {
     CN1WatchRenderingView *v = [CN1WatchHost sharedHost].renderingView;
     if (v == nil) {
         return;
     }
-    @synchronized (CN1WatchDrainLockObject()) {
-        NSArray *ops;
-        CGRect flushRect;
-        @synchronized (self) {
-            ops = [currentTarget copy];
-            // Snapshot the flush region with the op queue it belongs to.
-            flushRect = watchFlushRect;
-            // Consume both: these ops + region are about to be drawn, so the next
-            // flush starts fresh. The persistent bitmap keeps the pixels, so a later
-            // forced re-present (drawScreen) still shows this frame.
-            [currentTarget removeAllObjects];
-            watchFlushRect = CGRectZero;
-        }
-        [v setFramebuffer];
-        // Issue #5273: publish the flush region to ClipRect so a screen clip
-        // drained below is clamped to the repainted sub-region (the watch branch of
-        // ClipRect.execute no-ops the clamp while this is empty).
-        [ClipRect setDrawRect:flushRect];
-        for (ExecutableOp *op in ops) {
-            @try {
-                [op executeWithClipping];
-            } @catch (NSException *e) {
-                // Keep draining; a single failing op shouldn't blank the frame.
-            }
-        }
-        // Issue #5273: clear the flush region now the screen drain is done so a
-        // mutable-image draw executed immediately outside drawFrame is not clamped
-        // to the screen flush rect (the clamp in ClipRect's watch branch no-ops on
-        // an empty drawingRect).
-        [ClipRect setDrawRect:CGRectZero];
-        [v presentFramebuffer];
-        painted = YES;
-#ifndef CN1_USE_ARC
-        [ops release];
-#endif
+    NSArray *ops;
+    CGRect flushRect;
+    @synchronized (self) {
+        ops = [currentTarget copy];
+        // Snapshot the flush region with the op queue it belongs to.
+        flushRect = watchFlushRect;
+        // Consume both: these ops + region are about to be drawn, so the next
+        // flush starts fresh. The persistent bitmap keeps the pixels, so a later
+        // forced re-present (drawScreen) still shows this frame.
+        [currentTarget removeAllObjects];
+        watchFlushRect = CGRectZero;
     }
+    [v setFramebuffer];
+    // Issue #5273: publish the flush region to ClipRect so a screen clip
+    // drained below is clamped to the repainted sub-region (the watch branch of
+    // ClipRect.execute no-ops the clamp while this is empty).
+    [ClipRect setDrawRect:flushRect];
+    for (ExecutableOp *op in ops) {
+        @try {
+            [op executeWithClipping];
+        } @catch (NSException *e) {
+            // Keep draining; a single failing op shouldn't blank the frame.
+        }
+    }
+    // Issue #5273: clear the flush region now the screen drain is done so a
+    // mutable-image draw executed immediately outside drawFrame is not clamped
+    // to the screen flush rect (the clamp in ClipRect's watch branch no-ops on
+    // an empty drawingRect).
+    [ClipRect setDrawRect:CGRectZero];
+    [v presentFramebuffer];
+    painted = YES;
+#ifndef CN1_USE_ARC
+    [ops release];
+#endif
 }
 
 #ifndef CN1_USE_ARC
