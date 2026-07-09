@@ -23,8 +23,6 @@
 package com.codename1.maps.vector;
 
 import com.codename1.io.grpc.ProtoWriter;
-import com.codename1.ui.CN;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -73,14 +71,27 @@ public final class DemoTileSource implements TileSource {
     /// {@inheritDoc}
     @Override
     public void fetchTile(final int z, final int x, final int y, final TileCallback callback) {
-        CN.callSerially(new Runnable() {
+        MapTileWorker.run(new Runnable() {
             @Override
             public void run() {
+                final byte[] data;
                 try {
-                    callback.tileLoaded(z, x, y, tileBytes());
+                    data = tileBytes();
                 } catch (Throwable t) {
-                    callback.tileFailed(z, x, y);
+                    MapTileWorker.callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            callback.tileFailed(z, x, y);
+                        }
+                    });
+                    return;
                 }
+                MapTileWorker.callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        callback.tileLoaded(z, x, y, data);
+                    }
+                });
             }
         });
     }
