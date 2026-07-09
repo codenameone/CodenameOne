@@ -457,18 +457,25 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
                 // Callout placed outside the component (to the right if
                 // there's room, otherwise below).
                 String label = "H=" + heightMm + "mm, text=" + textHeightMm + "mm";
-                Font gFont = g.getFont();
-                Font f = gFont;
+                // EXPLICIT font: g.getFont() here is whatever the LAST component
+                // paint left on the Graphics -- usually the theme Label font, but
+                // paint order is not deterministic, and on the watch leg a run
+                // captured the annotation in the small system fallback (fontH=16)
+                // while every actual widget rendered normally -- an
+                // annotation-only mismatch no golden can reconcile. Resolve the
+                // theme Label font directly so the callout renders identically
+                // every run.
+                Font f = UIManager.getInstance().getComponentStyle("Label").getFont();
                 if (f == null) {
                     f = Font.getDefaultFont();
-                    g.setFont(f);
                 }
+                g.setFont(f);
                 int textW = f.stringWidth(label);
                 int textH = f.getHeight();
                 if (textH != lastLoggedFontH) {
                     lastLoggedFontH = textH;
                     System.out.println("[DualAppearance] annotation fontH=" + textH
-                            + " gFontNull=" + (gFont == null) + " dark=" + dark);
+                            + " dark=" + dark);
                 }
                 int labelX = x + w + 2;
                 int labelY = y + (h - textH) / 2;

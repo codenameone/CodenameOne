@@ -29,16 +29,16 @@ import java.io.InputStream;
 /// than baseline an error overlay.
 public class GoogleWebMapScreenshotTest extends BaseTest {
 
-    /// Attempts per wait (500ms each): 12s. A healthy load fires tilesloaded in
-    /// 3-8s; the pathological case is a COLD WebKit on a starved runner where the
-    /// page load alone ate ~21s of the old single 22s budget (observed on the
-    /// metal leg: MainFrameLoadCompleted at T+21s -> tiles never loaded -> missing
-    /// screenshot). Two 12s attempts with a fresh web view beat one 22s attempt:
-    /// by the retry WebKit's processes and the SDK script cache are warm, so the
-    /// reload takes seconds.
-    private static final int WAIT_ATTEMPTS = 24;
+    /// Attempts per wait (500ms each): 24s -- nearly the runner's whole 30s
+    /// per-test budget. A healthy load fires tilesloaded in 3-8s; a starved
+    /// runner has been observed needing >21s for the page load alone (and a
+    /// two-12s-attempt split fared worse: neither window fit a cold load).
+    private static final int WAIT_ATTEMPTS = 48;
 
-    /// One-shot in-test retry consumed (see waitForMapReady timeout branch).
+    /// Set when the first attempt exhausted its budget and the test went silent
+    /// to hand control to the runner's silent-timeout retry (which re-runs the
+    /// whole test on the SAME instance with a fresh 30s budget and a warm
+    /// WebKit). Distinguishes the second pass so it can fail loudly.
     private boolean retriedOnce;
 
     private String apiKey;
@@ -163,24 +163,22 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
         }
         if (attemptsLeft <= 0) {
             if (!retriedOnce) {
+                // First exhaustion: dispose the map (its JS loop must not starve
+                // later tests) and go SILENT -- no done(), no capture. The runner's
+                // per-test timeout then fires with captureStarted == false and its
+                // one-shot silent-timeout retry re-runs this WHOLE test on the same
+                // instance: a fresh web view, a fresh full budget, and a warm
+                // WebKit (the cold-process page load is what ate the first budget).
                 retriedOnce = true;
                 System.out.println("CN1SS:WARN:test=GoogleWebMap tiles not loaded after "
-                        + (WAIT_ATTEMPTS * 500) + "ms; retrying once with a fresh web view");
+                        + (WAIT_ATTEMPTS * 500)
+                        + "ms; going silent to hand off to the runner's timeout retry");
                 try {
                     currentMap.dispose();
                 } catch (Throwable t) {
                     // best effort
                 }
-                form.removeAll();
-                NativeMap fresh = buildWebMap();
-                if (fresh.isNativeMap()) {
-                    currentMap = fresh;
-                    form.add(BorderLayout.CENTER, fresh);
-                    form.revalidate();
-                    waitForMapReady(form, WAIT_ATTEMPTS, onReady);
-                    return;
-                }
-                // fresh view unavailable -> fall through to the loud failure
+                return;
             }
             System.out.println(
                     "CN1SS:INFO:test=GoogleWebMap status=FAILED reason=tiles-never-loaded");
