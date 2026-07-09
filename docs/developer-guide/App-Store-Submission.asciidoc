@@ -1,0 +1,231 @@
+[[app-store-submission]]
+== Automated App Store Submission
+
+Once a build is signed you still have to get it onto the store: upload the binary
+to App Store Connect or Google Play, fill in the release notes, set the store
+listing, and send it for review. Codename One automates that last mile. From the
+build console you can submit a finished build to the App Store, the Mac App Store,
+or Google Play with one click, and you can manage the store *listing itself* --
+title, description, keywords, what's-new, screenshots -- as code in your project
+and have it pushed to the stores automatically at submission time.
+
+This chapter covers the end-to-end flow, credentials, plan limits, and the
+metadata-as-code workflow. It builds on <<signing-section-top-heading, Signing>>:
+submission reuses the same App Store Connect API key the certificate wizard
+configures.
+
+=== What it does, and what it doesn't
+
+Automated submission delivers the binary and applies your release metadata to an
+*existing* app on the store. It does not create the app for you.
+
+IMPORTANT: You must create the app once, by hand, in
+https://appstoreconnect.apple.com[App Store Connect] and/or the
+https://play.google.com/console[Google Play Console] before you can submit to it.
+Neither store's API can register a brand-new app, set up pricing, in-app
+purchases, the privacy questionnaire, or the content-rating questionnaire -- those
+remain one-time manual steps in the store consoles. After that, every release's
+binary and listing can be shipped automatically.
+
+Three things are worth separating, because they happen at different times:
+
+* *The app record* -- the listing shell in the store. Created once, manually, and
+  exists before any build.
+* *The binary* -- produced by your build, delivered when you *submit*.
+* *The metadata* -- description, what's-new, screenshots and so on. Managed as code
+  and applied when you submit. Metadata attaches to the app record and the new
+  version, not to the binary, so there is no chicken-and-egg problem: the app
+  already exists on the store by the time you build.
+
+=== Prerequisites
+
+==== Store credentials
+
+*Apple.* Submission uses the App Store Connect API key described under
+<<certificate-wizard, the certificate wizard>>. If you have already run
+`mvn cn1:certificatewizard` and stored the key, you are ready -- the same key that
+creates certificates and profiles also uploads builds and manages listings.
+
+*Google.* Create a Google Play service account with the *Android Publisher* role
+in the Google Play Console (API access > Service accounts), download its JSON key,
+and add it to the build console's submission credentials page. The console shows
+which stores are connected.
+
+==== Plans and quotas
+
+Submission is a paid feature. The monthly cap is a hard limit -- a submission
+consumes a real store review slot -- so crossing it blocks further submissions
+until the month rolls over or you upgrade.
+
+[cols="1,1,1,1", options="header"]
+|===
+| Plan | Submissions / month | Destinations | Zero-touch auto-submit
+| Free | 0 (blocked) | -- | no
+| Basic | 5 | Beta only | no
+| Pro / Pro+ | 50 | Beta + Production | no
+| Enterprise / GOD | Unlimited | Beta + Production | yes
+|===
+
+*Beta* means TestFlight (Apple) or the internal-testing track (Google). *Production*
+means App Store review (Apple) or the production track (Google) and requires Pro or
+higher.
+
+=== Submitting a build from the console
+
+On any successful build the console shows a *Submit* action for each store the
+build can go to:
+
+* *Submit to App Store* -- when the build produced an iOS `.ipa`.
+* *Submit to Mac App Store* -- when the build produced a native/Catalyst `.pkg`
+  (see the *Working with macOS* chapter). An iOS build that also produced a
+  `.pkg` offers both.
+* *Submit to Google Play* -- for an Android build.
+
+The submit dialog lets you pick the destination (Beta or Production) and add
+release notes for this submission, then delivers the binary. For an Apple
+*production* submission the console then tracks the App Store review state
+(processing -> in review -> approved/rejected) and, on Pro and higher, can email
+you when the state changes. Google submissions and TestFlight deliveries complete
+as soon as the binary is delivered.
+
+TIP: Submitting to *Production* on Apple opens an App Store review submission
+automatically. Submitting to *Beta* delivers to TestFlight without opening a
+review.
+
+=== Metadata as code
+
+Release metadata -- the store listing text and screenshots -- can live in your
+project as a folder of plain text and image files, versioned in git alongside your
+code, and pushed to the stores with a single command. This makes your listing
+reproducible and CI-drivable: generate the what's-new from your changelog, push,
+and the next submission applies it to both stores. It is the alternative to typing
+the same fields into two different web consoles by hand for every release.
+
+Metadata is available on *Basic and higher* and is metered separately from
+submissions (Basic 20, Pro 200, Enterprise unlimited *metadata updates* per month;
+a descriptor push or a screenshot upload counts as one update).
+
+==== The metadata folder
+
+By default the goal reads a `cn1-metadata` folder next to your
+`codenameone_settings.properties`. It is organized by store, then locale, in the
+style of fastlane's `deliver`:
+
+[source]
+----
+cn1-metadata/
+  apple/
+    primary_locale.txt          (optional; defaults to the first locale)
+    primary_category.txt        (optional; an App Store Connect category id)
+    secondary_category.txt      (optional)
+    en-US/
+      name.txt                  (app name, max 30 chars)
+      subtitle.txt              (max 30 chars)
+      description.txt           (max 4000 chars)
+      keywords.txt              (comma separated, max 100 chars)
+      promotional_text.txt      (max 170 chars)
+      whats_new.txt             (release notes for this version)
+      marketing_url.txt
+      support_url.txt
+      privacy_url.txt
+      screenshots/
+        APP_IPHONE_67/1.png 2.png ...
+        APP_IPAD_PRO_129/1.png ...
+  google/
+    en-US/
+      name.txt                  (listing title, max 30 chars)
+      subtitle.txt              (short description, max 80 chars)
+      description.txt           (full description, max 4000 chars)
+      whats_new.txt             (release notes, max 500 chars)
+      support_url.txt
+      screenshots/
+        phoneScreenshots/1.png 2.png ...
+        tenInchScreenshots/1.png ...
+----
+
+Every file is optional; a field you don't include keeps whatever value the store
+already has. The same neutral file names map to each store's fields (for example
+`subtitle.txt` becomes the App Store *subtitle* and the Google Play *short
+description*). Fields a store doesn't have (Apple `keywords`/`promotional_text`)
+are simply ignored for the other store.
+
+The `screenshots/<dir>` sub-folders are named with each store's own type
+identifiers: App Store `screenshotDisplayType` values (for example
+`APP_IPHONE_67`) for Apple, and listing `imageType` values (for example
+`phoneScreenshots`) for Google. Images are uploaded in filename order.
+
+==== Pushing the metadata
+
+Run the goal from your project; it authenticates with the same Codename One
+account your builds use (run `mvn cn1:certificatewizard` once to sign in, or pass
+`-Dtoken=`):
+
+[source,bash]
+----
+# push both stores from cn1-metadata/
+mvn cn1:metadata-push
+
+# or a single store
+mvn cn1:metadata-push -Dstore=apple
+
+# override the folder or the package id if needed
+mvn cn1:metadata-push -DmetadataDir=path/to/metadata -Dpackage=com.example.app
+----
+
+The package id defaults to `codename1.packageName` from
+`codenameone_settings.properties`. The goal validates every field against the
+store's limits before storing it, so an over-long name or a malformed URL fails
+fast with a clear message. Wire it into CI to keep the stored listing in sync with
+your repo.
+
+NOTE: `metadata-push` uploads the descriptor and screenshots to Codename One; it
+does *not* submit. The stored metadata is applied to the store the next time you
+*submit* a build for that package.
+
+==== When and how it is applied
+
+At submission time the stored descriptor is applied to the store automatically:
+
+* *Apple* -- applied to the *production* App Store version (App Store review),
+  while the version is still editable. TestFlight has no store listing, so beta
+  Apple submissions don't apply listing metadata.
+* *Google* -- applied to the listing on the edit that publishes the binary, on any
+  track.
+
+Applying metadata is *best-effort*: the binary is delivered first, so a rejected
+field (say a name that's too long, or a locale the app hasn't enabled) never blocks
+the submission -- it is recorded as a warning you can see in the console, and the
+rest of the listing still applies. You can always fix a field by hand in the store
+console afterwards.
+
+==== Screenshots are not stored long-term
+
+Screenshots are a transient pass-through: `metadata-push` uploads them, the next
+submission delivers them to the store, and they are then deleted from Codename
+One's servers. Keep the canonical images in your repo (that is the point of
+managing them as code) and re-push when they change. Text descriptors are retained
+until you delete them, your account is deleted, or they go unused for about a year.
+
+Per-image limits: up to 10 MB, PNG or JPEG, and at most 10 screenshots per locale
+and display type (the stores' own limit).
+
+=== Benefits over editing the stores by hand
+
+Managing submission and metadata through Codename One pays off most for teams,
+frequent releases, many locales, or many apps:
+
+* *Automated release notes.* Generate what's-new from your changelog and ship it to
+  both stores on every release -- the one field that always changes.
+* *One source, two stores.* A single descriptor fans out to App Store Connect and
+  Google Play, which have different fields and limits.
+* *Reproducible and reviewable.* The listing lives in git: diffable, revertable,
+  and code-reviewed like everything else. Console edits have no history.
+* *Localization at scale.* Localized listings are just files, and can be generated
+  or translated in a pipeline.
+* *Fewer console logins.* Team members who ship releases don't each need App Store
+  Connect or Play Console access; the build pipeline and your Codename One plan gate
+  it instead.
+
+For a single app that updates rarely, editing the store console by hand is perfectly
+fine -- the payoff scales with how often you release and how many listings you
+maintain.
