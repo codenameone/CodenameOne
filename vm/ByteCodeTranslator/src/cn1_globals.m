@@ -2087,10 +2087,97 @@ static inline void cn1BibopInitSlot(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o, in
     __atomic_store_n(&o->__codenameOneGcMark, -1, __ATOMIC_RELEASE);
 }
 
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+// ============================ Exact clazz registry ============================
+// The conservative scan/drain can hand gcMarkObject a pointer to a FREED object
+// whose first header word (over __codenameOneParentClsReference) now holds
+// arbitrary reused data. Validating that value with a "close to the code"
+// distance heuristic proved UNSOUND: on a non-PIE Linux binary loaded low, the
+// whole malloc heap sits within the +-512MB window, so a freed object whose
+// offset-0 word was a heap pointer passed the filter -- and when that heap page
+// had been returned to the OS, the parentCls->markFunction LOAD itself faulted
+// (the recurred arm64 suite SIGSEGV at cn1_globals.c:3751).
+//
+// Replace the heuristic with an EXACT registry of every genuine clazz address:
+// every allocation entry point (cn1BibopFastAlloc/NoZero in the header,
+// cn1BibopAlloc, codenameOneGcMalloc -- allocArray funnels into the latter)
+// registers the class on its first allocation, so by construction the registry
+// contains the clazz of every object the GC can ever encounter -- including
+// objects later made immortal and removed from the heap table. Lookup is a
+// lock-free open-addressing probe; insert is a CAS (idempotent, grow-never:
+// the table is sized far beyond any real app's class count).
+#define CN1_CLAZZ_SET_BITS 15
+#define CN1_CLAZZ_SET_SIZE (1 << CN1_CLAZZ_SET_BITS)
+static _Atomic(uintptr_t) cn1ClazzSet[CN1_CLAZZ_SET_SIZE];
+static _Atomic(int) cn1ClazzSetCount;
+
+static inline int cn1ClazzSetSlot(uintptr_t v) {
+    // clazz statics are pointer-aligned; fold the address into the table.
+    uintptr_t h = (v >> 4) * (uintptr_t)2654435761u;
+    return (int)(h & (CN1_CLAZZ_SET_SIZE - 1));
+}
+
+// TRUE when c is a registered (genuine) clazz address. Never dereferences c.
+// Acquire pairs with the release CAS in cn1GcRegisterClazz: an object is
+// published to the GC only after its allocation entry point registered the
+// class, so a GC thread that sees the object also sees the registration.
+static int cn1ClazzRegistryContains(uintptr_t v) {
+    int i = cn1ClazzSetSlot(v);
+    for(;;) {
+        uintptr_t cur = atomic_load_explicit(&cn1ClazzSet[i], memory_order_acquire);
+        if(cur == v) {
+            return 1;
+        }
+        if(cur == 0) {
+            return 0;
+        }
+        i = (i + 1) & (CN1_CLAZZ_SET_SIZE - 1);
+    }
+}
+
+void cn1GcRegisterClazz(struct clazz* c) {
+    uintptr_t v = (uintptr_t)c;
+    if(v == 0) {
+        return;
+    }
+    // Safety valve: a table this size can never fill from real classes (tens of
+    // thousands of slots vs a few thousand classes); if it somehow neared full,
+    // stop inserting -- lookups then miss and the guard falls back to the
+    // authoritative resolver, which is correct just slower.
+    if(atomic_load_explicit(&cn1ClazzSetCount, memory_order_relaxed) > (CN1_CLAZZ_SET_SIZE / 2)) {
+        return;
+    }
+    int i = cn1ClazzSetSlot(v);
+    for(;;) {
+        uintptr_t cur = atomic_load_explicit(&cn1ClazzSet[i], memory_order_acquire);
+        if(cur == v) {
+            break; // already registered (racing first allocations -- fine)
+        }
+        if(cur == 0) {
+            uintptr_t expected = 0;
+            if(atomic_compare_exchange_strong_explicit(&cn1ClazzSet[i], &expected, v,
+                    memory_order_release, memory_order_acquire)) {
+                atomic_fetch_add_explicit(&cn1ClazzSetCount, 1, memory_order_relaxed);
+                break;
+            }
+            if(expected == v) {
+                break; // another thread inserted the same clazz
+            }
+            // slot taken by a different clazz -> keep probing
+        }
+        i = (i + 1) & (CN1_CLAZZ_SET_SIZE - 1);
+    }
+    // Plain flag store AFTER the table insert: the flag is only an allocation-
+    // side fast-path skip; the GC never reads it (it probes the table).
+    c->cn1ClazzRegistered = JAVA_TRUE;
+}
+#endif // CN1_CONSERVATIVE_GC_ROOTS
+
 // Allocate a small non-array object from the per-thread page for its size class.
 // Returns 0 only if pages cannot be obtained (caller falls back to the heap).
 static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
     pthread_once(&bibopOnce, cn1BibopDoInit);
+    CN1_CLAZZ_REGISTER(parent);
     int ci = cn1BibopSizeToClass[size];
     if(ci < 0) {
         return 0;
@@ -3087,6 +3174,7 @@ static void cn1GcSelfCheckThreadStack(struct ThreadLocalData* t, int stackSize) 
 #endif /* CN1_CONSERVATIVE_GC_ROOTS */
 
 JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
+    CN1_CLAZZ_REGISTER(parent); // first-alloc-per-class: exact clazz registry for the GC guard
     if(isAppSuspended) {
         mallocWhileSuspended += size;
         if(mallocWhileSuspended > 100000) {
@@ -3594,37 +3682,43 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
         return;
     }
 #endif
+    // SINGLE load of the class pointer, reused for every deref below. The header of a
+    // conservatively-reached object can be freed/reused WHILE this function runs; loading
+    // once and validating that one value removes the read-validate-reread window (the
+    // original crash note: "obj readable at acquire-load but header freed/reused mid-mark").
+    struct clazz* __cls = obj->__codenameOneParentClsReference;
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
     // Conservative-scan safety guard. The native-stack scan can legitimately false-positive-
     // mark a DEAD object (a stale native-stack word happens to resolve to it -- unavoidable
     // with conservative roots). Precisely draining that dead object then FOLLOWS its now-
     // dangling reference fields; e.g. a freed StringBuilder value[] whose first word (offset
-    // 0, over __codenameOneParentClsReference) now holds a BiBOP free-list next pointer. Left
-    // unchecked, gcMarkObject dereferences that garbage parentCls -> markFunction and jumps to
-    // a wild address (observed on arm64: parentCls=0x200000000, unmapped, deterministic SIGSEGV
-    // in the theme phase draining a dead StringBuilder's value[]; x86_64/musl simply never
-    // produced the offending stack word, which is why it looked arch-specific).
+    // 0, over __codenameOneParentClsReference) now holds a BiBOP free-list next pointer or
+    // any other reused data. Left unchecked, gcMarkObject dereferences that garbage
+    // parentCls -> markFunction: a wild JUMP when the value is mapped, or a wild LOAD fault
+    // when it is not (both observed on the Linux arm64 suite).
     //
-    // A real clazz is a static inside the loaded image, close to the code; validate the
-    // parentCls VALUE cheaply (aligned + within 512MB of the code) and, only when it looks
-    // implausible, confirm against the authoritative resolver -- which never dereferences the
-    // suspect pointer: a genuine live published slot resolves to itself, a dangling/free/garbage
-    // pointer does not. Skipping a non-live object is correct (it has no live fields to trace);
-    // a truly-live object with a far class still resolves to itself and is traced normally. The
-    // filter passes every real object in a couple of instructions, so resolve runs only on the
-    // rare suspicious pointer -- negligible on the mark hot path.
-    {
-        uintptr_t __pc = (uintptr_t)obj->__codenameOneParentClsReference;
-        uintptr_t __anchor = (uintptr_t)(void*)&gcMarkObject;
-        uintptr_t __dist = __pc > __anchor ? __pc - __anchor : __anchor - __pc;
-        if(__pc != 0 && (((__pc & (sizeof(void*) - 1)) != 0) || __dist > (512ULL << 20))) {
-            if(cn1ConservativeResolve((void*)obj) != obj) {
-                return;   // dangling / freed / garbage -> not a live object, skip
-            }
+    // The previous guard accepted any aligned value within 512MB of the code as a
+    // "plausible clazz" -- UNSOUND on a non-PIE Linux binary loaded low, where the whole
+    // malloc heap lives inside that window: a freed object whose offset-0 word was a heap
+    // pointer sailed through, and when that heap page had been MADV_FREE'd/unmapped the
+    // markFunction LOAD itself faulted (recurred arm64 SIGSEGV at the line below).
+    //
+    // Now the test is EXACT: every allocation entry point registers its class on first
+    // use (cn1GcRegisterClazz), so a genuine object's class is ALWAYS in the registry --
+    // including objects later made immortal and removed from the heap table. An unknown
+    // value falls back to the authoritative resolver, which never dereferences the suspect:
+    // a live published slot resolves to itself (then its class is adopted into the
+    // registry -- belt and suspenders for any allocation path not yet hooked); anything
+    // else is a freed/dangling slot with no live fields to trace -> skip.
+    if(__cls != 0 && __cls != (&class__java_lang_Class)
+       && !cn1ClazzRegistryContains((uintptr_t)__cls)) {
+        if(cn1ConservativeResolve((void*)obj) != obj) {
+            return;   // dangling / freed / garbage -> not a live object, skip
         }
+        cn1GcRegisterClazz(__cls);
     }
 #endif
-    if(obj->__codenameOneParentClsReference == 0 || obj->__codenameOneParentClsReference == (&class__java_lang_Class)) {
+    if(__cls == 0 || __cls == (&class__java_lang_Class)) {
         return;
     }
 #ifdef CN1_NURSERY
@@ -3655,7 +3749,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
         }
         if(__sync_bool_compare_and_swap(&obj->__codenameOneGcMark, old, markVal)) {
             CN1_BIBOP_STAMP_MARKED(obj, markVal);
-            if(obj->__codenameOneParentClsReference->markFunction != 0) {
+            if(__cls->markFunction != 0) {
                 gcMarkWorklistPush(obj, force);
             }
         }
@@ -3670,7 +3764,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
             if(cn1ForceVisitedTestAndSet(obj, recursionKey)) {
                 return;
             }
-            if(obj->__codenameOneParentClsReference->markFunction != 0) {
+            if(__cls->markFunction != 0) {
                 gcMarkWorklistPush(obj, force);
             }
         }
@@ -3748,7 +3842,7 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
         gcBeltDiagCount++;
     }
 #endif
-    gcMarkFunctionPointer __markFn = obj->__codenameOneParentClsReference->markFunction;
+    gcMarkFunctionPointer __markFn = __cls->markFunction;
 #if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
     // Poor-man's generational adoption: a reachable, non-leaf (markFunction != 0) BiBOP
     // object graduates into the legacy mark/sweep, which traces it unconditionally =

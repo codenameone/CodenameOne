@@ -194,7 +194,31 @@ struct clazz {
     JAVA_BOOLEAN isAnnotation;
     
     struct clazz* arrayClass;  // <----- The array type for a class.  if clazz=Object, then class->arrayClass=Object[]
+
+    // TRAILING field on purpose: every generated clazz initializer is positional and
+    // does not name it, so C zero-fills it -- no translator emission change needed.
+    // Set once by cn1GcRegisterClazz when the first object of this class is allocated;
+    // the conservative GC's mark guard then recognises the clazz ADDRESS as genuine via
+    // an exact registry instead of a distance heuristic (see gcMarkObject). Only
+    // meaningful under CN1_CONSERVATIVE_GC_ROOTS; stays zero otherwise.
+    JAVA_BOOLEAN cn1ClazzRegistered;
 };
+
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+// Registers a clazz address in the GC's exact clazz registry (idempotent, lock-free).
+// Called on the first allocation of each class from every allocation entry point, so
+// by construction every clazz that ever produced an object -- including objects later
+// made immortal / removed from the heap table -- is registered before the GC can
+// encounter one of its instances.
+extern void cn1GcRegisterClazz(struct clazz* c);
+#define CN1_CLAZZ_REGISTER(cptr) do { \
+        if((cptr) != 0 && __builtin_expect(!(cptr)->cn1ClazzRegistered, 0)) { \
+            cn1GcRegisterClazz((cptr)); \
+        } \
+    } while(0)
+#else
+#define CN1_CLAZZ_REGISTER(cptr) do {} while(0)
+#endif
 
 #define EMPTY_INTERFACES ((const struct clazz**)0)
 
@@ -1331,6 +1355,13 @@ extern long long totalAllocations;
 // ineligible / oversized) -> caller falls back to __NEW_X / codenameOneGcMalloc.
 static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
     if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
+    // NOTE deliberately NO CN1_CLAZZ_REGISTER here: a per-alloc flag check on the inline
+    // bump path measured ~4% on allocation-heavy renders. A class whose objects only ever
+    // allocate through this fast path is still handled -- BiBOP slots are ALWAYS resolvable
+    // (page walk), so the GC guard's resolve-then-adopt fallback registers such a class the
+    // first time one of its objects is marked. The slow paths (cn1BibopAlloc,
+    // codenameOneGcMalloc) register eagerly, which covers every LEGACY object -- the only
+    // kind that can later become unresolvable (immortal, removed from the heap table).
     CN1BibopPage* p = bibopCurrent[ci];
     if(__builtin_expect(p != (CN1BibopPage*)0 && p->freeList == (void*)0 &&
                         constantPoolObjects != (JAVA_OBJECT*)0
@@ -1413,6 +1444,7 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
 // body zero is elided.
 static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
     if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
+    // No CN1_CLAZZ_REGISTER: see cn1BibopFastAlloc.
     CN1BibopPage* p = bibopCurrent[ci];
     if(__builtin_expect(p != (CN1BibopPage*)0 && p->freeList == (void*)0 &&
                         constantPoolObjects != (JAVA_OBJECT*)0
