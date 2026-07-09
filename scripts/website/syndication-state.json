@@ -827,6 +827,11 @@
         "tags_set": false,
         "canonical_set": false,
         "syndicated_at": "2026-07-09T15:01:59+00:00"
+      },
+      "devto": {
+        "id": 4107450,
+        "url": "https://dev.to/codenameone/game-builder-tutorial-2-build-a-blackjack-card-game-duke-jack-gha",
+        "syndicated_at": "2026-07-09T15:53:13+00:00"
       }
     }
   }
