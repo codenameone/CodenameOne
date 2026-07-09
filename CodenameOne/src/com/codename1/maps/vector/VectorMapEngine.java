@@ -182,6 +182,50 @@ public final class VectorMapEngine {
         return !pending.isEmpty();
     }
 
+    /// True when every tile currently visible in the viewport has a rendered image
+    /// ready -- i.e. a paint right now would draw no background placeholder. This is
+    /// the reliable "map is fully drawn" signal: {@link #hasPendingTiles()} is only a
+    /// transient in-flight counter, and because tiles are requested lazily (a paint
+    /// requests a tile the first time it finds it missing) it can read false BETWEEN
+    /// request batches while most of the viewport is still unrendered. Returns false
+    /// until the first paint has established the viewport size. Useful for loading
+    /// indicators and for tests that must capture a fully-rendered map.
+    public boolean isViewportFullyRendered() {
+        if (viewWidth <= 0 || viewHeight <= 0) {
+            return false; // never painted yet
+        }
+        int z = integerZoom();
+        double s = MathUtil.pow(2, zoom - z);
+        double cwx = WebMercator.lonToWorldX(centerLon, zoom);
+        double cwy = WebMercator.latToWorldY(centerLat, zoom);
+        int tiles = 1 << z;
+        double halfW = viewWidth / 2.0 / pixelRatio;
+        double halfH = viewHeight / 2.0 / pixelRatio;
+        double wzLeft = (cwx - halfW) / s;
+        double wzRight = (cwx + halfW) / s;
+        double wzTop = (cwy - halfH) / s;
+        double wzBottom = (cwy + halfH) / s;
+        int txMin = floorDiv((int) Math.floor(wzLeft), tileSize);
+        int txMax = floorDiv((int) Math.floor(wzRight), tileSize);
+        int tyMin = floorDiv((int) Math.floor(wzTop), tileSize);
+        int tyMax = floorDiv((int) Math.floor(wzBottom), tileSize);
+        for (int tx = txMin; tx <= txMax; tx++) {
+            for (int ty = tyMin; ty <= tyMax; ty++) {
+                if (ty < 0 || ty >= tiles) {
+                    continue;
+                }
+                int wrappedTx = ((tx % tiles) + tiles) % tiles;
+                String key = TileUtil.key(z, wrappedTx, ty);
+                if (rendered.get(key) == null && !failed.containsKey(key)) {
+                    // a permanently-failed tile can never render; treating it as
+                    // pending would make this method never return true
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     private double clampZoom(double z) {
         double min = source.getMinZoom();
         double max = source.getMaxZoom();

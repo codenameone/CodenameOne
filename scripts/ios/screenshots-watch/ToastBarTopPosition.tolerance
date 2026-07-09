@@ -1,0 +1,9 @@
+# The toast's bottom edge lands +-1px run-to-run on the slow watch simulator:
+# its height derives from the label font, and the sim's async font load can
+# round the layout one pixel differently (the same fontH-fallback variance the
+# other watch text tests show). The observed benign diff is exactly 2 full-width
+# boundary rows out of 416x496 = 0.40% of pixels (dark<->light flips, so they
+# exceed any channel delta). Allow a small mismatch share; a real failure --
+# toast absent or mispositioned -- flips >10% of pixels and still fails.
+maxChannelDelta=32
+maxMismatchPercent=1.5

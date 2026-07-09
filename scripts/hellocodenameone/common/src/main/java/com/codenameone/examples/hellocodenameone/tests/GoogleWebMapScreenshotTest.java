@@ -29,6 +29,21 @@ import java.io.InputStream;
 /// than baseline an error overlay.
 public class GoogleWebMapScreenshotTest extends BaseTest {
 
+    /// Attempts per wait (500ms each): 12s. A healthy load fires tilesloaded in
+    /// 3-8s; the pathological case is a COLD WebKit on a starved runner where the
+    /// page load alone ate ~21s of the old single 22s budget (observed on the
+    /// metal leg: MainFrameLoadCompleted at T+21s -> tiles never loaded -> missing
+    /// screenshot). Two 12s attempts with a fresh web view beat one 22s attempt:
+    /// by the retry WebKit's processes and the SDK script cache are warm, so the
+    /// reload takes seconds.
+    private static final int WAIT_ATTEMPTS = 24;
+
+    /// One-shot in-test retry consumed (see waitForMapReady timeout branch).
+    private boolean retriedOnce;
+
+    private String apiKey;
+    private NativeMap currentMap;
+
     @Override
     public boolean runTest() {
         if (com.codename1.ui.CN.isWatch()) {
@@ -56,27 +71,21 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
             done();
             return true;
         }
-        String key = readKey();
-        if (key == null || key.length() == 0) {
+        apiKey = readKey();
+        if (apiKey == null || apiKey.length() == 0) {
             System.out.println(
                     "CN1SS:INFO:test=GoogleWebMap status=SKIPPED reason=no-api-key");
             done();
             return true;
         }
-        // Register the web Google provider and force it for this map only; the
-        // provider was resolved by the NativeMap constructor synchronously, so
-        // restoring the default order right after leaves later tests (e.g. the
-        // native Apple provider test) untouched.
-        MapProviderRegistry.register(WebMapProvider.google(key));
-        MapProviderRegistry.setProviderOrder(new String[]{"web"});
-        final NativeMap map = new NativeMap(new LatLng(41.0, 13.0), 5);
-        MapProviderRegistry.setProviderOrder(null);
+        final NativeMap map = buildWebMap();
         if (!map.isNativeMap()) {
             System.out.println(
                     "CN1SS:INFO:test=GoogleWebMap status=SKIPPED reason=no-web-peer");
             done();
             return true;
         }
+        currentMap = map;
         // Build the form by hand (rather than createForm) so we control what
         // happens AFTER the capture: the Google Maps JS keeps a continuous
         // requestAnimationFrame / tile-loading loop alive for the life of the
@@ -87,23 +96,16 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
         Form form = new Form("Google Web Map", new BorderLayout()) {
             @Override
             protected void onShowCompleted() {
-                final Form self = this;
                 // Wait for the live Google Maps SDK to actually paint its tiles
                 // (NativeMap.isMapReady() reflects the map's 'tilesloaded' event)
                 // before capturing, rather than guessing a fixed delay -- a slow
                 // CI runner otherwise snapped a blank grey frame before any tile
-                // loaded (the flake that previously failed this test). Poll up to
-                // ~22s (the load headroom the old blind wait needed on the
-                // slowest runner; still under the 30s native-test timeout). The
+                // loaded (the flake that previously failed this test). The
                 // readiness check is a cheap Java flag (set once by an in-page
                 // JS->Java bridge), so polling is free; we capture as soon as the
-                // map paints. If the tiles never load (blocked network / rejected
-                // key) fail loudly instead of baselining a blank map.
-                waitForMapReady(self, map, 44, () ->
-                        captureWhenSettled(self, "GoogleWebMap", () -> {
-                            map.dispose();
-                            done();
-                        }));
+                // map paints. If the tiles never load, retry once with a FRESH
+                // web view (see waitForMapReady) before failing loudly.
+                waitForMapReady(this, WAIT_ATTEMPTS, () -> captureAndFinish(this));
             }
         };
         form.add(BorderLayout.CENTER, map);
@@ -111,20 +113,45 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
         return true;
     }
 
+    /// Registers the web Google provider and builds a NativeMap forced onto it;
+    /// the provider is resolved by the NativeMap constructor synchronously, so
+    /// restoring the default order right after leaves later tests (e.g. the
+    /// native Apple provider test) untouched. Reused by the in-test retry.
+    private NativeMap buildWebMap() {
+        MapProviderRegistry.register(WebMapProvider.google(apiKey));
+        MapProviderRegistry.setProviderOrder(new String[]{"web"});
+        NativeMap map = new NativeMap(new LatLng(41.0, 13.0), 5);
+        MapProviderRegistry.setProviderOrder(null);
+        return map;
+    }
+
+    private void captureAndFinish(Form form) {
+        captureWhenSettled(form, "GoogleWebMap", () -> {
+            currentMap.dispose();
+            done();
+        });
+    }
+
     /// Poll until the live web map reports its tiles painted (map.isMapReady()),
     /// then run onReady. Captures as soon as the real map has rendered, so a fast
     /// runner finishes quickly; the attempt budget (500ms * attempts) is the
-    /// worst-case deadline. On timeout we deliberately do NOT capture -- a blank
-    /// or blocked map should fail loudly (missing_actual) rather than be
-    /// baselined -- but we MUST still dispose the map: the Google Maps JS keeps a
-    /// requestAnimationFrame / tile-loading loop alive, and leaving it running
-    /// starves the main thread and desyncs LATER tests' captures (a downstream
-    /// screenshot then differs). The onReady path disposes via its callback.
-    private void waitForMapReady(final Form form, final NativeMap map,
-                                 final int attemptsLeft, final Runnable onReady) {
+    /// per-attempt deadline.
+    ///
+    /// On the FIRST exhaustion, retry once with a completely fresh web view: the
+    /// observed failure mode (metal leg) was a cold WebKit on a starved runner
+    /// spending ~21s just reaching MainFrameLoadCompleted -- by the time the page
+    /// existed the tile budget was gone. On the retry WebKit's processes and the
+    /// SDK script cache are warm, so the reload renders in seconds. On the SECOND
+    /// exhaustion we deliberately do NOT capture -- a blank or blocked map should
+    /// fail loudly (missing_actual) rather than be baselined -- but we MUST still
+    /// dispose the map: the Google Maps JS keeps a requestAnimationFrame /
+    /// tile-loading loop alive, and leaving it running starves the main thread
+    /// and desyncs LATER tests' captures. The onReady path disposes via its
+    /// callback.
+    private void waitForMapReady(final Form form, final int attemptsLeft, final Runnable onReady) {
         boolean ready;
         try {
-            ready = map.isMapReady();
+            ready = currentMap.isMapReady();
         } catch (Throwable t) {
             ready = false;
         }
@@ -135,10 +162,30 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
             return;
         }
         if (attemptsLeft <= 0) {
+            if (!retriedOnce) {
+                retriedOnce = true;
+                System.out.println("CN1SS:WARN:test=GoogleWebMap tiles not loaded after "
+                        + (WAIT_ATTEMPTS * 500) + "ms; retrying once with a fresh web view");
+                try {
+                    currentMap.dispose();
+                } catch (Throwable t) {
+                    // best effort
+                }
+                form.removeAll();
+                NativeMap fresh = buildWebMap();
+                if (fresh.isNativeMap()) {
+                    currentMap = fresh;
+                    form.add(BorderLayout.CENTER, fresh);
+                    form.revalidate();
+                    waitForMapReady(form, WAIT_ATTEMPTS, onReady);
+                    return;
+                }
+                // fresh view unavailable -> fall through to the loud failure
+            }
             System.out.println(
                     "CN1SS:INFO:test=GoogleWebMap status=FAILED reason=tiles-never-loaded");
             try {
-                map.dispose();
+                currentMap.dispose();
             } catch (Throwable t) {
                 // best effort -- still report done so the suite advances
             }
@@ -146,7 +193,7 @@ public class GoogleWebMapScreenshotTest extends BaseTest {
             return;
         }
         UITimer.timer(500, false, form, () ->
-                waitForMapReady(form, map, attemptsLeft - 1, onReady));
+                waitForMapReady(form, attemptsLeft - 1, onReady));
     }
 
     /// The map is a native peer (BrowserComponent) view. On the iOS Metal
