@@ -2,6 +2,7 @@ package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.maps.MapSurface;
 import com.codename1.maps.MapView;
+import com.codename1.maps.NativeMap;
 import com.codename1.ui.Form;
 import com.codename1.ui.util.UITimer;
 
@@ -45,6 +46,9 @@ public abstract class VectorMapScreenshotBaseTest extends BaseTest {
     private boolean isMapReady() {
         if (mapUnderTest instanceof MapView) {
             return ((MapView) mapUnderTest).isMapReady();
+        }
+        if (mapUnderTest instanceof NativeMap) {
+            return ((NativeMap) mapUnderTest).isMapReady();
         }
         return mapUnderTest != null && !mapUnderTest.isLoadingTiles();
     }
