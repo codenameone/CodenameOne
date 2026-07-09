@@ -3676,6 +3676,10 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
             repaint();
+            Form current = JavaSEPort.this.getCurrentForm();
+            if (current != null) {
+                current.repaint();
+            }
 
         }
 
