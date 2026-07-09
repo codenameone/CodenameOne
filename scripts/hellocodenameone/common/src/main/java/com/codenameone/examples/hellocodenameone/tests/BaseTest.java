@@ -2,6 +2,7 @@ package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.testing.AbstractTest;
 import com.codename1.ui.AnimationManager;
+import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.util.UITimer;
@@ -9,6 +10,11 @@ import com.codename1.ui.layouts.Layout;
 import com.codename1.testing.TestUtils;
 
 public abstract class BaseTest extends AbstractTest {
+    /// The device orientation (portrait-ness) observed at the suite's FIRST
+    /// capture -- the orientation every subsequent screenshot baseline was
+    /// recorded in. Phone suites start portrait; desktop/tv suites record
+    /// their fixed landscape aspect and the guard below never engages.
+    private static Boolean suiteBaselinePortrait;
     private volatile boolean done;
     private volatile boolean failed;
     private volatile String failMessage;
@@ -84,10 +90,15 @@ public abstract class BaseTest extends AbstractTest {
         // Display.screenshot() would grab the PREVIOUS test's form (observed: css-gradients
         // capturing PaletteOverrideTheme_dark -> a "duplicate_image_with" wrong-form flake).
         boolean wrongForm = Display.getInstance().getCurrent() != form;
+        // A leaked landscape orientation is "not settled": wait for the
+        // re-asserted portrait lock to land (its own, longer budget -- a
+        // starved simulator rotation can exceed the 5s animation cap).
+        boolean wrongOrientation = captureBlockedByOrientation(imageName, waitedMs);
         boolean animating = wrongForm
                 || (am != null && am.isAnimating())
                 || Display.getInstance().isInTransition();
-        if (!animating || waitedMs >= 5000) {
+        int waitCapMs = wrongOrientation ? 15000 : 5000;
+        if ((!animating && !wrongOrientation) || waitedMs >= waitCapMs) {
             long extra = extraSettleBeforeCaptureMillis();
             if (extra > 0) {
                 // Heavy forms on the iOS Metal backend can have their first
@@ -118,6 +129,45 @@ public abstract class BaseTest extends AbstractTest {
     /// framebuffer -- overrides this to force a fresh, fully-presented frame.
     protected long extraSettleBeforeCaptureMillis() {
         return 0;
+    }
+
+    /// Tests that INTENTIONALLY capture in a non-baseline orientation (the
+    /// landscape VR/360 tests) override this to true so the orientation guard
+    /// below does not fight their deliberate rotation.
+    protected boolean allowNonBaselineOrientationCapture() {
+        return false;
+    }
+
+    /// Orientation leak guard. An orientation-changing test whose
+    /// restore-to-portrait silently times out (observed: OrientationLock on a
+    /// starved iOS Metal runner) leaves the simulator landscape for every test
+    /// after it -- the next capture ships sideways pixels (VideoIODecodedFrames
+    /// delivered 2556x1179 against a portrait golden) and orientation-sensitive
+    /// tests wedge. Returns true while the device is NOT in the suite's
+    /// baseline orientation, and actively re-asserts the portrait lock (an
+    /// earlier lock issued mid-rotation-animation can be swallowed), so the
+    /// suite self-heals instead of failing on the innocent downstream test.
+    /// Callers poll this from their capture path and log a CN1SS:WARN so a
+    /// genuine restore failure attributes to the right place.
+    protected final boolean captureBlockedByOrientation(String imageName, int waitedMs) {
+        if (suiteBaselinePortrait == null) {
+            suiteBaselinePortrait = Boolean.valueOf(CN.isPortrait());
+        }
+        if (!suiteBaselinePortrait.booleanValue()
+                || !CN.canForceOrientation()
+                || allowNonBaselineOrientationCapture()
+                || CN.isPortrait()) {
+            return false;
+        }
+        // Re-assert the portrait lock about once a second while blocked; the
+        // 50ms/250ms pollers both hit the ==0 first pass immediately.
+        if (waitedMs % 1000 == 0) {
+            System.out.println("CN1SS:WARN:test=" + imageName
+                    + " capture blocked: device left in landscape by an earlier test;"
+                    + " re-asserting portrait lock (waited " + waitedMs + "ms)");
+            CN.lockOrientation(true);
+        }
+        return true;
     }
 
     protected synchronized void done() {

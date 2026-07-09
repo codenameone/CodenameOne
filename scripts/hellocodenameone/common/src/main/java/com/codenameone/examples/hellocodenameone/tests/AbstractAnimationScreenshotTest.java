@@ -50,6 +50,24 @@ public abstract class AbstractAnimationScreenshotTest extends BaseTest {
     }
 
     private void captureAndEmit() {
+        captureAndEmit(0);
+    }
+
+    private void captureAndEmit(final int waitedMs) {
+        // The grid is composed at the HOST FORM's current size, so a landscape
+        // orientation leaked by an earlier test ships a sideways grid against a
+        // portrait golden (observed: VideoIODecodedFrames at 2556x1179 on iOS
+        // Metal). Wait -- while the guard re-asserts the portrait lock -- until
+        // the device is back in the suite's baseline orientation, with the same
+        // 15s budget as the BaseTest settle path, then compose regardless.
+        if (waitedMs < 15000 && captureBlockedByOrientation(getImageName(), waitedMs)) {
+            UITimer.timer(250, false, host, new Runnable() {
+                public void run() {
+                    captureAndEmit(waitedMs + 250);
+                }
+            });
+            return;
+        }
         int width = Math.max(1, host.getWidth());
         int height = Math.max(1, host.getHeight());
         Image grid;

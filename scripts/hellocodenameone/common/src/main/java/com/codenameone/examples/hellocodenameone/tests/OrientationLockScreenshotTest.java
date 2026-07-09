@@ -17,6 +17,16 @@ public class OrientationLockScreenshotTest extends BaseTest {
     // test). 80 * 100ms = 8s still leaves comfortable headroom under the 30s
     // native test timeout even with the trailing wait-back-to-portrait poll.
     private static final int ORIENTATION_POLL_ATTEMPTS = 80;
+    // The restore-to-portrait leg gets a LONGER budget than the capture leg
+    // (200 * 100ms = 20s) and re-asserts the portrait lock every ~2s: if this
+    // poll gives up while the simulator is still landscape, every later test
+    // inherits the sideways screen -- VideoIODecodedFrames ships a 2556x1179
+    // grid against a portrait golden and the orientation-sensitive tail tests
+    // wedge (the recurring iOS Metal suite failure). A lock issued while the
+    // previous rotation animation is still in flight can be swallowed, so a
+    // single lockOrientation(true) call is not enough on a starved runner.
+    private static final int RESTORE_POLL_ATTEMPTS = 200;
+    private static final int RESTORE_RELOCK_EVERY = 20;
     private static final int POST_PORTRAIT_SETTLE_MS = 1000;
 
     @Override
@@ -45,7 +55,7 @@ public class OrientationLockScreenshotTest extends BaseTest {
                         markCaptureStarted();
                         Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("landscape", () -> {
                             CN.lockOrientation(true);
-                            waitForOrientation(this, true, () -> {
+                            restorePortrait(this, RESTORE_POLL_ATTEMPTS, () -> {
                                 revalidate();
                                 UITimer.timer(POST_PORTRAIT_SETTLE_MS, false, this,
                                         OrientationLockScreenshotTest.this::done);
@@ -71,6 +81,32 @@ public class OrientationLockScreenshotTest extends BaseTest {
             return;
         }
         UITimer.timer(ORIENTATION_POLL_INTERVAL_MS, false, form, () -> waitForOrientation(form, portrait, attemptsLeft - 1, onDone));
+    }
+
+    /// Restore-to-portrait with teeth: re-asserts the portrait lock every
+    /// RESTORE_RELOCK_EVERY polls (a lock call issued mid-rotation can be
+    /// swallowed) and logs a CN1SS:WARN if the whole budget elapses while the
+    /// device is still landscape, so a genuine restore failure attributes HERE
+    /// instead of surfacing as a mysterious mismatch on whichever screenshot
+    /// test happens to run next. Proceeds to onDone regardless: the per-test
+    /// orientation guard in BaseTest is the downstream safety net.
+    private void restorePortrait(Form form, int attemptsLeft, Runnable onDone) {
+        form.revalidate();
+        if (isOrientationSettled(form, true)) {
+            onDone.run();
+            return;
+        }
+        if (attemptsLeft <= 0) {
+            System.out.println("CN1SS:WARN:test=OrientationLock restore-to-portrait timed out after "
+                    + (RESTORE_POLL_ATTEMPTS * ORIENTATION_POLL_INTERVAL_MS)
+                    + "ms; device may still be landscape");
+            onDone.run();
+            return;
+        }
+        if (attemptsLeft % RESTORE_RELOCK_EVERY == 0) {
+            CN.lockOrientation(true);
+        }
+        UITimer.timer(ORIENTATION_POLL_INTERVAL_MS, false, form, () -> restorePortrait(form, attemptsLeft - 1, onDone));
     }
 
     private boolean isOrientationSettled(Form form, boolean portrait) {

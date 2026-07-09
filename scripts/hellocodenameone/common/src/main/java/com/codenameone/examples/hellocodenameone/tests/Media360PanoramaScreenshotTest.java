@@ -133,6 +133,14 @@ public class Media360PanoramaScreenshotTest extends BaseTest {
         return 700;
     }
 
+    /// This test captures in landscape ON PURPOSE (via LandscapeCapture);
+    /// opt out of the baseline-orientation guard so it doesn't fight the
+    /// deliberate rotation.
+    @Override
+    protected boolean allowNonBaselineOrientationCapture() {
+        return true;
+    }
+
     /// Wait for landscape to settle, warm the panorama texture with an early
     /// render, then force a fresh GPU frame before the capture fires - mirroring
     /// VRStereoScene but with extra time for the 1024x512 texture upload.
