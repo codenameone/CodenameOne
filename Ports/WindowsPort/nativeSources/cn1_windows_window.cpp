@@ -804,6 +804,11 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
     } else {
         cn1Win.windowGraphics = cn1WinCreateGraphics((ID2D1RenderTarget*) g_hwndTarget);
     }
+    if (cn1Win.windowGraphics != NULL) {
+        /* Enables the #5273 flush-region clip clamp in cn1WinPushClip -- window
+         * graphics only, never mutable-image targets. */
+        cn1Win.windowGraphics->isWindowTarget = JAVA_TRUE;
+    }
 
     /* WIC factory for the image layer. The DirectWrite factory is created lazily
      * inside the C++ text layer (cn1_windows_dwrite.cpp), not here. */

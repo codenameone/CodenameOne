@@ -247,6 +247,12 @@ public final class WindowsNative {
 
     public static native void setClip(long graphics, int x, int y, int width, int height);
 
+    /** Issue #5273: records the current paintDirty flush region on the window
+     *  graphics so a rect clip set while a component paints is confined to it
+     *  (see WindowsImplementation.setPaintDirtyRegionClip). width/height == 0
+     *  disables the clamp. */
+    public static native void setFlushRect(long graphics, int x, int y, int width, int height);
+
     public static native void clipRect(long graphics, int x, int y, int width, int height);
 
     /** Sets the clip to an arbitrary screen-space polygon/path (flattened, same

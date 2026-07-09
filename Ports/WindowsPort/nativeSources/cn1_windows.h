@@ -158,6 +158,14 @@ typedef struct CN1Graphics {
     D2D1_MATRIX_3X2_F transform;     /* current affine; re-applied each BeginDraw so
                                       * a transform set before the first primitive
                                       * (the mutable-image path) isn't reset to identity */
+    /* Issue #5273: the current paintDirty flush region (screen space), pushed by
+     * WindowsNative.setFlushRect before each component paints. A rect clip set
+     * during that paint is clamped to it in cn1WinPushClip so a fill can never
+     * escape the flushed sub-region into the persistent surface (the same defect
+     * the iOS Metal and Linux Cairo backends had). flushW/flushH == 0 disables
+     * the clamp; only the window graphics ever receives setFlushRect. */
+    JAVA_BOOLEAN isWindowTarget;
+    JAVA_INT flushX, flushY, flushW, flushH;
 } CN1Graphics;
 
 typedef struct CN1Font {

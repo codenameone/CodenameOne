@@ -572,11 +572,29 @@ jobs:
           source scripts/lib/cn1ss.sh
           cn1ss_setup "$JAVA_HOME/bin/java" "$(pwd)/scripts/common/java"
           REF_DIR="$(pwd)/scripts/windows/screenshots"
+          # Gate the Windows port like the Linux one: fail on any mismatch/error or
+          # a new screenshot with no committed golden (missing_expected). Without
+          # this the comparison only posted a PR comment and stale goldens slipped
+          # through green CI (the picker case-conversion refresh was missed here).
+          export CN1SS_FAIL_ON_MISMATCH=1
+          export CN1SS_ALLOWED_MISSING=0
+          set +e
           cn1ss_process_and_report \
             "Native Windows port (x64)" \
             "$ART/compare.json" "$ART/summary.txt" "$ART/comment.md" \
             "$REF_DIR" "$ART/previews" "$ART" \
             "${entries[@]}"
+          gate_rc=$?
+          set -e
+          fail=0
+          if [ "$gate_rc" -ne 0 ]; then
+            echo "[windows-native-port x64] FATAL: screenshot gate failed (rc=$gate_rc)"; fail=1
+          fi
+          if [ -f "$ART/summary.txt" ] && grep -q "^missing_expected|" "$ART/summary.txt"; then
+            me="$(grep -c "^missing_expected|" "$ART/summary.txt" || echo 0)"
+            echo "[windows-native-port x64] FATAL: $me screenshot(s) streamed with no stored golden (missing_expected) -- add them to $REF_DIR."; fail=1
+          fi
+          if [ "$fail" -ne 0 ]; then echo "Windows x64 screenshot gate failed."; exit 1; fi
 
   windows-port-screenshot-comment-arm64:
     name: screenshot-comment (arm64)
@@ -628,8 +646,25 @@ jobs:
           source scripts/lib/cn1ss.sh
           cn1ss_setup "$JAVA_HOME/bin/java" "$(pwd)/scripts/common/java"
           REF_DIR="$(pwd)/scripts/windows/screenshots"
+          # Same gate as the x64 leg. The job itself is continue-on-error
+          # (experimental arm64 runner), so this reports red without blocking
+          # the PR -- but the mismatch is no longer silent.
+          export CN1SS_FAIL_ON_MISMATCH=1
+          export CN1SS_ALLOWED_MISSING=0
+          set +e
           cn1ss_process_and_report \
             "Native Windows port (arm64)" \
             "$ART/compare.json" "$ART/summary.txt" "$ART/comment.md" \
             "$REF_DIR" "$ART/previews" "$ART" \
             "${entries[@]}"
+          gate_rc=$?
+          set -e
+          fail=0
+          if [ "$gate_rc" -ne 0 ]; then
+            echo "[windows-native-port arm64] FATAL: screenshot gate failed (rc=$gate_rc)"; fail=1
+          fi
+          if [ -f "$ART/summary.txt" ] && grep -q "^missing_expected|" "$ART/summary.txt"; then
+            me="$(grep -c "^missing_expected|" "$ART/summary.txt" || echo 0)"
+            echo "[windows-native-port arm64] FATAL: $me screenshot(s) streamed with no stored golden (missing_expected) -- add them to $REF_DIR."; fail=1
+          fi
+          if [ "$fail" -ne 0 ]; then echo "Windows arm64 screenshot gate failed."; exit 1; fi
