@@ -7566,12 +7566,15 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
     __block UIImage *wimg = nil;
     __block NSData *wpng = nil;
     void (^captureWatchFrame)(void) = ^{
-        // Force the draw with allowInactive:YES. During a headless CN1SS test
-        // the watch app is not UIApplicationStateActive, and the default
-        // drawFrame: path (allowInactive:NO, added in the master merge) SKIPS
-        // the draw when inactive -- leaving an empty bitmap that the harness
-        // delivers as a 1x1 placeholder for every screenshot.
-        [[CodenameOne_GLViewController instance] drawFrame:CGRectZero allowInactive:YES];
+        // Use master's default drawFrame: (allowInactive:NO). During a headless
+        // CN1SS test the watch app is not UIApplicationStateActive; NO returns
+        // the already-painted frame instead of forcing a blocking draw, which is
+        // what master's green watch suite does. Forcing allowInactive:YES here
+        // blocks waiting for a frame that never schedules -> the capture hangs
+        // and 0 of 216 screenshots stream. (The 1x1 blanks were a separate bug:
+        // forceScreenRenderForCapture emptying the CG frame -- fixed by gating
+        // that method to the Metal backend.)
+        [[CodenameOne_GLViewController instance] drawFrame:CGRectZero];
         wv = [CN1WatchHost sharedHost].renderingView;
         wimg = wv != nil ? [wv currentFrame] : nil;
         wpng = wimg != nil ? UIImagePNGRepresentation(wimg) : nil;
