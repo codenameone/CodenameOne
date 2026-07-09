@@ -17,7 +17,7 @@ configures.
 === What it does, and what it doesn't
 
 Automated submission delivers the binary and applies your release metadata to an
-*existing* app on the store. It does not create the app for you.
+*existing* app on the store. It doesn't create the app for you.
 
 IMPORTANT: You must create the app once, by hand, in
 https://appstoreconnect.apple.com[App Store Connect] and/or the
@@ -32,9 +32,9 @@ Three things are worth separating, because they happen at different times:
 * *The app record* -- the listing shell in the store. Created once, manually, and
   exists before any build.
 * *The binary* -- produced by your build, delivered when you *submit*.
-* *The metadata* -- description, what's-new, screenshots and so on. Managed as code
-  and applied when you submit. Metadata attaches to the app record and the new
-  version, not to the binary, so there is no chicken-and-egg problem: the app
+* *The metadata* -- description, what's-new, screenshots. Managed as code and
+  applied when you submit. Metadata attaches to the app record and the new
+  version, not to the binary, so there's no chicken-and-egg problem: the app
   already exists on the store by the time you build.
 
 === Prerequisites
@@ -84,14 +84,14 @@ review.
 Release metadata -- the store listing text and screenshots -- can live in your
 project as a folder of plain text and image files, versioned in git alongside your
 code, and pushed to the stores with a single command. This makes your listing
-reproducible and CI-drivable: generate the what's-new from your changelog, push,
-and the next submission applies it to both stores. It is the alternative to typing
+reproducible and CI-drivable: generate release notes from your changelog, push,
+and the next submission applies it to both stores. It's the alternative to typing
 the same fields into two different web consoles by hand for every release.
 
 ==== The metadata folder
 
 By default the goal reads a `cn1-metadata` folder next to your
-`codenameone_settings.properties`. It is organized by store, then locale, with one
+`codenameone_settings.properties`. It's organized by store, then locale, with one
 plain text file per listing field:
 
 [source]
@@ -178,7 +178,7 @@ NOTE: `metadata-push` uploads the descriptor and screenshots to Codename One; it
 does *not* submit. The stored metadata is applied to the store the next time you
 *submit* a build for that package.
 
-==== When and how it is applied
+==== When and how it's applied
 
 At submission time the stored descriptor is applied to the store automatically:
 
@@ -190,15 +190,15 @@ At submission time the stored descriptor is applied to the store automatically:
 
 Applying metadata is *best-effort*: the binary is delivered first, so a rejected
 field (say a name that's too long, or a locale the app hasn't enabled) never blocks
-the submission -- it is recorded as a warning you can see in the console, and the
+the submission -- it's recorded as a warning you can see in the console, and the
 rest of the listing still applies. You can always fix a field by hand in the store
-console afterwards.
+console afterward.
 
-==== Screenshots are not stored long-term
+==== Screenshots aren't stored long-term
 
 Screenshots are a transient pass-through: `metadata-push` uploads them, the next
-submission delivers them to the store, and they are then deleted from Codename
-One's servers. Keep the canonical images in your repo (that is the point of
+submission delivers them to the store, and they're then deleted from Codename
+One's servers. Keep the canonical images in your repo (that's the point of
 managing them as code) and re-push when they change. Text descriptors are retained
 until you delete them, your account is deleted, or they go unused for about a year.
 
@@ -214,13 +214,13 @@ frequent releases, many locales, or many apps:
   both stores on every release -- the one field that always changes.
 * *One source, two stores.* A single descriptor fans out to App Store Connect and
   Google Play, which have different fields and limits.
-* *Reproducible and reviewable.* The listing lives in git: diffable, revertable,
-  and code-reviewed like everything else. Console edits have no history.
+* *Reproducible and reviewable.* The listing lives in git, versioned and
+  code-reviewed like everything else. Console edits have no history.
 * *Localization at scale.* Localized listings are just files, and can be generated
   or translated in a pipeline.
 * *Fewer console logins.* Team members who ship releases don't each need App Store
   Connect or Play Console access; they ship through the build pipeline instead.
 
-For a single app that updates rarely, editing the store console by hand is perfectly
+For a single app with infrequent updates, editing the store console by hand is
 fine -- the payoff scales with how often you release and how many listings you
 maintain.
