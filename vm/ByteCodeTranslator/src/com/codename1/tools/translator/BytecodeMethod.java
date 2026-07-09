@@ -2328,7 +2328,7 @@ public class BytecodeMethod implements SignatureSet {
         b.append("    int __savedLocalsBegin = threadStateData->threadObjectStackOffset;\n");
         b.append("    int __savedTryBlock = threadStateData->tryBlockOffset;\n");
         b.append("    jmp_buf __tryJmp;\n");
-        b.append("    if (setjmp(__tryJmp) == 0) {\n");
+        b.append("    if (CN1_TRY_SETJMP(__tryJmp) == 0) {\n");
         b.append("        threadStateData->blocks[threadStateData->tryBlockOffset].monitor = 0;\n");
         b.append("        threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = 0;\n");
         b.append("        memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, __tryJmp, sizeof(jmp_buf));\n");

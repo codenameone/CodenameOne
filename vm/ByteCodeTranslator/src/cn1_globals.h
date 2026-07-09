@@ -16,6 +16,23 @@
 #include <stdatomic.h>
 #include <stdint.h>
 
+// Darwin's setjmp/longjmp SAVE and RESTORE the caller's signal mask -- a sigprocmask
+// SYSCALL on each side. Every Java try-block entry compiles to a setjmp (as does every
+// synchronized method's monitor block), so an exception-scoped hot loop pays a kernel
+// round-trip per iteration (measured ~19% of an MVT-decode render's mutator time on
+// macOS). The VM never changes the signal mask per frame, so no try frame needs the
+// mask restored: use the no-mask _setjmp/_longjmp on Apple platforms. glibc's plain
+// setjmp already omits the mask and Windows has no signal mask, so both keep the
+// standard names. The GC's register-capture setjmps only need the callee-saved
+// register flush into the jmp_buf, which _setjmp performs identically.
+#if defined(__APPLE__)
+#define CN1_TRY_SETJMP _setjmp
+#define CN1_TRY_LONGJMP _longjmp
+#else
+#define CN1_TRY_SETJMP setjmp
+#define CN1_TRY_LONGJMP longjmp
+#endif
+
 // PHASE 3b DEFAULT ON: conservative native-stack GC as a real root source, paired
 // with object/instance frameless codegen (BytecodeMethod cn1.frameless.objects/
 // .instance, also default on). Validated bit-identical + GC-safe + MtStress
@@ -1549,7 +1566,7 @@ extern void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1Locals
 #define DEFINE_CATCH_BLOCK(destinationJump, labelName, restoreToCn1LocalsBeginInThread) jmp_buf destinationJump; \
 { \
     int currentOffset = threadStateData->tryBlockOffset; \
-    if(setjmp(destinationJump)) { \
+    if(CN1_TRY_SETJMP(destinationJump)) { \
         threadStateData->callStackOffset = currentCodenameOneCallStackOffset; \
         threadStateData->threadObjectStackOffset = restoreToCn1LocalsBeginInThread; \
         SP = &stack[1]; \
@@ -2232,7 +2249,7 @@ extern __thread struct ThreadLocalData* cn1TlsSelf;
 // and the GC only scans a thread after observing threadActive==FALSE (set right after
 // this macro), so it always reads a complete capture.
 #define CN1_GC_PARK_CAPTURE(ts) do { \
-        (void)setjmp((ts)->gcRegisterSnapshot); \
+        (void)CN1_TRY_SETJMP((ts)->gcRegisterSnapshot); \
         volatile void* cn1__sp = (void*)&cn1__sp; \
         (ts)->gcStackPointerAtPark = (void*)cn1__sp; \
         __atomic_thread_fence(__ATOMIC_RELEASE); \

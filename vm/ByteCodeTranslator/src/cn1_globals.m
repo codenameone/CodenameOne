@@ -533,7 +533,7 @@ void freeAndFinalize(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         // inside a catch-all try block and swallow anything it throws.
         int __savedTryBlock = threadStateData->tryBlockOffset;
         jmp_buf __finTryJmp;
-        if(setjmp(__finTryJmp) == 0) {
+        if(CN1_TRY_SETJMP(__finTryJmp) == 0) {
             threadStateData->blocks[threadStateData->tryBlockOffset].monitor = 0;
             threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = 0; // catch-all
             memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, __finTryJmp, sizeof(jmp_buf));
@@ -3040,7 +3040,7 @@ static void cn1GcScanThreadNativeStack(CODENAME_ONE_THREAD_STATE, struct ThreadL
 // local). flushes our callee-saved regs via setjmp into a scanned buffer.
 static void cn1GcScanOwnStack(CODENAME_ONE_THREAD_STATE) {
     if(!threadStateData->gcPthreadValid) return;
-    jmp_buf ownRegs; (void)setjmp(ownRegs);
+    jmp_buf ownRegs; (void)CN1_TRY_SETJMP(ownRegs);
     volatile void* spv = (void*)&spv;
     char* sp = (char*)spv;
     size_t ssz = 0;
@@ -3139,7 +3139,11 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
         }
     }
 #endif
-    if(getenv("CN1_LEGACY_DEBUG")) {
+    // cache the getenv -- this is the legacy-allocation hot path (a per-alloc
+    // getenv showed up as __findenv_locked in the MvtBench mutator profile)
+    static int cn1LegacyDbgOn = -1;
+    if(cn1LegacyDbgOn < 0) cn1LegacyDbgOn = getenv("CN1_LEGACY_DEBUG") ? 1 : 0;
+    if(cn1LegacyDbgOn) {
         static _Atomic long cn1LegacyDbgCount = 0;
         long c = atomic_fetch_add_explicit(&cn1LegacyDbgCount, 1, memory_order_relaxed);
         if((c % 100000) == 0) {
@@ -4825,7 +4829,7 @@ void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
             continue;
         } else if(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass <= 0 || instanceofFunction(threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass, exceptionArg->__codenameOneParentClsReference->classId)) {
             int off = threadStateData->tryBlockOffset;
-            longjmp(threadStateData->blocks[off].destination, 1);
+            CN1_TRY_LONGJMP(threadStateData->blocks[off].destination, 1);
             return;
         } 
         threadStateData->tryBlockOffset--; 

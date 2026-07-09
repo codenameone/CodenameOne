@@ -1547,7 +1547,7 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
     // sweeping a partial mark would free reachable objects.
     int __gcSavedTryBlock = threadStateData->tryBlockOffset;
     jmp_buf __gcTryJmp;
-    if(setjmp(__gcTryJmp) == 0) {
+    if(CN1_TRY_SETJMP(__gcTryJmp) == 0) {
         threadStateData->blocks[threadStateData->tryBlockOffset].monitor = 0;
         threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = 0; // catch-all
         memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, __gcTryJmp, sizeof(jmp_buf));
