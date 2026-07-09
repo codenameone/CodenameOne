@@ -2401,6 +2401,53 @@ void cn1BibopRetireThreadPages() {
 // SIGUSR2 is used so SIGUSR1 stays free for app/JNI use.
 #define CN1_GC_STOP_SIGNAL SIGUSR2
 
+// =========================================================================
+// CONSERVATIVE ROOT RESOLVER -- architecture + perf notes
+// =========================================================================
+// Under CN1_CONSERVATIVE_GC_ROOTS the collector finds roots by scanning stopped
+// threads' native stacks + register snapshots word by word. Every candidate word is
+// a raw machine value; to decide "does this word point at (or into) a live heap
+// object, and if so which one?" we need an address->object resolver. That resolver is
+// what cn1ConservativeResolve() queries and what cn1GcBuildRootSnapshots() (re)builds
+// at the start of every mark cycle. There are TWO backing structures, because the heap
+// has two allocation regimes with very different lifecycle:
+//
+//   1. BiBOP objects (small, non-array): live in size-class pages held in a GROW-ONLY
+//      registry (bibopAllPages -- pages are never unlinked or reordered). A pointer is
+//      resolved by locating its containing page (binary search over the page bases) then
+//      its slot (O(1) from the page geometry). Because the registry is grow-only, the
+//      base-sorted page array (cn1ConsPgSorted) is CACHED and only re-sorted when the
+//      registration COUNT changes -- NOT every cycle. See cn1ConsPgSortedKey below.
+//
+//   2. Legacy objects (arrays + anything not BiBOP): tracked in allObjectsInHeap[]. These
+//      are resolved via cn1ConsExt[] -- a flat array of (lo,hi,base) extents sorted by lo
+//      address, binary-searched on lookup.
+//
+// WHY cn1ConsExt IS REBUILT + qsort()ed EVERY CYCLE (and the BiBOP pages are not):
+//   allObjectsInHeap[] is NOT grow-only. The sweep removes a dead object by TOMBSTONING
+//   its slot (allObjectsInHeap[pos] = JAVA_NULL), and a later allocation REFILLS that same
+//   slot with a DIFFERENT object at a DIFFERENT address (placeObjectInHeapCollection's
+//   NULL-slot scan from lastOffsetInRam). So neither the slot->address mapping nor the
+//   address-sorted order is stable across cycles -- the cached-and-reuse trick that works
+//   for the grow-only page registry does NOT apply. The whole extent array is therefore
+//   rebuilt from the live legacy set and re-sorted each cycle.
+//
+// PERF: on allocation-heavy, array-heavy workloads with a large live set (e.g. the
+//   vector-map MVT render: parparvm-bench MvtBench holds ~213k live legacy/array objects),
+//   this per-cycle rebuild+qsort is a measurable slice of GC time (profiled ~8% of wall,
+//   larger as a fraction of the collector itself). It is NOT the dominant cost of that
+//   workload -- the conservative allocation path and marking the large live set dominate --
+//   but it is the most self-contained target. Future optimization directions, in rough
+//   order of payoff/risk: (a) incrementally maintain cn1ConsExt across cycles (the live
+//   set is non-moving and largely stable between collections; only the transient churn and
+//   the swept entries change) rather than a full rebuild; (b) route arrays through a
+//   grow-only size-class arena so they resolve via the cached page path and skip cn1ConsExt
+//   entirely; (c) replace the libc qsort (a function-pointer comparator call per compare)
+//   with an inlined/radix sort. All three are correctness-critical (a resolver miss is a
+//   use-after-free), so they must be validated against MvtBench + the GcStress/MtStress
+//   gauntlet, not just the small-heap tests.
+// =========================================================================
+
 // ---- large/array snapshot: sorted by low address, non-overlapping extents ----
 typedef struct { char* lo; char* hi; JAVA_OBJECT base; } CN1ConsExtent;
 static CN1ConsExtent* cn1ConsExt = 0;
