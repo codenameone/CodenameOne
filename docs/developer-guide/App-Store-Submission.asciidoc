@@ -9,8 +9,8 @@ or Google Play with one click, and you can manage the store *listing itself* --
 title, description, keywords, what's-new, screenshots -- as code in your project
 and have it pushed to the stores automatically at submission time.
 
-This chapter covers the end-to-end flow, credentials, plan limits, and the
-metadata-as-code workflow. It builds on <<signing-section-top-heading, Signing>>:
+This chapter covers the end-to-end flow, credentials, and the metadata-as-code
+workflow. It builds on <<signing-section-top-heading, Signing>>:
 submission reuses the same App Store Connect API key the certificate wizard
 configures.
 
@@ -51,24 +51,11 @@ in the Google Play Console (API access > Service accounts), download its JSON ke
 and add it to the build console's submission credentials page. The console shows
 which stores are connected.
 
-==== Plans and quotas
+==== Beta vs production
 
-Submission is a paid feature. The monthly cap is a hard limit -- a submission
-consumes a real store review slot -- so crossing it blocks further submissions
-until the month rolls over or you upgrade.
-
-[cols="1,1,1,1", options="header"]
-|===
-| Plan | Submissions / month | Destinations | Zero-touch auto-submit
-| Free | 0 (blocked) | -- | no
-| Basic | 5 | Beta only | no
-| Pro / Pro+ | 50 | Beta + Production | no
-| Enterprise / GOD | Unlimited | Beta + Production | yes
-|===
-
-*Beta* means TestFlight (Apple) or the internal-testing track (Google). *Production*
-means App Store review (Apple) or the production track (Google) and requires Pro or
-higher.
+When you submit you choose a destination. *Beta* means TestFlight (Apple) or the
+internal-testing track (Google). *Production* means App Store review (Apple) or the
+production track (Google).
 
 === Submitting a build from the console
 
@@ -84,9 +71,9 @@ build can go to:
 The submit dialog lets you pick the destination (Beta or Production) and add
 release notes for this submission, then delivers the binary. For an Apple
 *production* submission the console then tracks the App Store review state
-(processing -> in review -> approved/rejected) and, on Pro and higher, can email
-you when the state changes. Google submissions and TestFlight deliveries complete
-as soon as the binary is delivered.
+(processing -> in review -> approved/rejected) and can email you when the state
+changes. Google submissions and TestFlight deliveries complete as soon as the
+binary is delivered.
 
 TIP: Submitting to *Production* on Apple opens an App Store review submission
 automatically. Submitting to *Beta* delivers to TestFlight without opening a
@@ -101,15 +88,11 @@ reproducible and CI-drivable: generate the what's-new from your changelog, push,
 and the next submission applies it to both stores. It is the alternative to typing
 the same fields into two different web consoles by hand for every release.
 
-Metadata is available on *Basic and higher* and is metered separately from
-submissions (Basic 20, Pro 200, Enterprise unlimited *metadata updates* per month;
-a descriptor push or a screenshot upload counts as one update).
-
 ==== The metadata folder
 
 By default the goal reads a `cn1-metadata` folder next to your
-`codenameone_settings.properties`. It is organized by store, then locale, in the
-style of fastlane's `deliver`:
+`codenameone_settings.properties`. It is organized by store, then locale, with one
+plain text file per listing field:
 
 [source]
 ----
@@ -223,8 +206,7 @@ frequent releases, many locales, or many apps:
 * *Localization at scale.* Localized listings are just files, and can be generated
   or translated in a pipeline.
 * *Fewer console logins.* Team members who ship releases don't each need App Store
-  Connect or Play Console access; the build pipeline and your Codename One plan gate
-  it instead.
+  Connect or Play Console access; they ship through the build pipeline instead.
 
 For a single app that updates rarely, editing the store console by hand is perfectly
 fine -- the payoff scales with how often you release and how many listings you

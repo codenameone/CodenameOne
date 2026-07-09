@@ -26,7 +26,7 @@ import org.apache.maven.plugins.annotations.Parameter;
  * Pushes "metadata as code" (store listing text + screenshots) to the Codename
  * One build cloud, which applies it to App Store Connect / Google Play at
  * submission time. The descriptor lives in your project as a folder of plain text
- * files (fastlane {@code deliver}-style) so the listing is versioned in git and
+ * files (one file per listing field) so the listing is versioned in git and
  * CI-drivable; this goal reads it, builds the descriptor, and PUTs it plus the
  * screenshots over the same Codename One account the build uses.
  *
