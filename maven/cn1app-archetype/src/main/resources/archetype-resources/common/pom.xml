@@ -74,6 +74,10 @@
 
                                     <mkdir dir="${user.home}/.codenameone"/>
                                     <mkdir dir="${project.build.directory}/codenameone/tmpProject"/>
+                                    <!-- UpdateCodenameOne writes lib/CLDC11.jar without creating parent dirs; the dir
+                                         must exist or the updater dies with FileNotFoundException whenever the
+                                         update server publishes new artifact versions. -->
+                                    <mkdir dir="${project.build.directory}/codenameone/tmpProject/lib"/>
                                     <get src="https://www.codenameone.com/files/updates/UpdateCodenameOne.jar"
                                          dest="${user.home}/UpdateCodenameOne.jar"
                                          skipexisting="true"/>
