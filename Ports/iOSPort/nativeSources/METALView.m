@@ -530,8 +530,11 @@ extern BOOL isRetinaBug();
     if (!retainedFramebufferInvalid) {
         return;
     }
-    int targetWidth = displayWidth > 0 ? displayWidth : framebufferWidth;
-    int targetHeight = displayHeight > 0 ? displayHeight : framebufferHeight;
+    // During rotation, displayWidth/displayHeight can briefly lag the Metal
+    // drawable. Only consume the invalidation when the repaint covers the
+    // actual retained framebuffer we are about to load from.
+    int targetWidth = framebufferWidth > 0 ? framebufferWidth : displayWidth;
+    int targetHeight = framebufferHeight > 0 ? framebufferHeight : displayHeight;
     if (targetWidth <= 0 || targetHeight <= 0) {
         return;
     }

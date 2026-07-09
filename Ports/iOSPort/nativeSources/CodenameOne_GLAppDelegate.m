@@ -295,7 +295,6 @@ static void installSignalHandlers() {
         id renderingView = [vc eaglView];
         if ([renderingView respondsToSelector:@selector(invalidateRetainedFramebuffer)]) {
             [renderingView invalidateRetainedFramebuffer];
-            repaintUI();
         }
 #endif
         // Defer to the next runloop so UIKit can settle the view bounds
