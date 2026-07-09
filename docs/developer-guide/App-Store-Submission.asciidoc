@@ -160,7 +160,7 @@ Run the goal from your project; it authenticates with the same Codename One
 account your builds use (run `mvn cn1:certificatewizard` once to sign in, or pass
 `-Dtoken=`):
 
-[source,bash]
+[source]
 ----
 # push both stores from cn1-metadata/
 mvn cn1:metadata-push
