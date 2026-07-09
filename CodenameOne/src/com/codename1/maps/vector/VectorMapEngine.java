@@ -67,6 +67,7 @@ public final class VectorMapEngine {
     private final Map pending = new HashMap();
     private final Map failed = new HashMap();
     private final LabelEngine labelEngine = new LabelEngine();
+    private int generation;
 
     private Runnable repaintCallback;
 
@@ -86,6 +87,7 @@ public final class VectorMapEngine {
     /// Replaces the tile source, clearing cached tiles.
     public void setSource(TileSource source) {
         this.source = source;
+        generation++;
         rendered.clear();
         labels.clear();
         pending.clear();
@@ -100,8 +102,11 @@ public final class VectorMapEngine {
     /// Replaces the style, clearing rendered tiles so they redraw.
     public void setStyle(MapStyle style) {
         this.style = style;
+        generation++;
         rendered.clear();
         labels.clear();
+        pending.clear();
+        failed.clear();
     }
 
     /// The active style.
@@ -157,6 +162,7 @@ public final class VectorMapEngine {
     public void setPixelRatio(double ratio) {
         if (ratio > 0 && Math.abs(ratio - pixelRatio) > 1e-9) {
             pixelRatio = ratio;
+            generation++;
             rendered.clear();
             labels.clear();
             pending.clear();
@@ -182,48 +188,12 @@ public final class VectorMapEngine {
         return !pending.isEmpty();
     }
 
-    /// True when every tile currently visible in the viewport has a rendered image
-    /// ready -- i.e. a paint right now would draw no background placeholder. This is
-    /// the reliable "map is fully drawn" signal: {@link #hasPendingTiles()} is only a
-    /// transient in-flight counter, and because tiles are requested lazily (a paint
-    /// requests a tile the first time it finds it missing) it can read false BETWEEN
-    /// request batches while most of the viewport is still unrendered. Returns false
-    /// until the first paint has established the viewport size. Useful for loading
-    /// indicators and for tests that must capture a fully-rendered map.
-    public boolean isViewportFullyRendered() {
-        if (viewWidth <= 0 || viewHeight <= 0) {
-            return false; // never painted yet
-        }
-        int z = integerZoom();
-        double s = MathUtil.pow(2, zoom - z);
-        double cwx = WebMercator.lonToWorldX(centerLon, zoom);
-        double cwy = WebMercator.latToWorldY(centerLat, zoom);
-        int tiles = 1 << z;
-        double halfW = viewWidth / 2.0 / pixelRatio;
-        double halfH = viewHeight / 2.0 / pixelRatio;
-        double wzLeft = (cwx - halfW) / s;
-        double wzRight = (cwx + halfW) / s;
-        double wzTop = (cwy - halfH) / s;
-        double wzBottom = (cwy + halfH) / s;
-        int txMin = floorDiv((int) Math.floor(wzLeft), tileSize);
-        int txMax = floorDiv((int) Math.floor(wzRight), tileSize);
-        int tyMin = floorDiv((int) Math.floor(wzTop), tileSize);
-        int tyMax = floorDiv((int) Math.floor(wzBottom), tileSize);
-        for (int tx = txMin; tx <= txMax; tx++) {
-            for (int ty = tyMin; ty <= tyMax; ty++) {
-                if (ty < 0 || ty >= tiles) {
-                    continue;
-                }
-                int wrappedTx = ((tx % tiles) + tiles) % tiles;
-                String key = TileUtil.key(z, wrappedTx, ty);
-                if (rendered.get(key) == null && !failed.containsKey(key)) {
-                    // a permanently-failed tile can never render; treating it as
-                    // pending would make this method never return true
-                    return false;
-                }
-            }
-        }
-        return true;
+    /// True when the currently visible tile set has been requested and every
+    /// visible tile has finished loading/decoding/rendering into the tile
+    /// cache. Calling this may request missing visible tiles, so it can be used
+    /// as a deterministic readiness probe before the first paint has run.
+    public boolean hasRenderedVisibleTiles() {
+        return checkVisibleTilesReady();
     }
 
     private double clampZoom(double z) {
@@ -393,6 +363,49 @@ public final class VectorMapEngine {
         drawLabels(g, visibleLabels, s, cwx, cwy, originX, originY, width, height, z);
     }
 
+    private boolean checkVisibleTilesReady() {
+        if (viewWidth <= 0 || viewHeight <= 0) {
+            return false;
+        }
+
+        int z = integerZoom();
+        double s = MathUtil.pow(2, zoom - z);
+        double cwx = WebMercator.lonToWorldX(centerLon, zoom);
+        double cwy = WebMercator.latToWorldY(centerLat, zoom);
+
+        int tiles = 1 << z;
+        double halfW = viewWidth / 2.0 / pixelRatio;
+        double halfH = viewHeight / 2.0 / pixelRatio;
+        double wzLeft = (cwx - halfW) / s;
+        double wzRight = (cwx + halfW) / s;
+        double wzTop = (cwy - halfH) / s;
+        double wzBottom = (cwy + halfH) / s;
+
+        int txMin = floorDiv((int) Math.floor(wzLeft), tileSize);
+        int txMax = floorDiv((int) Math.floor(wzRight), tileSize);
+        int tyMin = floorDiv((int) Math.floor(wzTop), tileSize);
+        int tyMax = floorDiv((int) Math.floor(wzBottom), tileSize);
+
+        boolean ready = true;
+        boolean sawTile = false;
+        for (int tx = txMin; tx <= txMax; tx++) {
+            for (int ty = tyMin; ty <= tyMax; ty++) {
+                if (ty < 0 || ty >= tiles) {
+                    continue;
+                }
+                sawTile = true;
+                int wrappedTx = ((tx % tiles) + tiles) % tiles;
+                String key = TileUtil.key(z, wrappedTx, ty);
+                Image img = (Image) rendered.get(key);
+                if (img == null) {
+                    ready = false;
+                    requestTile(z, wrappedTx, ty);
+                }
+            }
+        }
+        return sawTile && ready;
+    }
+
     private void drawLabels(Graphics g, List candidates, double s, double cwx, double cwy,
                             int originX, int originY, int width, int height, int z) {
         labelEngine.reset();
@@ -450,41 +463,107 @@ public final class VectorMapEngine {
         if (pending.containsKey(key) || failed.containsKey(key)) {
             return;
         }
-        pending.put(key, Boolean.TRUE);
-        source.fetchTile(z, x, y, new TileCallback() {
+        final int requestGeneration = generation;
+        final TileSource requestSource = source;
+        final MapStyle requestStyle = style;
+        final int requestRasterSize = rasterTileSize();
+        pending.put(key, Integer.valueOf(requestGeneration));
+        requestSource.fetchTile(z, x, y, new TileCallback() {
             @Override
             public void tileLoaded(int tz, int tx, int ty, byte[] data) {
-                pending.remove(key);
-                try {
-                    if (source.isVector()) {
-                        VectorTile tile = MvtDecoder.decode(data);
-                        rendered.put(key, rasterize(tile, tz));
-                        labels.put(key, TileRenderer.extractLabels(tile, style, tz, tx, ty, tileSize));
-                    } else {
-                        rendered.put(key, Image.createImage(data, 0, data.length));
-                    }
-                    repaint();
-                } catch (Throwable t) {
-                    failed.put(key, Boolean.TRUE);
-                }
+                prepareTile(key, tz, tx, ty, data, requestSource, requestStyle,
+                        requestRasterSize, requestGeneration);
             }
 
             @Override
             public void tileFailed(int tz, int tx, int ty) {
-                pending.remove(key);
-                failed.put(key, Boolean.TRUE);
+                finishFailed(key, requestGeneration);
             }
         });
     }
 
-    private Image rasterize(VectorTile tile, int z) {
+    private void prepareTile(final String key, final int z, final int x, final int y, final byte[] data,
+                             final TileSource requestSource, final MapStyle requestStyle,
+                             final int requestRasterSize, final int requestGeneration) {
+        MapTileWorker.run(new Runnable() {
+            @Override
+            public void run() {
+                final TileResult result = new TileResult();
+                try {
+                    result.vector = requestSource.isVector();
+                    result.z = z;
+                    result.style = requestStyle;
+                    result.rasterSize = requestRasterSize;
+                    if (requestSource.isVector()) {
+                        result.tile = MvtDecoder.decode(data);
+                        result.labels = TileRenderer.extractLabels(result.tile, requestStyle, z, x, y, tileSize);
+                    } else {
+                        result.data = data;
+                    }
+                    result.success = true;
+                } catch (Throwable t) {
+                    result.success = false;
+                }
+                MapTileWorker.callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        applyTileResult(key, result, requestGeneration);
+                    }
+                });
+            }
+        });
+    }
+
+    private void applyTileResult(String key, TileResult result, int requestGeneration) {
+        if (requestGeneration != generation) {
+            removePendingIfMatches(key, requestGeneration);
+            return;
+        }
+        removePendingIfMatches(key, requestGeneration);
+        if (result.success) {
+            try {
+                Image image;
+                if (result.vector) {
+                    image = rasterize(result.tile, result.z, result.style, result.rasterSize);
+                    if (result.labels != null) {
+                        labels.put(key, result.labels);
+                    }
+                } else {
+                    image = Image.createImage(result.data, 0, result.data.length);
+                }
+                rendered.put(key, image);
+                repaint();
+            } catch (Throwable t) {
+                failed.put(key, Boolean.TRUE);
+            }
+        } else {
+            failed.put(key, Boolean.TRUE);
+        }
+    }
+
+    private void finishFailed(String key, int requestGeneration) {
+        if (requestGeneration != generation) {
+            removePendingIfMatches(key, requestGeneration);
+            return;
+        }
+        removePendingIfMatches(key, requestGeneration);
+        failed.put(key, Boolean.TRUE);
+    }
+
+    private void removePendingIfMatches(String key, int requestGeneration) {
+        Object value = pending.get(key);
+        if (value instanceof Integer && ((Integer) value).intValue() == requestGeneration) {
+            pending.remove(key);
+        }
+    }
+
+    private Image rasterize(VectorTile tile, int z, MapStyle requestStyle, int requestRasterSize) {
         // Rasterize at the device resolution (256 * pixelRatio) so the vector
         // geometry stays crisp when the tile is drawn into its scaled-up screen
         // rect, instead of upscaling a 256px buffer.
-        int rs = rasterTileSize();
-        Image buffer = Image.createImage(rs, rs, 0);
+        Image buffer = Image.createImage(requestRasterSize, requestRasterSize, 0);
         Graphics g = buffer.getGraphics();
-        TileRenderer.renderTile(g, tile, style, z, rs);
+        TileRenderer.renderTile(g, tile, requestStyle, z, requestRasterSize);
         return buffer;
     }
 
@@ -496,8 +575,21 @@ public final class VectorMapEngine {
 
     /// Drops all cached tiles (e.g. on low memory).
     public void clearCache() {
+        generation++;
         rendered.clear();
         labels.clear();
+        pending.clear();
         failed.clear();
+    }
+
+    private static final class TileResult {
+        private boolean success;
+        private boolean vector;
+        private byte[] data;
+        private VectorTile tile;
+        private int z;
+        private MapStyle style;
+        private int rasterSize;
+        private List labels;
     }
 }

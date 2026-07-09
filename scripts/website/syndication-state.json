@@ -795,6 +795,48 @@
         "url": "https://medium.com/p/9405e5ccbe89/edit",
         "syndicated_at": "2026-07-07T17:01:15+00:00"
       }
+    },
+    "device-integrity-and-app-review": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmrc7gx2z00000bjk0oam0ynq",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a4e6604718e4cea5fcbc44a",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-08T15:01:18+00:00"
+      },
+      "devto": {
+        "id": 4098406,
+        "url": "https://dev.to/codenameone/device-integrity-and-app-review-rasp-attestation-and-asking-for-ratings-right-2n1j",
+        "syndicated_at": "2026-07-08T15:12:56+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/d69f57e6bc7f/edit",
+        "syndicated_at": "2026-07-08T17:01:29+00:00"
+      }
+    },
+    "game-builder-board-game": {
+      "hashnode": {
+        "url": "https://hashnode.com/draft/6a4fb782bdcebc9cb2047aa5",
+        "published": false,
+        "draft_url": "https://hashnode.com/draft/6a4fb782bdcebc9cb2047aa5",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": false,
+        "canonical_set": false,
+        "syndicated_at": "2026-07-09T15:01:59+00:00"
+      },
+      "devto": {
+        "id": 4107450,
+        "url": "https://dev.to/codenameone/game-builder-tutorial-2-build-a-blackjack-card-game-duke-jack-gha",
+        "syndicated_at": "2026-07-09T15:53:13+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/3a146c0b65b9/edit",
+        "syndicated_at": "2026-07-09T17:02:30+00:00"
+      }
     }
   }
 }
