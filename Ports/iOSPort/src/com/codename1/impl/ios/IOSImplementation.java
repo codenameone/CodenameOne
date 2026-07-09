@@ -411,12 +411,23 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
     }
 
-    /// Mac Catalyst test windows do not reliably schedule another display-link
-    /// frame before a static form calls Display.screenshot(). Force only that
-    /// desktop path through the normal screen paint + native flush so the Metal
-    /// screenTexture readback sees the current form. Phone, tablet, TV, and
-    /// watch captures stay on their normal production screenshot path.
+    /// Test windows do not reliably schedule another display-link frame before a
+    /// static form calls Display.screenshot(), so force a paint + native flush so
+    /// the Metal screenTexture readback sees the current form. METAL-BACKEND ONLY:
+    /// watchOS renders through the CoreGraphics path and has no screenTexture, so
+    /// it stays on its normal production screenshot path (see the metalRendering
+    /// gate below).
     private void forceScreenRenderForCapture() {
+        // Metal-backend platforms ONLY. paintAndFlush below drives a Metal
+        // screenTexture readback (flushBufferForReadback). watchOS renders through
+        // the CoreGraphics backend, where forcing this paint+flush consumes/empties
+        // the CG frame the native watch screenshot then reads -- delivering 1x1
+        // placeholder captures for the entire watch suite. metalRendering is false
+        // on the watch CG backend, so gate on it (this is what regressed when the
+        // desktop-only gate was widened for the iOS glass-fidelity capture).
+        if (!metalRendering) {
+            return;
+        }
         // Runs on desktop (Mac Catalyst) AND the iOS simulator/device: the native
         // screenshot now reads the Metal screenTexture on ALL of them (see
         // cn1_renderViewToContext), and a STATIC form's show() does not reliably
