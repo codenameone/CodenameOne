@@ -137,6 +137,19 @@ identifiers: App Store `screenshotDisplayType` values (for example
 `APP_IPHONE_67`) for Apple, and listing `imageType` values (for example
 `phoneScreenshots`) for Google. Images are uploaded in filename order.
 
+TIP: You don't have to create the folder by hand. Run `mvn cn1:metadata-init` to
+scaffold `cn1-metadata` with an empty template of the field files, a screenshots
+folder, and a `README`, ready to fill in:
++
+[source]
+----
+mvn cn1:metadata-init                        # apple + google, en-US
+mvn cn1:metadata-init -Dstore=apple -Dlocale=fr-FR
+----
++
+It only creates what's missing, so it's safe to re-run (for example to add a new
+locale) -- it never overwrites files you've already filled in.
+
 ==== Pushing the metadata
 
 Run the goal from your project; it authenticates with the same Codename One
