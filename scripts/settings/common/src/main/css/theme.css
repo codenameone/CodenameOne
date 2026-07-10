@@ -1,0 +1,622 @@
+#Constants {
+    includeNativeBool: true;
+    defaultSourceDPIInt: "0";
+    fadeScrollBarBool: false;
+}
+
+Container {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+ContentPane, CenterAlignedContentPane {
+    background-color: transparent;
+    border-width: 0;
+    padding: 0;
+    margin: 0;
+}
+
+SettingsForm, SettingsFormDark {
+    font-family: "native:MainRegular";
+    font-size: 3.4mm;
+}
+SettingsChrome, SettingsChromeDark {
+    padding: 2.6mm 3.2mm 2.6mm 3.2mm;
+}
+SettingsToolbarBrand, SettingsToolbarBrandDark {
+    background-color: transparent;
+    border-width: 0;
+    font-family: "native:MainBold";
+    font-size: 3.6mm;
+    padding: 1.4mm 0 1.4mm 0;
+    margin: 0 1.6mm 0 0;
+    text-align: left;
+}
+SettingsTitle, SettingsTitleDark {
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.6mm;
+    padding: 0;
+    margin: 0;
+}
+SettingsMark, SettingsMarkDark {
+    background-color: transparent;
+    padding: 0;
+    margin: 0 1.6mm 0 0;
+    text-align: center;
+}
+SettingsAppName, SettingsAppNameDark {
+    background-color: transparent;
+    border-width: 0;
+    font-family: "native:MainBold";
+    font-size: 3mm;
+    padding: 1.6mm 0 1.6mm 0;
+    margin: 0 1.8mm 0 0;
+    text-align: left;
+}
+SettingsPathChip, SettingsPathChipDark {
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 1mm;
+    padding: 1.5mm 2mm 1.5mm 2mm;
+    margin: 0 1.5mm 0 0;
+}
+SettingsPathIcon, SettingsPathIconDark {
+    background-color: transparent;
+    padding: 0 1.4mm 0 0;
+    margin: 0;
+    text-align: center;
+}
+SettingsPathText, SettingsPathTextDark {
+    background-color: transparent;
+    font-size: 3mm;
+    padding: 0;
+    margin: 0;
+}
+SettingsToolbarButton, SettingsToolbarButtonDark {
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 1mm;
+    padding: 1.35mm;
+    margin: 0 0 0 1.5mm;
+    text-align: center;
+}
+SettingsSave, SettingsSaveDark {
+    background-color: #B8D532;
+    color: #12233F;
+    border: 1px solid #B8D532;
+    border-radius: 1mm;
+    font-family: "native:MainBold";
+    font-size: 3.1mm;
+    padding: 1.5mm 3.2mm 1.5mm 3.2mm;
+    margin: 0 0 0 1.5mm;
+    text-align: center;
+}
+
+SettingsRail, SettingsRailDark {
+    border-right-width: 1px;
+    border-right-style: solid;
+    padding: 2.2mm 1.5mm 2.2mm 1.5mm;
+}
+SettingsRailItem, SettingsRailItemDark, SettingsRailItemSelected, SettingsRailItemSelectedDark {
+    background-color: transparent;
+    border-width: 0;
+    border-radius: 1mm;
+    font-family: "native:MainBold";
+    font-size: 2.4mm;
+    padding: 1.5mm 1.8mm 1.4mm 1.8mm;
+    margin: 0 0 0.8mm 0;
+    text-align: center;
+}
+
+SettingsPage, SettingsPageDark {
+    padding: 4.5mm 5.5mm 5mm 5.5mm;
+    margin: 0;
+}
+SettingsPageTitle, SettingsPageTitleDark {
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 6mm;
+    padding: 0;
+    margin: 0 0 0.6mm 0;
+}
+SettingsSub, SettingsSubDark {
+    background-color: transparent;
+    font-size: 3.2mm;
+    padding: 0;
+    margin: 0 0 4.2mm 0;
+}
+SettingsFieldGrid, SettingsFieldGridDark, SettingsFieldPair, SettingsFieldPairDark, SettingsFieldGroup, SettingsFieldGroupDark {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+SettingsFieldGroup, SettingsFieldGroupDark {
+    margin: 0 1.8mm 3.2mm 0;
+}
+SettingsFieldLabel, SettingsFieldLabelDark {
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.7mm;
+    padding: 0;
+    margin: 0 0 0.9mm 0;
+}
+SettingsField, SettingsFieldDark, SettingsArea, SettingsAreaDark, SettingsFieldError, SettingsFieldErrorDark {
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 1mm;
+    font-size: 3.3mm;
+    padding: 1.65mm 2mm 1.65mm 2mm;
+    margin: 0;
+}
+SettingsField.selected, SettingsFieldDark.selected, SettingsArea.selected, SettingsAreaDark.selected {
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 1mm;
+    padding: 1.65mm 2mm 1.65mm 2mm;
+    margin: 0;
+}
+SettingsFieldError.selected, SettingsFieldErrorDark.selected {
+    border: 1px solid #D64545;
+    border-radius: 1mm;
+    padding: 1.65mm 2mm 1.65mm 2mm;
+    margin: 0;
+}
+SettingsSearchBox, SettingsSearchBoxDark {
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 1mm;
+    padding: 1.65mm 2mm 1.65mm 2mm;
+    margin: 0 0 3.2mm 0;
+}
+SettingsSearchBoxFocused, SettingsSearchBoxFocusedDark {
+    border-width: 2px;
+    border-style: solid;
+    border-radius: 1mm;
+    padding: 1.65mm 2mm 1.65mm 2mm;
+    margin: 0 0 3.2mm 0;
+}
+SettingsSearchIcon, SettingsSearchIconDark {
+    background-color: transparent;
+    border-width: 0;
+    padding: 0 1.5mm 0 0;
+    margin: 0;
+    text-align: center;
+}
+SettingsSearchField, SettingsSearchFieldDark {
+    background-color: transparent;
+    border-width: 0;
+    font-size: 3.3mm;
+    padding: 0;
+    margin: 0;
+}
+SettingsSearchField.selected, SettingsSearchFieldDark.selected {
+    background-color: transparent;
+    border-width: 0;
+    font-size: 3.3mm;
+    padding: 0;
+    margin: 0;
+}
+SettingsFilterRow, SettingsFilterRowDark, SettingsList, SettingsListDark {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+SettingsIconDrop, SettingsIconDropDark {
+    border-width: 1px;
+    border-style: dashed;
+    border-radius: 1mm;
+    padding: 2.6mm;
+    margin: 0 0 4mm 0;
+}
+SettingsIconPreview, SettingsIconPreviewDark {
+    color: #FFFFFF;
+    border-radius: 2.7mm;
+    font-family: "native:MainBold";
+    font-size: 4mm;
+    padding: 0;
+    margin: 0 2.8mm 0 0;
+    text-align: center;
+}
+SettingsIconAction, SettingsIconActionDark {
+    background-color: transparent;
+    padding: 0;
+    margin: 0 0 0 2.5mm;
+}
+SettingsDivider, SettingsDividerDark {
+    padding: 0.12mm;
+    margin: 0 0 4mm 0;
+}
+SettingsSectionTag, SettingsSectionTagDark {
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.3mm;
+    padding: 0;
+    margin: 0 0 2.2mm 0;
+}
+SettingsToggleRow, SettingsToggleRowDark {
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 1mm;
+    padding: 0.8mm 2mm 0.8mm 2mm;
+    margin: 0;
+}
+SettingsSwitch, SettingsSwitchDark {
+    color: #FFFFFF;
+    border-width: 0;
+    font-size: 3mm;
+    padding: 0;
+    margin: 0 1.2mm 0 2mm;
+}
+SettingsSwitch.selected, SettingsSwitchDark.selected {
+    color: #FFFFFF;
+    border-width: 0;
+    font-size: 3mm;
+    padding: 0;
+    margin: 0 1.2mm 0 2mm;
+}
+
+SettingsCard, SettingsCardDark, SettingsRow, SettingsRowDark {
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 1mm;
+    padding: 3mm 3.2mm 3mm 3.2mm;
+    margin: 0 0 1.4mm 0;
+}
+SettingsCardTitle, SettingsCardTitleDark, SettingsRowTitle, SettingsRowTitleDark {
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.3mm;
+    padding: 0;
+    margin: 0;
+}
+SettingsRowMeta, SettingsRowMetaDark, SettingsRowText, SettingsRowTextDark {
+    background-color: transparent;
+    font-size: 2.8mm;
+    padding: 0;
+    margin: 0;
+}
+SettingsCardRow, SettingsCardRowDark {
+    background-color: transparent;
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 1mm;
+    padding: 2mm;
+    margin: 0 0 1.4mm 0;
+}
+SettingsHintEditor, SettingsHintEditorDark {
+    background-color: transparent;
+    padding: 0;
+    margin: 1.2mm 0 0 0;
+}
+SettingsHintKeyCell, SettingsHintKeyCellDark {
+    background-color: transparent;
+    padding: 0;
+    margin: 0 1.2mm 0 0;
+}
+SettingsHintValueCell, SettingsHintValueCellDark {
+    background-color: transparent;
+    padding: 0;
+    margin: 0 1.2mm 0 0;
+}
+SettingsActiveBadge, SettingsActiveBadgeDark, SettingsExtensionTags, SettingsExtensionTagsDark {
+    border-radius: 1.5mm;
+    font-family: "native:MainBold";
+    font-size: 2.2mm;
+    padding: 0.2mm 1mm 0.2mm 1mm;
+    margin: 0 0.9mm 0 0;
+}
+
+SettingsPrimary, SettingsPrimaryDark, SettingsExtensionPrimary, SettingsExtensionPrimaryDark {
+    color: #FFFFFF;
+    border-radius: 1mm;
+    font-family: "native:MainBold";
+    font-size: 3.1mm;
+    padding: 1.6mm 3mm 1.6mm 3mm;
+    margin: 0;
+    text-align: center;
+}
+SettingsOutline, SettingsOutlineDark {
+    background-color: transparent;
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 1mm;
+    font-family: "native:MainBold";
+    font-size: 3.1mm;
+    padding: 1.6mm 2.4mm 1.6mm 2.4mm;
+    margin: 0;
+    text-align: center;
+}
+SettingsSmallIconButton, SettingsSmallIconButtonDark {
+    background-color: transparent;
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 1mm;
+    padding: 1.4mm;
+    margin: 0 0 0 2.2mm;
+    text-align: center;
+}
+
+SettingsPopupMenu, SettingsPopupMenuDark {
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 1.3mm;
+    padding: 0;
+    margin: 0;
+}
+SettingsPopupItem, SettingsPopupItemDark {
+    background-color: transparent;
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+    padding: 0;
+    margin: 0;
+}
+SettingsPopupLabel, SettingsPopupLabelDark {
+    background-color: transparent;
+    border-width: 0;
+    font-family: "native:MainBold";
+    font-size: 3.1mm;
+    padding: 3.5mm 2.6mm 3.5mm 2.6mm;
+    margin: 0;
+    text-align: left;
+}
+SettingsPopupIcon, SettingsPopupIconDark {
+    background-color: transparent;
+    border-width: 0;
+    padding: 3.5mm 2.6mm 3.5mm 1mm;
+    margin: 0;
+    text-align: center;
+}
+SettingsPopupToggleLabel, SettingsPopupToggleLabelDark {
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.1mm;
+    padding: 3.5mm 2.6mm 3.5mm 2.6mm;
+    margin: 0;
+}
+
+SettingsExtensionGrid, SettingsExtensionGridDark, SettingsExtensionRow, SettingsExtensionRowDark, SettingsExtensionBody, SettingsExtensionBodyDark {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+}
+SettingsExtensionRow, SettingsExtensionRowDark {
+    margin: 0 0 2.4mm 0;
+}
+SettingsExtensionCard, SettingsExtensionCardDark {
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 1.3mm;
+    padding: 4mm;
+    margin: 0 1.2mm 0 1.2mm;
+}
+SettingsExtensionTitle, SettingsExtensionTitleDark {
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 4mm;
+    padding: 0;
+    margin: 0 0 1.8mm 0;
+}
+SettingsExtensionText, SettingsExtensionTextDark {
+    background-color: transparent;
+    font-size: 3.1mm;
+    padding: 0;
+    margin: 0;
+}
+SettingsExtensionMetaGrid, SettingsExtensionMetaGridDark, SettingsExtensionMetaColumn, SettingsExtensionMetaColumnDark {
+    background-color: transparent;
+    padding: 0;
+    margin: 1.8mm 0 1.4mm 0;
+}
+SettingsExtensionMetaLabel, SettingsExtensionMetaLabelDark {
+    background-color: transparent;
+    font-size: 2.6mm;
+    padding: 0;
+    margin: 0 0 0.35mm 0;
+}
+SettingsExtensionMetaValue, SettingsExtensionMetaValueDark {
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    padding: 0;
+    margin: 0;
+}
+SettingsExtensionMeta, SettingsExtensionMetaDark, SettingsExtensionWarning, SettingsExtensionWarningDark {
+    background-color: transparent;
+    font-size: 2.6mm;
+    padding: 0;
+    margin: 0;
+}
+SettingsExtensionTagRow, SettingsExtensionTagRowDark {
+    background-color: transparent;
+    padding: 0;
+    margin: 0 0 1.8mm 0;
+}
+SettingsDialogContent, SettingsDialogContentDark {
+    padding: 4mm;
+}
+
+SettingsForm, SettingsPage {
+    background-color: #F3F4F7;
+    color: #112247;
+}
+SettingsChrome, SettingsCard, SettingsRow, SettingsExtensionCard, SettingsPopupMenu, SettingsDialogContent {
+    background-color: #FFFFFF;
+    color: #112247;
+    border-color: #D9DEE8;
+}
+SettingsChrome {
+    border-bottom: 1px solid #D9DEE8;
+}
+SettingsToolbarBrand, SettingsTitle, SettingsAppName, SettingsCardTitle, SettingsRowTitle, SettingsPopupLabel, SettingsPopupToggleLabel, SettingsExtensionTitle, SettingsExtensionMetaValue {
+    color: #112247;
+}
+SettingsAppName, SettingsPathIcon, SettingsPathText, SettingsRailItem, SettingsFieldLabel, SettingsSub, SettingsRowMeta, SettingsRowText, SettingsSearchIcon, SettingsExtensionText, SettingsExtensionMetaLabel, SettingsExtensionMeta, SettingsExtensionWarning {
+    color: #7F8AA3;
+}
+SettingsPopupIcon {
+    color: #7F8AA3;
+}
+SettingsPathChip, SettingsToolbarButton, SettingsField, SettingsArea, SettingsFieldError, SettingsSearchBox, SettingsToggleRow {
+    background-color: #FFFFFF;
+    color: #112247;
+    border-color: #D9DEE8;
+}
+SettingsSearchBoxFocused {
+    background-color: #FFFFFF;
+    color: #112247;
+    border-color: #2F6BFF;
+}
+SettingsSearchField, SettingsSearchField.selected {
+    color: #112247;
+}
+SettingsPathChip, SettingsToolbarButton {
+    color: #7F8AA3;
+}
+SettingsField.selected, SettingsArea.selected {
+    background-color: #FFFFFF;
+    color: #112247;
+    border-width: 2px;
+    border-color: #2F6BFF;
+}
+SettingsFieldError, SettingsFieldError.selected {
+    border-color: #D64545;
+}
+SettingsRail {
+    background-color: #F7F8FB;
+    border-color: #D9DEE8;
+}
+SettingsRailItemSelected {
+    background-color: #E8F0FF;
+    color: #2F6BFF;
+}
+SettingsIconDrop {
+    background-color: #F7F8FB;
+    border-color: #BFC7D6;
+}
+SettingsIconPreview {
+    background: linear-gradient(135deg, #2F6BFF 0%, #2A8A8A 100%);
+}
+SettingsDivider {
+    background-color: #D9DEE8;
+}
+SettingsSectionTag {
+    color: #A0A8BA;
+}
+SettingsCardRow, SettingsSmallIconButton, SettingsPopupItem, SettingsExtensionCard {
+    border-color: #D9DEE8;
+}
+SettingsSmallIconButton {
+    color: #7F8AA3;
+}
+SettingsActiveBadge, SettingsExtensionTags {
+    background-color: #E8F0FF;
+    color: #2F6BFF;
+}
+SettingsSwitch {
+    background-color: #BFC7D6;
+}
+SettingsSwitch.selected {
+    background-color: #2F6BFF;
+}
+SettingsPrimary, SettingsExtensionPrimary {
+    background-color: #2F6BFF;
+    border: 1px solid #2F6BFF;
+}
+SettingsOutline {
+    color: #2F6BFF;
+    border-color: #2F6BFF;
+}
+
+SettingsFormDark, SettingsPageDark {
+    background-color: #071B4D;
+    color: #F5F8FF;
+}
+SettingsChromeDark, SettingsCardDark, SettingsRowDark, SettingsExtensionCardDark, SettingsPopupMenuDark, SettingsDialogContentDark {
+    background-color: #102B66;
+    color: #F5F8FF;
+    border-color: #4C6EA8;
+}
+SettingsChromeDark {
+    border-bottom: 1px solid #4C6EA8;
+}
+SettingsToolbarBrandDark, SettingsTitleDark, SettingsPageTitleDark, SettingsCardTitleDark, SettingsRowTitleDark, SettingsPopupLabelDark, SettingsPopupToggleLabelDark, SettingsExtensionTitleDark, SettingsExtensionMetaValueDark {
+    color: #F5F8FF;
+}
+SettingsAppNameDark, SettingsPathIconDark, SettingsPathTextDark, SettingsRailItemDark, SettingsFieldLabelDark, SettingsSubDark, SettingsRowMetaDark, SettingsRowTextDark, SettingsSearchIconDark, SettingsExtensionTextDark, SettingsExtensionMetaLabelDark, SettingsExtensionMetaDark, SettingsExtensionWarningDark {
+    color: #A8B8DA;
+}
+SettingsPopupIconDark {
+    color: #A8B8DA;
+}
+SettingsPathChipDark, SettingsToolbarButtonDark, SettingsFieldDark, SettingsAreaDark, SettingsFieldErrorDark, SettingsSearchBoxDark, SettingsToggleRowDark {
+    background-color: #0E2A61;
+    color: #F5F8FF;
+    border-color: #4C6EA8;
+}
+SettingsSearchBoxFocusedDark {
+    background-color: #0E2A61;
+    color: #F5F8FF;
+    border-color: #4D86FF;
+}
+SettingsSearchFieldDark, SettingsSearchFieldDark.selected {
+    color: #F5F8FF;
+}
+SettingsPathChipDark, SettingsToolbarButtonDark {
+    color: #A8B8DA;
+}
+SettingsFieldDark.selected, SettingsAreaDark.selected {
+    background-color: #0E2A61;
+    color: #F5F8FF;
+    border-width: 2px;
+    border-color: #4D86FF;
+}
+SettingsFieldErrorDark, SettingsFieldErrorDark.selected {
+    border-color: #D96A6A;
+}
+SettingsRailDark {
+    background-color: #163575;
+    border-color: #4C6EA8;
+}
+SettingsRailItemSelectedDark {
+    background-color: #21478F;
+    color: #4D86FF;
+}
+SettingsIconDropDark {
+    background-color: #163575;
+    border-color: #7390C0;
+}
+SettingsIconPreviewDark {
+    background: linear-gradient(135deg, #2F6BFF 0%, #2A8A8A 100%);
+}
+SettingsDividerDark {
+    background-color: #4C6EA8;
+}
+SettingsSectionTagDark {
+    color: #7E93BC;
+}
+SettingsCardRowDark, SettingsSmallIconButtonDark, SettingsPopupItemDark, SettingsExtensionCardDark {
+    border-color: #4C6EA8;
+}
+SettingsSmallIconButtonDark {
+    color: #A8B8DA;
+}
+SettingsActiveBadgeDark, SettingsExtensionTagsDark {
+    background-color: #21478F;
+    color: #4D86FF;
+}
+SettingsSwitchDark {
+    background-color: #4C6EA8;
+}
+SettingsSwitchDark.selected {
+    background-color: #4D86FF;
+}
+SettingsPrimaryDark, SettingsExtensionPrimaryDark {
+    background-color: #4D86FF;
+    border: 1px solid #4D86FF;
+}
+SettingsOutlineDark {
+    color: #4D86FF;
+    border-color: #4D86FF;
+}

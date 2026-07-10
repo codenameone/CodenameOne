@@ -201,3 +201,38 @@ jobs:
             sleep 20
           done
           echo "codenameone-certificatewizard ${GITHUB_REF_NAME} not visible on repo1 yet; it may still be propagating from Sonatype Central."
+
+      # --- Settings editor ----------------------------------------------------
+      # The cn1:settings goal resolves the standalone Java-17 Settings editor
+      # and its runtime dependencies from Maven Central.
+      - name: Deploy Settings editor to Maven Central
+        if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
+        run: |
+          export GPG_TTY=$(tty)
+          cd scripts/settings
+          xvfb-run -a mvn -Pexecutable-jar -Psettings-central deploy \
+            -Dcodename1.platform=javase \
+            -Dgpg.passphrase=$MAVEN_GPG_PASSPHRASE \
+            -Dcn1.version=$GITHUB_REF_NAME -Dcn1.plugin.version=$GITHUB_REF_NAME \
+            -Dmaven.test.skip=true
+        env:
+          MAVEN_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+
+      - name: Confirm Settings editor on Maven Central
+        if: steps.deploy.outcome == 'success' || steps.confirm.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set +e
+          url="https://repo1.maven.org/maven2/com/codenameone/codenameone-settings/${GITHUB_REF_NAME}/codenameone-settings-${GITHUB_REF_NAME}.jar"
+          for i in $(seq 1 15); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+            if [ "$code" = "200" ]; then
+              echo "Confirmed codenameone-settings ${GITHUB_REF_NAME} on Maven Central"
+              exit 0
+            fi
+            echo "[$i/15] Waiting on Maven Central for codenameone-settings (code=$code)"
+            sleep 20
+          done
+          echo "codenameone-settings ${GITHUB_REF_NAME} not visible on repo1 yet; it may still be propagating from Sonatype Central."
