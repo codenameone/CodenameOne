@@ -1585,7 +1585,19 @@ JAVA_VOID java_lang_System_exit___int(CODENAME_ONE_THREAD_STATE, JAVA_INT i) {
 }
 
 JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
-    if(CN1_IS_TAGGED(obj)) { return; } // tagged Integer has no header/monitor; lock is a NOP
+    // TAGGED Integers lock like any other object: the monitor lives in the
+    // pointer-keyed side table below and a tagged value is a perfectly stable
+    // key -- it never moves and never gets collected. Making tagged locks a
+    // no-op (the previous behavior) broke Java synchronization semantics:
+    // synchronized (Integer.valueOf(1)) let every thread through at once, and
+    // wait()/notify() on the value dereferenced nonexistent monitor data.
+    // Equal tagged values share one monitor (identical bit pattern), which is
+    // the JDK's own -128..127 Integer-cache behavior extended to the whole
+    // tagged range -- legal and deterministic. Monitors created for tagged
+    // values are never reclaimed (there is no object death to trigger removal);
+    // they are bounded by the number of DISTINCT integer values a program ever
+    // synchronizes on, which is negligible in practice. The only header-touching
+    // step, cn1BibopNoteMonitorAttached, skips tagged values internally.
     int err = 0;
     // Double-checked locking for the lazily allocated per-object monitor. The fast-path
     // read MUST be an acquire load and the publishing store (inside the critical section)
@@ -1666,7 +1678,9 @@ JAVA_VOID monitorEnterBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
 }
 
 JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
-    if(CN1_IS_TAGGED(obj)) { return; } // tagged Integer has no header/monitor; unlock is a NOP
+    // Tagged Integers unlock through the same side-table monitor monitorEnter
+    // created for the value (see the comment there); no header access happens
+    // on this path.
     //printf("Unlocked mutex %i ", (int)obj->__codenameOneMutex);
     // remove the ownership of the thread
     struct CN1ThreadData* data = (struct CN1ThreadData*)cn1MonitorDataGet(obj);

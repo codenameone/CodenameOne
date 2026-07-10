@@ -12,7 +12,10 @@ cd "$(dirname "$0")"
 REF_JAVA="${BENCH_JAVA:-java}"
 J8="${JDK_8_HOME:?set JDK_8_HOME}"
 
-TORTURES="MapTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest"
+# TaggedSync guards Java monitor semantics on tagged boxed Integers (mutual
+# exclusion + wait/notify) -- regression test for the tagged monitorEnter/Exit
+# no-op bug a review caught.
+TORTURES="MapTorture SbTorture StrCmp FusedTest IbpTest ExcTest ThreadChurn SoeTest TaggedSync"
 mkdir -p target/host-classes target/bin
 # FusedTest uses @com.codename1.annotations.Fused -- supply the annotation
 # source for the host compile (ParparVM's JavaAPI carries its own copy)

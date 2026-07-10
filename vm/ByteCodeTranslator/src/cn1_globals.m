@@ -2431,6 +2431,12 @@ void cn1BibopNoteNativePeer(JAVA_OBJECT obj) {
 }
 
 void cn1BibopNoteMonitorAttached(JAVA_OBJECT obj) {
+    // A tagged Integer is an immediate, not a slot: no page to flag, and
+    // dereferencing its bit pattern as a header would read a garbage address
+    // (monitorEnter now creates REAL side-table monitors for tagged values).
+    if(CN1_IS_TAGGED(obj)) {
+        return;
+    }
     if(obj != JAVA_NULL && (obj->__heapPosition == CN1_BIBOP_HEAP_POS || obj->__heapPosition == CN1_BIBOP_ADOPTED)) {
         // STICKY per-page flag (plain store): visible to any sweep that could
         // legitimately take the all-dead shortcut for this page, because that
@@ -4951,6 +4957,14 @@ JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str) {
     struct obj__java_lang_String* nnn = (struct obj__java_lang_String*)s;
     nnn->java_lang_String_nsString = str;
     [str retain];
+    // The retained NSString peer must be released when this String's slot is
+    // reclaimed. With String.finalize() gone, peer release happens in the BiBOP
+    // page sweep -- but ONLY on pages flagged by cn1BibopNoteNativePeer: an
+    // unflagged all-dead page takes the O(1) fast reclaim that never visits its
+    // slots, and every retained peer on it would leak. toNSString() flags its
+    // page (see below); this path cached a peer without flagging -- the leak a
+    // review caught.
+    cn1BibopNoteNativePeer(s);
     finishedNativeAllocations();
     return s;
 }

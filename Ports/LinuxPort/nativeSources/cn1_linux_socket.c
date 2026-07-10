@@ -146,11 +146,19 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_socketWrite___long_byte_1ARRAY_int
         if (n <= 0) {
             s->lastError = errno;
             CN1_RESUME_THREAD;
+            /* Keep the buffer array reachable across the parked write, exactly like
+             * socketRead above: only `data` (an interior pointer) is used after the
+             * yield, so the optimizer may drop `buffer` and the concurrent GC --
+             * scanning this parked thread -- can sweep the array WHILE write() is
+             * still reading from it (use-after-free / corrupted network output). */
+            cn1SocketReadKeepAlive = (volatile void*) buffer;
             return written > 0 ? written : -1;
         }
         written += (int) n;
     }
     CN1_RESUME_THREAD;
+    /* See above: force the array live across the yielded write loop. */
+    cn1SocketReadKeepAlive = (volatile void*) buffer;
     return written;
 }
 
