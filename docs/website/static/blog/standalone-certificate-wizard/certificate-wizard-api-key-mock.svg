@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="700" viewBox="0 0 1120 700">
+  <rect width="1120" height="700" fill="#f3f4f7"/>
+  <rect width="1120" height="70" fill="#ffffff"/>
+  <text x="34" y="43" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#112247">Codename One</text>
+  <text x="218" y="43" font-family="Arial, sans-serif" font-size="22" fill="#112247">Signing</text>
+  <rect x="742" y="18" width="150" height="34" rx="17" fill="#fdf1dc"/>
+  <text x="762" y="40" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#b26a00">ASC API Key missing</text>
+  <circle cx="928" cy="35" r="17" fill="#ffffff" stroke="#d9dee8"/>
+  <text x="922" y="41" font-family="Arial, sans-serif" font-size="17" fill="#7f8aa3">D</text>
+  <circle cx="974" cy="35" r="17" fill="#ffffff" stroke="#d9dee8"/>
+  <path d="M968 35a6 6 0 1 0 6-6" fill="none" stroke="#7f8aa3" stroke-width="2"/>
+  <rect x="0" y="70" width="230" height="630" fill="#ffffff"/>
+  <rect x="18" y="180" width="194" height="42" rx="8" fill="#e8f0ff"/>
+  <text x="44" y="207" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#2f6bff">ASC API Key</text>
+  <text x="280" y="132" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#112247">ASC API Key</text>
+  <text x="280" y="166" font-family="Arial, sans-serif" font-size="16" fill="#7f8aa3">The .p8 key is stored by the cloud service and is never returned by the API.</text>
+  <rect x="280" y="205" width="760" height="390" rx="8" fill="#ffffff" stroke="#d9dee8"/>
+  <text x="306" y="244" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#112247">Create an App Store Connect API key</text>
+  <text x="306" y="278" font-family="Arial, sans-serif" font-size="15" fill="#7f8aa3">1. Open Users and Access &gt; Integrations &gt; App Store Connect API.</text>
+  <text x="306" y="304" font-family="Arial, sans-serif" font-size="15" fill="#7f8aa3">2. If prompted, request API access and accept Apple's terms.</text>
+  <text x="306" y="330" font-family="Arial, sans-serif" font-size="15" fill="#7f8aa3">3. On Team Keys, generate a key with Admin access.</text>
+  <text x="306" y="356" font-family="Arial, sans-serif" font-size="15" fill="#7f8aa3">4. Copy the Issuer ID and Key ID, then download the .p8 file.</text>
+  <rect x="306" y="380" width="286" height="40" rx="20" fill="#b8d532"/>
+  <text x="330" y="405" font-family="Arial, sans-serif" font-size="15" font-weight="700" fill="#ffffff">Create .p8 key in App Store Connect</text>
+  <text x="306" y="432" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#7f8aa3">Key ID</text>
+  <rect x="306" y="446" width="300" height="42" rx="6" fill="#ffffff" stroke="#d9dee8"/>
+  <text x="322" y="473" font-family="Arial, sans-serif" font-size="15" fill="#112247">ABCD1234EF</text>
+  <text x="640" y="432" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#7f8aa3">Issuer ID</text>
+  <rect x="640" y="446" width="360" height="42" rx="6" fill="#ffffff" stroke="#d9dee8"/>
+  <text x="656" y="473" font-family="Arial, sans-serif" font-size="15" fill="#112247">11111111-2222-3333-4444-555555555555</text>
+  <text x="306" y="526" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#7f8aa3">Private key .p8</text>
+  <rect x="306" y="540" width="160" height="38" rx="19" fill="#ffffff" stroke="#d9dee8"/>
+  <text x="332" y="564" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#112247">Import .p8 file</text>
+  <rect x="484" y="540" width="150" height="38" rx="19" fill="#b8d532"/>
+  <text x="525" y="564" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#ffffff">Store key</text>
+</svg>
