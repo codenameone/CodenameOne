@@ -37,7 +37,19 @@ public abstract class Instruction implements SignatureSet
     static boolean hasInstructions;
     private boolean optimized=false;
     private BytecodeMethod method;
-    
+    // Set by the prove-safe bounds-check-elimination pass on a raw array-load
+    // opcode instruction; ArrayLoadExpression.tryReduce copies it onto the reduced
+    // expression so it emits an unchecked load.
+    private boolean boundsSafe=false;
+
+    public boolean isBoundsSafe() {
+        return boundsSafe;
+    }
+
+    public void markBoundsSafe() {
+        boundsSafe = true;
+    }
+
     public static void setHasInstructions(boolean h) {
         hasInstructions = h;
     }   

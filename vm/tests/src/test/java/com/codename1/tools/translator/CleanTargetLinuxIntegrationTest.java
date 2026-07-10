@@ -341,7 +341,8 @@ class CleanTargetLinuxIntegrationTest {
         Path serverClasses = Files.createTempDirectory("cn1ss-server");
         assertEquals(0, CompilerHelper.compile(jdk.jdkHome, Arrays.asList(
                 "-d", serverClasses.toString(), "-sourcepath", serverSrc.getParent().toString(),
-                serverSrc.toString())), "Cn1ssScreenshotServer should compile");
+                serverSrc.toString())), "Cn1ssScreenshotServer should compile:\n"
+                + CompilerHelper.getLastErrorLog());
 
         int port = 8765;
         Path outDir = Files.createTempDirectory("cn1ss-linux-out");
@@ -374,9 +375,25 @@ class CleanTargetLinuxIntegrationTest {
             final AtomicBoolean finished = new AtomicBoolean(false);
             final Process appF = app;
             Thread areader = new Thread(() -> {
+                // Tee the app's merged stdout/stderr to CN1_APP_LOG_TEE when
+                // set: when the suite wedges mid-run on CI this is the only
+                // record of the exception/diagnostic output that preceded it.
+                java.io.PrintWriter tee = null;
+                try {
+                    String teePath = System.getenv("CN1_APP_LOG_TEE");
+                    if (teePath != null) {
+                        java.io.File teeFile = new java.io.File(teePath);
+                        if (teeFile.getParentFile() != null) {
+                            teeFile.getParentFile().mkdirs();
+                        }
+                        tee = new java.io.PrintWriter(new java.io.FileWriter(teeFile, true), true);
+                    }
+                } catch (IOException ignore) {
+                }
                 try (BufferedReader r = new BufferedReader(new InputStreamReader(appF.getInputStream(), StandardCharsets.UTF_8))) {
                     String line;
                     while ((line = r.readLine()) != null) {
+                        if (tee != null) { tee.println(line); }
                         if (line.contains("CN1SS:SUITE:FINISHED")) { finished.set(true); }
                     }
                 } catch (IOException ignore) {
@@ -389,12 +406,30 @@ class CleanTargetLinuxIntegrationTest {
             // for a stabilization window (the trailing non-rendering API tests burn
             // their per-test timeout after the last image). 40-minute hard cap.
             int minPngs = 100;
-            long stableMs = 150_000L;
+            // The stability window must outlast the suite's longest legitimate
+            // no-new-screenshot stretch: the ~30 non-rendering API tests between
+            // the last theme screenshot and DesktopMode produce no PNGs and ran
+            // ~140s on the slow arm64 runner -- 150s left single-digit margin,
+            // and any tail slowdown truncated the last three screenshot tests
+            // (the suite was force-killed mid-run, gate rc=17). Healthy runs
+            // never wait this out: SUITE:FINISHED breaks the loop first. Only a
+            // genuinely wedged suite pays the longer window, bounded by the
+            // 40-minute hard cap either way.
+            long stableMs = 300_000L;
             long deadline = System.currentTimeMillis() + 40L * 60 * 1000;
             int pngs = 0, lastPngs = -1;
             long lastChange = System.currentTimeMillis();
             while (System.currentTimeMillis() < deadline) {
                 if (finished.get()) { break; }
+                if (!app.isAlive()) {
+                    // The suite intermittently DIES mid-run with no output (the
+                    // tee cuts mid-line): surface the exit status -- 128+N means
+                    // signal N (e.g. 139 = SIGSEGV) -- instead of burning the
+                    // stabilization window waiting on a dead process.
+                    System.out.println("CN1SS:HARNESS: suite process exited early, exitValue="
+                            + app.exitValue() + " pngs=" + CleanTargetIntegrationTest.countPngFiles(outDir));
+                    break;
+                }
                 pngs = CleanTargetIntegrationTest.countPngFiles(outDir);
                 if (pngs != lastPngs) { lastPngs = pngs; lastChange = System.currentTimeMillis(); }
                 if (pngs >= minPngs && (System.currentTimeMillis() - lastChange) >= stableMs) { break; }

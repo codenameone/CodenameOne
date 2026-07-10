@@ -369,6 +369,11 @@ public class ByteCodeClass {
         return declaredMethod != null && !declaredMethod.isAbstract();
     }
 
+    /** any declaration (abstract or not) of the given method in THIS class. */
+    public boolean hasDeclaredMethod(String name, String desc) {
+        return findDeclaredMethod(name, desc) != null;
+    }
+
     public void unmark() {
         marked = false;
     }
@@ -442,6 +447,9 @@ public class ByteCodeClass {
             if(m.isEliminated()) {
                 continue;
             }
+            // late fold-dependency re-scan (see the method's javadoc): must run
+            // now, when all classes are parsed, before the dep list is copied
+            m.updateInlinableFieldDependencies();
 
             for(String s : m.getDependentClasses()) {
                 if(!dependsClassesInterfaces.contains(s)) {
@@ -511,11 +519,34 @@ public class ByteCodeClass {
         return false;
     }
 
-    private boolean hasFinalizer() {
+    public boolean hasFinalizer() {
         for(BytecodeMethod bm : methods) {
             if(bm.isFinalizer()) {
                 return true;
             }
+        }
+        return false;
+    }
+
+    // True iff this class OR any ancestor actually declares a finalize() override, i.e.
+    // the emitted __FINALIZER_<class> chain runs real user code (not just the empty
+    // Object finalizer). Used to decide whether the clazz.finalizerFunction pointer is
+    // worth emitting: a class with no real finalizer anywhere in its hierarchy gets a
+    // null pointer, so freeAndFinalize / cn1BibopReclaimSlot (both guard `ptr != 0`)
+    // skip a no-op indirect call -- and the BiBOP sweep can treat such a page's dead
+    // slots as needing no per-slot reclaim work. Conservative on an unresolved base.
+    private boolean hasRealFinalizerInHierarchy() {
+        ByteCodeClass c = this;
+        while(c != null) {
+            if(c.hasFinalizer()) {
+                return true;
+            }
+            if(c.baseClassObject == null) {
+                // root (Object: baseClass==null) -> no real finalizer; otherwise the base
+                // is unresolved -> assume it might declare one.
+                return c.baseClass != null;
+            }
+            c = c.baseClassObject;
         }
         return false;
     }
@@ -559,6 +590,10 @@ public class ByteCodeClass {
             b.append(s);
             b.append(".h\"\n");
         }
+        // call-site-inlined fast paths for the hottest String/StringBuilder
+        // natives (self-disables via __has_include when those classes are
+        // eliminated from the build)
+        b.append("#include \"cn1_intrinsics.h\"\n");
         
         b.append("const struct clazz *base_interfaces_for_");
         b.append(clsName);
@@ -582,11 +617,19 @@ public class ByteCodeClass {
         // object fields so class will be compatible to object
         
         if(clsName.equals("java_lang_Class")) {
-            b.append("  DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, &__FINALIZER_");
+            b.append("  DEBUG_GC_INIT 0, 0, 0, ");
         } else {
-            b.append("  DEBUG_GC_INIT &class__java_lang_Class, 999999, 0, 0, 0, 0, &__FINALIZER_");
+            b.append("  DEBUG_GC_INIT &class__java_lang_Class, 0, 0, ");
         }
-        b.append(clsName);
+        // finalizerFunction: null unless a real finalize() exists in the hierarchy (the
+        // __FINALIZER_<class> chain is still emitted for classes that DO, so subclass
+        // chaining is unaffected).
+        if(hasRealFinalizerInHierarchy()) {
+            b.append("&__FINALIZER_");
+            b.append(clsName);
+        } else {
+            b.append("0");
+        }
         b.append(" ,0 , &__GC_MARK_");
         b.append(clsName);
         
@@ -682,9 +725,9 @@ public class ByteCodeClass {
             b.append("__");
             b.append(clsName);
             if(clsName.equals("java_lang_Class")) {
-                b.append(" = {\n DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
+                b.append(" = {\n DEBUG_GC_INIT 0, 0, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
             } else {
-                b.append(" = {\n DEBUG_GC_INIT &class__java_lang_Class, 999999, 0, 0, 0, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
+                b.append(" = {\n DEBUG_GC_INIT &class__java_lang_Class, 0, 0, 0, &arrayFinalizerFunction, &gcMarkArrayObject, 0, cn1_array_");
             }
             b.append(iter);
             b.append("_id_");
@@ -848,6 +891,12 @@ public class ByteCodeClass {
                     b.append(bf.getClsName());
                     if (bf.isObjectType()) {
                         b.append("(threadStateData);\n    ");
+                        // A static field is a GC root outside any nursery -> a nursery
+                        // value stored here always escapes and must be promoted.
+                        b.append("CN1_WRITE_BARRIER(JAVA_NULL, __cn1StaticVal);\n    ");
+                        // SATB deletion barrier: preserve the overwritten static reference.
+                        b.append("CN1_SATB_DELETE(&STATIC_FIELD_").append(bf.getClsName())
+                         .append("_").append(bf.getFieldName()).append(");\n    ");
                     } else {
                         b.append("(getThreadLocalData());\n    ");
                     }
@@ -924,6 +973,14 @@ public class ByteCodeClass {
             b.append(fld.getCDefinition());
             if(fld.isObjectType()) {
                 b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n ").append(nullCheck).append("   ");
+                // Nursery write barrier: a reference is being stored into a heap object's
+                // field, so a nursery value escapes and must be promoted. No-op unless
+                // -DCN1_NURSERY.
+                b.append("CN1_WRITE_BARRIER(__cn1T, __cn1Val); ");
+                // SATB deletion barrier: preserve the reference being overwritten for the
+                // current mark cycle. No-op (single flag load) outside GC.
+                b.append("CN1_SATB_DELETE(&((struct obj__").append(clsName).append("*)__cn1T)->")
+                 .append(fld.getClsName()).append("_").append(fld.getFieldName()).append("); ");
             } else {
                 b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n  ").append(nullCheck).append("  ");
             }
@@ -1079,6 +1136,11 @@ public class ByteCodeClass {
                 }
                 if(m.isMain()) {
                     b.append("\nint main(int argc, char *argv[]) {\n    initConstantPool();\n");
+                    // With the nursery, the main thread allocates and must cooperate with
+                    // the concurrent GC's stop-the-world pause (so the GC never scans its
+                    // nursery while a minor collection runs). Lightweight threads are the
+                    // ones the GC pauses; mark the main thread lightweight too.
+                    b.append("#ifdef CN1_NURSERY\n    getThreadLocalData()->lightweightThread = JAVA_TRUE;\n#endif\n");
                     b.append("    ");
                     b.append(clsName);
                     b.append("_main___java_lang_String_1ARRAY(getThreadLocalData(), JAVA_NULL);\n}\n\n");
@@ -1106,8 +1168,8 @@ public class ByteCodeClass {
                     } else {
                         // we pretend to have a virtual method here but the optimizer says its not really needed
                         if(!m.isVirtualOverriden()) {
-                            m.appendVirtualMethodC(clsName, b, "classToInterfaceMap_" + clsName + 
-                                    "[__cn1ThisObject->__codenameOneParentClsReference->classId][" + offset + "]", true);
+                            m.appendVirtualMethodC(clsName, b, "classToInterfaceMap_" + clsName +
+                                    "[CN1_CLASS_OF(__cn1ThisObject)->classId][" + offset + "]", true);
                         }
                         offset++;
                     }
@@ -1175,12 +1237,18 @@ public class ByteCodeClass {
         b.append("(CODENAME_ONE_THREAD_STATE) {\n    if(__").append(clsName).append("_LOADED__) return;\n\n    ");
 
         
-        b.append("monitorEnter(threadStateData, (JAVA_OBJECT)&class__");
-        
+        // Block-registered enter/exit (the synchronized-method pattern): if the
+        // <clinit> body throws, throwException()'s unwind releases the class
+        // monitor. With a plain monitorEnter the lock leaked on a throwing
+        // clinit and every later thread touching the class deadlocked in
+        // monitorEnter (observed on CI as the EDT wedged initializing
+        // BufferedOutputStream while logging the very exception that leaked it).
+        b.append("monitorEnterBlock(threadStateData, (JAVA_OBJECT)&class__");
+
         b.append(clsName);
         b.append(");\n    if(class__");
         b.append(clsName);
-        b.append(".initialized) {\n        monitorExit(threadStateData, (JAVA_OBJECT)&class__");
+        b.append(".initialized) {\n        monitorExitBlock(threadStateData, (JAVA_OBJECT)&class__");
         b.append(clsName);
         b.append(");\n        return;\n    }\n\n");
         
@@ -1261,7 +1329,7 @@ public class ByteCodeClass {
             b.append(clInitMethod);
             b.append("(threadStateData);\n");
         }
-        b.append("monitorExit(threadStateData, (JAVA_OBJECT)&class__");
+        b.append("monitorExitBlock(threadStateData, (JAVA_OBJECT)&class__");
         b.append(clsName);
         b.append(");\n");
 
@@ -1786,10 +1854,7 @@ public class ByteCodeClass {
         // reference to the class, reference counter for the arc portion of the GC
         // and a mutex for synchronization code
         b.append("    DEBUG_GC_VARIABLES\n    struct clazz *__codenameOneParentClsReference;\n");
-        b.append("    int __codenameOneReferenceCount;\n");
-        b.append("    void* __codenameOneThreadData;\n");
         b.append("    int __codenameOneGcMark;\n");
-        b.append("    void* __ownerThread;\n");
         b.append("    int __heapPosition;\n");
 
         
@@ -2206,6 +2271,39 @@ public class ByteCodeClass {
     /**
      * @return the finalClass
      */
+    private boolean stackAllocatable;
+
+    /**
+     * True when the class carries {@code @com.codename1.annotations.StackAllocate}:
+     * its instances are allocated as method-scoped C structs instead of on the GC
+     * heap. The developer guarantees instances never escape their creating frame.
+     */
+    public boolean isStackAllocatable() {
+        return stackAllocatable;
+    }
+
+    public void setStackAllocatable(boolean stackAllocatable) {
+        this.stackAllocatable = stackAllocatable;
+    }
+
+    private boolean fused;
+
+    /**
+     * True when the class carries {@code @com.codename1.annotations.Fused}: its
+     * constructor-created primitive-array fields are encapsulated, so instances
+     * are allocated together with those arrays as ONE heap block (single
+     * allocation, single GC object; the arrays have no independent GC identity
+     * and die with the owner). See {@link
+     * com.codename1.tools.translator.bytecodes.FusedConstructor}.
+     */
+    public boolean isFused() {
+        return fused;
+    }
+
+    public void setFused(boolean fused) {
+        this.fused = fused;
+    }
+
     public boolean isFinalClass() {
         return finalClass;
     }

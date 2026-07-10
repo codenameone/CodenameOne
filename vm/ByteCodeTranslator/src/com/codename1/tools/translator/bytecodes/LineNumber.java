@@ -30,7 +30,13 @@ package com.codename1.tools.translator.bytecodes;
 public class LineNumber extends Instruction {
     private String sourceFile;
     private int line;
-    
+    // True when every instruction belonging to this source line is provably
+    // non-throwing and non-calling, so this line can never be the one reported in
+    // a stack trace -- its line-info store is then emitted as the elidable variant
+    // (no-op in release, full under the debugger). Set by
+    // BytecodeMethod.analyzeElidableLineInfo(). Defaults false (keep the store).
+    private boolean elidable;
+
     public LineNumber(String sourceFile, int line) {
         super(-1);
         this.sourceFile = sourceFile;
@@ -41,10 +47,20 @@ public class LineNumber extends Instruction {
         return line;
     }
 
+    public void setElidable(boolean elidable) {
+        this.elidable = elidable;
+    }
+
     @Override
     public void appendInstruction(StringBuilder b) {
+        // Frameless methods don't bump callStackOffset, so a per-line
+        // __CN1_DEBUG_INFO store (which writes callStackLine[callStackOffset - 1])
+        // would clobber the caller's call-stack slot. Suppress it entirely.
+        if(getMethod() != null && getMethod().isFrameless()) {
+            return;
+        }
         if(hasInstructions && (getMethod() == null || !getMethod().isDisableDebugInfo())) {
-            b.append("    __CN1_DEBUG_INFO(");
+            b.append(elidable ? "    __CN1_DEBUG_INFO_NT(" : "    __CN1_DEBUG_INFO(");
             b.append(line);
             b.append(");\n");
         }

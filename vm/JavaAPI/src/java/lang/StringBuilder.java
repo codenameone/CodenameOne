@@ -33,14 +33,19 @@ package java.lang;
  * Every string builder has a capacity. As long as the length of the character sequence contained in the string builder does not exceed the capacity, it is not necessary to allocate a new internal builder array. If the internal builder overflows, it is automatically made larger.
  * Since: JDK1.0, CLDC 1.0 See Also:ByteArrayOutputStream, String
  */
+@com.codename1.annotations.Fused
 public final class StringBuilder implements CharSequence, Appendable {
-    static final int INITIAL_CAPACITY = 16;
+    // 32 (was 16): the dominant StringBuilder lifecycle is javac-generated
+    // concatenation of a handful of segments totalling 17..32 chars, and a
+    // 16-char initial buffer forced a grow-and-copy on nearly every such
+    // builder. 32 chars = one BiBOP size class up on the transient buffer,
+    // in exchange for eliminating that per-builder reallocation.
+    static final int INITIAL_CAPACITY = 32;
 
     private char[] value;
 
     private int count;
 
-    //private boolean shared;
 
     /**
      * Constructs a string builder with no characters in it and an initial capacity of 16 characters.
@@ -99,7 +104,6 @@ public final class StringBuilder implements CharSequence, Appendable {
         char[] newData = new char[min > newCount ? min : newCount];
         System.arraycopy(value, 0, newData, 0, count);
         value = newData;
-        //shared = false;
     }
 
     final void appendNull() {
@@ -190,17 +194,15 @@ public final class StringBuilder implements CharSequence, Appendable {
      * Appends the string representation of the int argument to this string builder.
      * The argument is converted to a string as if by the method String.valueOf, and the characters of that string are then appended to this string builder.
      */
-    public java.lang.StringBuilder append(int i){
-        return append(Integer.toString(i)); 
-    }
+    // Native: write the decimal digits straight into the buffer instead of allocating a
+    // temporary String via Integer.toString. Same result, no per-append allocation.
+    public native java.lang.StringBuilder append(int i);
 
     /**
      * Appends the string representation of the long argument to this string builder.
      * The argument is converted to a string as if by the method String.valueOf, and the characters of that string are then appended to this string builder.
      */
-    public java.lang.StringBuilder append(long l){
-        return append(Long.toString(l)); 
-    }
+    public native java.lang.StringBuilder append(long l);
 
     /**
      * Appends the string representation of the Object argument to this string builder.
@@ -262,7 +264,6 @@ public final class StringBuilder implements CharSequence, Appendable {
         if (end > start) {
             int length = count - end;
             if (length >= 0) {
-                //if (!shared) {
                     System.arraycopy(value, end, value, start, length);
                 /*} else {
                     char[] newData = new char[value.length];
@@ -284,7 +285,6 @@ public final class StringBuilder implements CharSequence, Appendable {
     public java.lang.StringBuilder deleteCharAt(int index){
         int length = count - index - 1;
         if (length > 0) {
-            //if (!shared) {
                 System.arraycopy(value, index + 1, value, index, length);
             /*} else {
                 char[] newData = new char[value.length];
@@ -545,17 +545,14 @@ public final class StringBuilder implements CharSequence, Appendable {
     public void setLength(int newLength){
         if (newLength > value.length) {
             enlargeBuffer(newLength);
-        } else {
-            //if (shared) {
-//                char[] newData = new char[value.length];
-//                System.arraycopy(value, 0, newData, 0, count);
-//                value = newData;
-                /*shared = false;
-            } else {
-                if (count < newLength) {
-                    Arrays.fill(value, count, newLength, (char) 0);
-                }
-            }*/
+        } else if (count < newLength) {
+            // expansion within capacity must read as null characters, not as
+            // whatever a previous longer content left behind (JDK contract).
+            // The old copy-on-write share path masked this: unshare's fresh
+            // array happened to be zeroed.
+            for (int i = count; i < newLength; i++) {
+                value[i] = 0;
+            }
         }
         count = newLength;
     }
@@ -564,7 +561,20 @@ public final class StringBuilder implements CharSequence, Appendable {
      * Converts to a string representing the data in this string builder. A new String object is allocated and initialized to contain the character sequence currently represented by this string builder. This String is then returned. Subsequent changes to the string builder do not affect the contents of the String.
      * Implementation advice: This method can be coded so as to create a new String object without allocating new memory to hold a copy of the character sequence. Instead, the string can share the memory used by the string builder. Any subsequent operation that alters the content or capacity of the string builder must then make a copy of the internal builder at that time. This strategy is effective for reducing the amount of memory allocated by a string concatenation operation when it is implemented using a string builder.
      */
-    public java.lang.String toString(){
+    // Native: allocates the result as ONE fused String block and memcpys the
+    // buffer into it -- no ctor chain, no System.arraycopy. The buffer must not
+    // be shared with the String: it may live INSIDE this builder's own fused
+    // allocation block. toStringImpl is the pure-Java twin (JS port + C fallback).
+    public native java.lang.String toString();
+
+    java.lang.String toStringImpl(){
+        if (count == 0) {
+            return "";
+        }
+        return new String(value, 0, count);
+    }
+
+    private java.lang.String toStringOld(){
         if (count == 0) {
             return "";
         }

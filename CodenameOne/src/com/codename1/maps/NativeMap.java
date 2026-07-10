@@ -565,6 +565,9 @@ public class NativeMap extends Container implements MapSurface {
     /// fixed delay. Providers without an async-readiness signal report ready
     /// once their peer exists.
     public boolean isMapReady() {
+        if (isFallback()) {
+            return fallback.isMapReady();
+        }
         if (provider instanceof WebMapProvider) {
             return ((WebMapProvider) provider).isReady(mapId);
         }

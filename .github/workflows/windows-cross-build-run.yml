@@ -320,8 +320,26 @@ jobs:
           # which let 100+ render changes land unreviewed).
           export CN1SS_FAIL_ON_MISMATCH=1
           REF_DIR="$(pwd)/scripts/windows/screenshots"
+          # Gate like the Linux port: fail on any mismatch/error or a new
+          # screenshot with no committed golden. Previously this job only
+          # posted the comparison as a PR comment, so stale goldens sailed
+          # through green CI.
+          export CN1SS_FAIL_ON_MISMATCH=1
+          export CN1SS_ALLOWED_MISSING=0
+          set +e
           cn1ss_process_and_report \
             "Native Windows port (cross-compiled)" \
             "$ART/compare.json" "$ART/summary.txt" "$ART/comment.md" \
             "$REF_DIR" "$ART/previews" "$ART" \
             "${entries[@]}"
+          gate_rc=$?
+          set -e
+          fail=0
+          if [ "$gate_rc" -ne 0 ]; then
+            echo "[windows-cross] FATAL: screenshot gate failed (rc=$gate_rc)"; fail=1
+          fi
+          if [ -f "$ART/summary.txt" ] && grep -q "^missing_expected|" "$ART/summary.txt"; then
+            me="$(grep -c "^missing_expected|" "$ART/summary.txt" || echo 0)"
+            echo "[windows-cross] FATAL: $me screenshot(s) streamed with no stored golden (missing_expected) -- add them to $REF_DIR."; fail=1
+          fi
+          if [ "$fail" -ne 0 ]; then echo "Windows cross screenshot gate failed."; exit 1; fi

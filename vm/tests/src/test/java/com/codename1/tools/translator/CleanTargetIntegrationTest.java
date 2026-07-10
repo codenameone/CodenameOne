@@ -789,6 +789,14 @@ class CleanTargetIntegrationTest {
                 "    static class Holder { int value; }\n" +
                 "    static Holder nullHolder() { return null; }\n" +
                 "    public static void main(String[] args) {\n" +
+                // Offscreen-capture mode: a hidden window is still created (same
+                // pump/DPI/client size as a normal run) but the EDT paints into an
+                // offscreen WIC bitmap, so screenshot() reads back the real frame via
+                // captureWindowToPngBytes instead of repainting each form into a fresh
+                // mutable image -- the expensive per-screenshot step that stalled the
+                // slow windows-11-arm runner mid-suite. Must precede Display.init
+                // (which calls initDisplay synchronously).
+                "        com.codename1.impl.windows.WindowsNative.enableOffscreenCapture();\n" +
                 "        Display.init(null);\n" +
                 // Deterministic validation for the native fault->exception handler
                 // (cn1WinFaultToException). initDisplay (called synchronously by

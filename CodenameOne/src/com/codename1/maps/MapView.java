@@ -139,6 +139,15 @@ public class MapView extends Container implements MapSurface {
         return engine.hasPendingTiles();
     }
 
+    /// Whether every tile visible in the current viewport has finished
+    /// loading/decoding/rendering. Unlike [#isLoadingTiles()], this actively
+    /// computes the visible tile set and requests missing tiles, so it is a
+    /// deterministic readiness probe even before the first paint has run.
+    public boolean isMapReady() {
+        engine.setViewport(getWidth(), getHeight());
+        return engine.hasRenderedVisibleTiles();
+    }
+
     /// The underlying vector engine, for advanced configuration (tile cache,
     /// source and style swapping).
     public VectorMapEngine getEngine() {

@@ -99,7 +99,14 @@ jobs:
 
       - name: Run ParparVM JVM tests
         working-directory: vm
-        run: mvn -B clean package -pl JavaAPI -am -DskipTests && mvn -B test -pl tests -am -DexcludedGroups=benchmark
+        # Maven Central intermittently serves 403 from the runner CDN edge and
+        # Maven treats it as a permanent resolution failure (killed this job at
+        # dependency download, before any test ran). Retry with a pause; a real
+        # build/test failure fails identically on every attempt.
+        run: |
+          retry() { local i; for i in 1 2 3; do "$@" && return 0; [ $i -lt 3 ] && { echo "attempt $i failed; retrying in 30s (possible transient Maven Central 403/5xx)"; sleep 30; }; done; return 1; }
+          retry mvn -B clean package -pl JavaAPI -am -DskipTests
+          retry mvn -B test -pl tests -am -DexcludedGroups=benchmark
         env:
           JDK_8_HOME: ${{ env.JDK_8_HOME }}
           JDK_11_HOME: ${{ env.JDK_11_HOME }}

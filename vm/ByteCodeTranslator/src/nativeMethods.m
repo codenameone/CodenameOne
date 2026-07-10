@@ -30,7 +30,6 @@
 #include "java_lang_Throwable.h"
 #include "java_lang_StringBuilder.h"
 #include "java_util_HashMap.h"
-#include "java_util_HashMap_Entry.h"
 #include "java_lang_NullPointerException.h"
 #include "java_lang_Class.h"
 #include "java_lang_System.h"
@@ -45,6 +44,9 @@
 #else
 #include <pthread.h>
 #include <unistd.h>
+#if defined(__linux__)
+#include <signal.h>   /* sigaltstack / stack_t for the per-thread alt signal stack */
+#endif
 #include <sys/time.h>
 #endif
 #include "java_util_Date.h"
@@ -311,7 +313,7 @@ static size_t cn1_utf8_decode_replace(const uint8_t* src, size_t len, JAVA_ARRAY
  * The class representing classes
  */
 struct clazz ClazzClazz = {
-    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_start_offset, "java.lang.Class", JAVA_FALSE, 0, 0, JAVA_FALSE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
+    DEBUG_GC_INIT 0, 0, 0, 0, 0, 0, 0, cn1_array_start_offset, "java.lang.Class", JAVA_FALSE, 0, 0, JAVA_FALSE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
 
@@ -349,7 +351,7 @@ JAVA_BOOLEAN java_lang_String_equals___java_lang_Object_R_boolean(CODENAME_ONE_T
         THROW_NULL_POINTER_EXCEPTION();
     }
 #endif
-    if(__cn1Arg1 == JAVA_NULL || __cn1Arg1->__codenameOneParentClsReference->classId != __cn1ThisObject->__codenameOneParentClsReference->classId) {
+    if(__cn1Arg1 == JAVA_NULL || CN1_CLASS_OF(__cn1Arg1)->classId != __cn1ThisObject->__codenameOneParentClsReference->classId) {
         return JAVA_FALSE;
     }
     struct obj__java_lang_String* t = (struct obj__java_lang_String*)__cn1ThisObject;
@@ -357,18 +359,50 @@ JAVA_BOOLEAN java_lang_String_equals___java_lang_Object_R_boolean(CODENAME_ONE_T
     if(t->java_lang_String_count != o->java_lang_String_count) {
         return JAVA_FALSE;
     }
-    
-    JAVA_ARRAY_CHAR* oa = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)o->java_lang_String_value)->data;
-    JAVA_ARRAY_CHAR* ta = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_String_value)->data;
-    JAVA_INT oo = o->java_lang_String_offset;
-    JAVA_INT to = t->java_lang_String_offset;
-    
-    for(int iter = 0 ; iter < t->java_lang_String_count ; iter++) {
-        if(oa[iter+oo] != ta[iter+to]) {
-            return JAVA_FALSE;
+    // cached-hash precheck: two computed-and-cached unequal hashes prove
+    // inequality without touching the character data (big win for string keys
+    // in maps, where equals runs right after both hashes were computed).
+    JAVA_INT th = t->java_lang_String_hashCode;
+    JAVA_INT oh = o->java_lang_String_hashCode;
+    if(th != 0 && oh != 0 && th != oh) {
+        return JAVA_FALSE;
+    }
+
+    JAVA_ARRAY_CHAR* oa = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)o->java_lang_String_value)->data) + o->java_lang_String_offset;
+    JAVA_ARRAY_CHAR* ta = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_String_value)->data) + t->java_lang_String_offset;
+    // byte-equality of UTF-16 code units == string equality; libc memcmp is the
+    // SIMD-optimized comparison on every target.
+    return memcmp(ta, oa, (size_t)t->java_lang_String_count * sizeof(JAVA_ARRAY_CHAR)) == 0 ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_INT java_lang_String_compareTo___java_lang_String_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT __cn1Arg1) {
+    if(__cn1ThisObject == __cn1Arg1) {
+        return 0;
+    }
+    struct obj__java_lang_String* t = (struct obj__java_lang_String*)__cn1ThisObject;
+    struct obj__java_lang_String* o = (struct obj__java_lang_String*)__cn1Arg1;
+    JAVA_INT tc = t->java_lang_String_count;
+    JAVA_INT oc = o->java_lang_String_count;
+    JAVA_INT minL = tc < oc ? tc : oc;
+    const JAVA_ARRAY_CHAR* ta = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_String_value)->data) + t->java_lang_String_offset;
+    const JAVA_ARRAY_CHAR* oa = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)o->java_lang_String_value)->data) + o->java_lang_String_offset;
+    // find the first differing 4-char block with 64-bit compares, then resolve
+    // the exact code unit inside it (UTF-16 code-unit order, like Java).
+    JAVA_INT i = 0;
+    for(; i + 4 <= minL; i += 4) {
+        uint64_t a, b;
+        memcpy(&a, ta + i, 8);
+        memcpy(&b, oa + i, 8);
+        if(a != b) {
+            break;
         }
     }
-    return JAVA_TRUE;
+    for(; i < minL; i++) {
+        if(ta[i] != oa[i]) {
+            return (JAVA_INT)ta[i] - (JAVA_INT)oa[i];
+        }
+    }
+    return tc - oc;
 }
 
 JAVA_INT java_lang_Character_toLowerCase___int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_INT __cn1Arg1) {
@@ -394,7 +428,7 @@ JAVA_BOOLEAN java_lang_String_equalsIgnoreCase___java_lang_String_R_boolean(CODE
         THROW_NULL_POINTER_EXCEPTION();
     }
 #endif
-    if(__cn1Arg1 == JAVA_NULL || __cn1Arg1->__codenameOneParentClsReference->classId != __cn1ThisObject->__codenameOneParentClsReference->classId) {
+    if(__cn1Arg1 == JAVA_NULL || CN1_CLASS_OF(__cn1Arg1)->classId != __cn1ThisObject->__codenameOneParentClsReference->classId) {
         return JAVA_FALSE;
     }
     struct obj__java_lang_String* t = (struct obj__java_lang_String*)__cn1ThisObject;
@@ -433,8 +467,20 @@ JAVA_INT java_lang_String_hashCode___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
         }
         JAVA_INT end = t->java_lang_String_count + t->java_lang_String_offset;
         JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_String_value)->data;
-        for (JAVA_INT i = t->java_lang_String_offset; i < end; ++i) {
-            hash = 31*hash + chars[i];
+        JAVA_INT i = t->java_lang_String_offset;
+        // 4-way polynomial reassociation: h = h*31^4 + c0*31^3 + c1*31^2 + c2*31 + c3.
+        // The naive loop is a serially-dependent multiply chain (one 31*h per char);
+        // this breaks the dependency so the four products issue in parallel.
+        // -fwrapv makes the int overflow wrap exactly like Java's.
+        for (; i + 4 <= end; i += 4) {
+            hash = hash * 923521
+                 + chars[i] * 29791
+                 + chars[i + 1] * 961
+                 + chars[i + 2] * 31
+                 + chars[i + 3];
+        }
+        for (; i < end; ++i) {
+            hash = 31 * hash + chars[i];
         }
         t->java_lang_String_hashCode = hash;
     }
@@ -700,21 +746,18 @@ JAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREA
     java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, className);
     if(newline == JAVA_NULL) {
         newline = newStringFromCString(threadStateData, "\n");
-        newline->__codenameOneReferenceCount = 999999;
         dot = newStringFromCString(threadStateData, ".");
-        dot->__codenameOneReferenceCount = 999999;
         colon = newStringFromCString(threadStateData, ":");
-        colon->__codenameOneReferenceCount = 999999;
         indent = newStringFromCString(threadStateData, "    at ");
-        indent->__codenameOneReferenceCount = 999999;
-        removeObjectFromHeapCollection(threadStateData, newline);
-        removeObjectFromHeapCollection(threadStateData, dot);
-        removeObjectFromHeapCollection(threadStateData, colon);
-        removeObjectFromHeapCollection(threadStateData, indent);
-        removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)newline)->java_lang_String_value);
-        removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)dot)->java_lang_String_value);
-        removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)colon)->java_lang_String_value);
-        removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)indent)->java_lang_String_value);
+        // These strings are referenced ONLY by the C globals above -- invisible
+        // to every GC root source. The old removeObjectFromHeapCollection trick
+        // only immortalized objects living in the legacy table; BiBOP-resident
+        // objects (all small objects, arrays included) are swept by the page
+        // walk regardless, so they must be registered as real roots instead.
+        cn1AddImmortalRoot(newline);
+        cn1AddImmortalRoot(dot);
+        cn1AddImmortalRoot(colon);
+        cn1AddImmortalRoot(indent);
     }
     java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, newline);
 
@@ -768,7 +811,6 @@ JAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREA
         java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, bld, newline);
     }
     JAVA_OBJECT o = java_lang_StringBuilder_toString___R_java_lang_String(threadStateData, bld);
-    o->__codenameOneReferenceCount = 0;
     return o;
 }
 
@@ -808,6 +850,16 @@ JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int
     }
     struct clazz* cls = (*srcArr).__codenameOneParentClsReference;
     int byteSize = byteSizeForArray(cls);
+    // SATB deletion barrier: an object arraycopy overwrites dst[dstOffset..+length)
+    // with a bulk memmove that bypasses the per-element setter, so preserve those
+    // overwritten references for the current mark cycle. No-op (one flag load) off-GC.
+    if(__builtin_expect(gcSatbActive, 0) && !cls->primitiveType) {
+        JAVA_ARRAY_OBJECT* dstData = (JAVA_ARRAY_OBJECT*)(*dstArr).data;
+        for(int i = 0 ; i < length ; i++) {
+            JAVA_OBJECT o = dstData[dstOffset + i];
+            if(o != JAVA_NULL && !CN1_IS_TAGGED(o)) cn1SatbEnqueue(o);
+        }
+    }
     /* java.lang.System.arraycopy is contractually overlap-safe (the spec defines
      * it as if copying via a temporary), and callers such as ArrayList.remove
      * shift elements within a single array (overlapping src/dst). memcpy is
@@ -1212,8 +1264,9 @@ JAVA_BOOLEAN java_lang_Class_isAssignableFrom___java_lang_Class_R_boolean(CODENA
 }
 
 JAVA_BOOLEAN java_lang_Class_isInstance___java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls, JAVA_OBJECT obj) {
+    if(obj == JAVA_NULL) { return JAVA_FALSE; }
     struct clazz* clz1 = (struct clazz*)cls;
-    struct clazz* clz2 = (struct clazz*)obj->__codenameOneParentClsReference;
+    struct clazz* clz2 = (struct clazz*)CN1_CLASS_OF(obj); // tag-aware: a tagged Integer has no header
     return instanceofFunction(clz2->classId, clz1->classId);
 }
 
@@ -1293,6 +1346,13 @@ void initClazzClazz() {
 
 JAVA_OBJECT java_lang_Object_getClassImpl___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     initClazzClazz();
+#if CN1_TAGGED_ACTIVE
+    // A tagged Integer has no object header to read; its class is always Integer.
+    if(CN1_IS_TAGGED(obj)) {
+        class__java_lang_Integer.__codenameOneParentClsReference = &ClazzClazz;
+        return (JAVA_OBJECT)(&class__java_lang_Integer);
+    }
+#endif
     if(!obj->__codenameOneParentClsReference) {
         return (JAVA_OBJECT)(&ClazzClazz);
     }
@@ -1356,13 +1416,44 @@ struct ThreadLocalData* getThreadLocalData() {
 #endif
 
         i->callStackOffset = 0;
-        
+
+        // ThreadLocalData is malloc'd (not zeroed); 0 means "frameless native-stack
+        // limit not yet computed" -- it is filled in lazily on first frameless entry.
+        i->nativeStackLimit = 0;
+
         i->pendingHeapAllocations = malloc(PER_THREAD_ALLOCATION_COUNT * sizeof(void *));
         memset(i->pendingHeapAllocations, 0, PER_THREAD_ALLOCATION_COUNT * sizeof(void *));
         i->heapAllocationSize = 0;
         i->threadHeapTotalSize = PER_THREAD_ALLOCATION_COUNT;
+        // ThreadLocalData is malloc'd, NOT zeroed. bibopBytesLocal feeds the GC
+        // trigger/pacing accounting (CN1_BIBOP_FLUSH_BYTES adds it into the global
+        // counters); garbage here means a spurious immediate GC + hard-cap park, or
+        // a dead allocation trigger, on every new thread. nativeAllocationMode is
+        // read by the inlined alloc fast path (cn1BibopFastAlloc) before any setter
+        // runs -- garbage-nonzero silently disables the fast path for the thread.
+        i->bibopBytesLocal = 0;
+        i->nativeAllocationMode = JAVA_FALSE;
+        // dead-thread pending-migration queue state (single-writer allObjectsInHeap)
+        i->gcDeadNext = 0;
+        i->gcQueuedForDrain = JAVA_FALSE;
+        i->gcReleaseRequested = JAVA_FALSE;
         
         i->blocks = malloc(500 * sizeof(struct TryBlock));
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+        // PHASE 3b: record this thread's pthread handle + TLS self pointer so the GC can
+        // signal-stop it and the async-signal-safe stop handler can find its state.
+        i->gcPthread = pthread_self();
+        i->gcPthreadValid = JAVA_TRUE;
+        i->gcParkCaptured = JAVA_FALSE;
+        i->gcStackPointerAtPark = 0;
+        i->gcSigStopRequest = 0;
+        i->gcSigStopped = 0;
+        i->gcSigRelease = 0;
+        i->gcSigStopGen = 0;
+        i->gcSigStackPointer = 0;
+        i->gcSigRegsLen = 0;
+        cn1TlsSelf = i;
+#endif
         pthread_setspecific(threadIdKey, i);
         
         if(!allThreads) {
@@ -1445,8 +1536,45 @@ JAVA_VOID java_lang_System_gcMarkSweep__(CODENAME_ONE_THREAD_STATE) {
         pthread_setschedparam(pthread_self(), policy, &param);
     }
     flushReleaseQueue();
+    // Defense in depth: a collection cycle must NEVER let an exception escape to the GC
+    // thread's run loop (System$1.run only catches InterruptedException, so anything else
+    // kills the collector -- and because the gcCurrentlyRunning=FALSE reset below would be
+    // skipped and gcThreadInstance stays non-null, every allocating thread then deadlocks in
+    // cn1BibopMaybeGc's backpressure spin). Individual hazards are contained at their source
+    // (throwing finalizers are swallowed in freeAndFinalize), but wrap the whole cycle as a
+    // backstop: on any throw, drop it, and still clear gcCurrentlyRunning so the collector
+    // stays healthy and the next cycle retries. If MARK threw, SWEEP is skipped -- correct,
+    // sweeping a partial mark would free reachable objects.
+    int __gcSavedTryBlock = threadStateData->tryBlockOffset;
+    jmp_buf __gcTryJmp;
+    if(CN1_TRY_SETJMP(__gcTryJmp) == 0) {
+        threadStateData->blocks[threadStateData->tryBlockOffset].monitor = 0;
+        threadStateData->blocks[threadStateData->tryBlockOffset].exceptionClass = 0; // catch-all
+        memcpy(threadStateData->blocks[threadStateData->tryBlockOffset].destination, __gcTryJmp, sizeof(jmp_buf));
+        threadStateData->tryBlockOffset++;
+#ifdef CN1_GC_INSTRUMENT
+    extern long long cn1_instr_allocCount; extern int currentSizeOfAllObjectsInHeap;
+    static long long markNs=0, sweepNs=0; static int gcCount=0;
+    struct timespec _t0,_t1,_t2;
+    clock_gettime(CLOCK_MONOTONIC,&_t0);
+    codenameOneGCMark();
+    clock_gettime(CLOCK_MONOTONIC,&_t1);
+    codenameOneGCSweep();
+    clock_gettime(CLOCK_MONOTONIC,&_t2);
+    markNs  += (_t1.tv_sec-_t0.tv_sec)*1000000000LL+(_t1.tv_nsec-_t0.tv_nsec);
+    sweepNs += (_t2.tv_sec-_t1.tv_sec)*1000000000LL+(_t2.tv_nsec-_t1.tv_nsec);
+    gcCount++;
+    if(gcCount==1 || (gcCount % 20)==0) fprintf(stderr,"[GC-INSTR] cycles=%d allocs=%lld heapTableSize=%d markMs=%.0f sweepMs=%.0f\n",
+        gcCount, cn1_instr_allocCount, currentSizeOfAllObjectsInHeap, markNs/1e6, sweepNs/1e6);
+#else
     codenameOneGCMark();
     codenameOneGCSweep();
+#endif
+        threadStateData->tryBlockOffset = __gcSavedTryBlock;
+    } else {
+        threadStateData->tryBlockOffset = __gcSavedTryBlock;
+        threadStateData->exception = JAVA_NULL;
+    }
     flushReleaseQueue();
     lowMemoryMode = JAVA_FALSE;
     gcCurrentlyRunning = JAVA_FALSE;
@@ -1457,6 +1585,19 @@ JAVA_VOID java_lang_System_exit___int(CODENAME_ONE_THREAD_STATE, JAVA_INT i) {
 }
 
 JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
+    // TAGGED Integers lock like any other object: the monitor lives in the
+    // pointer-keyed side table below and a tagged value is a perfectly stable
+    // key -- it never moves and never gets collected. Making tagged locks a
+    // no-op (the previous behavior) broke Java synchronization semantics:
+    // synchronized (Integer.valueOf(1)) let every thread through at once, and
+    // wait()/notify() on the value dereferenced nonexistent monitor data.
+    // Equal tagged values share one monitor (identical bit pattern), which is
+    // the JDK's own -128..127 Integer-cache behavior extended to the whole
+    // tagged range -- legal and deterministic. Monitors created for tagged
+    // values are never reclaimed (there is no object death to trigger removal);
+    // they are bounded by the number of DISTINCT integer values a program ever
+    // synchronizes on, which is negligible in practice. The only header-touching
+    // step, cn1BibopNoteMonitorAttached, skips tagged values internally.
     int err = 0;
     // Double-checked locking for the lazily allocated per-object monitor. The fast-path
     // read MUST be an acquire load and the publishing store (inside the critical section)
@@ -1465,24 +1606,41 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     // pthread_mutex_init() has run on it -- and then pthread_mutex_lock() an
     // uninitialized mutex. On ARM's weak memory model that hangs forever (observed as the
     // EDT wedged in monitorEnter while logging an exception, which freezes the whole app).
-    // Build the struct fully, init its mutex/condition, and only then publish the pointer.
-    struct CN1ThreadData* data = (struct CN1ThreadData*)__atomic_load_n(&obj->__codenameOneThreadData, __ATOMIC_ACQUIRE);
+    // Build the struct fully, init its mutex/condition, and only then publish into the
+    // monitor side table. The table's own mutex (taken by Get/Set) supplies the
+    // acquire/release ordering the header atomics used to provide, so a thread that reads
+    // the entry from the table always sees the fully-initialized mutex.
+    struct CN1ThreadData* data = (struct CN1ThreadData*)cn1MonitorDataGet(obj);
     if(!data) {
         lockCriticalSection();
-        data = (struct CN1ThreadData*)obj->__codenameOneThreadData;
+        data = (struct CN1ThreadData*)cn1MonitorDataGet(obj);
         if(!data) {
             data = malloc(sizeof(struct CN1ThreadData));
             memset(data, 0, sizeof(struct CN1ThreadData));
             pthread_mutex_init(&data->__codenameOneMutex, NULL);
             pthread_cond_init(&data->__codenameOneCondition, NULL);
-            __atomic_store_n(&obj->__codenameOneThreadData, data, __ATOMIC_RELEASE);
+            cn1MonitorDataSet(obj, data);
+#if !defined(CN1_DISABLE_BIBOP) && !defined(CN1_BIBOP_NO_FASTSWEEP)
+            // If obj is a BiBOP slot, flag that a monitor now needs freeing at reclaim so
+            // the O(1) all-dead page shortcut is suppressed until it is freed.
+            cn1BibopNoteMonitorAttached(obj);
+#endif
         }
         unlockCriticalSection();
         err = pthread_mutex_lock(&data->__codenameOneMutex);
-        data->ownerThread = threadStateData->threadId;
+        data->ownerThread = CN1_MONITOR_SELF();
         data->counter++;
     } else {
-        JAVA_LONG own = threadStateData->threadId;
+        // The reentrancy identity MUST be the pthread, not threadStateData->threadId:
+        // one pthread can legitimately run under two ThreadLocalData structs (the
+        // main-thread-hosted EDT executes with the CodenameOneThread's state passed
+        // explicitly, while any native helper that calls getThreadLocalData() gets the
+        // pthread's own TLS struct). With id-based ownership a static-field accessor
+        // running inside that thread's own class initializer compared different ids,
+        // missed the reentrant case, and pthread_mutex_lock'd the mutex the same
+        // pthread already held -- observed as the EDT freezing in
+        // __STATIC_INITIALIZER_BufferedOutputStream while logging its first throwable.
+        JAVA_LONG own = CN1_MONITOR_SELF();
         JAVA_LONG currentlyHeldBy = data->ownerThread;
 
         // we already own the lock...
@@ -1520,17 +1678,52 @@ JAVA_VOID monitorEnterBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
 }
 
 JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
+    // Tagged Integers unlock through the same side-table monitor monitorEnter
+    // created for the value (see the comment there); no header access happens
+    // on this path.
     //printf("Unlocked mutex %i ", (int)obj->__codenameOneMutex);
     // remove the ownership of the thread
-    ((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter--;
-    if(((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter > 0) {
+    struct CN1ThreadData* data = (struct CN1ThreadData*)cn1MonitorDataGet(obj);
+    data->counter--;
+    if(data->counter > 0) {
         return;
     }
-    ((struct CN1ThreadData*)obj->__codenameOneThreadData)->ownerThread = 0;
-    int err = pthread_mutex_unlock(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneMutex);
+    data->ownerThread = 0;
+    int err = pthread_mutex_unlock(&data->__codenameOneMutex);
     if(err != 0) {
         printf("Error with unlock %i EINVAL %i, ETIMEDOUT %i, EPERM %i\n", err, EINVAL, ETIMEDOUT, EPERM);
     }
+}
+
+// ---- Tagged small-integer support (poor man's Valhalla, 64-bit pointers only) ----
+// Integer.valueOf returns an immediate tagged pointer instead of allocating; cn1Value
+// recovers the int from either a tagged immediate or a heap Integer's field. When the
+// optimization is off (or on a 32-bit-pointer target) these behave exactly as before:
+// valueOf delegates to the cached heap path and cn1Value just reads the field.
+#if CN1_TAGGED_ACTIVE
+extern void __STATIC_INITIALIZER_java_lang_Integer(CODENAME_ONE_THREAD_STATE);
+#endif
+JAVA_OBJECT java_lang_Integer_valueOf___int_R_java_lang_Integer(CODENAME_ONE_THREAD_STATE, JAVA_INT i) {
+#if CN1_TAGGED_ACTIVE
+    // Tagged ints never allocate, so nothing else triggers Integer's class init -- but
+    // dispatching hashCode/equals on a tagged int reads class__java_lang_Integer.vtable,
+    // which the static initializer populates. Force it once. The guard keeps the hot path
+    // a single predictable branch (the initializer itself is also idempotent).
+    static volatile int cn1IntInit = 0;
+    if(!cn1IntInit) { __STATIC_INITIALIZER_java_lang_Integer(threadStateData); cn1IntInit = 1; }
+    return CN1_TAG_INT(i);
+#else
+    return java_lang_Integer_valueOfHeap___int_R_java_lang_Integer(threadStateData, i);
+#endif
+}
+
+JAVA_INT java_lang_Integer_cn1Value___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+#if CN1_TAGGED_ACTIVE
+    if(CN1_IS_TAGGED(__cn1ThisObject)) {
+        return CN1_UNTAG_INT(__cn1ThisObject);
+    }
+#endif
+    return ((struct obj__java_lang_Integer*)__cn1ThisObject)->java_lang_Integer_value;
 }
 
 // monitorEnterBlock is used for synchronized methods because the JVM bytecode
@@ -1546,17 +1739,18 @@ JAVA_VOID monitorExitBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
 JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_LONG timeout, JAVA_INT nanos) {
     //printf("Waiting on mutex %i with timeout %i started", (int)obj->__codenameOneMutex, (int)timeout);
     threadStateData->threadActive = JAVA_FALSE;
-    
+
+    struct CN1ThreadData* data = (struct CN1ThreadData*)cn1MonitorDataGet(obj);
     int counter;
-    counter = ((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter;
-    
+    counter = data->counter;
+
     // remove the ownership of the thread
-    ((struct CN1ThreadData*)obj->__codenameOneThreadData)->ownerThread = 0;
-    ((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter = 0;
+    data->ownerThread = 0;
+    data->counter = 0;
 
     int errCode = 0;
     if(timeout == 0 && nanos == 0) {
-        errCode = pthread_cond_wait(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneCondition, &((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneMutex);
+        errCode = pthread_cond_wait(&data->__codenameOneCondition, &data->__codenameOneMutex);
         if(errCode != 0) {
             printf("Error with wait %i EINVAL %i, ETIMEDOUT %i, EPERM %i\n", errCode, EINVAL, ETIMEDOUT, EPERM);
         }
@@ -1570,9 +1764,9 @@ JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
             ts.tv_nsec -= 1000000000;
             ts.tv_sec++;
         }
-        pthread_cond_timedwait(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneCondition, &((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneMutex, &ts);
+        pthread_cond_timedwait(&data->__codenameOneCondition, &data->__codenameOneMutex, &ts);
     }
-    
+
     while(threadStateData->threadBlockedByGC) {
         struct timeval   tv;
         gettimeofday(&tv, NULL);
@@ -1583,12 +1777,12 @@ JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
             ts.tv_nsec -= 1000000000;
             ts.tv_sec++;
         }
-        pthread_cond_timedwait(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneCondition, &((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneMutex, &ts);
+        pthread_cond_timedwait(&data->__codenameOneCondition, &data->__codenameOneMutex, &ts);
     }
-    
+
     // restore the ownership of the thread
-    ((struct CN1ThreadData*)obj->__codenameOneThreadData)->ownerThread = threadStateData->threadId;
-    ((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter = counter;
+    data->ownerThread = CN1_MONITOR_SELF();
+    data->counter = counter;
     
     threadStateData->threadActive = JAVA_TRUE;
     //printf("Waiting on mutex %i with timeout %i finished", (int)obj->__codenameOneMutex, (int)timeout);
@@ -1596,23 +1790,18 @@ JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
 
 JAVA_VOID java_lang_Object_notify__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     //printf("Notifying mutex %i", (int)obj->__codenameOneMutex);
-    pthread_cond_signal(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneCondition);
+    pthread_cond_signal(&((struct CN1ThreadData*)cn1MonitorDataGet(obj))->__codenameOneCondition);
 }
 
 JAVA_VOID java_lang_Object_notifyAll__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     //printf("Notifying all mutex threads %i", (int)obj->__codenameOneMutex);
-    pthread_cond_broadcast(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneCondition);
+    pthread_cond_broadcast(&((struct CN1ThreadData*)cn1MonitorDataGet(obj))->__codenameOneCondition);
 }
 
 JAVA_VOID java_lang_Thread_setPriorityImpl___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT t, JAVA_INT p) {
 }
 
-JAVA_VOID java_lang_Thread_releaseThreadNativeResources___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG nativeThreadStruct) {
-    // if a thread object was created and never started, it will still become garbage
-    // and will still be finalized.  In that case, it never had resources allocated at all.
-    if(nativeThreadStruct!=0)
-    {
-    struct ThreadLocalData *head = (struct ThreadLocalData *)nativeThreadStruct;
+void cn1ReleaseThreadLocalData(struct ThreadLocalData *head) {
     free(head->blocks);
     free(head->threadObjectStack);
     free(head->callStackClass);
@@ -1625,6 +1814,27 @@ JAVA_VOID java_lang_Thread_releaseThreadNativeResources___long(CODENAME_ONE_THRE
     free(head->pendingHeapAllocations);
     free(head);
     nThreadsToKill--;
+}
+
+JAVA_VOID java_lang_Thread_releaseThreadNativeResources___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG nativeThreadStruct) {
+    // if a thread object was created and never started, it will still become garbage
+    // and will still be finalized.  In that case, it never had resources allocated at all.
+    if(nativeThreadStruct!=0)
+    {
+    struct ThreadLocalData *head = (struct ThreadLocalData *)nativeThreadStruct;
+    lockCriticalSection();
+    if(head->gcQueuedForDrain) {
+        // The TLD is still on the GC's dead-thread queue: its pendingHeapAllocations
+        // have not been migrated into allObjectsInHeap yet (this finalizer can run
+        // in the same cycle the thread died, when death lands mid-mark after the
+        // drain point). Freeing now would hand the drain a dangling TLD -- defer
+        // the free to cn1DrainDeadThreadPending, which runs it after migration.
+        head->gcReleaseRequested = JAVA_TRUE;
+        unlockCriticalSection();
+        return;
+    }
+    unlockCriticalSection();
+    cn1ReleaseThreadLocalData(head);
     }
 }
 
@@ -1671,8 +1881,29 @@ void markDeadThread(struct ThreadLocalData *d)
     }
 
 }
+// Register a per-thread alternate signal stack (Linux). The crash-protection SIGSEGV
+// handler is installed with SA_ONSTACK, but SA_ONSTACK only takes effect if THIS thread
+// has an alt stack registered (sigaltstack is per-thread). Without it, a STACK-OVERFLOW
+// SIGSEGV re-faults immediately on the already-exhausted stack and the process dies
+// SILENTLY -- no handler, no backtrace, no StackOverflowError. That is exactly why the
+// deep-recursion overflow produced only an opaque core. With an alt stack the handler
+// runs and dumps the faulting thread's backtrace (the recursion). Runtime-only, so it
+// does not perturb codegen.
+void cn1InstallThreadAltStack(void) {
+#if defined(__linux__)
+    static const size_t CN1_ALTSTACK_SZ = 512 * 1024;
+    stack_t ss;
+    ss.ss_sp = malloc(CN1_ALTSTACK_SZ);
+    if (ss.ss_sp == NULL) return;
+    ss.ss_size = CN1_ALTSTACK_SZ;
+    ss.ss_flags = 0;
+    sigaltstack(&ss, NULL); // intentionally leaked: lives for the thread's lifetime
+#endif
+}
+
 void* threadRunner(void *x)
 {
+    cn1InstallThreadAltStack();
     JAVA_OBJECT t = (JAVA_OBJECT)x;
     struct ThreadLocalData* d = getThreadLocalData();
     d->lightweightThread = JAVA_TRUE;
@@ -1704,8 +1935,18 @@ void* threadRunner(void *x)
 }
 
 JAVA_VOID java_lang_Thread_start__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT th) {
-    // disable reference counting on the thread object to prevent the gap between thread start and actual thread running
-    th->__codenameOneReferenceCount = 999999;
+    // Mark the thread alive HERE, on the calling thread, before the worker is
+    // spawned. Previously `alive` was set inside runImpl, which runs on the new
+    // worker thread asynchronously after start() returns. That left a window in
+    // which a caller that did start() then join() could observe isAlive()==false
+    // (worker not yet scheduled) and have join() return immediately -- before any
+    // of the worker's writes were published -- producing nondeterministic results
+    // (the MtStress "DONE 0"). Setting it synchronously here, in program order
+    // before start() returns, guarantees a subsequent join()/isAlive() on the
+    // same thread sees the thread as alive until the worker clears the flag under
+    // the monitor (runImpl: synchronized{ alive=false; notifyAll(); }), which also
+    // establishes the happens-before that publishes the worker's results.
+    set_field_java_lang_Thread_alive(JAVA_TRUE, th);
     pthread_t pt;
     pthread_attr_t attr;
     pthread_attr_init(&attr);
@@ -1822,7 +2063,7 @@ void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int
     }
 #endif
     if (threadStateData->callStackOffset >= CN1_STACK_OVERFLOW_CALL_DEPTH_LIMIT - 1) {
-        throwException(threadStateData, __NEW_INSTANCE_java_lang_StackOverflowError(threadStateData));
+        cn1ThrowStackOverflow(threadStateData); // preallocated: no alloc/trace at exhaustion
         return;
     }
     memset(&threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset], 0, sizeof(struct elementStruct) * (localsStackSize + stackSize));
@@ -1832,10 +2073,6 @@ void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int
     threadStateData->callStackOffset++;
 }
 
-void releaseForReturn(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread) {
-    threadStateData->threadObjectStackOffset = cn1LocalsBeginInThread;
-    threadStateData->callStackOffset--;
-}
 
 void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread, int methodBlockOffset) {
     threadStateData->tryBlockOffset = methodBlockOffset;
@@ -1868,6 +2105,19 @@ JAVA_LONG java_lang_Runtime_freeMemoryImpl___R_long(CODENAME_ONE_THREAD_STATE) {
 }
 
 
+// Closed-world native HashMap.get: one C call instead of get -> getEntry ->
+// computeHashCode(virtual hashCode) -> findNonNullKeyEntry. The chain walk and the
+// tagged-int hashCode (an inline untag in virtual_..._hashCode) are already cheap; this
+// removes the translated-Java wrapper frames. Bit-identical to the Java getEntry path.
+// ============================================================================
+// COMPACT HashMap natives (open addressing over parallel arrays -- see the
+// layout notes in java/util/HashMap.java). These are the C twins of the
+// pure-Java *Impl methods; any semantic change must be applied to BOTH (the
+// JavaScript port runs the Impls). ParparVM natives read the Java arrays as
+// raw C memory, so a probe is a linear scan of an int array -- no JNI cost,
+// no entry objects, no pointer chasing.
+// ============================================================================
+
 JAVA_BOOLEAN java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
     if(__cn1Arg1 == __cn1Arg2) {
         return JAVA_TRUE;
@@ -1875,15 +2125,140 @@ JAVA_BOOLEAN java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_
     return virtual_java_lang_Object_equals___java_lang_Object_R_boolean(threadStateData, __cn1Arg1, __cn1Arg2);
 }
 
-JAVA_OBJECT java_util_HashMap_findNonNullKeyEntry___java_lang_Object_int_int_R_java_util_HashMap_Entry(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT key, JAVA_INT index, JAVA_INT keyHash) {
-    struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
-    JAVA_ARRAY_OBJECT* obj = ((JAVA_ARRAY)t->java_util_HashMap_elementData)->data;
-    struct obj__java_util_HashMap_Entry* m = (struct obj__java_util_HashMap_Entry*)obj[index];
-    while (m != 0
-           && (m->java_util_HashMap_Entry_origKeyHash != keyHash || !java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_R_boolean(threadStateData, key, m->java_util_MapEntry_key))) {
-        m = (struct obj__java_util_HashMap_Entry*)m->java_util_HashMap_Entry_next;
+// the occupied-slot marker: mixed hash with the sign bit forced on (must match
+// HashMap.cn1Marker exactly)
+static inline JAVA_INT cn1HmMarker(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT key) {
+    if(key == JAVA_NULL) {
+        return (JAVA_INT)0x80000000;
     }
-    return (JAVA_OBJECT)m;
+    JAVA_INT h = virtual_java_lang_Object_hashCode___R_int(threadStateData, key);
+    h ^= (JAVA_INT)(((uint32_t)h) >> 16);
+    return h | (JAVA_INT)0x80000000;
+}
+
+// probe; >=0 found slot, else -(insertionPoint+1) (first tombstone on the path
+// if any, else the terminating empty slot). Must match cn1FindSlotImpl.
+static JAVA_INT cn1HmFindSlot(CODENAME_ONE_THREAD_STATE, struct obj__java_util_HashMap* t, JAVA_OBJECT key, JAVA_INT marker) {
+    JAVA_ARRAY metaArr = (JAVA_ARRAY)t->java_util_HashMap_cn1Meta;
+    JAVA_ARRAY_INT* meta = (JAVA_ARRAY_INT*)metaArr->data;
+    JAVA_ARRAY_OBJECT* keys = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Keys)->data;
+    int mask = metaArr->length - 1;
+    int i = marker & mask;
+    int firstTomb = -1;
+    while(1) {
+        JAVA_INT m = meta[i];
+        if(m == 0) { // META_EMPTY
+            return -((firstTomb >= 0 ? firstTomb : i) + 1);
+        }
+        if(m == marker) {
+            JAVA_OBJECT k = keys[i];
+            if(key == JAVA_NULL ? k == JAVA_NULL
+                    : (k == key || java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_R_boolean(threadStateData, key, k))) {
+                return i;
+            }
+        } else if(m == 1 && firstTomb < 0) { // META_TOMB
+            firstTomb = i;
+        }
+        i = (i + 1) & mask;
+    }
+}
+
+JAVA_OBJECT java_util_HashMap_get___java_lang_Object_R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT key) {
+    struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
+    JAVA_INT idx = cn1HmFindSlot(threadStateData, t, key, cn1HmMarker(threadStateData, key));
+    if(idx < 0) {
+        return JAVA_NULL;
+    }
+    return ((JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Vals)->data)[idx];
+}
+
+JAVA_BOOLEAN java_util_HashMap_containsKey___java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT key) {
+    struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
+    return cn1HmFindSlot(threadStateData, t, key, cn1HmMarker(threadStateData, key)) >= 0 ? JAVA_TRUE : JAVA_FALSE;
+}
+
+extern JAVA_VOID java_util_HashMap_cn1Grow__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);
+
+JAVA_OBJECT java_util_HashMap_put___java_lang_Object_java_lang_Object_R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT key, JAVA_OBJECT value) {
+    struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
+    JAVA_INT marker = cn1HmMarker(threadStateData, key);
+    JAVA_INT idx = cn1HmFindSlot(threadStateData, t, key, marker);
+    JAVA_OBJECT valsObj = t->java_util_HashMap_cn1Vals;
+    JAVA_ARRAY_OBJECT* vals = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)valsObj)->data;
+    if(idx >= 0) {
+        JAVA_OBJECT old = vals[idx];
+        CN1_WRITE_BARRIER(valsObj, value);
+        CN1_SATB_DELETE(&vals[idx]); // preserve the overwritten value for this mark cycle
+        vals[idx] = value;
+        return old;
+    }
+    JAVA_INT ins = -idx - 1;
+    JAVA_ARRAY_INT* meta = (JAVA_ARRAY_INT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Meta)->data;
+    JAVA_OBJECT keysObj = t->java_util_HashMap_cn1Keys;
+    JAVA_ARRAY_OBJECT* keys = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)keysObj)->data;
+    JAVA_BOOLEAN wasEmpty = meta[ins] == 0 ? JAVA_TRUE : JAVA_FALSE;
+    meta[ins] = marker;
+    CN1_WRITE_BARRIER(keysObj, key);
+    keys[ins] = key;
+    CN1_WRITE_BARRIER(valsObj, value);
+    vals[ins] = value;
+    t->java_util_HashMap_elementCount++;
+    if(wasEmpty) {
+        t->java_util_HashMap_cn1Occupied++;
+    }
+    t->java_util_HashMap_modCount++;
+    // NOTE: base-class receivers only -- LinkedHashMap overrides put() in Java
+    // (virtual dispatch never routes an LHM here), and cn1Grow is package-
+    // private so application subclasses cannot override it: the direct call to
+    // the base implementation below is exact.
+    if(t->java_util_HashMap_cn1Occupied >= t->java_util_HashMap_threshold) {
+        java_util_HashMap_cn1Grow__(threadStateData, __cn1ThisObject);
+    }
+    return JAVA_NULL;
+}
+
+JAVA_OBJECT java_util_HashMap_remove___java_lang_Object_R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT key) {
+    struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
+    JAVA_INT idx = cn1HmFindSlot(threadStateData, t, key, cn1HmMarker(threadStateData, key));
+    if(idx < 0) {
+        return JAVA_NULL;
+    }
+    JAVA_ARRAY_INT* meta = (JAVA_ARRAY_INT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Meta)->data;
+    JAVA_ARRAY_OBJECT* keys = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Keys)->data;
+    JAVA_ARRAY_OBJECT* vals = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Vals)->data;
+    JAVA_OBJECT old = vals[idx];
+    CN1_SATB_DELETE(&keys[idx]); // preserve the removed key/value for this mark cycle
+    CN1_SATB_DELETE(&vals[idx]);
+    meta[idx] = 1; // META_TOMB
+    keys[idx] = JAVA_NULL;
+    vals[idx] = JAVA_NULL;
+    t->java_util_HashMap_elementCount--;
+    t->java_util_HashMap_modCount++;
+    return old;
+}
+
+JAVA_VOID java_util_HashMap_clear__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;
+    if(t->java_util_HashMap_elementCount > 0 || t->java_util_HashMap_cn1Occupied > 0) {
+        JAVA_ARRAY metaArr = (JAVA_ARRAY)t->java_util_HashMap_cn1Meta;
+        int len = metaArr->length;
+        // SATB deletion barrier: the memsets below bulk-null every live key/value ref,
+        // so preserve them for the current mark cycle first. No-op (one flag load) off-GC.
+        if(__builtin_expect(gcSatbActive, 0)) {
+            JAVA_ARRAY_OBJECT* ck = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Keys)->data;
+            JAVA_ARRAY_OBJECT* cv = (JAVA_ARRAY_OBJECT*)((JAVA_ARRAY)t->java_util_HashMap_cn1Vals)->data;
+            for(int i = 0 ; i < len ; i++) {
+                JAVA_OBJECT k = ck[i]; if(k != JAVA_NULL && !CN1_IS_TAGGED(k)) cn1SatbEnqueue(k);
+                JAVA_OBJECT v = cv[i]; if(v != JAVA_NULL && !CN1_IS_TAGGED(v)) cn1SatbEnqueue(v);
+            }
+        }
+        memset(metaArr->data, 0, (size_t)len * sizeof(JAVA_ARRAY_INT));
+        memset(((JAVA_ARRAY)t->java_util_HashMap_cn1Keys)->data, 0, (size_t)len * sizeof(JAVA_ARRAY_OBJECT));
+        memset(((JAVA_ARRAY)t->java_util_HashMap_cn1Vals)->data, 0, (size_t)len * sizeof(JAVA_ARRAY_OBJECT));
+        t->java_util_HashMap_elementCount = 0;
+        t->java_util_HashMap_cn1Occupied = 0;
+        t->java_util_HashMap_modCount++;
+    }
 }
 
 JAVA_OBJECT java_util_Locale_getOSLanguage___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
@@ -2196,10 +2571,11 @@ JAVA_OBJECT java_text_DateFormat_format___java_util_Date_java_lang_StringBuffer_
 
 
 JAVA_CHAR java_lang_String_charAt___int_R_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_INT __cn1Arg1) {
-    //DEFINE_INSTANCE_METHOD_STACK(3, 2, 0, 752, 755);
     struct obj__java_lang_String* encString = (struct obj__java_lang_String*)__cn1ThisObject;
     JAVA_ARRAY arr =(JAVA_ARRAY)(encString->java_lang_String_value);
-    if(__cn1Arg1 < 0 || __cn1Arg1 >= arr->length) { THROW_ARRAY_INDEX_EXCEPTION(__cn1Arg1); }
+    // JDK contract: bound by the string's LOGICAL length, not the backing
+    // array's capacity (offset/aliasing-constructed strings differ)
+    if(__cn1Arg1 < 0 || __cn1Arg1 >= encString->java_lang_String_count) { THROW_ARRAY_INDEX_EXCEPTION(__cn1Arg1); }
     JAVA_ARRAY_CHAR* encArr = (JAVA_ARRAY_CHAR*)arr->data;
     JAVA_INT index = get_field_java_lang_String_offset(__cn1ThisObject)+__cn1Arg1;
     //releaseForReturn(threadStateData, cn1LocalsBeginInThread, stackPointer - 1, 2, stack, locals);
@@ -2228,9 +2604,32 @@ JAVA_OBJECT java_lang_String_toString___R_java_lang_String(CODENAME_ONE_THREAD_S
 
 JAVA_CHAR java_lang_StringBuilder_charAt___int_R_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_INT index) {
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)__cn1ThisObject;
-    if(index < 0 || index >= ((JAVA_ARRAY)t->java_lang_StringBuilder_value)->length) { THROW_ARRAY_INDEX_EXCEPTION(index); }
+    // bound by count (the JDK contract), NOT capacity: the lax capacity bound
+    // let buggy code read chars beyond length(), and it forced the stack-
+    // allocated builder path to zero its whole buffer just so such reads see
+    // the '\0' a fresh heap array would have held
+    if(index < 0 || index >= t->java_lang_StringBuilder_count) { THROW_ARRAY_INDEX_EXCEPTION(index); }
     JAVA_ARRAY_CHAR* dat = ((JAVA_ARRAY)t->java_lang_StringBuilder_value)->data;
     return dat[index];
+}
+
+// Small-copy helper: a libc memcpy call costs more than the copy itself for the
+// short segments string building deals in (a handful of UTF-16 chars). Inline
+// 8-byte word moves up to 32 chars; beyond that libc's SIMD wins. src/dst never
+// overlap here (fresh destination or append region beyond the source).
+static inline void cn1CharCopy(JAVA_ARRAY_CHAR* dst, const JAVA_ARRAY_CHAR* src, int count) {
+    if(count <= 32) {
+        int b = count * (int)sizeof(JAVA_ARRAY_CHAR);
+        int i = 0;
+        for(; i + 8 <= b; i += 8) {
+            uint64_t w; memcpy(&w, (const char*)src + i, 8); memcpy((char*)dst + i, &w, 8);
+        }
+        for(; i + 2 <= b; i += 2) {
+            uint16_t w; memcpy(&w, (const char*)src + i, 2); memcpy((char*)dst + i, &w, 2);
+        }
+    } else {
+        memcpy(dst, src, (size_t)count * sizeof(JAVA_ARRAY_CHAR));
+    }
 }
 
 JAVA_OBJECT java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT str) {
@@ -2240,21 +2639,80 @@ JAVA_OBJECT java_lang_StringBuilder_append___java_lang_String_R_java_lang_String
         finishedNativeAllocations();
         return __cn1ThisObject;
     }
-    int length = java_lang_String_length___R_int(threadStateData, str);
+    struct obj__java_lang_String* s = (struct obj__java_lang_String*)str;
+    int length = s->java_lang_String_count;
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)__cn1ThisObject;
     int newCount = t->java_lang_StringBuilder_count + length;
     if (newCount > ((JAVA_ARRAY)t->java_lang_StringBuilder_value)->length) {
         java_lang_StringBuilder_enlargeBuffer___int(threadStateData, __cn1ThisObject, newCount);
     }
-    java_lang_String_getChars___int_int_char_1ARRAY_int(threadStateData, str, 0, length, t->java_lang_StringBuilder_value, t->java_lang_StringBuilder_count);
+    JAVA_ARRAY_CHAR* src = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)s->java_lang_String_value)->data) + s->java_lang_String_offset;
+    JAVA_ARRAY_CHAR* dst = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_StringBuilder_value)->data) + t->java_lang_StringBuilder_count;
+    cn1CharCopy(dst, src, length);
     t->java_lang_StringBuilder_count = newCount;
     finishedNativeAllocations();
     return __cn1ThisObject;
-    
+
+}
+
+// Native toString: the result String is ONE fused block (object + char[] child)
+// filled with a single memcpy -- no Java ctor chain, no System.arraycopy, no
+// separate array allocation. Falls back to the pure-Java twin when the fused
+// allocator declines (oversize for BiBOP).
+JAVA_OBJECT java_lang_StringBuilder_toString___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
+    if(__builtin_expect(!class__java_lang_String.initialized, 0)) __STATIC_INITIALIZER_java_lang_String(threadStateData);
+    struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)__cn1ThisObject;
+    int count = t->java_lang_StringBuilder_count;
+    enteringNativeAllocations();
+    int off = (int)((sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7);
+    int total = off + CN1_FUSED_ARR_BYTES(count, sizeof(JAVA_ARRAY_CHAR));
+    // Inline no-zero bump path (init-before-publish, same discipline as the
+    // translator's CN1_FAST_NEW_NOZERO sites): every field of the String AND
+    // of the fused child header is stored, the data region is fully memcpy'd,
+    // and ONLY THEN is the class pointer published -- until that store the
+    // parentCls==0 guard keeps a signal-stopped scan from tracing the body.
+#if !defined(CN1_DISABLE_BIBOP) && !defined(DEBUG_GC_OBJECTS_IN_HEAP)
+    JAVA_OBJECT so = cn1BibopFastAllocNoZero(threadStateData, total, &class__java_lang_String, CN1_BIBOP_CIDX(total));
+#else
+    JAVA_OBJECT so = JAVA_NULL;
+#endif
+    JAVA_BOOLEAN published = JAVA_FALSE;
+    if(so == JAVA_NULL) {
+        so = cn1AllocFused(threadStateData, total, &class__java_lang_String); // zeroed, parentCls set
+        if(so == JAVA_NULL) {
+            JAVA_OBJECT r = java_lang_StringBuilder_toStringImpl___R_java_lang_String(threadStateData, __cn1ThisObject);
+            finishedNativeAllocations();
+            return r;
+        }
+        published = JAVA_TRUE;
+    }
+    JAVA_OBJECT arr = cn1FusedInstallPrimArray(so, off, &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), count);
+    struct obj__java_lang_String* rs = (struct obj__java_lang_String*)so;
+    rs->java_lang_String_value = arr;
+    rs->java_lang_String_offset = 0;
+    rs->java_lang_String_count = count;
+    rs->java_lang_String_hashCode = 0;
+    rs->java_lang_String_nsString = 0;
+    if(count > 0) {
+        // re-read the buffer AFTER the allocation (it can run a GC handshake;
+        // non-moving heap, but the value field itself is re-loadable for free)
+        JAVA_ARRAY_CHAR* src = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_StringBuilder_value)->data;
+        cn1CharCopy((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)arr)->data, src, count);
+    }
+    if(!published) {
+        so->__codenameOneParentClsReference = &class__java_lang_String; // PUBLISH
+    }
+    finishedNativeAllocations();
+    return so;
 }
 
 JAVA_VOID java_lang_StringBuilder_getChars___int_int_char_1ARRAY_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_INT start, JAVA_INT end, JAVA_OBJECT dst, JAVA_INT dstStart) {
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)__cn1ThisObject;
+    // JDK contract: srcEnd bounded by length(), not capacity. Also keeps a
+    // lax caller from reading a stack-allocated builder's unzeroed tail.
+    if(start < 0 || start > end || end > t->java_lang_StringBuilder_count) {
+        THROW_ARRAY_INDEX_EXCEPTION(end);
+    }
     java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int(threadStateData, t->java_lang_StringBuilder_value, start, dst, dstStart, end - start);
 }
 
@@ -2264,6 +2722,53 @@ JAVA_OBJECT java_lang_StringBuilder_append___java_lang_Object_R_java_lang_String
         return __cn1ThisObject;
     }
     return java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(threadStateData, __cn1ThisObject, virtual_java_lang_Object_toString___R_java_lang_String(threadStateData, obj));
+}
+
+// Native append(int)/append(long): write decimal digits straight into the StringBuilder
+// buffer, no temporary String. Digits are generated in negative space so INT/LONG_MIN
+// work without overflow.
+JAVA_OBJECT java_lang_StringBuilder_append___int_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_INT i) {
+    enteringNativeAllocations();
+    char tmp[12]; int tlen = 0;
+    JAVA_BOOLEAN neg = (i < 0);
+    JAVA_INT q = i; if(q > 0) q = -q;
+    do { tmp[tlen++] = (char)('0' - (q % 10)); q /= 10; } while(q != 0);
+    JAVA_INT needed = tlen + (neg ? 1 : 0);
+    JAVA_INT count = get_field_java_lang_StringBuilder_count(__cn1ThisObject);
+    JAVA_OBJECT value = get_field_java_lang_StringBuilder_value(__cn1ThisObject);
+    if(count + needed > ((JAVA_ARRAY)value)->length) {
+        java_lang_StringBuilder_enlargeBuffer___int(threadStateData, __cn1ThisObject, count + needed);
+        value = get_field_java_lang_StringBuilder_value(__cn1ThisObject);
+    }
+    JAVA_ARRAY_CHAR* d = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)value)->data;
+    JAVA_INT pos = count;
+    if(neg) { d[pos++] = '-'; }
+    for(int k = tlen - 1; k >= 0; k--) { d[pos++] = tmp[k]; }
+    set_field_java_lang_StringBuilder_count(count + needed, __cn1ThisObject);
+    finishedNativeAllocations();
+    return __cn1ThisObject;
+}
+
+JAVA_OBJECT java_lang_StringBuilder_append___long_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG l) {
+    enteringNativeAllocations();
+    char tmp[21]; int tlen = 0;
+    JAVA_BOOLEAN neg = (l < 0);
+    JAVA_LONG q = l; if(q > 0) q = -q;
+    do { tmp[tlen++] = (char)('0' - (q % 10)); q /= 10; } while(q != 0);
+    JAVA_INT needed = tlen + (neg ? 1 : 0);
+    JAVA_INT count = get_field_java_lang_StringBuilder_count(__cn1ThisObject);
+    JAVA_OBJECT value = get_field_java_lang_StringBuilder_value(__cn1ThisObject);
+    if(count + needed > ((JAVA_ARRAY)value)->length) {
+        java_lang_StringBuilder_enlargeBuffer___int(threadStateData, __cn1ThisObject, count + needed);
+        value = get_field_java_lang_StringBuilder_value(__cn1ThisObject);
+    }
+    JAVA_ARRAY_CHAR* d = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)value)->data;
+    JAVA_INT pos = count;
+    if(neg) { d[pos++] = '-'; }
+    for(int k = tlen - 1; k >= 0; k--) { d[pos++] = tmp[k]; }
+    set_field_java_lang_StringBuilder_count(count + needed, __cn1ThisObject);
+    finishedNativeAllocations();
+    return __cn1ThisObject;
 }
 
 JAVA_OBJECT java_lang_StringBuilder_append___char_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_CHAR __cn1Arg1) {
@@ -2288,12 +2793,47 @@ JAVA_VOID java_lang_String_getChars___int_int_char_1ARRAY_int(CODENAME_ONE_THREA
     JAVA_ARRAY srcArr = (JAVA_ARRAY)get_field_java_lang_String_value(__cn1ThisObject);
     JAVA_ARRAY_CHAR* src = (JAVA_ARRAY_CHAR*)srcArr->data;
     JAVA_ARRAY_CHAR* dst = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)__cn1Arg3)->data;
-    int start = offset + __cn1Arg1;
-    int end = offset + __cn1Arg2;
-    for (JAVA_INT i=start; i<end; i++) {
-        dst[__cn1Arg4++] = src[i];
-    }
+    // memmove: String and destination can only overlap through VM-internal
+    // aliasing tricks, but the safe spelling costs nothing here
+    memmove(dst + __cn1Arg4, src + offset + __cn1Arg1, (size_t)(__cn1Arg2 - __cn1Arg1) * sizeof(JAVA_ARRAY_CHAR));
 }
+
+// Shared non-ObjC case-conversion body: per-char simple mapping via towupper/
+// towlower (identical to Character.toUpperCase/toLowerCase for ASCII and the
+// BMP simple mappings). Returns `this` unchanged when no character maps (same
+// contract as the JDK). The old #else branch was a stub that ALWAYS returned
+// `this` -- silently wrong on every non-ObjC target (Linux, clean builds).
+#if !(defined(__APPLE__) && defined(__OBJC__))
+#include <wctype.h>
+static JAVA_OBJECT cn1StringConvertCase(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, int toUpper) {
+    struct obj__java_lang_String* s = (struct obj__java_lang_String*)me;
+    int count = s->java_lang_String_count;
+    if(count == 0) return me;
+    enteringNativeAllocations();
+    JAVA_OBJECT arr = allocArray(threadStateData, count, &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), 1);
+    // read the source AFTER the allocation (non-moving GC, `me` rooted by the caller)
+    JAVA_ARRAY_CHAR* src = ((JAVA_ARRAY_CHAR*)((JAVA_ARRAY)s->java_lang_String_value)->data) + s->java_lang_String_offset;
+    JAVA_ARRAY_CHAR* dst = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)arr)->data;
+    JAVA_BOOLEAN changed = JAVA_FALSE;
+    for(int i = 0 ; i < count ; i++) {
+        JAVA_ARRAY_CHAR c = src[i];
+        JAVA_ARRAY_CHAR m = (JAVA_ARRAY_CHAR)(toUpper ? towupper(c) : towlower(c));
+        if(m != c) changed = JAVA_TRUE;
+        dst[i] = m;
+    }
+    if(!changed) {
+        finishedNativeAllocations();
+        return me; // arr becomes garbage; the GC reclaims it
+    }
+    JAVA_OBJECT str = __NEW_INSTANCE_java_lang_String(threadStateData);
+    struct obj__java_lang_String* o = (struct obj__java_lang_String*)str;
+    o->java_lang_String_value = arr;   // fresh private array: alias, no copy
+    o->java_lang_String_offset = 0;
+    o->java_lang_String_count = count;
+    finishedNativeAllocations();
+    return str;
+}
+#endif
 
 JAVA_OBJECT java_lang_String_toUpperCase___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject) {
 #if defined(__APPLE__) && defined(__OBJC__)
@@ -2305,8 +2845,7 @@ JAVA_OBJECT java_lang_String_toUpperCase___R_java_lang_String(CODENAME_ONE_THREA
     finishedNativeAllocations();
     return jString;
 #else
-    // TODO: Implement stub
-    return __cn1ThisObject; // Stub
+    return cn1StringConvertCase(threadStateData, __cn1ThisObject, 1);
 #endif
 }
 
@@ -2320,8 +2859,7 @@ JAVA_OBJECT java_lang_String_toLowerCase___R_java_lang_String(CODENAME_ONE_THREA
     finishedNativeAllocations();
     return jString;
 #else
-    // TODO: Implement stub
-    return __cn1ThisObject; // Stub
+    return cn1StringConvertCase(threadStateData, __cn1ThisObject, 0);
 #endif
 }
 

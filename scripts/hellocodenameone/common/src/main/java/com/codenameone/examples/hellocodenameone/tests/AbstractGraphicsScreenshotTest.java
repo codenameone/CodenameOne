@@ -108,35 +108,40 @@ public abstract class AbstractGraphicsScreenshotTest extends BaseTest {
                         drawContent(g, getBounds());
                     }
                 };
+            // The mutable-image variants deliberately render into a FRESH image on
+            // EVERY paint rather than caching the first render: a first-paint
+            // transient (a native/derived font still loading asynchronously) would
+            // otherwise be frozen into the cached image and shipped by the capture
+            // even though the settle chain repaints -- observed on the Android
+            // emulator as DrawString's image-AA-on cell keeping a fallback font for
+            // its last line while the direct cells (which re-render every paint)
+            // self-healed. Rebuilding per paint keeps the pixels identical to the
+            // old first-paint render (fresh image each time) while guaranteeing the
+            // CAPTURED paint reflects the settled state. The extra allocation per
+            // frame is irrelevant for a screenshot test.
             case 2:
                 return new CleanPaintComponent() {
-                    private Image img;
                     @Override
                     public void cleanPaint(Graphics g) {
-                        if (img == null || img.getWidth() != getWidth() || img.getHeight() != getHeight()) {
-                            currentColor = -1;
-                            img = Image.createImage(getWidth(), getHeight());
-                            Graphics imgGraphics = img.getGraphics();
-                            imgGraphics.setAntiAliased(false);
-                            imgGraphics.setAntiAliasedText(false);
-                            drawContent(imgGraphics, new Rectangle(0, 0, img.getWidth(), img.getHeight()));
-                        }
+                        currentColor = -1;
+                        Image img = Image.createImage(getWidth(), getHeight());
+                        Graphics imgGraphics = img.getGraphics();
+                        imgGraphics.setAntiAliased(false);
+                        imgGraphics.setAntiAliasedText(false);
+                        drawContent(imgGraphics, new Rectangle(0, 0, img.getWidth(), img.getHeight()));
                         g.drawImage(img, getX(), getY());
                     }
                 };
             default:
                 return new CleanPaintComponent() {
-                    private Image img;
                     @Override
                     public void cleanPaint(Graphics g) {
-                        if (img == null || img.getWidth() != getWidth() || img.getHeight() != getHeight()) {
-                            currentColor = -1;
-                            img = Image.createImage(getWidth(), getHeight());
-                            Graphics imgGraphics = img.getGraphics();
-                            imgGraphics.setAntiAliased(true);
-                            imgGraphics.setAntiAliasedText(true);
-                            drawContent(imgGraphics, new Rectangle(0, 0, img.getWidth(), img.getHeight()));
-                        }
+                        currentColor = -1;
+                        Image img = Image.createImage(getWidth(), getHeight());
+                        Graphics imgGraphics = img.getGraphics();
+                        imgGraphics.setAntiAliased(true);
+                        imgGraphics.setAntiAliasedText(true);
+                        drawContent(imgGraphics, new Rectangle(0, 0, img.getWidth(), img.getHeight()));
                         g.drawImage(img, getX(), getY());
                     }
                 };

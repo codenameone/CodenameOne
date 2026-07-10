@@ -211,6 +211,9 @@ jobs:
         working-directory: vm
         env:
           CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}/artifacts/linux-port/raw
+          # Full app stdout/stderr -- the only evidence when the suite wedges
+          # mid-run (uploaded with the screenshot artifact below).
+          CN1_APP_LOG_TEE: ${{ github.workspace }}/artifacts/linux-port/raw/app-output.log
           # Build the native ELF (and the demo) against an old glibc for portability.
           CN1_CC: /usr/local/bin/cn1-zig-cc
           # After the suite runs, the capture test relinks the same objects into a
@@ -219,13 +222,50 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: |
           set -e
+          sudo apt-get install -y --no-install-recommends gdb >/dev/null 2>&1 || true
           Xvfb :99 -screen 0 1200x1600x24 >/tmp/xvfb-run.log 2>&1 &
           export DISPLAY=:99
           sleep 2
+          # The suite intermittently DIES mid-run with no output (gdb-attach
+          # watchdog found the pid already gone -- a silent crash, not a hang).
+          # Enable core dumps and post-mortem them into the artifact.
+          ulimit -c unlimited
+          echo '/tmp/cn1-cores/core.%e.%p' | sudo tee /proc/sys/kernel/core_pattern >/dev/null
+          mkdir -p /tmp/cn1-cores
+          rc=0
           mvn -B clean package -pl JavaAPI -am -DskipTests
           mvn -B test -pl tests -am \
             '-Dtest=CleanTargetLinuxIntegrationTest#capturesHelloSuiteOverWebSocketLinux' \
-            '-Dsurefire.failIfNoSpecifiedTests=false'
+            '-Dsurefire.failIfNoSpecifiedTests=false' || rc=$?
+          for core in /tmp/cn1-cores/core.*; do
+            [ -f "$core" ] || continue
+            elf="$(/usr/bin/find /tmp -maxdepth 4 -name LinuxHelloMain -type f 2>/dev/null | head -1)"
+            mkdir -p "$(dirname "$CN1_APP_LOG_TEE")"
+            {
+              echo "=== post-mortem of $core (elf=$elf) ==="
+              gdb "$elf" "$core" -batch -ex 'set pagination off' \
+                -ex 'thread apply all bt' \
+                -ex 'thread 1' -ex 'bt full' \
+                -ex 'frame 0' -ex 'info args' \
+                -ex 'frame 1' -ex 'info locals' -ex 'info args' \
+                -ex 'p gcMarkWorklistTop' -ex 'p currentGcMarkValue' \
+                2>&1
+            } >> "$(dirname "$CN1_APP_LOG_TEE")/crash-stacks.txt" || true
+          done
+          # Resolve the CN1 FAULT/ABORT backtrace addresses (LinuxHelloMain[0x...]) that the
+          # SA_ONSTACK handler dumped to app-output.log into function names -- the faulting
+          # frames (e.g. a stack overflow's recursion / the caller that ran CN1 on a small
+          # native stack). The suite binary is not stripped, so addr2line resolves them.
+          elf="$(/usr/bin/find /tmp -maxdepth 4 -name LinuxHelloMain -type f 2>/dev/null | head -1)"
+          if [ -n "$elf" ] && [ -f "$CN1_APP_LOG_TEE" ]; then
+            {
+              echo "=== addr2line of CN1 backtrace addresses (from app log) ==="
+              grep -oE "LinuxHelloMain\[0x[0-9a-f]+\]" "$CN1_APP_LOG_TEE" | grep -oE "0x[0-9a-f]+" | while read a; do
+                echo "$a -> $(addr2line -f -C -e "$elf" "$a" 2>/dev/null | tr '\n' ' ')"
+              done
+            } >> "$(dirname "$CN1_APP_LOG_TEE")/crash-stacks.txt" 2>&1 || true
+          fi
+          exit $rc
 
       - name: Upload screenshot artifact (${{ matrix.arch }})
         if: always()
@@ -272,6 +312,7 @@ jobs:
           docker run --rm \
             -v "$GITHUB_WORKSPACE":/cn1 -w /cn1 \
             -e CN1_SHOT_OUTPUT_DIR=/cn1/artifacts/linux-port/raw-musl \
+            -e CN1_APP_LOG_TEE=/cn1/artifacts/linux-port/raw-musl/app-output.log \
             -e LIBGL_ALWAYS_SOFTWARE=1 \
             docker.io/library/alpine:3.20 sh -ec '
               sed -i "s|^#\(.*/community\)|\1|" /etc/apk/repositories

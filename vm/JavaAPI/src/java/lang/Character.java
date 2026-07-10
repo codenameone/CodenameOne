@@ -1262,7 +1262,21 @@ public final class Character implements Comparable<Character>{
      * @return object instance
      */
     public static Character valueOf(char i) {
+        if (i <= 127) {
+            return CharacterCache.cache[i];
+        }
         return new Character(i);
+    }
+
+    /** Cache of boxed values for 0..127, mirroring the JDK's CharacterCache. */
+    private static final class CharacterCache {
+        static final Character[] cache = new Character[128];
+        static {
+            for (int j = 0; j < 128; j++) {
+                cache[j] = new Character((char) j);
+            }
+        }
+        private CharacterCache() {}
     }
 
     /**

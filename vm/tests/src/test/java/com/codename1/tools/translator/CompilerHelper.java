@@ -294,10 +294,13 @@ public class CompilerHelper {
         List<String> command = new ArrayList<>();
         command.add(javac);
 
-        // Filter out flags that might be unsupported on newer JDKs if target is old,
-        // but generally we rely on the caller to provide correct flags.
-        // However, we might need to suppress warnings for obsolete targets.
-        // args.add("-Xlint:-options"); // Added by caller?
+        // Sources are UTF-8; without this javac falls back to the platform
+        // charset, and in a C/POSIX-locale environment (bare containers) that
+        // is US-ASCII, failing on any non-ASCII character in a comment.
+        if (!args.contains("-encoding")) {
+            command.add("-encoding");
+            command.add("UTF-8");
+        }
 
         command.addAll(args);
 

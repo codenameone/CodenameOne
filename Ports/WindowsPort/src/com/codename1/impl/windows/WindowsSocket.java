@@ -35,6 +35,35 @@ import java.io.OutputStream;
 public final class WindowsSocket {
     private long handle;
 
+    /**
+     * A single read buffer, reused across every blocking read on this socket and held as a
+     * DIRECT GC root (see {@link #PINNED_READ_BUFFERS}) for as long as the socket is open.
+     *
+     * <p>The concurrent conservative collector can otherwise sweep a freshly-allocated read
+     * array while this thread is parked inside the native blocking {@code recv()}: platforms
+     * without signal-stop (Windows) rely purely on the cooperative stack scan and can miss the
+     * parked reader, and marking the buffer indirectly through the impl-&gt;stream-&gt;buffer
+     * chain depends on mark-completeness that has proven fragile under load. A stable,
+     * directly-rooted buffer removes both the per-read allocation window and the chain
+     * dependency, so it can never be reclaimed mid-read regardless of scan timing.
+     */
+    private byte[] readBuffer;
+
+    /** Directly-rooted set of live per-socket read buffers; scanned by markStatics. */
+    private static final java.util.Set<byte[]> PINNED_READ_BUFFERS =
+            java.util.Collections.synchronizedSet(new java.util.HashSet<byte[]>());
+
+    /** Lazily allocates and pins this socket's reusable read buffer. */
+    private byte[] readBuffer() {
+        byte[] b = readBuffer;
+        if (b == null) {
+            b = new byte[8192];
+            PINNED_READ_BUFFERS.add(b);
+            readBuffer = b;
+        }
+        return b;
+    }
+
     /** Connects to host:port; {@link #isConnected()} reports the outcome. */
     public WindowsSocket(String host, int port, int timeoutMillis) {
         handle = WindowsNative.socketConnect(host, port, timeoutMillis);
@@ -53,18 +82,17 @@ public final class WindowsSocket {
         if (handle == 0) {
             return null;
         }
-        int avail = WindowsNative.socketAvailable(handle);
-        byte[] buffer = new byte[avail > 0 ? avail : 8192];
-        int read = WindowsNative.socketRead(handle, buffer, 0, buffer.length);
+        // Read into the pinned, reusable buffer so the array can never be swept while this
+        // thread is parked in the native blocking recv, then copy out a right-sized result
+        // (allocated after recv returns, so it is never held across a blocking call).
+        byte[] scratch = readBuffer();
+        int read = WindowsNative.socketRead(handle, scratch, 0, scratch.length);
         if (read < 0) {
             return null;
         }
-        if (read == buffer.length) {
-            return buffer;
-        }
-        byte[] trimmed = new byte[read];
-        System.arraycopy(buffer, 0, trimmed, 0, read);
-        return trimmed;
+        byte[] result = new byte[read];
+        System.arraycopy(scratch, 0, result, 0, read);
+        return result;
     }
 
     public void write(byte[] data, int offset, int length) {
@@ -86,6 +114,11 @@ public final class WindowsSocket {
         if (handle != 0) {
             WindowsNative.socketClose(handle);
             handle = 0;
+        }
+        byte[] b = readBuffer;
+        if (b != null) {
+            PINNED_READ_BUFFERS.remove(b);
+            readBuffer = null;
         }
     }
 
@@ -132,7 +165,9 @@ public final class WindowsSocket {
             if (handle == 0) {
                 return false;
             }
-            byte[] chunk = new byte[8192];
+            // Reuse the socket's pinned read buffer so it can never be swept while this thread
+            // is parked in the native blocking recv (see WindowsSocket.readBuffer).
+            byte[] chunk = readBuffer();
             int n = WindowsNative.socketRead(handle, chunk, 0, chunk.length);
             if (n < 0) {
                 return false;
