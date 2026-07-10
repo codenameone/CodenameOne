@@ -241,9 +241,11 @@ distribution-channel package is your signed release APK stamped with a store
 identifier -- one APK per store, all built from the same release.
 
 You choose the stores; the build produces one package per store, each carrying its
-channel id. Your app reads that id at runtime through a Codename One API, so you can
-report the install source (to your own analytics or the store's) *without adding any
-third-party channel SDK* -- Codename One writes the id and reads it back for you.
+channel id. Your app reads that id at runtime with
+`Display.getInstance().getProperty("DistributionChannel", "")` -- an empty string
+for a normal Google Play build -- so you can report the install source (to your own
+analytics or the store's) *without adding any third-party channel SDK*. Codename One
+writes the id and reads it back for you.
 
 TIP: Google Play is never a channel package. Play always receives the standard,
 unmodified Android App Bundle, so nothing about this feature affects your Play
