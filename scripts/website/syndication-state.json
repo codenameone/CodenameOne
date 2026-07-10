@@ -848,6 +848,19 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-07-10T15:01:35+00:00"
+      },
+      "devto": {
+        "id": 4114785,
+        "url": "https://dev.to/codenameone/more-surfaces-same-deal-cars-sensors-commerce-video-and-builds-29pg",
+        "syndicated_at": "2026-07-10T15:27:50+00:00"
+      },
+      "foojay": {
+        "id": 124873,
+        "url": "https://foojay.io/wp-admin/post.php?post=124873&action=edit",
+        "preview_url": "https://foojay.io/?p=124873",
+        "featured_media_id": 124872,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-07-10T15:28:43+00:00"
       }
     }
   }
