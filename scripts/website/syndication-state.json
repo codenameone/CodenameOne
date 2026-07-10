@@ -837,6 +837,18 @@
         "url": "https://medium.com/p/3a146c0b65b9/edit",
         "syndicated_at": "2026-07-09T17:02:30+00:00"
       }
+    },
+    "one-codebase-more-surfaces": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmrf2cza500000ako6jv51fe8",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a4fb782bdcebc9cb2047aa5",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-10T15:01:35+00:00"
+      }
     }
   }
 }
