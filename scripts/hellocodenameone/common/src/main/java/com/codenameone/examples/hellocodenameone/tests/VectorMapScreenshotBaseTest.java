@@ -31,18 +31,35 @@ public abstract class VectorMapScreenshotBaseTest extends BaseTest {
     /// subclass before {@code form.show()}.
     protected MapSurface mapUnderTest;
 
+    // Minimum elapsed before trusting the probe: the first isMapReady() can fire
+    // BEFORE the host's final layout pass -- which may then reset the pixel ratio,
+    // bump the engine generation and CLEAR the rendered-tile cache, so a capture
+    // taken off that early "ready" catches the reload mid-flight (observed on the
+    // Android leg: capture 1.5s after test start with one visible tile beige).
+    private static final int MIN_SETTLE_MS = 1500;
     // Generous: heavy first renders on a starved CI simulator have been observed
     // far beyond the old 9s cap; a healthy run exits after a few polls.
     private static final int MAX_WAIT_MS = 30000;
     private static final int POLL_MS = 150;
+    // The probe must hold across consecutive polls: a single true can sit right
+    // before a generation clear (see MIN_SETTLE_MS note).
+    private static final int STABLE_POLLS = 2;
+
+    private int consecutiveReady;
 
     @Override
     protected void registerReadyCallback(Form parent, Runnable run) {
+        consecutiveReady = 0;
         awaitTilesThenRun(parent, run, 0);
     }
 
     private void awaitTilesThenRun(final Form parent, final Runnable run, final int waitedMs) {
         if (isMapReady()) {
+            consecutiveReady++;
+        } else {
+            consecutiveReady = 0;
+        }
+        if (consecutiveReady >= STABLE_POLLS && waitedMs >= MIN_SETTLE_MS) {
             run.run();
             return;
         }

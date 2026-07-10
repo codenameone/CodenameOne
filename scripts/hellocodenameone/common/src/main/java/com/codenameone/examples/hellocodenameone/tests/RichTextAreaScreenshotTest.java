@@ -68,7 +68,15 @@ public class RichTextAreaScreenshotTest extends BaseTest {
         // whole test with a fresh 30s budget and a warm WebKit (same pattern as
         // GoogleWebMap). The second pass captures at the bound regardless, so a
         // genuinely broken editor fails loudly as a differ.
-        UITimer.timer(12000, false, parent, this::boundFired);
+        //
+        // The bound MUST sit inside the runner's per-test timeout or it never
+        // fires: native gives 30s (bound 12s), but the JS port's timeout is 10s
+        // -- a 12s bound there turned this test into a guaranteed missing
+        // screenshot (both runner attempts timed out before the bound). The JS
+        // web "view" is the browser itself (no cold-WebKit problem), so a short
+        // bound is also the correct behavior there.
+        boolean html5 = "HTML5".equals(com.codename1.ui.Display.getInstance().getPlatformName());
+        UITimer.timer(html5 ? 7000 : 12000, false, parent, this::boundFired);
         maybeSettle();
     }
 
@@ -78,7 +86,7 @@ public class RichTextAreaScreenshotTest extends BaseTest {
         }
         if (!retriedOnce) {
             retriedOnce = true;
-            System.out.println("CN1SS:WARN:test=RichTextArea editor not ready after 12000ms; "
+            System.out.println("CN1SS:WARN:test=RichTextArea editor not ready at the capture bound; "
                     + "going silent to hand off to the runner's timeout retry");
             readyRunnable = null;
             return;
