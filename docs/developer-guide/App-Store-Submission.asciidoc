@@ -63,6 +63,12 @@ permissions > API client* and note its *Client ID* and *Client Secret*, then add
 them on the same submission credentials page. The app must already exist in
 AppGallery Connect (submission binds to the app resolved from your package name).
 
+The Submissions page shows a connect card for each store you haven't configured
+yet; fill one in and save to enable one-click submission to that store.
+
+.The submission credentials cards in the build console
+image::img/submission-store-credentials.png[Build console Submissions page showing the App Store Connect and Huawei AppGallery credential cards,scaledwidth=90%]
+
 ==== Beta vs production
 
 When you submit you choose a destination. *Beta* means TestFlight (Apple) or the
