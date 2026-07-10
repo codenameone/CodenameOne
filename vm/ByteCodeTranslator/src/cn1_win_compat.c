@@ -21,6 +21,19 @@
 _Static_assert(sizeof(cn1_srwlock_t) == sizeof(SRWLOCK), "SRWLOCK layout mismatch");
 _Static_assert(sizeof(cn1_condvar_t) == sizeof(CONDITION_VARIABLE), "CONDITION_VARIABLE layout mismatch");
 
+/* one-time init: double-checked CAS on the state word (0=idle 1=running 2=done) */
+int pthread_once(pthread_once_t* once_control, void (*init_routine)(void)) {
+    if (InterlockedCompareExchange((volatile LONG*)&once_control->state, 1, 0) == 0) {
+        init_routine();
+        InterlockedExchange((volatile LONG*)&once_control->state, 2);
+    } else {
+        while (InterlockedCompareExchange((volatile LONG*)&once_control->state, 2, 2) != 2) {
+            Sleep(0);
+        }
+    }
+    return 0;
+}
+
 /* --- mutex (non-recursive, like a default pthread mutex) --- */
 int pthread_mutex_init(pthread_mutex_t* mutex, const void* attr) {
     (void)attr;
@@ -178,6 +191,15 @@ int pthread_create(pthread_t* thread, const pthread_attr_t* attr, void* (*start_
     if (attr != NULL && attr->detachstate == PTHREAD_CREATE_DETACHED) {
         CloseHandle((HANDLE)h);
         thread->handle = NULL;
+    }
+    return 0;
+}
+
+int pthread_detach(pthread_t thread) {
+    /* joins are unsupported in this shim anyway; detaching = releasing the
+       handle so the kernel object dies with the thread (GC mark workers) */
+    if (thread.handle != NULL && thread.handle != GetCurrentThread()) {
+        CloseHandle((HANDLE)thread.handle);
     }
     return 0;
 }

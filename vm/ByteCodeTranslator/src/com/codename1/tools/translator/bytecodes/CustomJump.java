@@ -35,16 +35,26 @@ public class CustomJump extends Instruction {
     private Label label;
     
     /**
-     * If customCompareCode is set, it will be used for the comparison 
+     * If customCompareCode is set, it will be used for the comparison
      * leading to the jump instead of the default stack-based comparison.
      */
     private String customCompareCode;
-    
+
+    /**
+     * Emitted AFTER the goto/JUMP_TO -- lets a compare-code that opens a block
+     * (statement prelude for fused array-load comparisons) close it.
+     */
+    private String customSuffix;
+
     public CustomJump(Label label, String customCompareCode) {
         super(-1);
         this.label = label;
         LabelInstruction.labelIsUsed(label);
         this.customCompareCode = customCompareCode;
+    }
+
+    public void setCustomSuffix(String customSuffix) {
+        this.customSuffix = customSuffix;
     }
     
     public static CustomJump create(Jump orig, String customCompareCode) {
@@ -66,6 +76,9 @@ public class CustomJump extends Instruction {
             b.append("goto label_");
             b.append(label.toString());
             b.append(";\n");
+        }
+        if(customSuffix != null) {
+            b.append(customSuffix);
         }
     }
     

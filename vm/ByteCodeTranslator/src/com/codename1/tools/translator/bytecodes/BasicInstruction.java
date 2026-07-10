@@ -358,6 +358,8 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 }
                 b.append("{ /* BC_AASTORE */\n" +
                         "    JAVA_OBJECT aastoreTmp = SP[-3].data.o; \n" +
+                        "    CN1_WRITE_BARRIER(aastoreTmp, SP[-1].data.o); \n" +
+                        "    CN1_SATB_DELETE(&((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i]); \n" +
                         "    ((JAVA_ARRAY_OBJECT*) (*(JAVA_ARRAY)aastoreTmp).data)[SP[-2].data.i] = SP[-1].data.o; \n" +
                         "    SP -= 3; }\n");
                 break;
@@ -635,8 +637,10 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 
             case Opcodes.IRETURN:
                 appendSynchronized(b);
-                
-                if(TryCatch.isTryCatchInMethod()) {
+
+                if(getMethod() != null && getMethod().isFrameless()) {
+                    b.append("    return SP[-1].data.i;\n");
+                } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); return SP[-1].data.i;\n");
 //                    b.append(maxLocals);
 //                    b.append(", stack, locals, methodBlockOffset); \n    return SP[-1].data.i;\n");
@@ -657,8 +661,10 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 
             case Opcodes.LRETURN:
                 appendSynchronized(b);
-                                
-                if(TryCatch.isTryCatchInMethod()) {
+
+                if(getMethod() != null && getMethod().isFrameless()) {
+                    b.append("    return POP_LONG();\n");
+                } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_LONG();\n");
                 } else {
                     if(getMethod() != null && getMethod().isBarebone()) {
@@ -675,8 +681,10 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 
             case Opcodes.FRETURN:
                 appendSynchronized(b);
-                
-                if(TryCatch.isTryCatchInMethod()) {
+
+                if(getMethod() != null && getMethod().isFrameless()) {
+                    b.append("    return POP_FLOAT();\n");
+                } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_FLOAT();\n");
                 } else {
                     if(getMethod() != null && getMethod().isBarebone()) {
@@ -693,8 +701,10 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 
             case Opcodes.DRETURN:
                 appendSynchronized(b);
-                
-                if(TryCatch.isTryCatchInMethod()) {
+
+                if(getMethod() != null && getMethod().isFrameless()) {
+                    b.append("    return POP_DOUBLE();\n");
+                } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_DOUBLE();\n");
                 } else {
                     if(getMethod() != null && getMethod().isBarebone()) {
@@ -711,8 +721,12 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 
             case Opcodes.ARETURN:
                 appendSynchronized(b);
-                
-                if(TryCatch.isTryCatchInMethod()) {
+
+                if(getMethod() != null && getMethod().isFrameless()) {
+                    // No frame to release -- the operand stack is a method-local array and
+                    // the object roots live in native C storage scanned conservatively.
+                    b.append("    return POP_OBJ();\n");
+                } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_OBJ();\n");
                 } else {
                     if(getMethod() != null && getMethod().isBarebone()) {
@@ -734,7 +748,9 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                     b.append("    return;\n");
                     break;
                 }
-                if(TryCatch.isTryCatchInMethod()) {
+                if(getMethod() != null && getMethod().isFrameless()) {
+                    b.append("    return;\n");
+                } else if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return;\n");
                 } else {
                     if(getMethod() != null && getMethod().isBarebone()) {

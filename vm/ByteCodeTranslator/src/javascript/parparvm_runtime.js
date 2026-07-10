@@ -5200,6 +5200,15 @@ bindNative(["cn1_java_lang_System_arraycopy_java_lang_Object_int_java_lang_Objec
 bindNative(["cn1_java_lang_System_gcLight", "cn1_java_lang_System_gcLight__"], function() { return null; });
 bindNative(["cn1_java_lang_System_gcMarkSweep", "cn1_java_lang_System_gcMarkSweep__"], function() { return null; });
 bindNative(["cn1_java_lang_System_isHighFrequencyGC_R_boolean", "cn1_java_lang_System_isHighFrequencyGC___R_boolean"], function() { return 0; });
+// Tagged-immediate Integer natives (C-side poor-man's-Valhalla). The JS port
+// has no tagged pointers: cn1Value reads the heap field, valueOf delegates to
+// the pure-Java cache twin (valueOfHeap).
+bindNative(["cn1_java_lang_Integer_cn1Value_R_int"], function(__cn1ThisObject) {
+  return __cn1ThisObject.cn1_java_lang_Integer_value | 0;
+});
+bindNative(["cn1_java_lang_Integer_valueOf_int_R_java_lang_Integer"], function*(i) {
+  return yield* adaptVirtualResult(cn1_java_lang_Integer_valueOfHeap_int_R_java_lang_Integer(i));
+});
 bindNative(["cn1_java_lang_System_exit_int", "cn1_java_lang_System_exit___int"], function(status) { jvm.finish(status); return null; });
 bindNative(["cn1_java_lang_Runtime_totalMemoryImpl_R_long"], function() { return _LfromNumber(67108864); });
 bindNative(["cn1_java_lang_Runtime_freeMemoryImpl_R_long"], function() { return _LfromNumber(33554432); });
@@ -5247,7 +5256,13 @@ bindNative(["cn1_java_lang_StringBuilder_append_int_R_java_lang_StringBuilder"],
 bindNative(["cn1_java_lang_StringBuilder_append_long_R_java_lang_StringBuilder"], function(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, _LtoStr(value)); });
 bindNative(["cn1_java_lang_StringBuilder_append_java_lang_Object_R_java_lang_StringBuilder"], function(__cn1ThisObject, obj) { return sbAppendNativeString(__cn1ThisObject, jvm.toNativeString(obj)); });
 bindNative(["cn1_java_lang_StringBuilder_append_java_lang_String_R_java_lang_StringBuilder"], function(__cn1ThisObject, str) { return sbAppendNativeString(__cn1ThisObject, jvm.toNativeString(str)); });
-bindNative(["cn1_java_lang_StringBuilder_charAt_int_R_char"], function(__cn1ThisObject, index) { return (__cn1ThisObject[CN1_SB_VALUE][index | 0] || 0) | 0; });
+bindNative(["cn1_java_lang_StringBuilder_charAt_int_R_char"], function(__cn1ThisObject, index) {
+  index = index | 0;
+  if (index < 0 || index >= (__cn1ThisObject[CN1_SB_COUNT] | 0)) {
+    throw new Error("ArrayIndexOutOfBoundsException");
+  }
+  return (__cn1ThisObject[CN1_SB_VALUE][index] || 0) | 0;
+});
 bindNative(["cn1_java_lang_StringBuilder_length_R_int"], function(__cn1ThisObject) { return __cn1ThisObject[CN1_SB_COUNT] | 0; });
 bindNative(["cn1_java_lang_StringBuilder_toString_R_java_lang_String"], function(__cn1ThisObject) {
   const count = __cn1ThisObject[CN1_SB_COUNT] | 0;
@@ -5259,15 +5274,34 @@ bindNative(["cn1_java_lang_StringBuilder_toString_R_java_lang_String"], function
   return createJavaString(out);
 });
 bindNative(["cn1_java_lang_StringBuilder_getChars_int_int_char_1ARRAY_int"], function(__cn1ThisObject, start, end, dst, dstStart) {
+  if ((start | 0) < 0 || (start | 0) > (end | 0) || (end | 0) > (__cn1ThisObject[CN1_SB_COUNT] | 0)) {
+    throw new Error("ArrayIndexOutOfBoundsException");
+  }
   const value = __cn1ThisObject[CN1_SB_VALUE];
   for (let i = start | 0; i < (end | 0); i++) {
     dst[(dstStart | 0) + i - (start | 0)] = value[i] | 0;
   }
   return null;
 });
-bindNative(["cn1_java_lang_String_charAt_int_R_char"], function(__cn1ThisObject, index) { return jvm.toNativeString(__cn1ThisObject).charCodeAt(index | 0) | 0; });
+bindNative(["cn1_java_lang_String_charAt_int_R_char"], function(__cn1ThisObject, index) {
+  const ns = jvm.toNativeString(__cn1ThisObject);
+  index = index | 0;
+  if (index < 0 || index >= ns.length) {
+    throw new Error("ArrayIndexOutOfBoundsException");
+  }
+  return ns.charCodeAt(index) | 0;
+});
 bindNative(["cn1_java_lang_String_equals_java_lang_Object_R_boolean"], function(__cn1ThisObject, obj) {
   return (obj != null && obj.__class === "java_lang_String" && jvm.toNativeString(__cn1ThisObject) === jvm.toNativeString(obj)) ? 1 : 0;
+});
+bindNative(["cn1_java_lang_String_compareTo_java_lang_String_R_int"], function(__cn1ThisObject, other) {
+  const a = jvm.toNativeString(__cn1ThisObject), b = jvm.toNativeString(other);
+  const minL = Math.min(a.length, b.length);
+  for (let i = 0; i < minL; i++) {
+    const d = a.charCodeAt(i) - b.charCodeAt(i);
+    if (d !== 0) { return d | 0; }
+  }
+  return (a.length - b.length) | 0;
 });
 bindNative(["cn1_java_lang_String_equalsIgnoreCase_java_lang_String_R_boolean"], function(__cn1ThisObject, other) {
   return (other != null && jvm.toNativeString(__cn1ThisObject).toLowerCase() === jvm.toNativeString(other).toLowerCase()) ? 1 : 0;
@@ -5547,20 +5581,23 @@ bindNative(["cn1_java_util_HashMap_areEqualKeys_java_lang_Object_java_lang_Objec
   const equalsMethod = jvm.resolveVirtual(key1.__class, "cn1_s_equals_java_lang_Object_R_boolean");
   return (yield* adaptVirtualResult(equalsMethod(key1, key2))) ? 1 : 0;
 });
-bindNative(["cn1_java_util_HashMap_findNonNullKeyEntry_java_lang_Object_int_int_R_java_util_HashMap_Entry"], function*(__cn1ThisObject, key, index, keyHash) {
-  const buckets = __cn1ThisObject[CN1_HASHMAP_ELEMENT_DATA];
-  let entry = buckets == null ? null : buckets[index | 0];
-  while (entry != null) {
-    if (((entry.cn1_java_util_HashMap_Entry_origKeyHash | 0) === (keyHash | 0))
-            && (yield* adaptVirtualResult(cn1_java_util_HashMap_areEqualKeys_java_lang_Object_java_lang_Object_R_boolean(key, entry[CN1_HASHMAP_ENTRY_KEY])))) {
-      return entry;
-    }
-    entry = entry[CN1_HASHMAP_ENTRY_NEXT];
-  }
-  return null;
+// COMPACT HashMap natives: the C implementations are hand-tuned probe loops;
+// on the JS backend every one of them simply delegates to the pure-Java *Impl
+// twin (the semantic source of truth) that the translator compiled to JS.
+bindNative(["cn1_java_util_HashMap_get_java_lang_Object_R_java_lang_Object"], function*(__cn1ThisObject, key) {
+  return yield* adaptVirtualResult(cn1_java_util_HashMap_getImpl_java_lang_Object_R_java_lang_Object(__cn1ThisObject, key));
 });
-bindNative(["cn1_java_util_LinkedHashMap_findNonNullKeyEntry_java_lang_Object_int_int_R_java_util_HashMap_Entry"], function*(__cn1ThisObject, key, index, keyHash) {
-  return yield* adaptVirtualResult(cn1_java_util_HashMap_findNonNullKeyEntry_java_lang_Object_int_int_R_java_util_HashMap_Entry(__cn1ThisObject, key, index, keyHash));
+bindNative(["cn1_java_util_HashMap_put_java_lang_Object_java_lang_Object_R_java_lang_Object"], function*(__cn1ThisObject, key, value) {
+  return yield* adaptVirtualResult(cn1_java_util_HashMap_putImpl_java_lang_Object_java_lang_Object_R_java_lang_Object(__cn1ThisObject, key, value));
+});
+bindNative(["cn1_java_util_HashMap_remove_java_lang_Object_R_java_lang_Object"], function*(__cn1ThisObject, key) {
+  return yield* adaptVirtualResult(cn1_java_util_HashMap_removeImpl_java_lang_Object_R_java_lang_Object(__cn1ThisObject, key));
+});
+bindNative(["cn1_java_util_HashMap_containsKey_java_lang_Object_R_boolean"], function*(__cn1ThisObject, key) {
+  return yield* adaptVirtualResult(cn1_java_util_HashMap_containsKeyImpl_java_lang_Object_R_boolean(__cn1ThisObject, key));
+});
+bindNative(["cn1_java_util_HashMap_clear"], function*(__cn1ThisObject) {
+  return yield* adaptVirtualResult(cn1_java_util_HashMap_clearImpl(__cn1ThisObject));
 });
 bindNative(["cn1_java_io_NSLogOutputStream_write_byte_1ARRAY_int_int"], function*(__cn1ThisObject, bytes, off, len) {
   const chars = yield* adaptVirtualResult(cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(bytes, off, len, createJavaString("utf-8")));

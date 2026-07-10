@@ -7,7 +7,7 @@ if [ -d coderad ]; then
   rm -rf coderad
 fi
 
-curl -L https://github.com/shannah/CodeRAD/archive/refs/tags/v1.0.zip > master.zip
+curl -fL --retry 5 --retry-all-errors https://github.com/shannah/CodeRAD/archive/refs/tags/v1.0.zip > master.zip
 unzip master.zip
 rm master.zip
 mvn com.codenameone:codenameone-maven-plugin:${CN1_VERSION}:generate-cn1lib-project \

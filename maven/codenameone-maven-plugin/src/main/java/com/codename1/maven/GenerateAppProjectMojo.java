@@ -899,6 +899,13 @@ public class GenerateAppProjectMojo extends AbstractMojo {
                 File dest = new File(targetProjectDir(), path("target", "codenameone", "tmpProject"));
                 dest.getParentFile().mkdirs();
                 FileUtils.copyDirectory(sourceProject, dest);
+                // The ant build's UpdateCodenameOne run writes lib/CLDC11.jar into this
+                // project, but git never tracks the template's EMPTY lib dir, so the copy
+                // above doesn't produce one -- the updater then dies with
+                // FileNotFoundException the first time the server publishes new artifact
+                // versions (it opens the file without creating parent dirs). Ensure it
+                // exists up front; harmless when the template does ship a lib dir.
+                new File(dest, "lib").mkdirs();
                 File origSource = sourceProject;
                 sourceProject = dest;
 

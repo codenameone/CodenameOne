@@ -76,7 +76,16 @@ public class CustomInvoke extends Instruction {
     }
     
     public static CustomInvoke create(Invoke invoke) {
-        return new CustomInvoke(invoke.getOpcode(), invoke.getOwner(), invoke.getName(), invoke.getDesc(), invoke.isItf());
+        CustomInvoke ci = new CustomInvoke(invoke.getOpcode(), invoke.getOwner(), invoke.getName(), invoke.getDesc(), invoke.isItf());
+        // Preserve the init-before-publish marking across the literal-arg folding
+        // (memset elimination). The matching NEW is already deferred; if we lost
+        // the mark here the placeholder null would never be replaced.
+        if (invoke.isInitBeforePublish()) {
+            ci.initBeforePublish = true;
+        }
+        // Same for a FUSED construction (the deferred NEW's owner+children block).
+        ci.fusedPlan = invoke.getFusedPlan();
+        return ci;
     }
 
     public boolean isMethodUsed(String desc, String name) {
@@ -97,6 +106,12 @@ public class CustomInvoke extends Instruction {
             String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc, true);
             if (resolvedConcreteOwner != null) {
                 dependencyOwner = resolvedConcreteOwner;
+            } else {
+                // keep in sync with the closed-world devirt in the emission paths
+                String devirt = Parser.resolveDevirtualizedOwner(bc, name, desc);
+                if (devirt != null) {
+                    dependencyOwner = devirt;
+                }
             }
         }
         String t = owner.replace('.', '_').replace('/', '_').replace('$', '_');
@@ -279,6 +294,13 @@ public class CustomInvoke extends Instruction {
                         if (resolvedConcreteOwner != null) {
                             invokeOwner = resolvedConcreteOwner;
                             isVirtual = false;
+                        } else {
+                            // CLOSED-WORLD DEVIRT: no reachable override -> direct call
+                            String devirt = Parser.resolveDevirtualizedOwner(bc, name, desc);
+                            if (devirt != null) {
+                                invokeOwner = devirt;
+                                isVirtual = false;
+                            }
                         }
                     }
                 }
@@ -317,6 +339,14 @@ public class CustomInvoke extends Instruction {
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
         if (isVirtualCall) {
             BytecodeMethod.addVirtualMethodsInvoked(bld.substring("virtual_".length()));
+        } else {
+            // keep in sync with Invoke: direct/devirtualized calls of the mapped
+            // String/StringBuilder natives get the inlined fast path
+            String renamedIntr = com.codename1.tools.translator.InlineIntrinsics.rename(bld.toString());
+            if (!renamedIntr.contentEquals(bld)) {
+                bld.setLength(0);
+                bld.append(renamedIntr);
+            }
         }
         int numLiteralArgs = this.getNumLiteralArgs();
         if (numLiteralArgs > 0) {
@@ -353,8 +383,127 @@ public class CustomInvoke extends Instruction {
     }
     
     
+    // LEVER B (perf-tier1): re-entrancy guard. When emitting the #else branch of an
+    // inlined constructor we re-enter appendInstruction to emit the ordinary call;
+    // this flag stops it from inlining again (infinite recursion).
+    private boolean emittingInlineCtorElse = false;
+    private InlinableConstructor inlineCtorPlan;
+    private boolean inlineCtorAnalyzed = false;
+    // Copied from the source Invoke by create() -- this <init> allocates + builds
+    // + publishes its object (the matching NEW only pushed a placeholder).
+    private boolean initBeforePublish = false;
+
+    public boolean isInitBeforePublish() {
+        return initBeforePublish;
+    }
+
+    /**
+     * If this is a void INVOKESPECIAL {@code <init>} whose target ctor is inlinable
+     * (Lever B) and whose args are all folded literals, emit a
+     * {@code #ifdef CN1_INLINE_CTOR} block: the inlined field stores in the ON branch,
+     * the ordinary out-of-line ctor call (via re-entry) in the OFF branch. Both pop
+     * the identical stack slots, so the SAME translated C is A/B-able by the clang
+     * {@code -DCN1_INLINE_CTOR} flag. Returns true if handled.
+     */
+    private boolean tryAppendInlinedConstructor(StringBuilder b) {
+        if (origOpcode != Opcodes.INVOKESPECIAL || !"<init>".equals(name) || getReturnValue() != null) {
+            return false;
+        }
+        List<ByteCodeMethodArg> args = getArgs();
+        // Inline via CustomInvoke only when every argument is already a literal; the
+        // object may still be on the operand stack (the freshly-NEW'd ref).
+        if (getNumLiteralArgs() != args.size()) {
+            return false;
+        }
+        if (!inlineCtorAnalyzed) {
+            inlineCtorAnalyzed = true;
+            inlineCtorPlan = InlinableConstructor.analyze(owner, desc);
+        }
+        if (inlineCtorPlan == null) {
+            return false;
+        }
+        String objExpr = targetObjectLiteral != null ? targetObjectLiteral : "SP[-1].data.o";
+        String[] argExprs = literalArgs != null ? literalArgs : new String[0];
+        // FOLDED literal args are not always pure -- one can be a call expression
+        // or a throwing load. Hoist them into C temps in ARGUMENT ORDER (Java
+        // left-to-right semantics, single evaluation) before any store/alloc.
+        // See InlinableConstructor.appendArgTemps.
+        char[] argCats = new char[args.size()];
+        for (int j = 0; j < argCats.length; j++) {
+            argCats[j] = args.get(j).getQualifier();
+        }
+        int pop = targetObjectLiteral != null ? 0 : 1; // only the receiver may be on-stack
+        if (initBeforePublish && targetObjectLiteral == null) {
+            // Memset elimination: allocate into a temp, build fully, THEN publish.
+            // Literal-arg ctor with the receiver on-stack (from NEW;DUP): the
+            // survivor sits one slot below the receiver (SP[-2]); pop the receiver.
+            String cType = owner.replace('/', '_').replace('$', '_');
+            inlineCtorPlan.appendInitBeforePublish(b, cType, argExprs, argCats, 2, 1);
+            return true;
+        }
+        b.append("\n#ifndef CN1_DISABLE_INLINE_CTOR\n"); // leading \n: the previous emission may not end a line, and a directive must start one
+        b.append("    {\n");
+        String[] argTemps = InlinableConstructor.appendArgTemps(b, argExprs, argCats);
+        inlineCtorPlan.appendStores(b, objExpr, argTemps);
+        if (pop > 0) {
+            b.append("    SP -= ").append(pop).append(";\n");
+        }
+        b.append("    }\n");
+        b.append("\n#else\n");
+        emittingInlineCtorElse = true;
+        appendInstruction(b);
+        emittingInlineCtorElse = false;
+        b.append("\n#endif\n");
+        return true;
+    }
+
+    // FUSED OBJECTS: see Invoke.fusedPlan; copied by create().
+    private FusedConstructor fusedPlan;
+
+    /**
+     * Fused allocation for the FOLDED path. Stack: [survivor(ph), receiver(ph)]
+     * (all args are literals). Literal args are hoisted into C temps first --
+     * one may be a call/throwing expression, and the length expressions plus the
+     * ctor call itself must observe each argument exactly once, in order -- then
+     * the temps replace literalArgs for the ordinary call emission that follows.
+     */
+    private void appendFusedAllocBlock(StringBuilder b) {
+        List<ByteCodeMethodArg> args = getArgs();
+        char[] argCats = new char[args.size()];
+        for (int j = 0; j < argCats.length; j++) {
+            argCats[j] = args.get(j).getQualifier();
+        }
+        b.append("    {\n");
+        String[] temps = InlinableConstructor.appendArgTemps(b,
+                literalArgs != null ? literalArgs : new String[0], argCats);
+        for (int j = 0; j < temps.length; j++) {
+            literalArgs[j] = temps[j];
+        }
+        List<FusedConstructor.Child> kids = fusedPlan.getChildren();
+        String[] lenExprs = new String[kids.size()];
+        for (int i = 0; i < kids.size(); i++) {
+            lenExprs[i] = kids.get(i).siteLengthExpr(temps);
+        }
+        String cType = owner.replace('/', '_').replace('$', '_');
+        fusedPlan.appendFusedAlloc(b, cType, lenExprs, 1, 2);
+        // NOTE: the enclosing brace is closed AFTER the ordinary call emission by
+        // appendInstruction (the temps must stay in scope for the call).
+    }
+
     @Override
     public void appendInstruction(StringBuilder b) {
+        if (fusedPlan != null && targetObjectLiteral == null) {
+            appendFusedAllocBlock(b);
+            FusedConstructor plan = fusedPlan;
+            fusedPlan = null;              // recurse once into the ordinary emission
+            appendInstruction(b);
+            fusedPlan = plan;
+            b.append("    }\n");           // closes appendFusedAllocBlock's temp scope
+            return;
+        }
+        if (!emittingInlineCtorElse && tryAppendInlinedConstructor(b)) {
+            return;
+        }
         if (getSimdAllocaMacro() != null) {
             StringBuilder expr = new StringBuilder();
             if (appendSimdAllocaExpression(expr)) {
@@ -397,6 +546,13 @@ public class CustomInvoke extends Instruction {
                         if (resolvedConcreteOwner != null) {
                             invokeOwner = resolvedConcreteOwner;
                             isVirtual = false;
+                        } else {
+                            // CLOSED-WORLD DEVIRT: no reachable override -> direct call
+                            String devirt = Parser.resolveDevirtualizedOwner(bc, name, desc);
+                            if (devirt != null) {
+                                invokeOwner = devirt;
+                                isVirtual = false;
+                            }
                         }
                     }
                 }
@@ -435,6 +591,14 @@ public class CustomInvoke extends Instruction {
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
         if (isVirtualCall) {
             BytecodeMethod.addVirtualMethodsInvoked(bld.substring("virtual_".length()));
+        } else {
+            // keep in sync with Invoke: direct/devirtualized calls of the mapped
+            // String/StringBuilder natives get the inlined fast path
+            String renamedIntr = com.codename1.tools.translator.InlineIntrinsics.rename(bld.toString());
+            if (!renamedIntr.contentEquals(bld)) {
+                bld.setLength(0);
+                bld.append(renamedIntr);
+            }
         }
         int numLiteralArgs = this.getNumLiteralArgs();
         if (numLiteralArgs > 0) {
@@ -528,20 +692,23 @@ public class CustomInvoke extends Instruction {
                 }
             }
             if (targetObjectLiteral == null) {
+                // TYPE-BEFORE-DATA discipline -- see the identical block in
+                // Invoke.appendInstruction: a signal-stopped thread must never
+                // expose (type=OBJECT, data=<primitive>) to the stack scan.
                 if(returnVal.equals("JAVA_OBJECT")) {
-                    b.append("    SP[-1].data.o = tmpResult; SP[-1].type = CN1_TYPE_OBJECT; }\n");
+                    b.append("    SP[-1].type = CN1_TYPE_INVALID; SP[-1].data.o = tmpResult; SP[-1].type = CN1_TYPE_OBJECT; }\n");
                 } else {
                     if(returnVal.equals("JAVA_INT")) {
-                        b.append("    SP[-1].data.i = tmpResult; SP[-1].type = CN1_TYPE_INT; }\n");
+                        b.append("    SP[-1].type = CN1_TYPE_INT; SP[-1].data.i = tmpResult; }\n");
                     } else {
                         if(returnVal.equals("JAVA_LONG")) {
-                            b.append("    SP[-1].data.l = tmpResult; SP[-1].type = CN1_TYPE_LONG; }\n");
+                            b.append("    SP[-1].type = CN1_TYPE_LONG; SP[-1].data.l = tmpResult; }\n");
                         } else {
                             if(returnVal.equals("JAVA_DOUBLE")) {
-                                b.append("    SP[-1].data.d = tmpResult; SP[-1].type = CN1_TYPE_DOUBLE; }\n");
+                                b.append("    SP[-1].type = CN1_TYPE_DOUBLE; SP[-1].data.d = tmpResult; }\n");
                             } else {
                                 if(returnVal.equals("JAVA_FLOAT")) {
-                                    b.append("    SP[-1].data.f = tmpResult; SP[-1].type = CN1_TYPE_FLOAT; }\n");
+                                    b.append("    SP[-1].type = CN1_TYPE_FLOAT; SP[-1].data.f = tmpResult; }\n");
                                 } else {
                                     throw new UnsupportedOperationException("Unknown type: " + returnVal);
                                 }

@@ -100,11 +100,19 @@ public class TryCatch extends Instruction {
             cid = "cn1_class_id_" + type.replace('/', '_').replace('$', '_');
         } 
         LabelInstruction.addTryBeginLabel(start, cid, counter);
-        b.append("    int restoreTo");
+        // VOLATILE is load-bearing: both variables are assigned at TRY-ENTRY,
+        // i.e. AFTER the setjmp in DEFINE_CATCH_BLOCK, and read back in the
+        // catch handler -- which runs after a longjmp. C11 7.13.2.1: non-volatile
+        // automatics modified between setjmp and longjmp are INDETERMINATE after
+        // the jump. gcc register-allocates them (longjmp rolls the register back
+        // to its at-setjmp garbage), so the handler restored
+        // threadObjectStackOffset from trash and later callee frames were
+        // allocated on top of this frame's locals. clang happened to spill.
+        b.append("    volatile int restoreTo");
         b.append(start);
         b.append(cid);
         b.append(counter);
-        b.append(";\n    int tryBlockOffset");
+        b.append(";\n    volatile int tryBlockOffset");
         b.append(start);
         b.append(cid);
         b.append(counter);

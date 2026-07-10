@@ -179,35 +179,55 @@ public class HttpTileSource implements TileSource {
 
             @Override
             protected void postResponse() {
-                String tiles = body == null ? null : parseTileJsonTemplate(body);
-                List drain;
-                synchronized (HttpTileSource.this) {
-                    resolvedTemplate = tiles;
-                    resolving = false;
-                    drain = new ArrayList(pendingRequests);
-                    pendingRequests.clear();
-                }
-                for (Object drainItem : drain) {
-                    Object[] r = (Object[]) drainItem;
-                    TileCallback cb = (TileCallback) r[3];
-                    if (tiles == null) {
-                        cb.tileFailed(((Integer) r[0]).intValue(),
-                                ((Integer) r[1]).intValue(), ((Integer) r[2]).intValue());
-                    } else {
-                        doFetch(((Integer) r[0]).intValue(), ((Integer) r[1]).intValue(),
-                                ((Integer) r[2]).intValue(), cb);
+                MapTileWorker.run(new Runnable() {
+                    @Override
+                    public void run() {
+                        final String tiles = body == null ? null : parseTileJsonTemplate(body);
+                        MapTileWorker.callSerially(new Runnable() {
+                            @Override
+                            public void run() {
+                                List drain;
+                                synchronized (HttpTileSource.this) {
+                                    resolvedTemplate = tiles;
+                                    resolving = false;
+                                    drain = new ArrayList(pendingRequests);
+                                    pendingRequests.clear();
+                                }
+                                for (Object drainItem : drain) {
+                                    Object[] r = (Object[]) drainItem;
+                                    TileCallback cb = (TileCallback) r[3];
+                                    if (tiles == null) {
+                                        cb.tileFailed(((Integer) r[0]).intValue(),
+                                                ((Integer) r[1]).intValue(), ((Integer) r[2]).intValue());
+                                    } else {
+                                        doFetch(((Integer) r[0]).intValue(), ((Integer) r[1]).intValue(),
+                                                ((Integer) r[2]).intValue(), cb);
+                                    }
+                                }
+                            }
+                        });
                     }
-                }
+                });
             }
 
             @Override
             protected void handleException(Exception err) {
-                failAllPending();
+                MapTileWorker.callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        failAllPending();
+                    }
+                });
             }
 
             @Override
             protected void handleErrorResponseCode(int code, String message) {
-                failAllPending();
+                MapTileWorker.callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        failAllPending();
+                    }
+                });
             }
         };
         req.setUrl(replace(urlTemplate, "{key}", apiKey));
@@ -277,21 +297,49 @@ public class HttpTileSource implements TileSource {
                 callback.tileFailed(z, x, y);
                 return;
             }
-            try {
-                callback.tileLoaded(z, x, y, vector ? TileUtil.maybeGunzip(result) : result);
-            } catch (Throwable t) {
-                callback.tileFailed(z, x, y);
-            }
+            MapTileWorker.run(new Runnable() {
+                @Override
+                public void run() {
+                    final byte[] data;
+                    try {
+                        data = vector ? TileUtil.maybeGunzip(result) : result;
+                    } catch (Throwable t) {
+                        MapTileWorker.callSerially(new Runnable() {
+                            @Override
+                            public void run() {
+                                callback.tileFailed(z, x, y);
+                            }
+                        });
+                        return;
+                    }
+                    MapTileWorker.callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            callback.tileLoaded(z, x, y, data);
+                        }
+                    });
+                }
+            });
         }
 
         @Override
         protected void handleException(Exception err) {
-            callback.tileFailed(z, x, y);
+            MapTileWorker.callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    callback.tileFailed(z, x, y);
+                }
+            });
         }
 
         @Override
         protected void handleErrorResponseCode(int code, String message) {
-            callback.tileFailed(z, x, y);
+            MapTileWorker.callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    callback.tileFailed(z, x, y);
+                }
+            });
         }
     }
 }

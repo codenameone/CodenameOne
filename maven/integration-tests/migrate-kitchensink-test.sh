@@ -7,7 +7,7 @@ if [ -d kitchensink ]; then
   rm -rf kitchensink
 fi
 
-curl -L https://github.com/codenameone/KitchenSink/archive/v1.0-cn7.0.11.zip > master.zip
+curl -fL --retry 5 --retry-all-errors https://github.com/codenameone/KitchenSink/archive/v1.0-cn7.0.11.zip > master.zip
 unzip master.zip
 rm master.zip
 mvn com.codenameone:codenameone-maven-plugin:${CN1_VERSION}:generate-app-project \

@@ -3190,6 +3190,99 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /**
      * @inheritDoc
      */
+    private static String cn1DistributionChannel;
+    private static boolean cn1DistributionChannelResolved;
+    /** Codename One channel id-value pair id in the APK Signing Block ('c','n','1','C'). */
+    private static final int CN1_CHANNEL_PAIR_ID = 0x636E3143;
+
+    /**
+     * The distribution channel (app store) stamped into this APK's Signing Block by
+     * the build server's channel packages, or null for a normal build. Read once and
+     * cached. Mirrors the daemon's {@code ApkChannelWriter}: locate the signing block
+     * before the central directory and return the Codename One channel pair's value.
+     */
+    private String readDistributionChannel() {
+        if (cn1DistributionChannelResolved) {
+            return cn1DistributionChannel;
+        }
+        cn1DistributionChannelResolved = true;
+        try {
+            cn1DistributionChannel = cn1ReadChannelFromApk(getContext().getApplicationInfo().sourceDir);
+        } catch (Throwable t) {
+            cn1DistributionChannel = null;
+        }
+        return cn1DistributionChannel;
+    }
+
+    private static String cn1ReadChannelFromApk(String path) throws java.io.IOException {
+        java.io.RandomAccessFile f = new java.io.RandomAccessFile(path, "r");
+        try {
+            long len = f.length();
+            long eocd = -1;
+            long maxBack = Math.min(len, 22 + 0xFFFF);
+            for (long i = len - 22; i >= len - maxBack && i >= 0; i--) {
+                if (cn1U32(f, i) == 0x06054b50L) {
+                    eocd = i;
+                    break;
+                }
+            }
+            if (eocd < 0) {
+                return null;
+            }
+            long cdOffset = cn1U32(f, eocd + 16);
+            if (cdOffset < 24 || cdOffset == 0xFFFFFFFFL) {
+                return null;
+            }
+            byte[] magic = "APK Sig Block 42".getBytes("US-ASCII");
+            byte[] m = new byte[magic.length];
+            f.seek(cdOffset - 16);
+            f.readFully(m);
+            for (int i = 0; i < magic.length; i++) {
+                if (m[i] != magic[i]) {
+                    return null;
+                }
+            }
+            long sizeOfBlock = cn1U64(f, cdOffset - 24);
+            long blockStart = cdOffset - 8 - sizeOfBlock;
+            if (blockStart < 0) {
+                return null;
+            }
+            long p = blockStart + 8, to = cdOffset - 24;
+            while (p < to) {
+                long pairLen = cn1U64(f, p);
+                p += 8;
+                if (pairLen < 4 || p + pairLen > to + 8) {
+                    break;
+                }
+                if ((int) cn1U32(f, p) == CN1_CHANNEL_PAIR_ID) {
+                    byte[] v = new byte[(int) (pairLen - 4)];
+                    f.seek(p + 4);
+                    f.readFully(v);
+                    return new String(v, "UTF-8");
+                }
+                p += pairLen;
+            }
+            return null;
+        } finally {
+            f.close();
+        }
+    }
+
+    private static long cn1U32(java.io.RandomAccessFile f, long at) throws java.io.IOException {
+        f.seek(at);
+        int b0 = f.read(), b1 = f.read(), b2 = f.read(), b3 = f.read();
+        return (b0 & 0xFFL) | ((b1 & 0xFFL) << 8) | ((b2 & 0xFFL) << 16) | ((b3 & 0xFFL) << 24);
+    }
+
+    private static long cn1U64(java.io.RandomAccessFile f, long at) throws java.io.IOException {
+        f.seek(at);
+        long v = 0;
+        for (int i = 0; i < 8; i++) {
+            v |= (f.read() & 0xFFL) << (8 * i);
+        }
+        return v;
+    }
+
     public String getProperty(String key, String defaultValue) {
         if(key.equalsIgnoreCase("cn1_push_prefix")) {
             /*if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get notifications")){
@@ -3203,6 +3296,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
         if ("OS".equals(key)) {
             return "Android";
+        }
+        if ("DistributionChannel".equalsIgnoreCase(key) || "cn1.channel".equalsIgnoreCase(key)) {
+            // The app store this build was distributed through, stamped into the APK
+            // Signing Block by the Codename One build server's channel packages
+            // (android.distributionChannels). Empty for a normal Google Play build.
+            String ch = readDistributionChannel();
+            return ch != null ? ch : defaultValue;
         }
 
         // It's possible that this is triggering a Google Play data collection verification error

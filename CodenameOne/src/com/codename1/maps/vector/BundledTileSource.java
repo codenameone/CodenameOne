@@ -23,7 +23,6 @@
 package com.codename1.maps.vector;
 
 import com.codename1.io.Util;
-import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 
 import java.io.InputStream;
@@ -101,28 +100,35 @@ public final class BundledTileSource implements TileSource {
     @Override
     public void fetchTile(final int z, final int x, final int y, final TileCallback callback) {
         final String path = resolve(z, x, y);
-        CN.callSerially(new Runnable() {
+        MapTileWorker.run(new Runnable() {
             @Override
             public void run() {
-                byte[] data = null;
+                final byte[] data;
+                byte[] loaded = null;
                 try {
                     InputStream is = Display.getInstance().getResourceAsStream(
                             BundledTileSource.this.getClass(), path);
                     if (is != null) {
                         try {
-                            data = TileUtil.maybeGunzip(Util.readInputStream(is));
+                            loaded = TileUtil.maybeGunzip(Util.readInputStream(is));
                         } finally {
                             is.close();
                         }
                     }
                 } catch (Throwable t) {
-                    data = null;
+                    loaded = null;
                 }
-                if (data != null) {
-                    callback.tileLoaded(z, x, y, data);
-                } else {
-                    callback.tileFailed(z, x, y);
-                }
+                data = loaded;
+                MapTileWorker.callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (data != null) {
+                            callback.tileLoaded(z, x, y, data);
+                        } else {
+                            callback.tileFailed(z, x, y);
+                        }
+                    }
+                });
             }
         });
     }

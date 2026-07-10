@@ -430,6 +430,10 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         FileUtils.copyInputStreamToFile(getClass().getResourceAsStream("buildxml-template.xml"), new File(antProject, "build.xml"));
         File distDir = new File(antProject, "dist");
         distDir.mkdirs();
+        // The UpdateCodenameOne run inside the ant build writes lib/CLDC11.jar without
+        // creating parent dirs; make sure the dir exists (same latent hole as the
+        // template tmpProject -- only surfaces when the server publishes new versions).
+        new File(antProject, "lib").mkdirs();
 
 
         // Build a jar with all dependencies that we will send to the build server.

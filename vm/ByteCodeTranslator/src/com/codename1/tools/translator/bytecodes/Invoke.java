@@ -95,6 +95,13 @@ public class Invoke extends Instruction {
             String resolvedConcreteOwner = resolveConcreteInvokeOwner(bc, true);
             if (resolvedConcreteOwner != null) {
                 dependencyOwner = resolvedConcreteOwner;
+            } else {
+                // keep in sync with the closed-world devirt in appendInstruction:
+                // the direct call needs the implementing class's declaration.
+                String devirt = Parser.resolveDevirtualizedOwner(bc, name, desc);
+                if (devirt != null) {
+                    dependencyOwner = devirt;
+                }
             }
         }
         String t = owner.replace('.', '_').replace('/', '_').replace('$', '_');
@@ -167,8 +174,113 @@ public class Invoke extends Instruction {
         return null;
     }
 
+    // LEVER B (perf-tier1): re-entrancy guard for inlined-constructor #else emission.
+    private boolean emittingInlineCtorElse = false;
+    private InlinableConstructor inlineCtorPlan;
+    private boolean inlineCtorAnalyzed = false;
+    // Set by BytecodeMethod.markInitBeforePublish -- this <init> allocates + builds
+    // + publishes its object (the matching NEW only pushed a placeholder).
+    private boolean initBeforePublish = false;
+
+    public void markInitBeforePublish() {
+        this.initBeforePublish = true;
+    }
+
+    public boolean isInitBeforePublish() {
+        return initBeforePublish;
+    }
+
+    // FUSED OBJECTS: non-null when this <init> belongs to a deferred NEW of a
+    // @Fused class -- the emission allocates owner+children as one block,
+    // fills BOTH placeholder slots, then proceeds with the ordinary call.
+    private FusedConstructor fusedPlan;
+
+    public void setFusedPlan(FusedConstructor plan) {
+        this.fusedPlan = plan;
+    }
+
+    public FusedConstructor getFusedPlan() {
+        return fusedPlan;
+    }
+
+    /**
+     * Emit the fused allocation block for this {@code <init>}. Stack layout on
+     * entry: [survivor(placeholder), receiver(placeholder), args...]; child
+     * length expressions are pure reads of the on-stack int args. Falls through
+     * to the caller's ordinary emission afterwards.
+     */
+    private void appendFusedAllocBlock(StringBuilder b) {
+        List<ByteCodeMethodArg> args = getArgs();
+        int n = args.size();
+        // substitution table: __cn1ArgP -> this site's on-stack read of arg P
+        String[] argExprByParam = new String[n];
+        for (int p = 1; p <= n; p++) {
+            argExprByParam[p - 1] = "SP[-" + (n - (p - 1)) + "].data.i";
+        }
+        List<FusedConstructor.Child> kids = fusedPlan.getChildren();
+        String[] lenExprs = new String[kids.size()];
+        for (int i = 0; i < kids.size(); i++) {
+            lenExprs[i] = kids.get(i).siteLengthExpr(argExprByParam);
+        }
+        String cType = owner.replace('/', '_').replace('$', '_');
+        fusedPlan.appendFusedAlloc(b, cType, lenExprs, n + 1, n + 2);
+    }
+
+    /**
+     * Lever B for the non-folded path: a void INVOKESPECIAL {@code <init>} whose args
+     * are all still on the operand stack. Emits the {@code #ifdef CN1_INLINE_CTOR}
+     * block (inlined field stores ON / ordinary call via re-entry OFF). Returns true
+     * if handled. See {@link InlinableConstructor}.
+     */
+    private boolean tryAppendInlinedConstructor(StringBuilder b) {
+        if (opcode != Opcodes.INVOKESPECIAL || !"<init>".equals(name)) {
+            return false;
+        }
+        List<ByteCodeMethodArg> args = getArgs();
+        if (!inlineCtorAnalyzed) {
+            inlineCtorAnalyzed = true;
+            inlineCtorPlan = InlinableConstructor.analyze(owner, desc);
+        }
+        if (inlineCtorPlan == null) {
+            return false;
+        }
+        int n = args.size();
+        String objExpr = "SP[-" + (n + 1) + "].data.o";
+        String[] argExprs = new String[n];
+        for (int j = 0; j < n; j++) {
+            argExprs[j] = "SP[-" + (n - j) + "].data." + args.get(j).getQualifier();
+        }
+        if (initBeforePublish) {
+            // Memset elimination: allocate into a temp, build fully, THEN publish
+            // into the surviving object slot (SP[-(n+2)]) and pop receiver+args.
+            // argCats == null: every argExpr here is a pure SP[-k].data.x read
+            // (the args were evaluated onto the operand stack BEFORE this <init>),
+            // so no temp hoisting is needed.
+            String cType = owner.replace('/', '_').replace('$', '_');
+            inlineCtorPlan.appendInitBeforePublish(b, cType, argExprs, null, n + 2, n + 1);
+            return true;
+        }
+        b.append("\n#ifndef CN1_DISABLE_INLINE_CTOR\n"); // leading \n: the previous emission may not end a line, and a directive must start one
+        inlineCtorPlan.appendStores(b, objExpr, argExprs);
+        b.append("    SP -= ").append(n + 1).append(";\n");
+        b.append("\n#else\n");
+        emittingInlineCtorElse = true;
+        appendInstruction(b);
+        emittingInlineCtorElse = false;
+        b.append("\n#endif\n");
+        return true;
+    }
+
     @Override
     public void appendInstruction(StringBuilder b) {
+        if (fusedPlan != null) {
+            // FUSED construction: single-block owner+children allocation into the
+            // placeholder slots, then fall through to the ordinary ctor call below.
+            appendFusedAllocBlock(b);
+        }
+        if (!emittingInlineCtorElse && tryAppendInlinedConstructor(b)) {
+            return;
+        }
         // special case for clone on an array which isn't a real method invocation
         if(name.equals("clone") && owner.indexOf('[') > -1) {
             b.append("    POP_MANY_AND_PUSH_OBJ(cloneArray(PEEK_OBJ(1)), 1);\n");
@@ -177,7 +289,7 @@ public class Invoke extends Instruction {
         if (opcode == Opcodes.INVOKESPECIAL && !name.equals("<init>") && !name.equals("<clinit>")) {
             owner = Util.resolveInvokeSpecialOwner(owner, name, desc);
         }
-        
+
         String invokeOwner = owner;
         StringBuilder bld = new StringBuilder();
         boolean isVirtualCall = false;
@@ -201,6 +313,14 @@ public class Invoke extends Instruction {
                         if (resolvedConcreteOwner != null) {
                             invokeOwner = resolvedConcreteOwner;
                             isVirtual = false;
+                        } else {
+                            // CLOSED-WORLD DEVIRT: no reachable override -> direct call
+                            // (and ThinLTO can then inline it).
+                            String devirt = Parser.resolveDevirtualizedOwner(bc, name, desc);
+                            if (devirt != null) {
+                                invokeOwner = devirt;
+                                isVirtual = false;
+                            }
                         }
                     }
                 }
@@ -240,6 +360,14 @@ public class Invoke extends Instruction {
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
         if (isVirtualCall) {
             BytecodeMethod.addVirtualMethodsInvoked(bld.substring("virtual_".length()));
+        } else {
+            // direct/devirtualized calls of the hottest String/StringBuilder
+            // natives get the call-site-inlined fast path (cn1_intrinsics.h)
+            String renamed = com.codename1.tools.translator.InlineIntrinsics.rename(bld.toString());
+            if (!renamed.contentEquals(bld)) {
+                bld.setLength(0);
+                bld.append(renamed);
+            }
         }
         boolean noPop = false;
         if(returnVal == null) {
@@ -316,20 +444,29 @@ public class Invoke extends Instruction {
                     b.append(";\n");
                 }
             }
+            // TYPE-BEFORE-DATA discipline (same as the PUSH_* macros): the slot being
+            // overwritten here is typically the stale receiver slot (type OBJECT). A
+            // thread can be signal-stopped BETWEEN these two stores (conservative-GC
+            // thread freeze lands at arbitrary instructions); if data were written
+            // first the precise stack scan would see (type=OBJECT, data=<int>) and
+            // gcMarkObject would dereference a non-pointer. Primitives set the final
+            // type first (a (INT, stale-data) window is never dereferenced); the
+            // object case goes through INVALID exactly like PUSH_POINTER (tmpResult
+            // stays alive in the C temp, covered by the conservative scan).
             if(returnVal.equals("JAVA_OBJECT")) {
-                b.append("    SP[-1].data.o = tmpResult; SP[-1].type = CN1_TYPE_OBJECT; }\n");
+                b.append("    SP[-1].type = CN1_TYPE_INVALID; SP[-1].data.o = tmpResult; SP[-1].type = CN1_TYPE_OBJECT; }\n");
             } else {
                 if(returnVal.equals("JAVA_INT")) {
-                    b.append("    SP[-1].data.i = tmpResult; SP[-1].type = CN1_TYPE_INT; }\n");
+                    b.append("    SP[-1].type = CN1_TYPE_INT; SP[-1].data.i = tmpResult; }\n");
                 } else {
                     if(returnVal.equals("JAVA_LONG")) {
-                        b.append("    SP[-1].data.l = tmpResult; SP[-1].type = CN1_TYPE_LONG; }\n");
+                        b.append("    SP[-1].type = CN1_TYPE_LONG; SP[-1].data.l = tmpResult; }\n");
                     } else {
                         if(returnVal.equals("JAVA_DOUBLE")) {
-                            b.append("    SP[-1].data.d = tmpResult; SP[-1].type = CN1_TYPE_DOUBLE; }\n");
+                            b.append("    SP[-1].type = CN1_TYPE_DOUBLE; SP[-1].data.d = tmpResult; }\n");
                         } else {
                             if(returnVal.equals("JAVA_FLOAT")) {
-                                b.append("    SP[-1].data.f = tmpResult; SP[-1].type = CN1_TYPE_FLOAT; }\n");
+                                b.append("    SP[-1].type = CN1_TYPE_FLOAT; SP[-1].data.f = tmpResult; }\n");
                             } else {
                                 throw new UnsupportedOperationException("Unknown type: " + returnVal);
                             }
@@ -357,6 +494,246 @@ public class Invoke extends Instruction {
     }
     
     
+    // Master off-switch: -DCN1_DISABLE_INLINE=true disables trivial-method inlining.
+    private static final boolean DISABLE_INLINE =
+            "true".equalsIgnoreCase(System.getProperty("CN1_DISABLE_INLINE", "false"));
+
+    /**
+     * If this invoke is a direct (provably monomorphic) instance call to a trivial
+     * getter ({@code ALOAD 0; GETFIELD f; xRETURN}) or setter
+     * ({@code ALOAD 0; xLOAD 1; PUTFIELD f; RETURN}), returns the equivalent
+     * GETFIELD/PUTFIELD {@link Field} the optimizer can swap in for the call. The
+     * field op has the identical operand-stack effect (getter: pop receiver, push
+     * field; setter: pop receiver+value, push nothing) and derefs the same receiver,
+     * so null-pointer behavior is preserved. {@code Field.tryReduce} later folds the
+     * operands into a direct field expression. Returns null otherwise.
+     */
+    public Field asInlinableFieldAccess() {
+        if (DISABLE_INLINE) {
+            return null;
+        }
+        // Static no-arg singleton/static-field accessor: GETSTATIC f; xRETURN.
+        // Monomorphic by definition (static dispatch), no receiver -> no null concern.
+        if (opcode == Opcodes.INVOKESTATIC) {
+            if (desc.length() < 3 || desc.charAt(0) != '(' || desc.charAt(1) != ')' || desc.charAt(2) == 'V') {
+                return null;
+            }
+            BytecodeMethod target = findMethodUp(Parser.getClassObject(owner.replace('/', '_').replace('$', '_')));
+            if (target == null || !target.isStatic()) {
+                return null;
+            }
+            // Follow trivial static FORWARDER chains: with pre-nestmates javac a
+            // lazy-holder getter compiles to `INVOKESTATIC Holder.access$000()`
+            // whose own body is the GETSTATIC. optimize() collapses that inner
+            // call IN PLACE, so whether this call site sees a foldable body
+            // depends on CLASS EMISSION ORDER -- and the dependency re-scan
+            // (updateInlinableFieldDependencies) would disagree with emission.
+            // Resolving through the chain here makes both phases deterministic:
+            // the fold always lands on the final field, order-independent.
+            for (int depth = 0; target != null && depth < 4; depth++) {
+                Field f = trivialStaticFieldGetter(target);
+                if (f != null) {
+                    Field getstatic = new Field(Opcodes.GETSTATIC, f.getOwner(), f.getFieldName(), f.getDesc());
+                    getstatic.setMethod(getMethod());
+                    return getstatic;
+                }
+                target = trivialStaticForwarderTarget(target);
+            }
+            return null;
+        }
+        if (opcode != Opcodes.INVOKEVIRTUAL && opcode != Opcodes.INVOKESPECIAL) {
+            return null;
+        }
+        BytecodeMethod target = resolveDirectTarget();
+        if (target == null) {
+            return null;
+        }
+        // getter: zero args, non-void return
+        if (desc.length() >= 3 && desc.charAt(0) == '(' && desc.charAt(1) == ')' && desc.charAt(2) != 'V') {
+            Field f = trivialGetterField(target);
+            if (f != null) {
+                Field getfield = new Field(Opcodes.GETFIELD, f.getOwner(), f.getFieldName(), f.getDesc());
+                getfield.setMethod(getMethod());
+                return getfield;
+            }
+        }
+        // setter: EXACTLY one arg, void return. A multi-arg method whose body
+        // happens to store only arg1 (e.g. DateTimeRenderer.setMarkToday
+        // (boolean, long) -- the long is unused) still POPS every argument as a
+        // CALL; folding it to a PUTFIELD strands the extra args on the operand
+        // stack and the emitted C reads misaligned slots.
+        if (desc.endsWith(")V") && countDescArguments(desc) == 1) {
+            Field f = trivialSetterField(target);
+            if (f != null) {
+                Field putfield = new Field(Opcodes.PUTFIELD, f.getOwner(), f.getFieldName(), f.getDesc());
+                putfield.setMethod(getMethod());
+                return putfield;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The concretely-called method if this is a direct (provably monomorphic)
+     * instance call, else null. Monomorphic when: INVOKESPECIAL, or the static-type
+     * owner class is final (no subtypes), or the target method is final or private,
+     * or the existing @Concrete devirtualization resolves a single concrete owner.
+     */
+    private BytecodeMethod resolveDirectTarget() {
+        if (opcode == Opcodes.INVOKESPECIAL) {
+            return findMethodUp(Parser.getClassObject(owner.replace('/', '_').replace('$', '_')));
+        }
+        // INVOKEVIRTUAL
+        ByteCodeClass bc = Parser.getClassObject(owner.replace('/', '_').replace('$', '_'));
+        if (bc == null) {
+            return null;
+        }
+        BytecodeMethod m = findMethodUp(bc);
+        if (m != null && (bc.isFinalClass() || m.isFinal() || m.isPrivate())) {
+            return m;
+        }
+        String rc = resolveConcreteInvokeOwner(bc, false);
+        if (rc == null) {
+            return null; // genuinely virtual -> target not fixed -> unsafe to inline
+        }
+        return findMethodUp(Parser.getClassObject(rc.replace('/', '_').replace('$', '_')));
+    }
+
+    /**
+     * If {@code m}'s body is exactly {@code INVOKESTATIC n()X ; xRETURN} (a
+     * synthetic accessor / forwarder), resolves and returns n's method; else null.
+     */
+    private static BytecodeMethod trivialStaticForwarderTarget(BytecodeMethod m) {
+        Instruction a = null, b = null;
+        int count = 0;
+        for (Instruction in : m.getInstructions()) {
+            if (in instanceof LineNumber || in instanceof LabelInstruction || in instanceof LocalVariable) {
+                continue;
+            }
+            count++;
+            if (count == 1) a = in;
+            else if (count == 2) b = in;
+            else return null;
+        }
+        if (count != 2 || !(a instanceof Invoke)) return null;
+        Invoke inner = (Invoke) a;
+        if (inner.opcode != Opcodes.INVOKESTATIC) return null;
+        if (inner.desc.length() < 3 || inner.desc.charAt(0) != '(' || inner.desc.charAt(1) != ')'
+                || inner.desc.charAt(2) == 'V') return null;
+        int rc = b.getOpcode();
+        if (rc != Opcodes.IRETURN && rc != Opcodes.LRETURN && rc != Opcodes.FRETURN
+                && rc != Opcodes.DRETURN && rc != Opcodes.ARETURN) return null;
+        BytecodeMethod t = inner.findMethodUp(Parser.getClassObject(
+                inner.owner.replace('/', '_').replace('$', '_')));
+        return (t != null && t.isStatic()) ? t : null;
+    }
+
+    /** Number of declared arguments (not slots) in a method descriptor. */
+    private static int countDescArguments(String desc) {
+        int n = 0;
+        int i = 1; // skip '('
+        while (i < desc.length() && desc.charAt(i) != ')') {
+            char c = desc.charAt(i);
+            if (c == '[') {
+                i++;
+                continue; // array dims prefix the element type
+            }
+            n++;
+            if (c == 'L') {
+                i = desc.indexOf(';', i) + 1;
+                if (i == 0) {
+                    return -1; // malformed
+                }
+            } else {
+                i++;
+            }
+        }
+        return n;
+    }
+
+    /** Finds the method (name+desc) declared in cls or, if inherited, a superclass. */
+    private BytecodeMethod findMethodUp(ByteCodeClass cls) {
+        while (cls != null) {
+            for (BytecodeMethod m : cls.getMethods()) {
+                if (m.getMethodName().equals(name) && desc.equals(m.getSignature())) {
+                    return m;
+                }
+            }
+            cls = cls.getBaseClassObject();
+        }
+        return null;
+    }
+
+    /** Returns the GETFIELD Field if the method body is exactly ALOAD 0; GETFIELD f; xRETURN. */
+    private static Field trivialGetterField(BytecodeMethod m) {
+        Instruction a = null, b = null, c = null;
+        int count = 0;
+        for (Instruction in : m.getInstructions()) {
+            if (in instanceof LineNumber || in instanceof LabelInstruction || in instanceof LocalVariable) {
+                continue;
+            }
+            count++;
+            if (count == 1) a = in;
+            else if (count == 2) b = in;
+            else if (count == 3) c = in;
+            else return null;
+        }
+        if (count != 3) return null;
+        if (!(a instanceof VarOp) || a.getOpcode() != Opcodes.ALOAD || ((VarOp) a).getIndex() != 0) return null;
+        if (!(b instanceof Field) || b.getOpcode() != Opcodes.GETFIELD) return null;
+        int rc = c.getOpcode();
+        if (rc != Opcodes.IRETURN && rc != Opcodes.LRETURN && rc != Opcodes.FRETURN
+                && rc != Opcodes.DRETURN && rc != Opcodes.ARETURN) return null;
+        return (Field) b;
+    }
+
+    /** Returns the GETSTATIC Field if the body is exactly GETSTATIC f; xRETURN. */
+    private static Field trivialStaticFieldGetter(BytecodeMethod m) {
+        Instruction a = null, b = null;
+        int count = 0;
+        for (Instruction in : m.getInstructions()) {
+            if (in instanceof LineNumber || in instanceof LabelInstruction || in instanceof LocalVariable) {
+                continue;
+            }
+            count++;
+            if (count == 1) a = in;
+            else if (count == 2) b = in;
+            else return null;
+        }
+        if (count != 2) return null;
+        if (!(a instanceof Field) || a.getOpcode() != Opcodes.GETSTATIC) return null;
+        int rc = b.getOpcode();
+        if (rc != Opcodes.IRETURN && rc != Opcodes.LRETURN && rc != Opcodes.FRETURN
+                && rc != Opcodes.DRETURN && rc != Opcodes.ARETURN) return null;
+        return (Field) a;
+    }
+
+    /** Returns the PUTFIELD Field if the body is exactly ALOAD 0; xLOAD 1; PUTFIELD f; RETURN. */
+    private static Field trivialSetterField(BytecodeMethod m) {
+        Instruction a = null, b = null, c = null, d = null;
+        int count = 0;
+        for (Instruction in : m.getInstructions()) {
+            if (in instanceof LineNumber || in instanceof LabelInstruction || in instanceof LocalVariable) {
+                continue;
+            }
+            count++;
+            if (count == 1) a = in;
+            else if (count == 2) b = in;
+            else if (count == 3) c = in;
+            else if (count == 4) d = in;
+            else return null;
+        }
+        if (count != 4) return null;
+        if (!(a instanceof VarOp) || a.getOpcode() != Opcodes.ALOAD || ((VarOp) a).getIndex() != 0) return null;
+        if (!(b instanceof VarOp) || ((VarOp) b).getIndex() != 1) return null; // the single value arg
+        int lop = b.getOpcode();
+        if (lop != Opcodes.ILOAD && lop != Opcodes.LLOAD && lop != Opcodes.FLOAD
+                && lop != Opcodes.DLOAD && lop != Opcodes.ALOAD) return null;
+        if (!(c instanceof Field) || c.getOpcode() != Opcodes.PUTFIELD) return null;
+        if (d.getOpcode() != Opcodes.RETURN) return null; // void
+        return (Field) c;
+    }
+
     public List<ByteCodeMethodArg> getArgs() {
         return Util.getMethodArgs(desc);
     }

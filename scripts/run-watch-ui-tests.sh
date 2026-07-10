@@ -135,7 +135,8 @@ SS_TMP="$(mktemp -d "${TMPDIR:-/tmp}/cn1-watch-ss-XXXXXX")"
 WS_RAW_DIR="$SS_TMP/ws"; PREVIEW_DIR="$SS_TMP/previews"
 mkdir -p "$WS_RAW_DIR" "$PREVIEW_DIR"
 
-cleanup() { cn1ss_stop_ws_server 2>/dev/null || true; xcrun simctl terminate "$WATCH_UDID" "$BUNDLE_ID" 2>/dev/null || true; }
+APP_CONSOLE_PID=""
+cleanup() { cn1ss_stop_ws_server 2>/dev/null || true; [ -n "$APP_CONSOLE_PID" ] && kill "$APP_CONSOLE_PID" 2>/dev/null || true; xcrun simctl terminate "$WATCH_UDID" "$BUNDLE_ID" 2>/dev/null || true; }
 trap cleanup EXIT
 
 cn1ss_start_ws_server "$WS_RAW_DIR" || { rw_log "Failed to start Cn1ssScreenshotServer"; exit 6; }
@@ -144,7 +145,14 @@ rw_log "WS sink on port ${CN1SS_WS_PORT:-8765} -> $WS_RAW_DIR"
 xcrun simctl terminate "$WATCH_UDID" "$BUNDLE_ID" 2>/dev/null || true
 WATCH_LOG_START="$(/bin/date -u '+%Y-%m-%d %H:%M:%S %z')"
 xcrun simctl install "$WATCH_UDID" "$APP_PATH"
-xcrun simctl launch "$WATCH_UDID" "$BUNDLE_ID" >/dev/null 2>&1 || { rw_log "launch failed"; exit 6; }
+# Stream the app's os_log/NSLog output into the artifacts so suite-side failures
+# (exceptions, stalled animations, font issues) are diagnosable from CI runs.
+xcrun simctl spawn "$WATCH_UDID" log stream --style compact \
+  --predicate 'processImagePath CONTAINS "'"$WATCH_TARGET"'"' \
+  > "$ARTIFACTS_DIR/app-console.log" 2>&1 &
+APP_CONSOLE_PID=$!
+xcrun simctl launch --stdout="$ARTIFACTS_DIR/app-stdout.log" --stderr="$ARTIFACTS_DIR/app-stderr.log" \
+  "$WATCH_UDID" "$BUNDLE_ID" >/dev/null 2>&1 || { rw_log "launch failed"; exit 6; }
 rw_log "Launched watch app; waiting for the suite to stream screenshots..."
 
 # Wait until every expected screenshot has streamed (preferred), or the streamed

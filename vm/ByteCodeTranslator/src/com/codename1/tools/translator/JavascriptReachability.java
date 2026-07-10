@@ -200,6 +200,20 @@ final class JavascriptReachability {
         // throws "Missing JS member handleEvent" because the
         // receiver is a Java object, not a JS handler.
         seedJsoBridgeInterfaceMethods(classes);
+        // The runtime's bindNative fast paths for the native HashMap /
+        // StringBuilder / Integer methods DELEGATE to pure-Java *Impl twins
+        // (cn1_java_util_HashMap_getImpl_... etc.) straight from
+        // parparvm_runtime.js -- edges invisible to bytecode-only RTA. Without
+        // these seeds the twins are culled and the delegation throws
+        // ReferenceError at runtime.
+        seedRuntimeDispatched("java_util_HashMap", "getImpl", "(Ljava/lang/Object;)Ljava/lang/Object;");
+        seedRuntimeDispatched("java_util_HashMap", "putImpl", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+        seedRuntimeDispatched("java_util_HashMap", "removeImpl", "(Ljava/lang/Object;)Ljava/lang/Object;");
+        seedRuntimeDispatched("java_util_HashMap", "containsKeyImpl", "(Ljava/lang/Object;)Z");
+        seedRuntimeDispatched("java_util_HashMap", "clearImpl", "()V");
+        seedRuntimeDispatched("java_lang_StringBuilder", "toStringImpl", "()Ljava/lang/String;");
+        // valueOfHeap is STATIC: virtual seeding does not resolve it
+        enqueueResolved("java_lang_Integer", "valueOfHeap", "(I)Ljava/lang/Integer;", true);
     }
 
     /**

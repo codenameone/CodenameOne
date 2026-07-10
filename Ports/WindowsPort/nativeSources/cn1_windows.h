@@ -158,6 +158,14 @@ typedef struct CN1Graphics {
     D2D1_MATRIX_3X2_F transform;     /* current affine; re-applied each BeginDraw so
                                       * a transform set before the first primitive
                                       * (the mutable-image path) isn't reset to identity */
+    /* Issue #5273: the current paintDirty flush region (screen space), pushed by
+     * WindowsNative.setFlushRect before each component paints. A rect clip set
+     * during that paint is clamped to it in cn1WinPushClip so a fill can never
+     * escape the flushed sub-region into the persistent surface (the same defect
+     * the iOS Metal and Linux Cairo backends had). flushW/flushH == 0 disables
+     * the clamp; only the window graphics ever receives setFlushRect. */
+    JAVA_BOOLEAN isWindowTarget;
+    JAVA_INT flushX, flushY, flushW, flushH;
 } CN1Graphics;
 
 typedef struct CN1Font {
@@ -216,6 +224,16 @@ typedef struct {
     WCHAR* shotPath;
     JAVA_INT shotW;
     JAVA_INT shotH;
+
+    /* Offscreen-capture mode (the cn1ss WebSocket screenshot suite): a real
+     * (hidden) window is still created so the message pump, DPI and exact client
+     * size are identical to a normal run, but windowGraphics is pointed at an
+     * offscreen WIC bitmap of that same client size instead of the HWND target.
+     * That makes captureWindowToPngBytes read back real frames (the proven WIC
+     * path) instead of falling back to a fresh per-screenshot mutable-image
+     * repaint -- which is the expensive step that stalled the slow windows-11-arm
+     * runner mid-suite. Unlike `headless` there is no single-shot auto-exit. */
+    volatile LONG offscreenCapture;
 
     /* Pending window resize. WM_SIZE (main thread) records the new size here and
      * the EDT applies the Direct2D Resize between its own frames -- resizing the

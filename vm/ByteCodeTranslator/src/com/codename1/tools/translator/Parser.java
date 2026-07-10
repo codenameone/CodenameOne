@@ -60,10 +60,85 @@ public class Parser extends ClassVisitor {
     private static final String DISABLE_NULL_AND_ARRAY_BOUNDS_CHECKS_ANNOTATION =
             "Lcom/codename1/annotations/DisableNullChecksAndArrayBoundsChecks;";
     private static final String CONCRETE_ANNOTATION = "Lcom/codename1/annotations/Concrete;";
+    private static final String STACK_ALLOCATE_ANNOTATION = "Lcom/codename1/annotations/StackAllocate;";
+    private static final String FUSED_ANNOTATION = "Lcom/codename1/annotations/Fused;";
     private ByteCodeClass cls;
     private String clsName;
     private static String[] nativeSources;
     private static List<ByteCodeClass> classes = new ArrayList<>();
+
+    // ---- CLOSED-WORLD DEVIRTUALIZATION -----------------------------------
+    // ParparVM compiles a closed world: after dead-code elimination the class
+    // list is final, so an INVOKEVIRTUAL whose method has NO reachable override
+    // below the static receiver type can be emitted as a DIRECT call to the
+    // implementing class's C function -- removing the vtable load + indirect
+    // branch AND letting ThinLTO inline it (a vtable-dispatched getter like
+    // String.length()/HashMap.size() otherwise stays an opaque call in every
+    // hot loop). The subclass index is (re)built lazily whenever the class list
+    // changed; emission runs after the list is final.
+    private static java.util.Map<String, java.util.List<ByteCodeClass>> cn1SubclassIndex;
+    private static int cn1SubclassIndexSize = -1;
+
+    private static void cn1EnsureSubclassIndex() {
+        if (cn1SubclassIndexSize == classes.size()) {
+            return;
+        }
+        cn1SubclassIndex = new java.util.HashMap<String, java.util.List<ByteCodeClass>>();
+        for (ByteCodeClass c : classes) {
+            if (c.getBaseClass() != null) {
+                String b = c.getBaseClass().replace('/', '_').replace('$', '_');
+                java.util.List<ByteCodeClass> l = cn1SubclassIndex.get(b);
+                if (l == null) {
+                    l = new java.util.ArrayList<ByteCodeClass>();
+                    cn1SubclassIndex.put(b, l);
+                }
+                l.add(c);
+            }
+        }
+        cn1SubclassIndexSize = classes.size();
+    }
+
+    /**
+     * If (name, desc) invoked virtually on {@code owner} has no reachable
+     * override in any non-eliminated subclass, returns the mangled name of the
+     * class whose non-abstract declaration implements it (owner or an
+     * ancestor); otherwise null (the call must stay a vtable dispatch).
+     */
+    public static synchronized String resolveDevirtualizedOwner(ByteCodeClass owner, String name, String desc) {
+        if (owner == null) {
+            return null;
+        }
+        cn1EnsureSubclassIndex();
+        // any subclass DECLARING the method (abstract or not) keeps it virtual
+        java.util.ArrayDeque<ByteCodeClass> stack = new java.util.ArrayDeque<ByteCodeClass>();
+        java.util.List<ByteCodeClass> kids = cn1SubclassIndex.get(owner.getClsName());
+        if (kids != null) {
+            stack.addAll(kids);
+        }
+        while (!stack.isEmpty()) {
+            ByteCodeClass c = stack.pop();
+            if (!c.isEliminated() && c.hasDeclaredMethod(name, desc)) {
+                return null;
+            }
+            kids = cn1SubclassIndex.get(c.getClsName());
+            if (kids != null) {
+                stack.addAll(kids);
+            }
+        }
+        // resolve the implementing declaration at or above the static type
+        ByteCodeClass c = owner;
+        while (c != null) {
+            if (c.hasDeclaredNonAbstractMethod(name, desc)) {
+                return c.getClsName();
+            }
+            String b = c.getBaseClass();
+            if (b == null) {
+                return null;
+            }
+            c = getClassObject(b.replace('/', '_').replace('$', '_'));
+        }
+        return null;
+    }
     private static final MethodDependencyGraph dependencyGraph = new MethodDependencyGraph();
     private int lambdaCounter;
     private int stringConcatCounter;
@@ -823,6 +898,14 @@ public class Parser extends ClassVisitor {
                 continue;
             }
             for(BytecodeMethod mtd : bc.getMethods()) {
+                // Pure-Java twins that the JS runtime's bindNative delegates call
+                // (getImpl/putImpl/toStringImpl/valueOfHeap...): no bytecode call
+                // site exists, so without this keep they would be culled and the
+                // JS delegation would throw ReferenceError. Kept on all targets --
+                // the C natives use some of them as fallbacks too.
+                if(JavascriptNativeRegistry.isRuntimeDelegateTarget(bc.getClsName(), mtd.getMethodName())) {
+                    continue;
+                }
                 if(mtd.isEliminated() || mtd.isMain() || mtd.getMethodName().equals("__CLINIT__") || mtd.getMethodName().equals("finalize") || mtd.isNative()) {
                     if (!mtd.isEliminated() && mtd.getMethodName().contains("yield")) {
                         if(ByteCodeTranslator.verbose) {
@@ -1125,6 +1208,14 @@ public class Parser extends ClassVisitor {
 
     @Override
     public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+        if (STACK_ALLOCATE_ANNOTATION.equals(desc)) {
+            cls.setStackAllocatable(true);
+            return new AnnotationVisitorWrapper(super.visitAnnotation(desc, visible));
+        }
+        if (FUSED_ANNOTATION.equals(desc)) {
+            cls.setFused(true);
+            return new AnnotationVisitorWrapper(super.visitAnnotation(desc, visible));
+        }
         if (CONCRETE_ANNOTATION.equals(desc)) {
             return new AnnotationVisitorWrapper(super.visitAnnotation(desc, visible)) {
                 private String defaultConcrete;
@@ -1224,6 +1315,9 @@ public class Parser extends ClassVisitor {
         @Override
         public void visitEnd() {
             super.visitEnd();
+            // LEVER B: snapshot the inlinable-constructor plan from the RAW instruction
+            // list now, before optimize() (run later, per-class) folds the PUTFIELDs.
+            mtd.computeInlinableConstructorPlan();
             resolveDupForms(dupAnalysisOwner, dupAnalysisNode, mtd);
         }
 
@@ -1329,9 +1423,37 @@ public class Parser extends ClassVisitor {
                 BytecodeMethod helper = new BytecodeMethod(clsName, Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC, helperName, desc, null, null);
                 cls.addMethod(helper);
 
+                // Pre-size the StringBuilder from the recipe literals + per-argument length
+                // estimates so the common-case concat never grows its char[] (each growth is
+                // a fresh array + arraycopy). Over-estimates are harmless; under-estimates
+                // (e.g. a long String arg) still grow correctly.
+                int cn1Cap = 0;
+                if ("makeConcatWithConstants".equals(bsm.getName())) {
+                    String rcp = bsmArgs != null && bsmArgs.length > 0 ? String.valueOf(bsmArgs[0]) : "";
+                    for (int ci = 0; ci < rcp.length(); ci++) {
+                        char rc = rcp.charAt(ci);
+                        if (rc != 0x0001 && rc != 0x0002) cn1Cap++; // skip arg/const markers
+                    }
+                    if (bsmArgs != null) {
+                        for (int ci = 1; ci < bsmArgs.length; ci++) cn1Cap += String.valueOf(bsmArgs[ci]).length();
+                    }
+                }
+                for (Type at : invokedType.getArgumentTypes()) {
+                    switch (at.getSort()) {
+                        case Type.LONG: cn1Cap += 20; break;
+                        case Type.DOUBLE: cn1Cap += 24; break;
+                        case Type.FLOAT: cn1Cap += 15; break;
+                        case Type.BOOLEAN: cn1Cap += 5; break;
+                        case Type.CHAR: cn1Cap += 1; break;
+                        case Type.OBJECT: case Type.ARRAY: cn1Cap += 16; break;
+                        default: cn1Cap += 11; break; // int/short/byte
+                    }
+                }
+                if (cn1Cap < 16) cn1Cap = 16; else if (cn1Cap > 8192) cn1Cap = 8192;
                 helper.addTypeInstruction(Opcodes.NEW, "java/lang/StringBuilder");
                 helper.addInstruction(Opcodes.DUP);
-                helper.addInvoke(Opcodes.INVOKESPECIAL, "java/lang/StringBuilder", "<init>", "()V", false);
+                helper.addInstruction(Opcodes.SIPUSH, cn1Cap);
+                helper.addInvoke(Opcodes.INVOKESPECIAL, "java/lang/StringBuilder", "<init>", "(I)V", false);
 
                 Type[] argTypes = invokedType.getArgumentTypes();
                 int maxLocal = 0;

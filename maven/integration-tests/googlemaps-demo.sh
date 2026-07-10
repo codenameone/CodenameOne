@@ -7,7 +7,7 @@ if [ -d googlemapsdemo ]; then
   rm -rf googlemapsdemo
 fi
 
-curl -L https://github.com/shannah/googlemaps-maven-demo/archive/v1.0.2.zip > master.zip
+curl -fL --retry 5 --retry-all-errors https://github.com/shannah/googlemaps-maven-demo/archive/v1.0.2.zip > master.zip
 unzip master.zip
 rm master.zip
 mvn -e com.codenameone:codenameone-maven-plugin:${CN1_VERSION}:generate-app-project \

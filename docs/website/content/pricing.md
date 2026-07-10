@@ -40,6 +40,11 @@ For annual Pro/Enterprise subscriptions, SWIFT transfer and invoicing are availa
 ### Are there limits on number of apps?
 No. Pricing is per developer seat, not per app.
 
+### Are there limits on submitting my app to the App Store or Google Play?
+Manual submission is always unlimited and free. You can upload as many builds as you like to App Store Connect or the Google Play Console yourself, on any plan including Free — Codename One never sits between you and the stores.
+
+The limits shown above apply only to the optional *automated* submission feature: one-click submit from the build console and pushing your store listing as code (`cn1:metadata-push`). That's a convenience that delivers the binary and updates the listing for you; higher plans raise how many automated submissions and metadata updates you get per month, and add production review and zero-touch auto-submit. It never restricts your ability to publish manually.
+
 ### Will my app still work if I cancel subscription?
 Yes. Built apps continue to work.
 

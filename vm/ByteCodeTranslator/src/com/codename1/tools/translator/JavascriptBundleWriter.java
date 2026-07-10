@@ -280,6 +280,10 @@ final class JavascriptBundleWriter {
         // Authoritative: every native method the translator emitted (the bridge's
         // override targets, by name) -- more reliable than scanning runtime JS text.
         excluded.addAll(JavascriptMethodGenerator.NATIVE_METHOD_IDENTIFIERS);
+        // The runtime's bindNative fast paths call the pure-Java delegate twins
+        // (getImpl/valueOfHeap/...) as BARE identifiers -- invisible to the
+        // string-literal scans above -- so protect them from renaming explicitly.
+        excluded.addAll(JavascriptMethodGenerator.RUNTIME_DELEGATE_IDENTIFIERS);
         defs.removeAll(excluded);
         // Prefix protection: some bridge names are CONSTRUCTED at runtime by string
         // concatenation, so the full identifier never appears as a literal -- only

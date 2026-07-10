@@ -286,16 +286,36 @@ jobs:
           done
           echo "::error::Unable to install Android emulator package after retries"
           exit 1
+      # The emulator boot on GitHub-hosted runners intermittently dies before the
+      # device ever appears ("device 'emulator-5554' not found" -> the runner
+      # action's own boot timeout). One explicit retry recovers the infra lottery;
+      # a genuine test failure fails both attempts. emulator-boot-timeout is
+      # raised over the action's default for the slow-runner case where the boot
+      # is merely late rather than dead.
       - name: Run Android purchase instrumentation test (targeted)
+        id: purchase-emu-attempt1
+        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 36
           arch: x86_64
           target: google_apis
           disk-size: 2048M
+          emulator-boot-timeout: 900
           # android-emulator-runner runs each script line in its own shell, so
           # cd + gradlew must be a single `&&` line. Runs ONLY the purchase test
           # (it self-asserts by scraping logcat for CN1SS:IAP:SUBMITTED).
+          script: cd "${{ steps.build-android-app.outputs.gradle_project_dir }}" && ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.codenameone.examples.purchasetest.PurchaseBillingInstrumentationTest
+      - name: Run Android purchase instrumentation test (retry after emulator-boot failure)
+        if: steps.purchase-emu-attempt1.outcome == 'failure'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          disk-size: 2048M
+          emulator-boot-timeout: 900
+          force-avd-creation: true
           script: cd "${{ steps.build-android-app.outputs.gradle_project_dir }}" && ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.codenameone.examples.purchasetest.PurchaseBillingInstrumentationTest
       - name: Upload Android purchase test report
         if: always()
