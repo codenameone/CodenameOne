@@ -46,9 +46,14 @@
 extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char* str);
 extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str);
 
-/* Sink that forces a socket buffer object to stay live across a parked blocking read
- * so the conservative GC cannot sweep it mid-I/O (see socketRead). */
-static volatile void* cn1SocketReadKeepAlive;
+/* Forces a socket buffer object to stay live across a parked blocking read/write so
+ * the conservative GC cannot sweep it mid-I/O (see socketRead). An address-escape asm
+ * (the same idiom as the frameless GC anchor): the compiler must materialize the
+ * reference and keep it live up to this point, and unlike a store to a shared
+ * `volatile void*` static -- which qualifies the POINTEE, not the pointer, so the
+ * write is an eliminable dead store under LTO -- this cannot be optimized away and
+ * involves no cross-thread shared state. */
+#define CN1_SOCKET_KEEP_ALIVE(obj) __asm__ __volatile__("" : : "r"(obj))
 
 typedef struct {
     int fd;
@@ -119,7 +124,7 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_socketRead___long_byte_1ARRAY_int_
      * interior pointer) is used, so the optimizer may drop `buffer` and the concurrent GC
      * -- scanning this parked thread -- can sweep it mid-read (a use-after-free; see the
      * Windows port where this manifested on the cn1ss WebSocket reader). Force liveness. */
-    cn1SocketReadKeepAlive = (volatile void*) buffer;
+    CN1_SOCKET_KEEP_ALIVE(buffer);
     if (n <= 0) {
         s->lastError = n < 0 ? errno : 0;
         if (n == 0) {
@@ -151,14 +156,14 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_socketWrite___long_byte_1ARRAY_int
              * yield, so the optimizer may drop `buffer` and the concurrent GC --
              * scanning this parked thread -- can sweep the array WHILE write() is
              * still reading from it (use-after-free / corrupted network output). */
-            cn1SocketReadKeepAlive = (volatile void*) buffer;
+            CN1_SOCKET_KEEP_ALIVE(buffer);
             return written > 0 ? written : -1;
         }
         written += (int) n;
     }
     CN1_RESUME_THREAD;
     /* See above: force the array live across the yielded write loop. */
-    cn1SocketReadKeepAlive = (volatile void*) buffer;
+    CN1_SOCKET_KEEP_ALIVE(buffer);
     return written;
 }
 

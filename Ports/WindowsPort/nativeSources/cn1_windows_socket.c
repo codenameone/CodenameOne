@@ -38,9 +38,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Sink that forces a socket read/write buffer object to stay live across a parked
- * blocking call so the conservative GC can't sweep it mid-I/O (see socketRead). */
-static volatile void* cn1SocketReadKeepAlive;
+/* Forces a socket read/write buffer object to stay live across a parked blocking
+ * call so the conservative GC can't sweep it mid-I/O (see socketRead). An
+ * address-escape asm (the frameless GC anchor idiom): unlike a store to a
+ * `volatile void*` static -- which qualifies the POINTEE, not the pointer, so the
+ * write is an eliminable dead store under whole-program optimization -- this
+ * cannot be optimized away and shares no cross-thread state. clang-cl (the
+ * compiler for this port) supports GNU inline asm. */
+#define CN1_SOCKET_KEEP_ALIVE(obj) __asm__ __volatile__("" : : "r"(obj))
 
 typedef struct CN1Socket {
     SOCKET s;
@@ -163,7 +168,7 @@ JAVA_INT com_codename1_impl_windows_WindowsNative_socketRead___long_byte_1ARRAY_
      * buffer, sweeps it mid-read -> the observed WindowsSocket_SocketInput use-after-free
      * (0xC0000005 on the cn1ss WebSocket reader). The volatile sink forces __cn1Arg2 to stay
      * live through the recv so the conservative stack/register scan resolves it. */
-    cn1SocketReadKeepAlive = (volatile void*) __cn1Arg2;
+    CN1_SOCKET_KEEP_ALIVE(__cn1Arg2);
     if (n == 0) {
         return -1; /* peer closed */
     }
