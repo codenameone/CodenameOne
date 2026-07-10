@@ -21,7 +21,7 @@ The old wizard did it by logging in as you. You typed your Apple ID and password
 
 ## The New Approach: A Key, Not A Login
 
-The new wizard never sees your Apple ID or password. It uses an App Store Connect API key, which is Apple's official machine-to-machine credential: a `.p8` private key plus a Key ID and an Issuer ID, created once in App Store Connect under Users and Access, Integrations. The key authorizes certificate, bundle ID, device, profile and push key management through Apple's documented API, the same one Apple's own tooling uses.
+The new wizard never sees your Apple ID or password. It uses an App Store Connect API key, which is Apple's official machine-to-machine credential: a `.p8` private key plus a Key ID and an Issuer ID, created once in App Store Connect under Users and Access, Integrations. The key authorizes certificate, bundle ID, device, profile, and push key management through Apple's documented API, the same one Apple's own tooling uses.
 
 There's no password to store, no 2FA prompt to intercept, and no login flow to chase. When Apple redesigns their sign-in page next year, nothing on this path breaks.
 
@@ -51,7 +51,7 @@ The goal resolves the wizard from Maven, launches it against the current project
 
 One detail we enjoy: the wizard is itself a Codename One app. Same framework, same UI toolkit, running as a desktop tool. We keep saying one codebase reaches desktop too, so the signing tool seemed like a reasonable place to prove it.
 
-Android is handled locally, no cloud involved: the wizard generates a self-signed keystore with the JDK's `keytool` and writes the keystore path, alias and password into the project. Back that keystore up. A published Android app can never change its signing key. Windows code signing certificates must come from a certificate authority, so the wizard documents the settings rather than pretending it can issue them.
+Android is handled locally, no cloud involved: the wizard generates a self-signed keystore with the JDK's `keytool` and writes the keystore path, alias, and password into the project. Back that keystore up. A published Android app can never change its signing key. Windows code signing certificates must come from a certificate authority, so the wizard documents the settings rather than pretending it can issue them.
 
 ## The Tradeoff
 

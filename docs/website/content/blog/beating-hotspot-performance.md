@@ -19,7 +19,7 @@ But before we get to that, a few announcements.
 
 ## Before You Update
 
-The optimizations below landed this week. They were tested obsessively. Every commit was gated on bit identical output vs HotSpot, plus torture suites for maps, string builders, threads and GC stress, in both cooperative and forced signal stop modes, under both clang and gcc. But this is a deep change to code generation, allocation and collection. Like any change of this scale, there's risk.
+The optimizations below landed this week. They were tested obsessively. Every commit was gated on bit identical output vs HotSpot, plus torture suites for maps, string builders, threads, and GC stress, in both cooperative and forced signal stop modes, under both clang and gcc. But this is a deep change to code generation, allocation, and collection. Like any change of this scale, there's risk.
 
 If a build misbehaves, pin to the previous release with [versioned builds](https://www.codenameone.com/blog/versioned-builds-master/) and let us know through the usual channels. That's exactly the case versioned builds exist for.
 
@@ -27,7 +27,7 @@ There's a lot more shipping this week beyond the VM work; the bottom of this pos
 
 ## The Starting Point
 
-Client VMs are a different beast. The joke around here is that I built ParparVM in two weeks and Steve spent the next three years fixing bugs. When I built it, throughput wasn't a priority at all. I was aiming for simplicity, reliability and consistency. What actually matters for client performance is startup time, memory footprint, low latency and fast native access. Ninety percent of client code time should be spent in rendering and IO.
+Client VMs are a different beast. The joke around here is that I built ParparVM in two weeks and Steve spent the next three years fixing bugs. When I built it, throughput wasn't a priority at all. I was aiming for simplicity, reliability, and consistency. What actually matters for client performance is startup time, memory footprint, low latency, and fast native access. 90% of client code time should be spent in rendering and IO.
 
 Occasionally a customer would complain about performance, we'd add an optimization for that specific case, and we'd move along. We profiled common use cases, they were fine, and we never treated VM throughput as a problem. Comparing against HotSpot wasn't even on the table. You can't out-optimize a JIT, and we didn't run on the same platforms anyway. Now that we have desktop ports, people are porting heavier workloads and running direct comparisons on the same hardware. I assumed we were 2x or 3x slower than warmed HotSpot, ignoring startup.
 
@@ -196,7 +196,7 @@ The cap is now dynamic. The baseline is an eighth of available RAM, and threads 
 
 Chasing benchmarks pays for itself in the bugs it flushes out, and two of them deserve a paragraph each.
 
-The first: on Apple platforms, `setjmp` and `longjmp` save and restore the caller's signal mask, and each side is a `sigprocmask` syscall. Every Java try block entry compiles to a `setjmp` in our codegen. Put a try block inside a hot loop and you're paying a kernel round trip per iteration; on the vector map workload that was 19% of the app's own CPU samples. The VM never changes the signal mask, so Apple targets now use `_setjmp` and `_longjmp`, the variants that skip the mask. Every try/catch on iOS, tvOS, watchOS and macOS just got cheaper.
+The first: on Apple platforms, `setjmp` and `longjmp` save and restore the caller's signal mask, and each side is a `sigprocmask` syscall. Every Java try block entry compiles to a `setjmp` in our codegen. Put a try block inside a hot loop and you're paying a kernel round trip per iteration; on the vector map workload that was 19% of the app's own CPU samples. The VM never changes the signal mask, so Apple targets now use `_setjmp` and `_longjmp`, the variants that skip the mask. Every try/catch on iOS, tvOS, watchOS, and macOS just got cheaper.
 
 The second one had been latent for years. A variable assigned after `setjmp` and read after `longjmp` is indeterminate per the C standard. Our exception handler read exactly such a variable. Because clang happens to spill it to memory, every clang-compiled binary we ever shipped worked by luck. gcc keeps it in a register, which `longjmp` rolls back, so after any caught exception the thread's frame bookkeeping was wrong and new frames were allocated on top of live locals. Our Alpine Linux CI job, the only gcc-compiled platform in the matrix, hung deterministically and led us straight to it. Two `volatile` qualifiers fixed a bug that plausibly affected every gcc-built Codename One Linux app that ever caught an exception.
 
@@ -244,7 +244,7 @@ An honest list, because a benchmark suite is ten workloads and the world is bigg
 - **Warmup is the flip side.** Every HotSpot number here is after full warmup. Cold, the comparison inverts, and client apps live mostly in the cold and warm phases. We start at full speed with a 2.4 MB floor; HotSpot needs ~40 MB and a few thousand iterations to become the machine we benchmarked against.
 - **We haven't raced GraalVM native-image yet.** It's the natural AOT peer and it's on the list. This round was about closing the gap to the ceiling, which is warmed C2.
 
-All of the machinery above has a price, and it's small enough to state exactly: the benchmark app's binary grew from 434 KB to 451 KB, a 3.8% increase. Those 17 KB buy the inlined fast paths, the compact HashMap and the escape analysis. Memory moved the other direction: peak use under allocation churn dropped from gigabytes (the trigger bug) to below the JVM's on the same workload, and the no-op floor stayed at 2.4 MB.
+All of the machinery above has a price, and it's small enough to state exactly: the benchmark app's binary grew from 434 KB to 451 KB, a 3.8% increase. Those 17 KB buy the inlined fast paths, the compact HashMap, and the escape analysis. Memory moved the other direction: peak use under allocation churn dropped from gigabytes (the trigger bug) to below the JVM's on the same workload, and the no-op floor stayed at 2.4 MB.
 
 The whole suite ships in the repo under `vm/benchmarks`, including the torture tests and the checksum gate. If you think we cheated after all, `vm/benchmarks/run-benchmark.sh` will happily referee:
 

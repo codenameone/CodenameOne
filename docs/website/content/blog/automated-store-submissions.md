@@ -4,8 +4,8 @@ slug: automated-store-submissions
 url: /blog/automated-store-submissions/
 date: '2026-07-13'
 author: Shai Almog
-description: "Automated store submissions ship this week: one-click delivery to the App Store, Mac App Store, Google Play and Huawei AppGallery, with your listing text and screenshots versioned in git and pushed with mvn cn1:metadata-push. Plus organization accounts and self service account deletion."
-feed_html: '<img src="https://www.codenameone.com/blog/automated-store-submissions.jpg" alt="Automated store submissions" /> One-click delivery to the App Store, Google Play and Huawei AppGallery, with your listing versioned in git and pushed with mvn cn1:metadata-push.'
+description: "Automated store submissions ship this week: one-click delivery to the App Store, Mac App Store, Google Play, and Huawei AppGallery, with your listing text and screenshots versioned in git and pushed with mvn cn1:metadata-push. Plus organization accounts and self service account deletion."
+feed_html: '<img src="https://www.codenameone.com/blog/automated-store-submissions.jpg" alt="Automated store submissions" /> One-click delivery to the App Store, Google Play, and Huawei AppGallery, with your listing versioned in git and pushed with mvn cn1:metadata-push.'
 series: ["release-2026-07-10"]
 ---
 
@@ -72,7 +72,7 @@ flowchart LR
 
 Here's the narrative part, and we might as well say it directly. Google ships an app store and an app framework, and its tooling naturally treats Play as the finish line. We don't have a store, so we have no stake in which one wins. Our job is maximum audience with minimum friction, whatever the store.
 
-That matters because a large share of Android users can't install from Google Play at all: most of the market in China, plus many Huawei devices elsewhere. AppGallery is therefore a first-class submission target, exactly like the App Store and Play. For the long tail of Android markets (Xiaomi, OPPO, VIVO, Tencent MyApp and the rest), the build can produce distribution-channel packages: your same signed release APK stamped with a per-store channel id, which your app reads back at runtime with `Display.getInstance().getProperty("DistributionChannel", "")` for install-source reporting, no third-party SDK involved. Play itself always receives the standard, unmodified App Bundle, so none of this touches your Play compliance.
+That matters because a large share of Android users can't install from Google Play at all: most of the market in China, plus many Huawei devices elsewhere. AppGallery is therefore a first-class submission target, exactly like the App Store and Play. For the long tail of Android markets (Xiaomi, OPPO, VIVO, Tencent MyApp, and the rest), the build can produce distribution-channel packages: your same signed release APK stamped with a per-store channel id, which your app reads back at runtime with `Display.getInstance().getProperty("DistributionChannel", "")` for install-source reporting, no third-party SDK involved. Play itself always receives the standard, unmodified App Bundle, so none of this touches your Play compliance.
 
 Credentials are per store and configured once in the console: the same App Store Connect API key the certificate wizard stored on Saturday, a Google Play service account, and a Huawei API client id and secret.
 

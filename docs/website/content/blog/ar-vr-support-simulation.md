@@ -21,7 +21,7 @@ So this feature has two halves that matter equally: a portable API over ARKit an
 
 ## The AR Package
 
-The API follows the same shape as the camera package: check support, open a session with options, get one view. World tracking, plane detection (horizontal and vertical), hit testing, anchors, light estimation, image tracking and face tracking are all in. Placing a glTF model on a tapped surface looks like this:
+The API follows the same shape as the camera package: check support, open a session with options, get one view. World tracking, plane detection (horizontal and vertical), hit testing, anchors, light estimation, image tracking, and face tracking are all in. Placing a glTF model on a tapped surface looks like this:
 
 ```java
 if (!AR.isSupported()) {
@@ -64,7 +64,7 @@ The Simulate menu gains an AR Simulation window for the states you can't summon 
 
 `com.codename1.vr` takes the opposite approach: no platform SDK at all. It's pure core code built on the existing `com.codename1.gpu` pipeline and the motion sensors API from [last week](/blog/motion-input-form-factors/), so it runs anywhere `isGpuSupported()` is true, including the simulator.
 
-`VRView` renders your scene twice per frame, once per eye, with cameras offset by a configurable interpupillary distance; the offset is the depth cue. `HeadTracker` fuses the gyroscope, accelerometer and magnetometer into a head orientation through a deterministic complementary filter, which means the fusion math is unit tested rather than eyeballed.
+`VRView` renders your scene twice per frame, once per eye, with cameras offset by a configurable interpupillary distance; the offset is the depth cue. `HeadTracker` fuses the gyroscope, accelerometer, and magnetometer into a head orientation through a deterministic complementary filter, which means the fusion math is unit tested rather than eyeballed.
 
 ![A stereo scene; the offset between the eye views is the depth cue](/blog/ar-vr-support-simulation/vr-stereo-scene.png)
 
@@ -80,7 +80,7 @@ f.add(BorderLayout.CENTER, pano);
 
 ## What It Costs Your Build: Nothing, Unless You Use It
 
-The build pipeline treats AR like the camera and car APIs: referencing `com.codename1.ar` is what injects the camera permission, the ARCore Gradle dependency and the manifest entries, and marks ARCore as optional so your app still installs on devices without it (flip `android.ar.required=true` for an AR-only app). On iOS, ARKit is linked only for apps that use the API and compiled out on tvOS and watchOS. Apps that never touch the package pay no size, permission or store-visibility cost.
+The build pipeline treats AR like the camera and car APIs: referencing `com.codename1.ar` is what injects the camera permission, the ARCore Gradle dependency, and the manifest entries, and marks ARCore as optional so your app still installs on devices without it (flip `android.ar.required=true` for an AR-only app). On iOS, ARKit is linked only for apps that use the API and compiled out on tvOS and watchOS. Apps that never touch the package pay no size, permission, or store-visibility cost.
 
 ## Scoped Out, On Purpose
 
