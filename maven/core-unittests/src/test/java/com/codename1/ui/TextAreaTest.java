@@ -413,6 +413,60 @@ class TextAreaTest extends UITestBase {
     }
 
     @FormTest
+    void testEditableMultilineRendersTopAlignedToMatchNativeEditor() {
+        // Regression test for #5345: an editable multi-line text area must render
+        // top-aligned (to match the native editor which top-aligns) even when the
+        // theme/default valign is CENTER, otherwise the text jumps when editing
+        // starts and ends. getVerticalAlignment() still reports the logical value.
+        TextArea textArea = new TextArea("text text", 3, 20);
+        textArea.setSingleLineTextArea(false);
+        textArea.setEditable(true);
+        textArea.setVerticalAlignment(Component.CENTER);
+
+        assertEquals(Component.CENTER, textArea.getVerticalAlignment());
+        assertEquals(Component.TOP, textArea.getVerticalAlignmentForRendering());
+
+        textArea.setVerticalAlignment(Component.BOTTOM);
+        assertEquals(Component.TOP, textArea.getVerticalAlignmentForRendering());
+    }
+
+    @FormTest
+    void testNonEditableMultilineHonorsVerticalAlignmentWhenRendering() {
+        // Non-editable multi-line text areas never show a native editor, so they
+        // may honor CENTER/BOTTOM alignment when rendering.
+        TextArea textArea = new TextArea("text text", 3, 20);
+        textArea.setSingleLineTextArea(false);
+        textArea.setEditable(false);
+
+        textArea.setVerticalAlignment(Component.CENTER);
+        assertEquals(Component.CENTER, textArea.getVerticalAlignmentForRendering());
+
+        textArea.setVerticalAlignment(Component.BOTTOM);
+        assertEquals(Component.BOTTOM, textArea.getVerticalAlignmentForRendering());
+    }
+
+    @FormTest
+    void testSingleLineHonorsVerticalAlignmentWhenRendering() {
+        // Single-line fields center vertically in their native editor, so the
+        // rendering alignment always matches the requested alignment.
+        TextArea textArea = new TextArea("text", 1, 20);
+        textArea.setSingleLineTextArea(true);
+        textArea.setEditable(true);
+        textArea.setVerticalAlignment(Component.CENTER);
+        assertEquals(Component.CENTER, textArea.getVerticalAlignmentForRendering());
+    }
+
+    @FormTest
+    void testEditableSingleRowTextAreaRendersTopAligned() {
+        // A TextArea (not a TextField) is multi-line even with a single row unless
+        // singleLineTextArea is explicitly set, so it falls back to TOP while editing.
+        TextArea textArea = new TextArea("text", 1, 20);
+        textArea.setEditable(true);
+        textArea.setVerticalAlignment(Component.CENTER);
+        assertEquals(Component.TOP, textArea.getVerticalAlignmentForRendering());
+    }
+
+    @FormTest
     void testVerticalAlignmentScreenshotStates() {
         Form form = new Form("TextArea VAlign", BoxLayout.y());
         form.getStyle().setPadding(4, 4, 4, 4);

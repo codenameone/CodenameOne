@@ -1380,6 +1380,13 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         if (Display.getInstance().isNativeEditorVisible(this) && Display.impl.nativeEditorPaintsHint()) {
             return;
         }
+        // Keep the hint vertically aligned with where the text will actually be
+        // rendered/edited so it doesn't sit in the middle while the cursor is on
+        // the first line of a multi-line text area (issue #5345).
+        Label hint = getHintLabelImpl();
+        if (hint != null) {
+            hint.setVerticalAlignment(getVerticalAlignmentForRendering());
+        }
         super.paintHint(g);
     }
 
@@ -1870,6 +1877,27 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     ///
     /// - #BOTTOM
     public int getVerticalAlignment() {
+        return valign;
+    }
+
+    /// Returns the vertical alignment that should actually be used when rendering
+    /// the lightweight text, cursor and hint.
+    ///
+    /// This differs from #getVerticalAlignment() for editable multi-line text
+    /// areas on platforms whose native text editor top-aligns its content (which
+    /// is currently every platform). In that case the lightweight rendering is
+    /// forced to #TOP so it matches the native editor, otherwise the text would
+    /// visibly jump up when editing starts and back down when it ends (issue #5345).
+    /// Non-editable multi-line text areas still honor #CENTER and #BOTTOM.
+    ///
+    /// #### Returns
+    ///
+    /// the vertical alignment used for rendering, one of: CENTER, TOP, BOTTOM
+    public int getVerticalAlignmentForRendering() {
+        if (valign != TOP && !isSingleLineTextArea() && isEditable()
+                && !Display.impl.supportsNativeTextAreaVerticalAlignment()) {
+            return TOP;
+        }
         return valign;
     }
 

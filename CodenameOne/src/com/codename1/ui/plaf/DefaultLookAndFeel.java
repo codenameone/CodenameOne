@@ -827,7 +827,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             return 0;
         }
 
-        switch (ta.getVerticalAlignment()) {
+        switch (ta.getVerticalAlignmentForRendering()) {
             case Component.CENTER:
                 return remainingHeight / 2;
             case Component.BOTTOM:
