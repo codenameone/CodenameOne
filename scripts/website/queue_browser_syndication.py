@@ -98,8 +98,8 @@ def _eligible_posts(today: dt.date, floor: dt.date, min_age_days: int, blog_dir:
     return [p for p in posts if p.date > floor and p.date <= cutoff]
 
 
-def _build_task(post: Post, platform: str) -> dict:
-    body_html = _markdown_to_html(render_syndicated_body(post))
+def _build_task(post: Post, platform: str, all_posts: list[Post], today: dt.date) -> dict:
+    body_html = _markdown_to_html(render_syndicated_body(post, all_posts, today))
     return {
         "id": f"{platform}:{post.slug}",
         "site": platform,
@@ -136,9 +136,11 @@ def main(argv: list[str]) -> int:
     state = State.load(Path(args.state_file))
     blog_dir = Path(args.blog_dir)
     posts = _eligible_posts(today, floor, args.min_age_days, blog_dir)
-    # Slug -> publish date for *every* post, so existing queue tasks can be
-    # re-checked against the per-platform rules regardless of eligibility.
-    dates_by_slug = {p.slug: p.date for p in discover_posts(blog_dir)}
+    # Every post (not just the eligible ones), used both to re-check existing
+    # queue tasks against the per-platform rules and to resolve post-link
+    # forward references when rendering task bodies.
+    all_posts = discover_posts(blog_dir)
+    dates_by_slug = {p.slug: p.date for p in all_posts}
 
     queue_path = Path(args.queue_file)
     if queue_path.exists():
@@ -171,7 +173,7 @@ def main(argv: list[str]) -> int:
                 continue
             if state.is_syndicated(post.slug, platform):
                 continue
-            new_tasks.append(_build_task(post, platform))
+            new_tasks.append(_build_task(post, platform, all_posts, today))
 
     if new_tasks:
         print(f"Queueing {len(new_tasks)} new task(s):")

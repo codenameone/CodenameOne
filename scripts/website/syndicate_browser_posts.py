@@ -1193,7 +1193,7 @@ def main(argv: list[str]) -> int:
         print(f"validate-only: using newest post {candidate.slug} for selector verification.")
 
     print(f"Selected post: {candidate.slug} (date={candidate.date.isoformat()})")
-    body_markdown = render_syndicated_body(candidate)
+    body_markdown = render_syndicated_body(candidate, posts, today)
 
     any_change = False
     failures: list[str] = []

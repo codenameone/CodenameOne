@@ -318,10 +318,60 @@ def render_mermaid_as_images(body: str) -> str:
     return _MERMAID_BLOCK_RE.sub(repl, body)
 
 
-def render_syndicated_body(post: Post) -> str:
+# The {{< post-link path="/blog/x" text="..." >}} shortcode links to another
+# post *only if that post exists in the current build*. On the website the daily
+# rebuild resolves it into a real link once the target's publish date arrives;
+# before then it renders as plain text. Syndication must do the same resolution
+# here, because _HUGO_SHORTCODE_RE would otherwise strip the whole shortcode --
+# link *and* its visible text -- leaving a dangling "the walkthrough is in ."
+# sentence in the syndicated copy.
+_POST_LINK_RE = re.compile(
+    r"\{\{<\s*post-link\b([^>]*)>\}\}|\{\{%\s*post-link\b([^%]*)%\}\}",
+    re.IGNORECASE,
+)
+
+
+def _shortcode_attr(attrs: str, name: str) -> str | None:
+    match = re.search(rf'\b{name}\s*=\s*"([^"]*)"', attrs)
+    return match.group(1) if match else None
+
+
+def render_post_links(body: str, posts: list[Post], today: dt.date) -> str:
+    """Resolve ``post-link`` shortcodes to real Markdown links (or plain text).
+
+    Mirrors the Hugo shortcode: a link is emitted only when the target post
+    exists and is already published as of ``today`` (production builds exclude
+    future-dated posts); otherwise the shortcode's ``text`` is emitted bare, so
+    a still-unpublished forward reference never becomes a 404.
+    """
+    by_path: dict[str, Post] = {}
+    for post in posts:
+        keys = {f"/blog/{post.slug}", f"/blog/{post.path.stem}"}
+        url_field = post.front_matter.get("url")
+        if isinstance(url_field, str) and url_field.startswith("/"):
+            keys.add(url_field)
+        for key in keys:
+            by_path.setdefault(key.rstrip("/"), post)
+
+    def repl(match: "re.Match[str]") -> str:
+        attrs = match.group(1) if match.group(1) is not None else match.group(2)
+        path = _shortcode_attr(attrs, "path")
+        text = _shortcode_attr(attrs, "text") or ""
+        if not path:
+            return text
+        target = by_path.get(path.rstrip("/"))
+        if target is not None and target.date <= today:
+            return f"[{text or target.title}]({target.canonical_url})"
+        return text
+
+    return _POST_LINK_RE.sub(repl, body)
+
+
+def render_syndicated_body(post: Post, posts: list[Post] | None = None, today: dt.date | None = None) -> str:
     body = post.body.strip("\n")
     body = _HUGO_FOOTER_RE.sub("", body)
     body = render_mermaid_as_images(body)
+    body = render_post_links(body, posts or [], today or dt.date.today())
     body = _HUGO_SHORTCODE_RE.sub("", body).rstrip()
     body = absolutize_links(body)
     body = insert_blurb(body, CN1_BLURB)
@@ -465,7 +515,7 @@ def main(argv: list[str]) -> int:
         return 0
 
     print(f"Selected post: {candidate.slug} (date={candidate.date.isoformat()})")
-    body_markdown = render_syndicated_body(candidate)
+    body_markdown = render_syndicated_body(candidate, posts, today)
 
     any_change = False
     failures: list[str] = []
