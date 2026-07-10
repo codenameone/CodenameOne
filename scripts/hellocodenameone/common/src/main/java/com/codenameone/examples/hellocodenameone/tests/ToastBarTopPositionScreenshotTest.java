@@ -124,7 +124,7 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
             lastToastH = Integer.MIN_VALUE;
         }
         if ((shown && stableGeometryPolls >= 3) || waitedMs >= 15000) {
-            awaitRenderedToastFrame(parent, waitedMs);
+            awaitRenderedToastFrame(parent, 0);
             return;
         }
         if (!shown && waitedMs > 0 && (waitedMs % 3000) == 0) {
@@ -160,7 +160,7 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
                 return;
             }
             boolean rendered = containsRenderedToastBar(screen);
-            if (rendered || waitedMs >= 15000) {
+            if (rendered || waitedMs >= 12000) {
                 if (!rendered) {
                     System.out.println("CN1SS:WARN:test=ToastBarTopPosition rendered toast not detected at capture bound");
                 }
@@ -182,10 +182,16 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
             return false;
         }
         int[] rgb = screen.getRGB();
-        int maxY = Math.min(height, Math.max(1, height / 3));
+        int maxY = Math.min(height, Math.max(1, height / 2));
         int requiredDarkPixels = Math.max(1, (width * 3) / 5);
+        int requiredBrightPixels = Math.max(16, (width * 5) / 4);
+        int bestBandHeight = 0;
+        int bestBandBrightPixels = 0;
+        int currentBandHeight = 0;
+        int currentBandBrightPixels = 0;
         for (int y = 0; y < maxY; y++) {
             int darkPixels = 0;
+            int brightPixels = 0;
             int rowOffset = y * width;
             for (int x = 0; x < width; x++) {
                 int color = rgb[rowOffset + x];
@@ -195,11 +201,26 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
                 if (r < 96 && g < 96 && b < 96) {
                     darkPixels++;
                 }
+                if (r > 180 && g > 180 && b > 180) {
+                    brightPixels++;
+                }
             }
             if (darkPixels >= requiredDarkPixels) {
-                return true;
+                currentBandHeight++;
+                currentBandBrightPixels += brightPixels;
+            } else {
+                if (currentBandHeight > bestBandHeight) {
+                    bestBandHeight = currentBandHeight;
+                    bestBandBrightPixels = currentBandBrightPixels;
+                }
+                currentBandHeight = 0;
+                currentBandBrightPixels = 0;
             }
         }
-        return false;
+        if (currentBandHeight > bestBandHeight) {
+            bestBandHeight = currentBandHeight;
+            bestBandBrightPixels = currentBandBrightPixels;
+        }
+        return bestBandHeight > 0 && bestBandBrightPixels >= requiredBrightPixels;
     }
 }
