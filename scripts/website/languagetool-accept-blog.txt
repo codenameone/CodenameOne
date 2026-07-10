@@ -94,3 +94,19 @@ Classpath
 # Media tool names used in the JavaSE media backend.
 ffmpeg
 ffprobe
+
+# VM / compiler / performance terminology (the 2026-07-10 ParparVM
+# performance release post and future perf deep dives).
+[Gg]eomean
+gcc
+[Ii]nlin(es?|ing|ed)( it)?
+[Dd]eoptimizations?
+[Qq]uicksort
+[Rr]eassociat(es|ing|ion)
+[Mm]iscompil(es|ed|ations?)
+[Bb]ackpressure
+[Aa]utobox(es|ing)?
+memset
+
+# The store submission tool, officially lowercase.
+fastlane

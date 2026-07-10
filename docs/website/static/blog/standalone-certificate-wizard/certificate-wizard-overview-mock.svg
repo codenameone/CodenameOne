@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="700" viewBox="0 0 1120 700">
+  <rect width="1120" height="700" fill="#f3f4f7"/>
+  <rect width="1120" height="70" fill="#ffffff"/>
+  <text x="34" y="43" font-family="Arial, sans-serif" font-size="24" font-weight="700" fill="#112247">Codename One</text>
+  <text x="218" y="43" font-family="Arial, sans-serif" font-size="22" fill="#112247">Signing</text>
+  <rect x="620" y="18" width="168" height="34" rx="17" fill="#e7f4ec"/>
+  <text x="641" y="41" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#2e8b57">ASC API Key configured</text>
+  <rect x="800" y="18" width="138" height="34" rx="17" fill="#fdf1dc"/>
+  <polygon points="823,25 814,38 823,38 818,48 832,33 823,33" fill="#b26a00"/>
+  <text x="846" y="40" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#b26a00">Auto Setup</text>
+  <rect x="0" y="70" width="230" height="630" fill="#ffffff"/>
+  <text x="28" y="112" font-family="Arial, sans-serif" font-size="12" font-weight="700" fill="#a0a8ba">WORKSPACE</text>
+  <rect x="18" y="132" width="194" height="42" rx="8" fill="#e8f0ff"/>
+  <text x="44" y="159" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#2f6bff">Overview</text>
+  <text x="44" y="213" font-family="Arial, sans-serif" font-size="16" fill="#7f8aa3">ASC API Key</text>
+  <text x="28" y="268" font-family="Arial, sans-serif" font-size="12" font-weight="700" fill="#a0a8ba">SIGNING ASSETS</text>
+  <text x="44" y="309" font-family="Arial, sans-serif" font-size="16" fill="#7f8aa3">Certificates  2</text>
+  <text x="44" y="359" font-family="Arial, sans-serif" font-size="16" fill="#7f8aa3">Bundle IDs  1</text>
+  <text x="44" y="409" font-family="Arial, sans-serif" font-size="16" fill="#7f8aa3">Devices  2</text>
+  <text x="44" y="459" font-family="Arial, sans-serif" font-size="16" fill="#7f8aa3">Profiles  2</text>
+  <text x="280" y="132" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#112247">Overview</text>
+  <text x="280" y="166" font-family="Arial, sans-serif" font-size="16" fill="#7f8aa3">Everything you need to sign and ship an iOS build, managed through the App Store Connect API.</text>
+  <text x="280" y="226" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#a0a8ba">SETUP STATUS</text>
+  <g transform="translate(280 250)">
+    <rect width="250" height="118" rx="8" fill="#ffffff" stroke="#d9dee8"/>
+    <text x="22" y="36" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#112247">ASC API Key</text>
+    <text x="22" y="66" font-family="Arial, sans-serif" font-size="15" fill="#7f8aa3">Connected</text>
+    <text x="22" y="95" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#112247">ABCD1234EF</text>
+  </g>
+  <g transform="translate(552 250)">
+    <rect width="250" height="118" rx="8" fill="#ffffff" stroke="#d9dee8"/>
+    <text x="22" y="36" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#112247">Distribution certificate</text>
+    <text x="22" y="66" font-family="Arial, sans-serif" font-size="15" fill="#7f8aa3">Ready</text>
+    <text x="22" y="95" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#112247">App Store Distribution</text>
+  </g>
+  <g transform="translate(824 250)">
+    <rect width="250" height="118" rx="8" fill="#ffffff" stroke="#d9dee8"/>
+    <text x="22" y="36" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#112247">App Store profile</text>
+    <text x="22" y="66" font-family="Arial, sans-serif" font-size="15" fill="#7f8aa3">Ready</text>
+    <text x="22" y="95" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#112247">My App App Store</text>
+  </g>
+  <text x="280" y="430" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#a0a8ba">YOUR ASSETS</text>
+  <g transform="translate(280 454)">
+    <rect width="180" height="108" rx="8" fill="#ffffff" stroke="#d9dee8"/>
+    <text x="24" y="48" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#112247">2</text>
+    <text x="24" y="80" font-family="Arial, sans-serif" font-size="15" fill="#7f8aa3">Certificates</text>
+  </g>
+  <g transform="translate(480 454)">
+    <rect width="180" height="108" rx="8" fill="#ffffff" stroke="#d9dee8"/>
+    <text x="24" y="48" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#112247">1</text>
+    <text x="24" y="80" font-family="Arial, sans-serif" font-size="15" fill="#7f8aa3">Bundle IDs</text>
+  </g>
+  <g transform="translate(680 454)">
+    <rect width="180" height="108" rx="8" fill="#ffffff" stroke="#d9dee8"/>
+    <text x="24" y="48" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#112247">2</text>
+    <text x="24" y="80" font-family="Arial, sans-serif" font-size="15" fill="#7f8aa3">Devices</text>
+  </g>
+  <g transform="translate(880 454)">
+    <rect width="180" height="108" rx="8" fill="#ffffff" stroke="#d9dee8"/>
+    <text x="24" y="48" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#112247">2</text>
+    <text x="24" y="80" font-family="Arial, sans-serif" font-size="15" fill="#7f8aa3">Profiles</text>
+  </g>
+</svg>
