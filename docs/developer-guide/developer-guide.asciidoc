@@ -155,6 +155,8 @@ include::Working-With-Javascript.asciidoc[]
 
 include::Working-with-Mac-OS-X.asciidoc[]
 
+include::App-Store-Submission.asciidoc[]
+
 include::Desktop-Integration.asciidoc[]
 
 include::Working-With-Windows.asciidoc[]
