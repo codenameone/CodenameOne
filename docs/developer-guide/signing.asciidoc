@@ -209,12 +209,7 @@ image::img/ios-cert-wizard-5-bundle-id.png[Enter the app bundle ID,scaledwidth=2
 
 .Wildcard Card Provisioning
 ****
-Wildcard ids such as com.mycompany.\* or even \* allow you to create one generic certificate to use with all applications. This is useful for the global settings dialog and allows you to create an app without launching the wizard. Notice that wildcards apps can't use features such as push etc.
-
-You can set the global defaults for the IDE by going to IDE settings/preferences and setting default values e.g.:
-
-.Setting the development certificate and a global \* provisioning profile allows you to create a new app and built it to device without running the Certificate Wizard. Notice that you will need to run it when going into production
-image::img/ios-cert-global-settings.png[Setting the development certificate and a global \* provisioning profile allows you to create a new app and built it to device without running the Certificate Wizard. Notice that you will need to run it when going into production]
+Wildcard IDs such as `com.mycompany.*` or even `*` allow one generic development profile to cover multiple applications. The standalone Certificate Wizard can reuse an existing wildcard profile, but wildcard apps can't use capabilities such as push notifications and aren't suitable for App Store distribution.
 ****
 
 ==== Installing files locally
@@ -372,15 +367,9 @@ Notice that this is something you need to do once a year (generate P12), you wil
 .p12 export
 image::img/p12-export.png[P12 Export,scaledwidth=30%]
 
--	Make sure the package matches between the main preferences screen in the IDE and the iOS settings screen.
-+
-.Package ID matching App ID
-image::img/package-id-app-id.png[Package ID matching App ID,scaledwidth=30%]
+-	Launch Codename One Settings with `mvn cn1:settings` and make sure the *Package Name* in *Basic* matches the App ID used by the provisioning profile.
 
--	Make sure the prefix for the app ID in the iOS section of the preferences matches the one you've from Apple
-+
-.App prefix
-image::img/app-prefix.png[App prefix,scaledwidth=30%]
+-	Make sure the App ID prefix in the provisioning profile matches the prefix assigned by Apple. The standalone Certificate Wizard handles this automatically for profiles it creates.
 
 -	Make sure your provisioning profile's app ID matches your package name or is a * provisioning profile. Both are sampled in the pictures below, notice that you would need an actual package name for push/in-app purchase support as well as for app store distribution.
 +
@@ -434,6 +423,6 @@ CountryCode: [Country Code]
 Password: [password] (we expect both passwords to be identical)
 ----
 
-Executing the command will produce a Keystore.ks file in that directory which you need to keep since if you lose it you will no longer be able to upgrade your applications! Fill in the appropriate details in the project properties or in the CodenameOne section in the Netbeans preferences dialog.
+Executing the command produces a `Keystore.ks` file in that directory. Keep it safe: if you lose it, you can no longer publish upgrades signed with the same identity. Enter its path, alias, and passwords in `common/codenameone_settings.properties`, or use the *Android* page in the standalone Certificate Wizard (`mvn cn1:certificatewizard`) to generate and install a keystore.
 
 For more details see http://developer.android.com/guide/publishing/app-signing.html

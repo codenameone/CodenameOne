@@ -9,13 +9,7 @@ TIP: You can change the CSS values while the simulator is running and the change
 
 Codename One applications always use the resource file. The CSS support compiles a file in CSS syntax to a Codename One resource file and adds it to the application. In runtime the CSS no longer exists and the file acts like a regular theme file.
 
-To enable CSS support in Codename One you need to flip a switch in `Codename One Settings`.
-
-.The CSS Option in Codename One Settings Part I
-image::img/css-in-codenameone-settings-1.png[The CSS Option in Codename One Settings]
-
-.The CSS Option in Codename One Settings Part II
-image::img/css-in-codenameone-settings-2.png[The CSS Option in Codename One Settings]
+New Maven projects enable CSS by default with `codename1.cssTheme=true` in `common/codenameone_settings.properties`. Add that property manually if you are migrating an older project where CSS support is disabled.
 
 Once enabled your `theme.res` file will regenerate from a CSS file that resides under the `css` directory. Changes you make to the CSS file will instantly update the simulator as you save. But, there are some limits to this live update so sometimes a simulator restart would be necessary.
 
@@ -814,6 +808,5 @@ include::../demos/common/src/main/css/guide-snippets-theme.css[tag=css-css-043,i
 ----
 
 IMPORTANT: All matching `font-scale` constants will be applied to the styles. If you define 3 font-scale constants that all match the current runtime environment, they will all be applied. For example, If there are 3 matching font-scale constants with `2.0`, `3.0`, and `4.0`, then fonts will be scaled by 2*3*4=24!
-
 
 

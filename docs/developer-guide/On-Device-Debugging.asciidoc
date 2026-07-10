@@ -248,8 +248,9 @@ project directly:
 
 * *Local build*: `mvn cn1:buildIosXcodeProject` writes the complete Xcode
   project under `target/...-ios-source/`.
-* *Cloud build*: check the *Include Source* flag in Codename One Settings before
-  sending the build, and download the sources result from the build server.
+* *Cloud build*: run `mvn cn1:settings`, enable *Include Source* on the *Basic*
+  page, save, then send the build and download the sources result from the build
+  server.
 
 Open the `.xcworkspace` file if one was generated, otherwise the `.xcodeproj`,
 and run on a device or the native iOS simulator from Xcode as you would any iOS
