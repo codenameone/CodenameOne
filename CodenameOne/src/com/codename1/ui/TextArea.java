@@ -1380,11 +1380,12 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         if (Display.getInstance().isNativeEditorVisible(this) && Display.impl.nativeEditorPaintsHint()) {
             return;
         }
-        // Keep the hint vertically aligned with where the text will actually be
-        // rendered/edited so it doesn't sit in the middle while the cursor is on
-        // the first line of a multi-line text area (issue #5345).
+        // For multi-line text areas, keep the hint vertically aligned with where
+        // the text will actually be rendered/edited so it doesn't sit in the
+        // middle while the cursor is on the first line (issue #5345). Single-line
+        // fields keep their existing (centered) hint behavior.
         Label hint = getHintLabelImpl();
-        if (hint != null) {
+        if (hint != null && !isSingleLineTextArea()) {
             hint.setVerticalAlignment(getVerticalAlignmentForRendering());
         }
         super.paintHint(g);
