@@ -3858,19 +3858,18 @@ void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force
     // pointer sailed through, and when that heap page had been MADV_FREE'd/unmapped the
     // markFunction LOAD itself faulted (recurred arm64 SIGSEGV at the line below).
     //
-    // Now the test is EXACT: every allocation entry point registers its class on first
-    // use (cn1GcRegisterClazz), so a genuine object's class is ALWAYS in the registry --
-    // including objects later made immortal and removed from the heap table. An unknown
-    // value falls back to the authoritative resolver, which never dereferences the suspect:
-    // a live published slot resolves to itself (then its class is adopted into the
-    // registry -- belt and suspenders for any allocation path not yet hooked); anything
-    // else is a freed/dangling slot with no live fields to trace -> skip.
+    // Now the test is EXACT and deref-free: EVERY allocation entry point (the inline
+    // bump included) registers its class before the object publishes, so a genuine
+    // object's class is ALWAYS in the registry -- including objects later made
+    // immortal and removed from the heap table. An unregistered class pointer can
+    // therefore only mean the header was clobbered/reused out from under us (a
+    // conservatively-kept slot recycled mid-mark): skip WITHOUT dereferencing.
+    // (An earlier version "adopted" unknown class values here after re-resolving the
+    // slot -- but resolve() validates the SLOT, not the header word, and a reused
+    // header fed garbage into the registry: the register write faulted on arm64.)
     if(__cls != 0 && __cls != (&class__java_lang_Class)
        && !cn1ClazzRegistryContains((uintptr_t)__cls)) {
-        if(cn1ConservativeResolve((void*)obj) != obj) {
-            return;   // dangling / freed / garbage -> not a live object, skip
-        }
-        cn1GcRegisterClazz(__cls);
+        return;
     }
 #endif
     if(__cls == 0 || __cls == (&class__java_lang_Class)) {

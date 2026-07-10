@@ -1355,13 +1355,17 @@ extern long long totalAllocations;
 // ineligible / oversized) -> caller falls back to __NEW_X / codenameOneGcMalloc.
 static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
     if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
-    // NOTE deliberately NO CN1_CLAZZ_REGISTER here: a per-alloc flag check on the inline
-    // bump path measured ~4% on allocation-heavy renders. A class whose objects only ever
-    // allocate through this fast path is still handled -- BiBOP slots are ALWAYS resolvable
-    // (page walk), so the GC guard's resolve-then-adopt fallback registers such a class the
-    // first time one of its objects is marked. The slow paths (cn1BibopAlloc,
-    // codenameOneGcMalloc) register eagerly, which covers every LEGACY object -- the only
-    // kind that can later become unresolvable (immortal, removed from the heap table).
+    // EVERY allocation path must register the class BEFORE the object publishes --
+    // including this inline bump. That completes the invariant the GC mark guard
+    // depends on: a resolved (current) slot whose class pointer is NOT in the
+    // registry can only be a clobbered/reused header, and the guard skips it
+    // WITHOUT dereferencing. (An earlier version left this path unhooked and had
+    // the guard "adopt" unknown class values after resolving the slot -- a
+    // conservatively-reached slot with a reused header then fed garbage into the
+    // registry and the register write faulted: the arm64 suite SIGSEGV in
+    // cn1GcRegisterClazz.) Cost is one predictable flag-test per alloc, measured
+    // at noise level on allocation-heavy renders.
+    CN1_CLAZZ_REGISTER(parent);
     CN1BibopPage* p = bibopCurrent[ci];
     if(__builtin_expect(p != (CN1BibopPage*)0 && p->freeList == (void*)0 &&
                         constantPoolObjects != (JAVA_OBJECT*)0
@@ -1444,7 +1448,7 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
 // body zero is elided.
 static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
     if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
-    // No CN1_CLAZZ_REGISTER: see cn1BibopFastAlloc.
+    CN1_CLAZZ_REGISTER(parent); // see cn1BibopFastAlloc: every alloc path registers
     CN1BibopPage* p = bibopCurrent[ci];
     if(__builtin_expect(p != (CN1BibopPage*)0 && p->freeList == (void*)0 &&
                         constantPoolObjects != (JAVA_OBJECT*)0
