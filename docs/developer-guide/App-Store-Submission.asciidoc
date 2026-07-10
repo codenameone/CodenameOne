@@ -1,18 +1,25 @@
 [[app-store-submission]]
-== Automated App Store Submission
+== App Store Submission and Deployment
 
-Once a build is signed you still have to get it onto the store: upload the binary
-to App Store Connect or Google Play, fill in the release notes, set the store
-listing, and send it for review. Codename One automates that last mile. From the
-build console you can submit a finished build to the App Store, the Mac App Store,
-or Google Play with one click, and you can manage the store *listing itself* --
-title, description, keywords, what's-new, screenshots -- as code in your project
-and have it pushed to the stores automatically at submission time.
+Once a build is signed you still have to get it in front of users: upload the
+binary, fill in the release notes, set the store listing, and send it for review --
+on every store where your users are. Codename One automates that last mile as a
+one-stop shop. From the build console you can submit a finished build to the
+*App Store*, the *Mac App Store*, *Google Play*, and *Huawei AppGallery* with one
+click, manage the store *listing itself* -- title, description, keywords,
+what's-new, screenshots -- as code in your project, and produce per-store Android
+packages so you can reach the large Android audience that isn't on Google Play.
 
-This chapter covers the end-to-end flow, credentials, and the metadata-as-code
-workflow. It builds on <<signing-section-top-heading, Signing>>:
-submission reuses the same App Store Connect API key the certificate wizard
-configures.
+Reaching those audiences doesn't depend on, and can't be restricted by, any single
+store. Google Play always receives the standard, unmodified Android App Bundle, so
+your Play listing follows Google's rules exactly; the additional channels
+(AppGallery and other Android markets) are separate artifacts delivered to
+separate stores.
+
+This chapter covers the end-to-end flow, credentials, the metadata-as-code
+workflow, and multi-store Android distribution. It builds on
+<<signing-section-top-heading, Signing>>: submission reuses the same App Store
+Connect API key the certificate wizard configures.
 
 === What it does, and what it doesn't
 
@@ -51,6 +58,11 @@ in the Google Play Console (API access > Service accounts), download its JSON ke
 and add it to the build console's submission credentials page. The console shows
 which stores are connected.
 
+*Huawei.* In AppGallery Connect, create an API client under *Users and
+permissions > API client* and note its *Client ID* and *Client Secret*, then add
+them on the same submission credentials page. The app must already exist in
+AppGallery Connect (submission binds to the app resolved from your package name).
+
 ==== Beta vs production
 
 When you submit you choose a destination. *Beta* means TestFlight (Apple) or the
@@ -67,6 +79,9 @@ build can go to:
   (see the *Working with macOS* chapter). An iOS build that also produced a
   `.pkg` offers both.
 * *Submit to Google Play* -- for an Android build.
+* *Submit to AppGallery* -- for an Android build, to Huawei AppGallery. Production
+  sends the build for review; the beta destination uploads it and leaves it as a
+  draft for you to promote or open-test.
 
 The submit dialog lets you pick the destination (Beta or Production) and add
 release notes for this submission, then delivers the binary. For an Apple
@@ -204,6 +219,41 @@ until you delete them, your account is deleted, or they go unused for about a ye
 
 Per-image limits: up to 10 MB, PNG or JPEG, and at most 10 screenshots per locale
 and display type (the stores' own limit).
+
+=== Reaching Android users beyond Google Play
+
+A large share of Android users -- most of the market in China, and many devices
+elsewhere -- can't install from Google Play. Reaching them means shipping to other
+Android stores: Huawei AppGallery, and the many app markets run by device makers
+and carriers (Xiaomi, OPPO, VIVO, Tencent MyApp, Baidu, 360 and others). Codename
+One makes your app available on those stores without changing how you build or
+locking you to any of them.
+
+Huawei AppGallery is a first-class submission target, exactly like the App Store or
+Google Play (see <<app-store-submission, Submitting a build>> above). For the
+remaining Android markets, Codename One produces *distribution-channel packages*.
+
+==== Distribution-channel packages
+
+Most of these stores accept a plain, self-signed APK rather than an App Bundle, and
+they attribute each download and its revenue to the store it came from. A
+distribution-channel package is your signed release APK stamped with a store
+identifier -- one APK per store, all built from the same release.
+
+You choose the stores; the build produces one package per store, each carrying its
+channel id. Your app reads that id at runtime through a Codename One API, so you can
+report the install source (to your own analytics or the store's) *without adding any
+third-party channel SDK* -- Codename One writes the id and reads it back for you.
+
+TIP: Google Play is never a channel package. Play always receives the standard,
+unmodified Android App Bundle, so nothing about this feature affects your Play
+listing or its compliance -- the channel packages are separate APKs for separate
+stores.
+
+Sensible defaults keep this simple: enable it and you get packages for the major
+Android markets out of the box, and you can narrow or extend the channel list to
+match the stores you actually publish to. Each package is signed with your app's
+release key, so every store receives a signed, installable APK.
 
 === Benefits over editing the stores by hand
 
