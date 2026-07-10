@@ -6,6 +6,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
+import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -49,9 +50,10 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
         // the form WITHOUT the toast, a run-to-run "toast present vs absent" flake that no
         // golden can reconcile (max_channel_delta 191). Rather than guess a timer, poll until
         // the toast component is actually laid out + visible on the current form, re-issuing
-        // the show if it never took, then hand off to the base settle+capture. Bounded so a
-        // genuine show failure degrades to a capture instead of hanging the suite.
-        awaitToastShown(parent, run, 0);
+        // the show if it never took, then capture only after a screenshot readback contains
+        // the rendered top bar. Bounded so a genuine show failure degrades to a capture
+        // instead of hanging the suite.
+        awaitToastShown(parent, 0);
     }
 
     private void showToast() {
@@ -101,7 +103,7 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
     private int lastToastY = Integer.MIN_VALUE;
     private int lastToastH = Integer.MIN_VALUE;
 
-    private void awaitToastShown(final Form parent, final Runnable run, final int waitedMs) {
+    private void awaitToastShown(final Form parent, final int waitedMs) {
         Form f = Display.getInstance().getCurrent();
         Object tbc = (f != null) ? f.getClientProperty("ToastBarComponent") : null;
         boolean shown = (tbc instanceof Component)
@@ -122,13 +124,82 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
             lastToastH = Integer.MIN_VALUE;
         }
         if ((shown && stableGeometryPolls >= 3) || waitedMs >= 15000) {
-            run.run();
+            awaitRenderedToastFrame(parent, waitedMs);
             return;
         }
         if (!shown && waitedMs > 0 && (waitedMs % 3000) == 0) {
             // the show did not take (toast left at height 0) -> re-issue it
             showToast();
         }
-        UITimer.timer(250, false, parent, () -> awaitToastShown(parent, run, waitedMs + 250));
+        UITimer.timer(250, false, parent, () -> awaitToastShown(parent, waitedMs + 250));
+    }
+
+    private void awaitRenderedToastFrame(final Form parent, final int waitedMs) {
+        if (captureBlockedByOrientation("ToastBarTopPosition", waitedMs)) {
+            UITimer.timer(250, false, parent, () -> awaitRenderedToastFrame(parent, waitedMs + 250));
+            return;
+        }
+
+        Form f = Display.getInstance().getCurrent();
+        Object tbc = (f != null) ? f.getClientProperty("ToastBarComponent") : null;
+        if (tbc instanceof Component) {
+            Component c = (Component) tbc;
+            c.repaint();
+            if (c.getParent() != null) {
+                c.getParent().revalidate();
+                c.getParent().repaint();
+            }
+        }
+        parent.repaint();
+
+        markCaptureStarted();
+        Display.getInstance().screenshot(screen -> {
+            if (screen == null) {
+                Cn1ssDeviceRunnerHelper.emitPlaceholderScreenshot("ToastBarTopPosition");
+                done();
+                return;
+            }
+            boolean rendered = containsRenderedToastBar(screen);
+            if (rendered || waitedMs >= 15000) {
+                if (!rendered) {
+                    System.out.println("CN1SS:WARN:test=ToastBarTopPosition rendered toast not detected at capture bound");
+                }
+                Cn1ssDeviceRunnerHelper.emitImage(screen, "ToastBarTopPosition", this::done);
+                return;
+            }
+            screen.dispose();
+            if (waitedMs > 0 && (waitedMs % 3000) == 0) {
+                showToast();
+            }
+            UITimer.timer(250, false, parent, () -> awaitRenderedToastFrame(parent, waitedMs + 250));
+        });
+    }
+
+    private boolean containsRenderedToastBar(Image screen) {
+        int width = screen.getWidth();
+        int height = screen.getHeight();
+        if (width <= 0 || height <= 0) {
+            return false;
+        }
+        int[] rgb = screen.getRGB();
+        int maxY = Math.min(height, Math.max(1, height / 3));
+        int requiredDarkPixels = Math.max(1, (width * 3) / 5);
+        for (int y = 0; y < maxY; y++) {
+            int darkPixels = 0;
+            int rowOffset = y * width;
+            for (int x = 0; x < width; x++) {
+                int color = rgb[rowOffset + x];
+                int r = (color >> 16) & 0xff;
+                int g = (color >> 8) & 0xff;
+                int b = color & 0xff;
+                if (r < 96 && g < 96 && b < 96) {
+                    darkPixels++;
+                }
+            }
+            if (darkPixels >= requiredDarkPixels) {
+                return true;
+            }
+        }
+        return false;
     }
 }
