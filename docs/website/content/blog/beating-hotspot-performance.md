@@ -4,8 +4,8 @@ slug: beating-hotspot-performance
 url: /blog/beating-hotspot-performance/
 date: '2026-07-10'
 author: Shai Almog
-description: "ParparVM went from 4.21x slower than warmed Java 25 to geomean parity, with six of ten benchmarks at or below HotSpot. What we changed in the generated C, what HotSpot still wins, and why a JIT beats hand-tuned C on some workloads."
-feed_html: '<img src="https://www.codenameone.com/blog/beating-hotspot-performance.jpg" alt="ParparVM vs HotSpot performance" /> ParparVM went from 4.21x slower than warmed Java 25 to geomean parity. What we changed in the generated C, and what HotSpot still wins.'
+description: "ParparVM went from 4.21x slower than warmed Java 25 to geomean parity, with six of ten benchmarks at or below HotSpot and peak memory below the JVM's. The architecture behind it: frameless C codegen, a BiBOP page heap, and a poor man's Valhalla."
+feed_html: '<img src="https://www.codenameone.com/blog/beating-hotspot-performance.jpg" alt="ParparVM vs HotSpot performance" /> ParparVM went from 4.21x slower than warmed Java 25 to geomean parity, with peak memory below the JVM''s. The architecture behind it, in C terms.'
 series: ["release-2026-07-10"]
 ---
 
@@ -13,13 +13,13 @@ series: ["release-2026-07-10"]
 
 No, we didn't cheat in the benchmark. At least I hope we didn't. Every optimization in this story was gated on bit identical output checksums against HotSpot, and the harness refuses to print a ratio when a checksum differs. If anything, this post is about how good HotSpot actually is. We tilted the table in our favor in every way we could, we hand tuned C code, and we still only beat it on some benchmarks. Getting there was a genuine struggle. If you want to understand the nuts and bolts of what your Java code costs, and the tradeoffs each runtime picks, I hope this is a good read.
 
-The short version: [PR #5327](https://github.com/codenameone/CodenameOne/pull/5327) takes ParparVM, the AOT VM that compiles your Java bytecode to C for iOS and other targets, from 4.21x slower than warmed Java 25 to geomean 1.00x parity across a ten benchmark suite, with six of the ten at or below HotSpot.
+The short version: [PR #5327](https://github.com/codenameone/CodenameOne/pull/5327) takes ParparVM, the AOT VM that compiles your Java bytecode to C for iOS and other targets, from 4.21x slower than warmed Java 25 to geomean 1.00x parity across a ten benchmark suite, with six of the ten at or below HotSpot. Along the way you'll meet a new page based heap, a poor man's Project Valhalla, code generation that finally lets clang do its job, and two places where HotSpot beat our hand written C anyway. The memory story ends even better than the speed story.
 
 But before we get to that, a few announcements.
 
 ## Before You Update
 
-The optimizations below landed this week. They were tested obsessively. Every commit was gated on bit identical output vs HotSpot, plus torture suites for maps, string builders, threads, and GC stress, in both cooperative and forced signal stop modes, under both clang and gcc. But this is a deep change to code generation, allocation, and collection. Like any change of this scale, there's risk.
+The optimizations below landed this week. Performance was gated on bit identical output vs HotSpot on every commit. Correctness went further: 63 test pipelines ran across the ports, with torture suites for maps, string builders, threads, and GC stress, in both cooperative and forced signal stop modes, and we squashed every bug we found along the way, several of them in ports far from the VM. But this is a deep change to code generation, allocation, and collection. Like any change of this scale, there's risk.
 
 If a build misbehaves, pin to the previous release with [versioned builds](https://www.codenameone.com/blog/versioned-builds-master/) and let us know through the usual channels. That's exactly the case versioned builds exist for.
 
@@ -27,11 +27,11 @@ There's a lot more shipping this week beyond the VM work; the bottom of this pos
 
 ## The Starting Point
 
-Client VMs are a different beast. The joke around here is that I built ParparVM in two weeks and Steve spent the next three years fixing bugs. When I built it, throughput wasn't a priority at all. I was aiming for simplicity, reliability, and consistency. What actually matters for client performance is startup time, memory footprint, low latency, and fast native access. 90% of client code time should be spent in rendering and IO.
+Client VMs are a different beast. The joke around here is that I built ParparVM in two weeks and Steve spent the next three years fixing bugs. When I built it, throughput wasn't a priority at all. I was aiming for simplicity, reliability, and consistency. What actually matters for client performance is startup time, memory footprint, low latency, and fast native access. 90% of client code time should be spent in rendering and IO, and in Codename One those paths are handcrafted native code on each platform, already tuned to the metal.
 
 Occasionally a customer would complain about performance, we'd add an optimization for that specific case, and we'd move along. We profiled common use cases, they were fine, and we never treated VM throughput as a problem. Comparing against HotSpot wasn't even on the table. You can't out-optimize a JIT, and we didn't run on the same platforms anyway. Now that we have desktop ports, people are porting heavier workloads and running direct comparisons on the same hardware. I assumed we were 2x or 3x slower than warmed HotSpot, ignoring startup.
 
-I was really, really off. Here's the starting point, measured on an Apple M2 against OpenJDK 25 with full warmup, best of 25 samples, identical checksums on both runtimes:
+I was really, really off. Measuring it took some surgery: ParparVM normally exists to run Codename One, so we hacked it to run standalone, without the framework, and the suite measures the VM alone rather than the framework on top of it. The reference is OpenJDK 25 with full warmup, and warmed is the fair way to measure it: Java 25 ships ahead of time class loading and method profiles, so a deployed app can reach that warmed state quickly rather than earning it over thousands of iterations. Here's the starting point on an Apple M2, identical checksums on both runtimes:
 
 | Benchmark | What it stresses | ParparVM vs Java 25 |
 |---|---|---:|
@@ -47,8 +47,6 @@ I was really, really off. Here's the starting point, measured on an Apple M2 aga
 | arrayRandom | Cache-miss gather | **1.0x** |
 
 Geomean: 4.21x slower. This was really bad.
-
-The one consolation was the other half of the report. Runtime memory floor: 2.4 MB vs HotSpot's roughly 40 MB. Startup: effectively zero. Those are the numbers client apps live and die by, and they're why the architecture looks the way it does. But 36x on a HashMap is not a tradeoff, it's a bug you haven't found yet.
 
 Spoiler: after everything below, this is where the same suite landed.
 
@@ -66,22 +64,41 @@ One methodology note before you ask: the comparison runs on macOS because HotSpo
 
 {{< mermaid >}}
 xychart-beta
-    title "ParparVM time vs warmed Java 25 (1.0 = HotSpot, lower is better)"
-    x-axis [hashMap, stringB, objAlloc, recurse, arrSeq, qsort, longA, intA, mathT, arrRand]
-    y-axis "ratio (before bars truncated at 8)" 0 --> 8
-    bar [8, 8, 8, 7.6, 3.7, 1.8, 1.5, 1.3, 1.1, 1.0]
-    bar [0.95, 0.67, 1.19, 1.6, 0.82, 0.92, 1.12, 1.07, 0.96, 0.96]
+    title "Final time ratio vs warmed Java 25"
+    x-axis [stringB, arrSeq, qsort, hashMap, mathT, arrRand, intA, longA, objAlloc, recurse]
+    y-axis "ParparVM time / HotSpot time" 0 --> 1.8
+    bar [0.67, 0.82, 0.92, 0.95, 0.96, 0.96, 1.07, 1.12, 1.19, 1.6]
 {{< /mermaid >}}
 
-The light bars are the starting ratios (the three worst are actually 36x, 23x and 20x, truncated so the chart stays readable). The dark bars inside them are where the branch landed.
+Lower is better and 1.0 is HotSpot; everything left of intArithmetic finishes ahead of it. The starting ratios wouldn't fit on this chart. hashMapChurn began at 36.
+
+### The Memory Story
+
+Speed is only half the report, and for client apps it's the less important half. RAM is where this release moves the most:
+
+| Metric | master | this PR | Java 25 |
+|---|---:|---:|---:|
+| Binary size (bench app) | 434 KB | 451 KB (+3.8%) | n/a |
+| Memory floor (no-op app) | 2.2 MB | 2.4 MB | ~40 MB |
+| Peak memory (allocation churn) | 1.4 to 2.1 GB | **290 to 390 MB** | 508 MB |
+
+{{< mermaid >}}
+xychart-beta
+    title "Peak memory under allocation churn (MB)"
+    x-axis ["master (trigger bug)", "this PR", "Java 25"]
+    y-axis "MB" 0 --> 2200
+    bar [2100, 390, 508]
+{{< /mermaid >}}
+
+Master's gigabyte peaks were a real GC bug this work exposed: the allocated-since-last-collection counter was a 32-bit int counting bytes. Workloads that allocate gigabytes per cycle wrapped it negative, the "am I allocating fast?" check answered no, and the collector slept through the storm while dead pages piled up. With the trigger fixed, heavy churn peaks *below* the JVM on the same workload, and the idle floor stays where a phone wants it: 2.4 MB. Sit with that pair for a second, because it's the whole thesis of this VM. Trading blows with warmed HotSpot on speed while holding a 2.4 MB floor against its ~40 MB.
 
 ## How Did We "Cheat"?
 
 The one advantage we have over HotSpot is that we're not Java. Not really. We bill ourselves as a tool that lets Java developers ship their Java apps to mobile devices. See what we did there? You write Java code, so it's a Java app. But we're not really Java in some major ways, and that gives us freedom HotSpot doesn't have.
 
-We compile a closed world. There's no dynamic class loading, so we know every class that will ever exist. Reflection is minimal, so a method nobody calls is a method we can delete, and a virtual call with exactly one reachable implementation is a direct call. The API is smaller, so there's less legacy behavior to preserve. And we can play fast and loose with some nuanced VM behaviors that HotSpot must keep exactly (more on `Integer` identity below).
+We compile a closed world. There's no dynamic class loading, so we know every class that will ever exist. There's no reflection (`Class.forName()` exists in a limited form, and that's roughly the extent of it), so a method nobody calls is a method we can delete, and a virtual call with exactly one reachable implementation is a direct call. The API is smaller, so there's less legacy behavior to preserve. And we can play fast and loose with some nuanced VM behaviors that HotSpot must keep exactly (more on `Integer` identity below).
 
-Without this cheating we would have lost every benchmark in the group. HotSpot carries a quarter century of engineering and it spends none of it on our constraints. Even with these structural advantages, we had to spit blood to get to a competitive point.
+Without this cheating we would have lost every benchmark in the group. HotSpot carries a quarter century of engineering, and we wouldn't be able to come close playing "fair". Even with these structural advantages, we had to spit blood to get to a competitive point.
 
 ## What The C Compiler Actually Sees
 
@@ -148,15 +165,43 @@ We measured the check itself against a pure C control at identical flags: raw C 
 
 ### Where HotSpot Beat Our Hand-Tuned C
 
-Here's the part that humbled us. On intArithmetic and longArithmetic we wrote plain C controls, no VM, no GC, just the loop, compiled with the same clang flags. The generated ParparVM code ran at exact parity with the hand written C: 94.0ms vs 93.7ms, and 59.7ms vs 59.3ms. Zero VM overhead.
+On intArithmetic and longArithmetic we wrote plain C controls, no VM, no GC, just the loop, compiled with the same clang flags. The generated ParparVM code ran at exact parity with the hand written C: 94.0ms vs 93.7ms, and 59.7ms vs 59.3ms. Zero VM overhead.
 
 HotSpot still won, 1.07x and 1.12x. The residual is C2 reassociating the loop-carried dependency chain better than clang schedules it. On a tight arithmetic loop, HotSpot C2 generates better machine code than clang -O3 given identical semantics. The JIT sees the actual hot loop and its actual dependency graph and optimizes exactly that. We declared those benchmarks done, because when the gap between you and HotSpot is the same as the gap between clang and HotSpot, the VM is no longer the story.
 
 There's one footnote worth stealing for any C-generating project: Java integer semantics require `-fwrapv -fno-strict-aliasing`. Without `-fwrapv`, clang -O3 provably miscompiles overflowing accumulation loops. Our checksum gate caught it, off by exactly 2^32 per overflow.
 
-## The GC, In Plain Terms
+## Memory: Two Philosophies
 
-Most of the worst starting numbers, the 20x to 36x ones, weren't about code generation at all. They were about allocation and collection. To explain what changed, here's the collector in simple terms.
+The worst starting numbers, the 20x to 36x ones, weren't about code generation at all. They were about memory, and to understand them you need to see how differently the two VMs think about it.
+
+HotSpot asks the OS for one large block up front and manages everything inside it. That buys enormous speed. Allocation is a pointer bump into a thread-local slab, and because HotSpot owns the entire address range, a single address comparison can tell it which region or generation an object belongs to. Owning the addresses simplifies reasoning across the whole VM: barriers, card tables, generation checks, all of it gets cheaper when "where is this object?" is arithmetic.
+
+ParparVM went the other way: we allocate through the OS's own malloc, calloc, and free. For years that looked like the slow, naive choice, and parts of it were slow. We keep it anyway, because it buys three things a client VM cares about more than benchmark points:
+
+- **Direct native access.** Native code and the GPU see our objects as ordinary memory, no pinning, no copying at a heap boundary. That's what makes fast SIMD and rendering paths practical.
+- **Real tooling.** Native profilers and leak detectors (Instruments, Valgrind, and friends) understand our memory, because it is ordinary memory, not a black-box block they can't see into.
+- **A true footprint.** The process holds only what the app actually uses. On constrained devices that's smaller, and what the OS reports for your app is what your app really costs.
+
+### A Big Bag Of Pages
+
+The 19.6x objectAllocation gap was the bill for taking that philosophy too literally. Every `new` was a malloc, a full memset to zero, and an O(n) search for a tracking slot under a lock.
+
+The new allocator is a BiBOP heap, short for "big bag of pages," and it's the largest single architectural change in the PR. The heap is organized as pages, each holding objects of a single size class. The size class of your object is known at compile time, so the allocation the C compiler sees is a pointer bump:
+
+```c
+/* Inlined at the allocation site */
+CN1BibopPage* p = bibopCurrent[SIZE_CLASS];   /* compile-time size class */
+o = page_slot(p, p->bumpIndex++);             /* pointer bump             */
+o->field1 = arg1; o->field2 = arg2;           /* ctor writes every field  */
+o->parentCls = &class__Foo;                   /* class pointer LAST       */
+```
+
+There's no zeroing, because the constructor writes every field anyway, and the class pointer is stored last, so the concurrent collector can never trace a half-built object. When every slot in a page turns out to be garbage, the page flips back to bump-from-zero in one step instead of being swept slot by slot. And the pages themselves still come from the OS allocator, so everything in the section above stays true. objectAllocation went from 19.6x to 1.19x.
+
+This is where the two philosophies meet in the middle. We borrowed the part of HotSpot's design that makes allocation fast, pages we bump into, without borrowing the part we don't want, a giant pre-reserved heap the OS can't see into.
+
+## The GC, In Plain Terms
 
 ParparVM's GC never stops the world. Your app's threads keep running while a background collector thread walks the object graph and marks everything reachable, then sweeps what wasn't marked. The threads cooperate: each thread either checks in at safe points, or the collector briefly interrupts it with a signal, captures its registers and stack for scanning, and lets it continue.
 
@@ -178,29 +223,7 @@ Why build it this way? Because on a client, pause time is the only GC metric use
 
 The standard server answer is a generational collector: allocate new objects in a nursery, collect it often, copy the survivors out. It's a throughput machine, and for servers it's the right call. We tried a nursery on this branch. objectAllocation improved, and hashMapChurn got worse, 32x to 43x. Copying collectors pay for survivors, and a map that holds its entries makes everything survive. UI workloads look like that constantly: the object graph behind a form mostly survives, frame after frame.
 
-Generational collectors also move objects, which is a problem for us in two ways. Native code holds pointers into our heap, and a compacting collector would need to fix those up or pin everything native can see. And copying needs headroom, roughly double the live set during collection, which is exactly the memory a 2.4 MB footprint client doesn't have. Our collector never moves an object. Peak memory under heavy churn on this branch: 290 to 390 MB, versus 508 MB for the JVM on the same workload. The nursery experiment is off by default and stays off.
-
-### The Bug That Made It Look Worse Than It Was
-
-While benchmarking we found that master's GC had a genuine trigger bug in production: the "allocated since last GC" counter was a 32-bit int counting bytes. Workloads that allocate gigabytes per cycle wrapped it negative, the "am I allocating fast?" check answered no, and the collector slept its 30 second idle wait while dead pages piled into the gigabytes. That was the source of master's 1.4 to 2.1 GB peak memory on churn. One int-to-long fix later, the same workload peaks below the JVM.
-
-This is the quiet argument for benchmarking at all. The 36x headline number led us to two real production bugs that had nothing to do with benchmarks. The second was a sibling of the first: workloads that allocate only inside native code skipped the collection trigger entirely.
-
-### Don't Park The Render Thread
-
-One more GC change matters for real apps rather than benchmarks. A concurrent collector needs backpressure: if a thread allocates faster than the collector frees, something must slow it down. The old rule parked any fast-allocating thread in a sleep loop once a fixed 72 MB of uncollected garbage piled up. On an allocation-heavy render (decoding vector map tiles) that meant the UI thread spent most of every GC cycle parked, and the render serialized behind the collector. Measured cost: 20% of wall time, which made it the single biggest tunable in the whole investigation. The mark and sweep passes themselves overlap the app and measure roughly zero.
-
-The cap is now dynamic. The baseline is an eighth of available RAM, and threads the VM knows are high throughput, like the UI thread, get up to half of available RAM of headroom so they keep rendering while the collector catches up. On the vector map workload this branch renders 2.1x faster than master.
-
-## Two Bugs That Earned Their Keep
-
-Chasing benchmarks pays for itself in the bugs it flushes out, and two of them deserve a paragraph each.
-
-The first: on Apple platforms, `setjmp` and `longjmp` save and restore the caller's signal mask, and each side is a `sigprocmask` syscall. Every Java try block entry compiles to a `setjmp` in our codegen. Put a try block inside a hot loop and you're paying a kernel round trip per iteration; on the vector map workload that was 19% of the app's own CPU samples. The VM never changes the signal mask, so Apple targets now use `_setjmp` and `_longjmp`, the variants that skip the mask. Every try/catch on iOS, tvOS, watchOS, and macOS just got cheaper.
-
-The second one had been latent for years. A variable assigned after `setjmp` and read after `longjmp` is indeterminate per the C standard. Our exception handler read exactly such a variable. Because clang happens to spill it to memory, every clang-compiled binary we ever shipped worked by luck. gcc keeps it in a register, which `longjmp` rolls back, so after any caught exception the thread's frame bookkeeping was wrong and new frames were allocated on top of live locals. Our Alpine Linux CI job, the only gcc-compiled platform in the matrix, hung deterministically and led us straight to it. Two `volatile` qualifiers fixed a bug that plausibly affected every gcc-built Codename One Linux app that ever caught an exception.
-
-Neither bug is a performance optimization. Both came out of building a benchmark harness strict enough to notice when anything changes.
+Generational collectors also move objects, which is a problem for us in two ways. Native code holds pointers into our heap, and a compacting collector would need to fix those up or pin everything native can see, which would surrender the direct native access we just listed as a core advantage. And copying needs headroom, roughly double the live set during collection, which is exactly the memory a 2.4 MB footprint client doesn't have. Our collector never moves an object. The BiBOP page recycling gives us the cheap-reclamation benefit a nursery promises, without copying anything.
 
 ## A Poor Man's Valhalla
 
@@ -213,13 +236,13 @@ real object:    0x0000600001a2c3f0   (low bit 0, points at a header)
 tagged Integer: 0x000000000000001f   (low bit 1, value = 0xf = 15)
 ```
 
-The GC ignores tagged values entirely, dispatch substitutes `Integer`'s class when it sees one, and unboxing is a shift. Boxing became free: the PR's A/B measures hashMapChurn at 2.8x with tagging disabled vs 0.97x with it on. The embarrassing discovery: an early version of this existed behind an opt-in flag that no shipping configuration ever set. Writing the benchmark scripts is what exposed that deployed apps never had it. It's now on by default, with `-DCN1_DISABLE_TAGGED_INT` as the escape hatch.
+The GC ignores tagged values entirely, dispatch substitutes `Integer`'s class when it sees one, and unboxing is a shift. Boxing became free: the PR's A/B measures hashMapChurn at 2.8x with tagging disabled vs 0.97x with it on. It's on by default for 64-bit targets, with `-DCN1_DISABLE_TAGGED_INT` as the escape hatch.
 
 There's a semantic price, and it's the same one Valhalla asks: `Integer` loses identity. Two boxes holding the same value are now literally the same value, so `==` on boxes behaves like the JDK's small-value cache extended to the whole range, and `synchronized (someInteger)` cannot mean anything. The JDK itself has deprecated wrapper constructors and warns against locking on value-based classes for years. Rather than let that fail silently at runtime, [PR #5338](https://github.com/codenameone/CodenameOne/pull/5338) makes the build reject `synchronized` on a primitive wrapper at compile time, with a pointer toward a dedicated lock object. If your code locks on an `Integer`, it was already broken on modern JDKs in spirit. Now it's broken loudly, before it ships.
 
 ## Objects That Stopped Existing
 
-The rest of the allocation story is three related changes, each with the same theme: the fastest object is the one you never allocate.
+Two more changes share a theme with the tagged integers: the fastest object is the one you never allocate.
 
 **Fused objects.** `new String(...)` used to be two heap objects, the `String` and its `char[]`. They're now one block, one allocation, one GC slot, no pointer hop between them:
 
@@ -232,21 +255,17 @@ This ships as `@Fused`, applied internally to `String` and `StringBuilder`, and 
 
 **Escape analysis.** javac compiles `"item-" + i + "/" + n` into a `StringBuilder` chain. A control flow walk proves the builder never escapes the expression, so the builder and its buffer now live on the C stack. The only heap allocation in the whole concatenation is the final `String`. Combined with the rest, stringBuilding landed at 0.67x, finishing in two thirds of HotSpot's time, and this benchmark was rebuilt to be fair to HotSpot first (the original shape let HotSpot's own escape analysis delete the String entirely, so we made both VMs materialize every string).
 
-**Allocation itself.** `new` used to be malloc, a full memset to zero, and an O(n) search for a free tracking slot under a lock. It's now a pointer bump into a size-class page, and the constructor's own field writes replace the zeroing, with the class pointer stored last so the concurrent collector never sees a half-built object. objectAllocation went from 19.6x to 1.19x.
+## Going Deeper
 
-## What We Still Owe
+Optimization is a rabbit hole with no bottom. Every fix exposes the next lever, and part of the discipline is deciding where to stop. We're stopping here for now, because at geomean parity the VM is no longer the bottleneck for real apps. The map of the next levels is already drawn, and if a workload shows up that needs them, we'll keep digging:
 
-An honest list, because a benchmark suite is ten workloads and the world is bigger:
-
-- **Recursion is 1.6x** and will stay roughly there. Speculative inlining is the JIT's home turf.
+- **Recursion sits at 1.6x** and will stay roughly there. Speculative inlining is the JIT's home turf.
 - **Tight arithmetic is 1.07x to 1.12x**, and that's clang vs C2, not us vs HotSpot.
-- **Cross-file inlining is our next frontier.** The vector map workload is 2.1x faster than master but still trails warmed HotSpot 5x, and the profile says it's a per-byte `readByte()` call chain that HotSpot inlines across compilation units and we don't yet.
-- **Warmup is the flip side.** Every HotSpot number here is after full warmup. Cold, the comparison inverts, and client apps live mostly in the cold and warm phases. We start at full speed with a 2.4 MB floor; HotSpot needs ~40 MB and a few thousand iterations to become the machine we benchmarked against.
-- **We haven't raced GraalVM native-image yet.** It's the natural AOT peer and it's on the list. This round was about closing the gap to the ceiling, which is warmed C2.
+- **Cross-file inlining is the next big lever.** We deliberately generate one readable C file per class. You can open the output, read it, and debug it in Xcode, and we're not willing to trade that for one huge merged source file. The cost shows up in call-chain-heavy code: a real map rendering workload still trails warmed HotSpot because of a per-byte `readByte()` chain that HotSpot inlines across class boundaries. ThinLTO already recovers part of the gap. The rest waits until something real needs it.
 
-All of the machinery above has a price, and it's small enough to state exactly: the benchmark app's binary grew from 434 KB to 451 KB, a 3.8% increase. Those 17 KB buy the inlined fast paths, the compact HashMap, and the escape analysis. Memory moved the other direction: peak use under allocation churn dropped from gigabytes (the trigger bug) to below the JVM's on the same workload, and the no-op floor stayed at 2.4 MB.
+The machinery has a price small enough to state exactly: the benchmark app's binary grew from 434 KB to 451 KB. Those 17 KB buy the inlined fast paths, the compact HashMap, and the escape analysis.
 
-The whole suite ships in the repo under `vm/benchmarks`, including the torture tests and the checksum gate. If you think we cheated after all, `vm/benchmarks/run-benchmark.sh` will happily referee:
+The whole suite ships in the repo under `vm/benchmarks`, including the torture tests and the checksum gate:
 
 ```bash
 export JDK_8_HOME=/path/to/jdk8
@@ -254,6 +273,14 @@ export BENCH_JAVA=/path/to/jdk25/bin/java
 vm/benchmarks/run-benchmark.sh   # interleaved best-of-5, ratio table + geomean
 vm/benchmarks/run-gauntlet.sh    # correctness: byte-identical output + GC stress
 ```
+
+## TL;DR
+
+- ParparVM went from 4.21x slower than warmed Java 25 to geomean 1.00x, with six of ten benchmarks at or below HotSpot, verified by bit identical output checksums.
+- Peak memory under heavy allocation now lands below the JVM's (290 to 390 MB vs 508 MB), from a 2.4 MB floor vs HotSpot's ~40 MB.
+- The architecture behind it: frameless C code generation, diverging bounds checks, a BiBOP page heap over the OS allocator, stack-allocated string building, and tagged Integers.
+- Tagged Integers change `Integer` identity, and the build now rejects `synchronized` on primitive wrappers ([PR #5338](https://github.com/codenameone/CodenameOne/pull/5338)).
+- The cost: 17 KB of binary. If anything misbehaves, pin with [versioned builds](https://www.codenameone.com/blog/versioned-builds-master/) and tell us.
 
 ## The Rest Of This Week
 
@@ -263,11 +290,7 @@ The performance work is the headline, but the week is bigger than one PR:
 - **Sunday.** {{< post-link path="/blog/ar-vr-support-simulation" text="AR and VR support, including a simulated AR room you can debug in the simulator" >}}. PR [#5335](https://github.com/codenameone/CodenameOne/pull/5335).
 - **Monday.** {{< post-link path="/blog/automated-store-submissions" text="Automated store submissions with your listing as code, including Huawei AppGallery" >}}. The same post covers organization accounts and self service account deletion in the build cloud. PR [#5353](https://github.com/codenameone/CodenameOne/pull/5353).
 
-## What I Got Wrong
-
-I went into this convinced a small AOT VM can't play in HotSpot's arena, and the first table seemed to prove it. The real lesson cuts both ways. HotSpot is a marvel: it beat our hand tuned C on arithmetic and it will out-inline us on recursion forever. But most of our 4.21x gap wasn't HotSpot being fast. It was us paying for costs a closed world VM never needed to pay.
-
-We kept the things clients actually need, instant startup and a small footprint with no pauses, and bought back the throughput we'd been leaving on the table. The +17 KB of binary and the geomean 1.00x say the two goals weren't in conflict after all.
+One more note on the week itself. Most of our recent time went into two very large PRs, and the one in this post is the much smaller of the two. So this is a relatively slow week by feature count, but every change in it is tectonic, and there's a lot more moving through the pipeline. More on that soon.
 
 ---
 

@@ -55,7 +55,7 @@ Android is handled locally, no cloud involved: the wizard generates a self-signe
 
 ## The Tradeoff
 
-The honest cost of the new model: the `.p8` key is sent to the Codename One cloud signing service, which performs the Apple API calls on your behalf and doesn't return the key afterward. That's the same trust you already extend to the build cloud that signs your binaries, but it is trust, and you should know about it. If you revoke the key in App Store Connect, everything stops cleanly and you can issue a new one in two minutes. Use Admin access for the key; the lower App Store Connect roles can't create certificates and profiles.
+The cost of the new model: the `.p8` key is sent to the Codename One cloud signing service, which performs the Apple API calls on your behalf and doesn't return the key afterward. That's the same trust you already extend to the build cloud that signs your binaries, but it is trust, and you should know about it. If you revoke the key in App Store Connect, everything stops cleanly and you can issue a new one in two minutes. Use Admin access for the key; the lower App Store Connect roles can't create certificates and profiles.
 
 Tomorrow's post covers something entirely different: AR and VR support, including a simulated AR room you can walk through in the simulator with WASD keys. And the same API key you just configured comes back on Monday, when it powers automated App Store submissions.
 

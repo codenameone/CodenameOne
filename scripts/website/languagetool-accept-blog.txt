@@ -110,3 +110,5 @@ memset
 
 # The store submission tool, officially lowercase.
 fastlane
+calloc
+Valgrind
