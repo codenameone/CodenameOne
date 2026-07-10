@@ -136,6 +136,14 @@ jobs:
           echo "CN1SS_SKIP_COMMENT=1" >> $GITHUB_ENV
           echo "CN1SS_FAIL_ON_MISMATCH=1" >> $GITHUB_ENV
           echo "CN1SS_SKIP_COVERAGE=1" >> $GITHUB_ENV
+      # Every leg fails on a screenshot mismatch, including this one. The default
+      # leg differs from the JDK matrix legs only in what it ADDS (the PR comment
+      # and coverage) -- never in what it tolerates. Before this step it had no
+      # CN1SS_FAIL_ON_MISMATCH at all, so its comparison could report mismatches
+      # into the PR comment while the job itself stayed green.
+      - name: Configure CN1SS options (default leg)
+        if: matrix.id == 'default'
+        run: echo "CN1SS_FAIL_ON_MISMATCH=1" >> $GITHUB_ENV
       - name: Cache codenameone-tools
         uses: actions/cache@v5
         with:

@@ -37,6 +37,19 @@ final class JavascriptMethodGenerator {
      */
     static final java.util.Set<String> NATIVE_METHOD_IDENTIFIERS = new java.util.HashSet<String>();
 
+    /**
+     * Identifiers of the pure-Java twins the runtime's bindNative fast paths
+     * delegate to (getImpl/putImpl/toStringImpl/valueOfHeap...). The runtime
+     * calls them as BARE identifiers (not string literals), so the bundle
+     * writer's literal-token scan never sees them -- without this set the
+     * identifier minifier renames the definitions and the runtime's canonical
+     * references dangle (ReferenceError: cn1_java_lang_Integer_valueOfHeap...
+     * is not defined, observed as the JS suite dying inside UIManager's
+     * clinit before a single screenshot was produced). Populated during
+     * emission, like NATIVE_METHOD_IDENTIFIERS.
+     */
+    static final java.util.Set<String> RUNTIME_DELEGATE_IDENTIFIERS = new java.util.HashSet<String>();
+
     // Global class-name to ByteCodeClass index, used by appendFieldInstruction
     // to resolve a getfield/putfield instruction's class reference (the
     // "current receiver type" from the bytecode's Fieldref) to the actual
@@ -766,6 +779,11 @@ final class JavascriptMethodGenerator {
         for (BytecodeMethod method : cls.getMethods()) {
             if (method.isNative() || method.isAbstract() || method.isEliminated()) {
                 continue;
+            }
+            if (JavascriptNativeRegistry.isRuntimeDelegateTarget(cls.getClsName(), method.getMethodName())) {
+                String delegateId = jsMethodIdentifier(cls, method);
+                RUNTIME_DELEGATE_IDENTIFIERS.add(delegateId);
+                RUNTIME_DELEGATE_IDENTIFIERS.add(delegateId + "__impl");
             }
             appendMethod(methodsOut, regs, cls, method);
         }

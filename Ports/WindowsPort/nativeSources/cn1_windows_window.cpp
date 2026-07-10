@@ -46,6 +46,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <malloc.h>     /* _resetstkoflw (stack-overflow guard re-arm) */
+#include <dbghelp.h>    /* SymFromAddr: in-process symbolication of the crash backtrace */
 
 /* This unit is C++ (Direct2D has no C binding), but the ParparVM bridge
  * functions and the shared helpers must keep C linkage so the translated C
@@ -124,9 +125,47 @@ static LONG WINAPI cn1WinUnhandled(EXCEPTION_POINTERS* info) {
     {
         DWORD64 modBase = (DWORD64) GetModuleHandleW(NULL);
         CONTEXT uc = *ctx;
+        /* Symbolize in-process: the /Zi .pdb sits next to the running exe, so
+         * SymFromAddr turns each frame into a Java/C function name + offset. The
+         * process is already dying, so the (small) risk of dbghelp touching a
+         * corrupt heap is acceptable for a last-resort diagnostic; if init fails
+         * the raw rva=... line still symbolizes offline against the .pdb. */
+        HANDLE proc = GetCurrentProcess();
+        BOOL symOk = SymInitialize(proc, NULL, TRUE);
+        if (symOk) {
+            SymSetOptions(SymGetOptions() | SYMOPT_LOAD_LINES | SYMOPT_DEFERRED_LOADS);
+        }
         for (int i = 0; i < 40 && uc.Pc != 0; i++) {
-            sprintf(buf, "  stack[%d]=%p rva=%p", i, (void*) uc.Pc, (void*) (uc.Pc - modBase));
-            cn1WindowsLog(buf);
+            char symName[256];
+            symName[0] = 0;
+            if (symOk) {
+                char symBuf[sizeof(SYMBOL_INFO) + 256];
+                SYMBOL_INFO* si = (SYMBOL_INFO*) symBuf;
+                memset(si, 0, sizeof(SYMBOL_INFO));
+                si->SizeOfStruct = sizeof(SYMBOL_INFO);
+                si->MaxNameLen = 255;
+                DWORD64 disp = 0;
+                if (SymFromAddr(proc, uc.Pc, &disp, si)) {
+                    IMAGEHLP_LINE64 line;
+                    memset(&line, 0, sizeof(line));
+                    line.SizeOfStruct = sizeof(line);
+                    DWORD lineDisp = 0;
+                    if (SymGetLineFromAddr64(proc, uc.Pc, &lineDisp, &line) && line.FileName) {
+                        const char* fn = strrchr(line.FileName, '\\');
+                        _snprintf(symName, sizeof(symName), " %s+0x%llX (%s:%lu)",
+                                  si->Name, (unsigned long long) disp,
+                                  fn ? fn + 1 : line.FileName, (unsigned long) line.LineNumber);
+                    } else {
+                        _snprintf(symName, sizeof(symName), " %s+0x%llX",
+                                  si->Name, (unsigned long long) disp);
+                    }
+                    symName[sizeof(symName) - 1] = 0;
+                }
+            }
+            char sbuf[512];
+            _snprintf(sbuf, sizeof(sbuf), "  stack[%d]=%p rva=%p%s", i, (void*) uc.Pc, (void*) (uc.Pc - modBase), symName);
+            sbuf[sizeof(sbuf) - 1] = 0;
+            cn1WindowsLog(sbuf);
             DWORD64 imageBase = 0;
             PRUNTIME_FUNCTION fe = RtlLookupFunctionEntry(uc.Pc, &imageBase, NULL);
             if (fe == NULL) {
@@ -753,16 +792,36 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_Strin
         return;
     }
     cn1WindowsLog("initDisplay: render target created");
-    cn1Win.windowGraphics = cn1WinCreateGraphics((ID2D1RenderTarget*) g_hwndTarget);
+    if (cn1Win.offscreenCapture) {
+        /* Render into an offscreen WIC bitmap sized to the real client area, so
+         * captureWindowToPngBytes reads back the proven WIC frame instead of a
+         * per-screenshot mutable-image repaint. The HWND target stays created
+         * (the window is valid, just never shown or drawn to). */
+        cn1Win.windowGraphics = cn1WinCreateOffscreenGraphics(cn1Win.width, cn1Win.height);
+        cn1WindowsLog(cn1Win.windowGraphics != NULL
+                ? "initDisplay: offscreen capture target created"
+                : "initDisplay: offscreen capture target FAILED");
+    } else {
+        cn1Win.windowGraphics = cn1WinCreateGraphics((ID2D1RenderTarget*) g_hwndTarget);
+    }
+    if (cn1Win.windowGraphics != NULL) {
+        /* Enables the #5273 flush-region clip clamp in cn1WinPushClip -- window
+         * graphics only, never mutable-image targets. */
+        cn1Win.windowGraphics->isWindowTarget = JAVA_TRUE;
+    }
 
     /* WIC factory for the image layer. The DirectWrite factory is created lazily
      * inside the C++ text layer (cn1_windows_dwrite.cpp), not here. */
     CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER,
             IID_IWICImagingFactory, (void**) &cn1Win.wicFactory);
 
-    ShowWindow(cn1Win.hwnd, SW_SHOW);
-    UpdateWindow(cn1Win.hwnd);
-    cn1WindowsLog("initDisplay: window shown");
+    if (!cn1Win.offscreenCapture) {
+        ShowWindow(cn1Win.hwnd, SW_SHOW);
+        UpdateWindow(cn1Win.hwnd);
+        cn1WindowsLog("initDisplay: window shown");
+    } else {
+        cn1WindowsLog("initDisplay: offscreen capture -- window kept hidden");
+    }
 }
 
 JAVA_INT com_codename1_impl_windows_WindowsNative_getDisplayWidth___R_int(CODENAME_ONE_THREAD_STATE) {

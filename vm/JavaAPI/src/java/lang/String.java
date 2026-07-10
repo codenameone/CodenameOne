@@ -36,6 +36,7 @@ import java.util.Comparator;
  * The Java language provides special support for the string concatenation operator (+), and for conversion of other objects to strings. String concatenation is implemented through the StringBuffer class and its append method. String conversions are implemented through the method toString, defined by Object and inherited by all classes in Java. For additional information on string concatenation and conversion, see Gosling, Joy, and Steele, The Java Language Specification.
  * Since: JDK1.0, CLDC 1.0 See Also:Object.toString(), StringBuffer, StringBuffer.append(boolean), StringBuffer.append(char), StringBuffer.append(char[]), StringBuffer.append(char[], int, int), StringBuffer.append(int), StringBuffer.append(long), StringBuffer.append(java.lang.Object), StringBuffer.append(java.lang.String)
  */
+@com.codename1.annotations.Fused
 public final class String implements java.lang.CharSequence, Comparable<String> {
     
     public static final Comparator<String> CASE_INSENSITIVE_ORDER = new Comparator<String>() {
@@ -140,11 +141,31 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         System.arraycopy(data, offset, value, 0, count);
     }
 
+    /**
+     * ALIASING constructor -- the new String takes ownership of {@code data}
+     * WITHOUT copying. Callers must pass a freshly created array that no other
+     * code retains (StringBuilder's copy-on-write share, concat's scratch
+     * buffer). NEVER pass another String's value array: a fused String's value
+     * lives inside the donor's own allocation block and dies with it.
+     */
     String(int offset, int charCount, char[] data) {
         if ((offset | charCount) < 0 || charCount > data.length - offset) {
             throw failedBoundsCheck(data.length, offset, charCount);
         }
         this.offset = offset;
+        this.value = data;
+        this.count = charCount;
+    }
+
+    /**
+     * UNCHECKED aliasing constructor for VM-internal callers that construct the
+     * exact-length private array themselves (StringBuilder's copy-on-write
+     * share, concat's scratch buffer): no bounds guard, so the translator can
+     * inline it to three plain field stores at the allocation site. Same
+     * ownership rules as the guarded aliasing constructor above.
+     */
+    String(char[] data, int charCount) {
+        this.offset = 0;
         this.value = data;
         this.count = charCount;
     }
@@ -154,9 +175,12 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * value - a String.
      */
     public String(java.lang.String value){
-        this.offset = value.offset;
-        this.value = value.value;
+        // COPY, do not share: the source may be a FUSED string whose value array
+        // lives inside the source's own allocation block -- sharing it would let
+        // this string outlive the block it points into.
+        this.offset = 0;
         this.count = value.count;
+        this.value = value.toCharArray();
     }
 
     /**
@@ -191,20 +215,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * This is the definition of lexicographic ordering. If two strings are different, then either they have different characters at some index that is a valid index for both strings, or their lengths are different, or both. If they have different characters at one or more index positions, let k be the smallest such index; then the string whose character at position k has the smaller value, as determined by using the < operator, lexicographically precedes the other string. In this case, compareTo returns the difference of the two character values at position k in the two string -- that is, the value:
      * this.charAt(k)-anotherString.charAt(k) If there is no index position at which they differ, then the shorter string lexicographically precedes the longer string. In this case, compareTo returns the difference of the lengths of the strings -- that is, the value: this.length()-anotherString.length()
      */
-    public int compareTo(java.lang.String anotherString){
-        if(anotherString == this) {
-            return 0;
-        }
-        int minL = Math.min(anotherString.length(), length());
-        for(int iter = 0 ; iter < minL ; iter++) {
-            char a = value[offset + iter];
-            char b = anotherString.value[anotherString.offset + iter];
-            if(a != b) {
-                return a - b;
-            }
-        }
-        return length() - anotherString.length(); 
-    }
+    public native int compareTo(java.lang.String anotherString);
     
     public int compareToIgnoreCase(java.lang.String anotherString) {
         if (anotherString == this) {
@@ -241,7 +252,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         char[] n = new char[length() + str.length()];
         System.arraycopy(value, offset, n, 0, count);
         System.arraycopy(str.value, str.offset, n, count, str.count);
-        return new String(n); 
+        return new String(n, n.length); // n is fresh + private: alias, no copy
     }
 
     /**
@@ -867,7 +878,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * Returns the string representation of the char argument.
      */
     public static java.lang.String valueOf(char value){
-        String s = new String(0, 1, new char[] { value });
+        String s = new String(new char[] { value }, 1);
         s.hashCode = value;
         return s;
     }
@@ -928,15 +939,14 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         return substring(start, end);
     }
 
-    protected void finalize() {
-        if(nsString != 0) {
-            releaseNSString(nsString);
-        }
-        nsString = 0;
-    }
-    
-    private native static void releaseNSString(long ns);
-    
+    // NOTE: String deliberately has NO finalize(). Its old finalizer existed only
+    // to release the cached NSString peer (nsString) -- but a finalizer's mere
+    // existence forces the VM's page sweep to walk every slot of every page that
+    // ever held a dead String, on EVERY platform. The peer is now released by the
+    // VM's reclaim path natively (see cn1ReleaseStringPeer in cn1_globals.m),
+    // which only iOS pays for, and only on pages that actually hold peer-cached
+    // strings.
+
     
     public native static String format(String format, Object... args);
     

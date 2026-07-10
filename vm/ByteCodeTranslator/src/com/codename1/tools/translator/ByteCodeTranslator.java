@@ -232,6 +232,8 @@ public class ByteCodeTranslator {
 
         File cn1Globals = new File(srcRoot, "cn1_globals.h");
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), Files.newOutputStream(cn1Globals.toPath()));
+        File cn1Intrinsics = new File(srcRoot, "cn1_intrinsics.h");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_intrinsics.h"), Files.newOutputStream(cn1Intrinsics.toPath()));
         if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
@@ -554,6 +556,8 @@ public class ByteCodeTranslator {
 
         File cn1Globals = new File(srcRoot, "cn1_globals.h");
         copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), Files.newOutputStream(cn1Globals.toPath()));
+        File cn1Intrinsics = new File(srcRoot, "cn1_intrinsics.h");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_intrinsics.h"), Files.newOutputStream(cn1Intrinsics.toPath()));
         if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
@@ -885,7 +889,10 @@ public class ByteCodeTranslator {
                 //   The WinRT ABI headers + this import lib ship in every Windows SDK the
                 //   port builds against, including the xwin-laid-out SDK the Linux
                 //   cross-compile uses, so it is linked unconditionally.
-                writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp ws2_32 user32 gdi32 ole32 oleaut32 uuid mf mfplat mfreadwrite mfuuid shell32 comdlg32 crypt32 winmm runtimeobject)\n");
+                // dbghelp: lets the last-resort unhandled-exception handler symbolize its
+                // own native backtrace in-process (SymFromAddr against the /Zi .pdb), so a
+                // native crash logs Java/C function names instead of bare RVAs.
+                writer.append("    target_link_libraries(${PROJECT_NAME} d2d1 dwrite dxgi windowscodecs winhttp ws2_32 user32 gdi32 ole32 oleaut32 uuid mf mfplat mfreadwrite mfuuid shell32 comdlg32 crypt32 winmm runtimeobject dbghelp)\n");
                 // BrowserComponent is backed by WebView2 (cn1_windows_browser.cpp),
                 // gated on the SDK being present: when WEBVIEW2_SDK_DIR points at a
                 // Microsoft.Web.WebView2 build/native folder we link the static
@@ -934,6 +941,64 @@ public class ByteCodeTranslator {
                 writer.append("add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\n");
                 writer.append("target_include_directories(${PROJECT_NAME} PUBLIC ${CN1_APP_SOURCE_ROOT})\n");
             }
+
+            // JAVA SEMANTICS FLAGS -- required for correctness, every target:
+            // -fwrapv: Java int/long arithmetic is DEFINED to wrap on overflow;
+            //   in C signed overflow is UB and clang -O3 provably exploits it
+            //   (observed: `long += int + int` fused into a 64-bit add, skipping
+            //   the Java-mandated 32-bit wrap -- checksum diverged by 2^32 per
+            //   overflow). The Xcode template sets the same via OTHER_CFLAGS.
+            // -fno-strict-aliasing: the generated code accesses one allocation
+            //   through JavaObjectPrototype, JavaArrayPrototype and obj__<class>
+            //   simultaneously; TBAA is unsound for it.
+            // -fno-builtin-fmod(f): on Darwin/-fno-math-errno clang treats fmod as
+            //   pure and IF-CONVERTS rarely-taken clamp guards into branchless
+            //   selects that SPECULATE a full libm fmod call every iteration
+            //   (measured 1.7x slowdown on a transcendental loop). Dropping just
+            //   fmod's builtin status keeps the guard a branch; sqrt/sin/cos keep
+            //   their intrinsics.
+            // clang-cl (the Windows toolchain) takes the GNU spellings via /clang:.
+            writer.append("if(MSVC)\n");
+            writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE /clang:-fwrapv /clang:-fno-strict-aliasing /clang:-fno-builtin-fmod /clang:-fno-builtin-fmodf)\n");
+            writer.append("else()\n");
+            writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE -fwrapv -fno-strict-aliasing -fno-builtin-fmod -fno-builtin-fmodf)\n");
+            writer.append("endif()\n");
+            if (executable && !windows) {
+                // ThinLTO for the Release Linux executable: the translator emits one
+                // C function per Java method, so cross-TU inlining is where the
+                // remaining call overhead lives (measured: call-heavy benchmarks up
+                // to 1.6x faster; thin backend runs parallel, wall-time ~neutral).
+                // Executable-only: a static LIBRARY full of LLVM bitcode would break
+                // consumers whose final link is not LTO-aware, and clang-cl/lld-link
+                // on Windows is a separate follow-up. The iOS Xcode template enables
+                // the same via LLVM_LTO=YES_THIN on its optimized configurations.
+                // -flto=thin is CLANG syntax; gcc (Alpine/musl default) rejects it.
+                // Plain gcc -flto is deliberately NOT substituted -- untested here.
+                writer.append("if(CMAKE_C_COMPILER_ID MATCHES \"Clang\")\n");
+                writer.append("    target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:-flto=thin>)\n");
+                writer.append("    target_link_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:-flto=thin>)\n");
+                writer.append("endif()\n");
+            }
+
+            // Opt-in Link-Time Optimization. The translator emits a separate C
+            // function per reachable Java method; LTO lets the C compiler inline
+            // the tiny per-call frame helpers and the array-access inline helpers
+            // across translation units, which is where most of the AOT call/array
+            // overhead hides. It considerably increases link time, so it is OFF by
+            // default and must stay out of regular CI -- enable with
+            // -DCN1_ENABLE_LTO=ON only for release/perf builds. Uses CMake's
+            // INTERPROCEDURAL_OPTIMIZATION so it maps to -flto (clang/gcc) or
+            // /LTCG (MSVC) per toolchain; ${PROJECT_NAME} exists in every branch above.
+            writer.append("option(CN1_ENABLE_LTO \"Enable Link-Time Optimization (slow link; off in CI)\" OFF)\n");
+            writer.append("if(CN1_ENABLE_LTO)\n");
+            writer.append("    include(CheckIPOSupported)\n");
+            writer.append("    check_ipo_supported(RESULT CN1_IPO_OK OUTPUT CN1_IPO_MSG)\n");
+            writer.append("    if(CN1_IPO_OK)\n");
+            writer.append("        set_property(TARGET ${PROJECT_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)\n");
+            writer.append("    else()\n");
+            writer.append("        message(WARNING \"CN1_ENABLE_LTO requested but IPO/LTO unsupported: ${CN1_IPO_MSG}\")\n");
+            writer.append("    endif()\n");
+            writer.append("endif()\n");
         }
     }
 

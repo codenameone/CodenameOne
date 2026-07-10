@@ -541,6 +541,20 @@ public class WindowsImplementation extends CodenameOneImplementation {
         WindowsNative.flushGraphics(windowGraphicsPeer, x, y, width, height);
     }
 
+    /// Issue #5273: confine a clip set while a component paints to its flushed
+    /// (dirty) region. The Windows port draws screen ops immediately into a
+    /// persistent Direct2D surface (RETAIN_CONTENTS on-screen, the WIC bitmap in
+    /// offscreen capture), so without this an oversized clip would escape the
+    /// repainted sub-region and overwrite pixels outside it that stay stale until
+    /// a full repaint -- the same defect the iOS Metal and Linux Cairo backends
+    /// had, caught by the graphics-partial-flush-clip-escape screenshot test.
+    @Override
+    protected void setPaintDirtyRegionClip(int x, int y, int width, int height) {
+        if (windowGraphicsPeer != 0) {
+            WindowsNative.setFlushRect(windowGraphicsPeer, x, y, width, height);
+        }
+    }
+
     /*
      * Capture the already-rendered window instead of the base behaviour, which
      * re-paints the current form into a fresh mutable image

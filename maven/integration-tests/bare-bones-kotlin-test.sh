@@ -6,7 +6,7 @@ cd $SCRIPTPATH/build
 if [ -d myapp2 ]; then
   rm -rf myapp2
 fi
-curl -L https://github.com/shannah/cn1app-archetype-kotlin-template/archive/master.zip > master.zip
+curl -fL --retry 5 --retry-all-errors https://github.com/shannah/cn1app-archetype-kotlin-template/archive/master.zip > master.zip
 unzip master.zip
 rm master.zip
 mvn com.codenameone:codenameone-maven-plugin:${CN1_VERSION}:generate-app-project \

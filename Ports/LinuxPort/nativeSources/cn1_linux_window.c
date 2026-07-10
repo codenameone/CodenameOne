@@ -36,11 +36,15 @@
  * host -- see Ports/LinuxPort/status.md.
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE   /* pthread_getattr_np + ucontext REG_* gregs; before any libc include */
+#endif
 #include "cn1_linux_gfx.h"
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
 #include <signal.h>
+#include <ucontext.h>
 #ifdef __GLIBC__
 #include <execinfo.h> /* backtrace() -- glibc only; musl has no execinfo.h */
 #endif
@@ -428,15 +432,80 @@ static gboolean cn1OnDelete(GtkWidget* widget, GdkEvent* e, gpointer data) {
  * the fault first-chance). It is a release/CI resilience mechanism, not a debug
  * aid -- set CN1_LINUX_NO_FAULT_HANDLER=1 to disable it when debugging under gdb.
  */
+/* Dump the faulting thread's native backtrace to stderr (the app-output tee). Async-
+ * signal-safe (write + backtrace). With the per-thread alternate signal stack this runs
+ * even on a STACK OVERFLOW; the repeating frames are the recursion. Called from both the
+ * SIGABRT path and the wild-address SIGSEGV path (stack-overflow guard-page faults land
+ * there), so an overflow is finally legible instead of a bare, corrupt-unwind core. */
+/* async-signal-safe "KEY=0xHEX\n" */
+static void cn1LinuxWriteHexKV(const char* key, unsigned long v) {
+    char buf[64]; int i = 0;
+    while (key[i]) { buf[i] = key[i]; i++; }
+    buf[i++] = '='; buf[i++] = '0'; buf[i++] = 'x';
+    char hx[16]; int h = 0;
+    if (v == 0) hx[h++] = '0';
+    while (v) { int d = v & 0xf; hx[h++] = (char)(d < 10 ? '0' + d : 'a' + d - 10); v >>= 4; }
+    while (h > 0) buf[i++] = hx[--h];
+    buf[i++] = '\n';
+    write(2, buf, i);
+}
+
+static void cn1LinuxDumpNativeBacktrace(const char* label, siginfo_t* si, void* ucv) {
+    signal(SIGSEGV, SIG_DFL);
+    signal(SIGBUS, SIG_DFL);
+    write(2, "\n=====CN1 ", 10);
+    write(2, label, strlen(label));
+    write(2, " BACKTRACE=====\n", 16);
+    if (si != NULL) cn1LinuxWriteHexKV("faultAddr", (unsigned long)(uintptr_t)si->si_addr);
+    /* faulting PC + SP from the ucontext, and this thread's real stack bounds -- if the
+     * used span (top - sp) is a fraction of a MB, this is a SMALL-STACK thread overflow
+     * (e.g. CN1 rendering on a WebKit/Gallium/GLib worker thread), not deep recursion. */
+    if (ucv != NULL) {
+        ucontext_t* uc = (ucontext_t*)ucv;
+        unsigned long sp = 0, pc = 0;
+#if defined(__aarch64__)
+        sp = (unsigned long)uc->uc_mcontext.sp;
+        pc = (unsigned long)uc->uc_mcontext.pc;
+#elif defined(__x86_64__)
+        sp = (unsigned long)uc->uc_mcontext.gregs[REG_RSP];
+        pc = (unsigned long)uc->uc_mcontext.gregs[REG_RIP];
+#endif
+        if (pc) cn1LinuxWriteHexKV("faultPC", pc);
+        if (sp) cn1LinuxWriteHexKV("faultSP", sp);
+        pthread_attr_t at;
+        if (pthread_getattr_np(pthread_self(), &at) == 0) {
+            void* base = 0; size_t sz = 0;
+            if (pthread_attr_getstack(&at, &base, &sz) == 0) {
+                cn1LinuxWriteHexKV("stackLo", (unsigned long)(uintptr_t)base);
+                cn1LinuxWriteHexKV("stackSz", (unsigned long)sz);
+                if (sp) cn1LinuxWriteHexKV("stackUsed", (unsigned long)(((uintptr_t)base + sz) - sp));
+            }
+            pthread_attr_destroy(&at);
+        }
+    }
+#ifdef __GLIBC__
+    void* bt[96];
+    int n = backtrace(bt, 96);
+    backtrace_symbols_fd(bt, n, 2);
+#else
+    const char* na = "(native backtrace unavailable on this libc)\n";
+    write(2, na, strlen(na));
+#endif
+    const char* ftr = "=====END CN1 BACKTRACE=====\n";
+    write(2, ftr, strlen(ftr));
+}
+
 static void cn1LinuxFaultToException(int sig, siginfo_t* si, void* ucv) {
     (void) ucv;
     /* Only a genuine null-ish deref (null + a small field/vtable/array offset)
-     * is converted to an NPE. A wild faulting address is real memory corruption:
-     * restore the default disposition and return so the re-executed instruction
-     * faults again into a core dump that stays diagnosable, instead of being
-     * masked as a recoverable NPE that silently corrupts further state. */
+     * is converted to an NPE. A wild faulting address is real memory corruption OR a
+     * stack overflow (the guard-page address is high): dump a backtrace so the failing
+     * frame / recursion is identifiable from the CI log, then restore the default
+     * disposition and return so the re-executed instruction faults again into a core
+     * dump, instead of being masked as a recoverable NPE that silently corrupts state. */
     if ((sig == SIGSEGV || sig == SIGBUS) && si != NULL &&
             (uintptr_t) si->si_addr >= 0x10000) {
+        cn1LinuxDumpNativeBacktrace("FAULT", si, ucv);
         signal(sig, SIG_DFL);
         return;
     }
@@ -453,23 +522,7 @@ static void cn1LinuxFaultToException(int sig, siginfo_t* si, void* ucv) {
  * even where an interactive debugger is unavailable (CI containers). Enabled only
  * when CN1_LINUX_ABORT_BACKTRACE is set so it never interferes with normal runs. */
 static void cn1LinuxAbortBacktrace(int sig) {
-    /* Restore default SIGSEGV/SIGBUS so a fault while walking a corrupted stack
-     * just dies here instead of longjmp-ing out via the NPE handler. */
-    signal(SIGSEGV, SIG_DFL);
-    signal(SIGBUS, SIG_DFL);
-    const char* hdr = "\n=====CN1 ABORT BACKTRACE=====\n";
-    write(2, hdr, strlen(hdr));
-#ifdef __GLIBC__
-    void* bt[80];
-    int n = backtrace(bt, 80);
-    backtrace_symbols_fd(bt, n, 2);
-#else
-    /* musl has no execinfo.h/backtrace(); fall through with just the markers. */
-    const char* na = "(native backtrace unavailable on this libc)\n";
-    write(2, na, strlen(na));
-#endif
-    const char* ftr = "=====END CN1 ABORT BACKTRACE=====\n";
-    write(2, ftr, strlen(ftr));
+    cn1LinuxDumpNativeBacktrace("ABORT", NULL, NULL);
     signal(sig, SIG_DFL);
     raise(sig);
 }
@@ -480,10 +533,21 @@ static void cn1LinuxInstallFaultHandlers() {
         return;
     }
     installed = 1;
+    /* Alternate signal stack for THIS (main) thread so SA_ONSTACK works here too. The CN1
+     * worker/EDT/GC threads register their own in threadRunner/gcMarkWorkerMain. */
+    {
+        stack_t ss;
+        ss.ss_sp = malloc(512 * 1024);
+        if (ss.ss_sp != NULL) { ss.ss_size = 512 * 1024; ss.ss_flags = 0; sigaltstack(&ss, NULL); }
+    }
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_sigaction = cn1LinuxFaultToException;
-    sa.sa_flags = SA_SIGINFO | SA_NODEFER;
+    /* SA_ONSTACK: run the handler on the per-thread alternate signal stack (registered in
+     * threadRunner / gcMarkWorkerMain / crash-protection install) so it can execute even
+     * on a STACK OVERFLOW, when the faulting thread's own stack is exhausted -- otherwise
+     * the handler re-faults and the process dies silently with no backtrace. */
+    sa.sa_flags = SA_SIGINFO | SA_NODEFER | SA_ONSTACK;
     sigemptyset(&sa.sa_mask);
     sigaction(SIGSEGV, &sa, NULL);
     sigaction(SIGBUS, &sa, NULL);

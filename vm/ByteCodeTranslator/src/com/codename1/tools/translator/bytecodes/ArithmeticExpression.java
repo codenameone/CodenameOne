@@ -41,6 +41,27 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
 
     
     
+    /**
+     * If this expression is a long three-way compare ({@code LCMP}), returns the
+     * direct comparison {@code (a <op> b)} for the given branch operator, so an
+     * {@code LCMP} feeding an {@code IFxx} branch-on-zero is emitted as a plain
+     * long comparison instead of {@code CN1_CMP_EXPR(a,b) <op> 0} -- the latter
+     * (a three-way ?: chain) defeats clang's loop trip-count analysis and blocks
+     * vectorization. LCMP only: float/double compares ({@code FCMPx}/{@code DCMPx})
+     * keep {@code CN1_CMP_EXPR} because their NaN ordering differs from a direct C
+     * comparison. The folded operands are pure (the reducer only folds loads /
+     * constants / pure expressions), so evaluating them once here is bit-identical
+     * to -- and avoids the double-evaluation of -- the {@code CN1_CMP_EXPR} macro.
+     */
+    public String getLongCompareDirect(String operator) {
+        if (lastInstruction != null && lastInstruction.getOpcode() == Opcodes.LCMP
+                && subExpression != null && subExpression2 != null) {
+            return "(" + subExpression.getExpressionAsString().trim() + " " + operator + " "
+                    + subExpression2.getExpressionAsString().trim() + ")";
+        }
+        return null;
+    }
+
     @Override
     public void addDependencies(List<String> dependencyList) {
         if (subExpression != null) {

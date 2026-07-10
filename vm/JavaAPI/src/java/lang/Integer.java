@@ -64,50 +64,57 @@ public final class Integer extends Number implements Comparable<Integer> {
      * Returns the value of this Integer as a byte.
      */
     public byte byteValue(){
-        return (byte)value; 
+        return (byte)cn1Value();
     }
 
     /**
      * Returns the value of this Integer as a double.
      */
     public double doubleValue(){
-        return value;
+        return cn1Value();
     }
 
     /**
      * Compares this object to the specified object. The result is true if and only if the argument is not null and is an Integer object that contains the same int value as this object.
      */
     public boolean equals(java.lang.Object obj){
-        return obj != null && obj.getClass() == getClass() && ((Integer)obj).value == value;
+        // instanceof (not getClass()) so a tagged Integer needs no header; Integer is final.
+        return (obj instanceof Integer) && ((Integer)obj).cn1Value() == cn1Value();
     }
 
     /**
      * Returns the value of this Integer as a float.
      */
     public float floatValue(){
-        return value;
+        return cn1Value();
     }
 
     /**
      * Returns a hashcode for this Integer.
      */
     public int hashCode(){
-        return value; 
+        return cn1Value();
     }
 
     /**
      * Returns the value of this Integer as an int.
      */
     public int intValue(){
-        return value;
+        return cn1Value();
     }
 
     /**
      * Returns the value of this Integer as a long.
      */
     public long longValue(){
-        return value; 
+        return cn1Value();
     }
+
+    /**
+     * Returns this Integer's int value, transparently handling both heap-allocated and
+     * tagged-immediate (poor-man's-Valhalla) representations. All value reads route here.
+     */
+    private native int cn1Value();
 
     /**
      * Parses the string argument as a signed decimal integer. The characters in the string must all be decimal digits, except that the first character may be an ASCII minus sign '-' ('
@@ -184,7 +191,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      * Returns the value of this Integer as a short.
      */
     public short shortValue(){
-        return (short)value;
+        return (short)cn1Value();
     }
 
     /**
@@ -265,7 +272,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      * method.
      */
     public java.lang.String toString(){
-        return toString(value);
+        return toString(cn1Value());
     }
 
     /**
@@ -312,8 +319,30 @@ public final class Integer extends Number implements Comparable<Integer> {
      * @param i the primitive
      * @return object instance
      */
-    public static Integer valueOf(int i) {
+    // Native so the tagged-int build can return an immediate without allocating. The
+    // off path (and 32-bit-pointer targets) calls valueOfHeap, preserving the cache.
+    public static native Integer valueOf(int i);
+
+    static Integer valueOfHeap(int i) {
+        if (i >= -128 && i <= 127) {
+            return IntegerCache.cache[i + 128];
+        }
         return new Integer(i);
+    }
+
+    /**
+     * Cache of boxed values for the range -128..127, mirroring the JDK's
+     * {@code Integer.IntegerCache} so autoboxing in tight loops does not
+     * allocate. Initialized eagerly on class load.
+     */
+    private static final class IntegerCache {
+        static final Integer[] cache = new Integer[256];
+        static {
+            for (int j = 0; j < 256; j++) {
+                cache[j] = new Integer(j - 128);
+            }
+        }
+        private IntegerCache() {}
     }
 
     /**
@@ -339,7 +368,8 @@ public final class Integer extends Number implements Comparable<Integer> {
     }
 
     public int compareTo(Integer another) {
-        return value < another.value ? -1 : value > another.value ? 1 : 0;
+        int value = cn1Value(), av = another.cn1Value();
+        return value < av ? -1 : value > av ? 1 : 0;
     }
     
      public static int numberOfLeadingZeros(int i) {

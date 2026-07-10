@@ -13,7 +13,7 @@ if [ -d androidnativetest ]; then
   rm -rf androidnativetest
 fi
 
-curl -L https://github.com/shannah/test-android-native-interfaces/archive/refs/tags/1.0.1.zip > master.zip
+curl -fL --retry 5 --retry-all-errors https://github.com/shannah/test-android-native-interfaces/archive/refs/tags/1.0.1.zip > master.zip
 unzip master.zip
 rm master.zip
 

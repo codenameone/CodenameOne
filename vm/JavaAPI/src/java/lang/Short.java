@@ -97,7 +97,21 @@ public final class Short extends Number implements Comparable<Short> {
      * @return object instance
      */
     public static Short valueOf(short i) {
+        if (i >= -128 && i <= 127) {
+            return ShortCache.cache[i + 128];
+        }
         return new Short(i);
+    }
+
+    /** Cache of boxed values for -128..127, mirroring the JDK's ShortCache. */
+    private static final class ShortCache {
+        static final Short[] cache = new Short[256];
+        static {
+            for (int j = 0; j < 256; j++) {
+                cache[j] = new Short((short) (j - 128));
+            }
+        }
+        private ShortCache() {}
     }
 
     @Override

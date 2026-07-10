@@ -89,6 +89,11 @@ CN1Graphics* cn1WinCreateGraphics(ID2D1RenderTarget* target) {
     g->inFrame = JAVA_FALSE;
     g->wicBitmap = NULL;
     g->transform = D2D1::Matrix3x2F::Identity();
+    g->isWindowTarget = JAVA_FALSE;
+    g->flushX = 0;
+    g->flushY = 0;
+    g->flushW = 0;
+    g->flushH = 0;
     return g;
 }
 
@@ -203,11 +208,34 @@ extern "C" void cn1WinPushClip(CN1Graphics* g) {
         }
         return;
     }
+    int cx = g->clipX, cy = g->clipY, cw = g->clipW, ch = g->clipH;
+    /* Issue #5273: confine a screen clip to the current flush region. On a
+     * partial repaint paintDirty pushes the dirty sub-region via setFlushRect
+     * before the component paints; a clip the component then sets can extend
+     * past that sub-region, and because the window draws into a PERSISTENT
+     * Direct2D surface (RETAIN_CONTENTS on-screen, the WIC bitmap offscreen)
+     * the escaping fill would overwrite -- and leave stale -- pixels outside
+     * the flushed area until a full repaint (the same defect the iOS Metal and
+     * Linux Cairo backends had; caught by graphics-partial-flush-clip-escape).
+     * Window target only (mutable images keep flushW == 0 and are unaffected);
+     * skipped when no flush rect is set so a clip is never collapsed. */
+    if (g->isWindowTarget && g->flushW > 0 && g->flushH > 0) {
+        int cx2 = cx + cw, cy2 = cy + ch;
+        int fx2 = g->flushX + g->flushW, fy2 = g->flushY + g->flushH;
+        if (cx < g->flushX) { cx = g->flushX; }
+        if (cy < g->flushY) { cy = g->flushY; }
+        if (cx2 > fx2) { cx2 = fx2; }
+        if (cy2 > fy2) { cy2 = fy2; }
+        cw = cx2 - cx;
+        ch = cy2 - cy;
+        if (cw < 0) { cw = 0; }
+        if (ch < 0) { ch = 0; }
+    }
     D2D1_RECT_F clip;
-    clip.left = (FLOAT)g->clipX;
-    clip.top = (FLOAT)g->clipY;
-    clip.right = (FLOAT)(g->clipX + g->clipW);
-    clip.bottom = (FLOAT)(g->clipY + g->clipH);
+    clip.left = (FLOAT)cx;
+    clip.top = (FLOAT)cy;
+    clip.right = (FLOAT)(cx + cw);
+    clip.bottom = (FLOAT)(cy + ch);
     /* The Codename One clip is in screen (post-translate) space, independent of
      * the drawing transform. PushAxisAlignedClip applies the *current* world
      * transform to the clip rect, so pushing it while g->transform (a rotation/
@@ -308,6 +336,22 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_setClip___long_int_int_int_in
     g->clipH = __cn1Arg5;
     g->clipIsRect = JAVA_TRUE;
     cn1WinReleaseClipGeom(g);
+}
+
+/* Issue #5273: record the current paintDirty flush region (screen space) so a
+ * rectangular screen clip set while a component paints is confined to it in
+ * cn1WinPushClip. width/height == 0 disables the clamp (full repaint / no
+ * partial flush). Only meaningful on the window graphics; mutable-image
+ * graphics never receive this call. */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_setFlushRect___long_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2, JAVA_INT __cn1Arg3, JAVA_INT __cn1Arg4, JAVA_INT __cn1Arg5) {
+    CN1Graphics* g = (CN1Graphics*)__cn1Arg1;
+    if (g == NULL) {
+        return;
+    }
+    g->flushX = __cn1Arg2;
+    g->flushY = __cn1Arg3;
+    g->flushW = __cn1Arg4;
+    g->flushH = __cn1Arg5;
 }
 
 /* Sets the clip to an arbitrary shape (flattened path arrays, same encoding as

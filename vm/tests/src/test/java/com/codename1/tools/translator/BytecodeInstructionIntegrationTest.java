@@ -344,13 +344,24 @@ class BytecodeInstructionIntegrationTest {
         Path generatedSource = findGeneratedSource(srcRoot, "StringConcatInvokeDynamicApp");
         String generatedCode = new String(Files.readAllBytes(generatedSource), StandardCharsets.UTF_8);
 
-        assertTrue(generatedCode.contains("__NEW_java_lang_StringBuilder"),
+        // The builder may be heap-allocated (__NEW/CN1_FAST_NEW/deferred fused
+        // NEW) or -- when the escape analysis proves it non-escaping, the normal
+        // case for javac/indy concat -- STACK-allocated. The appends may be
+        // virtual, devirtualized (closed world), or renamed to the call-site
+        // intrinsics (cn1InlSbAppend*). Accept every modern shape.
+        assertTrue(generatedCode.contains("__NEW_java_lang_StringBuilder")
+                        || generatedCode.contains("CN1_FAST_NEW(java_lang_StringBuilder)")
+                        || generatedCode.contains("struct obj__java_lang_StringBuilder __cn1stk_")
+                        || generatedCode.contains("NEW deferred"),
                 "String concat invokedynamic should translate into StringBuilder allocation");
-        assertTrue(generatedCode.contains("virtual_java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder"),
+        assertTrue(generatedCode.contains("java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder")
+                        || generatedCode.contains("cn1InlSbAppendStr"),
                 "String concat invokedynamic should append string segments");
-        assertTrue(generatedCode.contains("virtual_java_lang_StringBuilder_append___int_R_java_lang_StringBuilder"),
+        assertTrue(generatedCode.contains("java_lang_StringBuilder_append___int_R_java_lang_StringBuilder")
+                        || generatedCode.contains("cn1InlSbAppendInt"),
                 "String concat invokedynamic should append primitive values");
-        assertTrue(generatedCode.contains("virtual_java_lang_StringBuilder_toString___R_java_lang_String"),
+        assertTrue(generatedCode.contains("java_lang_StringBuilder_toString___R_java_lang_String")
+                        || generatedCode.contains("cn1InlSbToString"),
                 "String concat invokedynamic should finalize to String");
 
         CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
@@ -499,12 +510,16 @@ class BytecodeInstructionIntegrationTest {
         StringBuilder generated = new StringBuilder();
         method.appendMethodC(generated);
         String c = generated.toString();
-        assertTrue(c.contains("DEFINE_METHOD_STACK_FAST_PRIMITIVE("),
-                "Primitive no-throw/no-monitor/no-try methods should use DEFINE_METHOD_STACK_FAST_PRIMITIVE");
+        // Frameless codegen SUPERSEDES the fast-stack macro for this shape: a
+        // primitive-only no-throw method now carries no frame at all. Either
+        // form satisfies the "no heavy frame" contract this test guards.
+        boolean frameless = c.contains("DEFINE_METHOD_STACK_FRAMELESS(");
+        assertTrue(frameless || c.contains("DEFINE_METHOD_STACK_FAST_PRIMITIVE("),
+                "Primitive no-throw/no-monitor/no-try methods should use the frameless or fast-primitive stack form");
         assertTrue(c.contains("if (!class__Example.initialized) __STATIC_INITIALIZER_Example(threadStateData);"),
                 "Static methods should emit a fast-path loaded check before static initialization");
-        assertTrue(c.contains("CN1_FAST_RETURN_RELEASE();"),
-                "Fast stack methods should use inline fast return release");
+        assertTrue(frameless || c.contains("CN1_FAST_RETURN_RELEASE();"),
+                "Fast stack methods should use inline fast return release (frameless methods return plainly)");
     }
 
     @Test

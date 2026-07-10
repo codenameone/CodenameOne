@@ -204,7 +204,21 @@ public final class Long extends Number implements Comparable<Long> {
      * @return object instance
      */
     public static Long valueOf(long i) {
+        if (i >= -128 && i <= 127) {
+            return LongCache.cache[(int) i + 128];
+        }
         return new Long(i);
+    }
+
+    /** Cache of boxed values for -128..127, mirroring the JDK's LongCache. */
+    private static final class LongCache {
+        static final Long[] cache = new Long[256];
+        static {
+            for (int j = 0; j < 256; j++) {
+                cache[j] = new Long(j - 128);
+            }
+        }
+        private LongCache() {}
     }
 
     public static int compare(long f1, long f2) {

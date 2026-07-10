@@ -3,6 +3,7 @@ package com.codenameone.examples.hellocodenameone.tests;
 import com.codename1.components.ToastBar;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
@@ -21,6 +22,7 @@ import com.codename1.ui.util.UITimer;
 public class ToastBarTopPositionScreenshotTest extends BaseTest {
     private Form form;
     private int originalPosition;
+    private ToastBar.Status status;
 
     @Override
     public boolean runTest() {
@@ -39,13 +41,94 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
 
     @Override
     protected void registerReadyCallback(Form parent, Runnable run) {
-        ToastBar tb = ToastBar.getInstance();
-        tb.setPosition(Component.TOP);
+        ToastBar.getInstance().setPosition(Component.TOP);
+        showToast();
 
-        // Use a long timeout so the toast stays visible for the screenshot
-        ToastBar.showMessage("Info message at top", FontImage.MATERIAL_INFO, 30000);
+        // The toast is shown asynchronously and, on the slow iOS/tvOS/watchOS simulators, is
+        // intermittently NOT visible when a fixed timer fires -- the screenshot then captures
+        // the form WITHOUT the toast, a run-to-run "toast present vs absent" flake that no
+        // golden can reconcile (max_channel_delta 191). Rather than guess a timer, poll until
+        // the toast component is actually laid out + visible on the current form, re-issuing
+        // the show if it never took, then hand off to the base settle+capture. Bounded so a
+        // genuine show failure degrades to a capture instead of hanging the suite.
+        awaitToastShown(parent, run, 0);
+    }
 
-        // Wait for the toast animation to complete before taking the screenshot
-        UITimer.timer(2000, false, parent, run);
+    private void showToast() {
+        // Keep the returned Status and give it a practically-unexpiring timeout:
+        // on a starved metal runner the poll + settle + capture chain was observed
+        // outliving the old 30s expiry, so the capture shipped the form with the
+        // toast ALREADY DISMISSED ("toast absent" all over again, this time by
+        // timeout rather than by late show). Rendering is identical to before
+        // (same showMessage path the golden was captured with); the status is
+        // cleared explicitly in cleanup() so it can never leak into a later
+        // test's capture.
+        if (status != null) {
+            status.clear();
+        }
+        status = ToastBar.showMessage("Info message at top", FontImage.MATERIAL_INFO,
+                10 * 60 * 1000);
+    }
+
+    /// The toast animates in on the GLOBAL layered pane, which the base settle
+    /// poll does not track, and the metal backend can present the frame a beat
+    /// late -- force a fresh, fully-presented frame before capturing (same
+    /// mitigation as DesktopMode / the VR tests).
+    @Override
+    protected long extraSettleBeforeCaptureMillis() {
+        return 700;
+    }
+
+    /// Invoked by the runner after the test completes (pass or fail): dismiss the
+    /// unexpiring toast and restore the global ToastBar position so no state leaks
+    /// into subsequent tests.
+    @Override
+    public void cleanup() {
+        if (status != null) {
+            status.clear();
+            status = null;
+        }
+        ToastBar.getInstance().setPosition(originalPosition);
+    }
+
+    /// Consecutive polls in which the toast's geometry (y + height) was
+    /// identical. visible && height>0 alone is NOT enough: the toast slides in
+    /// on the GLOBAL layered pane, which the form settle poll does not track,
+    /// and the slow watch simulator has been captured MID-SLIDE (a sliver of
+    /// toast peeking from the top edge). Require the geometry stable across
+    /// several polls so the animation has actually landed.
+    private int stableGeometryPolls;
+    private int lastToastY = Integer.MIN_VALUE;
+    private int lastToastH = Integer.MIN_VALUE;
+
+    private void awaitToastShown(final Form parent, final Runnable run, final int waitedMs) {
+        Form f = Display.getInstance().getCurrent();
+        Object tbc = (f != null) ? f.getClientProperty("ToastBarComponent") : null;
+        boolean shown = (tbc instanceof Component)
+                && ((Component) tbc).isVisible()
+                && ((Component) tbc).getHeight() > 0;
+        if (shown) {
+            Component c = (Component) tbc;
+            if (c.getY() == lastToastY && c.getHeight() == lastToastH) {
+                stableGeometryPolls++;
+            } else {
+                stableGeometryPolls = 0;
+                lastToastY = c.getY();
+                lastToastH = c.getHeight();
+            }
+        } else {
+            stableGeometryPolls = 0;
+            lastToastY = Integer.MIN_VALUE;
+            lastToastH = Integer.MIN_VALUE;
+        }
+        if ((shown && stableGeometryPolls >= 3) || waitedMs >= 15000) {
+            run.run();
+            return;
+        }
+        if (!shown && waitedMs > 0 && (waitedMs % 3000) == 0) {
+            // the show did not take (toast left at height 0) -> re-issue it
+            showToast();
+        }
+        UITimer.timer(250, false, parent, () -> awaitToastShown(parent, run, waitedMs + 250));
     }
 }

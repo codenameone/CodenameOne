@@ -6,6 +6,7 @@ import com.codename1.io.WebSocket;
 import com.codename1.io.WebSocketState;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.util.UITimer;
 import com.codename1.ui.Image;
 import com.codename1.ui.util.ImageIO;
 
@@ -72,12 +73,32 @@ interface Cn1ssDeviceRunnerHelper {
     }
 
     static void emitCurrentFormScreenshot(String testName, Runnable onComplete) {
+        emitCurrentFormScreenshot(testName, onComplete, 0);
+    }
+
+    static void emitCurrentFormScreenshot(String testName, Runnable onComplete, int attempt) {
         String safeName = sanitizeTestName(testName);
         Form current = Display.getInstance().getCurrent();
         if (current == null) {
             println("CN1SS:ERR:test=" + safeName + " message=Current form is null");
             emitPlaceholderScreenshot(safeName);
             complete(onComplete);
+            return;
+        }
+        // Robustness against the GPU/Metal late-present race: on the iOS Metal (and
+        // occasionally the software) backend the current form can still be un-laid-out
+        // (width/height 0) a beat after it settled, which the capture would emit as a
+        // useless empty 1x1 image -- a run-to-run flake (observed: ShowcaseTheme_dark on
+        // build-ios-metal). Force a relayout + repaint and retry a bounded number of times
+        // before giving up, so an unready frame is never captured.
+        if ((current.getWidth() <= 1 || current.getHeight() <= 1) && attempt < 12) {
+            println("CN1SS:INFO:test=" + safeName + " message=form-not-laid-out retry=" + (attempt + 1)
+                    + " w=" + current.getWidth() + " h=" + current.getHeight());
+            current.revalidate();
+            current.repaint();
+            final String tn = testName;
+            final Runnable oc = onComplete;
+            UITimer.timer(150, false, current, () -> emitCurrentFormScreenshot(tn, oc, attempt + 1));
             return;
         }
         int width = Math.max(1, current.getWidth());

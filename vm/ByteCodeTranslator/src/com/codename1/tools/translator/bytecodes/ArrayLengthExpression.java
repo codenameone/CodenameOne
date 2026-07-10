@@ -21,7 +21,12 @@ public class ArrayLengthExpression extends Instruction implements AssignableExpr
     private ArrayLengthExpression() {
         super(-3);
     }
-    
+
+    /** The instruction producing the array whose length is taken (e.g. an ALOAD VarOp). */
+    public Instruction getArrayInstruction() {
+        return target;
+    }
+
     public static int tryReduce(List<Instruction> instructions, int index) {
         if (index < 1) {
             return -1;

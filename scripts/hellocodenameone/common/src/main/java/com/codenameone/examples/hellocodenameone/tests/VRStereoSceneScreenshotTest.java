@@ -102,6 +102,14 @@ public class VRStereoSceneScreenshotTest extends BaseTest {
         return 700;
     }
 
+    /// This test captures in landscape ON PURPOSE (via LandscapeCapture);
+    /// opt out of the baseline-orientation guard so it doesn't fight the
+    /// deliberate rotation.
+    @Override
+    protected boolean allowNonBaselineOrientationCapture() {
+        return true;
+    }
+
     /// Wait for landscape to settle, then force a fresh GPU frame to be
     /// rendered (and read back for capture) before the screenshot fires,
     /// mirroring the Gpu3D screenshot tests.

@@ -24,6 +24,7 @@
 package com.codename1.tools.translator.bytecodes;
 
 import com.codename1.tools.translator.ByteCodeClass;
+import com.codename1.tools.translator.Parser;
 import java.util.List;
 import org.objectweb.asm.Opcodes;
 
@@ -34,9 +35,132 @@ import org.objectweb.asm.Opcodes;
 public class TypeInstruction extends Instruction {
     private String type;
     private String actualType;
+    private int stackAllocId = -1;
+    private boolean scalarReplaced = false;
+    private int scalarStructId = -1;
+    private boolean initBeforePublish = false;
+
+    /**
+     * Marks this {@code NEW} as INIT-BEFORE-PUBLISH (memset elimination): the
+     * allocation is DEFERRED to the matching inlined {@code <init>} site, so the
+     * NEW itself only pushes a null placeholder (keeping the operand-stack depth
+     * unchanged). The matching {@code <init>} allocates into a C temp, initializes
+     * every field, and only then publishes the object into the surviving stack
+     * slot. Set by {@code BytecodeMethod.markInitBeforePublish}.
+     */
+    public void markInitBeforePublish() {
+        this.initBeforePublish = true;
+    }
+
+    public boolean isInitBeforePublish() {
+        return initBeforePublish;
+    }
+
+    private boolean fusedNew = false;
+    private boolean implicitStackAlloc = false;
+
+    /**
+     * Marks this {@code NEW} of a {@code @Fused} class as DEFERRED: like
+     * init-before-publish, the NEW pushes only a null placeholder; the matching
+     * {@code <init>} site allocates owner + fused children as one block (or
+     * falls back to an ordinary allocation), writes it into both placeholder
+     * slots, and calls the constructor. See FusedConstructor.
+     */
+    public void markFusedNew() {
+        this.fusedNew = true;
+    }
+
+    public boolean isFusedNew() {
+        return fusedNew;
+    }
     public TypeInstruction(int opcode, String type) {
         super(opcode);
         this.type = type;
+    }
+
+    /**
+     * Marks this {@code NEW} of a primitive-only {@code @StackAllocate} class as
+     * scalar-replaced: the object becomes a pure C local struct
+     * {@code __cn1sr_<id>} whose address is never taken, so clang's SROA promotes
+     * its fields to registers. The NEW itself then emits nothing (no header init,
+     * no PUSH); the matching {@code <init>}, {@code DUP}, {@code ASTORE} and field
+     * accesses are rewritten by {@code BytecodeMethod.scalarReplaceStackAllocations}.
+     */
+    public void markScalarReplaced(int id) {
+        this.scalarReplaced = true;
+        this.scalarStructId = id;
+    }
+
+    public boolean isScalarReplaced() {
+        return scalarReplaced;
+    }
+
+    public int getScalarStructId() {
+        return scalarStructId;
+    }
+
+    /**
+     * If this is a {@code NEW} of a class annotated {@code @StackAllocate},
+     * returns the mangled struct suffix (e.g. {@code com_bench_Point}); otherwise
+     * null. Used by BytecodeMethod to declare one method-scoped struct per such
+     * site and to route the NEW codegen to the stack path. Must be queried before
+     * {@link #appendInstruction} mangles {@code type} in place.
+     */
+    public String getStackAllocType() {
+        if(opcode != Opcodes.NEW) {
+            return null;
+        }
+        String mangled = type.replace('.', '_').replace('/', '_').replace('$', '_');
+        if(implicitStackAlloc) {
+            // per-SITE stack allocation proven by escape analysis
+            // (BytecodeMethod.stackAllocStringBuilders) -- no class annotation
+            return mangled;
+        }
+        ByteCodeClass bc = Parser.getClassObject(mangled);
+        if(bc != null && bc.isStackAllocatable()) {
+            return mangled;
+        }
+        return null;
+    }
+
+    /**
+     * Marks this NEW site for stack allocation WITHOUT the class-level
+     * {@code @StackAllocate} annotation: the caller (an escape-analysis pass)
+     * has proven this particular allocation never outlives the frame.
+     */
+    public void markImplicitStackAlloc() {
+        this.implicitStackAlloc = true;
+    }
+
+    private int stackFusedLen = -1;
+    private String stackFusedElemCType;
+    private String stackFusedClassRef;
+    private String stackFusedFieldCName;
+
+    /**
+     * For an implicit stack-alloc site whose ctor's @Fused plan has ONE
+     * constant-length primitive-array child: the child buffer is placed in a
+     * method-scoped stack blob (__cn1stkbuf_<id>) and installed before the ctor
+     * runs, so the keep-if-null ctor field-init KEEPS it -- the builder then
+     * allocates nothing on the heap at all.
+     */
+    public void setStackFusedChild(int len, String elemCType, String classRef, String fieldCName) {
+        this.stackFusedLen = len;
+        this.stackFusedElemCType = elemCType;
+        this.stackFusedClassRef = classRef;
+        this.stackFusedFieldCName = fieldCName;
+    }
+
+    public int getStackFusedLen() {
+        return stackFusedLen;
+    }
+
+    public String getStackFusedElemCType() {
+        return stackFusedElemCType;
+    }
+
+    public void setStackAllocId(int id) {
+        this.stackAllocId = id;
     }
 
     public String getTypeName() {
@@ -106,9 +230,88 @@ public class TypeInstruction extends Instruction {
         b.append("    ");
         switch(opcode) {
             case Opcodes.NEW:
-                b.append("PUSH_POINTER(__NEW_");
+                if(scalarReplaced) {
+                    // Scalar-replaced @StackAllocate: the struct __cn1sr_<id> is a
+                    // pure C local (declared at method top by BytecodeMethod). The
+                    // object never escapes -- it is built directly into the struct
+                    // by the inlined <init> and read via direct member access -- so
+                    // the NEW emits nothing at all (no header, no PUSH).
+                    b.append("/* NEW scalar-replaced (__cn1sr_").append(scalarStructId).append(") */\n");
+                    break;
+                }
+                if(stackAllocId >= 0) {
+                    // @StackAllocate: the object lives in the method-scoped struct
+                    // __cn1stk_<id> (declared by BytecodeMethod). Replicate exactly
+                    // what __NEW_<type> does -- run the static initializer, then set
+                    // the same header fields codenameOneGcMalloc sets -- but skip the
+                    // heap registration so the sweep never visits it. The GC still
+                    // reaches it as a root (its pointer rides the operand stack) and
+                    // scans its fields, so any heap objects it references stay live.
+                    // It is never freed; it simply dies when the frame unwinds.
+                    b.append("if(__builtin_expect(!class__");
+                    b.append(type);
+                    b.append(".initialized, 0)) __STATIC_INITIALIZER_");
+                    b.append(type);
+                    b.append("(threadStateData); memset(&__cn1stk_");
+                    b.append(stackAllocId);
+                    b.append(", 0, sizeof(struct obj__");
+                    b.append(type);
+                    b.append(")); __cn1stk_");
+                    b.append(stackAllocId);
+                    b.append(".__codenameOneParentClsReference = &class__");
+                    b.append(type);
+                    b.append("; __cn1stk_");
+                    b.append(stackAllocId);
+                    b.append(".__codenameOneGcMark = -1; __cn1stk_");
+                    b.append(stackAllocId);
+                    b.append(".__heapPosition = -1; ");
+                    if(stackFusedLen >= 0) {
+                        // stack-resident fused child: install a normal array header,
+                        // point the owner's field at it BEFORE the ctor (keep-if-null
+                        // keeps it). The DATA region is deliberately NOT zeroed:
+                        // every reader of a builder buffer is bounded by count
+                        // (charAt/getChars/toString; setLength zero-fills expansion
+                        // explicitly), so the uninitialized tail is unreachable.
+                        b.append("__cn1stk_");
+                        b.append(stackAllocId);
+                        b.append(".");
+                        b.append(stackFusedFieldCName);
+                        b.append(" = cn1FusedInstallPrimArray((JAVA_OBJECT)__cn1stkbuf_");
+                        b.append(stackAllocId);
+                        b.append(", 0, ");
+                        b.append(stackFusedClassRef);
+                        b.append(", sizeof(");
+                        b.append(stackFusedElemCType);
+                        b.append("), ");
+                        b.append(stackFusedLen);
+                        b.append("); ");
+                    }
+                    b.append("PUSH_POINTER((JAVA_OBJECT)&__cn1stk_");
+                    b.append(stackAllocId);
+                    b.append("); /* NEW stack-allocated */\n");
+                    break;
+                }
+                if(fusedNew) {
+                    // FUSED construction: allocation deferred to the matching <init>
+                    // site (owner+children single block); push a placeholder only.
+                    b.append("PUSH_POINTER(JAVA_NULL); /* NEW deferred (fused) */\n");
+                    break;
+                }
+                if(initBeforePublish) {
+                    // INIT-BEFORE-PUBLISH: allocation is deferred to the matching
+                    // inlined <init> (which builds the object in a C temp and only
+                    // then publishes it). Push a null placeholder so the operand
+                    // stack depth / DUP shape is exactly as before; the <init> writes
+                    // the real object into the surviving slot.
+                    b.append("PUSH_POINTER(JAVA_NULL); /* NEW deferred (init-before-publish) */\n");
+                    break;
+                }
+                // CN1_FAST_NEW inlines the BiBOP bump fast-path at the allocation
+                // site (Lever 1, -DCN1_INLINE_ALLOC); with the flag off it expands
+                // verbatim to __NEW_<type>(threadStateData).
+                b.append("PUSH_POINTER(CN1_FAST_NEW(");
                 b.append(type);
-                b.append("(threadStateData)); /* NEW */\n");
+                b.append(")); /* NEW */\n");
                 break;
             case Opcodes.ANEWARRAY:
                 if(type.startsWith("[")) {
