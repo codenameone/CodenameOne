@@ -84,7 +84,14 @@ public class RichTextAreaScreenshotTest extends BaseTest {
         if (captured || ready) {
             return; // capture already happened / is being scheduled by the ready path
         }
-        if (!retriedOnce) {
+        // The silent handoff only works where the runner HAS a silent-timeout
+        // retry -- shouldRetryAfterSilentTimeout explicitly excludes HTML5, so
+        // going silent on the JS port guarantees a MISSING screenshot (observed:
+        // both attempts... there is no second attempt there). On HTML5 capture at
+        // the bound like the original behavior -- the browser renders the rich
+        // text synchronously enough that this always worked on that port.
+        boolean html5 = "HTML5".equals(com.codename1.ui.Display.getInstance().getPlatformName());
+        if (!html5 && !retriedOnce) {
             retriedOnce = true;
             System.out.println("CN1SS:WARN:test=RichTextArea editor not ready at the capture bound; "
                     + "going silent to hand off to the runner's timeout retry");

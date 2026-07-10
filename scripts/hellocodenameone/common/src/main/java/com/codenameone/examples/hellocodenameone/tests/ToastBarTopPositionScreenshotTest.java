@@ -91,17 +91,41 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
         ToastBar.getInstance().setPosition(originalPosition);
     }
 
+    /// Consecutive polls in which the toast's geometry (y + height) was
+    /// identical. visible && height>0 alone is NOT enough: the toast slides in
+    /// on the GLOBAL layered pane, which the form settle poll does not track,
+    /// and the slow watch simulator has been captured MID-SLIDE (a sliver of
+    /// toast peeking from the top edge). Require the geometry stable across
+    /// several polls so the animation has actually landed.
+    private int stableGeometryPolls;
+    private int lastToastY = Integer.MIN_VALUE;
+    private int lastToastH = Integer.MIN_VALUE;
+
     private void awaitToastShown(final Form parent, final Runnable run, final int waitedMs) {
         Form f = Display.getInstance().getCurrent();
         Object tbc = (f != null) ? f.getClientProperty("ToastBarComponent") : null;
         boolean shown = (tbc instanceof Component)
                 && ((Component) tbc).isVisible()
                 && ((Component) tbc).getHeight() > 0;
-        if (shown || waitedMs >= 15000) {
+        if (shown) {
+            Component c = (Component) tbc;
+            if (c.getY() == lastToastY && c.getHeight() == lastToastH) {
+                stableGeometryPolls++;
+            } else {
+                stableGeometryPolls = 0;
+                lastToastY = c.getY();
+                lastToastH = c.getHeight();
+            }
+        } else {
+            stableGeometryPolls = 0;
+            lastToastY = Integer.MIN_VALUE;
+            lastToastH = Integer.MIN_VALUE;
+        }
+        if ((shown && stableGeometryPolls >= 3) || waitedMs >= 15000) {
             run.run();
             return;
         }
-        if (waitedMs > 0 && (waitedMs % 3000) == 0) {
+        if (!shown && waitedMs > 0 && (waitedMs % 3000) == 0) {
             // the show did not take (toast left at height 0) -> re-issue it
             showToast();
         }
