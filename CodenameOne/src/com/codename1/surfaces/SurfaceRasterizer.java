@@ -808,16 +808,16 @@ public final class SurfaceRasterizer {
         return fallback;
     }
 
-    /// Applies an ARGB color to the graphics: RGB via `setColor`, alpha via `setAlpha`. A zero
-    /// alpha byte is treated as fully opaque so plain `0xRRGGBB` literals still show up.
+    /// Applies an ARGB color to the graphics: RGB via `setColor`, alpha via `setAlpha`. The
+    /// alpha byte is honored verbatim (a fully transparent color draws nothing), matching how
+    /// the iOS and Android renderers consume the same wire value.
     private static void setPaint(Graphics g, int argb) {
         g.setColor(argb & 0xffffff);
         g.setAlpha(alphaOf(argb));
     }
 
     private static int alphaOf(int argb) {
-        int alpha = (argb >>> 24) & 0xff;
-        return alpha == 0 ? 255 : alpha;
+        return (argb >>> 24) & 0xff;
     }
 
     private static Font fontOf(Map<String, Object> map) {

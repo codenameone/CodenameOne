@@ -36,7 +36,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -149,21 +151,47 @@ public class LinuxWidgetBridge implements SurfaceBridge {
         if (doc == null || kindId == null) {
             return;
         }
+        String dir = kindDir(kindId);
+        // The document's images list is the COMPLETE reference set (the serializer includes
+        // registered-name references to blobs shipped earlier). Resolve every referenced blob
+        // (new bytes, previous in-memory map, disk) so registered-name references keep
+        // rendering, and drop everything unreferenced.
+        Set<String> referenced = referencedImageNames(doc);
         Map<String, byte[]> imageCopy = new HashMap<String, byte[]>();
-        if (images != null) {
-            imageCopy.putAll(images);
-        }
         synchronized (this) {
+            Map<String, byte[]> previous = kindImages.get(kindId);
+            for (String name : referenced) {
+                byte[] data = images != null ? images.get(name) : null;
+                if (data == null && previous != null) {
+                    data = previous.get(name);
+                }
+                if (data == null) {
+                    data = readFile(dir + "/" + name + ".png");
+                }
+                if (data != null) {
+                    imageCopy.put(name, data);
+                }
+            }
             timelines.put(kindId, doc);
             kindImages.put(kindId, imageCopy);
         }
-        String dir = kindDir(kindId);
         writeFileSafely(dir + "/timeline.json", utf8(timelineJson));
         for (Map.Entry<String, byte[]> e : imageCopy.entrySet()) {
             String png = dir + "/" + e.getKey() + ".png";
             if (!LinuxNative.fileExists(png)) {
                 // image names are content hashes so an existing file never needs rewriting
                 writeFileSafely(png, e.getValue());
+            }
+        }
+        // garbage collect blobs the replacement timeline no longer references: content-hash
+        // names would otherwise accumulate without bound for frequently changing art
+        String[] files = LinuxNative.fileList(dir);
+        if (files != null) {
+            for (String name : files) {
+                if (name != null && name.endsWith(".png")
+                        && !referenced.contains(name.substring(0, name.length() - 4))) {
+                    LinuxNative.fileDelete(dir + "/" + name);
+                }
             }
         }
         WidgetWindow w;
@@ -173,6 +201,18 @@ public class LinuxWidgetBridge implements SurfaceBridge {
         if (w != null) {
             w.requestRender();
         }
+    }
+
+    /// The names in the parsed timeline document's `images` list.
+    private static Set<String> referencedImageNames(Map<String, Object> doc) {
+        Set<String> referenced = new HashSet<String>();
+        Object names = doc.get("images");
+        if (names instanceof java.util.Collection) {
+            for (Object o : (java.util.Collection<?>) names) {
+                referenced.add(String.valueOf(o));
+            }
+        }
+        return referenced;
     }
 
     @Override

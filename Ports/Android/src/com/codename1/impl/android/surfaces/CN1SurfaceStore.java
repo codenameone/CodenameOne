@@ -66,13 +66,42 @@ public final class CN1SurfaceStore {
         return new File(baseDir(ctx), sanitize(kindId));
     }
 
-    /// Atomically replaces the persisted timeline of a widget kind.
+    /// Atomically replaces the persisted timeline of a widget kind and garbage collects image
+    /// blobs the replacement timeline no longer references (the document's `images` list is the
+    /// complete reference set; content-hash names would otherwise accumulate without bound).
     public static void writeWidgetTimeline(Context ctx, String kindId, String timelineJson,
             Map<String, byte[]> images) throws IOException {
         File dir = kindDir(ctx, kindId);
         mkdirs(dir);
         writeImages(dir, images);
         writeAtomic(new File(dir, "timeline.json"), utf8(timelineJson));
+        deleteUnreferencedImages(dir, timelineJson);
+    }
+
+    private static void deleteUnreferencedImages(File dir, String timelineJson) {
+        try {
+            org.json.JSONObject doc = new org.json.JSONObject(timelineJson);
+            org.json.JSONArray names = doc.optJSONArray("images");
+            java.util.HashSet<String> referenced = new java.util.HashSet<String>();
+            if (names != null) {
+                for (int i = 0; i < names.length(); i++) {
+                    referenced.add(sanitize(names.optString(i)));
+                }
+            }
+            File[] files = dir.listFiles();
+            if (files == null) {
+                return;
+            }
+            for (File f : files) {
+                String name = f.getName();
+                if (name.endsWith(".png")
+                        && !referenced.contains(name.substring(0, name.length() - 4))) {
+                    delete(f);
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to garbage collect widget images in " + dir, t);
+        }
     }
 
     /// Returns the persisted timeline JSON of a widget kind, or null when nothing was published.

@@ -23,6 +23,7 @@
 package com.codename1.impl.javase;
 
 import com.codename1.io.JSONParser;
+import com.codename1.io.Log;
 import com.codename1.surfaces.SurfaceRasterizer;
 import com.codename1.surfaces.spi.SurfaceBridge;
 import com.codename1.ui.Display;
@@ -41,7 +42,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The JavaSE {@link SurfaceBridge}: the desktop face of the {@code com.codename1.surfaces}
@@ -185,15 +188,30 @@ public class JavaSEWidgetBridge implements SurfaceBridge {
         if (doc == null || kindId == null) {
             return;
         }
+        File dir = kindDir(kindId);
+        // The document's images list is the COMPLETE reference set (the serializer includes
+        // registered-name references to blobs shipped earlier, not just this publish's blobs).
+        // Resolve every referenced blob -- new bytes, the previous in-memory map, or disk --
+        // so registered-name references keep rendering, and drop everything unreferenced.
+        Set<String> referenced = referencedImageNames(doc);
         Map<String, byte[]> imageCopy = new HashMap<String, byte[]>();
-        if (images != null) {
-            imageCopy.putAll(images);
-        }
         synchronized (this) {
+            Map<String, byte[]> previous = kindImages.get(kindId);
+            for (String name : referenced) {
+                byte[] data = images != null ? images.get(name) : null;
+                if (data == null && previous != null) {
+                    data = previous.get(name);
+                }
+                if (data == null) {
+                    data = readFile(new File(dir, name + ".png"));
+                }
+                if (data != null) {
+                    imageCopy.put(name, data);
+                }
+            }
             timelines.put(kindId, doc);
             kindImages.put(kindId, imageCopy);
         }
-        File dir = kindDir(kindId);
         writeFileSafely(new File(dir, "timeline.json"),
                 timelineJson.getBytes(StandardCharsets.UTF_8));
         for (Map.Entry<String, byte[]> e : imageCopy.entrySet()) {
@@ -203,9 +221,35 @@ public class JavaSEWidgetBridge implements SurfaceBridge {
                 writeFileSafely(png, e.getValue());
             }
         }
+        // garbage collect blobs the replacement timeline no longer references: content-hash
+        // names would otherwise accumulate without bound for frequently changing art
+        File[] files = dir.listFiles();
+        if (files != null) {
+            for (File f : files) {
+                String name = f.getName();
+                if (name.endsWith(".png")
+                        && !referenced.contains(name.substring(0, name.length() - 4))) {
+                    if (!f.delete()) {
+                        Log.p("Surfaces: failed to delete stale image " + f.getPath());
+                    }
+                }
+            }
+        }
         for (Listener l : snapshotListeners()) {
             l.widgetTimelinePublished(kindId);
         }
+    }
+
+    /// The names in the parsed timeline document's `images` list.
+    private static Set<String> referencedImageNames(Map<String, Object> doc) {
+        Set<String> referenced = new HashSet<String>();
+        Object names = doc.get("images");
+        if (names instanceof java.util.Collection) {
+            for (Object o : (java.util.Collection<?>) names) {
+                referenced.add(String.valueOf(o));
+            }
+        }
+        return referenced;
     }
 
     @Override

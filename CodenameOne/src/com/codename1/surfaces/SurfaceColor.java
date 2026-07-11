@@ -60,7 +60,9 @@ public final class SurfaceColor {
         this.role = role;
     }
 
-    /// Creates a color used in both light and dark appearance.
+    /// Creates a color used in both light and dark appearance. The alpha byte is honored
+    /// verbatim by every renderer: pass `0xFFRRGGBB` for an opaque color -- a value with a zero
+    /// alpha byte (e.g. a plain `0xRRGGBB` literal) is fully transparent and draws nothing.
     ///
     /// #### Parameters
     ///
@@ -74,7 +76,8 @@ public final class SurfaceColor {
     }
 
     /// Creates a color with distinct light and dark appearance values. The surface renderer picks
-    /// the value matching the system appearance.
+    /// the value matching the system appearance. The alpha byte is honored verbatim: pass
+    /// `0xFFRRGGBB` for opaque colors.
     ///
     /// #### Parameters
     ///

@@ -104,7 +104,7 @@ public final class SurfaceSerializer {
             entryList.add(em);
         }
         doc.put("entries", entryList);
-        doc.put("images", new ArrayList<Object>(imagesOut.keySet()));
+        doc.put("images", referencedImageNames(layouts, imagesOut));
         return emit(doc, imagesOut);
     }
 
@@ -149,7 +149,12 @@ public final class SurfaceSerializer {
             doc.put("island", island);
         }
         doc.put("state", sortedCopy(state == null ? new LinkedHashMap<String, Object>() : state));
-        doc.put("images", new ArrayList<Object>(imagesOut.keySet()));
+        Map<String, Object> rendered = new LinkedHashMap<String, Object>();
+        rendered.put("content", doc.get("content"));
+        if (!island.isEmpty()) {
+            rendered.put("island", island);
+        }
+        doc.put("images", referencedImageNames(rendered, imagesOut));
         return emit(doc, imagesOut);
     }
 
@@ -242,6 +247,36 @@ public final class SurfaceSerializer {
             Map<String, byte[]> images) {
         if (node != null) {
             island.put(key, node.toMap(images, 0));
+        }
+    }
+
+    /// The document's `images` list names EVERY image the descriptor references -- both blobs
+    /// registered by this publish and `SurfaceImage(registeredName)` references to blobs shipped
+    /// earlier. Bridges use it to garbage collect persisted blobs the replacement timeline no
+    /// longer references, so it must be the complete reference set, sorted for determinism.
+    private static List<Object> referencedImageNames(Object serializedTree,
+            Map<String, byte[]> imagesOut) {
+        java.util.TreeSet<String> names = new java.util.TreeSet<String>(imagesOut.keySet());
+        collectImageNames(serializedTree, names);
+        return new ArrayList<Object>(names);
+    }
+
+    private static void collectImageNames(Object node, java.util.Set<String> out) {
+        if (node instanceof Map) {
+            Map<?, ?> m = (Map<?, ?>) node;
+            if ("img".equals(m.get("t"))) {
+                Object name = m.get("name");
+                if (name instanceof String && ((String) name).length() > 0) {
+                    out.add((String) name);
+                }
+            }
+            for (Object value : m.values()) {
+                collectImageNames(value, out);
+            }
+        } else if (node instanceof List) {
+            for (Object value : (List<?>) node) {
+                collectImageNames(value, out);
+            }
         }
     }
 

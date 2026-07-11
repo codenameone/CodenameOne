@@ -94,6 +94,9 @@ final class IOSSurfaceBridge implements SurfaceBridge {
             mkdirs(kindDir);
             writeImages(kindDir, images);
             writeAtomically(new File(kindDir, "timeline.json"), timelineJson.getBytes("UTF-8"));
+            // GC after the replacement timeline is in place: content-hash names mean
+            // frequently changing art would otherwise grow the container without bound
+            deleteUnreferencedImages(kindDir, timelineJson);
         } catch (IOException e) {
             Log.e(e);
             return;
@@ -199,6 +202,40 @@ final class IOSSurfaceBridge implements SurfaceBridge {
     private void mkdirs(File dir) throws IOException {
         if (!dir.exists() && !dir.mkdirs()) {
             throw new IOException("Failed to create " + dir.getPath());
+        }
+    }
+
+    /// Deletes `<name>.png` blobs in the kind directory that the freshly published timeline no
+    /// longer references. The document's `images` list is the complete reference set (the
+    /// serializer includes registered-name references, not just newly shipped blobs). Runs after
+    /// the new `timeline.json` is in place so a concurrently rendering extension re-reads the
+    /// replacement document first.
+    private void deleteUnreferencedImages(File kindDir, String timelineJson) {
+        try {
+            Map<String, Object> doc = new JSONParser()
+                    .parseJSON(new java.io.StringReader(timelineJson));
+            Object names = doc.get("images");
+            java.util.Set<String> referenced = new java.util.HashSet<String>();
+            if (names instanceof java.util.Collection) {
+                for (Object o : (java.util.Collection<?>) names) {
+                    referenced.add(String.valueOf(o));
+                }
+            }
+            File[] files = kindDir.listFiles();
+            if (files == null) {
+                return;
+            }
+            for (File f : files) {
+                String name = f.getName();
+                if (name.endsWith(".png")
+                        && !referenced.contains(name.substring(0, name.length() - 4))) {
+                    if (!f.delete()) {
+                        Log.p("Surfaces: failed to delete stale image " + f.getPath());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(e);
         }
     }
 }

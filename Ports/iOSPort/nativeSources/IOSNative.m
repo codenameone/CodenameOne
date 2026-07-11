@@ -13972,6 +13972,27 @@ static Class cn1SurfacesBridgeClass() {
     return NSClassFromString(@"CN1SurfaceBridge");
 }
 
+// True when the running OS meets the CN1Widgets extension's deployment target
+// (CN1SurfacesMinOS Info.plist key, injected by the builder from
+// ios.surfaces.deploymentTarget; defaults to 16.1). Below that version the
+// extension cannot run or appear in the widget gallery, so the API must not
+// report widget support even though WidgetKit itself shipped with iOS 14.
+static BOOL cn1SurfacesMinOSSupported() {
+    NSString *min = nil;
+    id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1SurfacesMinOS"];
+    if ([v isKindOfClass:[NSString class]] && [(NSString *)v length] > 0) {
+        min = (NSString *)v;
+    } else {
+        min = @"16.1";
+    }
+    NSArray *parts = [min componentsSeparatedByString:@"."];
+    NSOperatingSystemVersion required;
+    required.majorVersion = parts.count > 0 ? [[parts objectAtIndex:0] integerValue] : 16;
+    required.minorVersion = parts.count > 1 ? [[parts objectAtIndex:1] integerValue] : 1;
+    required.patchVersion = parts.count > 2 ? [[parts objectAtIndex:2] integerValue] : 0;
+    return [[NSProcessInfo processInfo] isOperatingSystemAtLeastVersion:required];
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_getSurfacesContainerPath__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     POOL_BEGIN();
     NSString *path = cn1SurfacesContainerPath();
@@ -14060,7 +14081,8 @@ void com_codename1_impl_ios_IOSNative_surfacesEndActivity___java_lang_String_jav
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesWidgetsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     if (@available(iOS 14.0, *)) {
         POOL_BEGIN();
-        BOOL supported = cn1SurfacesBridgeClass() != nil && cn1SurfacesContainerPath() != nil;
+        BOOL supported = cn1SurfacesMinOSSupported()
+                && cn1SurfacesBridgeClass() != nil && cn1SurfacesContainerPath() != nil;
         POOL_END();
         return supported ? JAVA_TRUE : JAVA_FALSE;
     }

@@ -34,7 +34,6 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.util.Iterator;
 import java.util.Map;
 
 /// Android lowering of live activities: an ongoing, silent, high-importance notification with
@@ -86,13 +85,13 @@ public final class CN1LiveActivityManager {
         }
     }
 
-    /// Re-renders a running live activity with a fresh state map merged into its descriptor.
+    /// Re-renders a running live activity with a fresh state map replacing the previous one.
     public static void update(Context ctx, String activityId, String stateJson) {
         if (ctx == null || activityId == null) {
             return;
         }
         try {
-            JSONObject doc = mergeState(ctx, activityId, stateJson);
+            JSONObject doc = replaceState(ctx, activityId, stateJson);
             if (doc == null) {
                 return;
             }
@@ -111,7 +110,7 @@ public final class CN1LiveActivityManager {
         }
         try {
             if (finalStateJson != null && !dismissImmediately) {
-                JSONObject doc = mergeState(ctx, activityId, finalStateJson);
+                JSONObject doc = replaceState(ctx, activityId, finalStateJson);
                 if (doc != null) {
                     notifyActivity(ctx, activityId, doc, false, true);
                 }
@@ -131,7 +130,7 @@ public final class CN1LiveActivityManager {
 
     // --- internals ------------------------------------------------------------
 
-    private static JSONObject mergeState(Context ctx, String activityId, String stateJson)
+    private static JSONObject replaceState(Context ctx, String activityId, String stateJson)
             throws Exception {
         String persisted = CN1SurfaceStore.readLiveActivity(ctx, activityId);
         if (persisted == null) {
@@ -140,17 +139,9 @@ public final class CN1LiveActivityManager {
         }
         JSONObject doc = new JSONObject(persisted);
         if (stateJson != null) {
-            JSONObject state = doc.optJSONObject("state");
-            if (state == null) {
-                state = new JSONObject();
-                doc.put("state", state);
-            }
-            JSONObject fresh = new JSONObject(stateJson);
-            Iterator<?> keys = fresh.keys();
-            while (keys.hasNext()) {
-                String key = String.valueOf(keys.next());
-                state.put(key, fresh.get(key));
-            }
+            // each update carries the complete fresh state: replace wholesale so
+            // keys omitted by the app disappear, matching every other platform
+            doc.put("state", new JSONObject(stateJson));
         }
         return doc;
     }

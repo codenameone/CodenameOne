@@ -4540,6 +4540,13 @@ public class IPhoneBuilder extends Executor {
             if (!inject.contains("CN1SurfacesAppGroup")) {
                 inject += "\n<key>CN1SurfacesAppGroup</key><string>" + surfacesAppGroup + "</string>";
             }
+            // The extension's deployment target: the runtime gates areWidgetsSupported() on it
+            // (the extension cannot run or appear in the widget gallery below this version, so
+            // WidgetKit's own iOS 14 floor is not the right check).
+            if (!inject.contains("CN1SurfacesMinOS")) {
+                inject += "\n<key>CN1SurfacesMinOS</key><string>"
+                        + request.getArg("ios.surfaces.deploymentTarget", "16.1") + "</string>";
+            }
             // NSSupportsLiveActivities belongs in the HOST app's Info.plist (the extension only
             // renders them). Intentionally skipped when ios.surfaces.extension=false: without
             // the extension ActivityKit would accept the request but show nothing.

@@ -301,7 +301,9 @@ class SurfaceTest {
         assertFalse(other.equals(name1));
         assertEquals(2, images.size());
 
-        // nodes that reference an already-registered name ship no new bytes
+        // nodes that reference an already-registered name ship no new bytes, but the
+        // document's images list still names them so bridges can garbage collect
+        // persisted blobs the replacement timeline no longer references
         SurfaceRow row = new SurfaceRow()
                 .add(new SurfaceImage(name1))
                 .add(new SurfaceImage("imgpreviouslyshipped"));
@@ -311,7 +313,9 @@ class SurfaceTest {
         assertTrue(publishImages.isEmpty());
         @SuppressWarnings("unchecked")
         List<Object> names = (List<Object>) doc.get("images");
-        assertTrue(names.isEmpty());
+        assertEquals(2, names.size());
+        assertTrue(names.contains(name1));
+        assertTrue(names.contains("imgpreviouslyshipped"));
     }
 
     @Test
