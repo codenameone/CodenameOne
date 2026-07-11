@@ -2,17 +2,17 @@
 
 === macOS Desktop Build Options
 
-You can configure Desktop macOS build settings, by opening Codename One Settings, and clicking the "Mac Desktop Settings" button:
+Launch Codename One Settings from the Maven project root and open *Hints* to configure `desktop.mac.*` build hints such as entitlements and `Info.plist` entries:
 
-.Mac Desktop settings
-image::img/mac-desktop-settings-button.png[Mac Desktop settings,scaledwidth=30%]
+[source,shell]
+----
+include::../demos/common/src/main/snippets/developer-guide/maven-appendix-control-center.sh[tag=maven-appendix-control-center-bash-001,indent=0]
+----
 
-This will bring you to the following form:
+.Desktop macOS build hints
+image::img/codename-one-settings-build-hints.png[Desktop macOS build hints in Codename One Settings,scaledwidth=85%]
 
-.Mac Desktop settings form
-image::img/mac-desktop-settings-form.png[Mac Desktop settings form,scaledwidth=30%]
-
-Here you can provide your certificate(s) as a `.p12` file, and select a bundle type.
+Desktop signing values that aren't build hints are top-level entries in `common/codenameone_settings.properties`: `codename1.desktop.mac.certificate` contains the `.p12` path and `codename1.desktop.mac.certificatePassword` contains its password. The Maven desktop macOS build reads these properties together with the `desktop.mac.*` hints.
 
 ==== Bundle Types
 
@@ -30,7 +30,7 @@ For the purposes of Mac application distribution, there are 3 types of certifica
 
 . **Developer ID Application Certificate (Mac applications)**
 +
-This type of certificate is used to sign an app to be distributed *outside* of the Mac App Store as a DMG image. This corresponds to the "DMG" bundle type in Codename one settings. You can identify this kind of certificate because its identity will be of the form "Developer ID Application: YOUR COMPANY NAME (SOMECODE)." For example, Developer ID Application: Acme Widgets Corp. (XYSD5YF).
+This type of certificate is used to sign an app to be distributed *outside* of the Mac App Store as a DMG image. This corresponds to the "DMG" bundle type. You can identify this kind of certificate because its identity will be of the form "Developer ID Application: YOUR COMPANY NAME (SOMECODE)." For example, Developer ID Application: Acme Widgets Corp. (XYSD5YF).
 . **Mac App Distribution Certificate (Mac App Store)**
 +
 This type of certificate is used to sign the.app bundle for an app that's to be distributed in the Mac App Store. This certificate is required for both the "Sandboxed DMG," and "Mac App Store Upload (PKG)" bundle types. You can identify this kind of certificate because its identity will be of the form "3rd Party Mac Developer Application: YOUR COMPANY NAME (SOMECODE)." For example, 3rd Party Mac Developer Application: Acme Widgets Corp. (XYSD5YF).
@@ -73,7 +73,7 @@ After generating the certificates, you should download them to your Mac, and imp
 
 NOTE: The following section requires access to a Mac, and assumes that you've already generated your 3 certificates
 
-Notice that Mac apps may require three different kinds of certificates, yet the settings page provides space for a single certificate (P12) file. This isn't a mistake. P12 files may contain more than one certificate, and you're expected to include all the certificates that the build server may require inside a single P12. The build server will automatically extract the certificates it needs according to the bundle type.
+Notice that Mac apps may require three different kinds of certificates, yet `codename1.desktop.mac.certificate` accepts a single P12 file. This isn't a mistake. P12 files may contain more than one certificate, and you're expected to include all the certificates that the build server may require inside a single P12. The build server automatically extracts the certificates it needs according to the bundle type.
 
 When building the "DMG" bundle type, the build server will look for a "Developer ID Application Certificate" inside the P12. If one is found, it will be used to sign the app bundle.
 
@@ -90,10 +90,7 @@ You will then be prompted to select a location to save the `.p12` file, as well 
 
 ==== Entitlements
 
-When distributing apps in the Mac App Store, or when using the "Sandboxed DMG" bundle type, your app is run inside a sandboxed environment, meaning that it doesn't have access to the outside world. It's provided its own "sandboxed" container for file system access, and it doesn't get any network access. If your app requires access to the "outside world," you need to request entitlements for that access. If you select a bundle type that uses the sandbox, you will be shown a list of all the available entitlements from which you can "check" the ones that you wish to include.
-
-.App sandbox entitlements
-image::img/mac-desktop-entitlements.png[App sandbox entitlements,scaledwidth=30%]
+When distributing apps in the Mac App Store, or when using the "Sandboxed DMG" bundle type, your app is run inside a sandboxed environment, meaning that it doesn't have access to the outside world. It's provided its own "sandboxed" container for file system access, and it doesn't get any network access. If your app requires access to the "outside world," request the required entitlements with `desktop.mac.entitlement.*` entries in the *Hints* view.
 
 For more information about the app sandbox, and a full list of entitlements, see https://developer.apple.com/library/content/documentation/Miscellaneous/Reference/EntitlementKeyReference/Chapters/EnablingAppSandbox.html[Apple's documentation on the subject].
 
@@ -192,4 +189,3 @@ The Mac Native build emits a `<MainClass>.entitlements` plist (or `<MainClass>-A
 | App Store      | Sandboxed, hardened runtime off. Signed with _Apple Distribution_; uploaded via App Store Connect.
 | Developer ID   | Hardened runtime on, sandbox off. Signed with _Developer ID Application_; notarized before distribution.
 |===
-

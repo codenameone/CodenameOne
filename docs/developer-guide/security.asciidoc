@@ -278,7 +278,7 @@ It's obviously hard to do but if someone was able to do this he could execute a 
 
 This is the attack certificate pinning (or SSL pinning) aims to prevent. You code into your app the "fingerprint" of the certificate that's "good" and thus prevent the app from working when the certificate is changed. This might break the app if you replace the certificate at some point but that might be reasonable in such a case.
 
-To do this you have a https://github.com/codenameone/SSLCertificateFingerprint/[cn1lib]. That fetches the certificate fingerprint from the server, you can check this fingerprint against a list of "authorized" keys to decide whether it's valid. You can install the `SSLCertificateFingerprint` from the extensions section in #Codename One Settings# and use something like this to verify your server:
+To do this you have a https://github.com/codenameone/SSLCertificateFingerprint/[cn1lib]. It fetches the certificate fingerprint from the server so you can check the fingerprint against a list of authorized keys. Run `mvn cn1:settings`, open *Extensions*, and install `SSLCertificateFingerprint`. Then use something like this to verify your server:
 
 
 Notice that once connection is established you don't need to verify again for the current application run.

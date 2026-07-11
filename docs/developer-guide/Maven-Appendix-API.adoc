@@ -25,8 +25,7 @@ Codename One apps support the https://kotlinlang.org/api/latest/jvm/stdlib/[Kotl
 
 Add-on libraries can be added to your library in the common/pom.xml file, but, if you use APIs that aren't supported by Codename One (for example, which use reflection), then your app will fail to build.
 
-Codename One supports its own library format (cn1lib) which sort of "certifies" that it's compatible with Codename One. You can browse the growing catalog of available cn1libs inside <<settings,Codename One Settings>>.
+Codename One supports its own library format (cn1lib) which sort of "certifies" that it's compatible with Codename One. Run `mvn cn1:settings` and open *Extensions* to browse the growing catalog of available cn1libs. See <<settings,Codename One Settings>>.
 
 For more information about cn1libs, see https://www.codenameone.com/developer-guide.html#_libraries_cn1lib[the cn1libs section] of the developer guide.
-
 

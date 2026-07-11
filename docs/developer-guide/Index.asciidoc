@@ -353,17 +353,17 @@ That's it. You should now have a general sense of the code. It's time to run on 
 
 ==== Building and deploying on devices
 
-.Codename One Control Center
-image::img/control-center-main.png[Codename One Settings/Control Center,scaledwidth=50%]
+.Codename One Settings
+image::img/codename-one-settings-basic.png[Codename One Settings,scaledwidth=85%]
 
-You can use the Control Center to configure almost anything. Specifically, the application title, application version, application icon etc. Are all found in the Codename One Settings maven target.
+Use the standalone Codename One Settings editor to configure the application title, version, package, icon, build hints, and extensions. Launch it from the Maven project root:
 
-There are many options within this UI that control almost every aspect of the application from signing to basic settings.
+[source,shell]
+----
+include::../demos/common/src/main/snippets/developer-guide/maven-appendix-control-center.sh[tag=maven-appendix-control-center-bash-001,indent=0]
+----
 
-Your device builds using the Codename One Cloud can also be found right here as well as subscription information.
-
-.Device Builds in Logged out State
-image::img/control-center-builds-empty.png[Builds in Empty State,scaledwidth=50%]
+Use the <<certificate-wizard,standalone Certificate Wizard>> for signing assets. Monitor Codename One Cloud builds and subscription information on the Codename One website.
 
 ===== Signing/Certificates
 

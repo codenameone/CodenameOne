@@ -49,8 +49,6 @@ include::Index.asciidoc[]
 
 include::basics.asciidoc[]
 
-include::Theme-Basics.asciidoc[]
-
 include::Advanced-Theming.asciidoc[]
 
 include::Native-Themes.asciidoc[]

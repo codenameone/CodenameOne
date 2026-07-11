@@ -245,6 +245,58 @@
           </build>
       </profile>
       <profile>
+          <!-- Profile for regenerating developer guide screenshots. -->
+          <id>guide-screenshot-generator</id>
+          <properties>
+              <codename1.platform>javase</codename1.platform>
+              <exec.mainClass>com.codenameone.developerguide.GuideScreenshotDesktopStub</exec.mainClass>
+              <guide.screenshot.output>${project.build.directory}/generated-guide-screenshots</guide.screenshot.output>
+          </properties>
+          <dependencies>
+              <dependency>
+                  <groupId>com.codenameone</groupId>
+                  <artifactId>codenameone-core</artifactId>
+                  <scope>compile</scope>
+              </dependency>
+              <dependency>
+                  <groupId>com.codenameone</groupId>
+                  <artifactId>codenameone-javase</artifactId>
+                  <scope>compile</scope>
+              </dependency>
+          </dependencies>
+          <build>
+              <resources>
+                  <resource><directory>src/main/resources</directory></resource>
+                  <resource><directory>src/desktop/resources</directory></resource>
+              </resources>
+              <plugins>
+                  <plugin>
+                      <groupId>org.codehaus.mojo</groupId>
+                      <artifactId>exec-maven-plugin</artifactId>
+                      <configuration>
+                          <executable>java</executable>
+                          <longClasspath>true</longClasspath>
+                          <arguments>
+                              <argument>-classpath</argument>
+                              <classpath />
+                              <argument>${exec.mainClass}</argument>
+                              <argument>${guide.screenshot.output}</argument>
+                          </arguments>
+                      </configuration>
+                      <executions>
+                          <execution>
+                              <id>generate-guide-screenshots</id>
+                              <phase>verify</phase>
+                              <goals>
+                                  <goal>exec</goal>
+                              </goals>
+                          </execution>
+                      </executions>
+                  </plugin>
+              </plugins>
+          </build>
+      </profile>
+      <profile>
           <!-- Profile for Building JavaSE Desktop App -->
           <id>desktop_build</id>
           <activation>

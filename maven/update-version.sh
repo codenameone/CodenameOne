@@ -101,12 +101,26 @@ if [ -f "$cwParent" ]; then
   perl -pi -e "s{<cn1\.plugin\.version>\Q$oldVersion\E</cn1\.plugin\.version>}{<cn1.plugin.version>$version</cn1.plugin.version>}g" "$cwParent"
 fi
 
+# Settings editor (scripts/settings) has the same out-of-reactor shape and is
+# deployed by the release workflow after the main Maven reactor.
+for f in ../scripts/settings/pom.xml \
+         ../scripts/settings/common/pom.xml \
+         ../scripts/settings/javase/pom.xml; do
+  [ -f "$f" ] && perl -pi -e "s{<version>\Q$oldVersion\E</version>}{<version>$version</version>}g" "$f"
+done
+settingsParent=../scripts/settings/pom.xml
+if [ -f "$settingsParent" ]; then
+  perl -pi -e "s{<cn1\.version>\Q$oldVersion\E</cn1\.version>}{<cn1.version>$version</cn1.version>}g" "$settingsParent"
+  perl -pi -e "s{<cn1\.plugin\.version>\Q$oldVersion\E</cn1\.plugin\.version>}{<cn1.plugin.version>$version</cn1.plugin.version>}g" "$settingsParent"
+fi
+
 echo "Committing version change in git"
 git add -u .
 # Note: the -u is to prevent adding files that aren't added to git yet.  Only changed
 # files.  This is to help avoid accidents.
 git add -u ../scripts/gamebuilder
 git add -u ../scripts/certificatewizard
+git add -u ../scripts/settings
 git commit -m "Updated version to $version"
 if [[ "$version" == *-SNAPSHOT ]]; then
   echo "This is a snapshot version so not adding a tag"

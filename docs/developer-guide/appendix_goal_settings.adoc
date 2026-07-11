@@ -1,5 +1,10 @@
 === Open settings (`settings`)
 
-Opens the Control Center (aka Codename One Settings; aka Codename One Preferences).
+Downloads and opens the standalone Codename One Settings editor bound to the current Maven project. The editor manages basic project properties, build hints, and extensions.
+
+[source,shell]
+----
+include::../demos/common/src/main/snippets/developer-guide/maven-appendix-control-center.sh[tag=maven-appendix-control-center-bash-001,indent=0]
+----
 
 See <<settings>>
