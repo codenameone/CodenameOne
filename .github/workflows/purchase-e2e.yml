@@ -272,6 +272,43 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      - name: Preinstall Android emulator package
+        run: |
+          set -euo pipefail
+          ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [ -z "$ANDROID_SDK_ROOT" ]; then
+            if [ -d "/usr/local/lib/android/sdk" ]; then
+              ANDROID_SDK_ROOT="/usr/local/lib/android/sdk"
+            elif [ -d "$HOME/Android/Sdk" ]; then
+              ANDROID_SDK_ROOT="$HOME/Android/Sdk"
+            fi
+          fi
+          if [ -z "$ANDROID_SDK_ROOT" ] || [ ! -d "$ANDROID_SDK_ROOT" ]; then
+            echo "::error::Android SDK root not found"
+            exit 1
+          fi
+          export ANDROID_SDK_ROOT ANDROID_HOME="$ANDROID_SDK_ROOT"
+
+          SDKMANAGER_BIN="$(command -v sdkmanager || true)"
+          if [ -z "$SDKMANAGER_BIN" ] && [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
+            SDKMANAGER_BIN="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          fi
+          if [ -z "$SDKMANAGER_BIN" ]; then
+            echo "::error::sdkmanager not found under $ANDROID_SDK_ROOT"
+            exit 1
+          fi
+
+          printf 'y\n%.0s' {1..100} | "$SDKMANAGER_BIN" --licenses >/dev/null || true
+          for attempt in 1 2 3; do
+            if "$SDKMANAGER_BIN" --install emulator --channel=0; then
+              exit 0
+            fi
+            echo "Android emulator package install failed on attempt ${attempt}; retrying"
+            rm -rf "$ANDROID_SDK_ROOT/.temp" || true
+            sleep 10
+          done
+          echo "::error::Unable to install Android emulator package after retries"
+          exit 1
       # The emulator boot on GitHub-hosted runners intermittently dies before the
       # device ever appears ("device 'emulator-5554' not found" -> the runner
       # action's own boot timeout). One explicit retry recovers the infra lottery;

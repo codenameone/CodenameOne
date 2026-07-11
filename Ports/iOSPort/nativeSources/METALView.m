@@ -519,6 +519,36 @@ extern BOOL isRetinaBug();
     [presentCb commit];
 }
 
+-(void)invalidateRetainedFramebuffer {
+    retainedFramebufferInvalid = YES;
+    clearRetainedFramebufferOnNextFrame = NO;
+    // A preserved resize frame is also stale after a suspend/resume cycle.
+    needsResizePresent = NO;
+}
+
+-(void)prepareRetainedFramebufferForDrawRect:(CGRect)rect displayWidth:(int)displayWidth displayHeight:(int)displayHeight {
+    if (!retainedFramebufferInvalid) {
+        return;
+    }
+    // During rotation, displayWidth/displayHeight can briefly lag the Metal
+    // drawable. Only consume the invalidation when the repaint covers the
+    // actual retained framebuffer we are about to load from.
+    int targetWidth = framebufferWidth > 0 ? framebufferWidth : displayWidth;
+    int targetHeight = framebufferHeight > 0 ? framebufferHeight : displayHeight;
+    if (targetWidth <= 0 || targetHeight <= 0) {
+        return;
+    }
+    CGFloat minX = rect.origin.x;
+    CGFloat minY = rect.origin.y;
+    CGFloat maxX = rect.origin.x + rect.size.width;
+    CGFloat maxY = rect.origin.y + rect.size.height;
+    if (minX <= 0.0f && minY <= 0.0f &&
+        maxX >= (CGFloat)targetWidth && maxY >= (CGFloat)targetHeight) {
+        clearRetainedFramebufferOnNextFrame = YES;
+        retainedFramebufferInvalid = NO;
+    }
+}
+
 -(void)createRenderPassDescriptor {
     if (self.screenTexture == nil) {
         self.renderPassDescriptor = nil;
@@ -532,7 +562,13 @@ extern BOOL isRetinaBug();
     // which would wipe everything each frame) — CN1 only queues diff ops
     // per frame; the OpenGL path relies on its renderbuffer persisting.
     colorAttachment.texture = self.screenTexture;
-    colorAttachment.loadAction = MTLLoadActionLoad;
+    if (clearRetainedFramebufferOnNextFrame) {
+        colorAttachment.loadAction = MTLLoadActionClear;
+        colorAttachment.clearColor = MTLClearColorMake(0.0, 0.0, 0.0, 1.0);
+        clearRetainedFramebufferOnNextFrame = NO;
+    } else {
+        colorAttachment.loadAction = MTLLoadActionLoad;
+    }
     colorAttachment.storeAction = MTLStoreActionStore;
     // Attach the Stencil8 texture for polygon-shape clipping (#3921).
     // Cleared at the start of every frame and discarded at the end --
