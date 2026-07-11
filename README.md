@@ -9,10 +9,11 @@
 [![Hacktoberfest](https://img.shields.io/badge/hacktoberfest-friendly-blueviolet?style=flat-square)](https://github.com/codenameone/CodenameOne/labels/Hacktoberfest)
 [![GitHub Stars](https://img.shields.io/github/stars/codenameone/CodenameOne?label=GitHub%20stars&style=social)](https://github.com/codenameone/CodenameOne/stargazers/)
 
-## Codename One - Cross Platform Native Apps with Java or Kotlin
+## Codename One - Native Cross-Platform Apps with Java or Kotlin
 
-[Codename One](https://www.codenameone.com/) is a mobile first cross platform environment for Java and [Kotlin](https://www.codenameone.com/blog/kotlin-support-public-beta.html) developers. It can compile Java bytecode to native OS executables (iOS, Android, UWP etc.).
-It's a complete mobile platform featuring virtual machines, simulator, design tools (visual theme/builder/css), IDE integrations, ports to multiple OS's and much more. It provides full access to the underlying native OS code (e.g. Objective-C, C#, Dalvik/ART) through a portable abstraction which enables 100% code reuse.
+[Codename One](https://www.codenameone.com/) is an open-source, cross-platform application framework for Java and Kotlin developers. A single project can target phones, tablets, desktops, browsers, TVs, watches, and in-vehicle displays while sharing the application logic and UI.
+
+Codename One includes a portable UI toolkit, native compilers and ports, a fast desktop simulator, CSS and visual design tools, Maven and IDE integration, testing tools, and optional cloud builds. Applications can use the portable APIs for common functionality or call platform SDKs and third-party native libraries directly when necessary.
 
 
 <!-- [![Build Status](https://travis-ci.org/codenameone/CodenameOne.svg?branch=master)](https://travis-ci.org/codenameone/CodenameOne)
@@ -23,16 +24,27 @@ It's a complete mobile platform featuring virtual machines, simulator, design to
 <a href="https://medium.com/CodenameOne"><img src="https://img.shields.io/badge/medium-%2312100E.svg?&style=for-the-badge&logo=medium&logoColor=white" height=25></a> 
 <a href="https://dev.to/codenameone"><img src="https://img.shields.io/badge/DEV.TO-%230A0A0A.svg?&style=for-the-badge&logo=dev-dot-to&logoColor=white" height=25></a> -->
 
-#### 🌟 &nbsp; Codename One is the only platform that..
+### Supported targets
 
-- Has Write Once Run Anywhere support with no special hardware requirements and 100% code reuse
-- Compiles Java or Kotlin into native code for iOS, UWP (Universal Windows Platform), Android and even JavaScript (with seamless PWA and Thread support), including the TV form factors Apple TV (tvOS) and Android TV / Google TV
-- Is Open Source and Free with an enterprise grade commercial offering
-- Is Easy to use with 100% portable Drag and Drop GUI builder
-- Has Full access to underlying native OS capabilities using the native OS programming language (e.g. Objective-C) without compromising portability
-- Has full control over every pixel on the screen! Just override paint and draw or use a glass pane to draw anywhere...
-- Lets you use native widgets (views) and mix them with Codename One components within the same hierarchy (heavyweight/lightweight mixing)
-- Supports seamless Continuous Integration out of the box
+| Form factor | Targets |
+| --- | --- |
+| Mobile | Android and iOS |
+| Desktop | Native Windows, native Linux, native macOS, and JVM desktop applications |
+| Web | JavaScript applications and installable PWAs, including multithreading support |
+| TV | Apple TV (tvOS) and Android TV / Google TV |
+| Watch | Apple Watch (watchOS) and Wear OS |
+| Vehicle | Apple CarPlay and Android Auto |
+
+### A complete application stack
+
+- **Portable UI** with a rich component library, layouts, animation, vector graphics, CSS themes, dark mode, desktop input, foldable support, and complete custom drawing.
+- **Native output** built with each target's official toolchain. The native Windows, Linux, and Apple targets produce self-contained executables without requiring a JVM on the user's device.
+- **Device and OS integration** for notifications, background work, location and maps, camera and media, sharing, contacts, NFC, Bluetooth LE, Wi-Fi, USB, motion sensors, biometrics, secure storage, printing, and more.
+- **Modern application services** including REST, WebSocket, GraphQL, gRPC-Web, SQLite and ORM, deep links and routing, passkeys and OIDC, payments, advertising, analytics, and crash protection.
+- **Advanced experiences** with portable GPU/3D and game APIs, AR and VR, AI/LLM integration, speech and transcription, TensorFlow Lite, and ML Kit libraries.
+- **Productive tooling** with an instant simulator, device skins, component and network inspectors, CSS live update, JUnit and screenshot testing, on-device debugging, Maven builds, and CI support.
+- **Full native escape hatch** through native interfaces written in Swift, Objective-C, Kotlin, Java, C, JavaScript, or ordinary JavaSE code, plus the ability to mix native views into a Codename One UI.
+- **Open source and commercially supported**, with no per-application license cap.
 
 <br>
 
@@ -119,15 +131,18 @@ You can then connect the recorded tests to your CI process including automated o
 
 <br>
 
-## How Does it Work?
+## How does it work?
 
 [Codename One](https://www.codenameone.com/) is a mature open source project with roots dating back to Sun Microsystems (2006) where one of its core underlying components was developed and open sourced. You can learn about its history and how it works in [this video](https://www.youtube.com/watch?v=MrwbpdMALig).
 
-Codename One apps perform like native apps, because they are real native apps.
+Codename One uses the target platform's official build tools and APIs rather than wrapping the application in a web view.
 
-They are statically compiled into native binaries using the target platform’s official build tools. 
+- On Apple platforms, native Windows, and native Linux, ParparVM translates reachable JVM bytecode to C and the platform toolchain compiles it into a self-contained native executable.
+- On Android, the application is packaged into a generated Android Gradle project and compiled by the Android toolchain.
+- On the web, the JavaScript port compiles the application into a browser runtime with PWA and multithreading support.
+- The JavaSE port runs on the JVM and powers both desktop applications and the development simulator.
 
-On platforms that do not support Java natively, such as iOS, the app’s JVM bytecode is first transpiled into a form that the native build tools will accept. On iOS, the app’s JVM bytecode is transformed into C source code, in a real xcode project. On Android, since Java is supported natively, no such transformation is necessary. The app jar is bundled directly into an Android studio gradle project, which can be built directly using the Android SDK build tools.
+The portable UI is drawn consistently on every target. When an application needs a platform-specific SDK or control, native interfaces and peer components provide direct access without forcing the rest of the application to become platform-specific.
 
 #### The figure below shows the build process for each supported platform:
 
@@ -138,7 +153,7 @@ You can click the image to enlarge or view a PDF version [here](https://www.code
 
 ## Quick Start
 
-TIP: We are currently transitioning to Maven, and have created a new, simpler method for creating projects.  Check out https://start.codenameone.com to get started now.
+Create a Maven project at [start.codenameone.com](https://start.codenameone.com), then open it in IntelliJ IDEA, NetBeans, Eclipse, VS Code, or another Maven-capable IDE.
 
 There is a lot to know about Codename One, this 3 minute video gives a very concise high level view. Notice there are similar videos for Eclipse, IntelliJ/IDEA and Netbeans [here](https://www.codenameone.com/download.html):
 
@@ -166,9 +181,6 @@ You can get started with the binary and the birds eye view in the [download sect
 
 
 ## Setup & Getting Started With The Code
-
-NOTE: *We are in the process of migrating from Ant to Maven, which simplifies the process for building from source. 
-See [Ant Quick Start](#quick-start-with-ant) for the legacy Ant build instructions.*
 
 The setup is covered in depth in [this article and video](https://www.codenameone.com/blog/building-codename-one-from-source-maven-edition.html). 
 
@@ -229,27 +241,21 @@ $ ant samples
 
 
 ## ParparVM
-Codename One's iOS VM is quite unique and is open source as well. You can read more about it [in its dedicated folder in this repository](https://github.com/codenameone/CodenameOne/tree/master/vm).
+Codename One's native compiler is open source. You can read more about it [in its dedicated folder in this repository](https://github.com/codenameone/CodenameOne/tree/master/vm).
 
-ParparVM is a uniquely conservative VM that translates Java bytecode to C code. Thus providing native performance and access while still providing a safety net. This approach is unique to Codename One and is essential for future compatibility!
+ParparVM translates Java bytecode to portable C, performs reachability analysis to remove unused code, and then hands the generated project to the target's native compiler. It powers the native Apple, Windows, Linux, and JavaScript pipelines and produces small, self-contained applications.
 
 Apple has a tendency to change things abruptly e.g. 64bit support, bitcode etc. Since ParparVM generates a standard Xcode project there were no code changes required for any of these tectonic shifts. It's as if you handcoded the project yourself!
 
-You can even open the resulting project in xcode and debug it or profile it directly on the iOS device. This provides a lot of useful information such as readable callstacks and valuable/actionable performance tracking...
+You can open the generated native project and use the platform's debugger and profiler directly. On Apple platforms, for example, the output is a standard Xcode project with readable call stacks and native performance tooling.
 
 Traditional compilers fall flat in these cases.
-
-## Modified iKVM
-
-Codename One maintains a fork of iKVM which is a JVM for CLR. This modified port allows us to run the Universal Windows Platform implementation of Codename One natively on Windows 10 devices.
 
 ## Getting Help & FAQ
 
 <img align="right" src="http://codenameone.com/github/new_icon.png" height="150">
 
-We provide support over at [StackOverflow when you tag using codenameone](http://stackoverflow.com/tags/codenameone), you can ask anything there and we try to be pretty responsive. [The StackOverflow link](http://stackoverflow.com/tags/codenameone) also serves as an excellent community driven FAQ since it literally maps user questions to answers.
-
-Codename One has a [discussion group](https://www.codenameone.com/discussion-forum.html) where you can post questions. However, due to the nature of that group we try to limit discussions over the source. The discussion forum is intended for simpler usage and more complex source code hacks/native compilation might create noise there.
+Ask usage questions and discuss the framework in [GitHub Discussions](https://github.com/codenameone/CodenameOne/discussions). Use [GitHub Issues](https://github.com/codenameone/CodenameOne/issues) for reproducible bugs and feature requests. The [`codenameone` tag on Stack Overflow](https://stackoverflow.com/tags/codenameone) also contains years of community questions and answers.
 
 <br>
   

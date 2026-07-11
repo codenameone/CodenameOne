@@ -21,8 +21,8 @@ defaultTheme = "dark"
 disableThemeToggle = false
 mainSections = ["blog"]
 author = "Codename One"
-homeTitle = "Codename One: Cross-Platform App Development with Java/Kotlin"
-description = "Open-source cross-platform mobile app development framework to build native iOS, Android, Desktop and Web apps with a single Java or Kotlin codebase."
+homeTitle = "Codename One: Native Cross-Platform Apps with Java/Kotlin"
+description = "Open-source Java and Kotlin framework for native mobile, desktop, web, TV, watch, and in-vehicle apps from one shared codebase."
 keywords = [
   "codename one",
   "cross platform app development",
