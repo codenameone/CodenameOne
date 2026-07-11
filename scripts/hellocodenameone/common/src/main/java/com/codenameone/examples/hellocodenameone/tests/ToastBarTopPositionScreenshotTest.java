@@ -106,9 +106,7 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
     private void awaitToastShown(final Form parent, final int waitedMs) {
         Form f = Display.getInstance().getCurrent();
         Object tbc = (f != null) ? f.getClientProperty("ToastBarComponent") : null;
-        boolean shown = (tbc instanceof Component)
-                && ((Component) tbc).isVisible()
-                && ((Component) tbc).getHeight() > 0;
+        boolean shown = isToastComponentShown(tbc);
         if (shown) {
             Component c = (Component) tbc;
             if (c.getY() == lastToastY && c.getHeight() == lastToastH) {
@@ -168,11 +166,19 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
                 return;
             }
             screen.dispose();
-            if (waitedMs > 0 && (waitedMs % 3000) == 0) {
+            if (waitedMs > 0 && (waitedMs % 3000) == 0 && !isToastComponentShown(tbc)) {
                 showToast();
+                awaitToastShown(parent, 0);
+                return;
             }
             UITimer.timer(250, false, parent, () -> awaitRenderedToastFrame(parent, waitedMs + 250));
         });
+    }
+
+    private boolean isToastComponentShown(Object tbc) {
+        return (tbc instanceof Component)
+                && ((Component) tbc).isVisible()
+                && ((Component) tbc).getHeight() > 0;
     }
 
     private boolean containsRenderedToastBar(Image screen) {
@@ -184,7 +190,9 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
         int[] rgb = screen.getRGB();
         int maxY = Math.min(height, Math.max(1, height / 2));
         int requiredDarkPixels = Math.max(1, (width * 3) / 5);
-        int requiredBrightPixels = Math.max(16, (width * 5) / 4);
+        // macOS native text antialiasing leaves relatively few pure-white
+        // pixels in the toast text/icon, even in the committed golden.
+        int requiredBrightPixels = Math.max(16, width / 3);
         int bestBandHeight = 0;
         int bestBandBrightPixels = 0;
         int currentBandHeight = 0;
