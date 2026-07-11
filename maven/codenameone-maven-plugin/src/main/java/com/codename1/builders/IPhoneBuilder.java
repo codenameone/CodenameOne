@@ -4111,8 +4111,21 @@ public class IPhoneBuilder extends Executor {
                 + "embed_phase.build_action_mask = \"2147483647\"\n"
                 + "embed_phase.dst_subfolder_spec = \"13\"\n"
                 + "embed_phase.run_only_for_deployment_postprocessing=\"0\"\n"
-                + "embed_phase.add_file_reference(fileref)\n"
-                + "service_target.build_configurations.each{|e| \n");
+                + "embed_file = embed_phase.add_file_reference(fileref)\n");
+        if (macNativeBuilder.isEnabled()) {
+            // Mac Catalyst v1 guard: this iOS build also produces a Mac Catalyst slice
+            // (macNative.enabled=true), but the CN1Widgets extension is iOS-only in v1 --
+            // MacNativeBuilder marks only the APP target SUPPORTS_MACCATALYST and its Mac
+            // entitlements carry no app group, so building/embedding the extension for the
+            // Mac destination would fail the Catalyst archive. Platform-filter the target
+            // dependency and the embed step to the iOS slice: the iOS app keeps its widgets
+            // and live activities, the Mac slice simply ships without them.
+            sb.append("dep = main_app_target.dependencies.find{|d| d.target && d.target.uuid == service_target.uuid}\n"
+                    + "dep.platform_filter = 'ios' if dep\n"
+                    + "embed_file.platform_filter = 'ios'\n");
+            buildSettingsMap.put("SUPPORTS_MACCATALYST", "NO");
+        }
+        sb.append("service_target.build_configurations.each{|e| \n");
         for (String buildSettingKey : buildSettingsMap.keySet()) {
             sb.append("  e.build_settings['" + buildSettingKey + "'] = \"" + buildSettingsMap.get(buildSettingKey) + "\"\n");
         }

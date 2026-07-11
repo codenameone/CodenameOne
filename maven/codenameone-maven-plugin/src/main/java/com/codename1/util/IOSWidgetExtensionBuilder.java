@@ -436,16 +436,19 @@ public class IOSWidgetExtensionBuilder {
     }
 
     private static String mapFamily(String family) {
-        if ("small".equals(family)) {
+        // Both the portable names (matching the core WidgetSize wire names) and the
+        // WidgetKit-style spellings are accepted, so manifests written against either
+        // naming in the docs resolve to the same families.
+        if ("small".equals(family) || "systemSmall".equals(family)) {
             return ".systemSmall";
         }
-        if ("medium".equals(family)) {
+        if ("medium".equals(family) || "systemMedium".equals(family)) {
             return ".systemMedium";
         }
-        if ("large".equals(family)) {
+        if ("large".equals(family) || "systemLarge".equals(family)) {
             return ".systemLarge";
         }
-        if ("lockscreen".equals(family)) {
+        if ("lockscreen".equals(family) || "accessoryRectangular".equals(family)) {
             return ".accessoryRectangular";
         }
         // Unknown family names are skipped so newer manifests degrade gracefully.

@@ -5210,6 +5210,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         });
         widgetsMenu.add(preview);
+        if (Boolean.getBoolean("cn1.surfaces.autodemo")) {
+            // Demo/automation hook: -Dcn1.surfaces.autodemo=true opens the Widgets preview
+            // window on startup so scripted runs (screenshots, samples CI) can observe
+            // published surfaces without interacting with the menu.
+            SwingUtilities.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    SimulatorWidgets.showWindow((JavaSEWidgetBridge) getSurfaceBridge(), window);
+                }
+            });
+        }
         return widgetsMenu;
     }
 

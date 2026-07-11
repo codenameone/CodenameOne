@@ -1,0 +1,14 @@
+{
+  "_comment": "Build-time widget kinds manifest for the surfaces sample. The sample runner only copies the .java file into the generated project, so when building this sample for a device copy this file into the project resources yourself: src/main/resources/surfaces.json in a Maven app (next to .ios.appext files), or the src directory of a legacy Ant project. The ids must mirror the runtime Surfaces.registerWidgetKind(...) calls.",
+  "liveActivities": true,
+  "kinds": [
+    {
+      "id": "delivery_status",
+      "name": "Delivery",
+      "description": "Track your order",
+      "iosFamilies": ["systemSmall", "systemMedium"],
+      "androidMinWidthDp": 180,
+      "androidMinHeightDp": 60
+    }
+  ]
+}
