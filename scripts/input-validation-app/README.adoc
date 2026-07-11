@@ -22,7 +22,7 @@ emitted when each gesture fires.
 
 == Suite
 
-Each step waits up to 8 seconds for its expected event, then auto-advances
+Each step waits up to 15 seconds for its expected event, then auto-advances
 on success or timeout. The XCUITest driver issues the actual OS input at
 the expected time.
 
