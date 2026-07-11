@@ -82,8 +82,8 @@ public final class SurfaceSerializer {
             layouts.put("default", def.toMap(imagesOut, 0));
         }
         for (WidgetSize size : WidgetSize.values()) {
-            SurfaceNode content = timeline.getContent(size);
-            if (content != null && content != def) {
+            SurfaceNode content = timeline.getExplicitContent(size);
+            if (content != null) {
                 layouts.put(size.getJsonName(), content.toMap(imagesOut, 0));
             }
         }

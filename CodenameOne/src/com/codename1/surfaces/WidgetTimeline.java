@@ -192,6 +192,23 @@ public class WidgetTimeline {
         return override != null ? override : defaultContent;
     }
 
+    /// Returns the explicit per-size override, or null when the size family falls back to the
+    /// default content. Used by the serializer so only real overrides are emitted per size.
+    SurfaceNode getExplicitContent(WidgetSize size) {
+        switch (size) {
+            case SMALL:
+                return smallContent;
+            case MEDIUM:
+                return mediumContent;
+            case LARGE:
+                return largeContent;
+            case LOCKSCREEN:
+                return lockscreenContent;
+            default:
+                return null;
+        }
+    }
+
     /// Returns the layout used for size families without an explicit override, or null.
     public SurfaceNode getDefaultContent() {
         return defaultContent;
