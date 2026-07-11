@@ -117,6 +117,18 @@ public final class Surfaces {
     /// and asking the platform to re-render the kind's widget instances. A no-op on platforms
     /// without widget support.
     ///
+    /// #### Threading
+    ///
+    /// Callable from any thread -- including
+    /// `com.codename1.background.BackgroundFetch#performBackgroundFetch(long, com.codename1.util.Callback)`
+    /// callbacks while the app UI is not running (on Android the fetch runs in a background
+    /// service with no Activity at all). Publishing is data-only: the timeline is serialized,
+    /// persisted where the platform renderer can reach it and the renderer is poked
+    /// asynchronously; no step blocks on the EDT or the platform UI thread. Implementing
+    /// background fetch and re-publishing there is the intended way to keep widgets fresh; see
+    /// the `com.codename1.surfaces.spi` package documentation for the per-platform background
+    /// update story.
+    ///
     /// #### Parameters
     ///
     /// - `kindId`: the widget kind id

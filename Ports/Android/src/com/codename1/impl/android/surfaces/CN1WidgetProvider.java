@@ -45,16 +45,19 @@ import org.json.JSONObject;
 ///
 /// Entry flips are scheduled with an *inexact* `AlarmManager.setWindow` (30 second window): no
 /// `SCHEDULE_EXACT_ALARM` permission is required and second-precision countdowns are covered by
-/// the natively ticking `Chronometer`, not by re-renders. When the timeline is exhausted the last
-/// entry stays on screen (`reload=atEnd` has no app-independent meaning on Android; re-publish
-/// from `BackgroundFetch` to refresh). Dark-mode colors resolve at render time, so a light/dark
-/// switch shows up on the next update rather than instantly.
+/// the natively ticking `Chronometer`, not by re-renders. When an `atEnd` timeline is exhausted
+/// (or nothing was published yet) the last known content stays on screen while the widget pulls
+/// the app: if the app declares `com.codename1.background.BackgroundFetch` its fetch service is
+/// started -- throttled to once per 15 minutes per kind -- so it can fetch data and re-publish
+/// without any UI running. Dark-mode colors resolve at render time, so a light/dark switch shows
+/// up on the next update rather than instantly.
 public abstract class CN1WidgetProvider extends AppWidgetProvider {
     /// Broadcast action used for self-scheduled timeline entry flips.
     public static final String ACTION_NEXT_ENTRY = "com.codename1.surfaces.NEXT_ENTRY";
     private static final String TAG = "CN1Surfaces";
     private static final int FLAG_IMMUTABLE = 0x04000000;
     private static final long FLIP_WINDOW_MILLIS = 30000;
+    private static final long FETCH_THROTTLE_MILLIS = 15L * 60 * 1000;
 
     /// Returns the widget kind id this provider renders; implemented by the generated
     /// per-kind subclass.
@@ -89,7 +92,9 @@ public abstract class CN1WidgetProvider extends AppWidgetProvider {
         String kindId = getKindId();
         String json = CN1SurfaceStore.readWidgetTimeline(context, kindId);
         if (json == null) {
-            // nothing published yet; keep the initial placeholder layout
+            // nothing published yet; keep the initial placeholder layout but ask the app
+            // (when it declares background fetch) to produce content
+            requestAppRefresh(context, kindId);
             return;
         }
         try {
@@ -112,9 +117,45 @@ public abstract class CN1WidgetProvider extends AppWidgetProvider {
                         imagesDir);
                 mgr.updateAppWidget(appWidgetId, rv);
             }
-            scheduleNextFlip(context, nextFlipDate(entries, now));
+            long nextFlip = nextFlipDate(entries, now);
+            scheduleNextFlip(context, nextFlip);
+            if (nextFlip == 0 && "atEnd".equals(doc.optString("reload", "atEnd"))) {
+                // reload=atEnd and the timeline is exhausted: the last entry stays on
+                // screen while the app is asked (throttled) to republish fresh content
+                requestAppRefresh(context, kindId);
+            }
         } catch (Throwable t) {
             Log.w(TAG, "Failed to render widget kind " + kindId, t);
+        }
+    }
+
+    /// Widget-driven refresh, the counterpart of the app-driven publish: starts the app's
+    /// background fetch service so `com.codename1.background.BackgroundFetch` can fetch data
+    /// and re-publish while no UI (and possibly no app process) exists. Only fires when the
+    /// app actually declares background fetch -- the bridge records the listener class on
+    /// publish -- and at most once per 15 minutes per kind. Failures are swallowed: modern
+    /// Android may refuse a background service start, in which case the widget simply keeps
+    /// showing the last entry until the app's own fetch schedule catches up.
+    private static void requestAppRefresh(Context context, String kindId) {
+        try {
+            String listenerClass = CN1SurfaceStore.getBackgroundFetchClass(context);
+            if (listenerClass == null) {
+                return;
+            }
+            if (!CN1SurfaceStore.tryClaimBackgroundFetch(context, kindId,
+                    System.currentTimeMillis(), FETCH_THROTTLE_MILLIS)) {
+                return;
+            }
+            Intent intent = new Intent(context,
+                    com.codename1.impl.android.BackgroundFetchHandler.class);
+            // same wire format as the alarm-driven fetch path: the listener class rides in
+            // the data URI (an old putExtra bug workaround the handler still expects)
+            intent.setData(android.net.Uri.parse("http://codenameone.com/a?" + listenerClass));
+            // legal here: a broadcast receiver executing onReceive counts as foreground,
+            // so the service start is exempt from background execution limits
+            context.startService(intent);
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to request a background refresh for widget kind " + kindId, t);
         }
     }
 

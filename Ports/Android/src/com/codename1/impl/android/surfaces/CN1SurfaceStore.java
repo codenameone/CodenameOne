@@ -54,6 +54,8 @@ public final class CN1SurfaceStore {
     private static final String PREFS = "cn1surfaces";
     private static final String KEY_KINDS = "kinds";
     private static final String KEY_ACTIVITY_SEQ = "laSeq";
+    private static final String KEY_FETCH_CLASS = "bgFetchClass";
+    private static final String KEY_FETCH_AT_PREFIX = "bgFetchAt_";
 
     private CN1SurfaceStore() {
     }
@@ -180,6 +182,45 @@ public final class CN1SurfaceStore {
             }
         }
         return out;
+    }
+
+    // --- widget-driven refresh ------------------------------------------------
+
+    /// Records the class name of the app's `com.codename1.background.BackgroundFetch` listener
+    /// so a widget rendering an exhausted timeline can start the fetch service while the app
+    /// process is dead. Called by the bridge on every publish; a null name (the app declares
+    /// no background fetch) is a no-op, keeping this zero-cost for apps without one.
+    public static void rememberBackgroundFetchClass(Context ctx, String className) {
+        if (className == null || className.length() == 0) {
+            return;
+        }
+        SharedPreferences prefs = prefs(ctx);
+        if (!className.equals(prefs.getString(KEY_FETCH_CLASS, null))) {
+            prefs.edit().putString(KEY_FETCH_CLASS, className).apply();
+        }
+    }
+
+    /// Returns the recorded `BackgroundFetch` listener class name, or null when the app never
+    /// published while declaring background fetch.
+    public static String getBackgroundFetchClass(Context ctx) {
+        String name = prefs(ctx).getString(KEY_FETCH_CLASS, "");
+        return name.length() == 0 ? null : name;
+    }
+
+    /// Claims a widget-driven background fetch slot for a kind: returns true (recording the
+    /// attempt time) when no attempt happened within the throttle window, false to skip. A
+    /// recorded time in the future (the clock jumped backwards) resets the window instead of
+    /// blocking fetches until the clock catches up.
+    public static boolean tryClaimBackgroundFetch(Context ctx, String kindId, long now,
+            long throttleMillis) {
+        SharedPreferences prefs = prefs(ctx);
+        String key = KEY_FETCH_AT_PREFIX + sanitize(kindId);
+        long last = prefs.getLong(key, 0);
+        if (last <= now && now - last < throttleMillis) {
+            return false;
+        }
+        prefs.edit().putLong(key, now).apply();
+        return true;
     }
 
     // --- internals ------------------------------------------------------------

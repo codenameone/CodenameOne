@@ -11976,6 +11976,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    /**
+     * Returns the fully qualified class name of the app's background fetch listener, or null
+     * when the app does not implement {@link com.codename1.background.BackgroundFetch}. The
+     * surfaces plumbing persists this name on publish so a home screen widget that rendered an
+     * exhausted timeline can start {@link BackgroundFetchHandler} and let the app republish
+     * fresh content while no activity exists.
+     *
+     * @return the listener class name or null
+     */
+    public static String getBackgroundFetchListenerClassName() {
+        if (instance == null) {
+            return null;
+        }
+        BackgroundFetch listener = instance.getBackgroundFetchListener();
+        return listener == null ? null : listener.getClass().getName();
+    }
+
     public void scheduleLocalNotification(LocalNotification notif, long firstTime, int repeat) {
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             if(!checkForPermission("android.permission.POST_NOTIFICATIONS", "This is required to receive notifications")){

@@ -28,6 +28,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.util.Log;
 
+import com.codename1.impl.android.AndroidImplementation;
 import com.codename1.impl.android.AndroidNativeUtil;
 import com.codename1.surfaces.Surfaces;
 import com.codename1.surfaces.spi.SurfaceBridge;
@@ -105,6 +106,10 @@ public class AndroidSurfaceBridge implements SurfaceBridge {
         try {
             CN1SurfaceStore.writeWidgetTimeline(ctx, kindId, timelineJson, images);
             CN1SurfaceStore.rememberKind(ctx, kindId);
+            // remember the app's BackgroundFetch listener (null when the app declares none)
+            // so a widget rendering an exhausted timeline can pull fresh content itself
+            CN1SurfaceStore.rememberBackgroundFetchClass(ctx,
+                    AndroidImplementation.getBackgroundFetchListenerClassName());
             broadcastUpdate(ctx, kindId);
         } catch (Throwable t) {
             Log.w(TAG, "Failed to publish the timeline of widget kind " + kindId, t);
