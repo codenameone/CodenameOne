@@ -1163,8 +1163,12 @@ PopupContent {
        fill leaking through, the row rendered as a light pill. */
     /* Dark grouped cell: #2c2c2e over the #1c1c1e form. Inherits the base's
        RoundRectBorder (no derive, no pill/glass), so a plain rounded rect. */
-    MultiButton { background-color: #2c2c2e; border: 0.25mm solid rgba(255,255,255,0.08); color: #ffffff; }
-    MultiButton.pressed { background-color: #3a3a3c; border: 0.25mm solid rgba(255,255,255,0.08); }
+    /* Redeclaring `border:` REPLACES the whole border for the dark appearance,
+       so the shape must be repeated too -- without border-radius the compiler
+       emits a plain rectangular border and the dark cell renders square while
+       light stays rounded (pinned by NativeThemeLightDarkConsistencyTest). */
+    MultiButton { background-color: #2c2c2e; border: 0.25mm solid rgba(255,255,255,0.08); border-radius: 3mm; color: #ffffff; }
+    MultiButton.pressed { background-color: #3a3a3c; border: 0.25mm solid rgba(255,255,255,0.08); border-radius: 3mm; cn1-background-type: cn1-round-border; }
     MultiLine1 { color: #ffffff; }
     MultiLine2 { color: #ebebf5; }
     MultiLine3 { color: #8e8e93; }
