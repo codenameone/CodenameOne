@@ -213,6 +213,15 @@ mkdir -p "$SCREENSHOT_RAW_DIR" "$SCREENSHOT_PREVIEW_DIR"
 export CN1SS_OUTPUT_DIR="$SCREENSHOT_RAW_DIR"
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 
+# Tight golden gate for the iOS sim pipelines (GL + Metal). The comparator's
+# stock default (0.30% of a 1179x2556 capture = ~9k px) let widget-level
+# regressions -- e.g. the dark ChatInput +/Mic buttons rendering square
+# instead of round, ~2-3k px of corners -- pass silently, so the stale golden
+# stayed in the tree while the render had long since changed. The sim renders
+# deterministically; screens with real run-to-run noise (GPU 3D, maps, video,
+# toast timing) carry explicit per-test .tolerance files that override this.
+export CN1SS_MAX_MISMATCH_PERCENT="${CN1SS_MAX_MISMATCH_PERCENT:-0.05}"
+
 # Start the host-side WebSocket screenshot server on the fixed standard port.
 # The iOS simulator shares the host loopback, so the device-runner defaults to
 # ws://127.0.0.1:8765 with no per-launch URL injection. PNGs the app sends land

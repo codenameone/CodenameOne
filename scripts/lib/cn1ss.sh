@@ -395,6 +395,19 @@ cn1ss_process_and_report() {
 
   # Run ProcessScreenshots
   local -a compare_args=("--reference-dir" "$ref_dir" "--emit-base64" "--preview-dir" "$preview_dir")
+  # Optional per-pipeline gate override. The ProcessScreenshots defaults
+  # (channelDelta=4, mismatch=0.30%) allow ~9k px of drift on a 1179x2556
+  # phone capture -- enough for a widget-level regression (e.g. a button's
+  # square-vs-round corners, ~2-3k px) to pass silently and leave a stale
+  # golden in the tree. Pipelines with deterministic renders should set a
+  # tighter CN1SS_MAX_MISMATCH_PERCENT; per-test .tolerance files still
+  # override for legitimately noisy screens (GPU 3D, maps, video, toasts).
+  if [ -n "${CN1SS_MAX_CHANNEL_DELTA:-}" ]; then
+    compare_args+=("--max-channel-delta" "${CN1SS_MAX_CHANNEL_DELTA}")
+  fi
+  if [ -n "${CN1SS_MAX_MISMATCH_PERCENT:-}" ]; then
+    compare_args+=("--max-mismatch-percent" "${CN1SS_MAX_MISMATCH_PERCENT}")
+  fi
   for entry in "${actual_entries[@]}"; do
     compare_args+=("--actual" "$entry")
   done
