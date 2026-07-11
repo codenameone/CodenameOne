@@ -241,15 +241,17 @@ public final class AccessibilityManager {
         out.builder.collectionItemInfo = config.getCollectionItemInfo() == null
                 ? inferCollectionItem(component) : config.getCollectionItemInfo();
         out.builder.bounds = componentBounds(component);
-        out.builder.selected = config.getSelected() == null ? inferSelected(component) : config.getSelected();
+        out.builder.selected = config.getSelected();
+        if (out.builder.selected == null) applyInferredSelected(component, out.builder);
         out.builder.expanded = config.getExpanded();
         out.builder.enabled = config.getEnabled() == null ? Boolean.valueOf(component.isEnabled()) : config.getEnabled();
         out.builder.invalid = config.getInvalid();
         out.builder.busy = config.getBusy();
-        out.builder.readOnly = config.getReadOnly() == null ? inferReadOnly(component) : config.getReadOnly();
+        out.builder.readOnly = config.getReadOnly();
         out.builder.required = config.getRequired();
-        out.builder.multiline = config.getMultiline() == null ? inferMultiline(component) : config.getMultiline();
-        out.builder.obscured = config.getObscured() == null ? inferObscured(component) : config.getObscured();
+        out.builder.multiline = config.getMultiline();
+        out.builder.obscured = config.getObscured();
+        applyInferredTextStates(component, out.builder);
         out.builder.pressed = config.getPressed();
         out.builder.current = config.getCurrent();
         out.builder.modal = config.isModal() || component instanceof Dialog;
@@ -339,14 +341,7 @@ public final class AccessibilityManager {
                             i + 1, size, 1, false))
                     .setBounds(list.getAccessibilityItemBounds(i, new Rectangle()))
                     .addAction(new AccessibilityAction(AccessibilityAction.ACTIVATE, null,
-                            new AccessibilityAction.Handler() {
-                                public boolean perform(Component component, Object argument) {
-                                    if (!list.isEnabled()) return false;
-                                    list.setSelectedIndex(index);
-                                    list.keyReleased(Display.getInstance().getKeyCode(Display.GAME_FIRE));
-                                    return true;
-                                }
-                            }));
+                            new ListActivateHandler(list, index)));
             destination.add(buildVirtualNode(list, item, "list/item-" + i));
         }
     }
@@ -354,65 +349,32 @@ public final class AccessibilityManager {
     private void addDefaultActions(final Component component, AccessibilityNodeSnapshot.Builder builder) {
         if (component.isFocusable() && !hasAction(builder.actions, AccessibilityAction.FOCUS)) {
             builder.actions.add(new AccessibilityAction(AccessibilityAction.FOCUS, null,
-                    new AccessibilityAction.Handler() {
-                        public boolean perform(Component source, Object argument) {
-                            if (!source.isEnabled()) return false;
-                            source.requestFocus();
-                            return true;
-                        }
-                    }));
+                    FocusHandler.INSTANCE));
         }
         if (component instanceof Button && !hasAction(builder.actions, AccessibilityAction.ACTIVATE)) {
             builder.actions.add(new AccessibilityAction(AccessibilityAction.ACTIVATE, null,
-                    new AccessibilityAction.Handler() {
-                        public boolean perform(Component source, Object argument) {
-                            if (!source.isEnabled()) return false;
-                            source.keyReleased(Display.getInstance().getKeyCode(Display.GAME_FIRE));
-                            return true;
-                        }
-                    }));
+                    ActivateHandler.INSTANCE));
         }
         if (component instanceof Slider) {
             final Slider slider = (Slider)component;
             if (slider.isEditable() && !hasAction(builder.actions, AccessibilityAction.INCREMENT)) {
                 builder.actions.add(new AccessibilityAction(AccessibilityAction.INCREMENT, null,
-                        new AccessibilityAction.Handler() {
-                            public boolean perform(Component source, Object argument) {
-                                slider.setProgress(Math.min(slider.getMaxValue(), slider.getProgress() + Math.max(1, slider.getIncrements())));
-                                return true;
-                            }
-                        }));
+                        new SliderAdjustmentHandler(slider, 1)));
             }
             if (slider.isEditable() && !hasAction(builder.actions, AccessibilityAction.DECREMENT)) {
                 builder.actions.add(new AccessibilityAction(AccessibilityAction.DECREMENT, null,
-                        new AccessibilityAction.Handler() {
-                            public boolean perform(Component source, Object argument) {
-                                slider.setProgress(Math.max(slider.getMinValue(), slider.getProgress() - Math.max(1, slider.getIncrements())));
-                                return true;
-                            }
-                        }));
+                        new SliderAdjustmentHandler(slider, -1)));
             }
         }
         if (component instanceof TextArea) {
             final TextArea text = (TextArea)component;
             if (!hasAction(builder.actions, AccessibilityAction.FOCUS)) {
                 builder.actions.add(new AccessibilityAction(AccessibilityAction.FOCUS, null,
-                        new AccessibilityAction.Handler() {
-                            public boolean perform(Component source, Object argument) {
-                                source.requestFocus();
-                                return true;
-                            }
-                        }));
+                        FocusHandler.INSTANCE));
             }
             if (text.isEditable() && !hasAction(builder.actions, AccessibilityAction.SET_TEXT)) {
                 builder.actions.add(new AccessibilityAction(AccessibilityAction.SET_TEXT, null,
-                        new AccessibilityAction.Handler() {
-                            public boolean perform(Component source, Object argument) {
-                                if (!(argument instanceof String)) return false;
-                                text.setText((String)argument);
-                                return true;
-                            }
-                        }));
+                        new SetTextHandler(text)));
             }
         }
     }
@@ -460,13 +422,13 @@ public final class AccessibilityManager {
         return AccessibilityCheckedState.UNSPECIFIED;
     }
 
-    private Boolean inferSelected(Component component) {
+    private void applyInferredSelected(Component component, AccessibilityNodeSnapshot.Builder builder) {
         if (component instanceof Button && (((Button)component).isToggle() || isTabButton((Button)component))) {
-            return Boolean.valueOf(((Button)component).isSelected());
+            builder.selected = Boolean.valueOf(((Button)component).isSelected());
+            return;
         }
         Tabs tabOwner = tabPanelOwner(component);
-        if (tabOwner != null) return Boolean.valueOf(tabOwner.getSelectedComponent() == component);
-        return null;
+        if (tabOwner != null) builder.selected = Boolean.valueOf(tabOwner.getSelectedComponent() == component);
     }
 
     private Tabs tabPanelOwner(Component component) {
@@ -515,16 +477,16 @@ public final class AccessibilityManager {
         return null;
     }
 
-    private Boolean inferReadOnly(Component component) {
-        return component instanceof TextArea ? Boolean.valueOf(!((TextArea)component).isEditable()) : null;
-    }
-
-    private Boolean inferMultiline(Component component) {
-        return component instanceof TextArea ? Boolean.valueOf(!(component instanceof TextField) || ((TextArea)component).getRows() > 1) : null;
-    }
-
-    private Boolean inferObscured(Component component) {
-        return component instanceof TextArea ? Boolean.valueOf((((TextArea)component).getConstraint() & TextArea.PASSWORD) != 0) : null;
+    private void applyInferredTextStates(Component component, AccessibilityNodeSnapshot.Builder builder) {
+        if (!(component instanceof TextArea)) return;
+        TextArea text = (TextArea)component;
+        if (builder.readOnly == null) builder.readOnly = Boolean.valueOf(!text.isEditable());
+        if (builder.multiline == null) {
+            builder.multiline = Boolean.valueOf(!(component instanceof TextField) || text.getRows() > 1);
+        }
+        if (builder.obscured == null) {
+            builder.obscured = Boolean.valueOf((text.getConstraint() & TextArea.PASSWORD) != 0);
+        }
     }
 
     private boolean shouldExpose(Component component, AccessibilityNode config, BuildNode node) {
@@ -565,16 +527,7 @@ public final class AccessibilityManager {
     }
 
     private void sortTree(List<BuildNode> nodes) {
-        Collections.sort(nodes, new Comparator<BuildNode>() {
-            public int compare(BuildNode a, BuildNode b) {
-                boolean an = Double.isNaN(a.builder.sortKey);
-                boolean bn = Double.isNaN(b.builder.sortKey);
-                if (an && bn) return 0;
-                if (an) return 1;
-                if (bn) return -1;
-                return a.builder.sortKey < b.builder.sortKey ? -1 : a.builder.sortKey == b.builder.sortKey ? 0 : 1;
-            }
-        });
+        Collections.sort(nodes, SortKeyComparator.INSTANCE);
         applyRelativeOrder(nodes);
         for (BuildNode node : nodes) sortTree(node.children);
     }
@@ -665,5 +618,86 @@ public final class AccessibilityManager {
         Component component;
         AccessibilityNodeSnapshot.Builder builder = new AccessibilityNodeSnapshot.Builder();
         List<BuildNode> children = new ArrayList<BuildNode>();
+    }
+
+    private static final class SortKeyComparator implements Comparator<BuildNode> {
+        private static final SortKeyComparator INSTANCE = new SortKeyComparator();
+
+        public int compare(BuildNode a, BuildNode b) {
+            boolean an = Double.isNaN(a.builder.sortKey);
+            boolean bn = Double.isNaN(b.builder.sortKey);
+            if (an && bn) return 0;
+            if (an) return 1;
+            if (bn) return -1;
+            return Double.compare(a.builder.sortKey, b.builder.sortKey);
+        }
+    }
+
+    private static final class FocusHandler implements AccessibilityAction.Handler {
+        private static final FocusHandler INSTANCE = new FocusHandler();
+
+        public boolean perform(Component source, Object argument) {
+            if (!source.isEnabled()) return false;
+            source.requestFocus();
+            return true;
+        }
+    }
+
+    private static final class ActivateHandler implements AccessibilityAction.Handler {
+        private static final ActivateHandler INSTANCE = new ActivateHandler();
+
+        public boolean perform(Component source, Object argument) {
+            if (!source.isEnabled()) return false;
+            source.keyReleased(Display.getInstance().getKeyCode(Display.GAME_FIRE));
+            return true;
+        }
+    }
+
+    private static final class ListActivateHandler implements AccessibilityAction.Handler {
+        private final com.codename1.ui.List list;
+        private final int index;
+
+        private ListActivateHandler(com.codename1.ui.List list, int index) {
+            this.list = list;
+            this.index = index;
+        }
+
+        public boolean perform(Component source, Object argument) {
+            if (!list.isEnabled()) return false;
+            list.setSelectedIndex(index);
+            list.keyReleased(Display.getInstance().getKeyCode(Display.GAME_FIRE));
+            return true;
+        }
+    }
+
+    private static final class SliderAdjustmentHandler implements AccessibilityAction.Handler {
+        private final Slider slider;
+        private final int direction;
+
+        private SliderAdjustmentHandler(Slider slider, int direction) {
+            this.slider = slider;
+            this.direction = direction;
+        }
+
+        public boolean perform(Component source, Object argument) {
+            int increment = Math.max(1, slider.getIncrements());
+            int value = slider.getProgress() + direction * increment;
+            slider.setProgress(Math.max(slider.getMinValue(), Math.min(slider.getMaxValue(), value)));
+            return true;
+        }
+    }
+
+    private static final class SetTextHandler implements AccessibilityAction.Handler {
+        private final TextArea text;
+
+        private SetTextHandler(TextArea text) {
+            this.text = text;
+        }
+
+        public boolean perform(Component source, Object argument) {
+            if (!(argument instanceof String)) return false;
+            text.setText((String)argument);
+            return true;
+        }
     }
 }

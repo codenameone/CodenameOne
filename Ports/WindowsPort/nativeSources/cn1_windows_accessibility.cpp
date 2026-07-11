@@ -1,13 +1,20 @@
 /* Native virtual accessibility tree for the lightweight Win32 port. */
 #ifdef _WIN32
 
-#include "cn1_windows.h"
+/* xwin may provide a newer MSVC STL than the clang-cl installed by the Linux
+ * cross-compile runner.  This file uses only the long-stable string/vector
+ * subset, so allow that supported cross-toolchain pairing. */
+#ifndef _ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+#define _ALLOW_COMPILER_AND_STL_VERSION_MISMATCH
+#endif
+
 #include <UIAutomation.h>
 #include <oleauto.h>
 #include <string>
 #include <vector>
 #include <utility>
 #include <algorithm>
+#include "cn1_windows.h"
 
 #pragma comment(lib, "uiautomationcore.lib")
 #pragma comment(lib, "oleaut32.lib")

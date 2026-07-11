@@ -11,12 +11,7 @@ Standard components work without extra configuration. `Button`, `CheckBox`, `Rad
 `Component.setAccessibilityText()` remains supported. It is a compatibility alias for the semantic label. New code should use `getSemantics()` when it needs more than a label.
 
 [source,java]
-----
-Button save = new Button("Save");
-save.getSemantics()
-    .setHint("Saves the edited profile")
-    .setIdentifier("profile-save");
-----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AccessibilitySemanticsSnippets.java[tag=accessibility-semantics-button,indent=0]
 
 Changes to text, selection, focus, enabled state, bounds, scrolling, ranges, tabs, and the current `Form` automatically invalidate the native semantic tree. Custom components should call `accessibilityChanged()` after a semantic value changes outside a standard setter.
 
@@ -25,20 +20,7 @@ Changes to text, selection, focus, enabled state, bounds, scrolling, ranges, tab
 `AccessibilityRole` contains portable control roles including buttons, toggle buttons, switches, checkboxes, radio buttons, headings, links, images, text and search fields, sliders, progress indicators, lists, grids, rows, cells, headers, tabs, dialogs, alerts, menus, toolbars, combo boxes, trees, and separators. A port maps an unsupported role to the closest native role without discarding its label or state.
 
 [source,java]
-----
-Component wifiSwitch = new MyPaintedSwitch();
-wifiSwitch.getSemantics()
-    .setRole(AccessibilityRole.SWITCH)
-    .setLabel("Wi-Fi")
-    .setChecked(AccessibilityCheckedState.CHECKED)
-    .setEnabled(Boolean.TRUE)
-    .setHint("Double tap to turn Wi-Fi off");
-
-Label title = new Label("Network");
-title.getSemantics()
-    .setHeadingLevel(2)
-    .setIdentifier("network-heading");
-----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AccessibilitySemanticsSnippets.java[tag=accessibility-semantics-roles,indent=0]
 
 Tri-state controls use `UNCHECKED`, `CHECKED`, or `MIXED`. Nullable Boolean properties distinguish an explicit state from an unspecified state. Available properties include selected, expanded, enabled, invalid, busy, read-only, required, multiline, obscured, pressed, and current. `setValidationError()` supplies both the error message and invalid state. `setPaneTitle()` describes a newly displayed pane or screen, and `setModal(true)` identifies a modal scope.
 
@@ -49,12 +31,7 @@ Use `setRoleDescription()` only when the platform role is not sufficiently speci
 `AccessibilityRange` describes minimum, maximum, current value, increment, and an optional spoken value. The spoken value is useful for ranges such as ratings and durations where a raw number is ambiguous.
 
 [source,java]
-----
-rating.getSemantics()
-    .setRole(AccessibilityRole.SLIDER)
-    .setLabel("Rating")
-    .setRange(new AccessibilityRange(0, 5, 3, 1, "3 out of 5"));
-----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AccessibilitySemanticsSnippets.java[tag=accessibility-semantics-range,indent=0]
 
 Editable controls can provide `SET_VALUE` or `SET_TEXT` actions. Sliders and other adjustable controls should expose `INCREMENT` and `DECREMENT`. Standard components infer these actions.
 
@@ -63,18 +40,7 @@ Editable controls can provide `SET_VALUE` or `SET_TEXT` actions. Sliders and oth
 An `AccessibilityAction` has a stable ID, a localized label, an enabled state, and a handler. Handlers always execute on the Codename One EDT, including when the action originates on a native accessibility thread.
 
 [source,java]
-----
-card.getSemantics().addAction(new AccessibilityAction(
-    "archive",
-    "Archive message",
-    new AccessibilityAction.Handler() {
-        public boolean perform(Component component, Object argument) {
-            archiveMessage();
-            return true;
-        }
-    }
-));
-----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AccessibilitySemanticsSnippets.java[tag=accessibility-semantics-action,indent=0]
 
 Use the standard IDs in `AccessibilityAction` for activation, long press, increment, decrement, set value, set text, selection, character or word cursor movement, focus, show-on-screen, dismiss, expand, collapse, scrolling, and clipboard operations. A custom ID must be stable and its label must not be null.
 
@@ -90,31 +56,12 @@ Use the standard IDs in `AccessibilityAction` for activation, long press, increm
 * `EXCLUDE_SUBTREE` removes the component and all descendants.
 
 [source,java]
-----
-summaryCard.getSemantics()
-    .setRole(AccessibilityRole.GENERIC)
-    .setGrouping(AccessibilityGrouping.MERGE_DESCENDANTS);
-----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AccessibilitySemanticsSnippets.java[tag=accessibility-semantics-grouping,indent=0]
 
 For content that is painted without child components, attach an `AccessibilityChildProvider`, or add standalone `AccessibilityNode` children. Every virtual node must use a stable `virtualKey`. Stable keys preserve native focus while rows are updated or recycled.
 
 [source,java]
-----
-chart.getSemantics().setChildProvider(new AccessibilityChildProvider() {
-    public List<AccessibilityNode> getAccessibilityChildren(Component owner) {
-        List<AccessibilityNode> result = new ArrayList<AccessibilityNode>();
-        for (Point point : model.getPoints()) {
-            AccessibilityNode node = new AccessibilityNode("point-" + point.getId());
-            node.setRole(AccessibilityRole.IMAGE)
-                .setLabel(point.getLabel())
-                .setValue(point.getFormattedValue())
-                .setBounds(point.getBounds());
-            result.add(node);
-        }
-        return result;
-    }
-});
-----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AccessibilitySemanticsSnippets.java[tag=accessibility-semantics-virtual,indent=0]
 
 Virtual bounds are relative to the owning component. Component nodes use their clipped absolute bounds.
 
@@ -123,11 +70,7 @@ Virtual bounds are relative to the owning component. Component nodes use their c
 Visual order is the default reading order. `setSortKey()` assigns an ordered semantic key among siblings. `setTraversalBefore()` and `setTraversalAfter()` express a direct relationship when a numeric order would be fragile.
 
 [source,java]
-----
-cancel.getSemantics().setSortKey(1);
-continueButton.getSemantics().setSortKey(2);
-help.getSemantics().setTraversalAfter(continueButton);
-----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AccessibilitySemanticsSnippets.java[tag=accessibility-semantics-traversal,indent=0]
 
 Keep traversal relationships within the same semantic parent. The tree builder resolves these constraints deterministically and preserves stable node IDs.
 
@@ -136,12 +79,7 @@ Keep traversal relationships within the same semantic parent. The tree builder r
 Set `AccessibilityLiveRegion.POLITE` for non-urgent updates and `ASSERTIVE` for errors or urgent status. `OFF` is the default. Live changes produce the corresponding platform notification or ARIA live update.
 
 [source,java]
-----
-status.getSemantics()
-    .setRole(AccessibilityRole.ALERT)
-    .setLiveRegion(AccessibilityLiveRegion.POLITE);
-status.setText("Upload complete");
-----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AccessibilitySemanticsSnippets.java[tag=accessibility-semantics-live,indent=0]
 
 Form changes and nodes with a pane title produce screen or pane transition notifications. `Display.announceForAccessibility()` remains available for an exceptional announcement that is not represented by persistent UI. Prefer a live region for state that is visible on screen.
 
@@ -150,15 +88,7 @@ Form changes and nodes with a pane title produce screen or pane transition notif
 `AccessibilityCollectionInfo` describes row and column counts, hierarchy, and selection mode. `AccessibilityCollectionItemInfo` describes row and column index, spans, position and size in a set, nesting level, and header status.
 
 [source,java]
-----
-grid.getSemantics().setCollectionInfo(
-    new AccessibilityCollectionInfo(20, 3, false,
-        AccessibilityCollectionInfo.SELECTION_MULTIPLE));
-
-cell.getSemantics().setCollectionItemInfo(
-    new AccessibilityCollectionItemInfo(
-        4, 1, 2, 1, 5, 20, 1, false));
-----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AccessibilitySemanticsSnippets.java[tag=accessibility-semantics-collection,indent=0]
 
 Row and column indexes are zero-based. Position and set size are one-based; use `-1` when unknown. Lists, tables, tabs, and their items infer this metadata where possible.
 
@@ -167,16 +97,7 @@ Row and column indexes are zero-based. Position and set size are one-based; use 
 `AccessibilityInspector` returns an immutable snapshot. A snapshot is safe to inspect without racing native accessibility callbacks and includes stable IDs, hierarchy, bounds, resolved state, actions, range and collection data. `toJson()` is suitable for diagnostic reports and tooling.
 
 [source,java]
-----
-AccessibilityTreeSnapshot tree =
-    AccessibilityInspector.snapshot(myForm);
-
-AccessibilityAssertions.assertNoErrors(tree);
-AccessibilityAssertions.assertNoUnlabeledInteractiveNodes(tree);
-
-String diagnosticJson = tree.toJson();
-AccessibilityNodeSnapshot hit = tree.getNodeAt(screenX, screenY);
-----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AccessibilitySemanticsSnippets.java[tag=accessibility-semantics-inspection,indent=0]
 
 `AccessibilityAssertions.audit()` reports machine-readable `AccessibilityIssue` values for unlabeled controls, invalid ranges, duplicate identifiers or actions, invalid collection positions, missing parents, cycles, unnamed dialogs, and unlabeled custom actions. Warnings also identify suspicious role/state combinations and empty bounds.
 
