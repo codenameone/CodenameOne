@@ -151,8 +151,8 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     private final EventDispatcher listeners = new EventDispatcher();
     private ActionListener doneListener;
     private int valign = defaultValign;
-    /// True once setVerticalAlignment() has been called, so the editable-multi-line
-    /// TOP default in getVerticalAlignment() no longer overrides an explicit choice.
+    /// True once setVerticalAlignment() has been called, so the multi-line TOP
+    /// default in getVerticalAlignment() no longer overrides an explicit choice.
     private boolean verticalAlignmentSet;
     private int linesToScroll = 1;
     //private int modifierFlag = 0x00000;
@@ -1866,14 +1866,14 @@ public class TextArea extends Component implements ActionSource, TextHolder {
 
     /// Returns the vertical alignment of the text field, one of: CENTER, TOP, BOTTOM
     ///
-    /// An **editable multi-line** text area reports #TOP by default, regardless of
-    /// the theme default (`textCmpVAlignInt`), on platforms whose native text editor
-    /// cannot vertically align its content (currently every platform). This keeps the
-    /// lightweight rendering aligned with the native editor so the text, cursor and
-    /// hint don't jump when editing starts and ends (issue #5345). Single-line fields
-    /// and non-editable multi-line areas (e.g. the text inside a `SpanLabel`) keep the
-    /// theme default and honor #CENTER / #BOTTOM. A value passed to
-    /// #setVerticalAlignment(int) is always honored as-is.
+    /// Multi-line text areas default to #TOP, regardless of the theme default
+    /// (`textCmpVAlignInt`, which is meant for single-line fields). Single-line fields
+    /// keep the theme default. A value passed to #setVerticalAlignment(int) is always
+    /// honored as-is, so an explicit #CENTER / #BOTTOM still works (e.g. for display
+    /// text). For editable multi-line areas the #TOP default also keeps the lightweight
+    /// rendering aligned with the native editor, which top-aligns its content on every
+    /// current platform, so the text, cursor and hint don't jump when editing starts
+    /// and ends (issue #5345).
     ///
     /// #### Returns
     ///
@@ -1887,9 +1887,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     ///
     /// - #BOTTOM
     public int getVerticalAlignment() {
-        if (!verticalAlignmentSet && valign != TOP
-                && !isSingleLineTextArea() && isEditable()
-                && !Display.impl.supportsNativeTextAreaVerticalAlignment()) {
+        if (!verticalAlignmentSet && !isSingleLineTextArea()) {
             return TOP;
         }
         return valign;
@@ -1901,7 +1899,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// vertical space in the component. If there is no extra room, alignment becomes
     /// effectively top-aligned because content already fills the available area.
     ///
-    /// Setting a value here overrides the editable-multi-line default described in
+    /// Setting a value here overrides the multi-line #TOP default described in
     /// #getVerticalAlignment(): the value you pass is honored even for an editable
     /// multi-line area (which may then visibly shift when its native editor, which
     /// top-aligns, takes over).

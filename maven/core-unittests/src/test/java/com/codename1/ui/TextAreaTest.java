@@ -413,17 +413,35 @@ class TextAreaTest extends UITestBase {
     }
 
     @FormTest
-    void testEditableMultilineDefaultsToTopToMatchNativeEditor() {
-        // Regression test for #5345: with a CENTER theme default an editable
-        // multi-line text area still reports TOP (to match the native editor which
-        // top-aligns), otherwise the text jumps when editing starts and ends. An
-        // explicit setVerticalAlignment() overrides that default.
+    void testMultilineDefaultsToTop() {
+        // Regression test for #5345: with a CENTER theme default a multi-line text
+        // area reports TOP by default (the theme default is meant for single-line
+        // fields). For an editable area this matches the top-aligning native editor,
+        // so the text doesn't jump when editing starts and ends.
+        int previous = TextArea.getDefaultValign();
+        TextArea.setDefaultValign(Component.CENTER);
+        try {
+            TextArea editable = new TextArea("text text", 3, 20);
+            editable.setEditable(true);
+            assertEquals(Component.TOP, editable.getVerticalAlignment());
+
+            TextArea nonEditable = new TextArea("text text", 3, 20);
+            nonEditable.setEditable(false);
+            assertEquals(Component.TOP, nonEditable.getVerticalAlignment());
+        } finally {
+            TextArea.setDefaultValign(previous);
+        }
+    }
+
+    @FormTest
+    void testExplicitVerticalAlignmentOverridesMultilineDefault() {
+        // An explicit setVerticalAlignment() is honored even for a multi-line area,
+        // so display text can still be centered/bottom-aligned.
         int previous = TextArea.getDefaultValign();
         TextArea.setDefaultValign(Component.CENTER);
         try {
             TextArea textArea = new TextArea("text text", 3, 20);
-            textArea.setEditable(true);
-            assertEquals(Component.TOP, textArea.getVerticalAlignment());
+            textArea.setEditable(false);
 
             textArea.setVerticalAlignment(Component.CENTER);
             assertEquals(Component.CENTER, textArea.getVerticalAlignment());
@@ -436,24 +454,9 @@ class TextAreaTest extends UITestBase {
     }
 
     @FormTest
-    void testNonEditableMultilineKeepsThemeVerticalAlignment() {
-        // Non-editable multi-line text areas (e.g. the text inside a SpanLabel)
-        // never show a native editor, so they keep the CENTER theme default.
-        int previous = TextArea.getDefaultValign();
-        TextArea.setDefaultValign(Component.CENTER);
-        try {
-            TextArea textArea = new TextArea("text text", 3, 20);
-            textArea.setEditable(false);
-            assertEquals(Component.CENTER, textArea.getVerticalAlignment());
-        } finally {
-            TextArea.setDefaultValign(previous);
-        }
-    }
-
-    @FormTest
     void testSingleLineKeepsThemeVerticalAlignment() {
-        // Single-line fields center vertically in their native editor, so they keep
-        // the CENTER theme default.
+        // Single-line fields keep the theme default (they center vertically in their
+        // native editor).
         int previous = TextArea.getDefaultValign();
         TextArea.setDefaultValign(Component.CENTER);
         try {
