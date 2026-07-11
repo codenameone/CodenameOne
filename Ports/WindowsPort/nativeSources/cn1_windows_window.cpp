@@ -601,6 +601,13 @@ LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
              * while the printing worker blocks in SendMessage
              * (cn1_windows_print.cpp). */
             return cn1WinPrintDialogHandleMessage(wParam);
+        case WM_CN1_WIDGET:
+            /* Floating widget window op (create/pixels/pos/hit-rects/destroy)
+             * marshaled from the EDT (cn1_windows_widgets.cpp). The widget
+             * windows have their own WndProc; this main-window case only hosts
+             * the op dispatch because ops arrive before their windows exist. */
+            cn1WinWidgetHandleMessage(wParam);
+            return 0;
         case WM_CTLCOLOREDIT: {
             /* Colour the native edit overlay to match the CN1 field it stands in
              * for; fall through to default when it is not our control. */
@@ -692,6 +699,15 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_faultSelfTestEnabled___R_b
 
 JAVA_VOID com_codename1_impl_windows_WindowsNative_initDisplay___java_lang_String_int_int(
         CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1, JAVA_INT __cn1Arg2, JAVA_INT __cn1Arg3) {
+#ifdef CN1_WIDGETBOARD
+    /* MSIX Widgets Board activation: when Windows launched this exe with
+     * -RegisterProcessAsComServer it wants the out-of-process widget provider,
+     * not the app UI. The check lives here (the first native call of every
+     * launch, before any window exists) because the process entry point is the
+     * translator-generated C main, which is not in nativeSources. This call
+     * never returns in server mode -- it serves widgets and exits the process. */
+    cn1WidgetBoardMaybeRunComServer();
+#endif
     if (InterlockedCompareExchange(&cn1Win.initialized, 1, 0) != 0) {
         return; /* already initialised */
     }

@@ -305,6 +305,17 @@ public class WindowsNativeBuilder extends Executor {
         boolean cross = !is_windows;
         File xwinSysroot = cross ? resolveXwinSysroot(request) : null;
 
+        // windows.msix=true additionally compiles the Windows 11 Widgets Board
+        // COM provider (cn1_windows_widgetboard.cpp, gated on CN1_WIDGETBOARD)
+        // into the exe and, after signing, packs an MSIX around it -- see
+        // buildMsixPackage below. The define is injected through the compile
+        // flags the builder already passes to CMake (the least invasive hook;
+        // the translator-generated CMakeLists is untouched), so plain builds
+        // are unaffected.
+        boolean msix = "true".equalsIgnoreCase(request.getArg("windows.msix", "false"));
+        File winAppSdk = msix ? resolveWinAppSdkDir() : null;
+        String widgetBoardCompileFlags = msix ? widgetBoardCompileFlags(winAppSdk) : "";
+
         List<String> configure = new ArrayList<String>();
         configure.add("cmake");
         configure.add("-S");
@@ -317,10 +328,14 @@ public class WindowsNativeBuilder extends Executor {
         configure.add("-DCMAKE_C_COMPILER=" + clangClExecutable());
         configure.add("-DCMAKE_CXX_COMPILER=" + clangClExecutable());
         if (cross) {
-            addCrossCompileConfigure(configure, triple, arch, xwinSysroot);
+            addCrossCompileConfigure(configure, triple, arch, xwinSysroot,
+                    widgetBoardCompileFlags, msix ? widgetBoardLinkFlags(winAppSdk, arch) : "");
         } else {
-            configure.add("-DCMAKE_C_FLAGS=--target=" + triple);
-            configure.add("-DCMAKE_CXX_FLAGS=--target=" + triple);
+            configure.add("-DCMAKE_C_FLAGS=--target=" + triple + widgetBoardCompileFlags);
+            configure.add("-DCMAKE_CXX_FLAGS=--target=" + triple + widgetBoardCompileFlags);
+            if (msix) {
+                configure.add("-DCMAKE_EXE_LINKER_FLAGS=" + widgetBoardLinkFlags(winAppSdk, arch).trim());
+            }
         }
 
         try {
@@ -354,6 +369,9 @@ public class WindowsNativeBuilder extends Executor {
         // is supplied; otherwise it ships unsigned (which runs, but trips SmartScreen
         // / "Unknown publisher").
         signWindowsExecutable(windowsExecutable, request);
+        // windows.msix=true: wrap the signed exe in an MSIX package that also
+        // declares the Windows 11 Widgets Board provider (surfaces.json kinds).
+        buildMsixPackage(request, resDir, arch);
         log("Native Windows executable: " + windowsExecutable.getAbsolutePath() + " (" + arch + ")");
         return true;
     }
@@ -468,6 +486,433 @@ public class WindowsNativeBuilder extends Executor {
         } catch (Exception ex) {
             throw new BuildException("Authenticode signing failed (osslsigncode)", ex);
         }
+    }
+
+    /* --------------------------------------------------------------------------
+     * MSIX packaging + Windows 11 Widgets Board (windows.msix=true)
+     * --------------------------------------------------------------------------
+     * Two distribution channels exist for the native Windows target:
+     *
+     *   1. The plain signed exe (the default). Users get the floating layered
+     *      widget windows (cn1_windows_widgets.cpp / WindowsWidgetBridge) --
+     *      always-on-top desktop widgets that work with zero packaging.
+     *
+     *   2. windows.msix=true: the exe is additionally wrapped in an MSIX
+     *      package that declares a Windows 11 Widgets Board provider -- real
+     *      widgets in the Win+W board, rendered from Adaptive Cards mapped off
+     *      the same persisted surface descriptors. This channel has hard
+     *      distribution prerequisites, which is why it is opt-in:
+     *        - the MSIX must be signed with a certificate the TARGET machine
+     *          trusts (a self-signed cert means dev-sideloading only; store or
+     *          EV/organization certs for real distribution);
+     *        - the Windows App SDK runtime (WindowsAppRuntime redistributable,
+     *          1.5 series) must be installed on the target machine -- the
+     *          provider binds it at startup via MddBootstrapInitialize;
+     *        - Widgets Board exists on Windows 11 only (older Windows installs
+     *          the MSIX fine but shows no widgets).
+     *
+     * Build-time requirements when windows.msix=true:
+     *   - CN1_WINAPPSDK_DIR must point at a Windows App SDK layout with
+     *     include/ (C++/WinRT projections + MddBootstrap.h), lib/<x64|arm64>/
+     *     (Microsoft.WindowsAppRuntime.Bootstrap.lib) and optionally
+     *     bin/<arch>/Microsoft.WindowsAppRuntime.Bootstrap.dll (copied into the
+     *     package next to the exe). Paths must not contain spaces (they travel
+     *     through CMake flag strings).
+     *   - `makemsix` (the cross-platform msix-packaging tool) must be on PATH
+     *     (CN1_MAKEMSIX overrides), so the Linux build daemon can pack without
+     *     a Windows host.
+     *
+     * Hints: windows.msix.identityName / windows.msix.publisher /
+     * windows.msix.version (default 1.0.0.0) fill the package Identity;
+     * windows.msix.pfx / windows.msix.password sign the package (falling back
+     * to the exe-signing configuration). Widget definitions are derived from
+     * the project's surfaces.json kinds; without a surfaces.json the MSIX is
+     * produced with no widget extension (plain packaged app).
+     * ------------------------------------------------------------------------ */
+
+    /**
+     * The COM class id of the widget provider ExeServer. Must match
+     * {@code CN1_WIDGET_PROVIDER_CLSID} in
+     * {@code Ports/WindowsPort/nativeSources/cn1_windows_widgetboard.cpp}.
+     */
+    static final String WIDGET_PROVIDER_CLSID = "C0DE4A11-5A2F-4E7B-9C61-7D1B4A0C8E52";
+
+    /**
+     * Resolves the Windows App SDK layout used to compile the Widgets Board
+     * provider ({@code CN1_WINAPPSDK_DIR}); required when {@code windows.msix=true}.
+     */
+    private File resolveWinAppSdkDir() {
+        String path = System.getenv("CN1_WINAPPSDK_DIR");
+        if (path == null || path.isEmpty()) {
+            throw new BuildException("windows.msix=true compiles the Windows 11 Widgets Board provider, "
+                    + "which needs the Windows App SDK headers and libs. Point the CN1_WINAPPSDK_DIR "
+                    + "environment variable at a layout containing include/ (C++/WinRT projections + "
+                    + "MddBootstrap.h) and lib/<x64|arm64>/Microsoft.WindowsAppRuntime.Bootstrap.lib "
+                    + "(extract them from the Microsoft.WindowsAppSDK NuGet package).");
+        }
+        File dir = new File(path);
+        if (!new File(dir, "include").isDirectory()) {
+            throw new BuildException("CN1_WINAPPSDK_DIR does not look like a Windows App SDK layout "
+                    + "(missing include/): " + dir.getAbsolutePath());
+        }
+        return dir;
+    }
+
+    /** clang-cl flags enabling the Widgets Board provider compile (CN1_WIDGETBOARD). */
+    private static String widgetBoardCompileFlags(File winAppSdk) {
+        return " /DCN1_WIDGETBOARD=1 /I" + new File(winAppSdk, "include").getAbsolutePath();
+    }
+
+    /** Linker flags adding the WindowsAppRuntime bootstrap import library. */
+    private static String widgetBoardLinkFlags(File winAppSdk, String arch) {
+        File libDir = new File(winAppSdk, "lib/" + normalizeArch(arch));
+        return " /libpath:" + libDir.getAbsolutePath() + " Microsoft.WindowsAppRuntime.Bootstrap.lib";
+    }
+
+    /**
+     * Packs the built (already signed) exe into an MSIX declaring the COM
+     * ExeServer + {@code com.microsoft.windows.widgets} app extension, then
+     * signs the package. See the block comment above for the channel
+     * requirements. No-op unless {@code windows.msix=true}.
+     */
+    private void buildMsixPackage(BuildRequest request, File resDir, String arch) {
+        if (!"true".equalsIgnoreCase(request.getArg("windows.msix", "false"))) {
+            return;
+        }
+        log("Packaging MSIX (windows.msix=true) with Widgets Board provider");
+        try {
+            File layout = new File(getBuildDirectory(), "msix-layout");
+            File assets = new File(layout, "Assets");
+            File publicDir = new File(layout, "Public");
+            layout.mkdirs();
+            assets.mkdirs();
+            publicDir.mkdirs();
+
+            // The manifest's Executable/ComServer reference "app.exe" so the
+            // COM activation command line is stable regardless of main class.
+            copy(windowsExecutable, new File(layout, "app.exe"));
+
+            // The provider binds the WindowsAppRuntime via MddBootstrapInitialize,
+            // which needs Microsoft.WindowsAppRuntime.Bootstrap.dll next to the
+            // exe. Copy it out of the SDK layout when present; otherwise the
+            // developer must add it to the package manually.
+            File winAppSdk = resolveWinAppSdkDir();
+            File bootstrapDll = new File(winAppSdk,
+                    "bin/" + normalizeArch(arch) + "/Microsoft.WindowsAppRuntime.Bootstrap.dll");
+            if (bootstrapDll.isFile()) {
+                copy(bootstrapDll, new File(layout, "Microsoft.WindowsAppRuntime.Bootstrap.dll"));
+            } else {
+                log("Warning: " + bootstrapDll.getAbsolutePath() + " not found; add "
+                        + "Microsoft.WindowsAppRuntime.Bootstrap.dll to the MSIX next to app.exe "
+                        + "or the widget provider will fail to bind the WindowsAppRuntime.");
+            }
+
+            // Widget definition icons/screenshots + package logos all reuse the
+            // app icon; Windows scales them (pixel-perfect per-scale assets can
+            // be a follow-up).
+            byte[] icon = request.getIcon();
+            if (icon == null || icon.length == 0) {
+                throw new BuildException("windows.msix=true needs the app icon to generate the MSIX "
+                        + "logo assets, but the build request carries no icon.");
+            }
+            createFile(new File(assets, "StoreLogo.png"), icon);
+            createFile(new File(assets, "Square150x150Logo.png"), icon);
+            createFile(new File(assets, "Square44x44Logo.png"), icon);
+            createFile(new File(assets, "WidgetScreenshot.png"), icon);
+            // uap3:AppExtension requires a public folder; ship a marker file so
+            // packers that skip empty directories keep it.
+            createFile(new File(publicDir, "readme.txt"),
+                    "Codename One widget provider public folder".getBytes(StandardCharsets.UTF_8));
+
+            String widgetDefinitions = buildWidgetDefinitionsXml(resDir);
+            String manifest = buildAppxManifest(request, arch, widgetDefinitions);
+            createFile(new File(layout, "AppxManifest.xml"), manifest.getBytes(StandardCharsets.UTF_8));
+
+            // Pack with makemsix (the MSIX SDK's cross-platform packer; runs on
+            // the Linux daemon hosts). Must be on PATH, CN1_MAKEMSIX overrides.
+            File msix = new File(resultDir, request.getMainClass() + ".msix");
+            String makemsix = System.getenv("CN1_MAKEMSIX");
+            if (makemsix == null || makemsix.isEmpty()) {
+                makemsix = "makemsix";
+            }
+            if (!exec(getBuildDirectory(), 600000, makemsix, "pack",
+                    "-d", layout.getAbsolutePath(), "-p", msix.getAbsolutePath()) || !msix.isFile()) {
+                throw new BuildException("MSIX packaging failed. Ensure the `makemsix` tool "
+                        + "(from the msix-packaging project) is on PATH, or point CN1_MAKEMSIX at it.");
+            }
+            signMsixPackage(msix, request);
+            log("MSIX package: " + msix.getAbsolutePath());
+        } catch (BuildException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BuildException("Failed to build the MSIX package", ex);
+        }
+    }
+
+    /**
+     * Derives the {@code <Definitions>} XML of the widget provider extension
+     * from the project's {@code surfaces.json} (the same build-time kinds
+     * manifest the iOS/Android builders consume). Returns null when the
+     * project has no surfaces.json / no kinds -- the MSIX is then produced
+     * without the widgets extension.
+     */
+    private String buildWidgetDefinitionsXml(File resDir) throws Exception {
+        File surfacesJson = new File(resDir, "surfaces.json");
+        if (!surfacesJson.isFile()) {
+            log("No surfaces.json in the project resources; the MSIX is packaged without "
+                    + "Widgets Board definitions (widget kinds must be declared at build time).");
+            return null;
+        }
+        java.util.Map<String, Object> doc;
+        try (java.io.InputStreamReader reader = new java.io.InputStreamReader(
+                new java.io.FileInputStream(surfacesJson), StandardCharsets.UTF_8)) {
+            doc = new com.codename1.builders.util.JSONParser().parseJSON(reader);
+        }
+        Object kindsObj = doc.get("kinds");
+        if (!(kindsObj instanceof List) || ((List) kindsObj).isEmpty()) {
+            log("surfaces.json declares no widget kinds; the MSIX is packaged without "
+                    + "Widgets Board definitions.");
+            return null;
+        }
+        // indented to sit directly inside <Definitions> in the manifest below
+        StringBuilder sb = new StringBuilder();
+        for (Object kindObj : (List) kindsObj) {
+            if (!(kindObj instanceof java.util.Map)) {
+                continue;
+            }
+            java.util.Map kind = (java.util.Map) kindObj;
+            Object idObj = kind.get("id");
+            if (!(idObj instanceof String) || !((String) idObj).matches("[a-z][a-z0-9_]*")) {
+                throw new BuildException("Invalid widget kind id '" + idObj
+                        + "' in surfaces.json; ids must match [a-z][a-z0-9_]*");
+            }
+            String id = (String) idObj;
+            String name = kind.get("name") instanceof String ? (String) kind.get("name") : id;
+            String description = kind.get("description") instanceof String
+                    ? (String) kind.get("description") : name;
+            sb.append("                  <Definition Id=\"").append(escapeXml(id))
+              .append("\" DisplayName=\"").append(escapeXml(name))
+              .append("\" Description=\"").append(escapeXml(description)).append("\">\n")
+              .append("                    <Capabilities>\n")
+              .append("                      <Capability><Size Name=\"small\"/></Capability>\n")
+              .append("                      <Capability><Size Name=\"medium\"/></Capability>\n")
+              .append("                      <Capability><Size Name=\"large\"/></Capability>\n")
+              .append("                    </Capabilities>\n")
+              .append("                    <ThemeResources>\n")
+              .append("                      <Icons>\n")
+              .append("                        <Icon Path=\"Assets\\Square44x44Logo.png\"/>\n")
+              .append("                      </Icons>\n")
+              .append("                      <Screenshots>\n")
+              .append("                        <Screenshot Path=\"Assets\\WidgetScreenshot.png\" "
+                      + "DisplayAltText=\"").append(escapeXml(name)).append("\"/>\n")
+              .append("                      </Screenshots>\n")
+              .append("                      <DarkMode/>\n")
+              .append("                      <LightMode/>\n")
+              .append("                    </ThemeResources>\n")
+              .append("                  </Definition>\n");
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Generates the AppxManifest.xml: package identity from the
+     * {@code windows.msix.*} hints, a full-trust win32 Application around
+     * app.exe, the COM ExeServer re-activating the exe with
+     * {@code -RegisterProcessAsComServer}, and (when surfaces.json declares
+     * kinds) the {@code com.microsoft.windows.widgets} app extension.
+     */
+    private String buildAppxManifest(BuildRequest request, String arch, String widgetDefinitions) {
+        String identityName = request.getArg("windows.msix.identityName", request.getPackageName());
+        String publisher = request.getArg("windows.msix.publisher", "CN=" + request.getDisplayName());
+        String version = normalizeMsixVersion(request.getArg("windows.msix.version",
+                request.getVersion() != null ? request.getVersion() : "1.0.0.0"));
+        String displayName = escapeXml(request.getDisplayName());
+        String procArch = ARCH_ARM64.equals(normalizeArch(arch)) ? "arm64" : "x64";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n")
+          .append("<Package xmlns=\"http://schemas.microsoft.com/appx/manifest/foundation/windows10\"\n")
+          .append("         xmlns:uap=\"http://schemas.microsoft.com/appx/manifest/uap/windows10\"\n")
+          .append("         xmlns:uap3=\"http://schemas.microsoft.com/appx/manifest/uap/windows10/3\"\n")
+          .append("         xmlns:com=\"http://schemas.microsoft.com/appx/manifest/com/windows10\"\n")
+          .append("         xmlns:rescap=\"http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities\"\n")
+          .append("         IgnorableNamespaces=\"uap uap3 com rescap\">\n")
+          .append("  <Identity Name=\"").append(escapeXml(identityName))
+          .append("\" Publisher=\"").append(escapeXml(publisher))
+          .append("\" Version=\"").append(version)
+          .append("\" ProcessorArchitecture=\"").append(procArch).append("\"/>\n")
+          .append("  <Properties>\n")
+          .append("    <DisplayName>").append(displayName).append("</DisplayName>\n")
+          .append("    <PublisherDisplayName>").append(escapeXml(request.getVendor() != null
+                  ? request.getVendor() : request.getDisplayName())).append("</PublisherDisplayName>\n")
+          .append("    <Logo>Assets\\StoreLogo.png</Logo>\n")
+          .append("  </Properties>\n")
+          // 10.0.22000 == Windows 11: the Widgets Board floor. The package
+          // installs there and up; the plain exe remains the pre-11 channel.
+          .append("  <Dependencies>\n")
+          .append("    <TargetDeviceFamily Name=\"Windows.Desktop\" MinVersion=\"10.0.22000.0\" "
+                  + "MaxVersionTested=\"10.0.26100.0\"/>\n")
+          .append("  </Dependencies>\n")
+          .append("  <Resources>\n")
+          .append("    <Resource Language=\"en-us\"/>\n")
+          .append("  </Resources>\n")
+          .append("  <Applications>\n")
+          .append("    <Application Id=\"App\" Executable=\"app.exe\" "
+                  + "EntryPoint=\"Windows.FullTrustApplication\">\n")
+          .append("      <uap:VisualElements DisplayName=\"").append(displayName)
+          .append("\" Description=\"").append(displayName)
+          .append("\" BackgroundColor=\"transparent\" "
+                  + "Square150x150Logo=\"Assets\\Square150x150Logo.png\" "
+                  + "Square44x44Logo=\"Assets\\Square44x44Logo.png\"/>\n");
+        if (widgetDefinitions != null) {
+            sb.append("      <Extensions>\n")
+              // COM out-of-proc server: the Widgets Board activates the widget
+              // provider by re-launching this very exe with the
+              // -RegisterProcessAsComServer argument (handled in
+              // cn1_windows_widgetboard.cpp before the app UI would start).
+              .append("        <com:Extension Category=\"windows.comServer\">\n")
+              .append("          <com:ComServer>\n")
+              .append("            <com:ExeServer Executable=\"app.exe\" "
+                      + "Arguments=\"-RegisterProcessAsComServer\" DisplayName=\"")
+              .append(displayName).append(" Widget Provider\">\n")
+              .append("              <com:Class Id=\"").append(WIDGET_PROVIDER_CLSID)
+              .append("\" DisplayName=\"").append(displayName).append(" Widget Provider\"/>\n")
+              .append("            </com:ExeServer>\n")
+              .append("          </com:ComServer>\n")
+              .append("        </com:Extension>\n")
+              .append("        <uap3:Extension Category=\"windows.appExtension\">\n")
+              .append("          <uap3:AppExtension Name=\"com.microsoft.windows.widgets\" "
+                      + "DisplayName=\"").append(displayName)
+              .append("\" Id=\"cn1widgets\" PublicFolder=\"Public\">\n")
+              .append("            <uap3:Properties>\n")
+              .append("              <WidgetProvider>\n")
+              .append("                <ProviderIcons>\n")
+              .append("                  <Icon Path=\"Assets\\Square44x44Logo.png\"/>\n")
+              .append("                </ProviderIcons>\n")
+              .append("                <Activation>\n")
+              .append("                  <CreateInstance ClassId=\"")
+              .append(WIDGET_PROVIDER_CLSID).append("\"/>\n")
+              .append("                </Activation>\n")
+              .append("                <Definitions>\n")
+              .append(widgetDefinitions)
+              .append("                </Definitions>\n")
+              .append("              </WidgetProvider>\n")
+              .append("            </uap3:Properties>\n")
+              .append("          </uap3:AppExtension>\n")
+              .append("        </uap3:Extension>\n")
+              .append("      </Extensions>\n");
+        }
+        sb.append("    </Application>\n")
+          .append("  </Applications>\n")
+          .append("  <Capabilities>\n")
+          .append("    <rescap:Capability Name=\"runFullTrust\"/>\n")
+          .append("  </Capabilities>\n")
+          .append("</Package>\n");
+        return sb.toString();
+    }
+
+    /**
+     * Signs the MSIX with osslsigncode (2.6+ supports the APPX/MSIX format),
+     * reusing the exe-signing command shape. Prefers windows.msix.pfx /
+     * windows.msix.password, falling back to the exe signing configuration;
+     * with no certificate at all the package is left unsigned -- installable
+     * only after the developer signs it, since Windows refuses unsigned MSIX.
+     */
+    private void signMsixPackage(File msix, BuildRequest request) {
+        File pkcs12 = null;
+        String pfxHint = request.getArg("windows.msix.pfx",
+                request.getArg("windows.signing.pkcs12", null));
+        try {
+            if (pfxHint != null && !pfxHint.isEmpty()) {
+                pkcs12 = new File(pfxHint);
+                if (!pkcs12.isFile()) {
+                    throw new BuildException("windows.msix.pfx file not found: " + pkcs12.getAbsolutePath());
+                }
+            } else if (request.getCertificate() != null && request.getCertificate().length > 0) {
+                pkcs12 = File.createTempFile("cn1-msixsign", ".p12", getBuildDirectory());
+                try (FileOutputStream out = new FileOutputStream(pkcs12)) {
+                    out.write(request.getCertificate());
+                }
+            }
+        } catch (java.io.IOException ex) {
+            throw new BuildException("Failed to stage the MSIX signing certificate", ex);
+        }
+        if (pkcs12 == null) {
+            log("MSIX left unsigned (no certificate). Windows refuses to install unsigned MSIX "
+                    + "packages: supply windows.msix.pfx/windows.msix.password (a cert the target "
+                    + "machine trusts; self-signed works only for dev sideloading with the cert "
+                    + "imported) or sign the package yourself before distribution.");
+            return;
+        }
+        String password = request.getArg("windows.msix.password",
+                request.getArg("windows.signing.password", request.getCertificatePassword()));
+        if (password == null) {
+            password = "";
+        }
+        String tool = System.getenv("CN1_OSSLSIGNCODE");
+        if (tool == null || tool.isEmpty()) {
+            tool = "osslsigncode";
+        }
+        File signed = new File(msix.getParentFile(), msix.getName() + ".signed");
+        List<String> cmd = new ArrayList<String>();
+        cmd.add(tool);
+        cmd.add("sign");
+        cmd.add("-pkcs12");
+        cmd.add(pkcs12.getAbsolutePath());
+        cmd.add("-pass");
+        cmd.add(password);
+        cmd.add("-h");
+        cmd.add(request.getArg("windows.signing.digest", "sha256"));
+        cmd.add("-in");
+        cmd.add(msix.getAbsolutePath());
+        cmd.add("-out");
+        cmd.add(signed.getAbsolutePath());
+        try {
+            if (!exec(getBuildDirectory(), 600000, cmd.toArray(new String[0])) || !signed.isFile()) {
+                throw new BuildException("MSIX signing failed (osslsigncode; version 2.6+ is needed "
+                        + "for the MSIX format). Ensure osslsigncode is on PATH (CN1_OSSLSIGNCODE "
+                        + "overrides) and the certificate/password are valid. Note: the certificate "
+                        + "Subject must equal the manifest Publisher (windows.msix.publisher).");
+            }
+            if (!msix.delete() || !signed.renameTo(msix)) {
+                copy(signed, msix);
+                signed.delete();
+            }
+            log("Signed " + msix.getName());
+        } catch (BuildException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BuildException("MSIX signing failed (osslsigncode)", ex);
+        }
+    }
+
+    /** Pads/truncates a version string to the four numeric parts MSIX requires. */
+    static String normalizeMsixVersion(String version) {
+        String[] parts = (version == null ? "1.0.0.0" : version).split("\\.");
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 4; i++) {
+            if (i > 0) {
+                sb.append('.');
+            }
+            String part = i < parts.length ? parts[i].trim() : "0";
+            boolean numeric = part.length() > 0;
+            for (int j = 0; j < part.length(); j++) {
+                if (!Character.isDigit(part.charAt(j))) {
+                    numeric = false;
+                    break;
+                }
+            }
+            sb.append(numeric ? part : "0");
+        }
+        return sb.toString();
+    }
+
+    private static String escapeXml(String s) {
+        if (s == null) {
+            return "";
+        }
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\"", "&quot;").replace("'", "&apos;");
     }
 
     /**
@@ -739,14 +1184,16 @@ public class WindowsNativeBuilder extends Executor {
      * -fuse-ld=lld}) links against the SDK libs; {@code llvm-rc} gets the SDK include
      * the resource compiler would otherwise read from {@code %INCLUDE%} on Windows.
      */
-    private void addCrossCompileConfigure(List<String> configure, String triple, String arch, File sys) {
+    private void addCrossCompileConfigure(List<String> configure, String triple, String arch, File sys,
+            String extraCompileFlags, String extraLinkFlags) {
         String a = sdkArchSubdir(arch);
         String inc = "--target=" + triple
                 + " /imsvc " + new File(sys, "crt/include")
                 + " /imsvc " + new File(sys, "sdk/include/ucrt")
                 + " /imsvc " + new File(sys, "sdk/include/um")
                 + " /imsvc " + new File(sys, "sdk/include/shared")
-                + " /imsvc " + new File(sys, "sdk/include/winrt");
+                + " /imsvc " + new File(sys, "sdk/include/winrt")
+                + extraCompileFlags;
         String rcFlags = "-I " + new File(sys, "sdk/include/um")
                 + " -I " + new File(sys, "sdk/include/shared")
                 + " -I " + new File(sys, "crt/include")
@@ -754,7 +1201,8 @@ public class WindowsNativeBuilder extends Executor {
         String linkFlags = "-fuse-ld=lld"
                 + " /libpath:" + new File(sys, "crt/lib/" + a)
                 + " /libpath:" + new File(sys, "sdk/lib/um/" + a)
-                + " /libpath:" + new File(sys, "sdk/lib/ucrt/" + a);
+                + " /libpath:" + new File(sys, "sdk/lib/ucrt/" + a)
+                + extraLinkFlags;
         configure.add("-DCMAKE_SYSTEM_NAME=Windows");
         configure.add("-DCMAKE_SYSTEM_PROCESSOR=" + cmakeSystemProcessor(arch));
         // STATIC_LIBRARY so CMake's compiler-detection try_compile does not need a

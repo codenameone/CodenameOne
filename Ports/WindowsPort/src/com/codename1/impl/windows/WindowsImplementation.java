@@ -690,6 +690,36 @@ public class WindowsImplementation extends CodenameOneImplementation {
         if (clicked != null) {
             dispatchLocalNotification(clicked);
         }
+        // Floating widget window events (clicks inside action hit-rects, drag
+        // moves) are queued on the pump thread by cn1_windows_widgets.cpp and
+        // drained here alongside every other input queue. The bridge routes
+        // clicks through Surfaces.dispatchAction, which marshals to the EDT.
+        if (surfaceBridge != null) {
+            String widgetEvent = WindowsNative.widgetPollEvent();
+            while (widgetEvent != null) {
+                surfaceBridge.handleNativeEvent(widgetEvent);
+                widgetEvent = WindowsNative.widgetPollEvent();
+            }
+        }
+    }
+
+    /* ------------------------------------------------------ external surfaces */
+
+    // volatile: created lazily on the EDT (getSurfaceBridge), read by the main
+    // pump thread inside drainInput
+    private volatile WindowsWidgetBridge surfaceBridge;
+
+    /**
+     * The Windows lowering of {@code com.codename1.surfaces}: floating layered
+     * widget windows plus a live activity pill (see {@link WindowsWidgetBridge}).
+     * Lazy so apps that never touch the surfaces API pay nothing.
+     */
+    @Override
+    public com.codename1.surfaces.spi.SurfaceBridge getSurfaceBridge() {
+        if (surfaceBridge == null) {
+            surfaceBridge = new WindowsWidgetBridge();
+        }
+        return surfaceBridge;
     }
 
     /* --------------------------------------------------- local notifications
