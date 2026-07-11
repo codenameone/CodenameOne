@@ -4590,6 +4590,18 @@ public final class Display extends CN1Constants {
         return impl.getCarBridge();
     }
 
+    /// Returns the platform bridge used by the `com.codename1.surfaces` API to render external
+    /// surfaces (home-screen widgets and live activities), or null when unsupported on this port.
+    /// Internal -- application code uses the `com.codename1.surfaces` API rather than this bridge
+    /// directly.
+    ///
+    /// #### Returns
+    ///
+    /// the surface bridge, or null
+    public com.codename1.surfaces.spi.SurfaceBridge getSurfaceBridge() {
+        return impl.getSurfaceBridge();
+    }
+
     /// Returns true if the device has dialing capabilities
     ///
     /// #### Returns
