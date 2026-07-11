@@ -278,19 +278,22 @@ public final class SurfaceSerializer {
         return null;
     }
 
+    private static final char[] HEX_DIGITS = "0123456789abcdef".toCharArray();
+
     private static String fnv1a(byte[] data) {
         long hash = 0xcbf29ce484222325L;
         for (byte b : data) {
             hash ^= b & 0xff;
             hash *= 0x100000001b3L;
         }
-        String hex = Long.toHexString(hash);
-        StringBuilder sb = new StringBuilder(16);
-        for (int p = hex.length(); p < 16; p++) {
-            sb.append('0');
+        // formatted by hand: the CLDC bootclasspath the Ant core build compiles
+        // against has no Long.toHexString
+        char[] hex = new char[16];
+        for (int i = 15; i >= 0; i--) {
+            hex[i] = HEX_DIGITS[(int) (hash & 0xf)];
+            hash >>>= 4;
         }
-        sb.append(hex);
-        return sb.toString();
+        return new String(hex);
     }
 
     private static void sortEntries(List<WidgetTimeline.Entry> entries) {

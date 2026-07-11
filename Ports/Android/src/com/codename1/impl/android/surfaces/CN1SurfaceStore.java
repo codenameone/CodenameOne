@@ -228,8 +228,8 @@ public final class CN1SurfaceStore {
         try {
             return s.getBytes("UTF-8");
         } catch (UnsupportedEncodingException ex) {
-            // UTF-8 is guaranteed on Android
-            return s.getBytes();
+            // UTF-8 is guaranteed on Android; this cannot happen
+            throw new IllegalStateException("UTF-8 unsupported", ex);
         }
     }
 

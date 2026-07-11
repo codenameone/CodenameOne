@@ -971,12 +971,16 @@ public class WindowsWidgetBridge implements SurfaceBridge {
 
     /** Follows the display's dark-mode flag when the port reports one; defaults to light. */
     private static boolean isSystemDark() {
+        // Assign-in-try / decide-outside-try: returning a freshly merged boolean
+        // from inside the translated try block ICEs gcc (SSA corruption) on the
+        // ParparVM-generated C -- see the identical note in LinuxWidgetBridge.
+        Boolean dark = null;
         try {
-            Boolean dark = Display.getInstance().isDarkMode();
-            return dark != null && dark.booleanValue();
+            dark = Display.getInstance().isDarkMode();
         } catch (Throwable t) {
-            return false;
+            // headless or uninitialized display: default to light
         }
+        return dark != null && dark.booleanValue();
     }
 
     /** String.split without regex (the translated runtime keeps regex minimal). */

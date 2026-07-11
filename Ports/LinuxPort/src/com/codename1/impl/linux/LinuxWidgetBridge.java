@@ -973,12 +973,16 @@ public class LinuxWidgetBridge implements SurfaceBridge {
 
     /** Follows the display's dark-mode flag when available; defaults to light. */
     private static boolean isSystemDark() {
+        // Deliberately assign-in-try / decide-outside-try: returning a freshly
+        // merged boolean from inside the translated try block ICEs Alpine gcc
+        // (SSA corruption) on the ParparVM-generated C for this method.
+        Boolean dark = null;
         try {
-            Boolean dark = Display.getInstance().isDarkMode();
-            return dark != null && dark.booleanValue();
+            dark = Display.getInstance().isDarkMode();
         } catch (Throwable t) {
-            return false;
+            // headless or uninitialized display: default to light
         }
+        return dark != null && dark.booleanValue();
     }
 
     /** Basic split (the clean target avoids regex-based String.split). */

@@ -65,15 +65,14 @@
  * poison an in-flight BeginDraw/EndDraw batch on the EDT.
  */
 
-/* Include the C++ standard library and SDK headers BEFORE cn1_windows.h:
- * cn1_globals.h installs macros for the bytecode runtime that otherwise break
- * the STL headers. */
+/* Include the SDK/CRT headers BEFORE cn1_windows.h: cn1_globals.h installs
+ * macros for the bytecode runtime that would otherwise break system headers.
+ * Deliberately no MSVC STL here -- the xwin cross-compile CI's clang-cl
+ * predates the Clang version the MSVC STL demands (STL1000), so this file
+ * sticks to plain C containers (see g_widgetEvents / CN1Widget.hitRects). */
 #ifdef _WIN32
 #include <windows.h>
 #include <windowsx.h>
-#include <deque>
-#include <string>
-#include <vector>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -115,9 +114,15 @@ struct CN1Widget {
     int w;                       /* current pixel size (window == DIB size)   */
     int h;
     float dpiScale;              /* 96 dpi == 1.0                              */
-    std::vector<RECT> hitRects;  /* action rectangles in client pixels        */
+    RECT* hitRects;              /* action rectangles in client pixels, owned */
+    int hitRectCount;
 
-    CN1Widget() : hwnd(NULL), x(0), y(0), w(1), h(1), dpiScale(1.0f) {
+    CN1Widget() : hwnd(NULL), x(0), y(0), w(1), h(1), dpiScale(1.0f),
+            hitRects(NULL), hitRectCount(0) {
+    }
+
+    ~CN1Widget() {
+        free(hitRects);
     }
 };
 
@@ -146,9 +151,14 @@ struct CN1WidgetLock {
 };
 static CN1WidgetLock g_widgetLock;
 
-/* Outbound event queue, drained by the EDT (widgetPollEvent). Declared after
- * g_widgetLock so its constructor runs second within this translation unit. */
-static std::deque<std::string> g_widgetEvents;
+/* Outbound event queue, drained by the EDT (widgetPollEvent): a fixed ring of
+ * malloc'd strings guarded by g_widgetLock. New events are dropped when the
+ * ring is full (the EDT drains every input pump pass, so 128 pending events
+ * already means the app is wedged). Plain C on purpose -- no MSVC STL. */
+#define CN1_WIDGET_EVENT_RING 128
+static char* g_widgetEvents[CN1_WIDGET_EVENT_RING];
+static int g_widgetEventHead = 0;   /* next slot to read                      */
+static int g_widgetEventCount = 0;  /* filled slots                           */
 
 static bool g_widgetClassRegistered = false;
 
@@ -158,8 +168,19 @@ static void cn1WidgetEnqueueEvent(CN1Widget* w, const char* kind, int x, int y) 
     char buf[96];
     _snprintf(buf, sizeof(buf), "%lld;%s;%d;%d", (long long) (intptr_t) w, kind, x, y);
     buf[sizeof(buf) - 1] = '\0';
+    char* copy = _strdup(buf);
+    if (copy == NULL) {
+        return;
+    }
     EnterCriticalSection(&g_widgetLock.cs);
-    g_widgetEvents.push_back(std::string(buf));
+    if (g_widgetEventCount >= CN1_WIDGET_EVENT_RING) {
+        LeaveCriticalSection(&g_widgetLock.cs);
+        free(copy);
+        return;
+    }
+    int tail = (g_widgetEventHead + g_widgetEventCount) % CN1_WIDGET_EVENT_RING;
+    g_widgetEvents[tail] = copy;
+    g_widgetEventCount++;
     LeaveCriticalSection(&g_widgetLock.cs);
 }
 
@@ -193,7 +214,7 @@ static float cn1WidgetDpiScaleFor(HWND hwnd) {
 static bool cn1WidgetHitTest(CN1Widget* w, int cx, int cy) {
     bool hit = false;
     EnterCriticalSection(&g_widgetLock.cs);
-    for (size_t i = 0; i < w->hitRects.size(); i++) {
+    for (int i = 0; i < w->hitRectCount; i++) {
         const RECT& r = w->hitRects[i];
         if (cx >= r.left && cx < r.right && cy >= r.top && cy < r.bottom) {
             hit = true;
@@ -409,16 +430,23 @@ static void cn1WidgetHandleSetPos(CN1Widget* w, int x, int y) {
 }
 
 static void cn1WidgetHandleSetHitRects(CN1Widget* w, const int* rects, int rectCount) {
-    EnterCriticalSection(&g_widgetLock.cs);
-    w->hitRects.clear();
-    for (int i = 0; i < rectCount; i++) {
-        RECT r;
-        r.left = rects[i * 4];
-        r.top = rects[i * 4 + 1];
-        r.right = r.left + rects[i * 4 + 2];
-        r.bottom = r.top + rects[i * 4 + 3];
-        w->hitRects.push_back(r);
+    RECT* copy = NULL;
+    if (rectCount > 0) {
+        copy = (RECT*) calloc((size_t) rectCount, sizeof(RECT));
+        if (copy == NULL) {
+            return;
+        }
+        for (int i = 0; i < rectCount; i++) {
+            copy[i].left = rects[i * 4];
+            copy[i].top = rects[i * 4 + 1];
+            copy[i].right = copy[i].left + rects[i * 4 + 2];
+            copy[i].bottom = copy[i].top + rects[i * 4 + 3];
+        }
     }
+    EnterCriticalSection(&g_widgetLock.cs);
+    free(w->hitRects);
+    w->hitRects = copy;
+    w->hitRectCount = copy == NULL ? 0 : rectCount;
     LeaveCriticalSection(&g_widgetLock.cs);
 }
 
@@ -670,18 +698,20 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_widgetDestroy___long(
  * or null when none. Drained by the EDT in WindowsImplementation.drainInput. */
 JAVA_OBJECT com_codename1_impl_windows_WindowsNative_widgetPollEvent___R_java_lang_String(
         CODENAME_ONE_THREAD_STATE) {
-    std::string ev;
-    {
-        EnterCriticalSection(&g_widgetLock.cs);
-        if (g_widgetEvents.empty()) {
-            LeaveCriticalSection(&g_widgetLock.cs);
-            return JAVA_NULL;
-        }
-        ev = g_widgetEvents.front();
-        g_widgetEvents.pop_front();
+    char* ev;
+    EnterCriticalSection(&g_widgetLock.cs);
+    if (g_widgetEventCount == 0) {
         LeaveCriticalSection(&g_widgetLock.cs);
+        return JAVA_NULL;
     }
-    return newStringFromCString(threadStateData, ev.c_str());
+    ev = g_widgetEvents[g_widgetEventHead];
+    g_widgetEvents[g_widgetEventHead] = NULL;
+    g_widgetEventHead = (g_widgetEventHead + 1) % CN1_WIDGET_EVENT_RING;
+    g_widgetEventCount--;
+    LeaveCriticalSection(&g_widgetLock.cs);
+    JAVA_OBJECT str = newStringFromCString(threadStateData, ev);
+    free(ev);
+    return str;
 }
 
 /* The widget window's current DPI scale (96 dpi == 1.0); peer 0 reports the
