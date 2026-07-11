@@ -44,10 +44,12 @@
 ///
 /// A small sealed catalog of nodes every platform can render natively -- `SurfaceColumn`,
 /// `SurfaceRow`, `SurfaceBox`, `SurfaceText`, `SurfaceDynamicText`, `SurfaceImage`,
-/// `SurfaceProgress`, `SurfaceSpacer` -- with shared styling (padding, background, corner radius,
-/// alignment, weight, size, action). `SurfaceDynamicText` is the headline feature: countdowns and
-/// elapsed-time text the OS animates on its own clock, so a delivery ETA ticks every second with
-/// zero app wakeups.
+/// `SurfaceProgress`, `SurfaceVector`, `SurfaceSpacer` -- with shared styling (padding,
+/// background, corner radius, alignment, weight, size, action). `SurfaceDynamicText` is the
+/// headline feature: countdowns and elapsed-time text the OS animates on its own clock, so a
+/// delivery ETA ticks every second with zero app wakeups. `SurfaceVector` covers the widgets the
+/// template catalog cannot express -- clocks, gauges, dials -- with a retained list of vector
+/// drawing ops (fills, strokes, arcs, text, rotation groups) replayed natively by every renderer.
 ///
 /// #### The lowest common denominator contract
 ///
@@ -66,6 +68,7 @@
 /// | Progress linear | ProgressView | ProgressBar | value 0..1 or state key |
 /// | Progress circular | Gauge | falls back to linear | Android widgets lack determinate circular |
 /// | Progress date interval | native animation | frozen at refresh | iOS-only nicety |
+/// | Vector | SwiftUI Canvas | bitmap rendered in-process | desktop: CN1 Graphics; Android renders vec nodes as raster, so very large vec nodes cost bitmap budget |
 /// | Spacer | Spacer | weighted View | |
 /// | corner radius | clipShape | background drawable | may render square below Android 12 |
 /// | node action | Link / widgetURL | setOnClickPendingIntent | small iOS widgets honor only the root action |
@@ -73,6 +76,30 @@
 /// Descriptors are limited to 8 nesting levels; keep payloads (JSON + images) comfortably under
 /// 200kb -- the iOS widget extension runs in about 30mb of memory and Android parcels rendered
 /// widgets over a 1mb binder transaction.
+///
+/// #### Example: an analog clock widget
+///
+/// A `SurfaceVector` face plus per-minute timeline entries driving the hand angles. Angles use
+/// the clock convention (degrees, 0 = 12 o'clock, clockwise positive); the OS flips the entries
+/// on schedule, so the clock stays correct for an hour with zero app wakeups:
+///
+/// ```java
+/// SurfaceVector face = new SurfaceVector(200, 200)
+///         .fillEllipse(100, 100, 96, 96, SurfaceColor.BACKGROUND)
+///         .beginRotation("hourAngle", 100, 100)
+///             .line(100, 100, 100, 52, 8, SurfaceColor.LABEL).endRotation()
+///         .beginRotation("minuteAngle", 100, 100)
+///             .line(100, 100, 100, 24, 5, SurfaceColor.ACCENT).endRotation();
+/// WidgetTimeline t = new WidgetTimeline().setContent(face);
+/// for (int m = 0; m < 60; m++) {
+///     int totalMinutes = hourOfDay * 60 + minute + m;
+///     Map<String, Object> state = new HashMap<String, Object>();
+///     state.put("minuteAngle", totalMinutes % 60 * 6f);
+///     state.put("hourAngle", totalMinutes % 720 * 0.5f);
+///     t.addEntry(new Date(minuteStart + m * 60000L), state);
+/// }
+/// Surfaces.publish("analog_clock", t);
+/// ```
 ///
 /// #### Build-time manifest: `surfaces.json`
 ///

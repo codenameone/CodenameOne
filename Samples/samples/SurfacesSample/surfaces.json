@@ -9,6 +9,14 @@
       "iosFamilies": ["systemSmall", "systemMedium"],
       "androidMinWidthDp": 180,
       "androidMinHeightDp": 60
+    },
+    {
+      "id": "analog_clock",
+      "name": "Analog Clock",
+      "description": "A vector clock face",
+      "iosFamilies": ["systemSmall"],
+      "androidMinWidthDp": 110,
+      "androidMinHeightDp": 110
     }
   ]
 }

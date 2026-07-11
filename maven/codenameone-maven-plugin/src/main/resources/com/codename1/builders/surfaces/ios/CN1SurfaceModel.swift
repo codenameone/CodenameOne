@@ -162,6 +162,31 @@ func cn1Color(_ spec: Any?) -> Color? {
     })
 }
 
+// MARK: - Vector node parsing
+
+/// Coordinate-pair list of a vector path op ("pts": [x0, y0, x1, y1, ...]).
+func cn1PointList(_ value: Any?) -> [CGPoint] {
+    guard let arr = value as? [Any] else {
+        return []
+    }
+    var out: [CGPoint] = []
+    var i = 0
+    while i + 1 < arr.count {
+        if let x = cn1CGFloat(arr[i]), let y = cn1CGFloat(arr[i + 1]) {
+            out.append(CGPoint(x: x, y: y))
+        }
+        i += 2
+    }
+    return out
+}
+
+/// Converts a clock-convention angle (the surfaces wire convention: degrees, 0 = 12 o'clock,
+/// clockwise positive) to a SwiftUI Angle. Path angles measure from 3 o'clock advancing
+/// clockwise in SwiftUI's y-down coordinate space, so the conversion subtracts 90 degrees.
+func cn1ClockAngle(_ clockDegrees: CGFloat) -> Angle {
+    return .degrees(Double(clockDegrees) - 90)
+}
+
 // MARK: - Fonts and alignment
 
 func cn1FontWeight(_ value: Any?) -> Font.Weight {

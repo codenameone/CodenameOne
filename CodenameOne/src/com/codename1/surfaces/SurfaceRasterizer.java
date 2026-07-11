@@ -26,6 +26,8 @@ import com.codename1.io.Log;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.Stroke;
+import com.codename1.ui.geom.GeneralPath;
 
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
@@ -446,6 +448,10 @@ public final class SurfaceRasterizer {
                 cw = 120;
                 chh = 6;
             }
+        } else if ("vec".equals(n.type)) {
+            // the natural size of a vector node is its view box, in dips
+            cw = asInt(n.map.get("vw"), 0);
+            chh = asInt(n.map.get("vh"), 0);
         } else if ("spacer".equals(n.type)) {
             // the min length applies along the parent's axis; using it on both axes is harmless
             // because the cross axis of a spacer never dominates a real sibling
@@ -598,6 +604,8 @@ public final class SurfaceRasterizer {
             drawImageNode(g, n.map, images, cx, cy, cw, ch);
         } else if ("prog".equals(n.type)) {
             drawProgress(g, n.map, state, cx, cy, cw, ch, dark, now, tick);
+        } else if ("vec".equals(n.type)) {
+            drawVector(g, n.map, state, cx, cy, cw, ch, dark);
         } else {
             for (LNode child : n.children) {
                 draw(g, child, state, images, dark, now, actions, tick);
@@ -744,6 +752,319 @@ public final class SurfaceRasterizer {
         return formatDynamicText(asString(map.get("style"), "timerDown"), date, now);
     }
 
+    // --- vector nodes -----------------------------------------------------------------
+
+    /// Renders a `vec` node. The view box scales to the node's content bounds preserving aspect
+    /// ratio (centered). Rotation groups are applied by transforming the geometry mathematically
+    /// -- every point runs through a software affine matrix -- rather than through
+    /// `Graphics.rotate`, so the output is identical on every desktop surface regardless of
+    /// affine support. Curves (ellipses, arcs, round corners) are sampled into short segments and
+    /// rendered through `GeneralPath` + `fillShape`/`drawShape` when the port supports shapes
+    /// (JavaSE, Windows and Linux all do). Without shape support the renderer falls back to 1px
+    /// primitives: geometry still *positions* through the transform, but ellipse/arc orientation
+    /// stays axis-aligned and stroke widths collapse to one pixel.
+    ///
+    /// Text ops draw unrotated at their transformed anchor point (middle of `x`, baseline at
+    /// `y`); rotating glyphs is not portably possible with core `Graphics`, and clock/gauge
+    /// labels are typically upright anyway.
+    ///
+    /// A vector node never requests a tick by itself: a state-driven rotation (`degKey`) only
+    /// changes when the timeline entry flips, so clocks publish per-minute entries.
+    @SuppressWarnings("unchecked")
+    private static void drawVector(Graphics g, Map<String, Object> map, Map<String, Object> state,
+            int cx, int cy, int cw, int ch, boolean dark) {
+        double vw = asDouble(map.get("vw"), 0);
+        double vh = asDouble(map.get("vh"), 0);
+        Object opsObj = map.get("ops");
+        if (vw <= 0 || vh <= 0 || cw <= 0 || ch <= 0 || !(opsObj instanceof List)) {
+            return;
+        }
+        double scale = Math.min(cw / vw, ch / vh);
+        if (scale <= 0) {
+            return;
+        }
+        // affine {m00, m01, m10, m11, tx, ty}: px = m00*x + m01*y + tx, py = m10*x + m11*y + ty
+        double[] t = new double[] {
+            scale, 0, 0, scale,
+            cx + (cw - vw * scale) / 2,
+            cy + (ch - vh * scale) / 2
+        };
+        drawVectorOps(g, (List<Object>) opsObj, t, scale, state, dark);
+        g.setAlpha(255);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void drawVectorOps(Graphics g, List<Object> ops, double[] t, double scale,
+            Map<String, Object> state, boolean dark) {
+        boolean shapes = g.isShapeSupported();
+        for (Object rawOp : ops) {
+            if (!(rawOp instanceof Map)) {
+                continue;
+            }
+            Map<String, Object> op = (Map<String, Object>) rawOp;
+            String o = asString(op.get("o"), "");
+            if ("rot".equals(o)) {
+                double deg = asDouble(op.get("deg"), 0);
+                String degKey = asString(op.get("degKey"), null);
+                if (degKey != null) {
+                    Object v = state == null ? null : state.get(degKey);
+                    deg = v instanceof Number ? ((Number) v).doubleValue() : 0;
+                }
+                double[] rotated = composeRotation(t, deg, asDouble(op.get("px"), 0),
+                        asDouble(op.get("py"), 0));
+                Object nested = op.get("ops");
+                if (nested instanceof List) {
+                    drawVectorOps(g, (List<Object>) nested, rotated, scale, state, dark);
+                }
+                continue;
+            }
+            int argb = resolveColor(op.get("c"), dark, dark ? ROLE_LABEL_DARK : ROLE_LABEL_LIGHT);
+            setPaint(g, argb);
+            if ("fillRect".equals(o)) {
+                double x = asDouble(op.get("x"), 0);
+                double y = asDouble(op.get("y"), 0);
+                double w = asDouble(op.get("w"), 0);
+                double h = asDouble(op.get("h"), 0);
+                fillVectorPoly(g, shapes, t, new double[] {x, y, x + w, y, x + w, y + h, x, y + h});
+            } else if ("fillRoundRect".equals(o)) {
+                fillVectorPoly(g, shapes, t, roundRectOutline(op));
+            } else if ("fillEllipse".equals(o)) {
+                fillVectorPoly(g, shapes, t, ellipseOutline(op, 0, 360, false));
+            } else if ("fillArc".equals(o)) {
+                fillVectorPoly(g, shapes, t, ellipseOutline(op,
+                        asDouble(op.get("start"), 0), asDouble(op.get("sweep"), 0), true));
+            } else if ("strokeEllipse".equals(o)) {
+                strokeVectorPoly(g, shapes, t, ellipseOutline(op, 0, 360, false), true,
+                        asDouble(op.get("sw"), 1) * scale);
+            } else if ("strokeArc".equals(o)) {
+                strokeVectorPoly(g, shapes, t, ellipseOutline(op,
+                        asDouble(op.get("start"), 0), asDouble(op.get("sweep"), 0), false), false,
+                        asDouble(op.get("sw"), 1) * scale);
+            } else if ("line".equals(o)) {
+                strokeVectorPoly(g, shapes, t, new double[] {
+                    asDouble(op.get("x1"), 0), asDouble(op.get("y1"), 0),
+                    asDouble(op.get("x2"), 0), asDouble(op.get("y2"), 0)
+                }, false, asDouble(op.get("sw"), 1) * scale);
+            } else if ("fillPath".equals(o)) {
+                fillVectorPoly(g, shapes, t, pointsOf(op));
+            } else if ("strokePath".equals(o)) {
+                strokeVectorPoly(g, shapes, t, pointsOf(op), asBoolean(op.get("close")),
+                        asDouble(op.get("sw"), 1) * scale);
+            } else if ("text".equals(o)) {
+                drawVectorText(g, op, t, scale, state);
+            }
+        }
+    }
+
+    private static void drawVectorText(Graphics g, Map<String, Object> op, double[] t,
+            double scale, Map<String, Object> state) {
+        String text = interpolate(asString(op.get("text"), ""), state);
+        if (text == null || text.length() == 0) {
+            return;
+        }
+        int px = (int) Math.round(asDouble(op.get("size"), DEFAULT_FONT_SIZE) * scale);
+        Font f = fontFor(Math.max(1, px), asString(op.get("fw"), "regular"));
+        g.setFont(f);
+        double[] anchor = transformPoint(t, asDouble(op.get("x"), 0), asDouble(op.get("y"), 0));
+        // anchor middle horizontally, baseline vertically; drawString draws from the top
+        int tx = (int) Math.round(anchor[0] - f.stringWidth(text) / 2.0);
+        int ty = (int) Math.round(anchor[1] - f.getAscent());
+        g.drawString(text, tx, ty);
+    }
+
+    private static void fillVectorPoly(Graphics g, boolean shapes, double[] t, double[] pts) {
+        if (pts.length < 6) {
+            return;
+        }
+        if (shapes) {
+            g.fillShape(transformedPath(t, pts, true));
+            return;
+        }
+        int n = pts.length / 2;
+        int[] xs = new int[n];
+        int[] ys = new int[n];
+        transformToArrays(t, pts, xs, ys);
+        g.fillPolygon(xs, ys, n);
+    }
+
+    private static void strokeVectorPoly(Graphics g, boolean shapes, double[] t, double[] pts,
+            boolean close, double strokeWidthPx) {
+        if (pts.length < 4) {
+            return;
+        }
+        if (shapes) {
+            Stroke stroke = new Stroke((float) Math.max(1, strokeWidthPx), Stroke.CAP_ROUND,
+                    Stroke.JOIN_ROUND, 1f);
+            g.drawShape(transformedPath(t, pts, close), stroke);
+            return;
+        }
+        // primitive fallback: 1px segments
+        int n = pts.length / 2;
+        int[] xs = new int[n];
+        int[] ys = new int[n];
+        transformToArrays(t, pts, xs, ys);
+        for (int i = 1; i < n; i++) {
+            g.drawLine(xs[i - 1], ys[i - 1], xs[i], ys[i]);
+        }
+        if (close && n > 2) {
+            g.drawLine(xs[n - 1], ys[n - 1], xs[0], ys[0]);
+        }
+    }
+
+    private static GeneralPath transformedPath(double[] t, double[] pts, boolean close) {
+        GeneralPath path = new GeneralPath();
+        double[] p = transformPoint(t, pts[0], pts[1]);
+        path.moveTo((float) p[0], (float) p[1]);
+        for (int i = 2; i + 1 < pts.length; i += 2) {
+            p = transformPoint(t, pts[i], pts[i + 1]);
+            path.lineTo((float) p[0], (float) p[1]);
+        }
+        if (close) {
+            path.closePath();
+        }
+        return path;
+    }
+
+    private static void transformToArrays(double[] t, double[] pts, int[] xs, int[] ys) {
+        for (int i = 0; i < xs.length; i++) {
+            double[] p = transformPoint(t, pts[i * 2], pts[i * 2 + 1]);
+            xs[i] = (int) Math.round(p[0]);
+            ys[i] = (int) Math.round(p[1]);
+        }
+    }
+
+    /// Samples the outline of an ellipse/arc op into a poly-line, in view-box coordinates. For
+    /// a pie the center is prepended so closing the path produces the slice.
+    private static double[] ellipseOutline(Map<String, Object> op, double startDeg,
+            double sweepDeg, boolean pie) {
+        double cx = asDouble(op.get("cx"), 0);
+        double cy = asDouble(op.get("cy"), 0);
+        double rx = asDouble(op.get("rx"), 0);
+        double ry = asDouble(op.get("ry"), 0);
+        double sweep = sweepDeg;
+        if (Math.abs(sweep) >= 360) {
+            sweep = sweep < 0 ? -360 : 360;
+        }
+        // one segment every ~4 degrees keeps small widget curves smooth without excess points
+        int segs = Math.max(8, Math.min(90, (int) Math.ceil(Math.abs(sweep) / 4)));
+        int extra = pie ? 1 : 0;
+        double[] pts = new double[(segs + 1 + extra) * 2];
+        if (pie) {
+            pts[0] = cx;
+            pts[1] = cy;
+        }
+        for (int i = 0; i <= segs; i++) {
+            double rad = clockRadians(startDeg + sweep * i / segs);
+            pts[(i + extra) * 2] = cx + rx * Math.cos(rad);
+            pts[(i + extra) * 2 + 1] = cy + ry * Math.sin(rad);
+        }
+        return pts;
+    }
+
+    /// Samples the outline of a rounded rectangle op, corners as quarter arcs.
+    private static double[] roundRectOutline(Map<String, Object> op) {
+        double x = asDouble(op.get("x"), 0);
+        double y = asDouble(op.get("y"), 0);
+        double w = asDouble(op.get("w"), 0);
+        double h = asDouble(op.get("h"), 0);
+        double r = Math.max(0, Math.min(asDouble(op.get("corner"), 0), Math.min(w, h) / 2));
+        if (r <= 0) {
+            return new double[] {x, y, x + w, y, x + w, y + h, x, y + h};
+        }
+        int segs = 6;
+        // corner centers in paint order starting after the top-left corner, with the clock
+        // start angle of each quarter arc
+        double[] centers = {
+            x + w - r, y + r, 0,
+            x + w - r, y + h - r, 90,
+            x + r, y + h - r, 180,
+            x + r, y + r, 270
+        };
+        double[] pts = new double[4 * (segs + 1) * 2];
+        int idx = 0;
+        for (int corner = 0; corner < 4; corner++) {
+            double ccx = centers[corner * 3];
+            double ccy = centers[corner * 3 + 1];
+            double start = centers[corner * 3 + 2];
+            for (int i = 0; i <= segs; i++) {
+                double rad = clockRadians(start + 90.0 * i / segs);
+                pts[idx++] = ccx + r * Math.cos(rad);
+                pts[idx++] = ccy + r * Math.sin(rad);
+            }
+        }
+        return pts;
+    }
+
+    private static double[] pointsOf(Map<String, Object> op) {
+        Object ptsObj = op.get("pts");
+        if (!(ptsObj instanceof List)) {
+            return new double[0];
+        }
+        List<?> list = (List<?>) ptsObj;
+        int n = list.size() - list.size() % 2;
+        double[] pts = new double[n];
+        for (int i = 0; i < n; i++) {
+            pts[i] = asDouble(list.get(i), 0);
+        }
+        return pts;
+    }
+
+    /// Converts a clock-convention angle (degrees, 0 = 12 o'clock, clockwise positive) to screen
+    /// radians measured from 3 o'clock advancing clockwise (y grows downward), the convention of
+    /// the sampling math: a point at clock angle `d` sits at
+    /// `(cx + r*cos(clockRadians(d)), cy + r*sin(clockRadians(d)))`. Package-private for unit
+    /// tests.
+    static double clockRadians(double clockDegrees) {
+        return Math.toRadians(clockDegrees - 90);
+    }
+
+    /// Converts a clock-convention start angle to the `Graphics.fillArc`/`drawArc` convention
+    /// (degrees, 0 = 3 o'clock, counterclockwise positive). Used by the primitive fallback and
+    /// kept as a documented, testable helper of the platform conversion. Package-private for
+    /// unit tests.
+    static int cn1ArcStartDegrees(double clockStartDeg) {
+        return (int) Math.round(90 - clockStartDeg);
+    }
+
+    /// Converts a clockwise-positive sweep to the counterclockwise-positive
+    /// `Graphics.fillArc`/`drawArc` sweep. Package-private for unit tests.
+    static int cn1ArcSweepDegrees(double clockSweepDeg) {
+        return (int) Math.round(-clockSweepDeg);
+    }
+
+    /// Composes a clockwise-on-screen rotation about a pivot (both in the source coordinate
+    /// space) onto an affine `{m00, m01, m10, m11, tx, ty}`. Package-private for unit tests.
+    static double[] composeRotation(double[] t, double clockwiseDeg, double px, double py) {
+        double a = Math.toRadians(clockwiseDeg);
+        double cos = Math.cos(a);
+        double sin = Math.sin(a);
+        // local matrix: translate(px, py) * rotate(a) * translate(-px, -py); with y growing
+        // downward the standard rotation matrix advances clockwise on screen
+        double m00 = cos;
+        double m01 = -sin;
+        double m10 = sin;
+        double m11 = cos;
+        double mtx = px - cos * px + sin * py;
+        double mty = py - sin * px - cos * py;
+        return new double[] {
+            t[0] * m00 + t[1] * m10,
+            t[0] * m01 + t[1] * m11,
+            t[2] * m00 + t[3] * m10,
+            t[2] * m01 + t[3] * m11,
+            t[0] * mtx + t[1] * mty + t[4],
+            t[2] * mtx + t[3] * mty + t[5]
+        };
+    }
+
+    /// Applies an affine `{m00, m01, m10, m11, tx, ty}` to a point. Package-private for unit
+    /// tests.
+    static double[] transformPoint(double[] t, double x, double y) {
+        return new double[] {
+            t[0] * x + t[1] * y + t[4],
+            t[2] * x + t[3] * y + t[5]
+        };
+    }
+
     // --- attribute helpers --------------------------------------------------------
 
     /// Replaces `${key}` placeholders with `String.valueOf` of the state value; missing keys
@@ -822,8 +1143,11 @@ public final class SurfaceRasterizer {
 
     private static Font fontOf(Map<String, Object> map) {
         int size = asInt(map.get("size"), 0);
-        int px = size <= 0 ? DEFAULT_FONT_SIZE : size;
-        String weight = asString(map.get("fw"), "regular");
+        return fontFor(size <= 0 ? DEFAULT_FONT_SIZE : size,
+                asString(map.get("fw"), "regular"));
+    }
+
+    private static Font fontFor(int px, String weight) {
         boolean bold = "semibold".equals(weight) || "bold".equals(weight);
         try {
             // exact pixel sizing with weights when the port ships native: fonts
@@ -933,6 +1257,16 @@ public final class SurfaceRasterizer {
 
     private static long asLong(Object o, long def) {
         return o instanceof Number ? ((Number) o).longValue() : def;
+    }
+
+    private static double asDouble(Object o, double def) {
+        return o instanceof Number ? ((Number) o).doubleValue() : def;
+    }
+
+    /// JSONParser hands booleans back as the strings "true"/"false" unless configured
+    /// otherwise; accept both representations.
+    private static boolean asBoolean(Object o) {
+        return Boolean.TRUE.equals(o) || "true".equals(o);
     }
 
     private static String asString(Object o, String def) {

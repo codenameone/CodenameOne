@@ -28,6 +28,11 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.RectF;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.SystemClock;
@@ -92,6 +97,12 @@ import java.util.Map;
 ///   most 512px, with a cumulative budget of about 500kb of bitmap data per rendered tree
 ///   (RemoteViews parcels bitmaps over a 1mb binder transaction). Images beyond the budget are
 ///   skipped with a logged warning.
+/// - **vector nodes**: RemoteViews has no drawing surface, so a `vec` node renders into an
+///   in-process `Bitmap` via `Canvas`/`Paint`/`Path` (anti-aliased) shipped through an
+///   ImageView; it shares the cumulative bitmap budget above and shrinks (or is skipped) when
+///   the budget runs out. Angles arrive in the wire's clock convention (degrees, 0 = 12
+///   o'clock, clockwise positive); `Canvas.drawArc` measures degrees from 3 o'clock advancing
+///   clockwise, so the conversion is `androidStart = clockStart - 90` with the sweep unchanged.
 public final class CN1SurfaceRenderer {
     private static final String TAG = "CN1Surfaces";
     private static final int MAX_DEPTH = 8;
@@ -215,6 +226,8 @@ public final class CN1SurfaceRenderer {
             rv = renderImage(node, rc);
         } else if ("prog".equals(type)) {
             rv = renderProgress(node, rc);
+        } else if ("vec".equals(type)) {
+            rv = renderVector(node, rc);
         } else if ("spacer".equals(type)) {
             rv = renderSpacer(node, rc);
         } else {
@@ -443,6 +456,198 @@ public final class CN1SurfaceRenderer {
                     resolveColor(color, rc, ACCENT, ACCENT));
         }
         return rv;
+    }
+
+    // --- vector nodes -----------------------------------------------------------
+
+    /// Renders a `vec` node into an in-process bitmap: RemoteViews cannot draw, but this
+    /// renderer runs inside the app process where Canvas is available, so vector art (clock
+    /// faces, gauges, dials) rasterizes here and ships as an ImageView bitmap. The bitmap is
+    /// sized to the node's target dips (fixed `w`/`h` when set, else the view box) times the
+    /// display density, capped by `MAX_BITMAP_DIMENSION` and the cumulative bitmap budget.
+    private static RemoteViews renderVector(JSONObject node, RenderContext rc) {
+        RemoteViews rv = new RemoteViews(rc.pkg, rc.layout("cn1_surface_image"));
+        Bitmap bmp = renderVectorBitmap(node, rc);
+        if (bmp != null) {
+            rv.setImageViewBitmap(rc.rootId(), bmp);
+        }
+        return rv;
+    }
+
+    private static Bitmap renderVectorBitmap(JSONObject node, RenderContext rc) {
+        double vw = node.optDouble("vw", 0);
+        double vh = node.optDouble("vh", 0);
+        JSONArray ops = node.optJSONArray("ops");
+        if (vw <= 0 || vh <= 0 || ops == null) {
+            return null;
+        }
+        int wDips = node.optInt("w", 0);
+        int hDips = node.optInt("h", 0);
+        if (wDips <= 0) {
+            wDips = (int) Math.round(vw);
+        }
+        if (hDips <= 0) {
+            hDips = (int) Math.round(vh);
+        }
+        int wpx = Math.min(rc.dip(wDips), MAX_BITMAP_DIMENSION);
+        int hpx = Math.min(rc.dip(hDips), MAX_BITMAP_DIMENSION);
+        if (wpx <= 0 || hpx <= 0) {
+            return null;
+        }
+        int remaining = BITMAP_BUDGET_BYTES - rc.bitmapBytes;
+        if (wpx * hpx * 4 > remaining) {
+            // shrink instead of dropping: a blurry clock beats no clock
+            double shrink = Math.sqrt(remaining / (wpx * hpx * 4d));
+            wpx = (int) (wpx * shrink);
+            hpx = (int) (hpx * shrink);
+            if (wpx < 8 || hpx < 8) {
+                Log.w(TAG, "Skipping vector node: the rendered tree exceeds "
+                        + (BITMAP_BUDGET_BYTES / 1024) + "kb of bitmap data (binder "
+                        + "transactions cap RemoteViews payloads)");
+                return null;
+            }
+            Log.w(TAG, "Vector node downscaled to " + wpx + "x" + hpx
+                    + " to stay within the RemoteViews bitmap budget");
+        }
+        try {
+            Bitmap bmp = Bitmap.createBitmap(wpx, hpx, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bmp);
+            // scale the view box into the bitmap preserving aspect ratio, centered; after this
+            // all op coordinates, stroke widths and font sizes are in view-box units
+            float scale = (float) Math.min(wpx / vw, hpx / vh);
+            canvas.translate((float) (wpx - vw * scale) / 2f, (float) (hpx - vh * scale) / 2f);
+            canvas.scale(scale, scale);
+            drawVectorOps(canvas, ops, rc);
+            rc.bitmapBytes += wpx * hpx * 4;
+            return bmp;
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed to render vector node", t);
+            return null;
+        }
+    }
+
+    private static void drawVectorOps(Canvas canvas, JSONArray ops, RenderContext rc) {
+        for (int i = 0; i < ops.length(); i++) {
+            JSONObject op = ops.optJSONObject(i);
+            if (op == null) {
+                continue;
+            }
+            String o = op.optString("o", "");
+            if ("rot".equals(o)) {
+                canvas.save();
+                canvas.rotate(resolveDegrees(op, rc),
+                        (float) op.optDouble("px", 0), (float) op.optDouble("py", 0));
+                JSONArray nested = op.optJSONArray("ops");
+                if (nested != null) {
+                    drawVectorOps(canvas, nested, rc);
+                }
+                canvas.restore();
+                continue;
+            }
+            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            JSONObject c = op.optJSONObject("c");
+            paint.setColor(c == null ? (rc.dark ? LABEL_DARK : LABEL_LIGHT)
+                    : resolveColor(c, rc, LABEL_LIGHT, LABEL_DARK));
+            if ("fillRect".equals(o)) {
+                float x = (float) op.optDouble("x", 0);
+                float y = (float) op.optDouble("y", 0);
+                canvas.drawRect(x, y, x + (float) op.optDouble("w", 0),
+                        y + (float) op.optDouble("h", 0), paint);
+            } else if ("fillRoundRect".equals(o)) {
+                float x = (float) op.optDouble("x", 0);
+                float y = (float) op.optDouble("y", 0);
+                float corner = (float) op.optDouble("corner", 0);
+                canvas.drawRoundRect(new RectF(x, y, x + (float) op.optDouble("w", 0),
+                        y + (float) op.optDouble("h", 0)), corner, corner, paint);
+            } else if ("fillEllipse".equals(o)) {
+                canvas.drawOval(ellipseRect(op), paint);
+            } else if ("fillArc".equals(o)) {
+                // wire angles are clock convention (0 = 12 o'clock, clockwise); Canvas.drawArc
+                // starts at 3 o'clock advancing clockwise, so shift the start by -90
+                canvas.drawArc(ellipseRect(op), (float) op.optDouble("start", 0) - 90f,
+                        (float) op.optDouble("sweep", 0), true, paint);
+            } else if ("strokeEllipse".equals(o)) {
+                strokePaint(paint, op, false);
+                canvas.drawOval(ellipseRect(op), paint);
+            } else if ("strokeArc".equals(o)) {
+                strokePaint(paint, op, true);
+                canvas.drawArc(ellipseRect(op), (float) op.optDouble("start", 0) - 90f,
+                        (float) op.optDouble("sweep", 0), false, paint);
+            } else if ("line".equals(o)) {
+                strokePaint(paint, op, true);
+                canvas.drawLine((float) op.optDouble("x1", 0), (float) op.optDouble("y1", 0),
+                        (float) op.optDouble("x2", 0), (float) op.optDouble("y2", 0), paint);
+            } else if ("fillPath".equals(o)) {
+                Path path = vectorPath(op, true);
+                if (path != null) {
+                    canvas.drawPath(path, paint);
+                }
+            } else if ("strokePath".equals(o)) {
+                Path path = vectorPath(op, op.optBoolean("close", false));
+                if (path != null) {
+                    strokePaint(paint, op, true);
+                    canvas.drawPath(path, paint);
+                }
+            } else if ("text".equals(o)) {
+                String text = interpolate(op.optString("text", ""), rc.state);
+                if (text.length() > 0) {
+                    paint.setTextSize((float) op.optDouble("size", 14));
+                    paint.setTextAlign(Paint.Align.CENTER);
+                    String fw = op.optString("fw", "regular");
+                    if ("semibold".equals(fw) || "bold".equals(fw)) {
+                        paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+                    }
+                    // drawText positions the baseline at y, matching the wire contract
+                    canvas.drawText(text, (float) op.optDouble("x", 0),
+                            (float) op.optDouble("y", 0), paint);
+                }
+            }
+        }
+    }
+
+    private static float resolveDegrees(JSONObject op, RenderContext rc) {
+        String degKey = op.optString("degKey", null);
+        if (degKey != null && degKey.length() > 0 && rc.state != null) {
+            Object v = rc.state.opt(degKey);
+            if (v instanceof Number) {
+                return ((Number) v).floatValue();
+            }
+            return 0f;
+        }
+        return (float) op.optDouble("deg", 0);
+    }
+
+    private static RectF ellipseRect(JSONObject op) {
+        float cx = (float) op.optDouble("cx", 0);
+        float cy = (float) op.optDouble("cy", 0);
+        float rx = (float) op.optDouble("rx", 0);
+        float ry = (float) op.optDouble("ry", 0);
+        return new RectF(cx - rx, cy - ry, cx + rx, cy + ry);
+    }
+
+    private static void strokePaint(Paint paint, JSONObject op, boolean roundCaps) {
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth((float) op.optDouble("sw", 1));
+        if (roundCaps) {
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setStrokeJoin(Paint.Join.ROUND);
+        }
+    }
+
+    private static Path vectorPath(JSONObject op, boolean close) {
+        JSONArray pts = op.optJSONArray("pts");
+        if (pts == null || pts.length() < 4) {
+            return null;
+        }
+        Path path = new Path();
+        path.moveTo((float) pts.optDouble(0, 0), (float) pts.optDouble(1, 0));
+        for (int i = 2; i + 1 < pts.length(); i += 2) {
+            path.lineTo((float) pts.optDouble(i, 0), (float) pts.optDouble(i + 1, 0));
+        }
+        if (close) {
+            path.close();
+        }
+        return path;
     }
 
     private static RemoteViews renderSpacer(JSONObject node, RenderContext rc) {

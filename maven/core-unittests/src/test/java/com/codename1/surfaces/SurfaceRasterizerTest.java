@@ -210,6 +210,77 @@ class SurfaceRasterizerTest {
         assertEquals("open ${", SurfaceRasterizer.interpolate("open ${", null));
     }
 
+    // --- vector angle conversion and transforms -------------------------------------------
+
+    /** A point at clock angle d sits at (cos(clockRadians(d)), sin(clockRadians(d))). */
+    private static double[] clockUnitVector(double deg) {
+        double rad = SurfaceRasterizer.clockRadians(deg);
+        return new double[] {Math.cos(rad), Math.sin(rad)};
+    }
+
+    @Test
+    void clockAngleZeroPointsUpAndAdvancesClockwise() {
+        double[] up = clockUnitVector(0);
+        assertEquals(0.0, up[0], 1e-9);
+        assertEquals(-1.0, up[1], 1e-9);
+        double[] right = clockUnitVector(90);
+        assertEquals(1.0, right[0], 1e-9);
+        assertEquals(0.0, right[1], 1e-9);
+        double[] down = clockUnitVector(180);
+        assertEquals(0.0, down[0], 1e-9);
+        assertEquals(1.0, down[1], 1e-9);
+        double[] left = clockUnitVector(270);
+        assertEquals(-1.0, left[0], 1e-9);
+        assertEquals(0.0, left[1], 1e-9);
+    }
+
+    @Test
+    void clockAnglesConvertToCn1ArcConvention() {
+        // CN1 Graphics arcs: 0 = 3 o'clock, counterclockwise positive
+        assertEquals(90, SurfaceRasterizer.cn1ArcStartDegrees(0));
+        assertEquals(0, SurfaceRasterizer.cn1ArcStartDegrees(90));
+        assertEquals(-90, SurfaceRasterizer.cn1ArcStartDegrees(180));
+        assertEquals(-180, SurfaceRasterizer.cn1ArcStartDegrees(270));
+        // a clockwise sweep is a negative CN1 sweep
+        assertEquals(-90, SurfaceRasterizer.cn1ArcSweepDegrees(90));
+        assertEquals(360, SurfaceRasterizer.cn1ArcSweepDegrees(-360));
+    }
+
+    @Test
+    void composedRotationSpinsPointsClockwiseAroundThePivot() {
+        double[] identity = new double[] {1, 0, 0, 1, 0, 0};
+        // 90 degrees clockwise around (100, 100): the 12 o'clock point moves to 3 o'clock
+        double[] rot = SurfaceRasterizer.composeRotation(identity, 90, 100, 100);
+        double[] p = SurfaceRasterizer.transformPoint(rot, 100, 40);
+        assertEquals(160.0, p[0], 1e-6);
+        assertEquals(100.0, p[1], 1e-6);
+        // the pivot itself is a fixed point
+        double[] pivot = SurfaceRasterizer.transformPoint(rot, 100, 100);
+        assertEquals(100.0, pivot[0], 1e-6);
+        assertEquals(100.0, pivot[1], 1e-6);
+        // nested rotations compose: two 90s make a 180
+        double[] twice = SurfaceRasterizer.composeRotation(rot, 90, 100, 100);
+        double[] p2 = SurfaceRasterizer.transformPoint(twice, 100, 40);
+        assertEquals(100.0, p2[0], 1e-6);
+        assertEquals(160.0, p2[1], 1e-6);
+    }
+
+    @Test
+    void rotationComposesUnderScaleAndOffset() {
+        // the view-box mapping of a 200x200 view box into a 100x100 target at offset (10, 20)
+        double[] base = new double[] {0.5, 0, 0, 0.5, 10, 20};
+        double[] rot = SurfaceRasterizer.composeRotation(base, 90, 100, 100);
+        // pivot maps to the same pixel with or without rotation
+        double[] pivotPlain = SurfaceRasterizer.transformPoint(base, 100, 100);
+        double[] pivotRot = SurfaceRasterizer.transformPoint(rot, 100, 100);
+        assertEquals(pivotPlain[0], pivotRot[0], 1e-6);
+        assertEquals(pivotPlain[1], pivotRot[1], 1e-6);
+        // a hand pointing up rotates to point right, scaled and offset
+        double[] p = SurfaceRasterizer.transformPoint(rot, 100, 40);
+        assertEquals(10 + 160 * 0.5, p[0], 1e-6);
+        assertEquals(20 + 100 * 0.5, p[1], 1e-6);
+    }
+
     // --- colors --------------------------------------------------------------------------
 
     @Test

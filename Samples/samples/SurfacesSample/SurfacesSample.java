@@ -35,6 +35,7 @@ import com.codename1.surfaces.SurfaceNode;
 import com.codename1.surfaces.SurfaceProgress;
 import com.codename1.surfaces.SurfaceRow;
 import com.codename1.surfaces.SurfaceText;
+import com.codename1.surfaces.SurfaceVector;
 import com.codename1.surfaces.Surfaces;
 import com.codename1.surfaces.WidgetKind;
 import com.codename1.surfaces.WidgetSize;
@@ -54,6 +55,7 @@ import com.codename1.ui.util.Resources;
 import com.codename1.ui.util.UITimer;
 import com.codename1.util.Callback;
 
+import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -63,7 +65,9 @@ import java.util.Map;
  * for home-screen widgets and live activities. The sample is a delivery tracker -- it publishes a
  * widget timeline that advances from "preparing" to "delivered" over four minutes with an
  * OS-animated countdown to the ETA, and runs a live activity with Dynamic Island regions that the
- * app updates as the delivery progresses.
+ * app updates as the delivery progresses. A second widget kind is an analog clock built with
+ * {@link SurfaceVector}: the vector face publishes once and 60 per-minute timeline entries drive
+ * the hour/minute hand rotation angles through state keys.
  *
  * <p>Where to see the surfaces: in the simulator open "Widgets" &gt; "Widgets Preview" (the mock
  * Dynamic Island at the bottom shows the live activity). On an Android device add the "Delivery"
@@ -83,6 +87,7 @@ import java.util.Map;
  */
 public class SurfacesSample implements BackgroundFetch {
     private static final String KIND_DELIVERY = "delivery_status";
+    private static final String KIND_CLOCK = "analog_clock";
     private static final int ACCENT_COLOR = 0xff6a1b9a;
 
     private Form current;
@@ -105,6 +110,10 @@ public class SurfacesSample implements BackgroundFetch {
                 .setDescription("Track your order")
                 .addSupportedSize(WidgetSize.SMALL)
                 .addSupportedSize(WidgetSize.MEDIUM));
+        Surfaces.registerWidgetKind(new WidgetKind(KIND_CLOCK)
+                .setDisplayName("Analog Clock")
+                .setDescription("A vector clock face")
+                .addSupportedSize(WidgetSize.SMALL));
         // One handler receives every surface tap on the EDT -- including the tap that
         // cold-started the app (queued until this registration, flagged isColdStart()).
         Surfaces.setActionHandler(evt -> {
@@ -148,6 +157,10 @@ public class SurfacesSample implements BackgroundFetch {
         });
         f.add(publish);
 
+        Button publishClock = new Button("Publish clock widget");
+        publishClock.addActionListener(e -> publishClockTimeline());
+        f.add(publishClock);
+
         Button startActivity = new Button("Start Live Activity");
         startActivity.addActionListener(e -> startDeliveryActivity());
         f.add(startActivity);
@@ -169,6 +182,7 @@ public class SurfacesSample implements BackgroundFetch {
             // without any manual clicks.
             UITimer.timer(2000, false, f, () -> {
                 publishDeliveryTimeline();
+                publishClockTimeline();
                 startDeliveryActivity();
             });
         }
@@ -193,6 +207,7 @@ public class SurfacesSample implements BackgroundFetch {
     @Override
     public void performBackgroundFetch(long deadline, Callback<Boolean> onComplete) {
         publishDeliveryTimeline();
+        publishClockTimeline();
         onComplete.onSucess(Boolean.TRUE);
     }
 
@@ -212,6 +227,58 @@ public class SurfacesSample implements BackgroundFetch {
                 .addEntry(new Date(eta), deliveryState("Delivered", eta, 1f))
                 .setReloadPolicy(WidgetTimeline.RELOAD_AT_END);
         Surfaces.publish(KIND_DELIVERY, timeline);
+    }
+
+    /**
+     * Publishes the analog clock widget: a {@link SurfaceVector} face published once, plus 60
+     * per-minute timeline entries carrying only the {@code hourAngle}/{@code minuteAngle} state
+     * the rotation groups read. The OS flips entries on its own schedule, so the clock stays
+     * correct for an hour with zero app wakeups; the background fetch hook re-publishes the next
+     * hour of entries.
+     */
+    private void publishClockTimeline() {
+        WidgetTimeline timeline = new WidgetTimeline()
+                .setContent(buildClockFace())
+                .setReloadPolicy(WidgetTimeline.RELOAD_AT_END);
+        Calendar c = Calendar.getInstance();
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        long minuteStart = c.getTimeInMillis();
+        int baseMinutes = c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE);
+        for (int m = 0; m < 60; m++) {
+            int totalMinutes = baseMinutes + m;
+            Map<String, Object> state = new HashMap<>();
+            // clock convention: degrees, 0 = 12 o'clock, clockwise positive
+            state.put("minuteAngle", totalMinutes % 60 * 6f);
+            state.put("hourAngle", totalMinutes % 720 * 0.5f);
+            timeline.addEntry(new Date(minuteStart + m * 60000L), state);
+        }
+        Surfaces.publish(KIND_CLOCK, timeline);
+    }
+
+    /**
+     * The clock face: a filled dial with twelve tick marks, hour/minute hands driven by
+     * state-keyed rotation groups and a center hub. Everything is resolution independent --
+     * the 200x200 view box scales to whatever size the widget gets.
+     */
+    private SurfaceNode buildClockFace() {
+        SurfaceVector face = new SurfaceVector(200, 200)
+                .fillEllipse(100, 100, 96, 96, SurfaceColor.rgb(0xfffafafa, 0xff1c1c1e))
+                .strokeEllipse(100, 100, 96, 96, 4, SurfaceColor.rgb(ACCENT_COLOR));
+        for (int hour = 0; hour < 12; hour++) {
+            boolean quarter = hour % 3 == 0;
+            face.beginRotation(hour * 30f, 100, 100)
+                    .line(100, 10, 100, quarter ? 24 : 18, quarter ? 5 : 3, SurfaceColor.LABEL)
+                    .endRotation();
+        }
+        face.beginRotation("hourAngle", 100, 100)
+                .line(100, 100, 100, 52, 8, SurfaceColor.LABEL)
+                .endRotation()
+                .beginRotation("minuteAngle", 100, 100)
+                .line(100, 100, 100, 26, 5, SurfaceColor.rgb(ACCENT_COLOR))
+                .endRotation()
+                .fillEllipse(100, 100, 6, 6, SurfaceColor.rgb(ACCENT_COLOR));
+        return face;
     }
 
     /**

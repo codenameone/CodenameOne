@@ -481,6 +481,124 @@ class SurfaceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void vectorSerializationRoundTrips() throws Exception {
+        SurfaceVector vec = new SurfaceVector(200, 100)
+                .fillEllipse(100, 50, 96, 46, SurfaceColor.rgb(0xffffffff, 0xff202020))
+                .fillArc(100, 50, 40, 40, 0, 90, SurfaceColor.ACCENT)
+                .strokeArc(100, 50, 44, 44, 90, 180, 3.5f, SurfaceColor.SECONDARY_LABEL)
+                .fillRoundRect(10, 10, 30, 20, 4, SurfaceColor.LABEL)
+                .fillPath(new float[] {0, 0, 10, 0, 5, 8}, true, SurfaceColor.LABEL)
+                .beginRotation(90, 100, 50)
+                    .line(100, 50, 100, 10, 6, SurfaceColor.LABEL)
+                    .beginRotation("minuteAngle", 100, 50)
+                        .strokePath(new float[] {0, 0, 4, 4}, false, 2, SurfaceColor.ACCENT)
+                    .endRotation()
+                .endRotation()
+                .text("${label}", 100, 80, 14, SurfaceFontWeight.SEMIBOLD, SurfaceColor.LABEL);
+        WidgetTimeline t = new WidgetTimeline().setContent(vec);
+        Map<String, Object> doc = parse(SurfaceSerializer.serializeTimeline("clock", t,
+                new LinkedHashMap<String, byte[]>()));
+        Map<String, Object> layouts = (Map<String, Object>) doc.get("layouts");
+        Map<String, Object> root = (Map<String, Object>) layouts.get("default");
+        assertEquals("vec", root.get("t"));
+        assertEquals(200, asLong(root.get("vw")));
+        assertEquals(100, asLong(root.get("vh")));
+
+        List<Object> ops = (List<Object>) root.get("ops");
+        assertEquals(7, ops.size());
+
+        Map<String, Object> ellipse = (Map<String, Object>) ops.get(0);
+        assertEquals("fillEllipse", ellipse.get("o"));
+        assertEquals(100.0, ((Number) ellipse.get("cx")).doubleValue());
+        assertEquals(46.0, ((Number) ellipse.get("ry")).doubleValue());
+        Map<String, Object> ellipseColor = (Map<String, Object>) ellipse.get("c");
+        assertEquals(0xffffffffL, asLong(ellipseColor.get("l")) & 0xffffffffL);
+        assertEquals(0xff202020L, asLong(ellipseColor.get("d")) & 0xffffffffL);
+
+        Map<String, Object> arc = (Map<String, Object>) ops.get(1);
+        assertEquals("fillArc", arc.get("o"));
+        assertEquals(0.0, ((Number) arc.get("start")).doubleValue());
+        assertEquals(90.0, ((Number) arc.get("sweep")).doubleValue());
+        assertEquals("accent", ((Map<String, Object>) arc.get("c")).get("role"));
+
+        Map<String, Object> strokeArc = (Map<String, Object>) ops.get(2);
+        assertEquals("strokeArc", strokeArc.get("o"));
+        assertEquals(3.5, ((Number) strokeArc.get("sw")).doubleValue());
+
+        Map<String, Object> roundRect = (Map<String, Object>) ops.get(3);
+        assertEquals("fillRoundRect", roundRect.get("o"));
+        assertEquals(4.0, ((Number) roundRect.get("corner")).doubleValue());
+
+        Map<String, Object> path = (Map<String, Object>) ops.get(4);
+        assertEquals("fillPath", path.get("o"));
+        // JSONParser returns booleans as strings by default; renderers accept both
+        assertEquals("true", String.valueOf(path.get("close")));
+        List<Object> pts = (List<Object>) path.get("pts");
+        assertEquals(6, pts.size());
+        assertEquals(10.0, ((Number) pts.get(2)).doubleValue());
+        assertEquals(8.0, ((Number) pts.get(5)).doubleValue());
+
+        Map<String, Object> rot = (Map<String, Object>) ops.get(5);
+        assertEquals("rot", rot.get("o"));
+        assertEquals(90.0, ((Number) rot.get("deg")).doubleValue());
+        assertEquals(100.0, ((Number) rot.get("px")).doubleValue());
+        assertEquals(50.0, ((Number) rot.get("py")).doubleValue());
+        List<Object> rotOps = (List<Object>) rot.get("ops");
+        assertEquals(2, rotOps.size());
+        Map<String, Object> line = (Map<String, Object>) rotOps.get(0);
+        assertEquals("line", line.get("o"));
+        assertEquals(6.0, ((Number) line.get("sw")).doubleValue());
+        Map<String, Object> nestedRot = (Map<String, Object>) rotOps.get(1);
+        assertEquals("rot", nestedRot.get("o"));
+        assertEquals("minuteAngle", nestedRot.get("degKey"));
+        assertNull(nestedRot.get("deg"));
+        List<Object> nestedOps = (List<Object>) nestedRot.get("ops");
+        assertEquals(1, nestedOps.size());
+        assertEquals("strokePath", ((Map<String, Object>) nestedOps.get(0)).get("o"));
+
+        Map<String, Object> text = (Map<String, Object>) ops.get(6);
+        assertEquals("text", text.get("o"));
+        assertEquals("${label}", text.get("text"));
+        assertEquals("semibold", text.get("fw"));
+        assertEquals(14.0, ((Number) text.get("size")).doubleValue());
+    }
+
+    @Test
+    void vectorUnbalancedRotationThrows() {
+        final SurfaceVector open = new SurfaceVector(100, 100)
+                .beginRotation(45, 50, 50)
+                .line(50, 50, 50, 10, 2, SurfaceColor.LABEL);
+        final WidgetTimeline t = new WidgetTimeline().setContent(open);
+        assertThrows(IllegalStateException.class, new org.junit.jupiter.api.function.Executable() {
+            public void execute() {
+                SurfaceSerializer.serializeTimeline("k", t,
+                        new LinkedHashMap<String, byte[]>());
+            }
+        });
+        assertThrows(IllegalStateException.class, new org.junit.jupiter.api.function.Executable() {
+            public void execute() {
+                new SurfaceVector(100, 100).endRotation();
+            }
+        });
+    }
+
+    @Test
+    void vectorOpCountIsCapped() {
+        SurfaceVector vec = new SurfaceVector(100, 100);
+        for (int i = 0; i < 513; i++) {
+            vec.line(0, 0, 100, 100, 1, SurfaceColor.LABEL);
+        }
+        final WidgetTimeline t = new WidgetTimeline().setContent(vec);
+        assertThrows(IllegalArgumentException.class, new org.junit.jupiter.api.function.Executable() {
+            public void execute() {
+                SurfaceSerializer.serializeTimeline("k", t,
+                        new LinkedHashMap<String, byte[]>());
+            }
+        });
+    }
+
+    @Test
     void kindSerializationIncludesSizesAndDefaults() throws Exception {
         WidgetKind k = new WidgetKind("scores");
         Map<String, Object> doc = parse(SurfaceSerializer.serializeKind(k));

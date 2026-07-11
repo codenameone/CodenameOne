@@ -255,7 +255,7 @@ public abstract class SurfaceNode {
     }
 
     /// Returns the wire-format type tag of this node (`col`, `row`, `box`, `text`, `dyn`, `img`,
-    /// `prog`, `spacer`).
+    /// `prog`, `vec`, `spacer`).
     abstract String getType();
 
     /// Adds the node-specific keys to the serialized form. Image nodes register their PNG bytes

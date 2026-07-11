@@ -46,6 +46,8 @@ func cn1RenderNode(_ node: [String: Any], _ ctx: CN1RenderContext, depth: Int = 
         content = cn1RenderImage(node, ctx)
     case "prog":
         content = cn1RenderProgress(node, ctx)
+    case "vec":
+        content = cn1RenderVector(node, ctx)
     case "spacer":
         content = AnyView(Spacer(minLength: cn1CGFloat(node["min"]) ?? 0))
     default:
@@ -267,6 +269,171 @@ private func cn1RenderProgress(_ node: [String: Any], _ ctx: CN1RenderContext) -
         view = AnyView(view.tint(color))
     }
     return view
+}
+
+// MARK: - Vector nodes
+
+/// Renders a "vec" node with SwiftUI Canvas: the retained op list replays in paint order in the
+/// node's view-box coordinate space, scaled to the laid-out bounds preserving aspect ratio (the
+/// aspectRatio modifier keeps the proposed size at the view-box ratio, and the in-canvas
+/// translate/scale centers the drawing for any residual mismatch). Wire angles use the clock
+/// convention: degrees, 0 = 12 o'clock, clockwise positive -- see cn1ClockAngle.
+private func cn1RenderVector(_ node: [String: Any], _ ctx: CN1RenderContext) -> AnyView {
+    guard let vw = cn1CGFloat(node["vw"]), let vh = cn1CGFloat(node["vh"]), vw > 0, vh > 0,
+          let ops = cn1Arr(node, "ops") else {
+        return AnyView(EmptyView())
+    }
+    let state = ctx.state
+    return AnyView(Canvas { context, size in
+        let scale = min(size.width / vw, size.height / vh)
+        guard scale > 0 else {
+            return
+        }
+        context.translateBy(x: (size.width - vw * scale) / 2, y: (size.height - vh * scale) / 2)
+        context.scaleBy(x: scale, y: scale)
+        cn1DrawVectorOps(ops, &context, state)
+    }.aspectRatio(vw / vh, contentMode: .fit))
+}
+
+private func cn1DrawVectorOps(_ ops: [Any], _ context: inout GraphicsContext, _ state: [String: Any]) {
+    for rawOp in ops {
+        guard let op = rawOp as? [String: Any], let o = cn1Str(op, "o") else {
+            continue
+        }
+        if o == "rot" {
+            // rotation groups: copy the context (an independent drawing state over the same
+            // canvas) and compose translate * rotate * translate about the pivot
+            var deg = cn1CGFloat(op["deg"]) ?? 0
+            if let key = cn1Str(op, "degKey") {
+                deg = cn1CGFloat(state[key]) ?? 0
+            }
+            let px = cn1CGFloat(op["px"]) ?? 0
+            let py = cn1CGFloat(op["py"]) ?? 0
+            var inner = context
+            inner.translateBy(x: px, y: py)
+            // GraphicsContext rotation advances clockwise in y-down space, matching the wire
+            inner.rotate(by: .degrees(Double(deg)))
+            inner.translateBy(x: -px, y: -py)
+            if let nested = cn1Arr(op, "ops") {
+                cn1DrawVectorOps(nested, &inner, state)
+            }
+            continue
+        }
+        let color = cn1Color(op["c"]) ?? Color.primary
+        let shading = GraphicsContext.Shading.color(color)
+        let strokeWidth = cn1CGFloat(op["sw"]) ?? 1
+        switch o {
+        case "fillRect":
+            context.fill(Path(cn1OpRect(op)), with: shading)
+        case "fillRoundRect":
+            let corner = cn1CGFloat(op["corner"]) ?? 0
+            context.fill(Path(roundedRect: cn1OpRect(op), cornerRadius: corner), with: shading)
+        case "fillEllipse":
+            context.fill(Path(ellipseIn: cn1EllipseRect(op)), with: shading)
+        case "fillArc":
+            context.fill(cn1ArcPath(op, pie: true), with: shading)
+        case "strokeEllipse":
+            context.stroke(Path(ellipseIn: cn1EllipseRect(op)), with: shading,
+                    style: StrokeStyle(lineWidth: strokeWidth))
+        case "strokeArc":
+            context.stroke(cn1ArcPath(op, pie: false), with: shading,
+                    style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round))
+        case "line":
+            var path = Path()
+            path.move(to: CGPoint(x: cn1CGFloat(op["x1"]) ?? 0, y: cn1CGFloat(op["y1"]) ?? 0))
+            path.addLine(to: CGPoint(x: cn1CGFloat(op["x2"]) ?? 0, y: cn1CGFloat(op["y2"]) ?? 0))
+            context.stroke(path, with: shading,
+                    style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round))
+        case "fillPath":
+            if let path = cn1PolyPath(op, close: true) {
+                context.fill(path, with: shading)
+            }
+        case "strokePath":
+            if let path = cn1PolyPath(op, close: cn1Bool(op["close"])) {
+                context.stroke(path, with: shading, style: StrokeStyle(
+                        lineWidth: strokeWidth, lineCap: .round, lineJoin: .round))
+            }
+        case "text":
+            cn1DrawVectorText(op, &context, state, color)
+        default:
+            // unknown ops are skipped so newer documents degrade gracefully
+            break
+        }
+    }
+}
+
+private func cn1OpRect(_ op: [String: Any]) -> CGRect {
+    return CGRect(x: cn1CGFloat(op["x"]) ?? 0, y: cn1CGFloat(op["y"]) ?? 0,
+            width: cn1CGFloat(op["w"]) ?? 0, height: cn1CGFloat(op["h"]) ?? 0)
+}
+
+private func cn1EllipseRect(_ op: [String: Any]) -> CGRect {
+    let cx = cn1CGFloat(op["cx"]) ?? 0
+    let cy = cn1CGFloat(op["cy"]) ?? 0
+    let rx = cn1CGFloat(op["rx"]) ?? 0
+    let ry = cn1CGFloat(op["ry"]) ?? 0
+    return CGRect(x: cx - rx, y: cy - ry, width: rx * 2, height: ry * 2)
+}
+
+/// Builds an elliptical arc path from wire clock angles as a unit-circle arc scaled to (rx, ry)
+/// about the center, so ellipses work through a circular addArc. Note that Path.addArc's
+/// `clockwise` flag is inverted in y-down coordinates: clockwise:false sweeps visually
+/// clockwise, matching the wire's positive (clockwise) sweeps.
+private func cn1ArcPath(_ op: [String: Any], pie: Bool) -> Path {
+    let cx = cn1CGFloat(op["cx"]) ?? 0
+    let cy = cn1CGFloat(op["cy"]) ?? 0
+    let rx = cn1CGFloat(op["rx"]) ?? 0
+    let ry = cn1CGFloat(op["ry"]) ?? 0
+    let start = cn1CGFloat(op["start"]) ?? 0
+    let sweep = cn1CGFloat(op["sweep"]) ?? 0
+    var path = Path()
+    if pie {
+        path.move(to: .zero)
+    }
+    path.addArc(center: .zero, radius: 1, startAngle: cn1ClockAngle(start),
+            endAngle: cn1ClockAngle(start + sweep), clockwise: sweep < 0)
+    if pie {
+        path.closeSubpath()
+    }
+    return path.applying(CGAffineTransform(translationX: cx, y: cy).scaledBy(x: rx, y: ry))
+}
+
+private func cn1PolyPath(_ op: [String: Any], close: Bool) -> Path? {
+    let pts = cn1PointList(op["pts"])
+    if pts.count < 2 {
+        return nil
+    }
+    var path = Path()
+    path.move(to: pts[0])
+    for pt in pts.dropFirst() {
+        path.addLine(to: pt)
+    }
+    if close {
+        path.closeSubpath()
+    }
+    return path
+}
+
+/// Draws a vector text op: anchored at the middle of x with the baseline at y (the wire
+/// contract), resolved so the measured first baseline can position the text exactly.
+private func cn1DrawVectorText(_ op: [String: Any], _ context: inout GraphicsContext,
+        _ state: [String: Any], _ color: Color) {
+    let value = cn1Interpolate(cn1Str(op, "text") ?? "", state: state)
+    if value.isEmpty {
+        return
+    }
+    let size = cn1CGFloat(op["size"]) ?? 14
+    let text = Text(value)
+            .font(.system(size: size, weight: cn1FontWeight(op["fw"])))
+            .foregroundColor(color)
+    let resolved = context.resolve(text)
+    let measured = resolved.measure(in: CGSize(width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude))
+    let baseline = resolved.firstBaseline(in: measured)
+    let x = cn1CGFloat(op["x"]) ?? 0
+    let y = cn1CGFloat(op["y"]) ?? 0
+    context.draw(resolved, at: CGPoint(x: x - measured.width / 2, y: y - baseline),
+            anchor: .topLeading)
 }
 
 // MARK: - Shared modifiers
