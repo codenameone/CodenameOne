@@ -842,8 +842,8 @@ public final class SurfaceRasterizer {
                         asDouble(op.get("sw"), 1) * scale);
             } else if ("line".equals(o)) {
                 strokeVectorPoly(g, shapes, t, new double[] {
-                    asDouble(op.get("x1"), 0), asDouble(op.get("y1"), 0),
-                    asDouble(op.get("x2"), 0), asDouble(op.get("y2"), 0)
+                        asDouble(op.get("x1"), 0), asDouble(op.get("y1"), 0),
+                        asDouble(op.get("x2"), 0), asDouble(op.get("y2"), 0)
                 }, false, asDouble(op.get("sw"), 1) * scale);
             } else if ("fillPath".equals(o)) {
                 fillVectorPoly(g, shapes, t, pointsOf(op));
