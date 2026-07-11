@@ -20,7 +20,7 @@
 </modules>
   <properties>
     <cn1.plugin.version>${cn1.version}</cn1.plugin.version>
-    <cn1.version>7.0.255</cn1.version>
+    <cn1.version>7.0.258</cn1.version>
     <!-- The bean-shell access registry is generated against the same
          Codename One sources the playground ships. The deployed
          JavaScript bundle now builds with the local ParparVM
