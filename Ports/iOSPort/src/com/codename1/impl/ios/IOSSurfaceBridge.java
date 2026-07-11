@@ -26,7 +26,6 @@ import com.codename1.io.FileSystemStorage;
 import com.codename1.io.JSONParser;
 import com.codename1.io.Log;
 import com.codename1.surfaces.spi.SurfaceBridge;
-import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Map;
@@ -45,11 +44,16 @@ import java.util.Map;
 /// `IOSNative`, which trampoline into the Swift `CN1SurfaceBridge` class compiled into the app
 /// target (WidgetKit/ActivityKit are Swift-only frameworks).
 ///
+/// All file IO goes through `FileSystemStorage` (which tolerates the container's plain absolute
+/// paths): `java.io.File`'s mutating methods are unimplemented natives on the ParparVM iOS
+/// runtime -- referencing them fails the native link.
+///
 /// This whole class is dead code unless the build linked the surfaces natives (the
 /// `CN1_USE_WIDGETS` define the builder flips when the app references `com.codename1.surfaces`);
 /// without it every native answers unsupported and the public API no-ops.
 final class IOSSurfaceBridge implements SurfaceBridge {
     private final IOSNative nativeInstance;
+    private final FileSystemStorage fs = FileSystemStorage.getInstance();
     private boolean warnedNoContainer;
 
     IOSSurfaceBridge(IOSNative nativeInstance) {
@@ -75,9 +79,9 @@ final class IOSSurfaceBridge implements SurfaceBridge {
             if (!(id instanceof String) || ((String) id).length() == 0) {
                 return;
             }
-            File kindsDir = new File(container, "cn1surfaces/kinds");
-            mkdirs(kindsDir);
-            writeAtomically(new File(kindsDir, id + ".json"), kindJson.getBytes("UTF-8"));
+            String kindsDir = container + "/cn1surfaces/kinds";
+            mkdirs(container, "cn1surfaces/kinds");
+            writeAtomically(kindsDir, id + ".json", kindJson.getBytes("UTF-8"));
         } catch (IOException e) {
             Log.e(e);
         }
@@ -90,10 +94,10 @@ final class IOSSurfaceBridge implements SurfaceBridge {
             return;
         }
         try {
-            File kindDir = new File(container, "cn1surfaces/" + kindId);
-            mkdirs(kindDir);
+            String kindDir = container + "/cn1surfaces/" + kindId;
+            mkdirs(container, "cn1surfaces/" + kindId);
             writeImages(kindDir, images);
-            writeAtomically(new File(kindDir, "timeline.json"), timelineJson.getBytes("UTF-8"));
+            writeAtomically(kindDir, "timeline.json", timelineJson.getBytes("UTF-8"));
             // GC after the replacement timeline is in place: content-hash names mean
             // frequently changing art would otherwise grow the container without bound
             deleteUnreferencedImages(kindDir, timelineJson);
@@ -120,8 +124,8 @@ final class IOSSurfaceBridge implements SurfaceBridge {
             // Image names are content hashes so a shared directory dedups across activities;
             // the descriptor references them by name exactly like a widget timeline does.
             try {
-                File actDir = new File(container, "cn1surfaces/activities");
-                mkdirs(actDir);
+                String actDir = container + "/cn1surfaces/activities";
+                mkdirs(container, "cn1surfaces/activities");
                 writeImages(actDir, images);
             } catch (IOException e) {
                 Log.e(e);
@@ -159,16 +163,19 @@ final class IOSSurfaceBridge implements SurfaceBridge {
             }
             return null;
         }
+        if (container.endsWith("/")) {
+            container = container.substring(0, container.length() - 1);
+        }
         return container;
     }
 
-    private void writeImages(File dir, Map<String, byte[]> images) throws IOException {
+    private void writeImages(String dir, Map<String, byte[]> images) throws IOException {
         if (images == null) {
             return;
         }
         for (Map.Entry<String, byte[]> e : images.entrySet()) {
-            File png = new File(dir, e.getKey() + ".png");
-            if (png.exists()) {
+            String png = dir + "/" + e.getKey() + ".png";
+            if (fs.exists(png)) {
                 // Names derive from a content hash, so an existing file is the same bytes.
                 continue;
             }
@@ -178,20 +185,22 @@ final class IOSSurfaceBridge implements SurfaceBridge {
 
     /// Writes `<name>.tmp` then renames over the target so the widget extension, which may read
     /// concurrently from another process, never sees a partially written document.
-    private void writeAtomically(File target, byte[] data) throws IOException {
-        File tmp = new File(target.getPath() + ".tmp");
+    private void writeAtomically(String dir, String name, byte[] data) throws IOException {
+        String target = dir + "/" + name;
+        String tmp = target + ".tmp";
         write(tmp, data);
-        if (target.exists() && !target.delete()) {
-            throw new IOException("Failed to replace " + target.getPath());
+        if (fs.exists(target)) {
+            fs.delete(target);
         }
-        if (!tmp.renameTo(target)) {
-            throw new IOException("Failed to rename " + tmp.getPath()
-                    + " to " + target.getPath());
+        // a relative new name renames within the same directory
+        fs.rename(tmp, name);
+        if (!fs.exists(target)) {
+            throw new IOException("Failed to rename " + tmp + " to " + target);
         }
     }
 
-    private void write(File f, byte[] data) throws IOException {
-        OutputStream os = FileSystemStorage.getInstance().openOutputStream(f.getPath());
+    private void write(String path, byte[] data) throws IOException {
+        OutputStream os = fs.openOutputStream(path);
         try {
             os.write(data);
         } finally {
@@ -199,9 +208,25 @@ final class IOSSurfaceBridge implements SurfaceBridge {
         }
     }
 
-    private void mkdirs(File dir) throws IOException {
-        if (!dir.exists() && !dir.mkdirs()) {
-            throw new IOException("Failed to create " + dir.getPath());
+    /// Creates the nested directories of `relative` (slash-separated) under `base` one level at
+    /// a time: `FileSystemStorage.mkdir` has no mkdirs equivalent.
+    private void mkdirs(String base, String relative) {
+        String current = base;
+        int start = 0;
+        while (start < relative.length()) {
+            int slash = relative.indexOf('/', start);
+            String segment = slash < 0 ? relative.substring(start)
+                    : relative.substring(start, slash);
+            if (segment.length() > 0) {
+                current = current + "/" + segment;
+                if (!fs.exists(current)) {
+                    fs.mkdir(current);
+                }
+            }
+            if (slash < 0) {
+                break;
+            }
+            start = slash + 1;
         }
     }
 
@@ -210,7 +235,7 @@ final class IOSSurfaceBridge implements SurfaceBridge {
     /// serializer includes registered-name references, not just newly shipped blobs). Runs after
     /// the new `timeline.json` is in place so a concurrently rendering extension re-reads the
     /// replacement document first.
-    private void deleteUnreferencedImages(File kindDir, String timelineJson) {
+    private void deleteUnreferencedImages(String kindDir, String timelineJson) {
         try {
             Map<String, Object> doc = new JSONParser()
                     .parseJSON(new java.io.StringReader(timelineJson));
@@ -221,17 +246,21 @@ final class IOSSurfaceBridge implements SurfaceBridge {
                     referenced.add(String.valueOf(o));
                 }
             }
-            File[] files = kindDir.listFiles();
+            String[] files = fs.listFiles(kindDir);
             if (files == null) {
                 return;
             }
-            for (File f : files) {
-                String name = f.getName();
+            for (String name : files) {
+                if (name == null) {
+                    continue;
+                }
+                // listFiles returns child names; directories carry a trailing slash on some ports
+                if (name.endsWith("/")) {
+                    continue;
+                }
                 if (name.endsWith(".png")
                         && !referenced.contains(name.substring(0, name.length() - 4))) {
-                    if (!f.delete()) {
-                        Log.p("Surfaces: failed to delete stale image " + f.getPath());
-                    }
+                    fs.delete(kindDir + "/" + name);
                 }
             }
         } catch (Exception e) {
