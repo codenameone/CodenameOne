@@ -91,6 +91,8 @@ import com.codename1.ui.Stroke;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextSelection;
 import com.codename1.ui.Transform;
+import com.codename1.ui.accessibility.AccessibilityManager;
+import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
@@ -11130,6 +11132,27 @@ public abstract class CodenameOneImplementation {
     public void announceForAccessibility(Component cmp, String text) {
         // No-op by default. Platforms that support accessibility announcements
         // should override this method.
+    }
+
+    /// Called after the portable semantic tree changes. Platform ports should
+    /// invalidate their native virtual accessibility roots and request the latest
+    /// immutable snapshot with {@link #getAccessibilityTreeSnapshot()}.
+    public void accessibilityTreeChanged(int changeType) {
+    }
+
+    /// Returns the latest immutable semantic tree for the current form.
+    public AccessibilityTreeSnapshot getAccessibilityTreeSnapshot() {
+        return AccessibilityManager.getInstance().getCurrentSnapshot();
+    }
+
+    /// Dispatches an action from a native virtual accessibility node onto the EDT.
+    public boolean performAccessibilityAction(long nodeId, String actionId, Object argument) {
+        return AccessibilityManager.getInstance().performAction(nodeId, actionId, argument);
+    }
+
+    /// Returns true when this port exposes the portable virtual semantic tree.
+    public boolean isAccessibilityTreeSupported() {
+        return false;
     }
 
     /// Returns true if the user has selected larger type fonts in the system settings.

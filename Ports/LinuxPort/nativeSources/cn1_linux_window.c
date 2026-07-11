@@ -95,6 +95,7 @@ static GtkWidget* cn1Window = 0;
 static GtkWidget* cn1DrawingArea = 0;
 static GtkWidget* cn1Overlay = 0;       /* GtkOverlay: drawing area + native widget layer */
 static GtkWidget* cn1Fixed = 0;         /* GtkFixed overlay hosting positioned native peers */
+static GtkWidget* cn1AccessibilityFixed = 0; /* transparent GTK/ATK semantic hierarchy */
 static CN1Graphics cn1WindowG;          /* the on-screen / headless back buffer */
 static int cn1DisplayWidth = 800;
 static int cn1DisplayHeight = 600;
@@ -602,6 +603,10 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_initDisplay___java_lang_String_in
     cn1Fixed = gtk_fixed_new();
     gtk_overlay_add_overlay(GTK_OVERLAY(cn1Overlay), cn1Fixed);
     gtk_overlay_set_overlay_pass_through(GTK_OVERLAY(cn1Overlay), cn1Fixed, TRUE);
+    cn1AccessibilityFixed = gtk_fixed_new();
+    gtk_widget_set_opacity(cn1AccessibilityFixed, 0.01);
+    gtk_overlay_add_overlay(GTK_OVERLAY(cn1Overlay), cn1AccessibilityFixed);
+    gtk_overlay_set_overlay_pass_through(GTK_OVERLAY(cn1Overlay), cn1AccessibilityFixed, TRUE);
     gtk_container_add(GTK_CONTAINER(cn1Window), cn1Overlay);
 
     g_signal_connect(cn1DrawingArea, "draw", G_CALLBACK(cn1OnDraw), 0);
@@ -712,6 +717,223 @@ JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_pollEvent___int_1ARRAY_R_boole
         }
     }
     return JAVA_FALSE;
+}
+
+/* ------------------------------------------------ accessibility / AT-SPI */
+
+typedef struct CN1A11yEntry {
+    long long id;
+    long long parentId;
+    GtkWidget* widget;
+    int x, y;
+    struct CN1A11yEntry* next;
+} CN1A11yEntry;
+
+typedef struct {
+    long long nodeId;
+    int actionHash;
+    char* actionId;
+    char* label;
+} CN1A11yAction;
+
+static CN1A11yEntry* cn1A11yEntries = 0;
+
+static void cn1A11yFreeEntries(void) {
+    CN1A11yEntry* entry = cn1A11yEntries;
+    while (entry) {
+        CN1A11yEntry* next = entry->next;
+        free(entry);
+        entry = next;
+    }
+    cn1A11yEntries = 0;
+}
+
+static CN1A11yEntry* cn1A11yFind(long long id) {
+    CN1A11yEntry* entry;
+    for (entry = cn1A11yEntries; entry; entry = entry->next) {
+        if (entry->id == id) return entry;
+    }
+    return 0;
+}
+
+static AtkRole cn1A11yRole(const char* role) {
+    if (!role) return ATK_ROLE_PANEL;
+    if (!strcmp(role, "BUTTON") || !strcmp(role, "TOGGLE_BUTTON")) return ATK_ROLE_PUSH_BUTTON;
+    if (!strcmp(role, "CHECKBOX")) return ATK_ROLE_CHECK_BOX;
+    if (!strcmp(role, "RADIO_BUTTON")) return ATK_ROLE_RADIO_BUTTON;
+    if (!strcmp(role, "SWITCH")) return ATK_ROLE_TOGGLE_BUTTON;
+    if (!strcmp(role, "HEADING")) return ATK_ROLE_HEADING;
+    if (!strcmp(role, "LINK")) return ATK_ROLE_LINK;
+    if (!strcmp(role, "IMAGE")) return ATK_ROLE_IMAGE;
+    if (!strcmp(role, "STATIC_TEXT")) return ATK_ROLE_LABEL;
+    if (!strcmp(role, "TEXT_FIELD") || !strcmp(role, "SEARCH_FIELD")) return ATK_ROLE_ENTRY;
+    if (!strcmp(role, "SLIDER")) return ATK_ROLE_SLIDER;
+    if (!strcmp(role, "PROGRESS_BAR")) return ATK_ROLE_PROGRESS_BAR;
+    if (!strcmp(role, "LIST")) return ATK_ROLE_LIST;
+    if (!strcmp(role, "LIST_ITEM")) return ATK_ROLE_LIST_ITEM;
+    if (!strcmp(role, "GRID")) return ATK_ROLE_TABLE;
+    if (!strcmp(role, "ROW")) return ATK_ROLE_TABLE_ROW;
+    if (!strcmp(role, "CELL")) return ATK_ROLE_TABLE_CELL;
+    if (!strcmp(role, "COLUMN_HEADER")) return ATK_ROLE_COLUMN_HEADER;
+    if (!strcmp(role, "ROW_HEADER")) return ATK_ROLE_ROW_HEADER;
+    if (!strcmp(role, "TAB_LIST")) return ATK_ROLE_PAGE_TAB_LIST;
+    if (!strcmp(role, "TAB")) return ATK_ROLE_PAGE_TAB;
+    if (!strcmp(role, "DIALOG")) return ATK_ROLE_DIALOG;
+    if (!strcmp(role, "ALERT")) return ATK_ROLE_ALERT;
+    if (!strcmp(role, "MENU")) return ATK_ROLE_MENU;
+    if (!strcmp(role, "MENU_ITEM")) return ATK_ROLE_MENU_ITEM;
+    if (!strcmp(role, "TOOLBAR")) return ATK_ROLE_TOOL_BAR;
+    if (!strcmp(role, "SCROLL_BAR")) return ATK_ROLE_SCROLL_BAR;
+    if (!strcmp(role, "COMBO_BOX")) return ATK_ROLE_COMBO_BOX;
+    if (!strcmp(role, "TREE")) return ATK_ROLE_TREE;
+    if (!strcmp(role, "TREE_ITEM")) return ATK_ROLE_TREE_ITEM;
+    if (!strcmp(role, "SEPARATOR")) return ATK_ROLE_SEPARATOR;
+    return ATK_ROLE_PANEL;
+}
+
+static void cn1A11yBeginMain(void* ignored) {
+    (void) ignored;
+    cn1A11yFreeEntries();
+    if (cn1AccessibilityFixed) {
+        GList* children = gtk_container_get_children(GTK_CONTAINER(cn1AccessibilityFixed));
+        GList* item;
+        for (item = children; item; item = item->next) {
+            gtk_widget_destroy(GTK_WIDGET(item->data));
+        }
+        g_list_free(children);
+    }
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_accessibilityBegin__(CODENAME_ONE_THREAD_STATE) {
+    cn1LinuxRunOnMainAndWait(cn1A11yBeginMain, 0);
+}
+
+typedef struct {
+    long long id, parentId;
+    char *role, *label, *description, *value;
+    int x, y, width, height, flags;
+} CN1A11yNodeCall;
+
+static GtkWidget* cn1A11yWidget(const char* role, const char* label, const char* value, int flags) {
+    GtkWidget* widget;
+    if (role && (!strcmp(role, "BUTTON") || !strcmp(role, "TOGGLE_BUTTON") || !strcmp(role, "SWITCH"))) {
+        widget = gtk_toggle_button_new_with_label(label ? label : "");
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), (flags & 0x30) == 0x20);
+        gtk_toggle_button_set_inconsistent(GTK_TOGGLE_BUTTON(widget), (flags & 0x30) == 0x30);
+    } else if (role && (!strcmp(role, "CHECKBOX") || !strcmp(role, "RADIO_BUTTON"))) {
+        widget = gtk_check_button_new_with_label(label ? label : "");
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), (flags & 0x30) == 0x20);
+        gtk_toggle_button_set_inconsistent(GTK_TOGGLE_BUTTON(widget), (flags & 0x30) == 0x30);
+    } else if (role && (!strcmp(role, "TEXT_FIELD") || !strcmp(role, "SEARCH_FIELD"))) {
+        widget = gtk_entry_new();
+        if (value) gtk_entry_set_text(GTK_ENTRY(widget), value);
+    } else if (role && (!strcmp(role, "SLIDER") || !strcmp(role, "PROGRESS_BAR"))) {
+        widget = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 0, 100, 1);
+        if (value) gtk_range_set_value(GTK_RANGE(widget), atof(value));
+    } else {
+        widget = gtk_fixed_new();
+    }
+    return widget;
+}
+
+static void cn1A11yNodeMain(void* pointer) {
+    CN1A11yNodeCall* call = (CN1A11yNodeCall*) pointer;
+    CN1A11yEntry* parent = cn1A11yFind(call->parentId);
+    GtkWidget* host = parent ? parent->widget : cn1AccessibilityFixed;
+    GtkWidget* widget = cn1A11yWidget(call->role, call->label, call->value, call->flags);
+    AtkObject* accessible = gtk_widget_get_accessible(widget);
+    atk_object_set_role(accessible, cn1A11yRole(call->role));
+    if (call->label) atk_object_set_name(accessible, call->label);
+    if (call->description) atk_object_set_description(accessible, call->description);
+    gtk_widget_set_can_focus(widget, (call->flags & 1) != 0);
+    gtk_widget_set_sensitive(widget, (call->flags & 4) != 0);
+    gtk_widget_set_size_request(widget, call->width > 0 ? call->width : 1,
+            call->height > 0 ? call->height : 1);
+    if (host && GTK_IS_FIXED(host)) {
+        int px = parent ? call->x - parent->x : call->x;
+        int py = parent ? call->y - parent->y : call->y;
+        gtk_fixed_put(GTK_FIXED(host), widget, px, py);
+    } else if (host && GTK_IS_CONTAINER(host)) {
+        gtk_container_add(GTK_CONTAINER(host), widget);
+    }
+    gtk_widget_show_all(widget);
+    CN1A11yEntry* entry = (CN1A11yEntry*) calloc(1, sizeof(CN1A11yEntry));
+    entry->id = call->id; entry->parentId = call->parentId; entry->widget = widget;
+    entry->x = call->x; entry->y = call->y; entry->next = cn1A11yEntries; cn1A11yEntries = entry;
+    free(call->role); free(call->label); free(call->description); free(call->value); free(call);
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_accessibilityNode___long_long_java_lang_String_java_lang_String_java_lang_String_java_lang_String_int_int_int_int_int(
+        CODENAME_ONE_THREAD_STATE, JAVA_LONG id, JAVA_LONG parentId, JAVA_OBJECT role, JAVA_OBJECT label,
+        JAVA_OBJECT description, JAVA_OBJECT value, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height,
+        JAVA_INT flags) {
+    extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);
+    CN1A11yNodeCall* call = (CN1A11yNodeCall*) calloc(1, sizeof(CN1A11yNodeCall));
+    call->id = id; call->parentId = parentId; call->x = x; call->y = y;
+    call->width = width; call->height = height; call->flags = flags;
+    call->role = role == JAVA_NULL ? 0 : strdup(stringToUTF8(threadStateData, role));
+    call->label = label == JAVA_NULL ? 0 : strdup(stringToUTF8(threadStateData, label));
+    call->description = description == JAVA_NULL ? 0 : strdup(stringToUTF8(threadStateData, description));
+    call->value = value == JAVA_NULL ? 0 : strdup(stringToUTF8(threadStateData, value));
+    cn1LinuxRunOnMainAndWait(cn1A11yNodeMain, call);
+}
+
+static void cn1A11yActionActivated(GtkWidget* widget, gpointer pointer) {
+    CN1A11yAction* action = (CN1A11yAction*) pointer;
+    (void) widget;
+    cn1LinuxPushEvent(CN1_EVENT_ACCESSIBILITY_ACTION, (int) action->nodeId, 0, action->actionHash);
+}
+
+static void cn1A11yActionFree(gpointer pointer, GClosure* closure) {
+    CN1A11yAction* action = (CN1A11yAction*) pointer;
+    (void) closure;
+    free(action->actionId); free(action->label); free(action);
+}
+
+static void cn1A11yActionMain(void* pointer) {
+    CN1A11yAction* action = (CN1A11yAction*) pointer;
+    CN1A11yEntry* entry = cn1A11yFind(action->nodeId);
+    if (!entry) { cn1A11yActionFree(action, 0); return; }
+    if (!strcmp(action->actionId, "activate") || !strcmp(action->actionId, "focus")) {
+        if (GTK_IS_BUTTON(entry->widget)) {
+            g_signal_connect_data(entry->widget, "clicked", G_CALLBACK(cn1A11yActionActivated), action,
+                    cn1A11yActionFree, 0);
+            return;
+        }
+    } else {
+        GtkWidget* custom = gtk_button_new_with_label(action->label ? action->label : action->actionId);
+        AtkObject* accessible = gtk_widget_get_accessible(custom);
+        atk_object_set_name(accessible, action->label ? action->label : action->actionId);
+        atk_object_set_description(accessible, "Custom accessibility action");
+        gtk_widget_set_size_request(custom, entry->widget ? gtk_widget_get_allocated_width(entry->widget) : 1,
+                entry->widget ? gtk_widget_get_allocated_height(entry->widget) : 1);
+        gtk_fixed_put(GTK_FIXED(cn1AccessibilityFixed), custom, entry->x, entry->y);
+        gtk_widget_show(custom);
+        g_signal_connect_data(custom, "clicked", G_CALLBACK(cn1A11yActionActivated), action,
+                cn1A11yActionFree, 0);
+        return;
+    }
+    cn1A11yActionFree(action, 0);
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_accessibilityAction___long_java_lang_String_int_java_lang_String(
+        CODENAME_ONE_THREAD_STATE, JAVA_LONG nodeId, JAVA_OBJECT actionId, JAVA_INT actionHash, JAVA_OBJECT label) {
+    extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT);
+    CN1A11yAction* action = (CN1A11yAction*) calloc(1, sizeof(CN1A11yAction));
+    action->nodeId = nodeId; action->actionHash = actionHash;
+    action->actionId = actionId == JAVA_NULL ? strdup("") : strdup(stringToUTF8(threadStateData, actionId));
+    action->label = label == JAVA_NULL ? 0 : strdup(stringToUTF8(threadStateData, label));
+    cn1LinuxRunOnMainAndWait(cn1A11yActionMain, action);
+}
+
+static void cn1A11yEndMain(void* pointer) {
+    (void) pointer;
+    if (cn1AccessibilityFixed) gtk_widget_show_all(cn1AccessibilityFixed);
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_accessibilityEnd___int(CODENAME_ONE_THREAD_STATE, JAVA_INT changeType) {
+    (void) changeType;
+    cn1LinuxRunOnMainAndWait(cn1A11yEndMain, 0);
 }
 
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_pumpMessages___R_boolean(CODENAME_ONE_THREAD_STATE) {

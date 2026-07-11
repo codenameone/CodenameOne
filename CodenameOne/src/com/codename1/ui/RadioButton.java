@@ -255,6 +255,7 @@ public class RadioButton extends Button {
         this.selected = selected;
         if (changed) {
             fireChangeEvent();
+            accessibilityChanged(com.codename1.ui.accessibility.AccessibilityManager.CHANGE_STATE);
         }
         repaint();
     }

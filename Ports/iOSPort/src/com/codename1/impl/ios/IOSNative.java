@@ -1213,6 +1213,8 @@ public final class IOSNative {
 
     public static native void announceForAccessibility(String text);
 
+    public static native void updateAccessibilityTree(String json, int changeType);
+
     // ============================================================
     // Crypto bridge -- backed by CN1Crypto.{h,m} in nativeSources/.
     //

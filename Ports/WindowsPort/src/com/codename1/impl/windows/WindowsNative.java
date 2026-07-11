@@ -143,6 +143,13 @@ public final class WindowsNative {
      */
     public static native boolean pollEvent(int[] out);
 
+    /** Rebuilds the Windows UI Automation virtual fragment tree. */
+    public static native void accessibilityBegin();
+    public static native void accessibilityNode(long id, long parentId, String role, String label,
+            String description, String value, int x, int y, int width, int height, int stateFlags);
+    public static native void accessibilityAction(long nodeId, String actionId, int actionHash, String label);
+    public static native void accessibilityEnd(int changeType);
+
     /**
      * True when an integrated or external touch digitizer is present, used for
      * {@code Display.isTouchScreen()} (queries GetSystemMetrics(SM_DIGITIZER)).

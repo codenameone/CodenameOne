@@ -471,6 +471,8 @@ static int cn1WinHandleGesture(HWND hwnd, LPARAM lParam) {
 
 LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
+        case WM_GETOBJECT:
+            return cn1WinAccessibilityObject(hwnd, wParam, lParam);
         case WM_LBUTTONDOWN:
             cn1WinButtonDown(hwnd, CN1_PE_MASK_PRIMARY);
             cn1WinPushEvent(CN1_EVENT_POINTER_PRESSED, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam),

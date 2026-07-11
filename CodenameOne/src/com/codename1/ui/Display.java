@@ -633,6 +633,22 @@ public final class Display extends CN1Constants {
         announceForAccessibility(null, text);
     }
 
+    /// Notifies the native port that the portable semantic tree changed. This is
+    /// primarily an internal bridge used by the accessibility subsystem.
+    ///
+    /// #### Parameters
+    ///
+    /// - `changeType`: bit mask of `AccessibilityManager.CHANGE_*` constants
+    public void accessibilityTreeChanged(int changeType) {
+        impl.accessibilityTreeChanged(changeType);
+    }
+
+    /// Returns true when the active port exposes lightweight components through
+    /// a native virtual accessibility tree.
+    public boolean isAccessibilityTreeSupported() {
+        return impl.isAccessibilityTreeSupported();
+    }
+
     /// Returns the status of the show during edit flag
     ///
     /// #### Returns
@@ -1730,6 +1746,9 @@ public final class Display extends CN1Constants {
         lastKeyPressed = 0;
         previousKeyPressed = 0;
         newForm.onShowCompletedImpl();
+        com.codename1.ui.accessibility.AccessibilityManager.getInstance().invalidate(
+                newForm, com.codename1.ui.accessibility.AccessibilityManager.CHANGE_STRUCTURE
+                | com.codename1.ui.accessibility.AccessibilityManager.CHANGE_PANE);
     }
 
     private boolean applyInitialWindowSize(Form form) {

@@ -304,7 +304,11 @@ public class Slider extends Label implements ActionSource {
     /// thumb sliders) can route their own input through the same value-set +
     /// repaint pipeline as the built-in handlers. See #1523.
     protected void setProgressInternal(int value) {
+        int oldValue = this.value;
         this.value = value;
+        if (oldValue != value) {
+            accessibilityChanged(com.codename1.ui.accessibility.AccessibilityManager.CHANGE_VALUE);
+        }
         if (renderValueOnTop || renderPercentageOnTop) {
             super.setText(formattedValue(value));
         } else {

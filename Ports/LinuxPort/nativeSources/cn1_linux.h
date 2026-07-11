@@ -69,7 +69,8 @@ typedef enum {
      * ROTATE. drainInput decodes these into Display.fireMagnifyGesture /
      * fireRotationGesture, the same hooks the macOS trackpad drives. */
     CN1_EVENT_PINCH = 10,
-    CN1_EVENT_ROTATE = 11
+    CN1_EVENT_ROTATE = 11,
+    CN1_EVENT_ACCESSIBILITY_ACTION = 12
 } CN1EventType;
 
 /* Fixed-point scale for the gesture keyCode field (see CN1_EVENT_PINCH). */

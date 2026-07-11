@@ -992,7 +992,12 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     ///
     /// - `toggle`: the toggle to set
     public void setToggle(boolean toggle) {
+        if (this.toggle == toggle) {
+            return;
+        }
         this.toggle = toggle;
+        accessibilityChanged(com.codename1.ui.accessibility.AccessibilityManager.CHANGE_STRUCTURE
+                | com.codename1.ui.accessibility.AccessibilityManager.CHANGE_STATE);
         if (toggle && "CheckBox".equals(getUIID()) || "RadioButton".equals(getUIID())) {
             setUIID("ToggleButton");
         }

@@ -11671,6 +11671,22 @@ public class IOSImplementation extends CodenameOneImplementation {
         IOSNative.announceForAccessibility(text);
     }
 
+    @Override
+    public void accessibilityTreeChanged(int changeType) {
+        IOSNative.updateAccessibilityTree(getAccessibilityTreeSnapshot().toJson(), changeType);
+    }
+
+    @Override
+    public boolean isAccessibilityTreeSupported() {
+        return true;
+    }
+
+    public static void performAccessibilityActionFromNative(long nodeId, String actionId, String argument) {
+        if (instance != null) {
+            instance.performAccessibilityAction(nodeId, actionId, argument);
+        }
+    }
+
     // ================================================================
     // Crypto bridge -- routes through CN1Crypto.{h,m} in nativeSources/
     // (the corresponding native methods live on IOSNative). The defaults

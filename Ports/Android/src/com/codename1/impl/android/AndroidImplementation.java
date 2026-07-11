@@ -318,6 +318,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
     }
     CodenameOneSurface myView = null;
+    private AndroidAccessibilityProvider accessibilityProvider;
     CodenameOneTextPaint defaultFont;
     private final char[] tmpchar = new char[1];
     private final Rect tmprect = new Rect();
@@ -1629,6 +1630,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 myView = new AndroidAsyncView(getActivity(), AndroidImplementation.this);
             }
             myView.getAndroidView().setVisibility(View.VISIBLE);
+
+            if (Build.VERSION.SDK_INT >= 16) {
+                final View semanticHost = myView.getAndroidView();
+                accessibilityProvider = new AndroidAccessibilityProvider(semanticHost, this);
+                semanticHost.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+                    @Override
+                    public android.view.accessibility.AccessibilityNodeProvider getAccessibilityNodeProvider(View host) {
+                        return accessibilityProvider;
+                    }
+                });
+            }
 
             relativeLayout.addView(myView.getAndroidView());
             myView.getAndroidView().setVisibility(View.VISIBLE);
@@ -12925,6 +12937,22 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             }
         });
+    }
+
+    @Override
+    public void accessibilityTreeChanged(final int changeType) {
+        final Activity act = getActivity();
+        if (act == null || accessibilityProvider == null) return;
+        act.runOnUiThread(new Runnable() {
+            public void run() {
+                if (accessibilityProvider != null) accessibilityProvider.invalidate(changeType);
+            }
+        });
+    }
+
+    @Override
+    public boolean isAccessibilityTreeSupported() {
+        return Build.VERSION.SDK_INT >= 16;
     }
 
     // ================================================================

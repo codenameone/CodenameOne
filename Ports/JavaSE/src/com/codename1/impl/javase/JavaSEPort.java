@@ -2456,6 +2456,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     protected class C extends JPanel implements KeyListener, MouseListener, MouseMotionListener, HierarchyBoundsListener, AdjustmentListener, MouseWheelListener {
+        private JavaSEAccessibility cn1Accessibility;
         private BufferedImage buffer;
         boolean painted;
         private Graphics2D g2dInstance;
@@ -2488,6 +2489,18 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             requestFocus();
+        }
+
+        @Override
+        public javax.accessibility.AccessibleContext getAccessibleContext() {
+            if (cn1Accessibility == null) {
+                cn1Accessibility = new JavaSEAccessibility(this, JavaSEPort.this);
+            }
+            return cn1Accessibility.getContext();
+        }
+
+        void accessibilityChanged(int changeType) {
+            if (cn1Accessibility != null) cn1Accessibility.changed(changeType);
         }
 
         private void installNativeMagnificationListeners() {
@@ -3765,6 +3778,20 @@ public class JavaSEPort extends CodenameOneImplementation {
     public JavaSEPort() {
         canvas = new C();
         instance = this;
+    }
+
+    @Override
+    public void accessibilityTreeChanged(final int changeType) {
+        EventQueue.invokeLater(new Runnable() {
+            public void run() {
+                if (canvas != null) canvas.accessibilityChanged(changeType);
+            }
+        });
+    }
+
+    @Override
+    public boolean isAccessibilityTreeSupported() {
+        return true;
     }
 
     public void paintDirty() {

@@ -173,6 +173,7 @@ public class CheckBox extends Button {
         this.selected = selected;
         if (changed) {
             fireChangeEvent();
+            accessibilityChanged(com.codename1.ui.accessibility.AccessibilityManager.CHANGE_STATE);
         }
         repaint();
     }

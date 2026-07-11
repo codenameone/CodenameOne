@@ -87,6 +87,14 @@ import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.events.FocusListener;
 import com.codename1.ui.events.MessageEvent;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.accessibility.AccessibilityAction;
+import com.codename1.ui.accessibility.AccessibilityCheckedState;
+import com.codename1.ui.accessibility.AccessibilityCollectionItemInfo;
+import com.codename1.ui.accessibility.AccessibilityLiveRegion;
+import com.codename1.ui.accessibility.AccessibilityNodeSnapshot;
+import com.codename1.ui.accessibility.AccessibilityRange;
+import com.codename1.ui.accessibility.AccessibilityRole;
+import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
 import com.codename1.ui.geom.Shape;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -571,6 +579,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
      * Container for all peer components.
      */
     HTMLElement peersContainer;
+    private HTMLElement accessibilityContainer;
     
     
     /**
@@ -1255,6 +1264,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         peersContainer = (HTMLElement)document.createElement("div");
         peersContainer.setAttribute("id", "cn1-peers-container");
         outputCanvas.getParentNode().insertBefore(peersContainer, outputCanvas);
+        accessibilityContainer = (HTMLElement)document.createElement("div");
+        accessibilityContainer.setAttribute("id", "cn1-accessibility-tree");
+        accessibilityContainer.setAttribute("role", "application");
+        accessibilityContainer.getStyle().setCssText("position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:2147483646;");
+        outputCanvas.getParentNode().insertBefore(accessibilityContainer, outputCanvas);
+        outputCanvas.setAttribute("role", "presentation");
+        outputCanvas.setAttribute("aria-hidden", "true");
         
         nativeEdt = EasyThread.start("NativeEDT");
         
@@ -2853,6 +2869,191 @@ public class HTML5Implementation extends CodenameOneImplementation {
             flushGraphics();
         }
 
+    }
+
+    @Override
+    public void accessibilityTreeChanged(int changeType) {
+        if (accessibilityContainer == null) return;
+        AccessibilityTreeSnapshot tree = getAccessibilityTreeSnapshot();
+        accessibilityContainer.setInnerHTML("");
+        final Map<Long, HTMLElement> elements = new HashMap<Long, HTMLElement>();
+        for (AccessibilityNodeSnapshot node : tree.getNodes().values()) {
+            final long nodeId = node.getId();
+            final HTMLElement element = (HTMLElement)document.createElement("div");
+            elements.put(Long.valueOf(nodeId), element);
+            element.setAttribute("data-cn1-accessibility-id", String.valueOf(nodeId));
+            applyAria(element, node);
+            if (node.getParentId() >= 0 && elements.get(Long.valueOf(node.getParentId())) != null) {
+                elements.get(Long.valueOf(node.getParentId())).appendChild(element);
+            } else {
+                accessibilityContainer.appendChild(element);
+            }
+            final AccessibilityAction activate = node.getAction(AccessibilityAction.ACTIVATE);
+            if (activate != null && activate.isEnabled()) {
+                element.addEventListener("click", new EventListener() {
+                    public void handleEvent(Event event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        performAccessibilityAction(nodeId, AccessibilityAction.ACTIVATE, null);
+                    }
+                });
+            }
+            final AccessibilityAction focus = node.getAction(AccessibilityAction.FOCUS);
+            if (focus != null && focus.isEnabled()) {
+                element.addEventListener("focus", new EventListener() {
+                    public void handleEvent(Event event) {
+                        performAccessibilityAction(nodeId, AccessibilityAction.FOCUS, null);
+                    }
+                });
+            }
+            element.addEventListener("keydown", new EventListener() {
+                public void handleEvent(Event event) {
+                    JSOImplementations.KeyEvent key = (JSOImplementations.KeyEvent)event;
+                    int code = key.getKeyCode();
+                    if ((code == 13 || code == 32) && activate != null) {
+                        event.preventDefault();
+                        performAccessibilityAction(nodeId, AccessibilityAction.ACTIVATE, null);
+                    } else if (code == 38 || code == 39) {
+                        performAccessibilityAction(nodeId, AccessibilityAction.INCREMENT, null);
+                    } else if (code == 37 || code == 40) {
+                        performAccessibilityAction(nodeId, AccessibilityAction.DECREMENT, null);
+                    }
+                }
+            });
+            addWebCustomActions(element, node);
+        }
+    }
+
+    @Override
+    public boolean isAccessibilityTreeSupported() {
+        return true;
+    }
+
+    private void applyAria(HTMLElement element, AccessibilityNodeSnapshot node) {
+        String role = ariaRole(node.getRole());
+        if (role != null) element.setAttribute("role", role);
+        if (node.getLabel() != null) element.setAttribute("aria-label", node.getLabel());
+        String description = node.getDescription();
+        if (node.getHint() != null) description = description == null ? node.getHint() : description + ". " + node.getHint();
+        if (node.getValidationError() != null) description = description == null ? node.getValidationError() : description + ". " + node.getValidationError();
+        if (description != null) element.setAttribute("aria-description", description);
+        if (node.getIdentifier() != null) element.setAttribute("id", node.getIdentifier());
+        if (node.getRoleDescription() != null) element.setAttribute("aria-roledescription", node.getRoleDescription());
+        if (node.getValue() != null) element.setAttribute("aria-valuetext", node.getValue());
+        if (node.getSelected() != null) element.setAttribute("aria-selected", String.valueOf(node.getSelected()));
+        if (node.getExpanded() != null) element.setAttribute("aria-expanded", String.valueOf(node.getExpanded()));
+        if (node.getEnabled() != null && !node.getEnabled().booleanValue()) element.setAttribute("aria-disabled", "true");
+        if (node.getInvalid() != null) element.setAttribute("aria-invalid", String.valueOf(node.getInvalid()));
+        if (node.getBusy() != null) element.setAttribute("aria-busy", String.valueOf(node.getBusy()));
+        if (node.getReadOnly() != null) element.setAttribute("aria-readonly", String.valueOf(node.getReadOnly()));
+        if (node.getRequired() != null) element.setAttribute("aria-required", String.valueOf(node.getRequired()));
+        if (node.getMultiline() != null) element.setAttribute("aria-multiline", String.valueOf(node.getMultiline()));
+        if (node.getCurrent() != null && node.getCurrent().booleanValue()) element.setAttribute("aria-current", "true");
+        if (node.isModal()) element.setAttribute("aria-modal", "true");
+        if (node.getHeadingLevel() > 0) element.setAttribute("aria-level", String.valueOf(node.getHeadingLevel()));
+        if (node.getChecked() != AccessibilityCheckedState.UNSPECIFIED) {
+            element.setAttribute("aria-checked", node.getChecked() == AccessibilityCheckedState.MIXED
+                    ? "mixed" : String.valueOf(node.getChecked() == AccessibilityCheckedState.CHECKED));
+        }
+        if (node.getPressed() != null) element.setAttribute("aria-pressed", String.valueOf(node.getPressed()));
+        if (node.getLiveRegion() != AccessibilityLiveRegion.OFF) {
+            element.setAttribute("aria-live", node.getLiveRegion() == AccessibilityLiveRegion.ASSERTIVE ? "assertive" : "polite");
+            element.setAttribute("aria-atomic", "true");
+        }
+        AccessibilityRange range = node.getRange();
+        if (range != null) {
+            element.setAttribute("aria-valuemin", String.valueOf(range.getMinimum()));
+            element.setAttribute("aria-valuemax", String.valueOf(range.getMaximum()));
+            element.setAttribute("aria-valuenow", String.valueOf(range.getCurrent()));
+            if (range.getText() != null) element.setAttribute("aria-valuetext", range.getText());
+        }
+        AccessibilityCollectionItemInfo item = node.getCollectionItemInfo();
+        if (item != null) {
+            if (item.getPositionInSet() > 0) element.setAttribute("aria-posinset", String.valueOf(item.getPositionInSet()));
+            if (item.getSetSize() != 0) element.setAttribute("aria-setsize", String.valueOf(item.getSetSize()));
+            if (item.getLevel() > 0) element.setAttribute("aria-level", String.valueOf(item.getLevel()));
+            if (item.getRowIndex() >= 0) element.setAttribute("aria-rowindex", String.valueOf(item.getRowIndex() + 1));
+            if (item.getColumnIndex() >= 0) element.setAttribute("aria-colindex", String.valueOf(item.getColumnIndex() + 1));
+            if (item.getRowSpan() > 1) element.setAttribute("aria-rowspan", String.valueOf(item.getRowSpan()));
+            if (item.getColumnSpan() > 1) element.setAttribute("aria-colspan", String.valueOf(item.getColumnSpan()));
+        }
+        Rectangle bounds = node.getBounds();
+        double ratio = getDevicePixelRatio();
+        element.getStyle().setCssText("position:absolute;opacity:0.001;pointer-events:none;overflow:hidden;"
+                + "left:" + bounds.getX() / ratio + "px;top:" + bounds.getY() / ratio + "px;"
+                + "width:" + Math.max(1, bounds.getWidth()) / ratio + "px;height:"
+                + Math.max(1, bounds.getHeight()) / ratio + "px;");
+        if (node.isFocusable()) element.setTabIndex(0);
+        else element.setTabIndex(-1);
+        if (node.getRole() == AccessibilityRole.STATIC_TEXT || node.getRole() == AccessibilityRole.HEADING) {
+            element.setTextContent(node.getLabel() == null ? "" : node.getLabel());
+        }
+    }
+
+    private void addWebCustomActions(HTMLElement parent, AccessibilityNodeSnapshot node) {
+        for (final AccessibilityAction action : node.getActions()) {
+            if (!action.isEnabled() || isStandardWebAction(action.getId())) continue;
+            final long nodeId = node.getId();
+            HTMLElement button = (HTMLElement)document.createElement("button");
+            button.setAttribute("type", "button");
+            button.setAttribute("aria-label", action.getLabel() == null ? action.getId() : action.getLabel());
+            button.setTextContent(action.getLabel() == null ? action.getId() : action.getLabel());
+            button.getStyle().setCssText("position:absolute;opacity:0.001;pointer-events:none;width:1px;height:1px;");
+            button.addEventListener("click", new EventListener() {
+                public void handleEvent(Event event) {
+                    event.preventDefault();
+                    performAccessibilityAction(nodeId, action.getId(), null);
+                }
+            });
+            parent.appendChild(button);
+        }
+    }
+
+    private boolean isStandardWebAction(String id) {
+        return AccessibilityAction.ACTIVATE.equals(id) || AccessibilityAction.FOCUS.equals(id)
+                || AccessibilityAction.INCREMENT.equals(id) || AccessibilityAction.DECREMENT.equals(id)
+                || AccessibilityAction.SET_TEXT.equals(id) || AccessibilityAction.SCROLL_FORWARD.equals(id)
+                || AccessibilityAction.SCROLL_BACKWARD.equals(id);
+    }
+
+    private String ariaRole(AccessibilityRole role) {
+        switch (role) {
+            case BUTTON:
+            case TOGGLE_BUTTON: return "button";
+            case CHECKBOX: return "checkbox";
+            case RADIO_BUTTON: return "radio";
+            case SWITCH: return "switch";
+            case HEADING: return "heading";
+            case LINK: return "link";
+            case IMAGE: return "img";
+            case TEXT_FIELD: return "textbox";
+            case SEARCH_FIELD: return "searchbox";
+            case SLIDER: return "slider";
+            case PROGRESS_BAR: return "progressbar";
+            case LIST: return "list";
+            case LIST_ITEM: return "listitem";
+            case GRID: return "grid";
+            case ROW: return "row";
+            case CELL: return "gridcell";
+            case COLUMN_HEADER: return "columnheader";
+            case ROW_HEADER: return "rowheader";
+            case TAB_LIST: return "tablist";
+            case TAB: return "tab";
+            case TAB_PANEL: return "tabpanel";
+            case DIALOG: return "dialog";
+            case ALERT: return "alert";
+            case MENU: return "menu";
+            case MENU_ITEM: return "menuitem";
+            case TOOLBAR: return "toolbar";
+            case SCROLL_BAR: return "scrollbar";
+            case SPIN_BUTTON: return "spinbutton";
+            case COMBO_BOX: return "combobox";
+            case TREE: return "tree";
+            case TREE_ITEM: return "treeitem";
+            case SEPARATOR: return "separator";
+            case GENERIC: return "group";
+            default: return null;
+        }
     }
     
     public static void setMainClass(Object main) {

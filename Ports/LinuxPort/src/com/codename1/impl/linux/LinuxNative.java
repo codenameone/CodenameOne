@@ -145,6 +145,13 @@ public final class LinuxNative {
      */
     public static native boolean pollEvent(int[] out);
 
+    /** Rebuilds the GTK/ATK virtual accessibility hierarchy. */
+    public static native void accessibilityBegin();
+    public static native void accessibilityNode(long id, long parentId, String role, String label,
+            String description, String value, int x, int y, int width, int height, int stateFlags);
+    public static native void accessibilityAction(long nodeId, String actionId, int actionHash, String label);
+    public static native void accessibilityEnd(int changeType);
+
     /**
      * True when the default seat has a touchscreen device, used for
      * {@code Display.isTouchScreen()}.

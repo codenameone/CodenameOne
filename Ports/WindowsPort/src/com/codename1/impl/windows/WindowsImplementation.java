@@ -35,6 +35,10 @@ import com.codename1.ui.Image;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Shape;
+import com.codename1.ui.accessibility.AccessibilityAction;
+import com.codename1.ui.accessibility.AccessibilityManager;
+import com.codename1.ui.accessibility.AccessibilityNodeSnapshot;
+import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
@@ -71,6 +75,7 @@ public class WindowsImplementation extends CodenameOneImplementation {
     private static final int EVENT_MOUSE_HWHEEL = 9;
     private static final int EVENT_PINCH = 10;
     private static final int EVENT_ROTATE = 11;
+    private static final int EVENT_ACCESSIBILITY_ACTION = 12;
 
     // The native gesture events encode their float (incremental scale / radians) as
     // an int in 1/10000 units; see CN1_GESTURE_FIXED in cn1_windows.h.
@@ -680,6 +685,9 @@ public class WindowsImplementation extends CodenameOneImplementation {
                 case EVENT_CLOSE:
                     Display.getInstance().exitApplication();
                     break;
+                case EVENT_ACCESSIBILITY_ACTION:
+                    AccessibilityManager.getInstance().performActionByHash(x & 0xffffffffL, key, null);
+                    break;
                 default:
                     break;
             }
@@ -690,6 +698,49 @@ public class WindowsImplementation extends CodenameOneImplementation {
         if (clicked != null) {
             dispatchLocalNotification(clicked);
         }
+    }
+
+    @Override
+    public void accessibilityTreeChanged(int changeType) {
+        AccessibilityTreeSnapshot tree = getAccessibilityTreeSnapshot();
+        WindowsNative.accessibilityBegin();
+        for (AccessibilityNodeSnapshot node : tree.getNodes().values()) {
+            int flags = (node.isFocusable() ? 1 : 0) | (node.isFocused() ? 2 : 0)
+                    | (Boolean.TRUE.equals(node.getEnabled()) ? 4 : 0)
+                    | (Boolean.TRUE.equals(node.getSelected()) ? 8 : 0)
+                    | (node.getChecked().ordinal() << 4)
+                    | (Boolean.TRUE.equals(node.getExpanded()) ? 64 : 0)
+                    | (Boolean.TRUE.equals(node.getInvalid()) ? 128 : 0);
+            com.codename1.ui.geom.Rectangle b = node.getBounds();
+            WindowsNative.accessibilityNode(node.getId(), node.getParentId(), node.getRole().name(), node.getLabel(),
+                    accessibilityDescription(node), node.getValue(), b.getX(), b.getY(), b.getWidth(), b.getHeight(), flags);
+            for (AccessibilityAction action : node.getActions()) {
+                if (action.isEnabled()) {
+                    WindowsNative.accessibilityAction(node.getId(), action.getId(), action.getId().hashCode(),
+                            action.getLabel() == null ? action.getId() : action.getLabel());
+                }
+            }
+        }
+        WindowsNative.accessibilityEnd(changeType);
+    }
+
+    private String accessibilityDescription(AccessibilityNodeSnapshot node) {
+        StringBuilder out = new StringBuilder();
+        if (node.getHint() != null) out.append(node.getHint());
+        if (node.getDescription() != null) {
+            if (out.length() > 0) out.append(". ");
+            out.append(node.getDescription());
+        }
+        if (node.getValidationError() != null) {
+            if (out.length() > 0) out.append(". ");
+            out.append(node.getValidationError());
+        }
+        return out.length() == 0 ? null : out.toString();
+    }
+
+    @Override
+    public boolean isAccessibilityTreeSupported() {
+        return true;
     }
 
     /* --------------------------------------------------- local notifications

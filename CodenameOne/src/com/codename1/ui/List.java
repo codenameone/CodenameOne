@@ -447,6 +447,37 @@ public class List<T> extends Component implements ActionSource {
         return model.getSize();
     }
 
+    /// Returns the bounds of a renderer-backed row for the portable virtual
+    /// accessibility tree. Bounds are relative to this list.
+    public Rectangle getAccessibilityItemBounds(int index, Rectangle out) {
+        if (out == null) {
+            throw new NullPointerException("out");
+        }
+        if (index < 0 || index >= size()) {
+            out.setBounds(0, 0, 0, 0);
+            return out;
+        }
+        int width = getWidth() - getStyle().getHorizontalPadding() - getSideGap();
+        calculateComponentPosition(index, width, out, getElementSize(false, true),
+                getElementSize(true, true), index <= getCurrentSelected());
+        return out;
+    }
+
+    /// Returns the accessible name produced by the list renderer for an item.
+    public String getAccessibilityItemText(int index) {
+        if (index < 0 || index >= size()) {
+            return null;
+        }
+        T value = model.getItemAt(index);
+        Component rendererComponent = renderer.getListCellRendererComponent(this, value, index,
+                index == getSelectedIndex());
+        String text = rendererComponent == null ? null : rendererComponent.getAccessibilityText();
+        if (text == null || text.length() == 0) {
+            text = value == null ? null : String.valueOf(value);
+        }
+        return text;
+    }
+
     /// Returns the visual selection during a drag operation, otherwise equivalent to model.getSelectedIndex
     ///
     /// #### Returns
@@ -515,7 +546,12 @@ public class List<T> extends Component implements ActionSource {
         if (index < 0) {
             throw new IllegalArgumentException("Selection index is negative:" + index);
         }
+        int oldIndex = model.getSelectedIndex();
         model.setSelectedIndex(index);
+        if (oldIndex != index) {
+            accessibilityChanged(com.codename1.ui.accessibility.AccessibilityManager.CHANGE_STATE
+                    | com.codename1.ui.accessibility.AccessibilityManager.CHANGE_VALUE);
+        }
         if (!isInitialized()) {
             Form f = getComponentForm();
             if (f == null) {

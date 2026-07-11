@@ -40,6 +40,8 @@ import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.events.StyleListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.accessibility.AccessibilityManager;
+import com.codename1.ui.accessibility.AccessibilityNode;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.LookAndFeel;
@@ -424,6 +426,7 @@ public class Component implements Animation, StyleListener, Editable {
     private EventDispatcher stateChangeListeners;
     private String tooltip;
     private String accessibilityText;
+    private AccessibilityNode semantics;
     /// The native overlay object.  Used in Javascript port for some components so that there is
     /// an inivisible "native" peer overlaid on the component itself to catch events.  E.g.
     /// TextFields on iOS can't be programmatically focused except through a user-initiated event -
@@ -1089,7 +1092,11 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `x`: the current x coordinate of the components origin
     public void setX(int x) {
+        if (bounds.getX() == x) {
+            return;
+        }
         bounds.setX(x);
+        accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
         if (Form.activePeerCount > 0) {
             onParentPositionChange();
         }
@@ -1132,7 +1139,11 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `y`: the current y coordinate of the components origin
     public void setY(int y) {
+        if (bounds.getY() == y) {
+            return;
+        }
         bounds.setY(y);
+        accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
         if (Form.activePeerCount > 0) {
             onParentPositionChange();
         }
@@ -1173,7 +1184,11 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `visible`: true if component is visible; otherwise false
     public void setVisible(boolean visible) {
+        if (this.visible == visible) {
+            return;
+        }
         this.visible = visible;
+        accessibilityChanged(AccessibilityManager.CHANGE_STRUCTURE);
     }
 
     void getVisibleRect(Rectangle r, boolean init) {
@@ -1363,7 +1378,11 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - #setPreferredSize
     public void setWidth(int width) {
+        if (bounds.getSize().getWidth() == width) {
+            return;
+        }
         bounds.getSize().setWidth(width);
+        accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
     }
 
     /// Gets the outer width of this component. This is the width of the component including horizontal margins.
@@ -1407,7 +1426,11 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - #setPreferredSize
     public void setHeight(int height) {
+        if (bounds.getSize().getHeight() == height) {
+            return;
+        }
         bounds.getSize().setHeight(height);
+        accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
     }
 
     /// Gets the outer height of this component.  This is the height of the component including vertical margins.
@@ -2038,6 +2061,7 @@ public class Component implements Animation, StyleListener, Editable {
             throw new IllegalArgumentException("Attempt to add self as parent");
         }
         this.parent = parent;
+        accessibilityChanged(AccessibilityManager.CHANGE_STRUCTURE);
     }
 
     /// Gets the "owner" of this component as set by `#setOwner(com.codename1.ui.Component)`.
@@ -2329,7 +2353,8 @@ public class Component implements Animation, StyleListener, Editable {
     void focusGainedInternal() {
         startComponentLableTicker();
         String text = getAccessibilityText();
-        if (text != null && text.length() > 0) {
+        if (text != null && text.length() > 0
+                && !Display.getInstance().isAccessibilityTreeSupported()) {
             announceForAccessibility(text);
         }
     }
@@ -3556,6 +3581,9 @@ public class Component implements Animation, StyleListener, Editable {
         // component back into view can't recurse infinitely (issue #5305).
         int oldScrollX = this.scrollX;
         this.scrollX = scrollXtmp;
+        if (oldScrollX != scrollXtmp) {
+            accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
+        }
         if (scrollListeners != null && oldScrollX != scrollXtmp) {
             scrollListeners.fireScrollEvent(scrollXtmp, this.scrollY, oldScrollX, this.scrollY);
         }
@@ -3581,6 +3609,7 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `scrollY`: the Y position of the scrolling
     protected void setScrollY(int scrollY) {
+        int oldAccessibilityScrollY = this.scrollY;
         if (this.scrollY != scrollY) {
             CodenameOneImplementation ci = Display.impl;
 
@@ -3598,6 +3627,9 @@ public class Component implements Animation, StyleListener, Editable {
             int h = getScrollDimension().getHeight() - getHeight() + v;
             scrollYtmp = Math.min(scrollYtmp, h);
             scrollYtmp = Math.max(scrollYtmp, 0);
+        }
+        if (oldAccessibilityScrollY != scrollYtmp) {
+            accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
         }
         if (isScrollableY()) {
             if (Form.activePeerCount > 0) {
@@ -4188,7 +4220,11 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - #requestFocus
     public void setFocus(boolean focused) {
+        if (this.focused == focused) {
+            return;
+        }
         this.focused = focused;
+        accessibilityChanged(AccessibilityManager.CHANGE_FOCUS);
     }
 
     /// Returns the Component Form or null if this Component
@@ -8125,6 +8161,7 @@ public class Component implements Animation, StyleListener, Editable {
             return;
         }
         this.enabled = enabled;
+        accessibilityChanged(AccessibilityManager.CHANGE_STATE);
         repaint();
     }
 
@@ -8964,6 +9001,9 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// accessibility description or `null` if none
     public String getAccessibilityText() {
+        if (semantics != null && semantics.getLabel() != null) {
+            return semantics.getLabel();
+        }
         if (accessibilityText != null) {
             return accessibilityText;
         }
@@ -8991,6 +9031,46 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `text`: accessibility description
     public void setAccessibilityText(String text) {
         this.accessibilityText = text;
+        if (semantics != null) {
+            semantics.setLabel(text);
+        } else {
+            accessibilityChanged(AccessibilityManager.CHANGE_CONTENT);
+        }
+    }
+
+    /// Returns the portable semantic configuration for this component. The same
+    /// instance is retained for the lifetime of the component. Mutating it updates
+    /// VoiceOver, TalkBack, UI Automation, AT-SPI, Java accessibility, and web ARIA
+    /// through the active platform adapter.
+    ///
+    /// #### Returns
+    ///
+    /// this component's semantic node
+    public AccessibilityNode getSemantics() {
+        if (semantics == null) {
+            semantics = new AccessibilityNode(this);
+            if (accessibilityText != null) {
+                semantics.setLabel(accessibilityText);
+            }
+        }
+        return semantics;
+    }
+
+    /// Alias for {@link #getSemantics()} for APIs that use accessibility-node terminology.
+    public AccessibilityNode getAccessibilityNode() {
+        return getSemantics();
+    }
+
+    /// Marks this component's semantic representation dirty. Custom components
+    /// whose accessible value is computed dynamically can call this after state
+    /// changes that do not pass through a semantic setter.
+    public void accessibilityChanged() {
+        accessibilityChanged(AccessibilityManager.CHANGE_ALL);
+    }
+
+    /// Marks a specific portion of this component's semantic representation dirty.
+    public void accessibilityChanged(int changeType) {
+        AccessibilityManager.getInstance().invalidate(this, changeType);
     }
 
     /// #### Returns
