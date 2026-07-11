@@ -151,6 +151,9 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     private final EventDispatcher listeners = new EventDispatcher();
     private ActionListener doneListener;
     private int valign = defaultValign;
+    /// True once setVerticalAlignment() has been called, so the editable-multi-line
+    /// TOP default in getVerticalAlignment() no longer overrides an explicit choice.
+    private boolean verticalAlignmentSet;
     private int linesToScroll = 1;
     //private int modifierFlag = 0x00000;
     /// Unsupported characters is a string that contains characters that cause issues
@@ -1387,7 +1390,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         // existing (centered) hint behavior since there is no meaningful gap.
         Label hint = getHintLabelImpl();
         if (hint != null && !isSingleLineTextArea() && getActualRows() > 1) {
-            hint.setVerticalAlignment(getVerticalAlignmentForRendering());
+            hint.setVerticalAlignment(getVerticalAlignment());
         }
         super.paintHint(g);
     }
@@ -1861,11 +1864,16 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         return "".equals(getText());
     }
 
-    /// Returns the vertical alignment of the text field.
+    /// Returns the vertical alignment of the text field, one of: CENTER, TOP, BOTTOM
     ///
-    /// For multi-line text areas, this alignment is applied only while there is extra
-    /// vertical space in the component. If the text content uses all available height
-    /// (or overflows), the rendering naturally starts from the top.
+    /// An **editable multi-line** text area reports #TOP by default, regardless of
+    /// the theme default (`textCmpVAlignInt`), on platforms whose native text editor
+    /// cannot vertically align its content (currently every platform). This keeps the
+    /// lightweight rendering aligned with the native editor so the text, cursor and
+    /// hint don't jump when editing starts and ends (issue #5345). Single-line fields
+    /// and non-editable multi-line areas (e.g. the text inside a `SpanLabel`) keep the
+    /// theme default and honor #CENTER / #BOTTOM. A value passed to
+    /// #setVerticalAlignment(int) is always honored as-is.
     ///
     /// #### Returns
     ///
@@ -1879,24 +1887,8 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     ///
     /// - #BOTTOM
     public int getVerticalAlignment() {
-        return valign;
-    }
-
-    /// Returns the vertical alignment that should actually be used when rendering
-    /// the lightweight text, cursor and hint.
-    ///
-    /// This differs from #getVerticalAlignment() for editable multi-line text
-    /// areas on platforms whose native text editor top-aligns its content (which
-    /// is currently every platform). In that case the lightweight rendering is
-    /// forced to #TOP so it matches the native editor, otherwise the text would
-    /// visibly jump up when editing starts and back down when it ends (issue #5345).
-    /// Non-editable multi-line text areas still honor #CENTER and #BOTTOM.
-    ///
-    /// #### Returns
-    ///
-    /// the vertical alignment used for rendering, one of: CENTER, TOP, BOTTOM
-    public int getVerticalAlignmentForRendering() {
-        if (valign != TOP && !isSingleLineTextArea() && isEditable()
+        if (!verticalAlignmentSet && valign != TOP
+                && !isSingleLineTextArea() && isEditable()
                 && !Display.impl.supportsNativeTextAreaVerticalAlignment()) {
             return TOP;
         }
@@ -1908,6 +1900,11 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// For multi-line text areas, this alignment is applied only when there is extra
     /// vertical space in the component. If there is no extra room, alignment becomes
     /// effectively top-aligned because content already fills the available area.
+    ///
+    /// Setting a value here overrides the editable-multi-line default described in
+    /// #getVerticalAlignment(): the value you pass is honored even for an editable
+    /// multi-line area (which may then visibly shift when its native editor, which
+    /// top-aligns, takes over).
     ///
     /// #### Parameters
     ///
@@ -1925,6 +1922,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
             throw new IllegalArgumentException("Alignment can't be set to " + valign);
         }
         this.valign = valign;
+        this.verticalAlignmentSet = true;
     }
 
     /// {@inheritDoc}
