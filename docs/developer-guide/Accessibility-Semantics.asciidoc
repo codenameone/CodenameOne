@@ -1,6 +1,6 @@
 = Accessibility Semantics
 
-Codename One components are lightweight: they are painted by Codename One instead of being represented by a native widget on every platform. The accessibility semantics API builds an explicit, immutable virtual tree from those components and presents it to VoiceOver, TalkBack, Windows UI Automation, AT-SPI, Java Access Bridge, and web accessibility APIs.
+Codename One components are lightweight: they're painted by Codename One instead of being represented by a native widget on every platform. The accessibility semantics API builds an explicit, immutable virtual tree from those components and presents it to VoiceOver, TalkBack, Windows UI Automation, AT-SPI, Java Access Bridge, and web accessibility APIs.
 
 The semantic tree is separate from the visual tree. This is important for renderer-backed controls, merged cards, decorative content, custom controls, and applications that need a reading order different from paint order.
 
@@ -8,7 +8,7 @@ The semantic tree is separate from the visual tree. This is important for render
 
 Standard components work without extra configuration. `Button`, `CheckBox`, `RadioButton`, `Slider`, text fields, lists, tables, tabs, labels, dialogs, and containers infer appropriate roles, values, states, collection metadata, and standard actions. Renderer-backed `List` rows are exposed as stable virtual children even though no `Component` exists for each painted row.
 
-`Component.setAccessibilityText()` remains supported. It is a compatibility alias for the semantic label. New code should use `getSemantics()` when it needs more than a label.
+`Component.setAccessibilityText()` remains supported. It's a compatibility alias for the semantic label. New code should use `getSemantics()` when it needs more than a label.
 
 [source,java]
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AccessibilitySemanticsSnippets.java[tag=accessibility-semantics-button,indent=0]
@@ -24,7 +24,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/A
 
 Tri-state controls use `UNCHECKED`, `CHECKED`, or `MIXED`. Nullable Boolean properties distinguish an explicit state from an unspecified state. Available properties include selected, expanded, enabled, invalid, busy, read-only, required, multiline, obscured, pressed, and current. `setValidationError()` supplies both the error message and invalid state. `setPaneTitle()` describes a newly displayed pane or screen, and `setModal(true)` identifies a modal scope.
 
-Use `setRoleDescription()` only when the platform role is not sufficiently specific. Localize labels, hints, descriptions, errors, pane titles, role descriptions, and custom action labels.
+Use `setRoleDescription()` only when the platform role isn't sufficiently specific. Localize labels, hints, descriptions, errors, pane titles, role descriptions, and custom action labels.
 
 == Ranges and editable values
 
@@ -58,7 +58,7 @@ Use the standard IDs in `AccessibilityAction` for activation, long press, increm
 [source,java]
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AccessibilitySemanticsSnippets.java[tag=accessibility-semantics-grouping,indent=0]
 
-For content that is painted without child components, attach an `AccessibilityChildProvider`, or add standalone `AccessibilityNode` children. Every virtual node must use a stable `virtualKey`. Stable keys preserve native focus while rows are updated or recycled.
+For content that's painted without child components, attach an `AccessibilityChildProvider`, or add standalone `AccessibilityNode` children. Every virtual node must use a stable `virtualKey`. Stable keys preserve native focus while rows are updated or recycled.
 
 [source,java]
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AccessibilitySemanticsSnippets.java[tag=accessibility-semantics-virtual,indent=0]
@@ -81,7 +81,7 @@ Set `AccessibilityLiveRegion.POLITE` for non-urgent updates and `ASSERTIVE` for 
 [source,java]
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AccessibilitySemanticsSnippets.java[tag=accessibility-semantics-live,indent=0]
 
-Form changes and nodes with a pane title produce screen or pane transition notifications. `Display.announceForAccessibility()` remains available for an exceptional announcement that is not represented by persistent UI. Prefer a live region for state that is visible on screen.
+Form changes and nodes with a pane title produce screen or pane transition notifications. `Display.announceForAccessibility()` remains available for an exceptional announcement that isn't represented by persistent UI. Prefer a live region for state that's visible on screen.
 
 == Collections
 

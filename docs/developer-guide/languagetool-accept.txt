@@ -604,6 +604,9 @@ bitmask
 DeX
 Siri
 devirtualization
+# Coordinate variable names used in accessibility hit-testing examples.
+screenX
+screenY
 # AR / VR terms (Augmented-Reality.asciidoc, Virtual-Reality.asciidoc)
 raycasts?
 equirectangular

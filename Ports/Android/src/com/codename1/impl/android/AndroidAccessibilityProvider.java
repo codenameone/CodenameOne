@@ -42,7 +42,7 @@ final class AndroidAccessibilityProvider extends AccessibilityNodeProvider {
     @Override
     public AccessibilityNodeInfo createAccessibilityNodeInfo(int virtualViewId) {
         AccessibilityTreeSnapshot tree = implementation.getAccessibilityTreeSnapshot();
-        if (virtualViewId == View.NO_ID || virtualViewId == AccessibilityNodeProvider.HOST_VIEW_ID) {
+        if (virtualViewId == AccessibilityNodeProvider.HOST_VIEW_ID) {
             return createHostNode(tree);
         }
         AccessibilityNodeSnapshot node = tree.getNode(virtualViewId);
