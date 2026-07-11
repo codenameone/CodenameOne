@@ -5861,6 +5861,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return b != null && b.isConnected();
     }
 
+    private com.codename1.surfaces.spi.SurfaceBridge surfaceBridge;
+
+    @Override
+    public com.codename1.surfaces.spi.SurfaceBridge getSurfaceBridge() {
+        if (surfaceBridge == null) {
+            surfaceBridge = new com.codename1.impl.android.surfaces.AndroidSurfaceBridge();
+        }
+        return surfaceBridge;
+    }
+
+    /// Invoked once the app has started (from the generated stub, next to
+    /// `deliverPendingSharedContent`) to flush surface actions that arrived through the
+    /// `CN1SurfaceActionActivity` trampoline before the app instance existed.
+    public static void deliverPendingSurfaceActions() {
+        com.codename1.impl.android.surfaces.AndroidSurfaceBridge.deliverPendingActions();
+    }
+
     /**
      * Executes r on the UI thread and blocks the EDT to completion
      * @param r runnable to execute

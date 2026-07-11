@@ -293,6 +293,10 @@ public class AndroidGradleBuilder extends Executor {
     // Set when the app references com.codename1.car.* (Google Android Auto support). Gates the
     // androidx.car.app gradle dependency, the CarAppService manifest entry and the injected glue.
     private boolean usesCar;
+    // Set when the app references com.codename1.surfaces.* (home-screen widgets / live
+    // activities). Gates the surfaces.json parse, the per-kind widget provider codegen, the
+    // pre-baked layout resources and the manifest receivers/trampoline activity.
+    private boolean usesSurfaces;
     private boolean usesOidc;
     private boolean usesAppleSignIn;
     private boolean usesWebauthn;
@@ -1393,6 +1397,13 @@ public class AndroidGradleBuilder extends Executor {
                         usesCar = true;
                     }
 
+                    // External surfaces (home-screen widgets / live activities). Gated on
+                    // actual usage so the widget receivers, the trampoline activity and the
+                    // pre-baked layout resources are only added for apps that publish surfaces.
+                    if (!usesSurfaces && cls.indexOf("com/codename1/surfaces/") == 0) {
+                        usesSurfaces = true;
+                    }
+
                     if (cls.equals("com/codename1/background/ForegroundService")) {
                         usesForegroundService = true;
                     }
@@ -2055,6 +2066,153 @@ public class AndroidGradleBuilder extends Executor {
                         request.getArg("gradleDependencies", "")
                                 + "\n" + compile + "(\"androidx.car.app:app:" + carAppVersion + "\") { exclude group: 'androidx.media' }\n"
                                 + compile + "(\"androidx.car.app:app-projected:" + carAppVersion + "\") { exclude group: 'androidx.media' }\n");
+            }
+        }
+
+        // External surfaces (com.codename1.surfaces): parse the build-time kinds manifest,
+        // generate one thin widget provider subclass per kind, copy the pre-baked RemoteViews
+        // layout/drawable resources shipped with the plugin and emit the per-kind
+        // appwidget-provider metadata. The matching manifest receivers and the tap trampoline
+        // activity are assembled here and injected into the manifest further below. No gradle
+        // dependencies are involved -- the runtime lowering is plain RemoteViews in the port.
+        String surfacesManifestEntries = "";
+        if (usesSurfaces) {
+            File surfacesJsonFile = new File(assetsDir, "surfaces.json");
+            if (!surfacesJsonFile.exists()) {
+                throw new BuildException("This app uses com.codename1.surfaces but no "
+                        + "surfaces.json was found in the project resources. Widget kinds must be "
+                        + "known at build time (the platform widget gallery is compiled into the "
+                        + "app), so add a surfaces.json next to your other resources "
+                        + "(src/main/resources), e.g. {\"liveActivities\":true,\"kinds\":"
+                        + "[{\"id\":\"delivery_status\",\"name\":\"Delivery\","
+                        + "\"description\":\"Track your order\"}]}");
+            }
+            Map<String, Object> surfacesJson;
+            try {
+                JSONParser surfacesParser = new JSONParser();
+                surfacesJson = surfacesParser.parseJSON(new InputStreamReader(
+                        new FileInputStream(surfacesJsonFile), StandardCharsets.UTF_8));
+            } catch (IOException ex) {
+                throw new BuildException("Failed to parse surfaces.json", ex);
+            }
+            // the parser yields Boolean or String depending on its useBoolean setting
+            Object surfacesLiveActivitiesValue = surfacesJson.get("liveActivities");
+            boolean surfacesLiveActivities = Boolean.TRUE.equals(surfacesLiveActivitiesValue)
+                    || "true".equals(surfacesLiveActivitiesValue);
+            java.util.List<Object> surfaceKinds = (java.util.List<Object>) surfacesJson.get("kinds");
+            if (surfaceKinds == null) {
+                // legitimate for live-activity-only apps
+                surfaceKinds = new java.util.ArrayList<Object>();
+                log("surfaces.json declares no widget kinds; only live activities are available");
+            }
+
+            // the pre-baked layouts the generic renderer composes at runtime
+            String[] surfaceLayouts = {
+                    "cn1_surface_column.xml", "cn1_surface_row.xml", "cn1_surface_box.xml",
+                    "cn1_surface_text.xml", "cn1_surface_chronometer.xml",
+                    "cn1_surface_textclock.xml", "cn1_surface_image.xml",
+                    "cn1_surface_image_fill.xml", "cn1_surface_image_center.xml",
+                    "cn1_surface_progress.xml", "cn1_surface_progress_circular.xml",
+                    "cn1_surface_spacer.xml", "cn1_surface_cell_h.xml", "cn1_surface_cell_v.xml",
+                    "cn1_surface_cell_weight1_h.xml", "cn1_surface_cell_weight1_v.xml"
+            };
+            File surfacesLayoutDir = new File(resDir, "layout");
+            surfacesLayoutDir.mkdirs();
+            for (String surfaceLayout : surfaceLayouts) {
+                InputStream lin = getResourceAsStream(
+                        "/com/codename1/builders/surfaces/android/layout/" + surfaceLayout);
+                if (lin == null) {
+                    throw new BuildException("Missing surfaces layout resource " + surfaceLayout);
+                }
+                try {
+                    copy(lin, new FileOutputStream(new File(surfacesLayoutDir, surfaceLayout)));
+                } catch (IOException ex) {
+                    throw new BuildException("Failed to write surfaces layout " + surfaceLayout, ex);
+                }
+            }
+            File surfacesDrawableDir = new File(resDir, "drawable");
+            surfacesDrawableDir.mkdirs();
+            InputStream roundedIn = getResourceAsStream(
+                    "/com/codename1/builders/surfaces/android/drawable/cn1_surface_rounded.xml");
+            if (roundedIn == null) {
+                throw new BuildException("Missing surfaces drawable resource cn1_surface_rounded.xml");
+            }
+            try {
+                copy(roundedIn, new FileOutputStream(
+                        new File(surfacesDrawableDir, "cn1_surface_rounded.xml")));
+            } catch (IOException ex) {
+                throw new BuildException("Failed to write cn1_surface_rounded.xml", ex);
+            }
+
+            File surfacesImplDir = new File(srcDir, "com/codename1/impl/android");
+            surfacesImplDir.mkdirs();
+            StringBuilder surfaceReceivers = new StringBuilder();
+            for (Object surfaceKindObj : surfaceKinds) {
+                Map<String, Object> surfaceKind = (Map<String, Object>) surfaceKindObj;
+                String kindId = surfaceKind.get("id") instanceof String
+                        ? (String) surfaceKind.get("id") : null;
+                if (kindId == null || !kindId.matches("[a-z][a-z0-9_]*")) {
+                    throw new BuildException("Invalid widget kind id '" + kindId
+                            + "' in surfaces.json; ids must match [a-z][a-z0-9_]*");
+                }
+                String providerClass = "CN1Widget_" + surfaceKindClassSuffix(kindId);
+                String providerSource = "package com.codename1.impl.android;\n\n"
+                        + "/** Generated by the Codename One build from surfaces.json. */\n"
+                        + "public class " + providerClass
+                        + " extends com.codename1.impl.android.surfaces.CN1WidgetProvider {\n"
+                        + "    @Override\n"
+                        + "    protected String getKindId() {\n"
+                        + "        return \"" + kindId + "\";\n"
+                        + "    }\n"
+                        + "}\n";
+                try {
+                    createFile(new File(surfacesImplDir, providerClass + ".java"),
+                            providerSource.getBytes(StandardCharsets.UTF_8));
+                } catch (IOException ex) {
+                    throw new BuildException("Failed to generate " + providerClass, ex);
+                }
+
+                String providerXml = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
+                        + "<appwidget-provider xmlns:android=\"http://schemas.android.com/apk/res/android\"\n"
+                        + "    android:minWidth=\"" + surfaceDp(surfaceKind.get("androidMinWidthDp"), "110") + "dp\"\n"
+                        + "    android:minHeight=\"" + surfaceDp(surfaceKind.get("androidMinHeightDp"), "40") + "dp\"\n"
+                        + "    android:updatePeriodMillis=\"0\"\n"
+                        + "    android:resizeMode=\"" + (surfaceKind.get("androidResizeMode") instanceof String
+                                ? (String) surfaceKind.get("androidResizeMode") : "horizontal|vertical") + "\"\n"
+                        + "    android:widgetCategory=\"home_screen\"\n"
+                        + "    android:initialLayout=\"@layout/cn1_surface_column\" />\n";
+                try {
+                    createFile(new File(xmlDir, "cn1_widget_" + kindId + ".xml"),
+                            providerXml.getBytes(StandardCharsets.UTF_8));
+                } catch (IOException ex) {
+                    throw new BuildException("Failed to write cn1_widget_" + kindId + ".xml", ex);
+                }
+
+                String kindLabel = surfaceKind.get("name") instanceof String
+                        ? xmlize((String) surfaceKind.get("name")) : kindId;
+                surfaceReceivers.append("        <receiver android:name=\"com.codename1.impl.android.")
+                        .append(providerClass).append("\" android:exported=\"false\" android:label=\"")
+                        .append(kindLabel).append("\">\n")
+                        .append("            <intent-filter>\n")
+                        .append("                <action android:name=\"android.appwidget.action.APPWIDGET_UPDATE\" />\n")
+                        .append("            </intent-filter>\n")
+                        .append("            <meta-data android:name=\"android.appwidget.provider\" android:resource=\"@xml/cn1_widget_")
+                        .append(kindId).append("\" />\n")
+                        .append("        </receiver>\n");
+            }
+            // the invisible trampoline that turns a widget/live-activity tap into a
+            // Surfaces.dispatchAction call and brings the main activity forward
+            surfaceReceivers.append("        <activity android:name=\"com.codename1.impl.android.surfaces.CN1SurfaceActionActivity\"\n")
+                    .append("                  android:theme=\"@android:style/Theme.NoDisplay\"\n")
+                    .append("                  android:exported=\"false\"\n")
+                    .append("                  android:excludeFromRecents=\"true\"\n")
+                    .append("                  android:noHistory=\"true\"\n")
+                    .append("                  android:taskAffinity=\"\" />\n");
+            surfacesManifestEntries = surfaceReceivers.toString();
+            if (surfacesLiveActivities) {
+                // live activities lower to ongoing notifications; Android 13+ needs the
+                // runtime permission declared (permissionAdd dedups against user overrides)
+                postNotificationsPermission = true;
             }
         }
 
@@ -3178,6 +3336,7 @@ public class AndroidGradleBuilder extends Executor {
                 + remoteControlService
                 + hceService
                 + carAppService
+                + surfacesManifestEntries
                 + "    </application>\n"
                 + "    <uses-feature android:name=\"android.hardware.touchscreen\" android:required=\"false\" />\n"
                 + basePermissions
@@ -3257,6 +3416,14 @@ public class AndroidGradleBuilder extends Executor {
                 + "        }\n"
                 + "        com.codename1.impl.android.AndroidImplementation.setCurrentApplicationInstance(i);\n"
                 + "        com.codename1.impl.android.AndroidImplementation.deliverPendingSharedContent();\n";
+
+        if (usesSurfaces) {
+            // flush surface actions (widget/live-activity taps) that arrived through the
+            // CN1SurfaceActionActivity trampoline before the app instance existed; conditional
+            // so apps that never touch com.codename1.surfaces keep it strippable
+            localNotificationCode
+                    += "        com.codename1.impl.android.AndroidImplementation.deliverPendingSurfaceActions();\n";
+        }
 
 
         // Install the build-time-generated @Route dispatcher before the
@@ -4375,6 +4542,13 @@ public class AndroidGradleBuilder extends Executor {
                 + "    public "+xclass("android.support.v4.app.NotificationCompat")+"$Builder setChannelId(java.lang.String);\n"
                 + "}\n\n"
                 + "-keep class **Stub { *; }\n\n" // Because there have been cases where release builds were stripping out native interfaces
+                // Surfaces: the generated widget providers are resolved by name from the
+                // manifest and from the class-name convention in AndroidSurfaceBridge, and the
+                // runtime package is reached from generated code; neither may be renamed.
+                + (usesSurfaces
+                        ? "-keep class com.codename1.impl.android.CN1Widget_* { *; }\n\n"
+                        + "-keep class com.codename1.impl.android.surfaces.** { *; }\n\n"
+                        : "")
                 + facebookProguard
                 + " " + request.getArg("android.proguardKeep", "") + "\n"
                 + googlePlayObfuscation
@@ -4976,6 +5150,42 @@ public class AndroidGradleBuilder extends Executor {
         return s;
     }
 
+    /**
+     * Maps a widget kind id to the simple name suffix of its generated provider class:
+     * underscore-separated words become CamelCase ({@code delivery_status} -&gt;
+     * {@code DeliveryStatus}). The identical logic lives in
+     * {@code com.codename1.impl.android.surfaces.AndroidSurfaceBridge#toClassSuffix} in the
+     * Android port; keep them in sync.
+     */
+    static String surfaceKindClassSuffix(String kindId) {
+        StringBuilder sb = new StringBuilder(kindId.length());
+        boolean upper = true;
+        for (int i = 0; i < kindId.length(); i++) {
+            char c = kindId.charAt(i);
+            if (c == '_') {
+                upper = true;
+                continue;
+            }
+            if (upper) {
+                sb.append(Character.toUpperCase(c));
+                upper = false;
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Formats a numeric surfaces.json value (the JSON parser produces Doubles) as a dp integer
+     * string, falling back to the supplied default when absent or malformed.
+     */
+    static String surfaceDp(Object value, String defaultValue) {
+        if (value instanceof Number) {
+            return String.valueOf(((Number) value).intValue());
+        }
+        return defaultValue;
+    }
 
     @Override
     protected String registerNativeImplementationsAndCreateStubs(ClassLoader parentClassLoader, File stubDir, File... classesDirectory) throws MalformedURLException, IOException {

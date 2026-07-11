@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Codename One surfaces: SurfaceProgress STYLE_CIRCULAR. App widgets cannot render a
+     determinate circular indicator, so per the LCD contract this is the same horizontal bar
+     as cn1_surface_progress (kept as a separate resource so a future lowering can improve it
+     without a renderer change). -->
+<ProgressBar xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/cn1_surface_root"
+    style="?android:attr/progressBarStyleHorizontal"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:indeterminate="false"
+    android:max="1000" />

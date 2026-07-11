@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Codename One surfaces: spacer (SurfaceSpacer). An expanding spacer is wrapped in a
+     weighted cell; a fixed-minimum spacer gets its size from runtime padding. -->
+<View xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/cn1_surface_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" />

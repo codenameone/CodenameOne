@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Codename One surfaces: vertical container (SurfaceColumn). Composed at runtime via
+     RemoteViews.addView; children are wrapped in cn1_surface_cell_* layouts. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/cn1_surface_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical" />
