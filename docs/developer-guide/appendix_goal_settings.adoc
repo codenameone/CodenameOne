@@ -4,7 +4,7 @@ Downloads and opens the standalone Codename One Settings editor bound to the cur
 
 [source,shell]
 ----
-mvn cn1:settings
+include::../demos/common/src/main/snippets/developer-guide/maven-appendix-control-center.sh[tag=maven-appendix-control-center-bash-001,indent=0]
 ----
 
 See <<settings>>
