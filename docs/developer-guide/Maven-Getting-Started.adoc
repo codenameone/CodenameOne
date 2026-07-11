@@ -232,7 +232,7 @@ The "common" module is where all your Codename One application resides. It house
 
 When adding dependencies into your app, you'll therefore almost always place them inside the pom.xml file for the "common" module.
 
-TIP: You can add dependencies without needing to change XML configuration files using the Control Center. See <<managing-addons-in-control-center>>.
+TIP: You can add dependencies without editing XML by launching Codename One Settings with `mvn cn1:settings`. See <<managing-addons-in-control-center>>.
 
 .When to use the "other" pom.xml Files
 [sidebar]
@@ -290,7 +290,7 @@ This is a special marker that's used by some Codename One tooling to help it loc
 
 You can paste any Maven dependency snippet you like into your project, but libraries that haven't been specifically developed for Codename One might not be compatible. See <<api>>. If you're unsure whether a library is compatible, you could add the dependency and try to use it in your app. If it isn't compatible, it will fail when you try to build the app, during the <<compliance-check,compliance check>>.
 
-The easiest way to find compatible libraries is to use the <<managing-addons-in-control-center, extensions section of the Control Center>>. Libraries listed in this section have been build specifically for Codename One and are guaranteed to be compatible.
+The easiest way to find Codename One libraries is to use the <<managing-addons-in-control-center,Extensions view in Codename One Settings>>. These libraries were built specifically for Codename One. Settings warns before installing catalog entries known to target older Codename One releases.
 
 
 [#compliance-check]
@@ -301,43 +301,38 @@ All application code in the common module of your Codename One project must be c
 If the compliance check fails (that is, the app uses unsupported APIs), the build will fail. The error log should provide some clues about where the offending code resides.
 
 [#managing-addons-in-control-center]
-==== Managing Add-Ons in control center
+==== Managing add-ons in Codename One Settings
 
-As mentioned throughout this guide, the best place to find and install add-ons for your project is in the Codename One Control Center (also known as Codename One Preferences or Codename One Settings). See <<settings>>.
+Launch Codename One Settings from the project root, then select *Extensions* in the left navigation rail:
 
-From the dashboard, select "Advanced Settings" > "Extensions" in the navigation menu on the left as shown below:
+[source,shell]
+----
+include::../demos/common/src/main/snippets/developer-guide/maven-appendix-control-center.sh[tag=maven-appendix-control-center-bash-001,indent=0]
+----
 
-image::img/image-2021-03-08-06-57-26-835.png[Control center navigation menu]
-
-This will bring up a list of available Codename One extensions as shown below:
-
-image::img/control-center-extensions.png[Control center extensions page]
+image::img/codename-one-settings-extensions.png[Codename One Settings Extensions view,scaledwidth=85%]
 
 As an example, install the "Google Maps" library.
 
-Type in "Maps" into the search box, and it should narrow the options down to three libraries as shown below:
+Type `Maps` in the search field and locate `Codename One Google Native`, the Google Maps library.
 
-image:img/control-center-extensions-search-maps.png[Control Center Extensions filtered on maps]
+Click *Install* or *Download*, depending on how the catalog entry is distributed.
 
-The one in the middle `Codename One Google Native`, is the Google Maps lib that you want.
+Settings shows progress while it installs the extension. For an installed extension, click the same action area and confirm *Uninstall* to remove it.
 
-Press the "Download" button.
-
-You should see a progress indicator while performs the installation.
-
-.How Control Center Handles Maven Dependencies
+.How Codename One Settings handles Maven dependencies
 [sidebar]
 ****
-Many of the extensions listed in the control center are deployed as cn1lib bundles. Others are deployed on Maven central and *could* be installed by adding a snippet into the pom.xml file (as described in <<maven-dependency-example>>).
+Many extensions listed in Settings are deployed as cn1lib bundles. Others are deployed on Maven Central and *could* be installed by adding a snippet to `pom.xml` (as described in <<maven-dependency-example>>).
 
-The control center UI shields you from the details of how it installs the extensions into your app. For extensions that are deployed on Maven central, it will add the Maven dependency for the library directly into your project's common/pom.xml file. For extensions that are distributed as cn1lib bundles, it uses the `install-cn1lib` Maven goal to install it into your project.
+Settings shields you from the details of how it installs extensions. For extensions deployed on Maven Central, it adds the dependency directly to your project's `common/pom.xml`. For extensions distributed as cn1lib bundles, it uses the `install-cn1lib` Maven goal.
 
 You shouldn't need to worry about this, as it happens seamlessly. If you're curious, you can look at the `<dependencies>` section of your common/pom.xml file to see the added `<dependency>` tag after you install an extension.
 ****
 
 ==== Installing legacy cn1libs
 
-The recommended approach for installing add-ons to your project is to use the <<managing-addons-in-control-center, control center>>, or by <<maven-dependency-example, adding the maven dependency to your common/pom.xml file>>. But, in some situations you may not be able to use those methods. For example, If you have a legacy cnlib file that you need to use in your app, and it isn't available on Maven central or the control center.
+The recommended approach for installing add-ons is to use <<managing-addons-in-control-center,Codename One Settings>> or <<maven-dependency-example,add the Maven dependency to `common/pom.xml`>>. In some situations neither method is available. For example, you might have a legacy cn1lib file that isn't listed in the extension catalog or deployed to Maven Central.
 
 In cases like this you can use the `install-cn1lib` Maven goal to install it as follows:
 
@@ -345,4 +340,3 @@ In cases like this you can use the `install-cn1lib` Maven goal to install it as 
 ----
 include::../demos/common/src/main/snippets/developer-guide/maven-getting-started.sh[tag=maven-getting-started-bash-007,indent=0]
 ----
-

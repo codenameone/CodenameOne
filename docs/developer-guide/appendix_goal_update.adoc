@@ -1,7 +1,7 @@
 [#update-goal]
 === Update Codename One (`update`)
 
-Updates Codename One. This will update the Codename One tools that live inside `$HOME/.codenameone` such as the GUI builder and Control Center. This will also try to update the `cn1.version` and `cn1.plugin.version` properties in your project's pom.xml file.
+Updates Codename One. This updates tools that live inside `$HOME/.codenameone`, such as the GUI builder, and tries to update the `cn1.version` and `cn1.plugin.version` properties in the project's `pom.xml`. The standalone Settings editor is resolved from Maven using `cn1.plugin.version` when you run `mvn cn1:settings`.
 
 ==== Usage example
 

@@ -6,10 +6,15 @@ When you send a build to the server, you can provide more parameters. The server
 
 These hints are often called "build hints" or "build arguments." They behave like compiler flags that tune the build server's behavior. That makes them useful for fast iteration on new functionality without rebuilding plugin UI for every change. They're also useful when you need to expose low-level behavior such as customizing the Android manifest XML or the iOS plist.
 
-You can set these hints by right-clicking the project in the IDE and selecting #Codename One# -> #Codename One Settings# -> #Build Hints#. The hints use the `key=value` style.
+Launch Codename One Settings from the Maven project root, then select *Hints* in the left navigation rail. The hints use the `key=value` style.
+
+[source,shell]
+----
+include::../demos/common/src/main/snippets/developer-guide/maven-appendix-control-center.sh[tag=maven-appendix-control-center-bash-001,indent=0]
+----
 
 .The build hints UI in Codename One Settings
-image::img/build-hints-codenameone-settings.png[The build hints UI in Codename One Settings,scaledwidth=50%]
+image::img/codename-one-settings-build-hints.png[The build hints UI in Codename One Settings,scaledwidth=85%]
 
 You can also set the build hints directly in the `codenameone_settings.properties` file. When you do that, each setting must start with the `codename1.arg.` prefix. For example, `android.debug=true` becomes `codename1.arg.android.debug=true`.
 
@@ -2900,11 +2905,11 @@ The https://github.com/codenameone/UpdateCodenameOne[Update Framework] solves ma
 
 - Skins update automatically - this is hugely important. When you change a theme you need to update it in the skins and if you don't update the skin you might see a difference between the simulator and the device
 
-- Update of settings/designer without IDE plugin update - The IDE plugin update process is slow and tedious. This way you can push out a bug fix for the GUI builder without going through the process of releasing a new plugin version
+- Update of designer tools without an IDE plugin update - The IDE plugin update process is slow and tedious. This way a GUI builder fix can ship without a new IDE plugin release. The standalone Settings artifact is versioned with the Maven plugin instead.
 
 This framework should be seamless. You should no longer see the "downloading" message whenever you push an update after your build client is updated. Your system would poll for a new version daily and update when new updates are available.
 
-You can also use the usual method of #Codename One Settings# -> #Basic# -> #Update Client Libs# which will force an update check. Notice that the UI will look a bit different after this update.
+To force an update check, run `mvn cn1:update` from the project root.
 
 ==== How does it work
 

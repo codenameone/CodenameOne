@@ -1,43 +1,35 @@
 
 [appendix]
 [#settings]
-== Codename One settings
+== Codename One Settings
 
-The Codename One Settings app (aka Codename One Preferences, aka Control Center) allows you to configure many aspects of your application. This is where you can generate certificates, browse/install add-ons, monitor the status of your cloud builds, configure build hints, and more.
+Codename One Settings is a standalone editor for the current Maven project. Use it to edit the application's basic properties, manage build hints, and browse, install, update, or uninstall extensions. Signing assets are managed by the separate <<certificate-wizard,Certificate Wizard>>, and cloud builds are monitored on the Codename One website.
 
-=== Opening Codename One settings
+=== Opening Codename One Settings
 
-==== Opening Codename One settings from command-line
+Run the following command from the root directory of a Codename One Maven project:
 
-Use the `run.sh` (or run.bat, if on Windows) to open Codename One settings:
-
-[source,bash]
+[source,shell]
 ----
 include::../demos/common/src/main/snippets/developer-guide/maven-appendix-control-center.sh[tag=maven-appendix-control-center-bash-001,indent=0]
 ----
 
-==== Opening Codename One settings from IntelliJ
+Maven downloads the Settings artifact that matches the Codename One Maven plugin version and opens it as a desktop application bound to the current project. The same command works in a terminal or an IDE's Maven runner.
 
-Click on the "Configuration" menu in the upper right of the toolbar, and select "Tools" > "Codename One Settings" as shown below.
+=== Basic settings
 
-image::img/intellij-open-settings.png[]
+The *Basic* view edits the application title, description, version, vendor, package name, main class, icon, versioned-build selection, and include-source option. Changes are written to `common/codenameone_settings.properties` when you click *Save*.
 
+image::img/codename-one-settings-basic.png[Codename One Settings Basic view,scaledwidth=85%]
 
-==== Opening Codename One settings from NetBeans
+=== Build hints
 
-Right-click on the project in the project inspector, and select "Maven" > "Open Control Center" as shown below:
+The *Build Hints* view searches the build-hint catalog from this guide. It provides a control appropriate to each known hint and also accepts arbitrary key/value hints. The editor adds and removes the `codename1.arg.` prefix when reading and writing `codenameone_settings.properties`.
 
-image::img/netbeans-open-control-center.png[]
+image::img/codename-one-settings-build-hints.png[Codename One Settings Build Hints view,scaledwidth=85%]
 
-==== Opening Codename One settings from Eclipse
+=== Extensions
 
-Press the image:img/eclipse-run-as-button.png[] button, and select the "_Your project_ Settings" option (where _Your project_ is the name of your project). For example:
+The *Extensions* view searches the Codename One library catalog. Depending on how an extension is distributed, installation either adds a Maven dependency to `common/pom.xml` or installs a legacy cn1lib. Click the action for an installed extension to uninstall it. Settings displays a compatibility warning before installing a catalog entry known to target an older Codename One release.
 
-image:img/eclipse-open-settings.png[]
-
-[#dashboard]
-=== The dashboard
-
-Once inside Codename One Settings, you'll see a dashboard like the following:
-
-image::img/control-center-dashboard.png[]
+image::img/codename-one-settings-extensions.png[Codename One Settings Extensions view,scaledwidth=85%]
