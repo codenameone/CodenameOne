@@ -229,6 +229,15 @@ public class IPhoneBuilder extends Executor {
     static String escapeRubyStr(String input) {
         return escapeRuby(input);
     }
+
+    static String createLldbSchemeSetupScript() {
+        return "lldb_init_file = File.join(File.dirname(project_file), 'cn1.lldbinit')\n"
+                + "File.write(lldb_init_file, \"# Codename One LLDB settings\\nprocess handle -s false -n false -p true SIGUSR2\\n\")\n"
+                + "configure_cn1_lldb = lambda do |scheme|\n"
+                + "  scheme.launch_action.xml_element.attributes['customLLDBInitFile'] = '$(SRCROOT)/cn1.lldbinit'\n"
+                + "  scheme.test_action.xml_element.attributes['customLLDBInitFile'] = '$(SRCROOT)/cn1.lldbinit'\n"
+                + "end\n";
+    }
     
     @Override
     protected String getDeviceIdCode() {
@@ -3018,9 +3027,17 @@ public class IPhoneBuilder extends Executor {
                                 tmpDir.getAbsolutePath() + "/dist/" +
                                 request.getMainClass() + ".xcodeproj\"\n" +
                             "xcproj = Xcodeproj::Project.open(project_file)\n" +
+                            createLldbSchemeSetupScript() +
                             installLocalizedStrings  +
                             "begin\n"
-                            + "  xcproj.recreate_user_schemes\n"
+                            + "  xcproj.recreate_user_schemes do |scheme, target|\n"
+                            + "    configure_cn1_lldb.call(scheme)\n"
+                            + "  end\n"
+                            + "  Dir.glob(File.join(project_file, 'xcshareddata', 'xcschemes', '*.xcscheme')).each do |scheme_path|\n"
+                            + "    scheme = Xcodeproj::XCScheme.new(scheme_path)\n"
+                            + "    configure_cn1_lldb.call(scheme)\n"
+                            + "    scheme.save!\n"
+                            + "  end\n"
                             + "rescue => e\n"
                             + "  puts \"Error during processing: #{$!}\"\n"
                             + "  puts \"Backtrace:\\n\\t#{e.backtrace.join(\"\\n\\t\")}\"\n"
