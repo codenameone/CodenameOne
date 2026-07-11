@@ -178,8 +178,14 @@ private func cn1RenderDynamicText(_ node: [String: Any], _ ctx: CN1RenderContext
     default: // timerDown
         let now = Date()
         if resolved > now {
-            // timerInterval stops at zero instead of counting into negative time.
-            text = Text(timerInterval: now...resolved, countsDown: true)
+            // timerInterval (iOS 16) stops at zero instead of counting into negative
+            // time; the .timer style is the pre-16 approximation so these sources
+            // compile at any deployment target the generated project ends up with.
+            if #available(iOS 16.0, *) {
+                text = Text(timerInterval: now...resolved, countsDown: true)
+            } else {
+                text = Text(resolved, style: .timer)
+            }
         } else {
             text = Text("0:00")
         }
@@ -246,11 +252,20 @@ private func cn1RenderProgress(_ node: [String: Any], _ ctx: CN1RenderContext) -
     if let start = cn1DateMs(node["start"]), let end = cn1DateMs(node["end"]), end > start {
         // Date-interval progress advances natively on the OS clock, like dynamic text.
         // The circular style falls back to the same linear bar (no native timer ring).
-        view = AnyView(ProgressView(timerInterval: start...end, countsDown: false) {
-            EmptyView()
-        } currentValueLabel: {
-            EmptyView()
-        }.progressViewStyle(.linear))
+        // timerInterval needs iOS 16; below that the fraction freezes at render time
+        // (the documented degradation on every non-iOS platform too).
+        if #available(iOS 16.0, *) {
+            view = AnyView(ProgressView(timerInterval: start...end, countsDown: false) {
+                EmptyView()
+            } currentValueLabel: {
+                EmptyView()
+            }.progressViewStyle(.linear))
+        } else {
+            let total = end.timeIntervalSince(start)
+            let elapsed = Date().timeIntervalSince(start)
+            let frozen = total > 0 ? min(max(elapsed / total, 0), 1) : 0
+            view = AnyView(ProgressView(value: frozen).progressViewStyle(.linear))
+        }
     } else {
         var value = cn1Double(node["value"]) ?? 0
         if let key = cn1Str(node, "valueKey"), let stateValue = cn1Double(ctx.state[key]) {
@@ -258,15 +273,25 @@ private func cn1RenderProgress(_ node: [String: Any], _ ctx: CN1RenderContext) -
         }
         value = min(max(value, 0), 1)
         if circular {
-            view = AnyView(Gauge(value: value, in: 0...1) {
-                EmptyView()
-            }.gaugeStyle(.accessoryCircularCapacity))
+            // Gauge needs iOS 16; the linear bar is the documented circular fallback
+            // below it (matching the Android degradation).
+            if #available(iOS 16.0, *) {
+                view = AnyView(Gauge(value: value, in: 0...1) {
+                    EmptyView()
+                }.gaugeStyle(.accessoryCircularCapacity))
+            } else {
+                view = AnyView(ProgressView(value: value).progressViewStyle(.linear))
+            }
         } else {
             view = AnyView(ProgressView(value: value))
         }
     }
     if let color = color {
-        view = AnyView(view.tint(color))
+        if #available(iOS 15.0, *) {
+            view = AnyView(view.tint(color))
+        } else {
+            view = AnyView(view.accentColor(color))
+        }
     }
     return view
 }
@@ -283,6 +308,13 @@ private func cn1RenderVector(_ node: [String: Any], _ ctx: CN1RenderContext) -> 
           let ops = cn1Arr(node, "ops") else {
         return AnyView(EmptyView())
     }
+    // Canvas/GraphicsContext need iOS 15. The extension's runtime floor is 16.1, but these
+    // sources must COMPILE at any deployment target the generated project ends up with
+    // (build variants can stomp the extension target's setting), so gate at runtime like
+    // CN1SurfaceBridge does rather than relying on the build configuration.
+    guard #available(iOS 15.0, *) else {
+        return AnyView(EmptyView())
+    }
     let state = ctx.state
     return AnyView(Canvas { context, size in
         let scale = min(size.width / vw, size.height / vh)
@@ -295,6 +327,7 @@ private func cn1RenderVector(_ node: [String: Any], _ ctx: CN1RenderContext) -> 
     }.aspectRatio(vw / vh, contentMode: .fit))
 }
 
+@available(iOS 15.0, *)
 private func cn1DrawVectorOps(_ ops: [Any], _ context: inout GraphicsContext, _ state: [String: Any]) {
     for rawOp in ops {
         guard let op = rawOp as? [String: Any], let o = cn1Str(op, "o") else {
@@ -416,6 +449,7 @@ private func cn1PolyPath(_ op: [String: Any], close: Bool) -> Path? {
 
 /// Draws a vector text op: anchored at the middle of x with the baseline at y (the wire
 /// contract), resolved so the measured first baseline can position the text exactly.
+@available(iOS 15.0, *)
 private func cn1DrawVectorText(_ op: [String: Any], _ context: inout GraphicsContext,
         _ state: [String: Any], _ color: Color) {
     let value = cn1Interpolate(cn1Str(op, "text") ?? "", state: state)

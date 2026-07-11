@@ -63,7 +63,9 @@ private func cn1IslandRegion(_ island: [String: Any], _ key: String, state: [Str
 }
 
 /// The lock screen / banner presentation: the descriptor's content root rendered with
-/// the current state.
+/// the current state. Availability-annotated so the file compiles at any deployment
+/// target the generated project ends up with (ActivityKit types are iOS 16.1+).
+@available(iOS 16.1, *)
 struct CN1LiveActivityLockScreenView: View {
     let context: ActivityViewContext<CN1SurfaceAttributes>
 
