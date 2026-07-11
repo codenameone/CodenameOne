@@ -837,6 +837,39 @@
         "url": "https://medium.com/p/3a146c0b65b9/edit",
         "syndicated_at": "2026-07-09T17:02:30+00:00"
       }
+    },
+    "one-codebase-more-surfaces": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmrf2cza500000ako6jv51fe8",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a4fb782bdcebc9cb2047aa5",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-10T15:01:35+00:00"
+      },
+      "devto": {
+        "id": 4114785,
+        "url": "https://dev.to/codenameone/more-surfaces-same-deal-cars-sensors-commerce-video-and-builds-29pg",
+        "syndicated_at": "2026-07-10T15:27:50+00:00"
+      },
+      "foojay": {
+        "id": 124873,
+        "url": "https://foojay.io/wp-admin/post.php?post=124873&action=edit",
+        "preview_url": "https://foojay.io/?p=124873",
+        "featured_media_id": 124872,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-07-10T15:28:43+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/df5ba1965711/edit",
+        "syndicated_at": "2026-07-10T17:02:06+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3664113/edit.html",
+        "syndicated_at": "2026-07-10T17:03:21+00:00"
+      }
     }
   }
 }

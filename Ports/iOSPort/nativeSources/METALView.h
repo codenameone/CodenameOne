@@ -50,6 +50,13 @@
     // turn or by the next normal presentFramebuffer -- whichever lands first.
     // Read/written on the main thread only, so no synchronisation is needed.
     BOOL needsResizePresent;
+
+    // The persistent screenTexture is private GPU storage. iOS may discard or
+    // leave it stale across app suspension, and CN1 can resume with only
+    // partial dirty-region flushes. Mark it invalid on foreground; the first
+    // full-screen repaint clears it before drawing fresh content.
+    BOOL retainedFramebufferInvalid;
+    BOOL clearRetainedFramebufferOnNextFrame;
 }
 @property (nonatomic, retain) id<MTLCommandQueue> commandQueue;
 @property (nonatomic, retain) id<MTLCommandBuffer> commandBuffer;
@@ -88,6 +95,8 @@
                   magnify:(float)magnify aberration:(float)aberration tintColor:(int)tintColor tintStrength:(float)tintStrength;
 -(void)presentPreservedFrameIfNeeded;
 -(void)updateFrameBufferSize:(int)w h:(int)h;
+-(void)invalidateRetainedFramebuffer;
+-(void)prepareRetainedFramebufferForDrawRect:(CGRect)rect displayWidth:(int)displayWidth displayHeight:(int)displayHeight;
 -(void)textFieldDidChange;
 -(void) keyboardDoneClicked;
 -(void) keyboardNextClicked;

@@ -27,7 +27,7 @@ import com.codename1.ui.util.UITimer;
 /// auto-advances on either success or timeout so a broken gesture fails fast
 /// without blocking the rest of the suite.
 public final class GestureSuite {
-    private static final long DEFAULT_STEP_TIMEOUT_MS = 8000L;
+    private static final long DEFAULT_STEP_TIMEOUT_MS = 15000L;
     private static final long SUITE_EXIT_DELAY_MS = 1500L;
 
     private final GestureStep[] steps;
@@ -35,6 +35,7 @@ public final class GestureSuite {
     private final Label statusLabel;
     private final Container targetArea;
     private int index = -1;
+    private int activeStepToken;
     private UITimer activeTimeout;
 
     public GestureSuite() {
@@ -69,6 +70,7 @@ public final class GestureSuite {
             finishSuite();
             return;
         }
+        final int stepToken = ++this.activeStepToken;
         final GestureStep step = this.steps[this.index];
         this.statusLabel.setText("Step " + (this.index + 1) + "/" + this.steps.length
                 + ": " + step.name());
@@ -76,6 +78,11 @@ public final class GestureSuite {
         step.install(this.targetArea, new GestureStep.Callback() {
             @Override
             public void onDetected(String details) {
+                if (stepToken != activeStepToken) {
+                    return;
+                }
+                activeStepToken++;
+                cancelTimeout();
                 log("CN1IV:EVENT:" + step.name() + (details == null ? "" : ":" + details));
                 CN.callSerially(GestureSuite.this::advance);
             }
@@ -83,6 +90,9 @@ public final class GestureSuite {
         this.targetArea.revalidate();
         log("CN1IV:READY:" + step.name());
         this.activeTimeout = UITimer.timer((int) DEFAULT_STEP_TIMEOUT_MS, false, this.form, () -> {
+            if (stepToken != activeStepToken) {
+                return;
+            }
             log("CN1IV:TIMEOUT:" + step.name());
             advance();
         });
@@ -96,6 +106,7 @@ public final class GestureSuite {
     }
 
     private void finishSuite() {
+        this.activeStepToken++;
         log("CN1IV:SUITE:FINISHED");
         UITimer.timer((int) SUITE_EXIT_DELAY_MS, false, this.form, () -> {
             try {

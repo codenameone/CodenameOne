@@ -48,6 +48,9 @@
 - (void)keyboardDoneClicked;
 - (void)keyboardNextClicked;
 - (void)textFieldDidChange;
+@optional
+- (void)invalidateRetainedFramebuffer;
+- (void)prepareRetainedFramebufferForDrawRect:(CGRect)rect displayWidth:(int)displayWidth displayHeight:(int)displayHeight;
 @end
 
 #endif

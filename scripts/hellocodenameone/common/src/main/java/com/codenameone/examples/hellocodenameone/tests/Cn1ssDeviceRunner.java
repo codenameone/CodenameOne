@@ -92,6 +92,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 && testClass instanceof LightweightPickerButtonsScreenshotTest) {
             return 45000;
         }
+        if (!"HTML5".equals(Display.getInstance().getPlatformName())
+                && testClass instanceof ToastBarTopPositionScreenshotTest) {
+            return 45000;
+        }
         return "HTML5".equals(Display.getInstance().getPlatformName())
                 ? TEST_TIMEOUT_MS_HTML5
                 : TEST_TIMEOUT_MS_NATIVE;

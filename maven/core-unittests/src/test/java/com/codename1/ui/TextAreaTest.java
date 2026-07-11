@@ -413,6 +413,63 @@ class TextAreaTest extends UITestBase {
     }
 
     @FormTest
+    void testMultilineDefaultsToTop() {
+        // Regression test for #5345: with a CENTER theme default a multi-line text
+        // area reports TOP by default (the theme default is meant for single-line
+        // fields). For an editable area this matches the top-aligning native editor,
+        // so the text doesn't jump when editing starts and ends.
+        int previous = TextArea.getDefaultValign();
+        TextArea.setDefaultValign(Component.CENTER);
+        try {
+            TextArea editable = new TextArea("text text", 3, 20);
+            editable.setEditable(true);
+            assertEquals(Component.TOP, editable.getVerticalAlignment());
+
+            TextArea nonEditable = new TextArea("text text", 3, 20);
+            nonEditable.setEditable(false);
+            assertEquals(Component.TOP, nonEditable.getVerticalAlignment());
+        } finally {
+            TextArea.setDefaultValign(previous);
+        }
+    }
+
+    @FormTest
+    void testExplicitVerticalAlignmentOverridesMultilineDefault() {
+        // An explicit setVerticalAlignment() is honored even for a multi-line area,
+        // so display text can still be centered/bottom-aligned.
+        int previous = TextArea.getDefaultValign();
+        TextArea.setDefaultValign(Component.CENTER);
+        try {
+            TextArea textArea = new TextArea("text text", 3, 20);
+            textArea.setEditable(false);
+
+            textArea.setVerticalAlignment(Component.CENTER);
+            assertEquals(Component.CENTER, textArea.getVerticalAlignment());
+
+            textArea.setVerticalAlignment(Component.BOTTOM);
+            assertEquals(Component.BOTTOM, textArea.getVerticalAlignment());
+        } finally {
+            TextArea.setDefaultValign(previous);
+        }
+    }
+
+    @FormTest
+    void testSingleLineKeepsThemeVerticalAlignment() {
+        // Single-line fields keep the theme default (they center vertically in their
+        // native editor).
+        int previous = TextArea.getDefaultValign();
+        TextArea.setDefaultValign(Component.CENTER);
+        try {
+            TextArea textArea = new TextArea("text", 1, 20);
+            textArea.setSingleLineTextArea(true);
+            textArea.setEditable(true);
+            assertEquals(Component.CENTER, textArea.getVerticalAlignment());
+        } finally {
+            TextArea.setDefaultValign(previous);
+        }
+    }
+
+    @FormTest
     void testVerticalAlignmentScreenshotStates() {
         Form form = new Form("TextArea VAlign", BoxLayout.y());
         form.getStyle().setPadding(4, 4, 4, 4);
