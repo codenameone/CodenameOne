@@ -113,11 +113,11 @@ final class AndroidAccessibilityProvider extends AccessibilityNodeProvider {
         }
         if (Build.VERSION.SDK_INT >= 21 && node.getValidationError() != null) info.setError(node.getValidationError());
         if (Build.VERSION.SDK_INT >= 28) {
-            info.setHeading(node.getHeadingLevel() > 0
-                    || node.getRole() == AccessibilityRole.HEADING
-                    || node.getCollectionItemInfo() != null && node.getCollectionItemInfo().isHeading());
-            info.setScreenReaderFocusable(node.isFocusable() || label != null);
-            if (node.getPaneTitle() != null) info.setPaneTitle(node.getPaneTitle());
+            setApi28Semantics(info,
+                    node.getHeadingLevel() > 0
+                            || node.getRole() == AccessibilityRole.HEADING
+                            || node.getCollectionItemInfo() != null && node.getCollectionItemInfo().isHeading(),
+                    node.isFocusable() || label != null, node.getPaneTitle());
         }
         if (Build.VERSION.SDK_INT >= 19) {
             info.setLiveRegion(node.getLiveRegion() == AccessibilityLiveRegion.ASSERTIVE
@@ -129,6 +129,30 @@ final class AndroidAccessibilityProvider extends AccessibilityNodeProvider {
         addActions(info, node);
         setBounds(info, node);
         return info;
+    }
+
+    /**
+     * Invokes API 28 node properties without requiring the Android port's
+     * compile-time SDK stub to expose them.  Release builds may compile the
+     * port against an older android.jar even though these calls run only on
+     * Android 9 and newer.
+     */
+    private static void setApi28Semantics(AccessibilityNodeInfo info, boolean heading,
+            boolean screenReaderFocusable, String paneTitle) {
+        try {
+            Class type = AccessibilityNodeInfo.class;
+            type.getMethod("setHeading", new Class[]{Boolean.TYPE})
+                    .invoke(info, new Object[]{Boolean.valueOf(heading)});
+            type.getMethod("setScreenReaderFocusable", new Class[]{Boolean.TYPE})
+                    .invoke(info, new Object[]{Boolean.valueOf(screenReaderFocusable)});
+            if (paneTitle != null) {
+                type.getMethod("setPaneTitle", new Class[]{CharSequence.class})
+                        .invoke(info, new Object[]{paneTitle});
+            }
+        } catch (Throwable ignored) {
+            // The runtime API is authoritative; gracefully omit these optional
+            // properties on vendor builds that don't expose the API 28 methods.
+        }
     }
 
     private void addActions(AccessibilityNodeInfo info, AccessibilityNodeSnapshot node) {

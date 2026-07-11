@@ -258,7 +258,7 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_accessibilityAction___long_ja
 JAVA_VOID com_codename1_impl_windows_WindowsNative_accessibilityEnd___int(CODENAME_ONE_THREAD_STATE, JAVA_INT changeType) {
     AcquireSRWLockExclusive(&cn1UiaLock); cn1UiaNodes.swap(cn1UiaPending); cn1UiaPending.clear(); ReleaseSRWLockExclusive(&cn1UiaLock);
     CN1UiaProvider* root=new CN1UiaProvider(0);
-    StructureChangedType type=(changeType&1)?StructureChangeType_ChildrenInvalidated:StructureChangeType_ChildrenReordered;
+    StructureChangeType type=(changeType&1)?StructureChangeType_ChildrenInvalidated:StructureChangeType_ChildrenReordered;
     UiaRaiseStructureChangedEvent(root,type,NULL,0); root->Release();
 }
 }
