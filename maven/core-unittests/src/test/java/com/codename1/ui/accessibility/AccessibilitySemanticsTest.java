@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2026 Codename One and contributors. All rights reserved.
+ */
 package com.codename1.ui.accessibility;
 
 import com.codename1.junit.UITestBase;

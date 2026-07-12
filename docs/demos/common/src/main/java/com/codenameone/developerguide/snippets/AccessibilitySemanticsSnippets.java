@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2026 Codename One and contributors. All rights reserved.
+ */
 package com.codenameone.developerguide.snippets;
 
 import com.codename1.ui.Button;

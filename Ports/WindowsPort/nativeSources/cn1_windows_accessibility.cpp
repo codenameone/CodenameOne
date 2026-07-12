@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2026 Codename One and contributors. All rights reserved.
+ */
+
 /* Native virtual accessibility tree for the lightweight Win32 port. */
 #ifdef _WIN32
 
