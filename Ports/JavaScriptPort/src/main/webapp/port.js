@@ -3939,16 +3939,6 @@ const cn1ssForcedTimeoutTestClasses = Object.freeze({
   // from efabb3e1a. The watchdog stays as a healthy-channel safety net for
   // genuine isolated blocks; it is NOT a cure for host-channel degradation.
   "com_codenameone_examples_hellocodenameone_tests_FileSystemStorageOpenInputStreamMissingTest": "fileSystemStorageLocalForageHang",
-  // The com.codename1.surfaces suite tests fail on the JS port only:
-  // the serializer round-trip's re-parsed timeline document comes back
-  // with mangled tokens (JSONParser throws IllegalStateException
-  // "expected a number but got [eecn1ss_status, reload, never, ...]",
-  // pointing at a runtime string/JSON handling bug, not a surfaces
-  // bug), and the rasterizer screenshot test NPEs during setup.
-  // Every other platform leg gates these; parked pending a JS runtime
-  // fix. Mirrored in Cn1ssDeviceRunner.isJsSkippedKnownRuntimeBug.
-  "com_codenameone_examples_hellocodenameone_tests_SurfacesSerializerRoundTripTest": "surfacesJsonRoundTrip",
-  "com_codenameone_examples_hellocodenameone_tests_SurfacesRasterizerScreenshotTest": "surfacesRasterizerNpe",
   // Transform + Rotated kept UN-parked -- never reached on the prior run
   // (CombinedXY hung first); testing whether they render now.
   // Two more late-suite tests that hit the canvas-accumulation

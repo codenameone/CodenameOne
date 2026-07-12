@@ -5254,7 +5254,17 @@ bindNative(["cn1_java_lang_Double_toStringImpl_double_boolean_R_java_lang_String
 bindNative(["cn1_java_lang_StringBuilder_append_char_R_java_lang_StringBuilder"], function(__cn1ThisObject, ch) { return sbAppendNativeString(__cn1ThisObject, String.fromCharCode(ch | 0)); });
 bindNative(["cn1_java_lang_StringBuilder_append_int_R_java_lang_StringBuilder"], function(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, String(value | 0)); });
 bindNative(["cn1_java_lang_StringBuilder_append_long_R_java_lang_StringBuilder"], function(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, _LtoStr(value)); });
-bindNative(["cn1_java_lang_StringBuilder_append_java_lang_Object_R_java_lang_StringBuilder"], function(__cn1ThisObject, obj) { return sbAppendNativeString(__cn1ThisObject, jvm.toNativeString(obj)); });
+bindNative(["cn1_java_lang_StringBuilder_append_java_lang_Object_R_java_lang_StringBuilder"], function*(__cn1ThisObject, obj) {
+  // Fast path: strings (and null) convert synchronously. Everything else must
+  // dispatch the Java toString() virtually -- jvm.toNativeString's "" + value
+  // fallback stringifies heap objects (boxed Integer/Long/Double included) as
+  // the JS "[object Object]", which corrupted JSONWriter output (the
+  // surfacesJsonRoundTrip bug).
+  if (obj == null || typeof obj === "string" || obj.__nativeString != null || obj.__class === "java_lang_String") {
+    return sbAppendNativeString(__cn1ThisObject, jvm.toNativeString(obj));
+  }
+  return sbAppendNativeString(__cn1ThisObject, yield* runtimeToNativeString(obj));
+});
 bindNative(["cn1_java_lang_StringBuilder_append_java_lang_String_R_java_lang_StringBuilder"], function(__cn1ThisObject, str) { return sbAppendNativeString(__cn1ThisObject, jvm.toNativeString(str)); });
 bindNative(["cn1_java_lang_StringBuilder_charAt_int_R_char"], function(__cn1ThisObject, index) {
   index = index | 0;
