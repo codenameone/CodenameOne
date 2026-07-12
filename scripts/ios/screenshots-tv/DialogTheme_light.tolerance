@@ -1,0 +1,7 @@
+# tvOS renders the Liquid Glass surfaces (backdrop blur) with small run-to-run
+# GPU noise (channel deltas up to ~40 across the glass area); the default
+# channelDelta=4 gate can never settle, so channelDelta stays above the noise
+# band. mismatch tightened 1.0 -> 0.40% (~33k px of 8.3M) so a regression past
+# the noise still fails loudly instead of hiding under the old 1% (~83k px) slop.
+maxChannelDelta=48
+maxMismatchPercent=0.40

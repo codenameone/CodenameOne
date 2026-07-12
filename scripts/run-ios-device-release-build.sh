@@ -132,10 +132,36 @@ XCODE_BUILD_CMD=(
 )
 
 if ! "${XCODE_BUILD_CMD[@]}" | tee "$BUILD_LOG"; then
-  rd_log "STAGE:IOS_DEVICE_RELEASE_BUILD_FAILED -> See $BUILD_LOG"
-  rd_log "Key failure lines:"
-  grep -nE "(Undefined symbols|ld: symbol|framework not found|library not found|clang: error|ld:|error:)" "$BUILD_LOG" | tail -n 200 || true
-  exit 10
+  # tvOS-heavy runners hit the same destination-enumeration bug documented in
+  # run-ios-ui-tests.sh: the multi-platform scheme lists ONLY Apple TV
+  # destinations, so { generic:1, platform:iOS } cannot match even though the
+  # iphoneos SDK builds fine. -sdk iphoneos alone does not go through
+  # destination matching, so retry once without the -destination pair.
+  if grep -q "Unable to find a destination matching the provided destination" "$BUILD_LOG"; then
+    rd_log "Generic iOS destination did not enumerate (tvOS-heavy scheme); retrying with -sdk iphoneos only"
+    RETRY_CMD=()
+    skip_next=0
+    for arg in "${XCODE_BUILD_CMD[@]}"; do
+      if [ "$skip_next" = "1" ]; then skip_next=0; continue; fi
+      case "$arg" in
+        -destination|-destination-timeout) skip_next=1; continue ;;
+      esac
+      RETRY_CMD+=("$arg")
+    done
+    if "${RETRY_CMD[@]}" | tee "$BUILD_LOG"; then
+      rd_log "Retry without destination succeeded"
+    else
+      rd_log "STAGE:IOS_DEVICE_RELEASE_BUILD_FAILED -> See $BUILD_LOG (after destination retry)"
+      rd_log "Key failure lines:"
+      grep -nE "(Undefined symbols|ld: symbol|framework not found|library not found|clang: error|ld:|error:)" "$BUILD_LOG" | tail -n 200 || true
+      exit 10
+    fi
+  else
+    rd_log "STAGE:IOS_DEVICE_RELEASE_BUILD_FAILED -> See $BUILD_LOG"
+    rd_log "Key failure lines:"
+    grep -nE "(Undefined symbols|ld: symbol|framework not found|library not found|clang: error|ld:|error:)" "$BUILD_LOG" | tail -n 200 || true
+    exit 10
+  fi
 fi
 COMPILE_END=$(date +%s)
 COMPILATION_TIME=$((COMPILE_END - COMPILE_START))

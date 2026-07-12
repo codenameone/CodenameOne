@@ -44,6 +44,12 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("DefaultLookAndFeel".equals(simpleName)) {
             return com.codename1.ui.plaf.DefaultLookAndFeel.class;
         }
+        if ("GlassRecipe".equals(simpleName)) {
+            return com.codename1.ui.plaf.GlassRecipe.class;
+        }
+        if ("Kind".equals(simpleName)) {
+            return com.codename1.ui.plaf.GlassRecipe.Kind.class;
+        }
         if ("LookAndFeel".equals(simpleName)) {
             return com.codename1.ui.plaf.LookAndFeel.class;
         }
@@ -208,11 +214,12 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if (type == com.codename1.ui.plaf.Border.class) return invokeStatic0(name, safeArgs);
         if (type == com.codename1.ui.plaf.CSSFilterParser.class) return invokeStatic1(name, safeArgs);
         if (type == com.codename1.ui.plaf.DefaultLookAndFeel.class) return invokeStatic2(name, safeArgs);
-        if (type == com.codename1.ui.plaf.RoundBorder.class) return invokeStatic3(name, safeArgs);
-        if (type == com.codename1.ui.plaf.RoundRectBorder.class) return invokeStatic4(name, safeArgs);
-        if (type == com.codename1.ui.plaf.Style.class) return invokeStatic5(name, safeArgs);
-        if (type == com.codename1.ui.plaf.StyleParser.class) return invokeStatic6(name, safeArgs);
-        if (type == com.codename1.ui.plaf.UIManager.class) return invokeStatic7(name, safeArgs);
+        if (type == com.codename1.ui.plaf.GlassRecipe.class) return invokeStatic3(name, safeArgs);
+        if (type == com.codename1.ui.plaf.RoundBorder.class) return invokeStatic4(name, safeArgs);
+        if (type == com.codename1.ui.plaf.RoundRectBorder.class) return invokeStatic5(name, safeArgs);
+        if (type == com.codename1.ui.plaf.Style.class) return invokeStatic6(name, safeArgs);
+        if (type == com.codename1.ui.plaf.StyleParser.class) return invokeStatic7(name, safeArgs);
+        if (type == com.codename1.ui.plaf.UIManager.class) return invokeStatic8(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
@@ -480,6 +487,45 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
     }
 
     private static Object invokeStatic3(String name, Object[] safeArgs) throws Exception {
+        if ("liquidChrome".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return com.codename1.ui.plaf.GlassRecipe.liquidChrome(((Boolean) adaptedArgs[0]).booleanValue());
+            }
+        }
+        if ("liquidPanel".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return com.codename1.ui.plaf.GlassRecipe.liquidPanel(((Boolean) adaptedArgs[0]).booleanValue());
+            }
+        }
+        if ("liquidPill".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return com.codename1.ui.plaf.GlassRecipe.liquidPill(((Boolean) adaptedArgs[0]).booleanValue());
+            }
+        }
+        if ("named".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Boolean.class}, false);
+                return com.codename1.ui.plaf.GlassRecipe.named((java.lang.String) adaptedArgs[0], ((Boolean) adaptedArgs[1]).booleanValue());
+            }
+        }
+        if ("plainBlur".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.ui.plaf.GlassRecipe.plainBlur();
+            }
+        }
+        if ("resolve".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.plaf.UIManager.class, java.lang.String.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.plaf.UIManager.class, java.lang.String.class, java.lang.Boolean.class}, false);
+                return com.codename1.ui.plaf.GlassRecipe.resolve((com.codename1.ui.plaf.UIManager) adaptedArgs[0], (java.lang.String) adaptedArgs[1], ((Boolean) adaptedArgs[2]).booleanValue());
+            }
+        }
+        throw unsupportedStatic(com.codename1.ui.plaf.GlassRecipe.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic4(String name, Object[] safeArgs) throws Exception {
         if ("create".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.RoundBorder.create();
@@ -488,7 +534,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         throw unsupportedStatic(com.codename1.ui.plaf.RoundBorder.class, name, safeArgs);
     }
 
-    private static Object invokeStatic4(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic5(String name, Object[] safeArgs) throws Exception {
         if ("create".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.RoundRectBorder.create();
@@ -497,7 +543,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         throw unsupportedStatic(com.codename1.ui.plaf.RoundRectBorder.class, name, safeArgs);
     }
 
-    private static Object invokeStatic5(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic6(String name, Object[] safeArgs) throws Exception {
         if ("createProxyStyle".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.plaf.Style[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.plaf.Style[].class}, true);
@@ -511,7 +557,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         throw unsupportedStatic(com.codename1.ui.plaf.Style.class, name, safeArgs);
     }
 
-    private static Object invokeStatic6(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic7(String name, Object[] safeArgs) throws Exception {
         if ("getBackgroundTypes".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.StyleParser.getBackgroundTypes();
@@ -537,7 +583,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         throw unsupportedStatic(com.codename1.ui.plaf.StyleParser.class, name, safeArgs);
     }
 
-    private static Object invokeStatic7(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic8(String name, Object[] safeArgs) throws Exception {
         if ("createInstance".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.ui.plaf.UIManager.createInstance();
@@ -615,65 +661,72 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.ui.plaf.GlassRecipe) {
+            try {
+                return invoke7((com.codename1.ui.plaf.GlassRecipe) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.ui.plaf.LookAndFeel) {
             try {
-                return invoke7((com.codename1.ui.plaf.LookAndFeel) target, name, safeArgs);
+                return invoke8((com.codename1.ui.plaf.LookAndFeel) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.plaf.Style) {
             try {
-                return invoke8((com.codename1.ui.plaf.Style) target, name, safeArgs);
+                return invoke9((com.codename1.ui.plaf.Style) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.plaf.StyleParser.BorderInfo) {
             try {
-                return invoke9((com.codename1.ui.plaf.StyleParser.BorderInfo) target, name, safeArgs);
+                return invoke10((com.codename1.ui.plaf.StyleParser.BorderInfo) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.plaf.StyleParser.BoxInfo) {
             try {
-                return invoke10((com.codename1.ui.plaf.StyleParser.BoxInfo) target, name, safeArgs);
+                return invoke11((com.codename1.ui.plaf.StyleParser.BoxInfo) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.plaf.StyleParser.FontInfo) {
             try {
-                return invoke11((com.codename1.ui.plaf.StyleParser.FontInfo) target, name, safeArgs);
+                return invoke12((com.codename1.ui.plaf.StyleParser.FontInfo) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.plaf.StyleParser.ImageInfo) {
             try {
-                return invoke12((com.codename1.ui.plaf.StyleParser.ImageInfo) target, name, safeArgs);
+                return invoke13((com.codename1.ui.plaf.StyleParser.ImageInfo) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.plaf.StyleParser.ScalarValue) {
             try {
-                return invoke13((com.codename1.ui.plaf.StyleParser.ScalarValue) target, name, safeArgs);
+                return invoke14((com.codename1.ui.plaf.StyleParser.ScalarValue) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.plaf.StyleParser.StyleInfo) {
             try {
-                return invoke14((com.codename1.ui.plaf.StyleParser.StyleInfo) target, name, safeArgs);
+                return invoke15((com.codename1.ui.plaf.StyleParser.StyleInfo) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.plaf.UIManager) {
             try {
-                return invoke15((com.codename1.ui.plaf.UIManager) target, name, safeArgs);
+                return invoke16((com.codename1.ui.plaf.UIManager) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -2546,7 +2599,41 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke7(com.codename1.ui.plaf.LookAndFeel typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke7(com.codename1.ui.plaf.GlassRecipe typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getKind".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getKind();
+            }
+        }
+        if ("getOffset".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getOffset();
+            }
+        }
+        if ("getRefraction".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getRefraction();
+            }
+        }
+        if ("getSaturation".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSaturation();
+            }
+        }
+        if ("getScale".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getScale();
+            }
+        }
+        if ("getSpecular".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSpecular();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke8(com.codename1.ui.plaf.LookAndFeel typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("bind".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -3066,7 +3153,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke8(com.codename1.ui.plaf.Style typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke9(com.codename1.ui.plaf.Style typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addStyleListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.StyleListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.StyleListener.class}, false);
@@ -3213,6 +3300,11 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("getIconGapUnit".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getIconGapUnit();
+            }
+        }
+        if ("getLetterSpacing".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getLetterSpacing();
             }
         }
         if ("getMargin".equals(name)) {
@@ -3690,6 +3782,16 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 typedTarget.setIconGapUnit((byte) toIntValue(adaptedArgs[0]), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
             }
         }
+        if ("setLetterSpacing".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                typedTarget.setLetterSpacing(((Number) adaptedArgs[0]).floatValue()); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Boolean.class}, false);
+                typedTarget.setLetterSpacing(((Number) adaptedArgs[0]).floatValue(), ((Boolean) adaptedArgs[1]).booleanValue()); return null;
+            }
+        }
         if ("setMargin".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Float.class}, false);
@@ -3952,7 +4054,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke9(com.codename1.ui.plaf.StyleParser.BorderInfo typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke10(com.codename1.ui.plaf.StyleParser.BorderInfo typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("colorString".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.colorString();
@@ -4264,7 +4366,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke10(com.codename1.ui.plaf.StyleParser.BoxInfo typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke11(com.codename1.ui.plaf.StyleParser.BoxInfo typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getValue".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
@@ -4294,7 +4396,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke11(com.codename1.ui.plaf.StyleParser.FontInfo typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke12(com.codename1.ui.plaf.StyleParser.FontInfo typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("createFont".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.plaf.Style.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.plaf.Style.class}, false);
@@ -4365,7 +4467,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke12(com.codename1.ui.plaf.StyleParser.ImageInfo typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke13(com.codename1.ui.plaf.StyleParser.ImageInfo typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getImage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.util.Resources.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.util.Resources.class}, false);
@@ -4380,7 +4482,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke13(com.codename1.ui.plaf.StyleParser.ScalarValue typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke14(com.codename1.ui.plaf.StyleParser.ScalarValue typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getPixelValue".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getPixelValue();
@@ -4420,7 +4522,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke14(com.codename1.ui.plaf.StyleParser.StyleInfo typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke15(com.codename1.ui.plaf.StyleParser.StyleInfo typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getAlignment".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getAlignment();
@@ -4590,7 +4692,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke15(com.codename1.ui.plaf.UIManager typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke16(com.codename1.ui.plaf.UIManager typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addThemeProps".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.Hashtable.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.Hashtable.class}, false);
@@ -4793,8 +4895,9 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
 
     public static Object getStaticField(Class<?> type, String name) throws Exception {
         if (type == com.codename1.ui.plaf.CSSBorder.class) return getStaticField0(name);
-        if (type == com.codename1.ui.plaf.Style.class) return getStaticField1(name);
-        if (type == com.codename1.ui.plaf.StyleParser.class) return getStaticField2(name);
+        if (type == com.codename1.ui.plaf.GlassRecipe.Kind.class) return getStaticField1(name);
+        if (type == com.codename1.ui.plaf.Style.class) return getStaticField2(name);
+        if (type == com.codename1.ui.plaf.StyleParser.class) return getStaticField3(name);
         throw unsupportedStaticField(type, name);
     }
 
@@ -4828,6 +4931,14 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
     }
 
     private static Object getStaticField1(String name) throws Exception {
+        if ("LIQUID_CHROME".equals(name)) return com.codename1.ui.plaf.GlassRecipe.Kind.LIQUID_CHROME;
+        if ("LIQUID_PANEL".equals(name)) return com.codename1.ui.plaf.GlassRecipe.Kind.LIQUID_PANEL;
+        if ("LIQUID_PILL".equals(name)) return com.codename1.ui.plaf.GlassRecipe.Kind.LIQUID_PILL;
+        if ("PLAIN_BLUR".equals(name)) return com.codename1.ui.plaf.GlassRecipe.Kind.PLAIN_BLUR;
+        throw unsupportedStaticField(com.codename1.ui.plaf.GlassRecipe.Kind.class, name);
+    }
+
+    private static Object getStaticField2(String name) throws Exception {
         if ("ALIGNMENT".equals(name)) return com.codename1.ui.plaf.Style.ALIGNMENT;
         if ("BACKDROP_FILTER_BLUR".equals(name)) return com.codename1.ui.plaf.Style.BACKDROP_FILTER_BLUR;
         if ("BACKDROP_FILTER_COLOR_MATRIX".equals(name)) return com.codename1.ui.plaf.Style.BACKDROP_FILTER_COLOR_MATRIX;
@@ -4876,6 +4987,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("GRADIENT".equals(name)) return com.codename1.ui.plaf.Style.GRADIENT;
         if ("ICON_GAP".equals(name)) return com.codename1.ui.plaf.Style.ICON_GAP;
         if ("ICON_GAP_UNIT".equals(name)) return com.codename1.ui.plaf.Style.ICON_GAP_UNIT;
+        if ("LETTER_SPACING".equals(name)) return com.codename1.ui.plaf.Style.LETTER_SPACING;
         if ("MARGIN".equals(name)) return com.codename1.ui.plaf.Style.MARGIN;
         if ("MARGIN_UNIT".equals(name)) return com.codename1.ui.plaf.Style.MARGIN_UNIT;
         if ("OPACITY".equals(name)) return com.codename1.ui.plaf.Style.OPACITY;
@@ -4903,7 +5015,7 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         throw unsupportedStaticField(com.codename1.ui.plaf.Style.class, name);
     }
 
-    private static Object getStaticField2(String name) throws Exception {
+    private static Object getStaticField3(String name) throws Exception {
         if ("UNIT_INHERIT".equals(name)) return com.codename1.ui.plaf.StyleParser.UNIT_INHERIT;
         throw unsupportedStaticField(com.codename1.ui.plaf.StyleParser.class, name);
     }
@@ -4974,6 +5086,9 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             return true;
         }
         if (type == com.codename1.ui.events.SelectionListener.class) {
+            return true;
+        }
+        if (type == com.codename1.printing.PrintResultListener.class) {
             return true;
         }
         return false;
@@ -5051,6 +5166,17 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 public void selectionChanged(int arg0, int arg1) {
                     try {
                         lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.printing.PrintResultListener.class) {
+            return new com.codename1.printing.PrintResultListener() {
+                public void onResult(com.codename1.printing.PrintResult arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
                     } catch (bsh.EvalError ex) {
                         throw new RuntimeException(ex);
                     }

@@ -84,6 +84,26 @@ ensure_jar() {
   exit 1
 }
 
+# Committed consumer copies of each generated .res. Themes/ is the canonical
+# source the port poms read at build time, but several builds bundle their own
+# checked-in copy and historically these drifted out of sync with theme.css
+# (the fidelity CI bundles scripts/fidelity-app/.../resources, the ports stage
+# nativeSources/Ports). Listing them here makes theme.css the single source of
+# truth: one run of this script refreshes every committed copy so a stale .res
+# can never silently regress the rendered theme. Paths are relative to REPO_ROOT.
+ios_modern_copies() {
+  # The fidelity-app copy is NOT listed: its common/pom.xml copies the .res
+  # from Themes/ at build time (process-resources), so Themes/ stays the only
+  # committed binary. Only the port staging copy remains a checked-in mirror.
+  printf '%s\n' \
+    "Ports/iOSPort/nativeSources/iOSModernTheme.res"
+}
+android_material_copies() {
+  # See ios_modern_copies: the fidelity-app copy is build-time, not committed.
+  printf '%s\n' \
+    "Ports/Android/src/AndroidMaterialTheme.res"
+}
+
 compile_theme() {
   local jar="$1" name="$2" basename="$3"
   local css="$CSS_SRC_ROOT/$name/theme.css"
@@ -99,6 +119,13 @@ compile_theme() {
     cp "$out" "$JS_ASSETS_DIR/$basename"
     log "Mirrored -> $JS_ASSETS_DIR/$basename"
   fi
+  local copy
+  while IFS= read -r copy; do
+    [ -n "$copy" ] || continue
+    mkdir -p "$REPO_ROOT/$(dirname "$copy")"
+    cp "$out" "$REPO_ROOT/$copy"
+    log "Mirrored -> $copy"
+  done < <("${name//-/_}_copies")
 }
 
 main() {
@@ -106,7 +133,7 @@ main() {
   jar="$(ensure_jar)"
   compile_theme "$jar" ios-modern iOSModernTheme.res
   compile_theme "$jar" android-material AndroidMaterialTheme.res
-  log "Native themes written to $OUT_DIR/"
+  log "Native themes written to $OUT_DIR/ and committed consumer copies"
 }
 
 main "$@"

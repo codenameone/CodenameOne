@@ -6188,6 +6188,33 @@ public class HTML5Implementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean blurRegion(Object graphics, int x, int y, int width, int height, float radius) {
+        g(graphics).blurRegion(x, y, width, height, radius, 0f);
+        return true;
+    }
+
+    @Override
+    public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius,
+            float cornerRadius, float sat, float scale, float offset, float refract, float specular) {
+        // Plain backdrop blur clipped to the glass shape. The full Liquid Glass
+        // colour transform (saturation/scale/offset/refraction/specular) is the
+        // iOS Metal port's material; the browser gets the honest frost, which
+        // is what backdrop-filter delivers on the web anyway.
+        g(graphics).blurRegion(x, y, width, height, radius, cornerRadius);
+        return true;
+    }
+
+    @Override
+    public boolean lensRegion(Object graphics, int x, int y, int width, int height, float cornerRadius,
+            float magnify, float aberration, int tintColor, float tintStrength) {
+        // The iOS-26 tab selection drop: magnify the content bulge + accent
+        // tint. Chromatic aberration (the iOS Metal shader's extra) is dropped
+        // on the web; magnify + tint carries the recognisable effect.
+        g(graphics).lensRegion(x, y, width, height, cornerRadius, magnify, tintColor, tintStrength);
+        return true;
+    }
+
+    @Override
     public Image gaussianBlurImage(Image image, float radius) {
         if (image == null) {
             return image;

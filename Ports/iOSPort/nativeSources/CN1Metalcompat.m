@@ -715,6 +715,41 @@ void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int widt
     drawQuad(CN1MetalPipelineTexturedRGBA, vertices, texcoords, tint, texture);
 }
 
+void CN1MetalDrawLens(id<MTLTexture> texture, int x, int y, int w, int h,
+                      int fw, int fh, float magnify, float aberration,
+                      int tintColor, float tintStrength, float cornerRadiusPx) {
+    if (activeEncoder == nil || pipelineCache == nil || texture == nil) {
+        return;
+    }
+    id<MTLRenderPipelineState> state = [pipelineCache pipelineFor:CN1MetalPipelineLens];
+    if (state == nil) {
+        return;
+    }
+    bindPipelineStateIfChanged(state);
+    float vertices[8] = {
+        (float)x,       (float)y,
+        (float)(x+w),   (float)y,
+        (float)x,       (float)(y+h),
+        (float)(x+w),   (float)(y+h)
+    };
+    // The source is a direct BLIT of the screen region (memory row 0 = region top),
+    // so V=0-at-top samples the correct (un-flipped) orientation.
+    static const float texcoords[8] = { 0, 0,  1, 0,  0, 1,  1, 1 };
+    [activeEncoder setVertexBytes:vertices length:sizeof(float) * 8 atIndex:0];
+    uploadMatricesIfChanged(1);
+    [activeEncoder setVertexBytes:texcoords length:sizeof(float) * 8 atIndex:2];
+    simd_float4 p0 = (simd_float4){ (float)fw, (float)fh, magnify, aberration };
+    simd_float4 p1 = (simd_float4){ ((tintColor >> 16) & 0xff) / 255.0f,
+                                    ((tintColor >> 8) & 0xff) / 255.0f,
+                                    (tintColor & 0xff) / 255.0f, tintStrength };
+    simd_float4 p2 = (simd_float4){ cornerRadiusPx, 0.0f, 0.0f, 0.0f };
+    [activeEncoder setFragmentBytes:&p0 length:sizeof(p0) atIndex:0];
+    [activeEncoder setFragmentBytes:&p1 length:sizeof(p1) atIndex:1];
+    [activeEncoder setFragmentBytes:&p2 length:sizeof(p2) atIndex:2];
+    [activeEncoder setFragmentTexture:texture atIndex:0];
+    [activeEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
+}
+
 void CN1MetalTileImage(id<MTLTexture> texture, int alpha,
                        int x, int y, int width, int height,
                        int imageWidth, int imageHeight) {

@@ -1,0 +1,8 @@
+/*
+ * Minimal app theme. The fidelity suite installs the real native theme
+ * (iOSModernTheme.res / AndroidMaterialTheme.res) at runtime over this base,
+ * so the compiled app theme only needs to exist for the CSS build step.
+ */
+#Constants {
+    includeNativeBool: true;
+}

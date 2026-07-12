@@ -188,7 +188,18 @@ public class CN1Playground extends Lifecycle {
         previewColumn = new PlaygroundPreviewColumn(device, orientation, websiteDarkMode, () -> {
             PlaygroundStateStore.saveDevice(previewColumn.getDevice());
             PlaygroundStateStore.saveOrientation(previewColumn.getOrientation());
-            applyDeviceTheme(previewColumn.getDevice());
+            // Re-run the script when the native theme flips (iOS <-> Material):
+            // switching themes resets the theme CONSTANTS, but layout-shaping
+            // components like Tabs read constants (tabPlacementInt, glass /
+            // selection-capsule bools, equal-width) at CONSTRUCTION and won't
+            // re-read them on a plain restyle - so a Tabs built under iOS keeps
+            // its bottom glass-pill layout in Material mode. Rebuilding the
+            // preview tree makes it pick up the new theme cleanly. Orientation-
+            // only toggles don't change the theme (applyDeviceTheme returns
+            // false) and are handled by the size listeners, so skip the rebuild.
+            if (applyDeviceTheme(previewColumn.getDevice())) {
+                runScript(appForm);
+            }
         });
 
         mobileTopTabs = buildMobileTopTabs();
@@ -1066,12 +1077,15 @@ public class CN1Playground extends Lifecycle {
         Dialog.setDefaultInteractionDialogMode(true);
     }
 
-    private void applyDeviceTheme(String device) {
+    /// Switches the preview's native theme (iOS Modern vs Android Material).
+    /// Returns true when the device actually changed so the caller can rebuild
+    /// the preview tree - see the device-toggle listener. A no-op returns false.
+    private boolean applyDeviceTheme(String device) {
         if (device == null) {
             device = PlaygroundPreviewColumn.DEVICE_IPHONE;
         }
         if (device.equals(activeDeviceThemeKey)) {
-            return;
+            return false;
         }
         activeDeviceThemeKey = device;
         restoreThemeDefaults();
@@ -1083,6 +1097,7 @@ public class CN1Playground extends Lifecycle {
         if (previewColumn != null) {
             previewColumn.refreshPreviewTheme();
         }
+        return true;
     }
 
     private void layerAndroidTheme() {

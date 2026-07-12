@@ -37,14 +37,31 @@ public class ProcessScreenshots {
             System.exit(2);
             return;
         }
-        Map<String, Object> payload = buildResults(
-                arguments.referenceDir,
-                arguments.actualEntries,
-                arguments.emitBase64,
-                arguments.previewDir,
-                arguments.maxChannelDelta,
-                arguments.maxMismatchPercent
-        );
+        Map<String, Object> payload;
+        if ("fidelity".equals(arguments.mode)) {
+            // Fidelity mode compares the CN1 render of a component against the
+            // committed native widget golden of the SAME name. There is no
+            // pass/fail equality here -- it emits a similarity score per pair so
+            // the report/gate can track how close CN1 is to the real OS widget.
+            payload = buildFidelityResults(
+                    arguments.referenceDir,
+                    arguments.actualEntries,
+                    arguments.emitBase64,
+                    arguments.previewDir,
+                    arguments.backdrop,
+                    arguments.spec,
+                    arguments.specPlatform
+            );
+        } else {
+            payload = buildResults(
+                    arguments.referenceDir,
+                    arguments.actualEntries,
+                    arguments.emitBase64,
+                    arguments.previewDir,
+                    arguments.maxChannelDelta,
+                    arguments.maxMismatchPercent
+            );
+        }
         String json = JsonUtil.stringify(payload);
         System.out.print(json);
     }
@@ -144,6 +161,1227 @@ public class ProcessScreenshots {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("results", results);
         return payload;
+    }
+
+    /// Fidelity comparison: each delivered actual is the CN1 render of a
+    /// component (named "<prefix>", path "<prefix>_cn1.png"); the reference dir
+    /// holds the committed NATIVE widget golden "<prefix>.png". For every pair we
+    /// emit a similarity score (fidelity_percent + ssim + mean_channel_delta)
+    /// rather than an equal/different verdict, and we embed previews of BOTH the
+    /// native golden and the CN1 render so the report can show them side by side.
+    /// Goldens with no delivered CN1 render are recorded as missing_actual so the
+    /// pair-count guard (cn1ss.sh cn1ss_count_covered) sees the same reality.
+    static Map<String, Object> buildFidelityResults(
+            Path referenceDir,
+            List<Map.Entry<String, Path>> actualEntries,
+            boolean emitBase64,
+            Path previewDir,
+            Path backdropPath,
+            Path specPath,
+            String specPlatform
+    ) throws IOException {
+        List<Map<String, Object>> results = new ArrayList<>();
+        // Glass tiles (Toolbar/Tabs/Buttons over iOS Liquid Glass) are composited
+        // over a shared gradient backdrop. Comparing the whole tile lets the
+        // identical-ish backdrop (~70% of the pixels) inflate the score regardless
+        // of how wrong the widget is. Load the backdrop so we can mask it out and
+        // score ONLY the widget (see structuralFidelityGlass).
+        BufferedImage backdropImg = loadBackdrop(backdropPath, referenceDir);
+        // Comparison mode comes from the per-test `material:` declared in
+        // fidelity-tests.yaml (test INTENT), not from image-content heuristics.
+        // A missing spec (or a test the spec does not know) falls back to the
+        // legacy corner heuristic so old artifact sets can still be re-scored.
+        // The spec's per-test `backdrop:` also drives the GEOMETRY masks: tiles
+        // over a declared solid/gradient/photo backdrop are masked against that
+        // backdrop, so their widget bbox is real instead of the full tile.
+        Map<String, String[]> specByComponent = loadSpecInfo(specPath, referenceDir, specPlatform);
+        java.util.Set<String> deliveredTests = new java.util.LinkedHashSet<>();
+        for (Map.Entry<String, Path> entry : actualEntries) {
+            String testName = entry.getKey();
+            deliveredTests.add(testName);
+            Path cn1Path = entry.getValue();
+            Path nativePath = referenceDir.resolve(testName + ".png");
+            Map<String, Object> record = new LinkedHashMap<>();
+            record.put("test", testName);
+            record.put("cn1_path", cn1Path.toString());
+            record.put("native_path", nativePath.toString());
+            // Keep actual_path/expected_path mirrors so the shared cn1ss.sh
+            // artifact-copy/summary plumbing can treat these records uniformly.
+            record.put("actual_path", cn1Path.toString());
+            record.put("expected_path", nativePath.toString());
+            if (!Files.exists(cn1Path)) {
+                record.put("status", "missing_actual");
+                record.put("message", "CN1 render was not delivered for this component.");
+            } else if (!Files.exists(nativePath)) {
+                record.put("status", "missing_expected");
+                record.put("message", "Native golden missing at " + nativePath
+                        + " (regenerate goldens with FIDELITY_UPDATE_GOLDENS=1).");
+                if (emitBase64) {
+                    try {
+                        recordFidelityImage(record, "", "_cn1", testName, loadPngWithRetry(cn1Path), previewDir);
+                    } catch (Exception ex) {
+                        record.put("message", "Failed to load CN1 preview: " + ex.getMessage());
+                    }
+                }
+            } else {
+                try {
+                    PNGImage cn1 = loadPngWithRetry(cn1Path);
+                    PNGImage nativeImage = loadPngWithRetry(nativePath);
+                    Map<String, Object> details = new LinkedHashMap<>();
+                    details.put("width", cn1.width());
+                    details.put("height", cn1.height());
+                    // Both renders anchor the widget at the tile's TOP-LEFT, so when
+                    // the two tiles differ in size -- a few px of cross-environment
+                    // rounding (iOS goldens are produced offline by a separate native
+                    // app), or a larger native-vs-CN1 tile-geometry divergence that can
+                    // flake between emulator runs -- we crop BOTH to their common
+                    // top-left region and overlay 1:1 (never a scale). The structural
+                    // metric then crops to each widget's content bbox, so an honest
+                    // size/extent difference still shows up as a lower score rather than
+                    // an un-scorable "size mismatch" that breaks the gate. Only a
+                    // degenerate render (a near-empty common region) is treated as an
+                    // error.
+                    int cw = Math.min(cn1.width(), nativeImage.width());
+                    int ch = Math.min(cn1.height(), nativeImage.height());
+                    if (cw < 8 || ch < 8) {
+                        details.put("native_width", nativeImage.width());
+                        details.put("native_height", nativeImage.height());
+                        details.put("fidelity_percent", 0.0d);
+                        details.put("ssim", 0.0d);
+                        details.put("mean_channel_delta", 255.0d);
+                        record.put("status", "size_mismatch");
+                        record.put("message", "CN1 tile " + cn1.width() + "x" + cn1.height()
+                                + " has no usable overlap with native golden "
+                                + nativeImage.width() + "x" + nativeImage.height() + ".");
+                    } else {
+                        PNGImage cn1c = cropTopLeft(cn1, cw, ch);
+                        PNGImage natc = cropTopLeft(nativeImage, cw, ch);
+                        details.put("native_width", nativeImage.width());
+                        details.put("native_height", nativeImage.height());
+                        // Structure-aware fidelity: see structuralFidelity(). The
+                        // background colour is known from the appearance (the tile
+                        // backdrop we render), so a near-white CN1 fill still counts
+                        // as widget content rather than being mistaken for blank bg.
+                        int bg = testName.contains("_dark") ? 0x000000 : 0xffffff;
+                        double[] sf;
+                        boolean glass = false;
+                        String[] specInfo = resolveSpecInfo(specByComponent, testName);
+                        String material = specInfo != null ? specInfo[SPEC_MATERIAL] : null;
+                        String materialSource = material != null ? "spec" : "heuristic";
+                        int[] refArr = backdropImg != null
+                                ? stretchCropTopLeft(backdropImg, cn1.width(), cn1.height(), cw, ch)
+                                : null;
+                        if (material != null) {
+                            // Mode from declared test intent (review: material tag).
+                            boolean wantsMask = "glass".equals(material) || "lens".equals(material);
+                            if (wantsMask && refArr != null) {
+                                glass = true;
+                                sf = structuralFidelityGlass(natc, cn1c, refArr);
+                            } else {
+                                if (wantsMask) {
+                                    details.put("material_note",
+                                            "material=" + material + " but no backdrop reference was found; scored whole-tile");
+                                }
+                                sf = structuralFidelity(natc, cn1c, bg);
+                            }
+                        } else if (refArr != null && isGlassTile(natc, refArr, cw, ch)) {
+                            // Legacy fallback: infer glass from the golden's corners
+                            // matching the stretched shared backdrop (scaleToFill,
+                            // ignore aspect), sampled at the cropped top-left region.
+                            glass = true;
+                            sf = structuralFidelityGlass(natc, cn1c, refArr);
+                        } else {
+                            sf = structuralFidelity(natc, cn1c, bg);
+                        }
+                        double meanDelta = meanChannelDelta(natc, cn1c);
+                        details.put("fidelity_percent", round2(sf[0]));
+                        details.put("shape_sim", round4(sf[1]));
+                        details.put("size_agreement", round4(sf[2]));
+                        details.put("glass", glass);
+                        details.put("material", material != null ? material : (glass ? "glass" : "normal"));
+                        details.put("material_source", materialSource);
+                        // Explicit geometry metrics (review: separate geometry fidelity
+                        // from visual similarity). The visual score overlays cropped
+                        // tiles, which can hide size / position / anchoring drift, so
+                        // the widget content bboxes of BOTH renders are reported raw,
+                        // plus derived offset / size-ratio / center-offset numbers the
+                        // gate can ratchet on. Corner radius is estimated for the
+                        // masked glass/lens pills where roundness is a design feature.
+                        // Tiles over a DECLARED backdrop (solid/gradient/photo) mask
+                        // against that backdrop -- a bg-colour mask would classify the
+                        // whole backdrop as widget and report a degenerate full-tile
+                        // bbox on exactly the geometry-isolation tiles.
+                        int[] geoRef = glass ? refArr : geometryReference(
+                                specInfo != null ? specInfo[SPEC_BACKDROP] : null,
+                                backdropImg, cn1.width(), cn1.height(), cw, ch);
+                        details.put("geometry", geometryMetrics(natc, cn1c, bg, geoRef));
+                        details.put("ssim", round4(computeSsim(natc, cn1c)));
+                        details.put("mean_channel_delta", round2(meanDelta));
+                        record.put("status", "compared");
+                    }
+                    record.put("details", details);
+                    if (emitBase64) {
+                        recordFidelityImage(record, "", "_cn1", testName, cn1, previewDir);
+                        recordFidelityImage(record, "native_", "_native", testName, nativeImage, previewDir);
+                    }
+                } catch (Exception ex) {
+                    record.put("status", "error");
+                    record.put("message", ex.getMessage());
+                }
+            }
+            results.add(record);
+        }
+        // Backfill goldens that no delivered CN1 render covered as missing_actual,
+        // mirroring buildResults() so a suite that hung or crashed partway is
+        // visible to the shell-level pair-count guard rather than silently
+        // reporting a clean pass over only the survivors.
+        if (referenceDir != null && Files.isDirectory(referenceDir)) {
+            List<String> missingTests = new ArrayList<>();
+            try (java.util.stream.Stream<Path> goldens = Files.list(referenceDir)) {
+                goldens.filter(Files::isRegularFile)
+                        .map(p -> p.getFileName().toString())
+                        .filter(n -> n.endsWith(".png"))
+                        .map(n -> n.substring(0, n.length() - ".png".length()))
+                        .filter(name -> !deliveredTests.contains(name))
+                        .forEach(missingTests::add);
+            }
+            Collections.sort(missingTests);
+            for (String testName : missingTests) {
+                Path nativePath = referenceDir.resolve(testName + ".png");
+                Map<String, Object> record = new LinkedHashMap<>();
+                record.put("test", testName);
+                record.put("cn1_path", "");
+                record.put("native_path", nativePath.toString());
+                record.put("actual_path", "");
+                record.put("expected_path", nativePath.toString());
+                record.put("status", "missing_actual");
+                record.put("message", "No CN1 render was delivered for this native golden (the test did not run, hung, or the suite crashed before reaching it).");
+                results.add(record);
+            }
+        }
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("results", results);
+        return payload;
+    }
+
+    /// Builds a JPEG/PNG preview of one fidelity image and records its base64 +
+    /// preview-file metadata under a key prefix ("" for the CN1 render,
+    /// "native_" for the native golden) so a single result can carry both. The
+    /// file suffix ("_cn1"/"_native") keeps the two preview files distinct.
+    private static void recordFidelityImage(Map<String, Object> record, String keyPrefix, String fileSuffix,
+            String testName, PNGImage image, Path previewDir) throws IOException {
+        CommentPayload payload = buildCommentPayload(image, MAX_COMMENT_BASE64);
+        if (payload.base64 != null) {
+            record.put(keyPrefix + "base64", payload.base64);
+        } else {
+            record.put(keyPrefix + "base64_omitted", payload.omittedReason);
+            record.put(keyPrefix + "base64_length", payload.base64Length);
+        }
+        record.put(keyPrefix + "base64_mime", payload.mime);
+        record.put(keyPrefix + "base64_codec", payload.codec);
+        if (payload.quality != null) {
+            record.put(keyPrefix + "base64_quality", payload.quality);
+        }
+        if (payload.note != null) {
+            record.put(keyPrefix + "base64_note", payload.note);
+        }
+        if (previewDir != null && payload.data != null) {
+            Files.createDirectories(previewDir);
+            String suffix = payload.mime.equals("image/jpeg") ? ".jpg" : ".png";
+            String baseName = slugify(testName) + fileSuffix;
+            Path previewPath = previewDir.resolve(baseName + suffix);
+            Files.write(previewPath, payload.data);
+            Map<String, Object> preview = new LinkedHashMap<>();
+            preview.put("path", previewPath.toString());
+            preview.put("name", previewPath.getFileName().toString());
+            preview.put("mime", payload.mime);
+            preview.put("codec", payload.codec);
+            if (payload.quality != null) {
+                preview.put("quality", payload.quality);
+            }
+            if (payload.note != null) {
+                preview.put("note", payload.note);
+            }
+            record.put(keyPrefix + "preview", preview);
+        }
+    }
+
+    /// Structure-aware fidelity. Returns {fidelity_percent, coverage_iou}.
+    ///
+    /// A plain per-pixel colour delta over a tile that is mostly background
+    /// rewards matching empty space and is blind to structure -- two widgets that
+    /// look nothing alike (a small outlined field vs a full-width filled one) can
+    /// score 95% because both tiles are mostly near-white. Instead we score only
+    /// the WIDGET, defined as pixels that differ from the known tile background by
+    /// more than a small threshold:
+    ///   * a pixel that is widget in BOTH images contributes its colour match
+    ///     (1 - normalized channel delta),
+    ///   * a pixel that is widget in only ONE image contributes 0 (one has the
+    ///     widget there, the other does not),
+    ///   * background-in-both pixels are ignored entirely.
+    /// The score is the mean over the union of widget pixels, so extent, position,
+    /// shape AND colour all matter, and empty margins never inflate it. The
+    /// coverage IoU (widget-pixel overlap) is returned alongside as a diagnostic.
+    /// Returns {fidelity_percent, shape_sim, size_agreement}.
+    ///
+    /// The two widgets are compared at 1:1 PIXEL SCALE with NO resampling. Each is
+    /// cropped to its content bounding box (removing the surrounding tile padding,
+    /// which differs between the native and CN1 layouts) and the two crops are then
+    /// overlaid top-left -- the same corner the harness anchors both tiles to. Every
+    /// pixel that is content in at least one crop is compared; where only one crop
+    /// has a pixel (because the widgets are different sizes) the missing side is
+    /// treated as background, so a size or shape difference shows up as a real
+    /// colour mismatch rather than being scaled away. We deliberately do NOT
+    /// normalize the two widgets to a common canvas size -- a CN1 button rendered
+    /// 1.5x Material's size is a genuine fidelity gap and must score lower.
+    ///   * shape_sim     -- 1 - mean channel delta over the overlaid content pixels.
+    ///   * size_agreement -- ratio of the content bounding-box dimensions, reported
+    ///     as a diagnostic (the 1:1 overlay already accounts for size, so it is not
+    ///     multiplied back in).
+    /// fidelity = 100 * shape_sim. Identical -> 100; same widget styled slightly
+    /// differently or off by a few pixels -> high 90s; a genuinely different or
+    /// mis-sized widget -> lower, in proportion to the mismatched area.
+    private static final int CONTENT_TAU = 10;
+    private static final int MIN_CONTENT_PIXELS = 4;
+
+    private static double[] structuralFidelity(PNGImage nativeImg, PNGImage cn1, int bgRgb) {
+        BufferedImage bn = toRgbImage(nativeImg);
+        BufferedImage bc = toRgbImage(cn1);
+        int[] boxN = contentBBox(bn, bgRgb);
+        int[] boxC = contentBBox(bc, bgRgb);
+        boolean emptyN = boxN[2] <= 0;
+        boolean emptyC = boxC[2] <= 0;
+        if (emptyN && emptyC) {
+            return new double[]{100.0d, 1.0d, 1.0d};   // both blank -> trivially identical
+        }
+        if (emptyN || emptyC) {
+            return new double[]{0.0d, 0.0d, 0.0d};      // one has a widget, the other does not
+        }
+        // Compare at ABSOLUTE pixel position -- NO content-crop, NO whole-widget
+        // re-alignment. The widget's margin from the tile edges is part of
+        // fidelity: a control rendered 15px too high is 15px of mismatch, not
+        // silently slid into place. Only a small per-pixel window absorbs genuine
+        // sub-pixel anti-aliasing between the two render paths.
+        //
+        // We score TWO independent terms and take the WORSE:
+        //   fillSim   -- mean colour agreement over the widget-content pixels. A
+        //                large flat region that happens to match (e.g. a dark nav-bar
+        //                fill against a dark tile) makes this high on its own, which
+        //                is exactly why it cannot be the whole story.
+        //   structSim -- the same colour agreement but WEIGHTED BY STRUCTURAL
+        //                SALIENCE (local gradient), so flat fills count for almost
+        //                nothing and the actual distinguishing content -- glyph
+        //                strokes, widget edges, separators -- dominates. A title that
+        //                is centred in one render and left-aligned in the other has
+        //                its strokes land on the other render's flat fill, so this
+        //                term collapses even though the fills match.
+        // fidelity = min(fillSim, structSim): a widget must agree in BOTH its fill
+        // AND its structure/placement, so "same background, totally different
+        // widget" can no longer score high.
+        // Headline = geometric mean of TWO complementary, well-understood terms:
+        //   fillSim -- mean colour agreement over the widget-content pixels (catches
+        //              a wrong fill/glyph colour: a black checkbox vs a blue one).
+        //   ssim    -- windowed structural similarity, robust to the few-pixel
+        //              sub-pixel offsets two render paths inevitably produce (so a
+        //              title that sits 8px lower in one render is still recognised
+        //              as the same title, not scored to zero).
+        // sqrt(fillSim * ssim) demands BOTH be high: a genuinely-similar widget
+        // (Toolbar: fill .96, ssim .95 -> 95) reads honestly, a real defect stays
+        // low because at least one term collapses (a broken dark field with ssim
+        // ~0 -> ~0; a wrong glyph colour drags fillSim). The earlier
+        // min(fillSim, squared-salience structSim) is kept ONLY as a diagnostic:
+        // its structural term could not tell "same widget, text a few px off" from
+        // "different widget" and so crushed genuinely-faithful renders.
+        double fillSim = absoluteShapeSim(bn, bc, bgRgb);
+        double structSim = structuralSalienceSim(bn, bc, bgRgb);   // diagnostic only
+        double ssim = computeSsim(nativeImg, cn1);
+        double headline = Math.sqrt(Math.max(0.0d, fillSim) * Math.max(0.0d, ssim));
+        double fidelity = 100.0d * headline;
+        return new double[]{fidelity, structSim, fillSim};
+    }
+
+    /// A pixel further than this (mean channel delta) from the backdrop reference
+    /// is treated as WIDGET; closer pixels are the shared glass backdrop and are
+    /// excluded from the glass fidelity score. Generous enough to absorb the
+    /// minor render/AA differences in the gradient between the two stacks.
+    private static final int GLASS_TAU = 26;
+
+    /// Load the glass backdrop PNG (the gradient that the iOS Liquid-Glass tiles
+    /// composite behind the widget). Explicit --backdrop wins; otherwise fall back
+    /// to the canonical location relative to the goldens dir. Returns null when no
+    /// backdrop is found, in which case fidelity scoring stays whole-tile.
+    private static BufferedImage loadBackdrop(Path explicit, Path referenceDir) {
+        Path[] candidates = {
+            explicit,
+            referenceDir == null ? null
+                : referenceDir.resolve("../../common/src/main/resources/glass-backdrop.png").normalize()
+        };
+        for (Path p : candidates) {
+            if (p == null) {
+                continue;
+            }
+            try {
+                if (Files.isRegularFile(p)) {
+                    BufferedImage img = javax.imageio.ImageIO.read(p.toFile());
+                    if (img != null) {
+                        return img;
+                    }
+                }
+            } catch (IOException ignore) {
+                // try the next candidate
+            }
+        }
+        return null;
+    }
+
+    /// Reproduce a BACKGROUND scaleToFill (stretch to the full tile, ignoring aspect
+    /// -- matching the iOS native ref's .scaleToFill and the CN1 SCALED background
+    /// type), sampled over the top-left (cw x ch) crop the comparator overlays.
+    /// Nearest-neighbour is sufficient: the backdrop is a smooth gradient and this
+    /// is only used to classify backdrop-vs-widget pixels.
+    private static int[] stretchCropTopLeft(BufferedImage bd, int fullW, int fullH, int cw, int ch) {
+        int bw = bd.getWidth(), bh = bd.getHeight();
+        int[] out = new int[cw * ch];
+        for (int y = 0; y < ch; y++) {
+            int sy = fullH <= 0 ? 0 : (int) ((long) y * bh / fullH);
+            if (sy >= bh) {
+                sy = bh - 1;
+            }
+            for (int x = 0; x < cw; x++) {
+                int sx = fullW <= 0 ? 0 : (int) ((long) x * bw / fullW);
+                if (sx >= bw) {
+                    sx = bw - 1;
+                }
+                out[y * cw + x] = bd.getRGB(sx, sy) & 0xffffff;
+            }
+        }
+        return out;
+    }
+
+    private static int colorDist(int p, int q) {
+        return (Math.abs(((p >> 16) & 0xff) - ((q >> 16) & 0xff))
+                + Math.abs(((p >> 8) & 0xff) - ((q >> 8) & 0xff))
+                + Math.abs((p & 0xff) - (q & 0xff))) / 3;
+    }
+
+    /// Per-component declarations parsed from fidelity-tests.yaml:
+    /// [0] = normalized material (normal|glass|lens; null = legacy heuristic),
+    /// [1] = the tile backdrop the DEVICE renders behind the widget (a 6-hex
+    ///       colour, "gradient", "photo", or null for a plain tile) -- explicit,
+    ///       or the material-derived "photo" default, matching
+    ///       ComponentSpec.getBackdrop(). Backdrops are an iOS-only concept.
+    private static final int SPEC_MATERIAL = 0;
+    private static final int SPEC_BACKDROP = 1;
+
+    /// Loads the per-component `material:`/`backdrop:` declarations from
+    /// fidelity-tests.yaml. An explicit --spec path wins; otherwise the canonical
+    /// spec is located relative to the goldens dir (mirroring loadBackdrop). Only
+    /// the flat subset the spec is written in is understood: a `components:` list
+    /// whose entries start with `- id:` followed by indented `key: value` lines.
+    /// Entries whose `platforms:` allow-list excludes the platform are skipped.
+    /// On Android the glass/lens intents degrade to "normal" and backdrops to
+    /// none: Android tiles never composite a backdrop, so there is nothing to
+    /// mask. Returns null when no spec can be read (callers fall back to the
+    /// legacy heuristic).
+    static Map<String, String[]> loadSpecInfo(Path specPath, Path referenceDir, String platform) {
+        Path candidate = specPath != null ? specPath
+                : (referenceDir != null
+                        ? referenceDir.resolve("../../common/src/main/resources/fidelity-tests.yaml").normalize()
+                        : null);
+        if (candidate == null || !Files.isRegularFile(candidate)) {
+            if (specPath != null) {
+                System.err.println("WARNING: --spec " + specPath + " not readable; falling back to glass heuristic");
+            }
+            return null;
+        }
+        boolean android = platform != null && platform.startsWith("and");
+        Map<String, String[]> out = new LinkedHashMap<>();
+        try {
+            boolean inComponents = false;
+            String id = null;
+            String material = null;
+            String backdrop = null;
+            boolean platformOk = true;
+            List<String> lines = Files.readAllLines(candidate);
+            lines.add("- id: __end__");   // flush the final entry
+            for (String raw : lines) {
+                String trimmed = stripYamlComment(raw).trim();
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                if (trimmed.equals("components:")) {
+                    inComponents = true;
+                    continue;
+                }
+                if (!inComponents) {
+                    continue;
+                }
+                if (trimmed.startsWith("- ")) {
+                    if (id != null && platformOk) {
+                        String mat = normalizeMaterial(material, android);
+                        String bd = android ? null : effectiveBackdrop(backdrop, mat);
+                        out.put(id, new String[]{mat, bd});
+                    }
+                    id = null;
+                    material = null;
+                    backdrop = null;
+                    platformOk = true;
+                    trimmed = trimmed.substring(2).trim();
+                }
+                int idx = trimmed.indexOf(':');
+                if (idx < 0) {
+                    continue;
+                }
+                String key = trimmed.substring(0, idx).trim();
+                String value = trimmed.substring(idx + 1).trim();
+                if (value.length() >= 2 && (value.startsWith("\"") && value.endsWith("\"")
+                        || value.startsWith("'") && value.endsWith("'"))) {
+                    value = value.substring(1, value.length() - 1);
+                }
+                switch (key) {
+                    case "id" -> id = value;
+                    case "material" -> material = value;
+                    case "backdrop" -> backdrop = value;
+                    case "platforms" -> {
+                        platformOk = false;
+                        for (String p : value.split(",")) {
+                            p = p.trim();
+                            if (!p.isEmpty() && platform != null
+                                    && (platform.startsWith(p) || p.startsWith(platform))) {
+                                platformOk = true;
+                                break;
+                            }
+                        }
+                    }
+                    default -> { }
+                }
+            }
+        } catch (IOException ex) {
+            System.err.println("WARNING: failed to read spec " + candidate + ": " + ex.getMessage());
+            return null;
+        }
+        return out.isEmpty() ? null : out;
+    }
+
+    /// Strips a trailing "#" comment, but only when the "#" is outside quotes
+    /// and at the line start or preceded by whitespace, so a quoted value that
+    /// contains "#" (e.g. a colour) survives.
+    private static String stripYamlComment(String line) {
+        boolean inQuote = false;
+        char quote = 0;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (inQuote) {
+                if (c == quote) {
+                    inQuote = false;
+                }
+            } else if (c == '"' || c == '\'') {
+                inQuote = true;
+                quote = c;
+            } else if (c == '#' && (i == 0 || Character.isWhitespace(line.charAt(i - 1)))) {
+                return line.substring(0, i);
+            }
+        }
+        return line;
+    }
+
+    /// A spec entry without a material declaration maps to null so that test
+    /// keeps the legacy heuristic; glass/lens degrade to normal on Android.
+    private static String normalizeMaterial(String material, boolean android) {
+        if (material == null || material.isEmpty()) {
+            return null;
+        }
+        if (!material.equals("normal") && !material.equals("glass") && !material.equals("lens")) {
+            System.err.println("WARNING: unknown material '" + material + "' in spec; treating as normal");
+            return "normal";
+        }
+        if (android && !material.equals("normal")) {
+            return "normal";
+        }
+        return material;
+    }
+
+    /// Mirrors ComponentSpec.getBackdrop(): explicit value wins, material
+    /// glass/lens default to the shared photo, everything else has none.
+    private static String effectiveBackdrop(String backdrop, String material) {
+        if (backdrop != null && !backdrop.isEmpty()) {
+            return backdrop;
+        }
+        if ("glass".equals(material) || "lens".equals(material)) {
+            return "photo";
+        }
+        return null;
+    }
+
+    /// Maps a delivered test name ("Toolbar_normal_dark") to its component's
+    /// spec declaration via longest-id-prefix match at an underscore boundary,
+    /// so a future id containing underscores still resolves. Null = unknown.
+    static String[] resolveSpecInfo(Map<String, String[]> specByComponent, String testName) {
+        if (specByComponent == null || testName == null) {
+            return null;
+        }
+        String[] best = null;
+        int bestLen = -1;
+        for (Map.Entry<String, String[]> e : specByComponent.entrySet()) {
+            String id = e.getKey();
+            if ((testName.equals(id) || testName.startsWith(id + "_")) && id.length() > bestLen) {
+                best = e.getValue();
+                bestLen = id.length();
+            }
+        }
+        return best;
+    }
+
+    /// A tile is "glass" when its corners show the backdrop (the widget is inset, so
+    /// the corner pixels match the stretched backdrop reference). Solid white/black
+    /// tiles (checkbox, textfield, dialog card) fail this and keep the whole-tile
+    /// solid-background scoring.
+    private static boolean isGlassTile(PNGImage nativeImg, int[] refArr, int w, int h) {
+        if (w < 16 || h < 16) {
+            return false;
+        }
+        BufferedImage bn = toRgbImage(nativeImg);
+        // Sample the corners INSET by a few pixels: the native capture leaves a 1px
+        // dark border at the very edge, so the exact corner pixel is not the backdrop.
+        int m = 5;
+        int[][] pts = {{m, m}, {w - 1 - m, m}, {m, h - 1 - m}, {w - 1 - m, h - 1 - m}};
+        int match = 0;
+        for (int[] pt : pts) {
+            int idx = pt[1] * w + pt[0];
+            int p = bn.getRGB(pt[0], pt[1]) & 0xffffff;
+            if (colorDist(p, refArr[idx]) <= GLASS_TAU) {
+                match++;
+            }
+        }
+        return match >= 3;
+    }
+
+    private static boolean[] contentMaskRef(int[] arr, int[] ref, int tau) {
+        boolean[] m = new boolean[arr.length];
+        for (int i = 0; i < arr.length; i++) {
+            m[i] = colorDist(arr[i], ref[i]) > tau;
+        }
+        return m;
+    }
+
+    /// Glass-tile fidelity: the shared gradient backdrop is masked OUT (pixels close
+    /// to the backdrop reference in BOTH images) and only the WIDGET is scored, so a
+    /// widget that looks nothing like the native one can no longer ride the matching
+    /// backdrop to a high number. fillSim is the colour agreement over the union of
+    /// widget pixels (widget-in-only-one-image counts as full mismatch); ssim is
+    /// computed over the widget bounding box only, so flat backdrop windows never
+    /// inflate it. Returns {fidelity_percent, fillSim, fillSim}.
+    private static double[] structuralFidelityGlass(PNGImage nativeImg, PNGImage cn1, int[] refArr) {
+        BufferedImage bn = toRgbImage(nativeImg);
+        BufferedImage bc = toRgbImage(cn1);
+        int w = Math.min(bn.getWidth(), bc.getWidth());
+        int h = Math.min(bn.getHeight(), bc.getHeight());
+        int[] nArr = new int[w * h];
+        int[] cArr = new int[w * h];
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                nArr[y * w + x] = bn.getRGB(x, y) & 0xffffff;
+                cArr[y * w + x] = bc.getRGB(x, y) & 0xffffff;
+            }
+        }
+        boolean[] nC = contentMaskRef(nArr, refArr, GLASS_TAU);
+        boolean[] cC = contentMaskRef(cArr, refArr, GLASS_TAU);
+        long sum = 0;
+        long count = 0;
+        int x0 = w, y0 = h, x1 = -1, y1 = -1;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int idx = y * w + x;
+                if (!nC[idx] && !cC[idx]) {
+                    continue;   // shared backdrop in both -> ignore
+                }
+                int d1 = tolerantDelta(nArr[idx], cArr, x, y, w, h);
+                int d2 = tolerantDelta(cArr[idx], nArr, x, y, w, h);
+                sum += Math.max(d1, d2);
+                count++;
+                if (x < x0) x0 = x;
+                if (x > x1) x1 = x;
+                if (y < y0) y0 = y;
+                if (y > y1) y1 = y;
+            }
+        }
+        if (count == 0) {
+            // Neither render put anything over the backdrop -> identical (both bare
+            // backdrop). Treat as a perfect match rather than dividing by zero.
+            return new double[]{100.0d, 1.0d, 1.0d};
+        }
+        double fillSim = 1.0d - (double) sum / (count * 255.0d);
+        if (fillSim < 0) {
+            fillSim = 0;
+        }
+        double ssim;
+        int bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+        if (bw >= 4 && bh >= 4) {
+            double[] gn = grayCrop(nArr, w, x0, y0, bw, bh);
+            double[] gc = grayCrop(cArr, w, x0, y0, bw, bh);
+            ssim = computeSsimGray(gn, gc, bw, bh);
+        } else {
+            ssim = fillSim;
+        }
+        if (ssim < 0) {
+            ssim = 0;
+        }
+        double headline = Math.sqrt(fillSim * ssim);
+        return new double[]{100.0d * headline, fillSim, fillSim};
+    }
+
+    /// Geometry fidelity block (independent of the visual similarity score):
+    ///   native_bbox / cn1_bbox -- [x, y, w, h] of the widget content in each
+    ///     render (bg-delta mask for normal tiles, backdrop-delta mask when
+    ///     refArr is provided, i.e. the glass/lens tiles).
+    ///   offset_x / offset_y   -- CN1 bbox origin minus native bbox origin (px).
+    ///   width_ratio / height_ratio -- CN1 bbox extent over native bbox extent.
+    ///   center_offset         -- Euclidean distance between the bbox centers (px).
+    ///   corner_radius_native / _cn1 / _delta -- rounded-corner radius estimate
+    ///     for backdrop-masked tiles (glass/lens and the declared-backdrop
+    ///     isolation tiles, where the widget silhouette is well-defined), from
+    ///     the non-content area of the bbox corner squares
+    ///     (a = r^2 * (1 - pi/4) per corner, averaged over the 4 corners).
+    /// A tile with no content on either side reports empty=true and no numbers.
+    ///
+    /// The outermost EDGE_TRIM pixels of the tile are excluded from the geometry
+    /// masks: off-screen native captures leave single-pixel junk lines at the
+    /// tile borders (a grey bottom row, a dark right column), and while a few
+    /// hundred stray pixels are noise to the visual score, they stretch a
+    /// min/max bounding box to the full tile. Both renders are trimmed
+    /// identically, so a widget genuinely flush with the tile edge keeps
+    /// identical (clipped) numbers on both sides.
+    private static final int GEOMETRY_EDGE_TRIM = 2;
+
+    private static Map<String, Object> geometryMetrics(PNGImage nativeImg, PNGImage cn1, int bgRgb, int[] refArr) {
+        Map<String, Object> geo = new LinkedHashMap<>();
+        BufferedImage bn = toRgbImage(nativeImg);
+        BufferedImage bc = toRgbImage(cn1);
+        int w = Math.min(bn.getWidth(), bc.getWidth());
+        int h = Math.min(bn.getHeight(), bc.getHeight());
+        int[] nArr = new int[w * h];
+        int[] cArr = new int[w * h];
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                nArr[y * w + x] = bn.getRGB(x, y) & 0xffffff;
+                cArr[y * w + x] = bc.getRGB(x, y) & 0xffffff;
+            }
+        }
+        boolean[] maskN;
+        boolean[] maskC;
+        if (refArr != null) {
+            maskN = contentMaskRef(nArr, refArr, GLASS_TAU);
+            maskC = contentMaskRef(cArr, refArr, GLASS_TAU);
+        } else {
+            maskN = contentMaskBg(nArr, bgRgb, CONTENT_TAU);
+            maskC = contentMaskBg(cArr, bgRgb, CONTENT_TAU);
+        }
+        trimEdges(maskN, w, h, GEOMETRY_EDGE_TRIM);
+        trimEdges(maskC, w, h, GEOMETRY_EDGE_TRIM);
+        int[] boxN = maskBBox(maskN, w, h);
+        int[] boxC = maskBBox(maskC, w, h);
+        if (boxN[2] <= 0 || boxC[2] <= 0) {
+            geo.put("empty", true);
+            return geo;
+        }
+        geo.put("native_bbox", bboxList(boxN));
+        geo.put("cn1_bbox", bboxList(boxC));
+        geo.put("offset_x", boxC[0] - boxN[0]);
+        geo.put("offset_y", boxC[1] - boxN[1]);
+        geo.put("width_ratio", round4((double) boxC[2] / boxN[2]));
+        geo.put("height_ratio", round4((double) boxC[3] / boxN[3]));
+        double dcx = (boxC[0] + boxC[2] / 2.0d) - (boxN[0] + boxN[2] / 2.0d);
+        double dcy = (boxC[1] + boxC[3] / 2.0d) - (boxN[1] + boxN[3] / 2.0d);
+        geo.put("center_offset", round2(Math.sqrt(dcx * dcx + dcy * dcy)));
+        if (refArr != null) {
+            double rn = estimateCornerRadius(maskN, w, boxN);
+            double rc = estimateCornerRadius(maskC, w, boxC);
+            geo.put("corner_radius_native", round2(rn));
+            geo.put("corner_radius_cn1", round2(rc));
+            geo.put("corner_radius_delta", round2(rc - rn));
+        }
+        return geo;
+    }
+
+    /// Builds the geometry-mask reference for a tile's DECLARED backdrop: the
+    /// pixel the backdrop would put at each position of the cropped region, so
+    /// widget pixels are the ones that differ from it. Mirrors the device
+    /// renderer's applyBackdrop: a 6-hex value is a solid fill, "gradient" is a
+    /// vertical #1e64ff -> #28c850 ramp over the full tile, "photo" is the
+    /// shared backdrop PNG (scaleToFill). Returns null when the tile has no
+    /// backdrop (callers fall back to the plain bg-colour mask) or the photo
+    /// asset is unavailable.
+    private static int[] geometryReference(String backdrop, BufferedImage backdropImg,
+            int fullW, int fullH, int cw, int ch) {
+        if (backdrop == null) {
+            return null;
+        }
+        if ("photo".equals(backdrop)) {
+            return backdropImg != null ? stretchCropTopLeft(backdropImg, fullW, fullH, cw, ch) : null;
+        }
+        int[] out = new int[cw * ch];
+        if ("gradient".equals(backdrop)) {
+            int sr = 0x1e, sg = 0x64, sb = 0xff;
+            int er = 0x28, eg = 0xc8, eb = 0x50;
+            for (int y = 0; y < ch; y++) {
+                float f = fullH <= 1 ? 0f : (float) y / (fullH - 1);
+                int r = sr + (int) ((er - sr) * f);
+                int g = sg + (int) ((eg - sg) * f);
+                int b = sb + (int) ((eb - sb) * f);
+                int rgb = (r << 16) | (g << 8) | b;
+                for (int x = 0; x < cw; x++) {
+                    out[y * cw + x] = rgb;
+                }
+            }
+            return out;
+        }
+        if (backdrop.length() == 6) {
+            try {
+                int rgb = Integer.parseInt(backdrop, 16) & 0xffffff;
+                java.util.Arrays.fill(out, rgb);
+                return out;
+            } catch (NumberFormatException ignore) {
+                // not a colour -> no backdrop reference
+            }
+        }
+        return null;
+    }
+
+    /// Content mask against a known solid background colour (the tile bg).
+    private static boolean[] contentMaskBg(int[] arr, int bgRgb, int tau) {
+        int bgR = (bgRgb >> 16) & 0xff;
+        int bgG = (bgRgb >> 8) & 0xff;
+        int bgB = bgRgb & 0xff;
+        boolean[] m = new boolean[arr.length];
+        for (int i = 0; i < arr.length; i++) {
+            int p = arr[i];
+            int r = (p >> 16) & 0xff;
+            int g = (p >> 8) & 0xff;
+            int b = p & 0xff;
+            m[i] = Math.abs(r - bgR) > tau || Math.abs(g - bgG) > tau || Math.abs(b - bgB) > tau;
+        }
+        return m;
+    }
+
+    /// Clears the outermost `trim` pixels of the mask on every side.
+    private static void trimEdges(boolean[] mask, int w, int h, int trim) {
+        for (int y = 0; y < h; y++) {
+            boolean edgeRow = y < trim || y >= h - trim;
+            for (int x = 0; x < w; x++) {
+                if (edgeRow || x < trim || x >= w - trim) {
+                    mask[y * w + x] = false;
+                }
+            }
+        }
+    }
+
+    private static List<Object> bboxList(int[] box) {
+        List<Object> out = new ArrayList<>();
+        out.add(box[0]);
+        out.add(box[1]);
+        out.add(box[2]);
+        out.add(box[3]);
+        return out;
+    }
+
+    /// Bounding box {x, y, w, h} of the true pixels of a content mask; w=0 when
+    /// the mask has fewer than MIN_CONTENT_PIXELS set.
+    private static int[] maskBBox(boolean[] mask, int w, int h) {
+        int x0 = w, y0 = h, x1 = -1, y1 = -1;
+        long count = 0;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                if (mask[y * w + x]) {
+                    if (x < x0) x0 = x;
+                    if (x > x1) x1 = x;
+                    if (y < y0) y0 = y;
+                    if (y > y1) y1 = y;
+                    count++;
+                }
+            }
+        }
+        if (x1 < 0 || count < MIN_CONTENT_PIXELS) {
+            return new int[]{0, 0, 0, 0};
+        }
+        return new int[]{x0, y0, x1 - x0 + 1, y1 - y0 + 1};
+    }
+
+    /// Rounded-corner radius estimate for a pill/rounded-rect content mask: in
+    /// each k x k bbox-corner square the rounding leaves a = r^2 * (1 - pi/4)
+    /// pixels uncovered, so r = sqrt(a / (1 - pi/4)); the four corners are
+    /// averaged. Interior glyphs never reach the bbox corners, so they do not
+    /// disturb the estimate; a square corner reports ~0.
+    private static double estimateCornerRadius(boolean[] mask, int stride, int[] box) {
+        int k = Math.min(48, Math.min(box[2], box[3]) / 2);
+        if (k < 3) {
+            return 0;
+        }
+        long[] miss = new long[4];
+        for (int j = 0; j < k; j++) {
+            for (int i = 0; i < k; i++) {
+                if (!mask[(box[1] + j) * stride + (box[0] + i)]) {
+                    miss[0]++;                                                     // top-left
+                }
+                if (!mask[(box[1] + j) * stride + (box[0] + box[2] - 1 - i)]) {
+                    miss[1]++;                                                     // top-right
+                }
+                if (!mask[(box[1] + box[3] - 1 - j) * stride + (box[0] + i)]) {
+                    miss[2]++;                                                     // bottom-left
+                }
+                if (!mask[(box[1] + box[3] - 1 - j) * stride + (box[0] + box[2] - 1 - i)]) {
+                    miss[3]++;                                                     // bottom-right
+                }
+            }
+        }
+        final double factor = 1.0d - Math.PI / 4.0d;
+        double sum = 0;
+        for (long m : miss) {
+            sum += Math.sqrt(m / factor);
+        }
+        return sum / 4.0d;
+    }
+
+    private static double[] grayCrop(int[] arr, int stride, int x0, int y0, int w, int h) {
+        double[] g = new double[w * h];
+        for (int j = 0; j < h; j++) {
+            for (int i = 0; i < w; i++) {
+                int p = arr[(y0 + j) * stride + (x0 + i)];
+                g[j * w + i] = 0.299d * ((p >> 16) & 0xff) + 0.587d * ((p >> 8) & 0xff) + 0.114d * (p & 0xff);
+            }
+        }
+        return g;
+    }
+
+    private static double computeSsimGray(double[] ga, double[] gb, int w, int h) {
+        final double c1 = 6.5025d;
+        final double c2 = 58.5225d;
+        int win = 8;
+        double total = 0.0d;
+        int windows = 0;
+        for (int y = 0; y + win <= h; y += win) {
+            for (int x = 0; x + win <= w; x += win) {
+                total += ssimWindow(ga, gb, w, x, y, win, win, c1, c2);
+                windows++;
+            }
+        }
+        if (windows == 0) {
+            return ssimWindow(ga, gb, w, 0, 0, w, h, c1, c2);
+        }
+        return total / windows;
+    }
+
+    /// Top/left margin agreement (1 = identical edge-to-widget distance, decaying
+    /// with the summed absolute top+left margin error). Diagnostic only -- the
+    /// absolute-position shapeSim already penalizes a mis-placed widget.
+    private static double marginAgreement(int[] boxN, int[] boxC) {
+        int err = Math.abs(boxN[1] - boxC[1]) + Math.abs(boxN[0] - boxC[0]);
+        double a = 1.0d - err / 100.0d;
+        return a < 0 ? 0 : a;
+    }
+
+    /// Bounding box {x, y, w, h} of the widget (pixels >CONTENT_TAU off bg).
+    /// Returns w=0 when there is no meaningful content.
+    private static int[] contentBBox(BufferedImage img, int bgRgb) {
+        int w = img.getWidth(), h = img.getHeight();
+        int bgR = (bgRgb >> 16) & 0xff, bgG = (bgRgb >> 8) & 0xff, bgB = bgRgb & 0xff;
+        int x0 = w, y0 = h, x1 = -1, y1 = -1;
+        long count = 0;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int p = img.getRGB(x, y);
+                int r = (p >> 16) & 0xff, g = (p >> 8) & 0xff, b = p & 0xff;
+                if (Math.abs(r - bgR) > CONTENT_TAU || Math.abs(g - bgG) > CONTENT_TAU || Math.abs(b - bgB) > CONTENT_TAU) {
+                    if (x < x0) x0 = x;
+                    if (x > x1) x1 = x;
+                    if (y < y0) y0 = y;
+                    if (y > y1) y1 = y;
+                    count++;
+                }
+            }
+        }
+        if (x1 < 0 || count < MIN_CONTENT_PIXELS) {
+            return new int[]{0, 0, 0, 0};
+        }
+        return new int[]{x0, y0, x1 - x0 + 1, y1 - y0 + 1};
+    }
+
+    /// Sub-pixel tolerance window. For each pixel we look for the best match in the
+    /// OTHER image within +/-ALIGN_RADIUS, adding ALIGN_PENALTY per pixel of offset
+    /// beyond the first (the first pixel is free -- two render paths anti-aliasing
+    /// the same edge differ by ~1px). This absorbs ONLY genuine sub-pixel fuzz; it
+    /// is small on purpose, so a real margin / position error (the widget rendered
+    /// several px off where it belongs) is NOT absorbed and shows up as mismatch.
+    private static final int ALIGN_RADIUS = 2;
+    private static final int ALIGN_PENALTY = 22;   // per pixel of offset, in 0..255 channel units
+
+    /// Compares the two tiles at ABSOLUTE pixel position (1:1, no crop, no whole-
+    /// widget re-alignment). Every pixel that is content in either tile is matched
+    /// against the other within the small sub-pixel window; where the widget sits at
+    /// a different place (a wrong margin) the content simply does not line up and is
+    /// scored as mismatch. Symmetric: each side searches the other and the worse
+    /// direction is taken so content present on only one side is penalized.
+    private static double absoluteShapeSim(BufferedImage bn, BufferedImage bc, int bgRgb) {
+        int bgR = (bgRgb >> 16) & 0xff, bgG = (bgRgb >> 8) & 0xff, bgB = bgRgb & 0xff;
+        int w = Math.min(bn.getWidth(), bc.getWidth());
+        int h = Math.min(bn.getHeight(), bc.getHeight());
+        int[] nArr = new int[w * h];
+        int[] cArr = new int[w * h];
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                nArr[y * w + x] = bn.getRGB(x, y) & 0xffffff;
+                cArr[y * w + x] = bc.getRGB(x, y) & 0xffffff;
+            }
+        }
+        boolean[] nC = contentMask(nArr, bgR, bgG, bgB);
+        boolean[] cC = contentMask(cArr, bgR, bgG, bgB);
+        long sum = 0;
+        long count = 0;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int idx = y * w + x;
+                if (!nC[idx] && !cC[idx]) {
+                    continue;   // background in both -> part of neither widget
+                }
+                int d1 = tolerantDelta(nArr[idx], cArr, x, y, w, h);
+                int d2 = tolerantDelta(cArr[idx], nArr, x, y, w, h);
+                sum += Math.max(d1, d2);
+                count++;
+            }
+        }
+        if (count == 0) {
+            return 1.0d;
+        }
+        double shape = 1.0d - (double) sum / (count * 255.0d);
+        return shape < 0 ? 0 : shape;
+    }
+
+    /// Gradient (local edge strength) below which a pixel is treated as flat fill
+    /// and contributes nothing to the structural term.
+    private static final int EDGE_TAU = 12;
+
+    /// Colour agreement WEIGHTED BY STRUCTURAL SALIENCE (local gradient magnitude),
+    /// at absolute position. Each pixel's contribution is weighted by how much
+    /// structure (edge/stroke) it carries in EITHER render, so a large flat fill --
+    /// however well it matches -- barely moves the score, while glyph strokes and
+    /// widget edges dominate. A control whose distinguishing marks land in a
+    /// different place (wrong title alignment, wrong size, missing separator) scores
+    /// low here even when the surrounding fill matches perfectly. Returns 0..1.
+    private static double structuralSalienceSim(BufferedImage bn, BufferedImage bc, int bgRgb) {
+        int w = Math.min(bn.getWidth(), bc.getWidth());
+        int h = Math.min(bn.getHeight(), bc.getHeight());
+        int[] nArr = new int[w * h];
+        int[] cArr = new int[w * h];
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                nArr[y * w + x] = bn.getRGB(x, y) & 0xffffff;
+                cArr[y * w + x] = bc.getRGB(x, y) & 0xffffff;
+            }
+        }
+        int[] gN = gradientMag(nArr, w, h);
+        int[] gC = gradientMag(cArr, w, h);
+        double wSum = 0.0d;
+        double dSum = 0.0d;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int idx = y * w + x;
+                int sal = Math.max(gN[idx], gC[idx]);
+                if (sal < EDGE_TAU) {
+                    continue;   // flat in both -> not structural content
+                }
+                int d1 = tolerantDelta(nArr[idx], cArr, x, y, w, h);
+                int d2 = tolerantDelta(cArr[idx], nArr, x, y, w, h);
+                int delta = Math.max(d1, d2);
+                // Weight by salience SQUARED so the strongest edges (glyph strokes,
+                // crisp widget outlines) dominate over faint low-contrast edges (a
+                // subtle bar fill boundary). A mis-placed title -- the salient mark a
+                // human keys on -- then drives the score, not the incidental frame.
+                double weight = (double) sal * sal;
+                wSum += weight * 255.0d;
+                dSum += weight * delta;
+            }
+        }
+        if (wSum == 0.0d) {
+            return 1.0d;   // neither render has any structure -> trivially equal
+        }
+        double s = 1.0d - dSum / wSum;
+        return s < 0 ? 0 : s;
+    }
+
+    /// Per-pixel local edge strength (0..255): the larger of the right- and
+    /// down-neighbour mean channel differences. High on glyph/widget edges, ~0 on
+    /// flat fills.
+    private static int[] gradientMag(int[] arr, int w, int h) {
+        int[] g = new int[w * h];
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int p = arr[y * w + x];
+                int pr = (p >> 16) & 0xff, pg = (p >> 8) & 0xff, pb = p & 0xff;
+                int gx = 0, gy = 0;
+                if (x + 1 < w) {
+                    int q = arr[y * w + x + 1];
+                    gx = (Math.abs(pr - ((q >> 16) & 0xff)) + Math.abs(pg - ((q >> 8) & 0xff)) + Math.abs(pb - (q & 0xff))) / 3;
+                }
+                if (y + 1 < h) {
+                    int q = arr[(y + 1) * w + x];
+                    gy = (Math.abs(pr - ((q >> 16) & 0xff)) + Math.abs(pg - ((q >> 8) & 0xff)) + Math.abs(pb - (q & 0xff))) / 3;
+                }
+                g[idxClamp(y * w + x, g.length)] = Math.max(gx, gy);
+            }
+        }
+        return g;
+    }
+
+    private static int idxClamp(int i, int len) {
+        return i < 0 ? 0 : (i >= len ? len - 1 : i);
+    }
+
+    private static boolean[] contentMask(int[] arr, int bgR, int bgG, int bgB) {
+        boolean[] m = new boolean[arr.length];
+        for (int i = 0; i < arr.length; i++) {
+            int p = arr[i];
+            int r = (p >> 16) & 0xff, g = (p >> 8) & 0xff, b = p & 0xff;
+            m[i] = Math.abs(r - bgR) > CONTENT_TAU || Math.abs(g - bgG) > CONTENT_TAU
+                    || Math.abs(b - bgB) > CONTENT_TAU;
+        }
+        return m;
+    }
+
+    /// Best (lowest) cost of matching the anchor pixel against any pixel of `other`
+    /// within +/-ALIGN_RADIUS, where cost = mean channel delta + ALIGN_PENALTY per
+    /// pixel of Chebyshev offset. Returns a value in 0..255.
+    private static int tolerantDelta(int anchor, int[] other, int x, int y, int w, int h) {
+        int ar = (anchor >> 16) & 0xff, ag = (anchor >> 8) & 0xff, ab = anchor & 0xff;
+        int best = Integer.MAX_VALUE;
+        for (int dy = -ALIGN_RADIUS; dy <= ALIGN_RADIUS; dy++) {
+            int yy = y + dy;
+            if (yy < 0 || yy >= h) {
+                continue;
+            }
+            for (int dx = -ALIGN_RADIUS; dx <= ALIGN_RADIUS; dx++) {
+                int xx = x + dx;
+                if (xx < 0 || xx >= w) {
+                    continue;
+                }
+                int p = other[yy * w + xx];
+                int delta = (Math.abs(ar - ((p >> 16) & 0xff))
+                        + Math.abs(ag - ((p >> 8) & 0xff))
+                        + Math.abs(ab - (p & 0xff))) / 3;
+                // The first pixel of offset is free: a <=1px halo is just the two
+                // rendering stacks anti-aliasing the same edge a hair differently,
+                // which is visually identical. From 2px out the distance penalty
+                // kicks in, so genuine size/shape/position differences still count
+                // (e.g. a square vs a pill corner, which differs by ~2-3px, is no
+                // longer silently forgiven).
+                int cheb = Math.max(Math.abs(dx), Math.abs(dy));
+                int cost = delta + Math.max(0, cheb - 1) * ALIGN_PENALTY;
+                if (cost < best) {
+                    best = cost;
+                }
+            }
+        }
+        return best == Integer.MAX_VALUE ? 255 : Math.min(best, 255);
+    }
+
+    /// Mean absolute per-channel difference across all RGB channels, 0..255.
+    /// 0 means pixel-identical; reported only as a diagnostic now.
+    private static double meanChannelDelta(PNGImage a, PNGImage b) {
+        int[] ar = toRgbArray(a);
+        int[] br = toRgbArray(b);
+        long sum = 0;
+        long count = (long) ar.length * 3L;
+        for (int i = 0; i < ar.length; i++) {
+            int e = ar[i];
+            int f = br[i];
+            sum += Math.abs(((e >> 16) & 0xff) - ((f >> 16) & 0xff));
+            sum += Math.abs(((e >> 8) & 0xff) - ((f >> 8) & 0xff));
+            sum += Math.abs((e & 0xff) - (f & 0xff));
+        }
+        return count == 0 ? 0.0d : (double) sum / (double) count;
+    }
+
+    /// Structural similarity (SSIM) over 8x8 non-overlapping grayscale windows,
+    /// averaged. Robust to the ~1px sub-pixel offsets a mean-delta penalises
+    /// harshly, so it is the headline fidelity number while mean-delta is the
+    /// diagnostic. Falls back to a single whole-image window for tiles smaller
+    /// than the window size. Constants are the standard C1/C2 for 8-bit images.
+    private static double computeSsim(PNGImage a, PNGImage b) {
+        int w = a.width();
+        int h = a.height();
+        double[] ga = toGray(a);
+        double[] gb = toGray(b);
+        final double c1 = 6.5025d;   // (0.01*255)^2
+        final double c2 = 58.5225d;  // (0.03*255)^2
+        int win = 8;
+        double total = 0.0d;
+        int windows = 0;
+        for (int y = 0; y + win <= h; y += win) {
+            for (int x = 0; x + win <= w; x += win) {
+                total += ssimWindow(ga, gb, w, x, y, win, win, c1, c2);
+                windows++;
+            }
+        }
+        if (windows == 0) {
+            return ssimWindow(ga, gb, w, 0, 0, w, h, c1, c2);
+        }
+        return total / windows;
+    }
+
+    private static double ssimWindow(double[] ga, double[] gb, int stride, int x0, int y0, int ww, int wh,
+            double c1, double c2) {
+        int count = ww * wh;
+        if (count <= 0) {
+            return 1.0d;
+        }
+        double ma = 0.0d;
+        double mb = 0.0d;
+        for (int j = 0; j < wh; j++) {
+            int row = (y0 + j) * stride + x0;
+            for (int i = 0; i < ww; i++) {
+                ma += ga[row + i];
+                mb += gb[row + i];
+            }
+        }
+        ma /= count;
+        mb /= count;
+        double va = 0.0d;
+        double vb = 0.0d;
+        double cov = 0.0d;
+        for (int j = 0; j < wh; j++) {
+            int row = (y0 + j) * stride + x0;
+            for (int i = 0; i < ww; i++) {
+                double da = ga[row + i] - ma;
+                double db = gb[row + i] - mb;
+                va += da * da;
+                vb += db * db;
+                cov += da * db;
+            }
+        }
+        double denomCount = count > 1 ? (count - 1) : 1;
+        va /= denomCount;
+        vb /= denomCount;
+        cov /= denomCount;
+        return ((2 * ma * mb + c1) * (2 * cov + c2)) / ((ma * ma + mb * mb + c1) * (va + vb + c2));
+    }
+
+    private static double[] toGray(PNGImage image) {
+        int[] rgb = toRgbArray(image);
+        double[] gray = new double[rgb.length];
+        for (int i = 0; i < rgb.length; i++) {
+            int p = rgb[i];
+            int r = (p >> 16) & 0xff;
+            int g = (p >> 8) & 0xff;
+            int b = p & 0xff;
+            gray[i] = 0.299d * r + 0.587d * g + 0.114d * b;
+        }
+        return gray;
+    }
+
+    private static double round2(double value) {
+        return Math.round(value * 100.0d) / 100.0d;
+    }
+
+    private static double round4(double value) {
+        return Math.round(value * 10000.0d) / 10000.0d;
     }
 
     private static CommentPayload loadPreviewOrBuild(String testName, Path actualPath, Path previewDir) throws IOException {
@@ -306,6 +1544,22 @@ public class ProcessScreenshots {
         } catch (Exception ex) {
             return null;
         }
+    }
+
+    /// Returns the top-left w x h crop of an image (no scaling). Pixels are stored
+    /// row-major, bytesPerPixel each, width*bytesPerPixel per row.
+    private static PNGImage cropTopLeft(PNGImage img, int w, int h) {
+        if (w == img.width() && h == img.height()) {
+            return img;
+        }
+        int bpp = img.bytesPerPixel();
+        int srcStride = img.width() * bpp;
+        int dstStride = w * bpp;
+        byte[] out = new byte[h * dstStride];
+        for (int y = 0; y < h; y++) {
+            System.arraycopy(img.pixels(), y * srcStride, out, y * dstStride, dstStride);
+        }
+        return new PNGImage(w, h, img.bitDepth(), img.colorType(), out, bpp);
     }
 
     private static BufferedImage toRgbImage(PNGImage image) {
@@ -803,15 +2057,24 @@ public class ProcessScreenshots {
         final Path previewDir;
         final int maxChannelDelta;
         final double maxMismatchPercent;
+        final String mode;
+        final Path backdrop;
+        final Path spec;
+        final String specPlatform;
 
         private Arguments(Path referenceDir, List<Map.Entry<String, Path>> actualEntries, boolean emitBase64, Path previewDir,
-                          int maxChannelDelta, double maxMismatchPercent) {
+                          int maxChannelDelta, double maxMismatchPercent, String mode, Path backdrop,
+                          Path spec, String specPlatform) {
             this.referenceDir = referenceDir;
             this.actualEntries = actualEntries;
             this.emitBase64 = emitBase64;
             this.previewDir = previewDir;
             this.maxChannelDelta = maxChannelDelta;
             this.maxMismatchPercent = maxMismatchPercent;
+            this.mode = mode;
+            this.backdrop = backdrop;
+            this.spec = spec;
+            this.specPlatform = specPlatform;
         }
 
         static Arguments parse(String[] args) {
@@ -820,16 +2083,52 @@ public class ProcessScreenshots {
             Path previewDir = null;
             int maxChannelDelta = 4;
             double maxMismatchPercent = 0.30d;
+            String mode = "golden";
+            Path backdrop = null;
+            Path spec = null;
+            String specPlatform = "ios";
             List<Map.Entry<String, Path>> actuals = new ArrayList<>();
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
                 switch (arg) {
+                    case "--mode" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --mode");
+                            return null;
+                        }
+                        mode = args[i];
+                        if (!mode.equals("golden") && !mode.equals("fidelity")) {
+                            System.err.println("Unknown --mode (expected golden or fidelity): " + mode);
+                            return null;
+                        }
+                    }
                     case "--reference-dir" -> {
                         if (++i >= args.length) {
                             System.err.println("Missing value for --reference-dir");
                             return null;
                         }
                         reference = Path.of(args[i]);
+                    }
+                    case "--backdrop" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --backdrop");
+                            return null;
+                        }
+                        backdrop = Path.of(args[i]);
+                    }
+                    case "--spec" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --spec");
+                            return null;
+                        }
+                        spec = Path.of(args[i]);
+                    }
+                    case "--spec-platform" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --spec-platform");
+                            return null;
+                        }
+                        specPlatform = args[i];
                     }
                     case "--emit-base64" -> emitBase64 = true;
                     case "--preview-dir" -> {
@@ -884,7 +2183,7 @@ public class ProcessScreenshots {
                 System.err.println("--reference-dir is required");
                 return null;
             }
-            return new Arguments(reference, actuals, emitBase64, previewDir, maxChannelDelta, maxMismatchPercent);
+            return new Arguments(reference, actuals, emitBase64, previewDir, maxChannelDelta, maxMismatchPercent, mode, backdrop, spec, specPlatform);
         }
 
         private static int parseIntArg(String flag, String value) {

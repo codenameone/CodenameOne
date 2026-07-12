@@ -1827,6 +1827,11 @@ public class UIManager {
     }
 
     private void buildTheme(Hashtable themeProps) {
+        // A new theme may change constants that the platform consults while deriving
+        // fonts (e.g. a native theme's text letter spacing). Flush the derived-font
+        // cache so those fonts are rebuilt against the incoming constants rather than
+        // returning a paint derived under the previous (or no) theme.
+        Font.clearDerivedFontCache();
         String con = (String) themeProps.get("@includeNativeBool");
         if (con != null && "true".equalsIgnoreCase(con) && Display.getInstance().hasNativeTheme()) {
             boolean a = accessible;
@@ -2468,6 +2473,16 @@ public class UIManager {
                     style.setFont(parseFont((String) font));
                 } else {
                     style.setFont((Font) font);
+                }
+            }
+            if (themeProps.containsKey(id + Style.LETTER_SPACING)) {
+                float ls = ((Number) themeProps.get(id + Style.LETTER_SPACING)).floatValue();
+                style.setLetterSpacing(ls);
+                // Bake the spacing into the style's font so it is applied
+                // consistently for both text measurement and rendering.
+                Font lsFont = style.getFont();
+                if (ls != 0 && lsFont != null) {
+                    style.setFont(lsFont.deriveLetterSpacing(ls));
                 }
             }
             if (border != null) {

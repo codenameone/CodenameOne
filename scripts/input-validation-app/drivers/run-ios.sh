@@ -227,6 +227,34 @@ sleep 2
 cleanup
 trap - EXIT INT TERM
 
+# The live stream takes a few seconds to attach its predicate, and xcodebuild
+# can drive the first gestures before it is live -- a CI run lost the tap
+# event this way while XCUITest itself passed. `log show` reads the persisted
+# unified-log archive retroactively, so appending it recovers anything the
+# stream missed; the event greps below run against the union.
+iv_log "Appending buffered device log (log show) to cover the stream attach window"
+xcrun simctl spawn "$SIM_UDID" log show --style compact --level debug \
+    --predicate '(processImagePath CONTAINS[c] "'"$BUNDLE_ID"'") OR (eventMessage CONTAINS "CN1IV:")' \
+    --last 30m >> "$LOG_FILE" 2>/dev/null || true
+
+# Unified logging DROPS messages under burst pressure (CI observed interleaved
+# CN1IV lines missing from both the stream and the archive), so the app also
+# writes its full event transcript to a file in its container; that file is the
+# authoritative record and is appended for the event greps below.
+APP_CONTAINER="$(xcrun simctl get_app_container "$SIM_UDID" "$BUNDLE_ID" data 2>/dev/null || true)"
+if [ -n "$APP_CONTAINER" ]; then
+  EVENTS_FILE="$(find "$APP_CONTAINER" -maxdepth 3 -name 'cn1iv-events.log' 2>/dev/null | head -n1)"
+  if [ -n "$EVENTS_FILE" ] && [ -f "$EVENTS_FILE" ]; then
+    iv_log "Appending app-side event transcript $EVENTS_FILE"
+    cp -f "$EVENTS_FILE" "$ARTIFACTS_DIR/cn1iv-events.log" 2>/dev/null || true
+    cat "$EVENTS_FILE" >> "$LOG_FILE"
+  else
+    iv_log "WARNING: app-side event transcript not found under $APP_CONTAINER"
+  fi
+else
+  iv_log "WARNING: could not resolve the app container for $BUNDLE_ID"
+fi
+
 # Assertion: each expected event must appear at least once in the log.
 REQUIRED_EVENTS=(
   "CN1IV:READY:tap"

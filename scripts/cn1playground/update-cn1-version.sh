@@ -33,6 +33,16 @@ latest_plugin_version_from_maven() {
   return 1
 }
 
+SCRIPT_DIR_EARLY="$(cd "$(dirname "$0")" && pwd)"
+CURRENT_PIN="$(perl -0777 -ne 'if (m|<properties>.*?<cn1\.version>([^<]+)</cn1\.version>|s) { print $1; }' "$SCRIPT_DIR_EARLY/pom.xml")"
+if [[ "$CURRENT_PIN" == *-SNAPSHOT ]]; then
+  # The playground is deliberately pinned to the in-repo snapshot so it
+  # previews the CURRENT framework + native themes (see the pom comment).
+  # Release bumps and the website build must leave that pin alone.
+  echo "Playground is pinned to $CURRENT_PIN (in-repo snapshot); leaving it unchanged."
+  exit 0
+fi
+
 RAW_VERSION="${1:-}"
 VERSION=""
 if [ -n "$RAW_VERSION" ]; then

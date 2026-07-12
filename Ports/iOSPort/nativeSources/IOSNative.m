@@ -889,9 +889,100 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_createImageNSData___long_int_1ARRAY(C
     data2[1] = (int)img.size.height;
     
     GLUIImage* glu = [[GLUIImage alloc] initWithImage:img];
-    
+
     POOL_END();
     return (JAVA_LONG) ((BRIDGE_CAST void*)glu);
+}
+
+// Renders an Apple SF Symbol (iOS 13+) into a tinted UIImage and wraps it in a
+// GLUIImage peer, mirroring createImageNSData. Returns 0 when SF Symbols are
+// unavailable or the named symbol does not exist; the caller falls back to the
+// Material icon font. widthHeight[0/1] receive the image size in PIXELS.
+JAVA_LONG com_codename1_impl_ios_IOSNative_nativeCreateSFSymbol___java_lang_String_int_float_int_int_1ARRAY_R_long(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT name, JAVA_INT color, JAVA_FLOAT size, JAVA_INT weight, JAVA_OBJECT n2)
+{
+#if TARGET_OS_WATCH
+    // watchOS marks UIScreen and UIGraphicsImageRenderer unavailable; returning
+    // 0 makes FontImage fall back to the Material icon font, same as pre-iOS-13.
+    return 0;
+#else
+    if (@available(iOS 13.0, *)) {
+        POOL_BEGIN();
+        NSString* nameStr = toNSString(CN1_THREAD_STATE_PASS_ARG name);
+        if (nameStr == nil) {
+            POOL_END();
+            return 0;
+        }
+        // `size` arrives in CN1 device pixels (the same units as the Material glyph
+        // it replaces). UIImage symbol point size is in POINTS, so divide by the
+        // screen scale; the rendered bitmap is then ~`size` pixels tall, matching.
+        CGFloat scale = [UIScreen mainScreen].scale;
+        if (scale < 1) { scale = 1; }
+        CGFloat pointSize = size / scale;
+        UIImageSymbolConfiguration* cfg = [UIImageSymbolConfiguration configurationWithPointSize:pointSize weight:(weight >= 1 ? UIImageSymbolWeightBold : UIImageSymbolWeightRegular)];
+        UIImage* sym = [UIImage systemImageNamed:nameStr withConfiguration:cfg];
+        if (sym == nil) {
+            POOL_END();
+            return 0;
+        }
+        UIColor* c = [UIColor colorWithRed:((color >> 16) & 0xff) / 255.0 green:((color >> 8) & 0xff) / 255.0 blue:(color & 0xff) / 255.0 alpha:1.0];
+        // Fetch the int[] up front: slots [0],[1] receive the rendered pixel w/h;
+        // slots [2],[3] (when present) carry optional per-call layout tuning -- a
+        // uniform icon SLOT height as a percent of `size`, and the glyph's VERTICAL
+        // BIAS within that slot as a percent (50 = centred). Defaults 100/50
+        // reproduce the legacy centred, downscale-to-fit behaviour.
+#ifndef NEW_CODENAME_ONE_VM
+        org_xmlvm_runtime_XMLVMArray* intArray = n2;
+        JAVA_ARRAY_INT* data2 = (JAVA_ARRAY_INT*)intArray->fields.org_xmlvm_runtime_XMLVMArray.array_;
+        int arrayLen = (int)intArray->fields.org_xmlvm_runtime_XMLVMArray.length_;
+#else
+        JAVA_ARRAY_INT* data2 = (JAVA_ARRAY_INT*)((JAVA_ARRAY)n2)->data;
+        int arrayLen = (int)((JAVA_ARRAY)n2)->length;
+#endif
+        int slotPct = 100, vBiasPct = 50;
+        if (arrayLen >= 4) {
+            if (data2[2] > 0) { slotPct = data2[2]; }
+            if (data2[3] >= 0) { vBiasPct = data2[3]; }
+        }
+        // Flatten the (template) symbol, tinted, into a real RGBA bitmap. SF symbols are
+        // sized by point size (a shared font metric), so each glyph keeps its true
+        // per-symbol extent -- the ellipsis is naturally short (small dots), the star
+        // taller -- exactly as UIKit renders them. To lay them out like a UITabBar (a
+        // uniform icon slot with aligned labels) we composite each glyph at its NATURAL
+        // proportions into a canvas of UNIFORM height = `size` * slotPct%. A glyph TALLER
+        // than the slot is scaled DOWN to fit (keeps the slot uniform so labels align);
+        // shorter glyphs keep their size and are placed by vBiasPct. With a tall-enough
+        // slot the star then reaches its full native height and sits high (vBias < 50),
+        // instead of being shrunk to the nominal size and centred.
+        CGFloat baseH = size / scale;                       // nominal slot height (device `size` px)
+        CGFloat slotH = baseH * (CGFloat)slotPct / 100.0;
+        CGFloat glyphWpt = sym.size.width;
+        CGFloat glyphHpt = sym.size.height;
+        CGFloat k = glyphHpt > slotH ? (slotH / glyphHpt) : 1.0;   // shrink only to fit the slot
+        glyphWpt *= k;
+        glyphHpt *= k;
+        CGFloat canvasHpt = slotH;
+        CGSize szPt = CGSizeMake(glyphWpt, canvasHpt);
+        CGFloat glyphYpt = (canvasHpt - glyphHpt) * (CGFloat)vBiasPct / 100.0;   // 50% = centred
+        UIGraphicsImageRendererFormat* rfmt = [UIGraphicsImageRendererFormat defaultFormat];
+        rfmt.scale = scale;
+        rfmt.opaque = NO;
+        UIGraphicsImageRenderer* rndr = [[UIGraphicsImageRenderer alloc] initWithSize:szPt format:rfmt];
+        UIImage* flat = [rndr imageWithActions:^(UIGraphicsImageRendererContext* _Nonnull rc) {
+            [c set];
+            UIImage* templ = [sym imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+            [templ drawInRect:CGRectMake(0, glyphYpt, glyphWpt, glyphHpt)];
+        }];
+        data2[0] = (int)(flat.size.width * flat.scale);
+        data2[1] = (int)(flat.size.height * flat.scale);
+
+        GLUIImage* glu = [[GLUIImage alloc] initWithImage:flat];
+
+        POOL_END();
+        return (JAVA_LONG) ((BRIDGE_CAST void*)glu);
+    } else {
+        return 0;
+    }
+#endif
 }
 
 JAVA_LONG com_codename1_impl_ios_IOSNative_scale___long_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_LONG n1, JAVA_INT n2, JAVA_INT n3)
@@ -1069,6 +1160,30 @@ void com_codename1_impl_ios_IOSNative_nativeDrawLineGlobal___int_int_int_int_int
     Java_com_codename1_impl_ios_IOSImplementation_nativeDrawLineGlobalImpl(n1, n2, n3, n4, n5, n6);
     POOL_END();
     //XMLVM_END_WRAPPER
+}
+
+extern void Java_com_codename1_impl_ios_IOSImplementation_nativeBlurScreenRegionImpl(int x, int y, int width, int height, float radius);
+void com_codename1_impl_ios_IOSNative_nativeBlurScreenRegion___int_int_int_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_FLOAT n5)
+{
+    POOL_BEGIN();
+    Java_com_codename1_impl_ios_IOSImplementation_nativeBlurScreenRegionImpl(n1, n2, n3, n4, n5);
+    POOL_END();
+}
+
+extern void Java_com_codename1_impl_ios_IOSImplementation_nativeGlassScreenRegionImpl(int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular);
+void com_codename1_impl_ios_IOSNative_nativeGlassScreenRegion___int_int_int_int_float_float_float_float_float_float_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_FLOAT n5, JAVA_FLOAT n6, JAVA_FLOAT n7, JAVA_FLOAT n8, JAVA_FLOAT n9, JAVA_FLOAT n10, JAVA_FLOAT n11)
+{
+    POOL_BEGIN();
+    Java_com_codename1_impl_ios_IOSImplementation_nativeGlassScreenRegionImpl(n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11);
+    POOL_END();
+}
+
+extern void Java_com_codename1_impl_ios_IOSImplementation_nativeLensScreenRegionImpl(int x, int y, int width, int height, float cornerRadius, float magnify, float aberration, int tintColor, float tintStrength);
+void com_codename1_impl_ios_IOSNative_nativeLensScreenRegion___int_int_int_int_float_float_float_int_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_FLOAT n5, JAVA_FLOAT n6, JAVA_FLOAT n7, JAVA_INT n8, JAVA_FLOAT n9)
+{
+    POOL_BEGIN();
+    Java_com_codename1_impl_ios_IOSImplementation_nativeLensScreenRegionImpl(n1, n2, n3, n4, n5, n6, n7, n8, n9);
+    POOL_END();
 }
 
 void com_codename1_impl_ios_IOSNative_nativeFillRectMutable___int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6)
@@ -3175,11 +3290,14 @@ void com_codename1_impl_ios_IOSNative_fillRectRadialGradientGlobal___int_int_int
 
 void com_codename1_impl_ios_IOSNative_fillLinearGradientGlobal___int_int_int_int_int_int_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT n1, JAVA_INT n2, JAVA_INT n3, JAVA_INT n4, JAVA_INT n5, JAVA_INT n6, JAVA_BOOLEAN n7) {
     POOL_BEGIN();
-    int horizontal = 2;
-    if(n7) {
-        horizontal = 3;
-    }
-    DrawGradient* d = [[DrawGradient alloc] initWithArgs:horizontal startColorA:n1 endColorA:n2 xA:n3 yA:n4 widthA:n5 heightA:n6 relativeXA:0 relativeYA:0 relativeSizeA:0];
+    // DrawGradient's protocol (DrawGradient.h): 2 = GRADIENT_TYPE_HORIZONTAL,
+    // 3 = GRADIENT_TYPE_VERTICAL. This mapping had been INVERTED here since the
+    // original 2012 port (horizontal=true sent 3), so every ON-SCREEN linear
+    // gradient painted with its axis swapped; the mutable-image variant
+    // (fillLinearGradientMutable) always had it right. Caught by the fidelity
+    // suite's geometry masks on the gradient-backdrop isolation tile.
+    int gradientType = n7 ? 2 : 3;
+    DrawGradient* d = [[DrawGradient alloc] initWithArgs:gradientType startColorA:n1 endColorA:n2 xA:n3 yA:n4 widthA:n5 heightA:n6 relativeXA:0 relativeYA:0 relativeSizeA:0];
     [CodenameOne_GLViewController upcoming:d];
 #ifndef CN1_USE_ARC
     [d release];
@@ -7437,10 +7555,25 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
 #if TARGET_OS_WATCH
     // Capture the Core Graphics surface. Drain any pending ops first so the
     // snapshot reflects the latest painted frame, then PNG-encode the bitmap.
+    // watchOS render + PNG encode are main-thread-affine in this host (see the
+    // watch drawFrame / main-thread decode changes in
+    // CodenameOne_GLViewController.m), so the capture MUST run on the main
+    // queue. Do NOT wrap it in the old external drain lock: master's watch
+    // drawFrame drains on the main thread itself, so an extra lock around a
+    // main-queue dispatch only starves the render pump and every frame comes
+    // back nil -- 1x1 placeholders for the whole suite.
     __block CN1WatchRenderingView *wv = nil;
     __block UIImage *wimg = nil;
     __block NSData *wpng = nil;
     void (^captureWatchFrame)(void) = ^{
+        // Use master's default drawFrame: (allowInactive:NO). During a headless
+        // CN1SS test the watch app is not UIApplicationStateActive; NO returns
+        // the already-painted frame instead of forcing a blocking draw, which is
+        // what master's green watch suite does. Forcing allowInactive:YES here
+        // blocks waiting for a frame that never schedules -> the capture hangs
+        // and 0 of 216 screenshots stream. (The 1x1 blanks were a separate bug:
+        // forceScreenRenderForCapture emptying the CG frame -- fixed by gating
+        // that method to the Metal backend.)
         [[CodenameOne_GLViewController instance] drawFrame:CGRectZero];
         wv = [CN1WatchHost sharedHost].renderingView;
         wimg = wv != nil ? [wv currentFrame] : nil;
@@ -7449,9 +7582,8 @@ void com_codename1_impl_ios_IOSNative_screenshot__(CN1_THREAD_STATE_MULTI_ARG JA
         [wpng retain];
 #endif
     };
-    // The watch renderer and UIImagePNGRepresentation must run on the main
-    // queue. CN1SS screenshot requests originate from Java callbacks, so they
-    // are not guaranteed to already be on the watch UI thread.
+    // CN1SS screenshot requests originate from Java callbacks and are not
+    // guaranteed to already be on the watch UI thread.
     if ([NSThread isMainThread]) {
         captureWatchFrame();
     } else {

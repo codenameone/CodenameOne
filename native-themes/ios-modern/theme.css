@@ -41,14 +41,63 @@
        override is supplied. */
     --accent-color: #007aff;
     --accent-color-dark: #0a84ff;
-    --accent-pressed-color: #0064d1;
-    --accent-pressed-color-dark: #64b1ff;
+    /* Opt the backdrop-filter glass layers into the reverse-engineered iOS Liquid Glass material (affine luma/sat/scale/offset transform). */
+    glassMaterialBool: true;
+    /* Liquid Glass MATERIALS are typed, named recipes (com.codename1.ui.plaf.
+       GlassRecipe): each bundles the measured saturation/scale/offset colour
+       transform + edge optics of one native material, so similar glass surfaces
+       share one bounded definition instead of loose per-parameter constants.
+       Per-UIID assignment below; everything else defaults to the "panel" recipe
+       (bare UIGlassEffect: heavy wash + edge refraction + specular rim), which
+       is what the glass buttons, dialogs and panels use.
+         chrome -- rectangular edge-anchored bars (nav/title): near pass-through,
+                   no rim/lensing (the bar has no floating edges).
+         pill   -- the floating tab-bar chrome: bright frost that still passes
+                   the backdrop colours, faint rim, no refraction (only the
+                   travelling selection lens refracts; double-refraction read as
+                   a "hole + offset layer").
+         panel  -- the default for free-standing glass surfaces.
+       The selection DROP itself is the lens op (tabSel* below), not a backdrop
+       material. */
+    ToolbarGlassRecipe: "chrome";
+    TitleAreaGlassRecipe: "chrome";
+    TabsContainerGlassRecipe: "pill";
+    /* Rim measured from the native bar: the selected pill leaves only ~2px of
+       bar frost at the edge (pill 276x175 vs bar 179 tall) -- 0.6mm insets shrank
+       the capsule to 236x161 and read as a floating inner pill. */
+    tabSelInsetMm: "0.12";
+    /* iOS 26 selection-DROP lens morph (Tabs.paintSelectionCapsule ->
+       Graphics.lensRegion): the detailed envelopes (stretch/squash/lift/lens
+       magnify/aberration/tint timing) live in NAMED PRESETS inside the motion
+       model (TabSelectionMorph.Tokens.preset), pinned by unit test and the
+       fidelity animation-frame captures. The theme only picks the high-level
+       controls:
+         tabsMorphPreset            "ios26" (default) | "subtle"
+         tabsMorphLensIntensityPct  scales the lens optics around 100
+         tabsMorphSpringPct         scales the settle overshoot around 100
+         tabsAnimatedIndicatorDurationInt   the morph duration (ms), below */
+    tabsMorphPreset: "ios26";
+    /* Pressed = the SUSTAINED held-down look: iOS 26 dims a Liquid Glass button
+       by ~12% while a finger stays on it (modeled in the native reference as a
+       0.12 black overlay). 0.88 x the accent fill matches that dim. (The old
+       dark value brightened the accent -- the wrong direction for a held dim.) */
+    --accent-pressed-color: #006be0;
+    --accent-pressed-color-dark: #0874e0;
     --accent-disabled-color: #b3d4ff;
     --accent-disabled-color-dark: #004a99;
     --accent-on-color: #ffffff;
 
     includeNativeBool: false;
     darkModeBool: true;
+    /* When true, FontImage.createSFOrMaterial renders real Apple SF Symbols on
+       iOS (falling back to the Material icon font elsewhere / when a symbol is
+       missing). Set false to force the Material font everywhere. */
+    iosSFSymbolsBool: true;
+    /* Opt-in: the check-box / radio state glyphs render as real SF Symbols on
+       iOS (checkmark.circle.fill / largecircle.fill.circle / circle). The
+       Material radio glyph's ring/dot ratio (thick ring, small dot) does not
+       match the native thin-ring/large-dot look. */
+    iosSFStateIconsBool: true;
     commandBehavior: Native;
     ios7StatusBarHack: true;
     paintsTitleBarBool: true;
@@ -59,6 +108,18 @@
     tabPlacementInt: 2;
     tabsFillRowsBool: true;
     tabsGridBool: true;
+    /* EQUAL-width tab cells: native iOS spaces tabs evenly, so the longer "Featured"
+       label must not widen its cell and shove the others right. Neither fill (content-
+       sized) nor grid (sizes to widest, overflows) gives pill/N cells, so the Tabs
+       layout equalizes tab widths when this is on. */
+    tabsEqualWidthBool: true;
+    /* Native iOS 26: content scrolls UNDER the translucent floating tab pill so
+       the glass blurs real content. tabsOnTopBool makes the content pane fill the
+       full height (BorderLayout TOTAL_BELOW) with the pill overlaying the bottom,
+       and the framework adds bottom padding to scrollable pages so the last rows
+       clear the bar. Without this the content stops above the bar and the glass
+       has nothing to blur. */
+    tabsOnTopBool: true;
     /* For a floating-pill tab bar, Tabs wraps the pill in a host
        container that absorbs the safe-area inset as bottom padding -
        pushing the pill UP, away from the home indicator, without
@@ -71,9 +132,15 @@
        selection. Off by default in the framework (so existing apps
        don't suddenly animate); on by default in the modern native
        theme. Duration 200ms matches Material 3's reference. */
-    tabsAnimatedIndicatorBool: true;
-    tabsAnimatedIndicatorDurationInt: 200;
+    /* iOS 26 tab bars use a sliding CAPSULE selection indicator, not the Material 3
+       underline -- so the underline is off and the capsule is on. */
+    tabsAnimatedIndicatorBool: false;
+    tabsAnimatedIndicatorDurationInt: 480;
     tabsAnimatedIndicatorThicknessMm: 1;
+    /* iOS 26 sliding selection capsule: a single Liquid Glass blob behind the
+       selected tab that tweens between tabs on selection change. Replaces the
+       per-tab selected fill (which is transparent above). */
+    tabsSelectionCapsuleBool: true;
     /* Modern arc-spinner pull-to-refresh. Replaces the legacy
        rotating-arrow + text stack with a thin circular arc whose sweep
        grows as the user pulls, then spins continuously while the
@@ -89,14 +156,47 @@
        rounded shape. Declaring TabIcon as transparent below means only
        the glyph itself paints. */
     tabIconUIID: TabIcon;
-    switchThumbPaddingInt: 2;
-    switchThumbScaleY: "1.4";
-    switchTrackScaleY: "1.5";
-    switchTrackScaleX: "2.5";
-    switchTrackOffOutlineWidthMM: "0.25";
+    /* Tab icon nominal size (mm), tunable so the SF/Material tab glyphs match the
+       native UITabBar icon size. SF renders at its natural per-symbol bounds for this
+       point size (bigger than the nominal), so this is smaller than the Material value
+       that preceded it. */
+    tabIconSizeMm: "3.75";
+    /* SF symbol tab-icon layout (IOSImplementation.createSFSymbolImage -> nativeCreateSFSymbol):
+       a taller-than-nominal UNIFORM icon slot so a tall glyph (star.fill) renders at its full
+       native height instead of being shrunk to the nominal size, with the glyph biased toward
+       the TOP of the slot (vBias < 50) so it sits high on the SF baseline like native's UITabBar
+       (the star extends above the shorter glyphs). slotPct = slot height as % of tabIconSizeMm;
+       vBias = glyph position in the slot as % (50 = centred). Tuned against the native golden. */
+    iosSFSlotPct: "115";
+    iosSFVBias: "50";
+    switchThumbPaddingInt: 1;
+    /* Native iOS 26 UISwitch proportions, measured from the goldens: the thumb
+       is a WIDE capsule nearly filling the track (74px of the 79px track height,
+       ~5px rim) -- 1.4/0.22 drew an 62px thumb that read as a small floating
+       knob. */
+    switchThumbScaleY: "1.55";
+    switchTrackScaleY: "1.6";
+    /* Native switch track measured 177x78px (ratio 2.27); trackScaleX/trackScaleY
+       must equal that ratio (3.6/1.6 = 2.25). 2.6 made the track too narrow. */
+    switchTrackScaleX: "3.6";
+    /* No shadow ring at all -- the native thumb is a clean white circle (a
+       spread of 1 still drew a visible grey stroke). */
+    switchThumbShadowSpreadInt: 0;
+    /* The modern iOS off-switch is a solid grey fill with no pill outline
+       (older iOS drew a faint rim). Drop the outline so it reads as a clean
+       capsule like the native UISwitch. */
+    switchTrackOffOutlineWidthMM: "0";
     switchTrackOnOutlineWidthMM: "0";
-    switchTrackOffOutlineColor: "cccccc";
-    switchThumbInsetMM: "0.25";
+    switchTrackOffOutlineColor: "e9e9ea";
+    switchThumbInsetMM: "0.1";
+    /* Native thumb is wider than tall (106x74 off / 104x67 on @3x). */
+    switchThumbWidthScale: "1.4";
+    /* iOS 26 Liquid Glass thumb: while it slides the knob stretches along the travel
+       axis and squashes vertically like a droplet (peaks mid-slide, round at the ends)
+       and carries a soft glass sheen. stretch/squash are percentages. */
+    switchLiquidGlassBool: true;
+    switchLiquidStretchPct: 38;
+    switchLiquidSquashPct: 50;
     /* iOS uses a circular mark for checkboxes (Reminders-style) and
        keeps the circular radio button. These integer constants are
        Material icon codepoints that DefaultLookAndFeel reads to
@@ -105,9 +205,42 @@
        RADIO_BUTTON_CHECKED = E837 (59447), RADIO_BUTTON_UNCHECKED
        = E836 (59446). */
     checkBoxCheckedIconInt: 59500;
-    checkBoxUncheckedIconInt: 59693;
+    /* Unchecked = a PLAIN empty circle (RADIO_BUTTON_UNCHECKED E836). The previous
+       CHECK_CIRCLE_OUTLINE drew a check the unchecked state should not have. */
+    checkBoxUncheckedIconInt: 59446;
     radioCheckedIconInt: 59447;
     radioUncheckedIconInt: 59446;
+    /* Explicit glyph size for the SF state icons (iosSFStateIconsBool): SF renders
+       ~11% past its nominal size and the global iosSFSlotPct 115 (a tab-bar tuning)
+       inflates it further, so a 5.05mm request lands the rendered circle at the
+       native 108px @3x. Without these the font-height sizing (6mm -> 115px request)
+       produced a 128px circle. */
+    /* Glyph size: 4.72mm (was 5.9mm). 5.9 rendered the ring at ~108px @3x -- a
+       30pt SF symbol, which reads oversized next to the ~17pt list label. 4.72mm
+       lands ~86px (a ~24pt symbol), the size a checkbox/radio takes in a native
+       list cell. The native-ref glyphs drop to 24pt in lockstep so the isolated
+       fidelity tiles still overlay 1:1. */
+    radioIconSizeMM: "4.83";
+    checkBoxIconSizeMM: "4.83";
+    /* iOS slider: a thin (~3px) track with a large round white knob. The thumb
+       is drawn at the component height, so the runner sizes the slider tile to
+       the knob diameter and the thumb width matches it -> a circle. */
+    sliderTrackThicknessMM: "0.78";
+    /* The iOS 26 knob is a large white HORIZONTAL capsule (~106x78px =>
+       ~5.9x4.3mm, wider than tall) with a soft drop shadow, sitting on one
+       continuous track (no M3 gap / stop dot). sliderThumbHeightMM makes it a
+       horizontal capsule; without it the thumb spans the component height. */
+    sliderThumbWidthMM: "5.0";
+    sliderThumbHeightMM: "3.8";
+    sliderContinuousTrackBool: true;
+    sliderThumbShadowSizeMM: "0.4";
+    /* iOS picker wheel: the 3D perspective fade (rows shrink/dim toward the edges)
+       and ~7 visible rows, matching a native UIPickerView. */
+    ios7SpinnerBool: true;
+    spinnerElementsInt: 7;
+    /* No sliding underline under the selected tab -- the native UITabBar tints the
+       selected item instead. */
+    tabsAnimatedIndicatorThicknessMm: "0";
     /* Dialog sizing/layout constants. dialogPosition is the load-bearing
        one: without it Dialog.show() falls through to Form.showDialog()
        which always positions the dialog with 20%/10%/20% screen-edge
@@ -118,6 +251,9 @@
        boolean constants below tune button-area rendering (compact
        title, grid commands) but don't affect outer sizing. */
     dialogPosition: Center;
+    /* Cap the alert width so a long body wraps into an iOS-style card instead of
+       stretching full-width on wide screens (tablet / landscape / desktop): ~72% is the UIAlertController proportion (density-robust). */
+    dialogMaxWidthPercentInt: 72;
     hideEmptyTitleBool: true;
     shrinkPopupTitleBool: true;
     dialogButtonCommandsBool: true;
@@ -168,39 +304,96 @@ SpanLabelText { cn1-derive: Label; background-color: transparent; }
    degenerate to a circle when width<=height - RoundBorder paints a
    circle in that case, border-radius always keeps the corner radius. */
 Button {
-    color: var(--accent-color, #007aff);
-    padding: 2mm 4mm 2mm 4mm;
-    margin: 1mm;
+    /* iOS 26 .glass() system button: a translucent FROSTED-WHITE capsule (the
+       backdrop reads through, washed toward white) with a near-black label -- NOT a
+       bare blue text label. The pill fill is the defining part of the look; without
+       it the button reads as plain text over the backdrop. */
+    color: #000000;
+    /* Compact glass capsule: very little padding. */
+    padding: 1mm 2.5mm 1mm 2.5mm;
+    /* Breathing room like a native iOS form: buttons aren't flush to the
+       screen edges or stacked edge-to-edge. The fidelity tiles zero this
+       out per-widget (Cn1WidgetRenderer) so the tight native-vs-CN1
+       comparison is unaffected; this margin is purely how apps should
+       look. */
+    margin: 1mm 2mm 1mm 2mm;
     font-family: "native:MainRegular";
-    background-color: transparent;
-    border-radius: 3mm;
+    font-size: 2.7mm;
+    /* Real Liquid Glass is a THIN white tint (~0.1-0.2) over a blurred backdrop,
+       not a milky opaque fill. 0.34 read as a flat pill; 0.20 lets the blur carry
+       the look while the stronger hairline rim (below) keeps the capsule defined
+       over a flat app background. */
+    background-color: rgba(255,255,255,0.20);
+    /* Hairline rim: the native glass capsule always shows a faint darker
+       edge, and over a FLAT white/light app background the thin translucent
+       fill alone is invisible -- the rim carries the shape there. */
+    border: 0.25mm solid rgba(0,0,0,0.16);
+    /* iOS 26 glass buttons are capsules (fully rounded sides). */
+    cn1-background-type: cn1-pill-border;
+    /* Real Liquid Glass: blur the backdrop behind the capsule (no CEF), then the
+       light translucent tint above frosts it. The blur is most visible over busy
+       content; over a smooth backdrop the tint carries the look. */
+    backdrop-filter: blur(20px);
     text-align: center;
 }
-Button.pressed { color: var(--accent-pressed-color, #0064d1); background-color: #e5e5ea; }
-Button.disabled { color: var(--accent-disabled-color, #b3d4ff); }
+/* Pressed (light): the frosted capsule dims slightly. */
+/* Held-down dim: 0.88 x the normal glass render. With the thinner 0.20 fill,
+   alpha_p = 0.12 + 0.88 x 0.20 = 0.30 and fill_p = 0.88 x 0.20 x 255 / 0.30 ~=
+   150. Reads as a clearly pressed grey pill; matches the held native reference. */
+Button.pressed { color: #000000; background-color: rgba(150,150,158,0.30); border: 0.25mm solid rgba(0,0,0,0.16); cn1-background-type: cn1-pill-border; }
+Button.disabled { color: rgba(0,0,0,0.3); background-color: rgba(255,255,255,0.40); border: 0.25mm solid rgba(0,0,0,0.08); cn1-background-type: cn1-pill-border; }
 
 RaisedButton {
     cn1-derive: Button;
-    color: var(--accent-on-color, #ffffff);
+    color: #ffffff;
     background-color: var(--accent-color, #007aff);
-    border-radius: 3mm;
+    cn1-background-type: cn1-pill-border;
     text-align: center;
 }
-RaisedButton.pressed { color: var(--accent-on-color, #ffffff); background-color: var(--accent-pressed-color, #0064d1); }
-RaisedButton.disabled { background-color: var(--accent-disabled-color, #b3d4ff); color: var(--accent-on-color, #ffffff); }
+RaisedButton.pressed { color: #ffffff; background-color: var(--accent-pressed-color, #0064d1); cn1-background-type: cn1-pill-border; }
+/* Disabled prominent-glass button is almost fully transparent (just a hint of the
+   tint), with greyed text. */
+RaisedButton.disabled { background-color: rgba(255,255,255,0.5); color: rgba(60,60,67,0.45); cn1-background-type: cn1-pill-border; }
 
-FlatButton { cn1-derive: Button; }
+/* clearGlass FlatButton: a MORE translucent capsule than the .glass() Button (more
+   backdrop shows through) with a blue label. */
+/* Nearly invisible fill: the native clearGlass capsule is frost you mostly see
+   by its rim; 0.32 white read as a solid pill. Padding trimmed to the native
+   text inset (2.1mm). */
+FlatButton { cn1-derive: Button; color: #000000; background-color: rgba(255,255,255,0.16); border: 0.25mm solid rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); padding: 1mm 2.1mm 1mm 2.1mm; }
+/* Held-down dim (clear-glass): alpha_p = 0.12 + 0.88 x 0.16 = 0.26, fill_p =
+   0.88 x 0.16 x 255 / 0.26 ~= 138. (Was 0.34 white -- a BRIGHTEN, the wrong way
+   for a held press.) */
+FlatButton.pressed { color: #000000; background-color: rgba(138,138,144,0.26); border: 0.25mm solid rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; padding: 1mm 2.1mm 1mm 2.1mm; }
 
 TextField {
     color: #000000;
+    /* Grouped-list cell (secondarySystemGroupedBackground): a WHITE rounded cell
+       that CONTRASTS with the grouped form background (#f2f2f7). The old fill was
+       also #f2f2f7 == the form, so the field was invisible. A hairline edge +
+       backdrop blur give it the iOS 26 glass character while staying legible over
+       the flat form. */
     background-color: #ffffff;
     padding: 2mm 3mm 2mm 3mm;
     margin: 1mm 2mm 1mm 2mm;
     font-family: "native:MainRegular";
-    border-radius: 2mm;
+    /* Very faint rim: the native rounded field has almost no visible stroke -- its
+       definition comes from the white-cell-vs-grey-form contrast, not a border. A
+       heavier rim diverged from the native roundedRect. */
+    border: 0.25mm solid rgba(0,0,0,0.04);
+    border-radius: 1.4mm;
+    backdrop-filter: blur(20px);
 }
-TextField.pressed { background-color: #e5e5ea; }
-TextField.disabled { color: #c7c7cc; background-color: #e5e5ea; }
+TextField.pressed { background-color: #f2f2f7; border: 0.25mm solid rgba(0,0,0,0.05); border-radius: 1.4mm; }
+/* The native disabled field barely changes: same cell, text dims slightly. */
+TextField.disabled { color: rgba(0,0,0,0.4); background-color: #ffffff; border: 0.25mm solid rgba(0,0,0,0.03); border-radius: 1.4mm; }
+
+/* The Picker BUTTON (the control that opens the wheel) had no rule at all, so it
+   rendered as a bare label. Give it the same contrasting-glass cell chrome as a
+   TextField so it reads as a tappable field. */
+Picker { cn1-derive: TextField; color: #000000; text-align: left; }
+Picker.pressed { cn1-derive: TextField; background-color: #f2f2f7; }
+Picker.disabled { cn1-derive: TextField; color: rgba(0,0,0,0.3); }
 
 TextArea {
     color: #000000;
@@ -219,27 +412,45 @@ TextHint {
     font-family: "native:MainRegular";
 }
 
+/* The iOS native reference tints the SF-symbol glyph systemBlue in BOTH the
+   unchecked (circle) and checked (checkmark.circle.fill) states, so the CN1
+   glyph is blue in both. Zero padding so the box sits hard against the tile's
+   top-left like the native glyph. */
 CheckBox {
-    color: #000000;
+    color: #007aff;
     background-color: transparent;
-    padding: 1mm 2mm 1mm 2mm;
-    margin: 0;
+    padding: 0;
+    /* Left margin indents the glyph to the form's content column so the control
+       lines up with the section labels (which start inset), instead of sitting
+       flush against the screen edge. The fidelity renderer zeros this so the
+       isolated-glyph tile still overlays the native glyph 1:1. */
+    margin: 0.5mm 0 0.5mm 2mm;
     font-family: "native:MainRegular";
+    /* LABEL font only - the glyph is sized independently by the
+       checkBoxIconSizeMM constant (5.9mm, calibrated to the native 30pt SF
+       symbol's 107px ring). 2.7mm matches the Button label (~16pt on a
+       460ppi device). This was 6mm for a while to inflate the glyph via its
+       font-height fallback, which made every checkbox LABEL render at
+       ~2x body size in real apps. */
+    font-size: 2.7mm;
     icon-gap: 2mm;
 }
-CheckBox.selected { color: var(--accent-color, #007aff); }
-CheckBox.disabled { color: #c7c7cc; background-color: #e5e5ea; }
+CheckBox.selected { color: #007aff; }
+CheckBox.disabled { color: #c6c6c8; background-color: transparent; padding: 0; margin: 0.5mm 0 0.5mm 2mm; }
 
 RadioButton {
-    color: #000000;
+    color: #007aff;
     background-color: transparent;
-    padding: 1mm 2mm 1mm 2mm;
-    margin: 0;
+    padding: 0;
+    /* Left margin: see CheckBox -- aligns the ring with the label column. */
+    margin: 0.5mm 0 0.5mm 2mm;
     font-family: "native:MainRegular";
+    /* Label font only - the ring is sized by radioIconSizeMM; see CheckBox. */
+    font-size: 2.7mm;
     icon-gap: 2mm;
 }
-RadioButton.selected { color: var(--accent-color, #007aff); }
-RadioButton.disabled { color: #c7c7cc; background-color: #e5e5ea; }
+RadioButton.selected { color: #007aff; }
+RadioButton.disabled { color: #c6c6c8; background-color: transparent; }
 
 /* Switch's track-left needs to land at the same x as the Label
    text-left of the row above so the column reads as aligned.
@@ -247,14 +458,19 @@ RadioButton.disabled { color: #c7c7cc; background-color: #e5e5ea; }
    Switch track starts at margin-left + padding-left so we keep
    margin-left at 2mm and zero out padding. */
 Switch {
+    /* iOS off-state track is a solid light-grey fill with a white thumb and no
+       visible outline (not a white pill). */
     color: #ffffff;
-    background-color: #ffffff;
+    /* Native off-track measured #c5c5c7 (systemGray) -- not the near-white #e9e9ea. */
+    background-color: #c5c5c7;
     padding: 0;
     margin: 1mm 2mm 1mm 2mm;
     text-align: left;
 }
 Switch.selected { color: #ffffff; background-color: #34c759; }
-Switch.disabled { color: #c7c7cc; background-color: #e5e5ea; }
+/* Disabled OFF switch: a faded LIGHT track with a WHITE thumb (the thumb fg is
+   white, not grey -- a grey thumb reads as "too dark"). */
+Switch.disabled { color: #ffffff; background-color: #e2e2e3; }
 
 OnOffSwitch {
     cn1-derive: Label;
@@ -265,11 +481,91 @@ OnOffSwitch {
 }
 OnOffSwitch.selected { background-color: #34c759; color: #ffffff; }
 
-Toolbar {
-    background-color: #ffffff;
-    color: #000000;
-    padding: 1mm;
+/* iOS slider: a thin rounded track (systemFill grey) with the filled portion in
+   the accent (system blue). border-radius without a border is CEF-free. */
+Slider {
+    /* Empty track grey; the thumb takes the foreground colour -> white, like the
+       native UISlider knob. The native-slider painter (gated on
+       sliderTrackThicknessMM) draws a thin track + a round white thumb sized to
+       the component height. */
+    background-color: #e5e5ea;
+    color: #ffffff;
+    border-radius: 1mm;
+    padding: 0;
     margin: 0;
+}
+SliderFull {
+    background-color: var(--accent-color, #007aff);
+    border-radius: 1mm;
+    padding: 0;
+    margin: 0;
+}
+/* Disabled slider is translucent (faded track, fill and thumb). */
+/* paintNativeSlider fills with the style's solid bgColor (alpha/transparency is
+   ignored), so the disabled tones must be SOLID light colours, not rgba() -- an
+   rgba fill rendered as full-saturation blue and read as "not disabled". */
+Slider.disabled { background-color: #e5e5ea; color: #ffffff; }
+SliderFull.disabled { background-color: #a6d0ff; }
+/* iOS linear progress: same thin track, accent fill. */
+ProgressBar {
+    background-color: #e5e5ea;
+    color: var(--accent-color, #007aff);
+    border-radius: 1mm;
+    padding: 0;
+    margin: 0;
+}
+ProgressBarFull {
+    background-color: var(--accent-color, #007aff);
+    border-radius: 1mm;
+}
+
+/* iOS picker wheel (UIPickerView). The rows are black centred labels on a clear
+   wheel; the centre selection band is a translucent rounded grey pill. The 3D
+   perspective fade is driven by ios7SpinnerBool + spinnerElementsInt. */
+Spinner { background-color: transparent; padding: 0; margin: 0; }
+SpinnerWrapper { background-color: transparent; padding: 0; margin: 0; }
+SpinnerRenderer {
+    color: #000000;
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 3.2mm;
+    text-align: center;
+    /* Native UIPickerView rows sit on an ~87px @3x pitch; 1mm insets spread the
+       wheel to ~110px per row. */
+    padding: 0.4mm 2mm 0.4mm 2mm;
+}
+/* The selected (centre) row paints the translucent rounded selection band -- the
+   FRONT_ANGLE cell renders via the normal cell paint, so its selected style is the
+   band, matching the native UIPickerView's centred selection pill. */
+SpinnerRenderer.selected {
+    color: #000000;
+    background-color: rgba(120,120,128,0.10);
+    border-radius: 2.5mm;
+    text-align: center;
+    padding: 0.4mm 2mm 0.4mm 2mm;
+}
+/* The centre (selected) row carries the translucent rounded selection band -- a
+   full-bounds overlay with a round border degenerates into a big circle that hides
+   the rest of the wheel. */
+SpinnerRendererFocus {
+    color: #000000;
+    background-color: rgba(120,120,128,0.16);
+    border-radius: 2mm;
+    text-align: center;
+    padding: 0.4mm 2mm 0.4mm 2mm;
+}
+/* No full-height overlay fill (it would cover the wheel); the focus row is the band. */
+SpinnerOverlay { background-color: transparent; padding: 0; margin: 0; }
+
+Toolbar {
+    background-color: transparent;
+    color: #000000;
+    padding: 0;
+    margin: 0;
+    /* NO bar-wide glass: the iOS 26 nav bar is effectively invisible -- the
+       backdrop reads through unmodified and only the floating circle items and
+       title sit on it. The old bar-wide blur(32px) painted a washed frost BAND
+       across the strip that the native reference simply does not have. */
 }
 /* TitleArea derives from Toolbar so theme overrides on Toolbar cascade
    to TitleArea. UIManager used to install a defensive
@@ -280,16 +576,26 @@ TitleArea { cn1-derive: Toolbar; padding: 1mm 2mm 1mm 2mm; }
 
 Title {
     color: #000000;
-    background-color: #ffffff;
-    padding: 1mm;
+    /* Transparent so the glass nav-bar (and its backdrop) shows through; an
+       opaque title paints a hard white box over the translucent bar. */
+    background-color: transparent;
+    /* Asymmetric vertical padding: the centred title sat 5px below the native
+       bar's title baseline (y48 vs y43 on the fidelity tile). */
+    padding: 0.72mm 1mm 1.28mm 1mm;
+    /* iOS inline navigation-bar title: ~17pt semibold, centred. 4.5mm was the
+       large-title size and read far too big next to the native bar. */
     font-family: "native:MainBold";
-    font-size: 4.5mm;
+    font-size: 2.7mm;
     text-align: center;
 }
 MainTitle { cn1-derive: Title; }
 
-BackCommand { cn1-derive: Button; color: var(--accent-color, #007aff); padding: 1mm 2mm 1mm 2mm; }
-TitleCommand { cn1-derive: Button; color: var(--accent-color, #007aff); padding: 1mm 2mm 1mm 2mm; }
+/* iOS 26 nav-bar items: a circular translucent-white glass button holding a blue
+   glyph (no text). cn1-round-border draws the circle; rgba gives the glass fill. */
+/* Leading/trailing margins reproduce the native bar-item inset from the screen
+   edge (~2.6mm); flush-to-edge circles were the single biggest Toolbar diff. */
+BackCommand { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.72); padding: 1.6mm; margin: 0.5mm 0.5mm 0.5mm 2.6mm; cn1-background-type: cn1-round-border; }
+TitleCommand { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.72); padding: 1.6mm; margin: 0.5mm 2.6mm 0.5mm 0.5mm; cn1-background-type: cn1-round-border; }
 
 /* ---- Desktop chrome (macOS conventions) ----
    Only used when the desktop port enables interactiveScrollBool /
@@ -359,35 +665,114 @@ DesktopHorizontalScrollThumb.pressed {
    not foreground colour. The selected pill uses surface-tertiary
    (#e5e5ea) for visible contrast against the frosted glass group. */
 Tabs { background-color: transparent; padding: 0; margin: 0; }
-/* TabbedPane is the inner content area where the active tab page
-   renders. It sits below the floating pill group (TabsContainer)
-   and stays opaque on the form's surface colour - the pill is the
-   only translucent element. */
-TabbedPane { background-color: #f2f2f7; padding: 0; margin: 0; }
+TabbedPane { background-color: transparent; padding: 0; margin: 0; }
+/* iOS 26 Liquid Glass tab bar: a floating translucent-white glass PILL holding
+   icon-over-label items; the selected item sits on a lighter inner pill and turns
+   blue, the others are dark. cn1-pill-border draws the capsule; rgba is the glass. */
 TabsContainer {
-    background-color: rgba(242,242,247,0.7);
-    color: #000000;
-    padding: 0.5mm;
-    /* Bottom margin only buys visual breathing room above the home
-       indicator; the actual safe-area inset is absorbed by Tabs's host
-       wrapper because tabsSafeAreaBool=false (see #Constants). */
-    margin: 1mm 3mm 1mm 3mm;
+    border: none;  /* see Tab: survive addThemeProps layering */
+    /* Floating WHITE glass capsule (native iOS 26 bar): a translucent white fill over
+       the blurred backdrop so it reads as a distinct white pill even over light-grey
+       content, not a near-invisible frost. The blur still lets colour bleed through. */
+    /* Sampled against the golden over the shared backdrop: the native pill is
+       only ~22% white over a LIGHTLY blurred local backdrop (yellow stays
+       yellow); 0.60/blur40 washed and cross-mixed the colours. */
+    background-color: rgba(255,255,255,0.22);
+    color: #3c3c43;
+    /* Tight local blur: 24px still dragged neighbouring backdrop colour across
+       the pill (blue bleeding into the warm left gap); native frost stays local. */
+    backdrop-filter: blur(14px);
+    /* Horizontal end-padding widens the pill at its rounded ends WITHOUT moving the tab
+       centres (the pill grows symmetrically and the content shifts by the same amount,
+       cancelling) -- this is how native's first/last cells get extra width. Tuned so the
+       pill width matches native (~773px). */
+    padding: 0.5mm 1.3mm 0.5mm 1.3mm;
+    /* Bigger side margins -> a narrower, clearly-centred floating capsule with the tabs
+       grouped centrally (native), instead of a near-full-width bar spread to the edges. */
+    margin: 0 7mm 1mm 7mm;
     cn1-background-type: cn1-pill-border;
 }
 
-Tab {
-    color: #000000;
+/* Transparent wrapper that holds the floating tab pill and absorbs the bottom
+   safe-area inset. (A negative bottom margin was tried to pull the bar toward the
+   home indicator, but CN1's Style.setMargin rejects negatives -- it threw on every
+   Tabs construction and dropped this style. Use 0; the pill keeps its own shape.) */
+TabsContainerHost {
     background-color: transparent;
-    padding: 1mm 2mm 1mm 2mm;
+    padding: 0;
     margin: 0;
+}
+
+Tab {
+    /* Dark glyph: the selection-drop LENS supplies the blue (only inside the drop), so
+       the selected colour lives in the lens, not here -- this fixes both old+new tabs
+       reading blue mid-morph. Dark enough (lum < the lens tint key ~55) that a tab the
+       drop passes over tints too (half-blue during travel). */
+    color: #2c2c2e;
+    /* Explicit no-border: when this theme is LAYERED over another via
+       addThemeProps (the Playground preview, apps switching themes at
+       runtime) a base theme's Tab border would otherwise survive the merge
+       and draw a boxy outline around every tab cell. */
+    border: none;
+    background-color: transparent;
+    /* With equal-width cells (tabsEqualWidthBool) the GridLayout sizes every cell to
+       the widest tab's content + this padding, so the padding sets the cell (and pill)
+       size. Horizontal trimmed to land the cells on native's ~244px spacing; vertical
+       raised so the pill matches native's height (~172px) -- a taller capsule pill also
+       widens (its rounded ends scale with height). */
+    /* Vertical split measured against the native bar: CN1 glyphs sat ~3px high
+       (label centre 123.5 vs native 126.5 @3x), so the top inset absorbs the
+       shift; totals keep the cell (and pill) height at native's ~172px. */
+    padding: 0.86mm 2.9mm 1.24mm 2.9mm;
+    /* Same margin as Tab.selected/pressed so selecting only TOGGLES the capsule
+       background -- it must not change the cell geometry. Small margins so the
+       selected capsule nearly reaches the pill edges (native): minimal top/bottom
+       + thin left/right. */
+    margin: 0.18mm 0.4mm 0.18mm 0.4mm;
     font-family: "native:MainRegular";
+    /* Native tab glyphs measure ~20 rows @3x vs 22 at 1.8mm -- 1.65mm matches. */
+    font-size: 1.65mm;
     text-align: center;
 }
-Tab.selected { color: #000000; background-color: #e5e5ea; cn1-background-type: cn1-pill-border; }
-Tab.pressed { color: #000000; background-color: rgba(229,229,234,0.85); cn1-background-type: cn1-pill-border; }
+/* iOS 26 bottom tab bar: the selected item sits on its OWN brighter frosted
+   sub-capsule (a lighter glass pill INSIDE the outer bar) and turns blue -- a
+   layered "glass on glass" highlight, like the native UITabBar. */
+/* iOS 26: the SELECTION capsule is the Liquid Glass indicator (the bright frosted
+   glass blob), sitting on a more translucent bar -- so the glass material/refraction/
+   specular belongs HERE, not on the outer bar. backdrop-filter makes this the glass
+   hero; the bar (TabsContainer) is dialled down to a plainer translucent surface. */
+/* The selected-tab background is drawn by the single sliding selection capsule
+   (Tabs.paintSelectionCapsule, tabsSelectionCapsuleBool) so it can tween between
+   tabs -- so the per-tab selected fill is transparent. */
+/* The selected tab paints NO background of its own -- the single sliding glass
+   selection capsule (Tabs.paintSelectionCapsule) is the only selection visual.
+   A cn1-pill-border here painted a SECOND, smaller, brighter pill on top of the
+   capsule, leaving the capsule's material as a darker "ring" around it (the gap
+   the native bar does not have). Omit the background-type so it stays transparent. */
+Tab.selected {
+    color: #2c2c2e;                 /* dark; the lens drop colours it blue */
+    border: none;                   /* see Tab: survive addThemeProps layering */
+    background-color: transparent;
+    margin: 0.18mm 0.4mm 0.18mm 0.4mm;
+}
+/* Pressed paints NO background pill either -- the selected tab is drawn pressed
+   (CN1 renders the active RadioButton armed), so a pressed fill here became a
+   second 40%-white pill on top of the glass capsule (the inner-pill "ring"). The
+   capsule is the only selection visual; a press just keeps the capsule. */
+Tab.pressed {
+    color: #2c2c2e;                 /* dark; the lens drop colours it blue */
+    border: none;                   /* see Tab: survive addThemeProps layering */
+    background-color: transparent;
+    margin: 0.18mm 0.4mm 0.18mm 0.4mm;
+}
 
-SelectedTab { cn1-derive: Tab; color: #000000; }
-UnselectedTab { cn1-derive: Tab; color: #000000; }
+SelectedTab {
+    cn1-derive: Tab;
+    color: #2c2c2e;                 /* dark; the lens drop colours it blue */
+    background-color: transparent;
+    margin: 0.18mm 0.4mm 0.18mm 0.4mm;
+}
+UnselectedTab { cn1-derive: Tab; color: #3c3c43; }
 
 /* TabIcon: separate UIID applied via tabIconUIID so the icon's glyph
    image paints with no fill behind it. Without this the FontImage
@@ -402,6 +787,43 @@ TabIcon { background-color: transparent; padding: 0; margin: 0; }
 TabIndicator { color: var(--accent-color, #007aff); background-color: transparent; padding: 0; margin: 0; }
 TabIcon.selected { background-color: transparent; }
 TabIcon.pressed { background-color: transparent; }
+
+/* GlassPanel: a bare Liquid Glass rectangle used only by the fidelity
+   isolation tests (no text/items), so the glass blend can be inspected on its
+   own across several backdrops. Same recipe as the glass widgets -- a
+   translucent white tint + backdrop-filter:blur over a rounded rect -- but
+   plain. This is the CN1 approximation of a UIVisualEffectView; tuned later. */
+GlassPanel {
+    color: #3c3c43;
+    background-color: transparent;
+    border-radius: 2.8mm;
+    backdrop-filter: blur(40px);
+    padding: 0;
+    margin: 1mm;
+}
+
+/* GlassText / GlassIcon ladder rungs: a glass CAPSULE (cn1-pill-border, so the
+   glassRegion shape mask is radius h/2 -- matching the native capsule) filling
+   the tile minus 1mm, holding one centred element. The container colour drives
+   the light/dark glass-material pick (like GlassPanel); the child label/icon
+   carries the visible primary-label colour. */
+GlassText {
+    color: #3c3c43;
+    background-color: transparent;
+    cn1-background-type: cn1-pill-border;
+    backdrop-filter: blur(40px);
+    padding: 0;
+    margin: 1mm;
+}
+GlassTextLabel {
+    color: #000000;
+    background-color: transparent;
+    font-family: "native:MainRegular";
+    font-size: 1.8mm;
+    text-align: center;
+    padding: 0;
+    margin: 0;
+}
 
 SideNavigationPanel { background-color: #ffffff; padding: 0; margin: 0; }
 
@@ -422,8 +844,15 @@ ListRenderer { cn1-derive: Label; padding: 2mm 3mm 2mm 3mm; }
    Margins keep each row floating slightly off the form edge and
    away from the next row, mimicking iOS 26 grouped-list cards. */
 MultiButton {
-    cn1-derive: Button;
-    background-color: rgba(255,255,255,0.85);
+    /* Grouped-list cell: an opaque WHITE rounded cell (secondarySystemGrouped
+       Background) that contrasts with the #f2f2f7 grouped form, with a hairline
+       edge. Deliberately does NOT derive Button: that pulled in cn1-pill-border
+       (a pill/circle background -- the light halo in each cell) AND the glass
+       backdrop blur, neither of which suits an opaque list cell. With no round/
+       pill background type, border-radius alone compiles to a RoundRectBorder --
+       a plain rounded rectangle. */
+    background-color: #ffffff;
+    border: 0.25mm solid rgba(0,0,0,0.08);
     color: #000000;
     padding: 3mm 4mm 3mm 4mm;
     margin: 1mm 3mm 1mm 3mm;
@@ -433,7 +862,7 @@ MultiButton {
     icon-gap: 3mm;
     border-radius: 3mm;
 }
-MultiButton.pressed { background-color: #e5e5ea; }
+MultiButton.pressed { background-color: #e5e5ea; border: 0.25mm solid rgba(0,0,0,0.08); border-radius: 3mm; backdrop-filter: blur(0); cn1-background-type: cn1-round-border; }
 
 MultiLine1 {
     cn1-derive: Label;
@@ -478,28 +907,39 @@ MultiLine4 {
    `Dialog.show("title", "body", "OK", null)` it grows to ~full
    screen with empty space around the body). */
 Dialog {
-    background-color: rgba(255,255,255,0.78);
+    /* iOS alert surface: an opaque light-grey card (secondary system background)
+       so the card reads clearly, with a rounded corner. */
+    background-color: #f2f2f7;
     color: #000000;
-    padding: 3mm;
+    padding: 0;
     margin: 0;
     border-radius: 4mm;
 }
 DialogBody {
+    /* Supporting text: centred, secondary-label grey, ~13pt. */
     background-color: transparent;
-    color: #000000;
-    padding: 2mm;
+    color: #8e8e93;
+    padding: 1mm;
     margin: 0;
+    font-size: 2.2mm;
+    text-align: center;
 }
 DialogTitle {
     color: #000000;
     background-color: transparent;
-    padding: 2mm;
+    padding: 1mm;
     font-family: "native:MainBold";
-    font-size: 4mm;
+    font-size: 2.9mm;
     text-align: center;
 }
 DialogContentPane { background-color: transparent; padding: 2mm; margin: 0; }
-DialogCommandArea { background-color: transparent; padding: 1mm; }
+/* Action row: a hairline separator above the buttons, like the native alert. */
+DialogCommandArea { background-color: transparent; padding: 0; border-top: 0.2mm solid #c6c6c8; }
+/* Alert actions are blue, ~17pt, centred and split the row. */
+/* Defined standalone (NOT cn1-derive: Button) so the Button pill background /
+   cn1-pill-border can never leak in and turn the flush alert actions into pills. */
+DialogButton { cn1-background-type: cn1-none; color: var(--accent-color, #007aff); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.9mm; padding: 2mm; margin: 0; border-radius: 0; text-align: center; }
+DialogButton.pressed { background-color: #e1e1e6; color: var(--accent-color, #007aff); }
 
 FloatingActionButton {
     color: var(--accent-on-color, #ffffff);
@@ -584,42 +1024,86 @@ PopupContent {
     SpanLabel { color: #ffffff; background-color: transparent; }
     SpanLabelText { color: #ffffff; background-color: transparent; }
 
-    Button { color: var(--accent-color-dark, #0a84ff); }
-    Button.pressed { color: var(--accent-pressed-color-dark, #64b1ff); background-color: #3a3a3c; }
-    Button.disabled { color: var(--accent-disabled-color-dark, #004a99); }
+    /* Dark glass button: a translucent blue capsule with white text. */
+    /* Dark .glass() button: a DARK translucent capsule (darkens the backdrop) with a
+       white label -- not a blue fill. */
+    /* Hairline light rim (see the light-mode Button comment): the native dark
+       glass capsule keeps a faint brighter edge, and over a FLAT black app
+       background the dark translucent fill alone disappears completely. */
+    Button { color: #ffffff; background-color: rgba(20,20,24,0.24); border: 0.25mm solid rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); }
+    /* Held-down dim (dark glass): 0.88 x the normal render. alpha_p = 0.12 +
+       0.88 x 0.36 = 0.44, fill_p = 0.88 x 0.36 x 20 / 0.44 ~= 14. (Was 40,40,44
+       0.6 -- a BRIGHTEN, the wrong direction for a held dim.) */
+    Button.pressed { color: #ffffff; background-color: rgba(13,13,16,0.33); border: 0.25mm solid rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; }
+    Button.disabled { color: rgba(255,255,255,0.4); background-color: rgba(20,20,24,0.58); border: 0.25mm solid rgba(255,255,255,0.10); cn1-background-type: cn1-pill-border; }
+    /* Dark FlatButton matches light: iOS 26's flat glass button is a light cream
+       pill with DARK text in BOTH appearances (native ref). White text flipped it
+       to the dark "charcoal" material; dark text uses the light pass-through frost. */
+    FlatButton { color: #000000; background-color: rgba(255,255,255,0.16); border: 0.25mm solid rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); padding: 1mm 2.1mm 1mm 2.1mm; }
+    FlatButton.pressed { color: #000000; background-color: rgba(138,138,144,0.26); border: 0.25mm solid rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; padding: 1mm 2.1mm 1mm 2.1mm; }
 
-    RaisedButton { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color-dark, #0a84ff); }
-    RaisedButton.pressed { background-color: var(--accent-pressed-color-dark, #64b1ff); }
-    RaisedButton.disabled { background-color: var(--accent-disabled-color-dark, #004a99); }
+    RaisedButton { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
+    RaisedButton.pressed { color: #ffffff; background-color: var(--accent-pressed-color-dark, #64b1ff); cn1-background-type: cn1-pill-border; }
+    RaisedButton.disabled { color: rgba(235,235,245,0.45); background-color: rgba(0,0,0,0.32); cn1-background-type: cn1-pill-border; }
 
-    TextField { color: #ffffff; background-color: #1c1c1e; }
-    TextField.pressed { background-color: #2c2c2e; }
-    TextField.disabled { color: #48484a; background-color: #2c2c2e; }
-    TextArea { color: #ffffff; background-color: #1c1c1e; }
-    TextArea.pressed { background-color: #2c2c2e; }
+    /* Dark grouped cell: #2c2c2e contrasts with the #1c1c1e form (was #1c1c1e ==
+       form -> invisible field). Hairline + blur for the glass character. */
+    TextField { color: #ffffff; background-color: #2c2c2e; border: 0.25mm solid rgba(255,255,255,0.12); border-radius: 1.4mm; backdrop-filter: blur(20px); }
+    TextField.pressed { color: #ffffff; background-color: #3a3a3c; border: 0.25mm solid rgba(255,255,255,0.14); border-radius: 1.4mm; }
+    TextField.disabled { color: rgba(235,235,245,0.4); background-color: #2c2c2e; border: 0.25mm solid rgba(255,255,255,0.08); border-radius: 1.4mm; }
+    /* Explicit dark cell -- do NOT derive TextField here: cn1-derive copies the
+       BASE (light) TextField's white fill, so a derived dark Picker rendered
+       white-on-white. Mirror the dark TextField values directly. */
+    Picker { background-color: #2c2c2e; color: #ffffff; border: 0.25mm solid rgba(255,255,255,0.12); border-radius: 1.4mm; text-align: left; padding: 2mm 3mm 2mm 3mm; font-family: "native:MainRegular"; }
+    Picker.pressed { background-color: #3a3a3c; color: #ffffff; border: 0.25mm solid rgba(255,255,255,0.14); border-radius: 1.4mm; }
+    Picker.disabled { background-color: #2c2c2e; color: rgba(235,235,245,0.3); border: 0.25mm solid rgba(255,255,255,0.08); border-radius: 1.4mm; }
+    TextArea { color: #ffffff; background-color: #2c2c2e; border: 0.25mm solid rgba(255,255,255,0.12); border-radius: 1.4mm; }
+    TextArea.pressed { background-color: #3a3a3c; }
     TextArea.disabled { color: #48484a; background-color: #2c2c2e; }
     TextHint { color: #8e8e93; }
 
-    CheckBox { color: #ffffff; background-color: transparent; }
-    CheckBox.selected { color: var(--accent-color-dark, #0a84ff); }
-    CheckBox.disabled { color: #48484a; background-color: #2c2c2e; }
-    RadioButton { color: #ffffff; background-color: transparent; }
-    RadioButton.selected { color: var(--accent-color-dark, #0a84ff); }
-    RadioButton.disabled { color: #48484a; background-color: #2c2c2e; }
+    CheckBox { color: #0a84ff; background-color: transparent; }
+    CheckBox.selected { color: #0a84ff; }
+    CheckBox.disabled { color: #48484a; background-color: transparent; padding: 0; margin: 0.5mm 0 0.5mm 2mm; }
+    RadioButton { color: #0a84ff; background-color: transparent; }
+    RadioButton.selected { color: #0a84ff; }
+    RadioButton.disabled { color: #48484a; background-color: transparent; }
 
-    Switch { color: #ffffff; background-color: #2c2c2e; }
+    /* Off track sampled from the native dark switch: #464649 (2c2c2e was the
+       surface colour and read too dark). */
+    Switch { color: #ffffff; background-color: #464649; }
     Switch.selected { color: #ffffff; background-color: #30d158; }
-    Switch.disabled { color: #48484a; background-color: #2c2c2e; }
+    /* Sampled from the native disabled UISwitch (dark): the thumb dims to a mid
+       grey (#808080) and the track sits near surface-dark -- ebebf5/3a3a3c read
+       as an ENABLED off switch. */
+    Switch.disabled { color: #808080; background-color: #232325; }
+    /* Dark slider: inactive track is a dark grey (not the light #e5e5ea), active
+       track blue, thumb white. */
+    Slider { background-color: #3a3a3c; color: #ffffff; }
+    SliderFull { background-color: var(--accent-color-dark, #0a84ff); }
+    /* Solid muted tones for the disabled dark slider (alpha is ignored by the painter).
+       The disabled thumb (color/fg) is grey, not white, to match the native knob. */
+    Slider.disabled { background-color: #2c2c2e; color: #8e8e93; }
+    SliderFull.disabled { background-color: #2a4a73; }
+    /* Dark progress bar: the empty track must be a DARK grey, not the light #e5e5ea
+       carried over from the base rule (which read as a white bar on the dark tile). */
+    ProgressBar { background-color: #3a3a3c; color: var(--accent-color-dark, #0a84ff); }
+    ProgressBarFull { background-color: var(--accent-color-dark, #0a84ff); }
+    /* Dark picker wheel: white labels, lighter translucent selection band. */
+    SpinnerRenderer { color: #ffffff; background-color: transparent; }
+    SpinnerRenderer.selected { color: #ffffff; background-color: rgba(120,120,128,0.18); border-radius: 2.5mm; }
+    SpinnerRendererFocus { color: #ffffff; background-color: rgba(120,120,128,0.26); border-radius: 2mm; }
+    SpinnerOverlay { background-color: transparent; }
 
     OnOffSwitch { color: var(--accent-color-dark, #0a84ff); background-color: #2c2c2e; }
     OnOffSwitch.selected { background-color: #30d158; color: #ffffff; }
 
-    Toolbar { background-color: #000000; color: #ffffff; }
-    TitleArea { background-color: #000000; color: #ffffff; }
-    Title { color: #ffffff; background-color: #000000; }
-    MainTitle { color: #ffffff; background-color: #000000; }
-    BackCommand { color: var(--accent-color-dark, #0a84ff); }
-    TitleCommand { color: var(--accent-color-dark, #0a84ff); }
+    Toolbar { background-color: transparent; color: #ffffff; }
+    TitleArea { background-color: transparent; color: #ffffff; }
+    Title { color: #ffffff; background-color: transparent; }
+    MainTitle { color: #ffffff; background-color: transparent; }
+    BackCommand { color: #ffffff; background-color: rgba(24,24,26,0.80); padding: 1.6mm; margin: 0.5mm 0.5mm 0.5mm 2.6mm; cn1-background-type: cn1-round-border; }
+    TitleCommand { color: #ffffff; background-color: rgba(24,24,26,0.80); padding: 1.6mm; margin: 0.5mm 2.6mm 0.5mm 0.5mm; cn1-background-type: cn1-round-border; }
 
     /* Desktop scrollbar (macOS) dark overrides. cn1-background-type must be
        re-declared so the round primitive carries into dark mode. */
@@ -633,24 +1117,36 @@ PopupContent {
     DesktopHorizontalScrollThumb.pressed { background-color: #aeaeb2; cn1-background-type: cn1-round-border; }
 
     Tabs { background-color: transparent; }
-    TabbedPane { background-color: #1c1c1e; }
-    TabsContainer { background-color: rgba(44,44,46,0.7); color: #ffffff; }
-    Tab { color: #ffffff; background-color: transparent; }
-    /* Re-declare cn1-background-type on the dark overrides - the
-       compiler doesn't carry it forward from the light Tab.selected
-       style, so without this the selected pill renders as a flat
-       rectangular block instead of a rounded pill in dark mode. */
-    Tab.selected { color: #ffffff; background-color: #3a3a3c; cn1-background-type: cn1-pill-border; }
-    Tab.pressed { color: #ffffff; background-color: rgba(58,58,60,0.9); cn1-background-type: cn1-pill-border; }
-    SelectedTab { color: #ffffff; }
-    UnselectedTab { color: #ffffff; }
+    TabbedPane { background-color: transparent; }
+    /* Dark glass tab pill: translucent so the backdrop reads through like the
+       native Liquid Glass bar (0.55 was too opaque -> flat grey vs native's tint;
+       fully transparent left NO visible pill on plain-blur ports and even on
+       Metal read lighter than the native bar's slight dark wash). */
+    TabsContainer { background-color: rgba(22,22,26,0.18); color: #ebebf5; cn1-background-type: cn1-pill-border; backdrop-filter: blur(40px); border: none; }
+    Tab { color: #ebebf5; background-color: transparent; }
+    /* Dark bottom tab bar: the selected item sits on a lighter frosted sub-capsule
+       over the dark pill (layered glass), matching the native UITabBar. */
+    /* No per-tab background -- the sliding glass capsule is the only selection visual
+       (a cn1-pill-border here double-painted a brighter inner pill / dark ring). */
+    Tab.selected { color: var(--accent-color-dark, #0a84ff); background-color: transparent; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
+    Tab.pressed { color: var(--accent-color-dark, #0a84ff); background-color: transparent; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
+    SelectedTab { color: var(--accent-color-dark, #0a84ff); background-color: transparent; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
+    UnselectedTab { color: #ebebf5; }
 
     /* Dark overrides for the icon-only UIID. Background stays transparent
        so the pill shows through; only the glyph (fgColor) is forced
        white. */
     TabIcon { color: #ffffff; background-color: transparent; }
-    TabIcon.selected { color: #ffffff; background-color: transparent; }
-    TabIcon.pressed { color: #ffffff; background-color: transparent; }
+    /* With the dark lens tint disabled (it flooded the dark bar solid blue)
+       the selected glyph carries the accent itself, like the native dark bar. */
+    TabIcon.selected { color: #0a84ff; background-color: transparent; }
+    TabIcon.pressed { color: #0a84ff; background-color: transparent; }
+
+    /* Dark glass panel: a translucent dark tint so the backdrop reads through as
+       Liquid Glass (matches the dark UIVisualEffectView in the isolation tests). */
+    GlassPanel { color: #ebebf5; background-color: transparent; border-radius: 2.8mm; backdrop-filter: blur(40px); padding: 0; margin: 1mm; }
+    GlassText { color: #ebebf5; background-color: transparent; cn1-background-type: cn1-pill-border; backdrop-filter: blur(40px); padding: 0; margin: 1mm; }
+    GlassTextLabel { color: #ffffff; background-color: transparent; font-family: "native:MainRegular"; font-size: 1.8mm; text-align: center; padding: 0; margin: 0; }
 
     /* Animated indicator inherits the dark-mode accent. */
     TabIndicator { color: var(--accent-color-dark, #0a84ff); background-color: transparent; }
@@ -661,8 +1157,18 @@ PopupContent {
 
     List { background-color: #000000; }
     ListRenderer { color: #ffffff; background-color: transparent; }
-    MultiButton { background-color: #000000; color: #ffffff; }
-    MultiButton.pressed { background-color: #3a3a3c; }
+    /* Dark grouped-list cell: ONE STEP LIGHTER than the #1c1c1e form (tertiary
+       SystemGroupedBackground) so the white/light row text reads. Pure #000000
+       (the old value) is darker than the form and, with the light MultiButton
+       fill leaking through, the row rendered as a light pill. */
+    /* Dark grouped cell: #2c2c2e over the #1c1c1e form. Inherits the base's
+       RoundRectBorder (no derive, no pill/glass), so a plain rounded rect. */
+    /* Redeclaring `border:` REPLACES the whole border for the dark appearance,
+       so the shape must be repeated too -- without border-radius the compiler
+       emits a plain rectangular border and the dark cell renders square while
+       light stays rounded (pinned by NativeThemeLightDarkConsistencyTest). */
+    MultiButton { background-color: #2c2c2e; border: 0.25mm solid rgba(255,255,255,0.08); border-radius: 3mm; color: #ffffff; }
+    MultiButton.pressed { background-color: #3a3a3c; border: 0.25mm solid rgba(255,255,255,0.08); border-radius: 3mm; cn1-background-type: cn1-round-border; }
     MultiLine1 { color: #ffffff; }
     MultiLine2 { color: #ebebf5; }
     MultiLine3 { color: #8e8e93; }
@@ -673,11 +1179,13 @@ PopupContent {
        stripes bleed through and obscure the text. DialogBody /
        Title / ContentPane / CommandArea stay transparent so the
        Dialog surface is the single colour they all share. */
-    Dialog { background-color: rgba(44,44,46,0.95); color: #ffffff; }
-    DialogBody { background-color: transparent; color: #ffffff; }
+    Dialog { background-color: #1c1c1e; color: #ffffff; }
+    DialogBody { background-color: transparent; color: #8e8e93; }
     DialogTitle { color: #ffffff; background-color: transparent; }
     DialogContentPane { background-color: transparent; }
-    DialogCommandArea { background-color: transparent; }
+    DialogCommandArea { background-color: transparent; border-top: 0.2mm solid #38383a; }
+    DialogButton { cn1-background-type: cn1-none; color: var(--accent-color-dark, #0a84ff); background-color: transparent; }
+    DialogButton.pressed { background-color: #2c2c2e; color: var(--accent-color-dark, #0a84ff); }
     PopupContent { background-color: rgba(44,44,46,0.95); color: #ffffff; }
 
     FloatingActionButton { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color-dark, #0a84ff); }
@@ -692,6 +1200,12 @@ PopupContent {
     ChatTypingIndicator { color: #8e8e93; }
     ChatInput { background-color: #1c1c1e; }
     ChatInputField { background-color: #2c2c2e; color: #ffffff; border-radius: 3mm; }
+    /* Attach (+) and voice (Mic) derive the LIGHT Button glass and had no dark
+       override, so in dark mode they rendered a pale grey glass halo around the
+       glyph. Give them the dark Button glass so they read as dark circular
+       affordances instead of a light patch on the dark bar. */
+    ChatAttachButton { background-color: rgba(20,20,24,0.24); border: 0.25mm solid rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; color: #ffffff; padding: 1.5mm; margin: 0.5mm; }
+    ChatVoiceButton { background-color: rgba(20,20,24,0.24); border: 0.25mm solid rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; color: #ffffff; padding: 1.5mm; margin: 0.5mm; }
 
     Separator { background-color: #38383a; }
 }

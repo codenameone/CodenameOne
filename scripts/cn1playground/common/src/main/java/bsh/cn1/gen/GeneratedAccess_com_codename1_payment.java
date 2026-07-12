@@ -32,6 +32,9 @@ public final class GeneratedAccess_com_codename1_payment {
         if ("ApplePromotionalOffer".equals(simpleName)) {
             return com.codename1.payment.ApplePromotionalOffer.class;
         }
+        if ("CommerceManager".equals(simpleName)) {
+            return com.codename1.payment.CommerceManager.class;
+        }
         if ("PendingPurchaseCallback".equals(simpleName)) {
             return com.codename1.payment.PendingPurchaseCallback.class;
         }
@@ -103,12 +106,22 @@ public final class GeneratedAccess_com_codename1_payment {
 
     public static Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
-        if (type == com.codename1.payment.Purchase.class) return invokeStatic0(name, safeArgs);
-        if (type == com.codename1.payment.WalletExtension.class) return invokeStatic1(name, safeArgs);
+        if (type == com.codename1.payment.CommerceManager.class) return invokeStatic0(name, safeArgs);
+        if (type == com.codename1.payment.Purchase.class) return invokeStatic1(name, safeArgs);
+        if (type == com.codename1.payment.WalletExtension.class) return invokeStatic2(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
+        if ("getInstance".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.payment.CommerceManager.getInstance();
+            }
+        }
+        throw unsupportedStatic(com.codename1.payment.CommerceManager.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
         if ("getInAppPurchase".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.payment.Purchase.getInAppPurchase();
@@ -127,7 +140,7 @@ public final class GeneratedAccess_com_codename1_payment {
         throw unsupportedStatic(com.codename1.payment.Purchase.class, name, safeArgs);
     }
 
-    private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
         if ("clear".equals(name)) {
             if (safeArgs.length == 0) {
                 com.codename1.payment.WalletExtension.clear(); return null;
@@ -175,58 +188,65 @@ public final class GeneratedAccess_com_codename1_payment {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.payment.CommerceManager) {
+            try {
+                return invoke1((com.codename1.payment.CommerceManager) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.payment.Product) {
             try {
-                return invoke1((com.codename1.payment.Product) target, name, safeArgs);
+                return invoke2((com.codename1.payment.Product) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.payment.Purchase) {
             try {
-                return invoke2((com.codename1.payment.Purchase) target, name, safeArgs);
+                return invoke3((com.codename1.payment.Purchase) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.payment.Receipt) {
             try {
-                return invoke3((com.codename1.payment.Receipt) target, name, safeArgs);
+                return invoke4((com.codename1.payment.Receipt) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.payment.WalletPassEntry) {
             try {
-                return invoke4((com.codename1.payment.WalletPassEntry) target, name, safeArgs);
+                return invoke5((com.codename1.payment.WalletPassEntry) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.payment.PendingPurchaseCallback) {
             try {
-                return invoke5((com.codename1.payment.PendingPurchaseCallback) target, name, safeArgs);
+                return invoke6((com.codename1.payment.PendingPurchaseCallback) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.payment.PurchaseCallback) {
             try {
-                return invoke6((com.codename1.payment.PurchaseCallback) target, name, safeArgs);
+                return invoke7((com.codename1.payment.PurchaseCallback) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.payment.ReceiptStore) {
             try {
-                return invoke7((com.codename1.payment.ReceiptStore) target, name, safeArgs);
+                return invoke8((com.codename1.payment.ReceiptStore) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.payment.RestoreCallback) {
             try {
-                return invoke8((com.codename1.payment.RestoreCallback) target, name, safeArgs);
+                return invoke9((com.codename1.payment.RestoreCallback) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -296,7 +316,66 @@ public final class GeneratedAccess_com_codename1_payment {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke1(com.codename1.payment.Product typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke1(com.codename1.payment.CommerceManager typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getActiveEntitlements".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getActiveEntitlements();
+            }
+        }
+        if ("getAppUserId".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAppUserId();
+            }
+        }
+        if ("isCloudEnabled".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isCloudEnabled();
+            }
+        }
+        if ("isDegraded".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isDegraded();
+            }
+        }
+        if ("isEntitled".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.isEntitled((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("purchase".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.purchase((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("refresh".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.refresh(); return null;
+            }
+        }
+        if ("setAppUserId".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.setAppUserId((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("subscribe".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.subscribe((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("unsubscribe".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.unsubscribe((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke2(com.codename1.payment.Product typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getDescription".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getDescription();
@@ -344,7 +423,7 @@ public final class GeneratedAccess_com_codename1_payment {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke2(com.codename1.payment.Purchase typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke3(com.codename1.payment.Purchase typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getExpiryDate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, true)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, true);
@@ -528,7 +607,7 @@ public final class GeneratedAccess_com_codename1_payment {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke3(com.codename1.payment.Receipt typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke4(com.codename1.payment.Receipt typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getCancellationDate".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getCancellationDate();
@@ -646,7 +725,7 @@ public final class GeneratedAccess_com_codename1_payment {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke4(com.codename1.payment.WalletPassEntry typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke5(com.codename1.payment.WalletPassEntry typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("artPng".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
@@ -727,7 +806,7 @@ public final class GeneratedAccess_com_codename1_payment {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke5(com.codename1.payment.PendingPurchaseCallback typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke6(com.codename1.payment.PendingPurchaseCallback typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("itemPurchaseError".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
@@ -779,7 +858,7 @@ public final class GeneratedAccess_com_codename1_payment {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke6(com.codename1.payment.PurchaseCallback typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke7(com.codename1.payment.PurchaseCallback typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("itemPurchaseError".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
@@ -825,7 +904,7 @@ public final class GeneratedAccess_com_codename1_payment {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke7(com.codename1.payment.ReceiptStore typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke8(com.codename1.payment.ReceiptStore typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("fetchReceipts".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.SuccessCallback.class}, false);
@@ -841,7 +920,7 @@ public final class GeneratedAccess_com_codename1_payment {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke8(com.codename1.payment.RestoreCallback typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke9(com.codename1.payment.RestoreCallback typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("itemRestored".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -938,6 +1017,9 @@ public final class GeneratedAccess_com_codename1_payment {
         if (type == com.codename1.ui.events.SelectionListener.class) {
             return true;
         }
+        if (type == com.codename1.printing.PrintResultListener.class) {
+            return true;
+        }
         return false;
     }
 
@@ -1013,6 +1095,17 @@ public final class GeneratedAccess_com_codename1_payment {
                 public void selectionChanged(int arg0, int arg1) {
                     try {
                         lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.printing.PrintResultListener.class) {
+            return new com.codename1.printing.PrintResultListener() {
+                public void onResult(com.codename1.printing.PrintResult arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
                     } catch (bsh.EvalError ex) {
                         throw new RuntimeException(ex);
                     }

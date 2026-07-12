@@ -77,6 +77,19 @@ public final class IOSNative {
 
     native void nativeDrawLineMutable(int color, int alpha, int x1, int y1, int x2, int y2);
     native void nativeDrawLineGlobal(int color, int alpha, int x1, int y1, int x2, int y2);
+    // Queues a live-screen backdrop-filter:blur op (real glass). Enqueued in paint
+    // order; the drain blurs the already-drawn screenTexture region and draws it back.
+    native void nativeBlurScreenRegion(int x, int y, int width, int height, float radius);
+    // Queues a live-screen "Liquid Glass" MATERIAL op (the full backdrop-filter
+    // recipe -- material + blur + rounded-rect mask + refraction + specular),
+    // matching the offscreen IOSImplementation.glassRegion. Enqueued in paint order.
+    native void nativeGlassScreenRegion(int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular);
+    // Queues a live-screen iOS 26 selection-drop LENS op (magnify + chromatic
+    // aberration + dark->accent tint over the painted content). See lensScreenRegionX.
+    native void nativeLensScreenRegion(int x, int y, int width, int height, float cornerRadius, float magnify, float aberration, int tintColor, float tintStrength);
+    // Renders an Apple SF Symbol to a GLUIImage peer (iOS 13+). Returns 0 when the
+    // symbol is unavailable; writes the pixel width/height into widthHeight[0]/[1].
+    native long nativeCreateSFSymbol(String name, int color, float size, int weight, int[] widthHeight);
     native void nativeFillRectMutable(int color, int alpha, int x, int y, int width, int height);
     native void nativeFillRectGlobal(int color, int alpha, int x, int y, int width, int height);
     native void nativeDrawRectMutable(int color, int alpha, int x, int y, int width, int height);

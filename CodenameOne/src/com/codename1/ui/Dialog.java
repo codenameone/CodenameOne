@@ -855,8 +855,19 @@ public class Dialog extends Form implements AbstractDialog {
         dialogContentPane.setUIID("DialogContentPane");
         dialogTitle = new Label("", dialogTitleUIID);
         super.getContentPane().setLayout(new BorderLayout());
-        super.getContentPane().addComponent(BorderLayout.NORTH, dialogTitle);
-        super.getContentPane().addComponent(BorderLayout.CENTER, dialogContentPane);
+        // Liquid-glass / iOS alert layout: the title sits as the prominent centred
+        // text and the body (content pane) drops BELOW it, rather than the title being
+        // a top bar with the body filling the centre. Opt in via dialogTitleCenterBool
+        // so existing dialogs are unaffected. The title Label is centred; an app that
+        // needs a wrapping multi-line title can supply one via setTitleComponent.
+        if (UIManager.getInstance().isThemeConstant("dialogTitleCenterBool", false)) {
+            dialogTitle.getAllStyles().setAlignment(Component.CENTER);
+            super.getContentPane().addComponent(BorderLayout.CENTER, dialogTitle);
+            super.getContentPane().addComponent(BorderLayout.SOUTH, dialogContentPane);
+        } else {
+            super.getContentPane().addComponent(BorderLayout.NORTH, dialogTitle);
+            super.getContentPane().addComponent(BorderLayout.CENTER, dialogContentPane);
+        }
         super.getContentPane().setScrollable(false);
         super.getContentPane().setAlwaysTensile(false);
 
@@ -1792,9 +1803,44 @@ public class Dialog extends Form implements AbstractDialog {
 
         revalidate();
 
-        int prefHeight = contentPane.getPreferredH();
         int prefWidth = contentPane.getPreferredW();
         prefWidth = Math.min(prefWidth, width);
+        // Cap the packed dialog width so a long body wraps into a centered card
+        // instead of stretching to a full-width strip on wide screens (tablet /
+        // desktop / landscape). Two optional, theme-driven caps, both density-robust:
+        //  - dialogMaxWidthPercentInt: a percentage of the screen width (the primary
+        //    guard; behaves the same on any device, so an iOS-style ~72% alert reads
+        //    correctly on a phone AND stays a card on a wide desktop).
+        //  - dialogMaxWidthMMInt: an absolute millimetre cap that tightens it further
+        //    on very wide low-density screens (NOTE: CN1's convertToPixels treats its
+        //    unit as millimetres, so this is physical, not iOS-point, width).
+        // Unset (0) keeps the legacy full-width behaviour.
+        int origPrefWidth = prefWidth;
+        int maxPct = getUIManager().getThemeConstant("dialogMaxWidthPercentInt", 0);
+        if (maxPct > 0 && maxPct < 100) {
+            prefWidth = Math.min(prefWidth, width * maxPct / 100);
+        }
+        int maxWidthMM = getUIManager().getThemeConstant("dialogMaxWidthMMInt", 0);
+        if (maxWidthMM > 0) {
+            int maxWidthPx = Display.getInstance().convertToPixels(maxWidthMM, true);
+            if (maxWidthPx > 0) {
+                prefWidth = Math.min(prefWidth, maxWidthPx);
+            }
+        }
+        if (prefWidth < origPrefWidth) {
+            // Re-measure at the capped width so the wrapped body reports its true
+            // (taller) height. Merely invalidating preferred sizes is NOT enough:
+            // a TextArea derives its preferred height from rows wrapped at its
+            // CURRENT width, and the children still hold their stale (uncapped)
+            // widths -- reporting the unwrapped, shorter height and clipping the
+            // body behind the commands wherever the cap binds. Lay the content
+            // out at the capped width first so nested text actually wraps.
+            contentPane.setWidth(prefWidth);
+            contentPane.setHeight(height);
+            ((Container) contentPane).layoutContainer();
+            contentPane.setShouldCalcPreferredSize(true);
+        }
+        int prefHeight = contentPane.getPreferredH();
         if (contentPaneStyle.getBorder() != null) {
             prefWidth = Math.max(contentPaneStyle.getBorder().getMinimumWidth(), prefWidth);
             prefHeight = Math.max(contentPaneStyle.getBorder().getMinimumHeight(), prefHeight);

@@ -6621,6 +6621,13 @@ public final class Display extends CN1Constants {
         return impl.gaussianBlurImage(image, radius);
     }
 
+    /// Renders an Apple SF Symbol to an image on iOS (null elsewhere / if the symbol
+    /// is unavailable). name = SF Symbol name (e.g. "star.fill"); color = 0xRRGGBB;
+    /// sizePixels = target point size in PIXELS; weight 0=regular..higher bolder.
+    public Image createSFSymbolImage(String name, int color, float sizePixels, int weight) {
+        return impl.createSFSymbolImage(name, color, sizePixels, weight);
+    }
+
     /// Returns true if gaussian blur is supported on this platform
     ///
     /// #### Returns

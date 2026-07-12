@@ -160,6 +160,10 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     private Image trackOffImage;
     private Image trackDisabledImage;
     private boolean dragged;
+    // TEST-ONLY: when >=0, paint() renders the thumb slide frozen at this 0..1
+    // progress (OFF -> ON) instead of the live drag state, so the fidelity
+    // animation-frame probe can capture deterministic droplet frames.
+    private float morphTestProgress = -1f;
     private long dragStartTime;
     private int pressX;
     private int pressY;
@@ -281,43 +285,64 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     }
 
     private static Image createRoundThumbImage(Component context, int pxDim, int color, int shadowSpread, int thumbInset) {
-        Image img = ImageFactory.createImage(context, pxDim + 2 * shadowSpread, pxDim + 2 * shadowSpread, 0x0);
+        // switchThumbWidthScale (>1) stretches the thumb horizontally into an
+        // elongated pill (the iOS knob is a touch wider than tall); default 1.0
+        // keeps the circular Material thumb.
+        float widthScale = 1.0f;
+        try {
+            widthScale = Float.parseFloat(UIManager.getInstance().getThemeConstant(
+                    "switchThumbWidthScale", "1.0"));
+        } catch (NumberFormatException malformed) {
+            widthScale = 1.0f;   // bad constant -> circular thumb
+        }
+        int baseH = Math.max(1, pxDim - 2 * thumbInset);
+        int baseW = Math.max(baseH, Math.round(baseH * widthScale));
+        int imgW = baseW + 2 * (shadowSpread + thumbInset);
+        int imgH = pxDim + 2 * shadowSpread;
+        Image img = ImageFactory.createImage(context, imgW, imgH, 0x0);
         Graphics g = img.getGraphics();
         g.setAntiAliased(true);
 
         int shadowOpacity = 200;
         float shadowBlur = 10;
+        int arc = baseH;
 
         if (shadowSpread > 0) {
-            // draw a gradient of sort for the shadow
+            // soft drop shadow tracing the pill body
             for (int iter = shadowSpread - 1; iter >= 0; iter--) {
                 g.translate(iter, iter);
                 g.setColor(0);
                 int alpha = g.concatenateAlpha(shadowOpacity / shadowSpread);
-                g.fillArc(
+                g.fillRoundRect(
                         Math.max(1, thumbInset + shadowSpread + shadowSpread / 2 - iter),
                         Math.max(1, thumbInset + 2 * shadowSpread - iter),
-                        Math.max(1, pxDim - (iter * 2) - 2 * thumbInset),
-                        Math.max(1, pxDim - (iter * 2) - 2 * thumbInset), 0, 360);
+                        Math.max(1, baseW - (iter * 2)),
+                        Math.max(1, baseH - (iter * 2)), arc, arc);
                 g.setAlpha(alpha);
                 g.translate(-iter, -iter);
             }
             if (Display.getInstance().isGaussianBlurSupported()) {
                 Image blured = Display.getInstance().gaussianBlurImage(img, shadowBlur / 2);
-                //img = Image.createImage(pxDim+2*shadowSpread, pxDim+2*shadowSpread, 0);
                 img = blured;
                 g = img.getGraphics();
-                //g.drawImage(blured, 0, 0);
                 g.setAntiAliased(true);
             }
         }
 
-        //g.translate(shadowSpread, shadowSpread);
         int alpha = g.concatenateAlpha(255);
         g.setColor(color);
-        g.fillArc(shadowSpread + thumbInset, shadowSpread + thumbInset, Math.max(1, pxDim - 2 * thumbInset), Math.max(1, pxDim - 2 * thumbInset), 0, 360);
-        //g.setColor(outlinecolor);
-        //g.drawArc(shadowSize, shadowSize, pxDim-1, pxDim-1, 0, 360);
+        g.fillRoundRect(shadowSpread + thumbInset, shadowSpread + thumbInset, baseW, baseH, arc, arc);
+        // Liquid-glass sheen: a soft specular highlight across the top of the knob so it
+        // reads as glass rather than a flat disc. Subtle -- the primary glass cue is the
+        // droplet stretch/squash during travel (see paint()).
+        if (UIManager.getInstance().isThemeConstant("switchLiquidGlassBool", false)) {
+            int tx = shadowSpread + thumbInset;
+            int ty = shadowSpread + thumbInset;
+            g.setColor(0xffffff);
+            g.concatenateAlpha(110);
+            g.fillRoundRect(tx + baseW / 8, ty + baseH / 10, baseW * 3 / 4, baseH * 2 / 5, arc, arc);
+            g.setAlpha(255);
+        }
         g.setAlpha(alpha);
         return img;
     }
@@ -378,6 +403,9 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
 
     private Image getThumbOnImage() {
         if (thumbOnImage == null) {
+            // The "on" thumb keeps its elevation shadow on every platform (Material 3
+            // elevates the selected thumb); only the off/disabled thumbs go flat where
+            // the theme asks (switchThumbShadowSpreadInt).
             thumbOnImage = createPlatformThumbImage(this, (int) (getFontSize() * getThumbScaleY()), getSelectedStyle().getFgColor(), 2, getThumbInset());
         }
         return thumbOnImage;
@@ -399,7 +427,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
 
     private Image getThumbOffImage() {
         if (thumbOffImage == null) {
-            thumbOffImage = createPlatformThumbImage(this, (int) (getFontSize() * getThumbScaleY()), getUnselectedStyle().getFgColor(), 2, getThumbInset()); //getUnselectedStyle().getFgColor(), true);
+            thumbOffImage = createPlatformThumbImage(this, (int) (getFontSize() * getThumbOffScaleY()), getUnselectedStyle().getFgColor(), getThumbShadowSpread(), getThumbInset()); //getUnselectedStyle().getFgColor(), true);
         }
         return thumbOffImage;
     }
@@ -420,7 +448,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
 
     private Image getThumbDisabledImage() {
         if (thumbDisabledImage == null) {
-            thumbDisabledImage = createPlatformThumbImage(this, (int) (getFontSize() * getThumbScaleY()), getDisabledStyle().getFgColor(), 2, getThumbInset()); //getDisabledStyle().getFgColor(), true);
+            thumbDisabledImage = createPlatformThumbImage(this, (int) (getFontSize() * getThumbOffScaleY()), getDisabledStyle().getFgColor(), getThumbShadowSpread(), getThumbInset()); //getDisabledStyle().getFgColor(), true);
         }
         return thumbDisabledImage;
     }
@@ -464,6 +492,51 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     private double getThumbScaleY() {
         return Double.parseDouble(getUIManager().
                 getThemeConstant(getUIID().toLowerCase() + "ThumbScaleY", "1.5"));
+    }
+
+    /// Vertical scale of the OFF (and disabled) thumb. Material 3 renders the
+    /// off-thumb smaller than the on-thumb (16dp vs 24dp); the Android theme sets
+    /// switchThumbOffScaleY below ThumbScaleY. Defaults to ThumbScaleY (a single
+    /// thumb size) so iOS and existing themes are unaffected.
+    private double getThumbOffScaleY() {
+        return Double.parseDouble(getUIManager().getThemeConstant(
+                getUIID().toLowerCase() + "ThumbOffScaleY", String.valueOf(getThumbScaleY())));
+    }
+
+    /// Pixels of drop-shadow spread painted under the thumb. Defaults to 2 (the
+    /// iOS-style elevated thumb). Material 3 renders a FLAT thumb, so the Android
+    /// native theme sets switchThumbShadowSpreadInt to 0.
+    private int getThumbShadowSpread() {
+        return getUIManager().getThemeConstant(
+                getUIID().toLowerCase() + "ThumbShadowSpreadInt", 2);
+    }
+
+    /// Extra inset (px from mm) of the OFF thumb from the track's leading edge.
+    /// Material 3 leaves a small gap; defaults to 0 so iOS/legacy are unaffected.
+    private int getThumbOffInset() {
+        String v = getUIManager().getThemeConstant(
+                getUIID().toLowerCase() + "ThumbOffInsetMM", null);
+        if (v != null) {
+            try {
+                return Display.getInstance().convertToPixels(Float.parseFloat(v.trim()));
+            } catch (NumberFormatException ignore) {
+                // fall through to no inset
+            }
+        }
+        return 0;
+    }
+
+    /// Colour of the disabled track's outline ring. Material 3 uses a very subtle
+    /// near-surface tone (distinct from the more visible disabled thumb/fg). A theme
+    /// names a UIID via switchDisabledOutlineColorUIID whose fg supplies it
+    /// (dark-resolved); unset falls back to the disabled foreground colour.
+    private int getTrackDisabledOutlineColor() {
+        String uiid = getUIManager().getThemeConstant(
+                getUIID().toLowerCase() + "DisabledOutlineColorUIID", null);
+        if (uiid != null) {
+            return getUIManager().getComponentStyle(uiid).getFgColor();
+        }
+        return getDisabledStyle().getFgColor();
     }
 
     private double getTrackScaleX() {
@@ -518,7 +591,12 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
 
     private Image getTrackDisabledImage() {
         if (trackDisabledImage == null) {
-            trackDisabledImage = createPlatformTrackImage(this, (int) (getFontSize() * getTrackScaleX()), (int) (getFontSize() * getTrackScaleY()), getDisabledStyle().getBgColor(), 255, 2, getTrackOffOutlineColor(), getTrackOffOutlineWidth());
+            // Material 3 disabled switch reads as a thin outline ring over a
+            // surface-coloured interior (~ the page background, so it looks almost
+            // fill-less) - NOT the accent or a contrasting fill. The smooth ring is
+            // the outer pill (foreground colour) minus the inner surface pill, so the
+            // disabled style's bg must be the surface colour and its fg the outline.
+            trackDisabledImage = createPlatformTrackImage(this, (int) (getFontSize() * getTrackScaleX()), (int) (getFontSize() * getTrackScaleY()), getDisabledStyle().getBgColor(), 255, 2, getTrackDisabledOutlineColor(), Math.max(1, getTrackOffOutlineWidth()));
         }
         return trackDisabledImage;
     }
@@ -720,6 +798,24 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         changeDispatcher.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Change));
     }
 
+    /// TEST-ONLY hook: render the thumb slide frozen at a fixed `progress`
+    /// (0 = resting OFF .. 1 = the ON end) instead of the live drag state, so a
+    /// fidelity probe can capture exact deterministic frames of the liquid-glass
+    /// droplet animation without racing the real-time motion. Assumes the switch
+    /// is in the OFF state (the frame travels OFF -> ON). Pass a negative value
+    /// to clear and resume normal behaviour.
+    public void setMorphTestProgress(float progress) {
+        morphTestProgress = progress > 1 ? 1 : progress;
+        if (morphTestProgress < 0) {
+            // Clearing must also undo the drag state the probe forced during
+            // paint, or the thumb keeps rendering the last frozen frame until a
+            // real pointer interaction resets it.
+            dragged = false;
+            deltaX = 0;
+        }
+        repaint();
+    }
+
     /// {@inheritDoc}
     @Override
     public void paint(Graphics g) {
@@ -731,12 +827,28 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         int strackLength = Math.max(cTrackImage.getWidth(), cTrackImage.getWidth());
         int sheight = Math.max(cthumbImage.getHeight(), Math.max(cTrackImage.getHeight(), cTrackImage.getHeight()));
 
+        if (morphTestProgress >= 0) {
+            // Frozen-frame probe: fake a drag from OFF toward ON at exactly this
+            // progress so the thumb position AND the droplet envelope below are a
+            // pure function of the probe value (see setMorphTestProgress).
+            int trackM = cTrackImage.getWidth() - cthumbImage.getWidth();
+            int v = (int) (morphTestProgress * trackM);
+            dragged = v > 0;
+            deltaX = isRTL() ? v : -v;
+        }
+
         int vdeltaX = -deltaX; //virtual increase in slider "value" where OFF state = 0 and ON state = itrackLength
         if (isRTL()) {
             vdeltaX = deltaX;
         }
 
         Style s = getStyle();
+        // Liquid-glass thumb (iOS 26): while the thumb slides it stretches along the
+        // travel axis and squashes vertically like a droplet, settling round at each end.
+        // Opt in with switchLiquidGlassBool; the envelope peaks mid-slide (nextImageProgress).
+        boolean liquidGlass = getUIManager().isThemeConstant("switchLiquidGlassBool", false);
+        float liquidStretch = getUIManager().getThemeConstant("switchLiquidStretchPct", 38) / 100f;
+        float liquidSquash = getUIManager().getThemeConstant("switchLiquidSquashPct", 50) / 100f;
         int padLeft = s.getPaddingLeft(isRTL()); //s.getPaddingLeftNoRTL();
         int padRight = s.getPaddingRight(isRTL());
         int padTop = s.getPaddingTop();
@@ -745,15 +857,15 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         int innerWidth = getWidth() - padLeft - padRight;
         int halign = s.getAlignment(); //TODO: swap left and right if RTL
 
-        int thumbrX = 0; //X position of the thumb relative to the start of the track
+        // In the OFF position Material 3 leaves a small gap between the (smaller)
+        // thumb and the track's leading edge - switchThumbOffInsetMM (0 by default,
+        // so iOS/legacy themes are unaffected). The ON position stays flush.
+        int offInset = getThumbOffInset();
+        int thumbrX; //X position of the thumb relative to the start of the track
         if (isRTL()) {
-            if (!value) {
-                thumbrX = cTrackImage.getWidth() - cthumbImage.getWidth();
-            }
+            thumbrX = value ? 0 : (cTrackImage.getWidth() - cthumbImage.getWidth() - offInset);
         } else {
-            if (value) {
-                thumbrX = cTrackImage.getWidth() - cthumbImage.getWidth();
-            }
+            thumbrX = value ? (cTrackImage.getWidth() - cthumbImage.getWidth()) : offInset;
         }
 
         Image nextThumbImage = null;
@@ -827,19 +939,36 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
 
         }
 
-        //draw the thumb image
+        //draw the thumb image (liquid-glass: stretch along travel + squash mid-slide)
+        int thumbAbsX = getX() + padLeft + getAlignedCoord(thumbrX, innerWidth, strackLength, halign);
+        int thumbAbsY = getY() + padTop + getAlignedCoord((sheight / 2 - cthumbImage.getHeight() / 2), innerHeight, sheight, valign);
+        int tw = cthumbImage.getWidth();
+        int th = cthumbImage.getHeight();
+        int tx = thumbAbsX;
+        int ty = thumbAbsY;
+        int tdw = tw;
+        int tdh = th;
+        if (liquidGlass && dragged && nextImageProgress > 0) {
+            // The whole frame comes from the pure, unit-tested droplet model so the
+            // motion can be validated deterministically (see SwitchThumbDropletTest
+            // / the fidelity animation-frame probe).
+            SwitchThumbDroplet.Tokens tk = new SwitchThumbDroplet.Tokens();
+            tk.stretch = liquidStretch;
+            tk.squash = liquidSquash;
+            SwitchThumbDroplet drop = SwitchThumbDroplet.compute((float) nextImageProgress, tw, th, tk);
+            tdw = drop.drawW;
+            tdh = drop.drawH;
+            tx = thumbAbsX + drop.offsetX;                    // keep centred on the thumb centre
+            ty = thumbAbsY + drop.offsetY;
+        }
         int alph = g.getAlpha();
         if (nextImageProgress > 0 && nextThumbImage != null) {
             g.setAlpha((int) Math.round((1 - nextImageProgress) * 255));
         }
-        g.drawImage(cthumbImage,
-                getX() + padLeft + getAlignedCoord(thumbrX, innerWidth, strackLength, halign),
-                getY() + padTop + getAlignedCoord((sheight / 2 - cthumbImage.getHeight() / 2), innerHeight, sheight, valign));
+        g.drawImage(cthumbImage, tx, ty, tdw, tdh);
         if (nextImageProgress > 0 && nextThumbImage != null) {
             g.setAlpha((int) Math.round(nextImageProgress * 255));
-            g.drawImage(nextThumbImage,
-                    getX() + padLeft + getAlignedCoord(thumbrX, innerWidth, strackLength, halign),
-                    getY() + padTop + getAlignedCoord((sheight / 2 - cthumbImage.getHeight() / 2), innerHeight, sheight, valign));
+            g.drawImage(nextThumbImage, tx, ty, tdw, tdh);
             g.setAlpha(alph);
         }
 

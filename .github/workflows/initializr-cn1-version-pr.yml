@@ -84,8 +84,11 @@ jobs:
       - name: Update Initializr Codename One versions
         run: ./scripts/initializr/update-cn1-version.sh "${{ github.event.release.tag_name || github.ref_name }}"
 
-      - name: Update Playground Codename One versions
-        run: ./scripts/cn1playground/update-cn1-version.sh "${{ github.event.release.tag_name || github.ref_name }}"
+      # The Playground is intentionally NOT bumped here: it is pinned to the
+      # in-repo 8.0-SNAPSHOT so it previews the current framework + native
+      # themes (its bundled Themes/*.res use resource-format features released
+      # runtimes cannot read). update-cn1-version.sh also refuses to change a
+      # SNAPSHOT pin as a second line of defense.
 
       - name: Create pull request
         uses: peter-evans/create-pull-request@v7
@@ -108,7 +111,6 @@ jobs:
             - `scripts/initializr/common/src/main/java/com/codename1/initializr/model/GeneratorModel.java`
             - `scripts/initializr/common/src/test/java/com/codename1/initializr/model/GeneratorModelMatrixTest.java`
             - Embedded root `pom.xml` in `scripts/initializr/common/src/main/resources/common.zip`
-            - `scripts/cn1playground/pom.xml`
           branch: automation/website-cn1-version-${{ github.event.release.tag_name || github.ref_name }}
           delete-branch: true
           labels: |
@@ -117,4 +119,3 @@ jobs:
             website
           add-paths: |
             scripts/initializr
-            scripts/cn1playground

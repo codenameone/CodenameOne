@@ -1,0 +1,305 @@
+# Native fidelity test specification.
+#
+# Each component below is rendered TWICE on device: once as the real native OS
+# widget (UIKit on iOS, Material on Android) and once as the Codename One
+# equivalent under the native theme (iOSModernTheme / AndroidMaterialTheme). The
+# two renders are diffed to produce a per-(component,state,appearance) fidelity
+# score; the goal is to drive every score toward 99-100%.
+#
+# This file is the trigger for the fidelity CI workflow: editing it re-runs the
+# suite. It is parsed on-device by FidelitySpecParser, which understands a flat,
+# 2-space-indented subset of YAML (maps + comma-separated scalar lists, "#"
+# comments, optional quotes). Do NOT use anchors, flow style, or tabs.
+#
+# Per-component keys:
+#   id              required; stable identifier, used in screenshot names.
+#   cn1_uiid        CN1 UIID to apply to the CN1 render (defaults to id).
+#   native          iOS native widget key (see NativeWidgetFactoryImpl .m switch).
+#   native_android  Android native widget key (see NativeWidgetFactoryImpl.java).
+#   text            label text for widgets that show text.
+#   backdrop        tile background behind the widget (iOS only): a 6-hex colour
+#                   (e.g. 808080) = solid fill; "gradient" = vertical blue->green
+#                   ramp; "photo" = the shared glass-backdrop.png. Omit to use the
+#                   default: material glass/lens tests default to "photo" (the
+#                   Liquid Glass blend needs content behind it), everything else
+#                   to none.
+#   material        comparison intent: how the host comparator scores this test.
+#                   "normal" (default) = whole-tile compare. Also used for the
+#                   isolation tiles over a SOLID/gradient backdrop: both sides
+#                   render the identical backdrop, so it self-cancels in a
+#                   whole-tile compare and masking is unnecessary.
+#                   "glass"  = the widget composites over the shared photo
+#                   backdrop; the comparator masks the backdrop out and scores
+#                   ONLY the widget, so the unchanged backdrop cannot inflate
+#                   the score.
+#                   "lens"   = selection-lens optics (the iOS-26 tab lens).
+#                   Scored like "glass"; animation-frame captures are
+#                   additionally validated against the motion model.
+#                   The comparison mode is chosen from THIS field (test intent),
+#                   not from corner/backdrop heuristics; material is resolved
+#                   per platform (Android tiles never composite the shared
+#                   backdrop, so glass/lens degrade to normal there).
+#   states          comma-separated: normal, pressed, disabled, selected.
+#   frames          comma-separated animation progress values (0..100). When set,
+#                   the component is captured once per value with its animation
+#                   FROZEN at exactly that progress (deterministic frames named
+#                   "<id>_t<value>_<appearance>_cn1.png") instead of per-state.
+#                   Frames have no native golden: they are regression-compared
+#                   against committed CN1 frame goldens (goldens/<platform>-frames)
+#                   and property-validated against the motion model on the host.
+#   platforms       comma-separated allow-list (ios, android). Omit = both.
+#   tile_width_mm   per-component width override (logical mm).
+#   tile_height_mm  per-component height override (logical mm).
+
+defaults:
+  tile_width_mm: 60
+  tile_height_mm: 14
+  bg: ffffff
+  appearances: light,dark
+
+components:
+  # "pressed" references are captured as a REAL highlighted/pressed state on a
+  # live control in the native-ref apps (isHighlighted / setPressed + ripple
+  # hotspot in a real window) -- honest pressed visuals an off-screen
+  # rasterizer cannot produce.
+  - id: Button
+    material: glass
+    cn1_uiid: Button
+    native: ios_uibutton_system
+    native_android: material_button_filled
+    text: Default
+    states: normal,pressed,disabled
+
+  - id: RaisedButton
+    material: glass
+    cn1_uiid: RaisedButton
+    native: ios_uibutton_filled
+    native_android: material_button_tonal
+    text: Raised
+    states: normal,pressed,disabled
+
+  - id: FlatButton
+    material: glass
+    cn1_uiid: FlatButton
+    native: ios_uibutton_plain
+    native_android: material_button_outlined
+    text: Flat
+    states: normal,pressed
+
+  - id: TextField
+    material: normal
+    cn1_uiid: TextField
+    native: ios_uitextfield
+    native_android: material_textinput
+    text: Hello
+    states: normal,disabled
+    # The white grouped-cell field is invisible on a plain white tile; score it
+    # over the grey grouped-form background (iOS only) where the cell contrasts.
+    backdrop: grouped
+
+  - id: CheckBox
+    material: normal
+    cn1_uiid: CheckBox
+    native: ios_check_glyph
+    native_android: material_checkbox
+    text: Enabled
+    states: normal,selected,disabled
+
+  - id: RadioButton
+    material: normal
+    cn1_uiid: RadioButton
+    native: ios_radio_glyph
+    native_android: material_radio
+    text: Option
+    states: normal,selected,disabled
+
+  - id: Switch
+    material: normal
+    cn1_uiid: Switch
+    native: ios_uiswitch
+    native_android: material_switch
+    states: normal,selected,disabled
+
+  # SwitchMorph: deterministic animation-frame validation of the liquid-glass
+  # switch-thumb droplet (stretch along travel + vertical squash, peaking
+  # mid-slide). Each frame renders the slide FROZEN at the given progress via
+  # Switch.setMorphTestProgress; validated by MorphFrameValidator + frame
+  # goldens, and pinned numerically in SwitchThumbDropletTest.
+  - id: SwitchMorph
+    material: normal
+    cn1_uiid: Switch
+    platforms: ios
+    frames: 0,25,50,75,100
+    states: normal
+
+  - id: Slider
+    material: normal
+    cn1_uiid: Slider
+    native: ios_uislider
+    native_android: material_slider
+    states: normal,disabled
+
+  - id: ProgressBar
+    material: normal
+    cn1_uiid: ProgressBar
+    native: ios_uiprogress
+    native_android: material_progress_linear
+    states: normal
+
+  - id: Tabs
+    material: glass
+    cn1_uiid: Tabs
+    native: ios_uitabbar
+    native_android: material_tablayout
+    tile_height_mm: 16
+    states: normal
+
+  - id: Toolbar
+    material: glass
+    cn1_uiid: Toolbar
+    native: ios_uinavbar
+    native_android: material_toolbar
+    text: Title
+    tile_height_mm: 16
+    states: normal
+
+  - id: Dialog
+    material: normal
+    cn1_uiid: Dialog
+    native: ios_alert_view
+    native_android: material_alert_view
+    text: Message
+    tile_width_mm: 60
+    tile_height_mm: 40
+    states: normal
+
+  - id: FloatingActionButton
+    material: normal
+    cn1_uiid: FloatingActionButton
+    native_android: material_fab
+    platforms: android
+    tile_width_mm: 20
+    tile_height_mm: 20
+    states: normal,pressed
+
+  - id: Spinner
+    material: normal
+    cn1_uiid: Spinner
+    native: ios_uipickerview
+    platforms: ios
+    tile_width_mm: 60
+    tile_height_mm: 34
+    states: normal
+
+  # --- Isolation tests (iOS only) ---------------------------------------------
+  # GlassPanel: a plain glass rectangle (no text/items) rendered over four
+  # different backdrops, so the glass BLEND can be inspected independently of any
+  # widget content. CN1 paints a GlassPanel-UIID container; native paints a
+  # UIVisualEffectView (iOS 26 Liquid Glass when available).
+  - id: GlassPanelGrey
+    material: normal
+    cn1_uiid: GlassPanel
+    native: ios_glass_panel
+    backdrop: 808080
+    platforms: ios
+    tile_width_mm: 60
+    tile_height_mm: 14
+    states: normal
+
+  - id: GlassPanelRed
+    material: normal
+    cn1_uiid: GlassPanel
+    native: ios_glass_panel
+    backdrop: ff3b30
+    platforms: ios
+    tile_width_mm: 60
+    tile_height_mm: 14
+    states: normal
+
+  - id: GlassPanelGrad
+    material: normal
+    cn1_uiid: GlassPanel
+    native: ios_glass_panel
+    backdrop: gradient
+    platforms: ios
+    tile_width_mm: 60
+    tile_height_mm: 14
+    states: normal
+
+  - id: GlassPanelPhoto
+    material: glass
+    cn1_uiid: GlassPanel
+    native: ios_glass_panel
+    backdrop: photo
+    platforms: ios
+    tile_width_mm: 60
+    tile_height_mm: 14
+    states: normal
+
+  # TabsGeom: the same tab bar as Tabs but over a SOLID grey backdrop. The glass
+  # blurs a flat colour into a uniform tint, so only the tab GEOMETRY differs --
+  # isolating layout fidelity from the glass blend.
+  - id: TabsGeom
+    material: normal
+    cn1_uiid: Tabs
+    native: ios_uitabbar
+    backdrop: 808080
+    platforms: ios
+    tile_width_mm: 60
+    tile_height_mm: 16
+    states: normal
+
+  # TabsMorph: deterministic animation-frame validation of the iOS-26 tab
+  # selection morph (review point: static start/end screenshots cannot catch a
+  # wrong motion path, overshoot, lens size or tint timing). The same tab bar as
+  # TabsGeom morphs from tab 0 (Featured) to tab 2 (More); each frame renders
+  # the morph FROZEN at the given progress via Tabs.setMorphTestState, so the
+  # captures are stable across runs. The flat grey backdrop keeps the travelling
+  # lens/tint measurable. Validated by MorphFrameValidator + frame goldens; the
+  # same fixed progress points are pinned numerically in TabSelectionMorphTest.
+  - id: TabsMorph
+    material: lens
+    cn1_uiid: Tabs
+    backdrop: 808080
+    platforms: ios
+    frames: 0,10,25,50,75,90,100
+    tile_width_mm: 60
+    tile_height_mm: 16
+    states: normal
+
+  # TabOne: the MINIMAL tab bar -- one text-only tab over flat grey. No icons (no
+  # SF-vs-Material mismatch), no second item, no multi-tab spacing. Only the glass
+  # pill geometry, a single centred text label and the uniform glass tint remain,
+  # so this is the smallest case we can drive to ~100% to expose what breaks.
+  - id: TabOne
+    material: normal
+    cn1_uiid: Tabs
+    native: ios_uitabbar_one
+    backdrop: 808080
+    platforms: ios
+    tile_width_mm: 60
+    tile_height_mm: 16
+    states: normal
+
+  # Ladder rungs: a glass capsule + ONE element, identical authored geometry on
+  # both sides over flat grey. GlassText isolates the centred text label; GlassIcon
+  # isolates the icon glyph -- each on top of the matched glass capsule.
+  - id: GlassText
+    material: normal
+    cn1_uiid: GlassText
+    native: ios_glass_text
+    backdrop: 808080
+    platforms: ios
+    tile_width_mm: 60
+    tile_height_mm: 14
+    states: normal
+
+  - id: GlassIcon
+    material: normal
+    cn1_uiid: GlassText
+    native: ios_glass_icon
+    backdrop: 808080
+    platforms: ios
+    tile_width_mm: 60
+    tile_height_mm: 14
+    states: normal

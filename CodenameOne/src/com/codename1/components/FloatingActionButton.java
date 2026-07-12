@@ -230,6 +230,24 @@ public class FloatingActionButton extends Button {
     }
 
     private void updateBorder() {
+        // Material 3 made the FAB a rounded SQUARE (squircle). A theme that sets
+        // fabCornerRadiusMM gets a RoundRectBorder of that corner radius (with the
+        // component's own bg colour filling it) instead of the legacy full circle.
+        String cr = getUIManager().getThemeConstant("fabCornerRadiusMM", null);
+        if (cr != null) {
+            try {
+                float mm = Float.parseFloat(cr.trim());
+                getUnselectedStyle().setBorder(com.codename1.ui.plaf.RoundRectBorder.create()
+                        .cornerRadius(mm).shadowOpacity(shadowOpacity));
+                getSelectedStyle().setBorder(com.codename1.ui.plaf.RoundRectBorder.create()
+                        .cornerRadius(mm).shadowOpacity(shadowOpacity));
+                getPressedStyle().setBorder(com.codename1.ui.plaf.RoundRectBorder.create()
+                        .cornerRadius(mm).shadowOpacity(shadowOpacity));
+                return;
+            } catch (NumberFormatException ignore) {
+                // malformed constant -> fall through to the legacy circular FAB
+            }
+        }
         getUnselectedStyle().setBorder(RoundBorder.create().
                 color(getUnselectedStyle().getBgColor()).
                 shadowOpacity(shadowOpacity).rectangle(rectangle));
@@ -281,6 +299,22 @@ public class FloatingActionButton extends Button {
     @Override
     protected Dimension calcPreferredSize() {
         if (autoSizing && getIcon() != null) {
+            // Material 3's standard FAB is a fixed 56dp square (24dp icon). A theme
+            // can pin that exact diameter via fabDiameterMM, which is more faithful
+            // than the legacy icon*11/4 (=2.75x) heuristic that yields ~71dp. Falls
+            // back to the heuristic when the constant is absent.
+            String diaMm = com.codename1.ui.plaf.UIManager.getInstance()
+                    .getThemeConstant("fabDiameterMM", null);
+            if (diaMm != null) {
+                try {
+                    int d = Display.getInstance().convertToPixels(Float.parseFloat(diaMm));
+                    if (d > 0) {
+                        return new Dimension(d, d);
+                    }
+                } catch (NumberFormatException ignore) {
+                    // malformed fabDiameterMM constant -> fall back to the icon-derived size
+                }
+            }
             return new Dimension(getIcon().getWidth() * 11 / 4, getIcon().getHeight() * 11 / 4);
         }
         return super.calcPreferredSize();
