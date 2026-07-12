@@ -211,16 +211,17 @@ final class IOSSurfaceBridge implements SurfaceBridge {
     /// Creates the nested directories of `relative` (slash-separated) under `base` one level at
     /// a time: `FileSystemStorage.mkdir` has no mkdirs equivalent.
     private void mkdirs(String base, String relative) {
-        String current = base;
+        StringBuilder current = new StringBuilder(base);
         int start = 0;
         while (start < relative.length()) {
             int slash = relative.indexOf('/', start);
             String segment = slash < 0 ? relative.substring(start)
                     : relative.substring(start, slash);
             if (segment.length() > 0) {
-                current = current + "/" + segment;
-                if (!fs.exists(current)) {
-                    fs.mkdir(current);
+                current.append('/').append(segment);
+                String path = current.toString();
+                if (!fs.exists(path)) {
+                    fs.mkdir(path);
                 }
             }
             if (slash < 0) {

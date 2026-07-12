@@ -8,7 +8,7 @@ import Foundation
 import SwiftUI
 import WidgetKit
 
-#if canImport(ActivityKit)
+#if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
 import ActivityKit
 
 struct CN1LiveActivityWidget: Widget {

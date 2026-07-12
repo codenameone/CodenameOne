@@ -13,7 +13,7 @@ import Foundation
 #if canImport(WidgetKit)
 import WidgetKit
 #endif
-#if canImport(ActivityKit)
+#if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
 import ActivityKit
 #endif
 
@@ -67,7 +67,7 @@ public class CN1SurfaceBridge: NSObject {
 
     /// True when ActivityKit is available and the user has not disabled live activities.
     @objc public static func activitiesEnabled() -> Bool {
-        #if canImport(ActivityKit)
+        #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
         if #available(iOS 16.1, *) {
             return ActivityAuthorizationInfo().areActivitiesEnabled
         }
@@ -78,7 +78,7 @@ public class CN1SurfaceBridge: NSObject {
     /// Starts a live activity from the serialized descriptor (which embeds the initial
     /// state). Returns the ActivityKit activity id, or "" on failure.
     @objc public static func startActivity(_ descriptorJson: String) -> String {
-        #if canImport(ActivityKit)
+        #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
         if #available(iOS 16.1, *) {
             guard let data = descriptorJson.data(using: .utf8),
                   let doc = (try? JSONSerialization.jsonObject(with: data, options: [])) as? [String: Any] else {
@@ -111,7 +111,7 @@ public class CN1SurfaceBridge: NSObject {
 
     /// Pushes a fresh state into a running activity; the views re-interpolate locally.
     @objc public static func updateActivity(_ id: String, stateJson: String) {
-        #if canImport(ActivityKit)
+        #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
         if #available(iOS 16.1, *) {
             let contentState = CN1SurfaceAttributes.ContentState(stateJson: stateJson)
             Task {
@@ -125,7 +125,7 @@ public class CN1SurfaceBridge: NSObject {
 
     /// Ends a running activity, optionally showing a final state before dismissal.
     @objc public static func endActivity(_ id: String, finalStateJson: String?, immediate: Bool) {
-        #if canImport(ActivityKit)
+        #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
         if #available(iOS 16.1, *) {
             let finalState = finalStateJson.map { CN1SurfaceAttributes.ContentState(stateJson: $0) }
             Task {
