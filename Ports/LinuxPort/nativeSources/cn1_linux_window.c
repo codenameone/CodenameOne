@@ -648,6 +648,25 @@ JAVA_INT com_codename1_impl_linux_LinuxNative_screenDpi___R_int(CODENAME_ONE_THR
     return 96;
 }
 
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_isHighContrastEnabled___R_boolean(CODENAME_ONE_THREAD_STATE) {
+    const char* theme = getenv("GTK_THEME");
+    return theme != NULL && strcasestr(theme, "highcontrast") != NULL ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_isReduceMotionEnabled___R_boolean(CODENAME_ONE_THREAD_STATE) {
+    const char* animations = getenv("GTK_ENABLE_ANIMATIONS");
+    return animations != NULL && strcmp(animations, "0") == 0 ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_isScreenReaderEnabled___R_boolean(CODENAME_ONE_THREAD_STATE) {
+    const char* modules = getenv("GTK_MODULES");
+    if (modules == NULL) {
+        return JAVA_FALSE;
+    }
+    return strcasestr(modules, "atk-bridge") != NULL || strcasestr(modules, "gail") != NULL
+            ? JAVA_TRUE : JAVA_FALSE;
+}
+
 /* True when the default seat has a touchscreen pointing device attached, so the
  * framework reports a touch device (Display.isTouchScreen()). */
 JAVA_BOOLEAN com_codename1_impl_linux_LinuxNative_isTouchDevice___R_boolean(CODENAME_ONE_THREAD_STATE) {

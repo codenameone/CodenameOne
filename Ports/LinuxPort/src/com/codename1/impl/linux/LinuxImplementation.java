@@ -73,19 +73,17 @@ public class LinuxImplementation extends CodenameOneImplementation {
 
     @Override
     public boolean isHighContrastEnabled() {
-        String theme = System.getenv("GTK_THEME");
-        return theme != null && theme.toLowerCase().indexOf("highcontrast") >= 0;
+        return LinuxNative.isHighContrastEnabled();
     }
 
     @Override
     public boolean isReduceMotionEnabled() {
-        return "0".equals(System.getenv("GTK_ENABLE_ANIMATIONS"));
+        return LinuxNative.isReduceMotionEnabled();
     }
 
     @Override
     public boolean isScreenReaderEnabled() {
-        String modules = System.getenv("GTK_MODULES");
-        return modules != null && (modules.indexOf("atk-bridge") >= 0 || modules.indexOf("gail") >= 0);
+        return LinuxNative.isScreenReaderEnabled();
     }
     private static LinuxImplementation INSTANCE;
 

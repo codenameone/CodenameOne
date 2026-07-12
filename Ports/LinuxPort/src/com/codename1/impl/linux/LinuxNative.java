@@ -125,6 +125,15 @@ public final class LinuxNative {
     /** Real horizontal screen DPI (96 == 100% scale). */
     public static native int screenDpi();
 
+    /** True when the GTK theme requests high contrast. */
+    public static native boolean isHighContrastEnabled();
+
+    /** True when GTK animations are disabled. */
+    public static native boolean isReduceMotionEnabled();
+
+    /** True when the GTK accessibility bridge is active. */
+    public static native boolean isScreenReaderEnabled();
+
     /** The window's graphics peer (a Direct2D render target wrapper). */
     public static native long getWindowGraphics();
 
