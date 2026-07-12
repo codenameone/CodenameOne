@@ -264,6 +264,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // tests (serializer round trip, timeline logic, action dispatch, publish contract)
             // run with the other API tests near the end of the suite.
             new SurfacesRasterizerScreenshotTest(),
+            // Android only: the REAL RemoteViews widget lowering (publish -> CN1SurfaceStore
+            // -> CN1SurfaceRenderer -> RemoteViews.apply on real views) captured through a
+            // native PeerComponent. Self-skips with a CN1SS SKIPPED line everywhere else, so
+            // only the Android leg carries a SurfacesRemoteViews golden.
+            new SurfacesRemoteViewsScreenshotTest(),
             // Modern maps API: the pure-vector MapView (real OSM basemap,
             // light/dark styles, marker + shape overlays) and the NativeMap
             // vector fallback, all rendered against the bundled real San
@@ -562,16 +567,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 // unaffected and keep running. Tracked in port.js under the
                 // same name.
                 || "TransformPerspective".equals(testName)
-                || "TransformCamera".equals(testName)
-                // ``surfacesJsonRoundTrip`` / ``surfacesRasterizerNpe``: the JS
-                // port fails the surfaces serializer round-trip (the parsed
-                // timeline document comes back with mangled tokens, an
-                // IllegalStateException "expected a number" from JSONParser)
-                // and the rasterizer screenshot setup throws an NPE. Every
-                // other platform leg gates these tests; parked here pending a
-                // JS-port runtime fix, tracked in port.js under these names.
-                || "SurfacesSerializerRoundTripTest".equals(testName)
-                || "SurfacesRasterizerScreenshotTest".equals(testName);
+                || "TransformCamera".equals(testName);
     }
 
     private void awaitTestCompletion(int index, BaseTest testClass, String testName, long deadline) {

@@ -83,6 +83,35 @@ public class SurfacesPublishTest extends BaseTest {
             Surfaces.reloadWidgets("cn1ss_no_such_kind");
             assertBool(Surfaces.getInstalledWidgetCount("cn1ss_no_such_kind") >= 0,
                     "unknown kind count is non-negative");
+
+            // live activity lifecycle: start/update/end must be safe on every platform.
+            // Where unsupported (or the platform refuses, e.g. the iOS simulator test
+            // harness) start returns an inert handle whose methods are documented
+            // no-ops; where supported (Android ongoing notification, desktop pill)
+            // the full cycle must run without throwing. No support value is asserted.
+            boolean activities = com.codename1.surfaces.LiveActivity.isSupported();
+            System.out.println("CN1SS:INFO:test=SurfacesPublishTest activities_supported="
+                    + activities);
+            Map<String, Object> laState = new HashMap<String, Object>();
+            laState.put("status", "started");
+            com.codename1.surfaces.LiveActivity activity =
+                    com.codename1.surfaces.LiveActivity.start(
+                            new com.codename1.surfaces.LiveActivityDescriptor("cn1ss")
+                                    .setContent(new SurfaceColumn()
+                                            .add(new SurfaceText("cn1ss ${status}")
+                                                    .setColor(SurfaceColor.LABEL)))
+                                    .setCompactLeading(new SurfaceText("cn1ss"))
+                                    .setCompactTrailing(new SurfaceText("${status}")),
+                            laState);
+            assertBool(activity != null, "start returns a handle even when unsupported");
+            laState.put("status", "updated");
+            activity.update(laState);
+            laState.put("status", "done");
+            activity.end(laState, true);
+            assertBool(!activity.isActive(), "activity is inactive after end");
+            // ended and inert handles tolerate further calls
+            activity.update(laState);
+            activity.end(null);
         } catch (Throwable t) {
             fail("Surfaces publish contract failed: " + t);
             return false;
