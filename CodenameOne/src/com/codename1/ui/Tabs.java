@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.accessibility.AccessibilityManager;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -1300,8 +1301,7 @@ public class Tabs extends Container {
         if (index == activeComponent) {
             return;
         }
-        accessibilityChanged(com.codename1.ui.accessibility.AccessibilityManager.CHANGE_STATE
-                | com.codename1.ui.accessibility.AccessibilityManager.CHANGE_PANE);
+        accessibilityChanged(AccessibilityManager.CHANGE_STATE | AccessibilityManager.CHANGE_PANE);
         // Snapshot the current tab bounds *before* we mutate state, so the
         // animated indicator can tween from where it visibly is to the new
         // selection's bounds.

@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.accessibility.AccessibilityManager;
 import com.codename1.compat.java.util.Objects;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
@@ -549,8 +550,7 @@ public class List<T> extends Component implements ActionSource {
         int oldIndex = model.getSelectedIndex();
         model.setSelectedIndex(index);
         if (oldIndex != index) {
-            accessibilityChanged(com.codename1.ui.accessibility.AccessibilityManager.CHANGE_STATE
-                    | com.codename1.ui.accessibility.AccessibilityManager.CHANGE_VALUE);
+            accessibilityChanged(AccessibilityManager.CHANGE_STATE | AccessibilityManager.CHANGE_VALUE);
         }
         if (!isInitialized()) {
             Form f = getComponentForm();

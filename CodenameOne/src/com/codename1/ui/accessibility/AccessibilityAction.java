@@ -53,9 +53,15 @@ public final class AccessibilityAction {
         this.enabled = enabled;
     }
 
-    public String getId() { return id; }
-    public String getLabel() { return label; }
-    public boolean isEnabled() { return enabled; }
+    public String getId() {
+        return id;
+    }
+    public String getLabel() {
+        return label;
+    }
+    public boolean isEnabled() {
+        return enabled;
+    }
 
     public boolean perform(Component component, Object argument) {
         return enabled && handler != null && handler.perform(component, argument);

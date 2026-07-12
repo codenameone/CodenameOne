@@ -59,6 +59,7 @@ import com.codename1.plugin.PluginSupport;
 import com.codename1.plugin.event.IsGalleryTypeSupportedEvent;
 import com.codename1.plugin.event.OpenGalleryEvent;
 import com.codename1.system.CrashReport;
+import com.codename1.ui.accessibility.AccessibilityManager;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Transition;
@@ -1746,9 +1747,8 @@ public final class Display extends CN1Constants {
         lastKeyPressed = 0;
         previousKeyPressed = 0;
         newForm.onShowCompletedImpl();
-        com.codename1.ui.accessibility.AccessibilityManager.getInstance().invalidate(
-                newForm, com.codename1.ui.accessibility.AccessibilityManager.CHANGE_STRUCTURE
-                | com.codename1.ui.accessibility.AccessibilityManager.CHANGE_PANE);
+        AccessibilityManager.getInstance().invalidate(newForm,
+                AccessibilityManager.CHANGE_STRUCTURE | AccessibilityManager.CHANGE_PANE);
     }
 
     private boolean applyInitialWindowSize(Form form) {

@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.accessibility.AccessibilityManager;
 
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -307,7 +308,7 @@ public class Slider extends Label implements ActionSource {
         int oldValue = this.value;
         this.value = value;
         if (oldValue != value) {
-            accessibilityChanged(com.codename1.ui.accessibility.AccessibilityManager.CHANGE_VALUE);
+            accessibilityChanged(AccessibilityManager.CHANGE_VALUE);
         }
         if (renderValueOnTop || renderPercentageOnTop) {
             super.setText(formattedValue(value));

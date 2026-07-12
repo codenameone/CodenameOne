@@ -87,47 +87,123 @@ public final class AccessibilityNodeSnapshot {
         actions = Collections.unmodifiableList(new ArrayList<AccessibilityAction>(b.actions));
     }
 
-    public long getId() { return id; }
-    public long getParentId() { return parentId; }
-    public Component getComponent() { return component; }
-    public String getVirtualKey() { return virtualKey; }
-    public String getIdentifier() { return identifier; }
-    public String getLabel() { return label; }
-    public String getHint() { return hint; }
-    public String getDescription() { return description; }
-    public String getValue() { return value; }
-    public String getValidationError() { return validationError; }
-    public String getPaneTitle() { return paneTitle; }
-    public String getRoleDescription() { return roleDescription; }
-    public AccessibilityRole getRole() { return role; }
-    public AccessibilityCheckedState getChecked() { return checked; }
-    public AccessibilityLiveRegion getLiveRegion() { return liveRegion; }
-    public AccessibilityRange getRange() { return range; }
-    public AccessibilityCollectionInfo getCollectionInfo() { return collectionInfo; }
-    public AccessibilityCollectionItemInfo getCollectionItemInfo() { return collectionItemInfo; }
-    public Rectangle getBounds() { return new Rectangle(bounds); }
-    public Boolean getSelected() { return selected; }
-    public Boolean getExpanded() { return expanded; }
-    public Boolean getEnabled() { return enabled; }
-    public Boolean getInvalid() { return invalid; }
-    public Boolean getBusy() { return busy; }
-    public Boolean getReadOnly() { return readOnly; }
-    public Boolean getRequired() { return required; }
-    public Boolean getMultiline() { return multiline; }
-    public Boolean getObscured() { return obscured; }
-    public Boolean getPressed() { return pressed; }
-    public Boolean getCurrent() { return current; }
-    public boolean isModal() { return modal; }
-    public boolean isFocusable() { return focusable; }
-    public boolean isFocused() { return focused; }
-    public int getHeadingLevel() { return headingLevel; }
-    public List<Long> getChildIds() { return childIds; }
-    public List<AccessibilityAction> getActions() { return actions; }
+    public long getId() {
+        return id;
+    }
+    public long getParentId() {
+        return parentId;
+    }
+    public Component getComponent() {
+        return component;
+    }
+    public String getVirtualKey() {
+        return virtualKey;
+    }
+    public String getIdentifier() {
+        return identifier;
+    }
+    public String getLabel() {
+        return label;
+    }
+    public String getHint() {
+        return hint;
+    }
+    public String getDescription() {
+        return description;
+    }
+    public String getValue() {
+        return value;
+    }
+    public String getValidationError() {
+        return validationError;
+    }
+    public String getPaneTitle() {
+        return paneTitle;
+    }
+    public String getRoleDescription() {
+        return roleDescription;
+    }
+    public AccessibilityRole getRole() {
+        return role;
+    }
+    public AccessibilityCheckedState getChecked() {
+        return checked;
+    }
+    public AccessibilityLiveRegion getLiveRegion() {
+        return liveRegion;
+    }
+    public AccessibilityRange getRange() {
+        return range;
+    }
+    public AccessibilityCollectionInfo getCollectionInfo() {
+        return collectionInfo;
+    }
+    public AccessibilityCollectionItemInfo getCollectionItemInfo() {
+        return collectionItemInfo;
+    }
+    public Rectangle getBounds() {
+        return new Rectangle(bounds);
+    }
+    public Boolean getSelected() {
+        return selected;
+    }
+    public Boolean getExpanded() {
+        return expanded;
+    }
+    public Boolean getEnabled() {
+        return enabled;
+    }
+    public Boolean getInvalid() {
+        return invalid;
+    }
+    public Boolean getBusy() {
+        return busy;
+    }
+    public Boolean getReadOnly() {
+        return readOnly;
+    }
+    public Boolean getRequired() {
+        return required;
+    }
+    public Boolean getMultiline() {
+        return multiline;
+    }
+    public Boolean getObscured() {
+        return obscured;
+    }
+    public Boolean getPressed() {
+        return pressed;
+    }
+    public Boolean getCurrent() {
+        return current;
+    }
+    public boolean isModal() {
+        return modal;
+    }
+    public boolean isFocusable() {
+        return focusable;
+    }
+    public boolean isFocused() {
+        return focused;
+    }
+    public int getHeadingLevel() {
+        return headingLevel;
+    }
+    public List<Long> getChildIds() {
+        return childIds;
+    }
+    public List<AccessibilityAction> getActions() {
+        return actions;
+    }
 
     public AccessibilityAction getAction(String id) {
-        if (id == null) return null;
+        if (id == null) {
+            return null;
+        }
         for (AccessibilityAction action : actions) {
-            if (id.equals(action.getId())) return action;
+            if (id.equals(action.getId())) {
+                return action;
+            }
         }
         return null;
     }

@@ -19,7 +19,7 @@ public final class AccessibilityCollectionItemInfo {
     }
 
     public AccessibilityCollectionItemInfo(int rowIndex, int rowSpan, int columnIndex, int columnSpan,
-            int positionInSet, int setSize, int level, boolean heading) {
+                                           int positionInSet, int setSize, int level, boolean heading) {
         this.rowIndex = rowIndex;
         this.rowSpan = rowSpan;
         this.columnIndex = columnIndex;
@@ -30,12 +30,28 @@ public final class AccessibilityCollectionItemInfo {
         this.heading = heading;
     }
 
-    public int getRowIndex() { return rowIndex; }
-    public int getRowSpan() { return rowSpan; }
-    public int getColumnIndex() { return columnIndex; }
-    public int getColumnSpan() { return columnSpan; }
-    public int getPositionInSet() { return positionInSet; }
-    public int getSetSize() { return setSize; }
-    public int getLevel() { return level; }
-    public boolean isHeading() { return heading; }
+    public int getRowIndex() {
+        return rowIndex;
+    }
+    public int getRowSpan() {
+        return rowSpan;
+    }
+    public int getColumnIndex() {
+        return columnIndex;
+    }
+    public int getColumnSpan() {
+        return columnSpan;
+    }
+    public int getPositionInSet() {
+        return positionInSet;
+    }
+    public int getSetSize() {
+        return setSize;
+    }
+    public int getLevel() {
+        return level;
+    }
+    public boolean isHeading() {
+        return heading;
+    }
 }

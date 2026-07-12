@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.accessibility.AccessibilityManager;
 import com.codename1.cloud.BindTarget;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -255,7 +256,7 @@ public class RadioButton extends Button {
         this.selected = selected;
         if (changed) {
             fireChangeEvent();
-            accessibilityChanged(com.codename1.ui.accessibility.AccessibilityManager.CHANGE_STATE);
+            accessibilityChanged(AccessibilityManager.CHANGE_STATE);
         }
         repaint();
     }

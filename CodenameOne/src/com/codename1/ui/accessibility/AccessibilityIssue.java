@@ -19,10 +19,18 @@ public final class AccessibilityIssue {
         this.nodeId = nodeId;
     }
 
-    public Severity getSeverity() { return severity; }
-    public String getCode() { return code; }
-    public String getMessage() { return message; }
-    public long getNodeId() { return nodeId; }
+    public Severity getSeverity() {
+        return severity;
+    }
+    public String getCode() {
+        return code;
+    }
+    public String getMessage() {
+        return message;
+    }
+    public long getNodeId() {
+        return nodeId;
+    }
 
     @Override
     public String toString() {

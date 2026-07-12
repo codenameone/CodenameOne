@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.accessibility.AccessibilityManager;
 import com.codename1.cloud.BindTarget;
 import com.codename1.compat.java.util.Objects;
 import com.codename1.io.Log;
@@ -609,8 +610,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
         if (!Objects.equals(text, old)) {
             fireDataChanged(DataChangedListener.CHANGED, -1);
-            accessibilityChanged(com.codename1.ui.accessibility.AccessibilityManager.CHANGE_VALUE
-                    | com.codename1.ui.accessibility.AccessibilityManager.CHANGE_CONTENT);
+            accessibilityChanged(AccessibilityManager.CHANGE_VALUE | AccessibilityManager.CHANGE_CONTENT);
         }
         // while native editing we don't need the cursor animations
         if (Display.getInstance().isNativeInputSupported() && Display.getInstance().isTextEditing(this)) {

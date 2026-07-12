@@ -24,6 +24,7 @@
 
 package com.codename1.ui;
 
+import com.codename1.ui.accessibility.AccessibilityManager;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
@@ -996,8 +997,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
             return;
         }
         this.toggle = toggle;
-        accessibilityChanged(com.codename1.ui.accessibility.AccessibilityManager.CHANGE_STRUCTURE
-                | com.codename1.ui.accessibility.AccessibilityManager.CHANGE_STATE);
+        accessibilityChanged(AccessibilityManager.CHANGE_STRUCTURE | AccessibilityManager.CHANGE_STATE);
         if (toggle && "CheckBox".equals(getUIID()) || "RadioButton".equals(getUIID())) {
             setUIID("ToggleButton");
         }

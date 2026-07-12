@@ -30,23 +30,31 @@ public final class AccessibilityAssertions {
         StringBuilder errors = new StringBuilder();
         for (AccessibilityIssue issue : issues) {
             if (issue.getSeverity() == AccessibilityIssue.Severity.ERROR) {
-                if (errors.length() > 0) errors.append('\n');
+                if (errors.length() > 0) {
+                    errors.append('\n');
+                }
                 errors.append(issue.toString());
             }
         }
-        if (errors.length() > 0) throw new AssertionError(errors.toString());
+        if (errors.length() > 0) {
+            throw new AssertionError(errors.toString());
+        }
     }
 
     public static void assertNoUnlabeledInteractiveNodes(AccessibilityTreeSnapshot tree) {
         StringBuilder errors = new StringBuilder();
         for (AccessibilityNodeSnapshot node : tree.getNodes().values()) {
             if (node.isFocusable() && empty(node.getLabel()) && empty(node.getValue())) {
-                if (errors.length() > 0) errors.append('\n');
+                if (errors.length() > 0) {
+                    errors.append('\n');
+                }
                 errors.append("Interactive node ").append(node.getId()).append(" (")
                         .append(node.getRole()).append(") has no accessible name");
             }
         }
-        if (errors.length() > 0) throw new AssertionError(errors.toString());
+        if (errors.length() > 0) {
+            throw new AssertionError(errors.toString());
+        }
     }
 
     private static void auditNode(AccessibilityTreeSnapshot tree, AccessibilityNodeSnapshot node,
@@ -92,7 +100,9 @@ public final class AccessibilityAssertions {
         }
         Set<String> actions = new HashSet<String>();
         for (AccessibilityAction action : node.getActions()) {
-            if (!actions.add(action.getId())) error(issues, "duplicate-action", "Action ids must be unique per node", node);
+            if (!actions.add(action.getId())) {
+                error(issues, "duplicate-action", "Action ids must be unique per node", node);
+            }
             if (!isStandardAction(action.getId()) && empty(action.getLabel())) {
                 error(issues, "unlabeled-custom-action", "Custom accessibility actions require localized labels", node);
             }
@@ -106,15 +116,21 @@ public final class AccessibilityAssertions {
     private static void detectCycle(AccessibilityTreeSnapshot tree, long id, Set<Long> visiting,
             Set<Long> visited, List<AccessibilityIssue> issues) {
         Long boxed = Long.valueOf(id);
-        if (visited.contains(boxed)) return;
+        if (visited.contains(boxed)) {
+            return;
+        }
         if (!visiting.add(boxed)) {
             AccessibilityNodeSnapshot node = tree.getNode(id);
-            if (node != null) error(issues, "tree-cycle", "Semantic tree contains a cycle", node);
+            if (node != null) {
+                error(issues, "tree-cycle", "Semantic tree contains a cycle", node);
+            }
             return;
         }
         AccessibilityNodeSnapshot node = tree.getNode(id);
         if (node != null) {
-            for (Long child : node.getChildIds()) detectCycle(tree, child.longValue(), visiting, visited, issues);
+            for (Long child : node.getChildIds()) {
+                detectCycle(tree, child.longValue(), visiting, visited, issues);
+            }
         }
         visiting.remove(boxed);
         visited.add(boxed);
@@ -146,5 +162,7 @@ public final class AccessibilityAssertions {
         issues.add(new AccessibilityIssue(AccessibilityIssue.Severity.WARNING, code, message, node.getId()));
     }
 
-    private static boolean empty(String value) { return value == null || value.length() == 0; }
+    private static boolean empty(String value) {
+        return value == null || value.length() == 0;
+    }
 }
