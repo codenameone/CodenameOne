@@ -4,7 +4,23 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class WizardDecisions {
+    public static final String WIDGET_EXTENSION_SUFFIX = ".CN1Widgets";
+
     private WizardDecisions() {
+    }
+
+    public static String widgetExtensionBundleId(String mainBundleId) {
+        if (mainBundleId == null || mainBundleId.trim().isEmpty()) {
+            return null;
+        }
+        return mainBundleId.trim() + WIDGET_EXTENSION_SUFFIX;
+    }
+
+    public static String defaultAppGroup(String packageName) {
+        if (packageName == null || packageName.trim().isEmpty()) {
+            return null;
+        }
+        return "group." + packageName.trim();
     }
 
     public static boolean profileRequiresDevices(String profileType) {

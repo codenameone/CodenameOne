@@ -11,15 +11,18 @@ public final class SigningState {
     public final List<Device> devices;
     public final List<Profile> profiles;
     public final List<ApnsKey> apnsKeys;
+    public final List<AppGroup> appGroups;
 
     public SigningState(Credential credential, List<Certificate> certificates, List<BundleId> bundleIds,
-                        List<Device> devices, List<Profile> profiles, List<ApnsKey> apnsKeys) {
+                        List<Device> devices, List<Profile> profiles, List<ApnsKey> apnsKeys,
+                        List<AppGroup> appGroups) {
         this.credential = credential == null ? new Credential(false, null, null) : credential;
         this.certificates = immutable(certificates);
         this.bundleIds = immutable(bundleIds);
         this.devices = immutable(devices);
         this.profiles = immutable(profiles);
         this.apnsKeys = immutable(apnsKeys);
+        this.appGroups = immutable(appGroups);
     }
 
     private static <T> List<T> immutable(List<T> values) {
@@ -53,7 +56,7 @@ public final class SigningState {
     }
 
     public static SigningState empty() {
-        return new SigningState(new Credential(false, null, null), null, null, null, null, null);
+        return new SigningState(new Credential(false, null, null), null, null, null, null, null, null);
     }
 
     public record Credential(boolean configured, String keyId, String issuerId) {}
@@ -64,4 +67,5 @@ public final class SigningState {
     public record Profile(Long id, String appleProfileId, String name, String profileType, String bundleId,
                           String uuid, Long expiresAt, String status) {}
     public record ApnsKey(String keyId, String teamId, String displayName, Long createdAt) {}
+    public record AppGroup(String id, String identifier, String name) {}
 }

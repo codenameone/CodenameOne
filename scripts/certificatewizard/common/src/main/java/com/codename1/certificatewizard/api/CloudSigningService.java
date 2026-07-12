@@ -1,6 +1,7 @@
 package com.codename1.certificatewizard.api;
 
 import com.codename1.certificatewizard.cloud.APNsKeysApi;
+import com.codename1.certificatewizard.cloud.AppGroupsApi;
 import com.codename1.certificatewizard.cloud.BundleIDsApi;
 import com.codename1.certificatewizard.cloud.CertificatesApi;
 import com.codename1.certificatewizard.cloud.CredentialApi;
@@ -8,10 +9,12 @@ import com.codename1.certificatewizard.cloud.DevicesApi;
 import com.codename1.certificatewizard.cloud.ProfilesApi;
 import com.codename1.certificatewizard.cloud.model.ApnsKeyRequest;
 import com.codename1.certificatewizard.cloud.model.ApnsKeyStatus;
+import com.codename1.certificatewizard.cloud.model.AppGroupDTO;
 import com.codename1.certificatewizard.cloud.model.AscCredentialRequest;
 import com.codename1.certificatewizard.cloud.model.AscCredentialStatus;
 import com.codename1.certificatewizard.cloud.model.BundleIdDTO;
 import com.codename1.certificatewizard.cloud.model.CapabilityRequest;
+import com.codename1.certificatewizard.cloud.model.CreateAppGroupRequest;
 import com.codename1.certificatewizard.cloud.model.CertDTO;
 import com.codename1.certificatewizard.cloud.model.CreateBundleIdRequest;
 import com.codename1.certificatewizard.cloud.model.CreateCertRequest;
@@ -44,6 +47,7 @@ public final class CloudSigningService implements SigningService {
     private final DevicesApi devicesApi;
     private final ProfilesApi profilesApi;
     private final APNsKeysApi apnsKeysApi;
+    private final AppGroupsApi appGroupsApi;
 
     public CloudSigningService(String baseUrl, String token, String downloadDir) {
         this.baseUrl = baseUrl == null || baseUrl.trim().isEmpty() ? DEFAULT_BASE_URL : baseUrl.trim();
@@ -55,6 +59,7 @@ public final class CloudSigningService implements SigningService {
         devicesApi = DevicesApi.of(this.baseUrl);
         profilesApi = ProfilesApi.of(this.baseUrl);
         apnsKeysApi = APNsKeysApi.of(this.baseUrl);
+        appGroupsApi = AppGroupsApi.of(this.baseUrl);
     }
 
     public void refresh(OnComplete<Result<SigningState>> callback) {
@@ -68,6 +73,7 @@ public final class CloudSigningService implements SigningService {
         final List<DeviceDTO>[] devices = new List[1];
         final List<ProfileDTO>[] profiles = new List[1];
         final List<ApnsKeyStatus>[] apns = new List[1];
+        final List<AppGroupDTO>[] appGroups = new List[1];
 
         credentialApi.getCredential(bearerToken, r1 -> {
             if (authFailure(r1)) {
@@ -80,7 +86,7 @@ public final class CloudSigningService implements SigningService {
             }
             cred[0] = r1.getResponseData();
             if (cred[0] == null || !Boolean.TRUE.equals(cred[0].configured())) {
-                callback.completed(Result.ok(toState(cred[0], null, null, null, null, null)));
+                callback.completed(Result.ok(toState(cred[0], null, null, null, null, null, null)));
                 return;
             }
             certificatesApi.listCertificates(bearerToken, r2 -> {
@@ -133,8 +139,19 @@ public final class CloudSigningService implements SigningService {
                                     return;
                                 }
                                 apns[0] = r6.getResponseData();
-                                callback.completed(Result.ok(toState(cred[0], certs[0], bundles[0],
-                                        devices[0], profiles[0], apns[0])));
+                                appGroupsApi.listAppGroups(bearerToken, r7 -> {
+                                    if (authFailure(r7)) {
+                                        callback.completed(Result.ok(SigningState.empty()));
+                                        return;
+                                    }
+                                    if (!ok(r7)) {
+                                        callback.completed(Result.fail(message(r7)));
+                                        return;
+                                    }
+                                    appGroups[0] = r7.getResponseData();
+                                    callback.completed(Result.ok(toState(cred[0], certs[0], bundles[0],
+                                            devices[0], profiles[0], apns[0], appGroups[0])));
+                                });
                             });
                         });
                     });
@@ -174,12 +191,34 @@ public final class CloudSigningService implements SigningService {
             }
             BundleIdDTO created = r.getResponseData();
             if (push && created != null && created.id() != null) {
-                bundleIdsApi.enableCapability(created.id(), new CapabilityRequest("PUSH_NOTIFICATIONS"),
+                bundleIdsApi.enableCapability(created.id(), new CapabilityRequest("PUSH_NOTIFICATIONS", null),
                         bearerToken, rr -> done(rr, callback));
             } else {
                 callback.completed(Result.ok(null));
             }
         });
+    }
+
+    public void createAppGroup(String identifier, String name, OnComplete<Result<SigningState.AppGroup>> callback) {
+        appGroupsApi.createAppGroup(new CreateAppGroupRequest(identifier, name), bearerToken, r -> {
+            if (!ok(r)) {
+                callback.completed(Result.<SigningState.AppGroup>fail(message(r)));
+                return;
+            }
+            AppGroupDTO created = r.getResponseData();
+            if (created == null) {
+                callback.completed(Result.<SigningState.AppGroup>fail("Server returned no App Group"));
+                return;
+            }
+            callback.completed(Result.ok(new SigningState.AppGroup(created.id(), created.identifier(),
+                    created.name())));
+        });
+    }
+
+    public void enableAppGroupCapability(String bundleIdAppleId, List<String> appGroupIds,
+                                         OnComplete<Result<Void>> callback) {
+        bundleIdsApi.enableCapability(bundleIdAppleId, new CapabilityRequest("APP_GROUPS", appGroupIds),
+                bearerToken, r -> done(r, callback));
     }
 
     public void registerDevice(String name, String udid, OnComplete<Result<Void>> callback) {
@@ -316,7 +355,8 @@ public final class CloudSigningService implements SigningService {
     }
 
     private SigningState toState(AscCredentialStatus cred, List<CertDTO> certs, List<BundleIdDTO> bundles,
-                                 List<DeviceDTO> devices, List<ProfileDTO> profiles, List<ApnsKeyStatus> apns) {
+                                 List<DeviceDTO> devices, List<ProfileDTO> profiles, List<ApnsKeyStatus> apns,
+                                 List<AppGroupDTO> appGroups) {
         List<SigningState.Certificate> outCerts = new ArrayList<SigningState.Certificate>();
         if (certs != null) {
             for (CertDTO c : certs) {
@@ -350,9 +390,15 @@ public final class CloudSigningService implements SigningService {
                 outApns.add(new SigningState.ApnsKey(a.keyId(), a.teamId(), a.displayName(), a.createdAt()));
             }
         }
+        List<SigningState.AppGroup> outGroups = new ArrayList<SigningState.AppGroup>();
+        if (appGroups != null) {
+            for (AppGroupDTO g : appGroups) {
+                outGroups.add(new SigningState.AppGroup(g.id(), g.identifier(), g.name()));
+            }
+        }
         SigningState.Credential c = cred == null ? new SigningState.Credential(false, null, null)
                 : new SigningState.Credential(Boolean.TRUE.equals(cred.configured()), cred.keyId(), cred.issuerId());
-        return new SigningState(c, outCerts, outBundles, outDevices, outProfiles, outApns);
+        return new SigningState(c, outCerts, outBundles, outDevices, outProfiles, outApns, outGroups);
     }
 
     private void saveBytes(Response<byte[]> response, String suggestedName, OnComplete<Result<String>> callback) {
