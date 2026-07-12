@@ -103,8 +103,17 @@
 #include <string.h>
 #include <time.h>
 
-/* C++/WinRT + Windows App SDK (projection headers generated from the WinAppSDK
- * winmd; shipped in the SDK layout CN1_WINAPPSDK_DIR points at). */
+/* Classic COM interop: <unknwn.h> must precede winrt/base.h so C++/WinRT
+ * enables its ::IUnknown integration -- this file implements a classic
+ * IClassFactory through winrt::implements and converts GUID <-> winrt::guid in
+ * CreateInstance's `.as(iid, result)`. The full <windows.h> above already pulls
+ * unknwn.h in transitively (WIN32_LEAN_AND_MEAN is not defined yet at this
+ * point), but the projection would silently degrade if that ever changed, so
+ * the dependency is spelled out. */
+#include <unknwn.h>
+
+/* C++/WinRT + Windows App SDK (projection headers generated with cppwinrt.exe
+ * from the WinAppSDK winmd into the SDK layout CN1_WINAPPSDK_DIR points at). */
 #include <winrt/base.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Microsoft.Windows.Widgets.h>

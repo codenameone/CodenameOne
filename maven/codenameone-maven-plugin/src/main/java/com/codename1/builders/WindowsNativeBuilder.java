@@ -397,7 +397,7 @@ public class WindowsNativeBuilder extends Executor {
      * </ul>
      *
      * <p>Hardware-backed / cloud keys (the post-2023 CA/B requirement -- Azure Trusted
-     * Signing, DigiCert KeyLocker, …) are reached by pointing the above at a
+     * Signing, DigiCert KeyLocker, ...) are reached by pointing the above at a
      * PKCS#11-fronted credential per the signing service's docs; the command shape is
      * the same.</p>
      */
@@ -514,10 +514,19 @@ public class WindowsNativeBuilder extends Executor {
      * Build-time requirements when windows.msix=true:
      *   - CN1_WINAPPSDK_DIR must point at a Windows App SDK layout with
      *     include/ (C++/WinRT projections + MddBootstrap.h), lib/<x64|arm64>/
+     *     or the raw nupkg's lib/win10-<x64|arm64>/
      *     (Microsoft.WindowsAppRuntime.Bootstrap.lib) and optionally
-     *     bin/<arch>/Microsoft.WindowsAppRuntime.Bootstrap.dll (copied into the
-     *     package next to the exe). Paths must not contain spaces (they travel
-     *     through CMake flag strings).
+     *     bin/<arch>/ or runtimes/win10-<arch>/native/
+     *     Microsoft.WindowsAppRuntime.Bootstrap.dll (copied into the package
+     *     next to the exe). Note the Microsoft.WindowsAppSDK NuGet package
+     *     ships only winmd metadata, NOT prebuilt C++/WinRT headers: generate
+     *     the projections into include/ with cppwinrt.exe (the
+     *     Microsoft.Windows.CppWinRT package), e.g.
+     *       cppwinrt -in lib/uap10.0/Microsoft.Windows.Widgets.winmd -in local
+     *                -output include
+     *     -- the same recipe the widgetboard-compile-check CI job uses
+     *     (.github/workflows/parparvm-tests-windows.yml). Paths must not
+     *     contain spaces (they travel through CMake flag strings).
      *   - `makemsix` (the cross-platform msix-packaging tool) must be on PATH
      *     (CN1_MAKEMSIX overrides), so the Linux build daemon can pack without
      *     a Windows host.
@@ -547,8 +556,11 @@ public class WindowsNativeBuilder extends Executor {
             throw new BuildException("windows.msix=true compiles the Windows 11 Widgets Board provider, "
                     + "which needs the Windows App SDK headers and libs. Point the CN1_WINAPPSDK_DIR "
                     + "environment variable at a layout containing include/ (C++/WinRT projections + "
-                    + "MddBootstrap.h) and lib/<x64|arm64>/Microsoft.WindowsAppRuntime.Bootstrap.lib "
-                    + "(extract them from the Microsoft.WindowsAppSDK NuGet package).");
+                    + "MddBootstrap.h) and lib/<x64|arm64>/ (or the raw nupkg's lib/win10-<arch>/) "
+                    + "Microsoft.WindowsAppRuntime.Bootstrap.lib. Extract the layout from the "
+                    + "Microsoft.WindowsAppSDK NuGet package, then generate the C++/WinRT projection "
+                    + "headers into include/ with cppwinrt.exe (Microsoft.Windows.CppWinRT package): "
+                    + "cppwinrt -in lib/uap10.0/Microsoft.Windows.Widgets.winmd -in local -output include");
         }
         File dir = new File(path);
         if (!new File(dir, "include").isDirectory()) {
@@ -563,9 +575,22 @@ public class WindowsNativeBuilder extends Executor {
         return " /DCN1_WIDGETBOARD=1 /I" + new File(winAppSdk, "include").getAbsolutePath();
     }
 
-    /** Linker flags adding the WindowsAppRuntime bootstrap import library. */
+    /**
+     * Linker flags adding the WindowsAppRuntime bootstrap import library.
+     * Accepts both the documented lib/&lt;arch&gt;/ layout and the raw NuGet
+     * package's lib/win10-&lt;arch&gt;/ layout, so an extracted
+     * Microsoft.WindowsAppSDK nupkg works as CN1_WINAPPSDK_DIR without
+     * re-arranging directories.
+     */
     private static String widgetBoardLinkFlags(File winAppSdk, String arch) {
-        File libDir = new File(winAppSdk, "lib/" + normalizeArch(arch));
+        String normalized = normalizeArch(arch);
+        File libDir = new File(winAppSdk, "lib/" + normalized);
+        if (!new File(libDir, "Microsoft.WindowsAppRuntime.Bootstrap.lib").isFile()) {
+            File nupkgLayout = new File(winAppSdk, "lib/win10-" + normalized);
+            if (new File(nupkgLayout, "Microsoft.WindowsAppRuntime.Bootstrap.lib").isFile()) {
+                libDir = nupkgLayout;
+            }
+        }
         return " /libpath:" + libDir.getAbsolutePath() + " Microsoft.WindowsAppRuntime.Bootstrap.lib";
     }
 
@@ -594,11 +619,20 @@ public class WindowsNativeBuilder extends Executor {
 
             // The provider binds the WindowsAppRuntime via MddBootstrapInitialize,
             // which needs Microsoft.WindowsAppRuntime.Bootstrap.dll next to the
-            // exe. Copy it out of the SDK layout when present; otherwise the
-            // developer must add it to the package manually.
+            // exe. Copy it out of the SDK layout when present (either the
+            // documented bin/<arch>/ layout or the raw nupkg's
+            // runtimes/win10-<arch>/native/); otherwise the developer must add
+            // it to the package manually.
             File winAppSdk = resolveWinAppSdkDir();
             File bootstrapDll = new File(winAppSdk,
                     "bin/" + normalizeArch(arch) + "/Microsoft.WindowsAppRuntime.Bootstrap.dll");
+            if (!bootstrapDll.isFile()) {
+                File nupkgDll = new File(winAppSdk, "runtimes/win10-" + normalizeArch(arch)
+                        + "/native/Microsoft.WindowsAppRuntime.Bootstrap.dll");
+                if (nupkgDll.isFile()) {
+                    bootstrapDll = nupkgDll;
+                }
+            }
             if (bootstrapDll.isFile()) {
                 copy(bootstrapDll, new File(layout, "Microsoft.WindowsAppRuntime.Bootstrap.dll"));
             } else {
