@@ -186,14 +186,22 @@ public class PaletteOverrideThemeScreenshotTest extends DualAppearanceBaseTest {
     private void assertPaletteApplied(Button primary, Button text, Button disabled, String suffix) {
         int primaryBg = primary.getUnselectedStyle().getBgColor();
         int textFg = text.getUnselectedStyle().getFgColor();
+        int textBg = text.getUnselectedStyle().getBgColor();
         int disabledBg = disabled.getDisabledStyle().getBgColor();
         boolean iosTheme = "ios".equals(Display.getInstance().getPlatformName())
                 || suffix.startsWith("ios_");
-        if (primaryBg != 0xff2d95 || textFg != 0xff2d95
+        // iOS Button is a text-accent glass pill. Material Button is the
+        // filled primary action, so its background (not foreground) carries
+        // the accent while the label remains on-primary white.
+        boolean textAccentApplied = iosTheme
+                ? textFg == 0xff2d95
+                : textBg == 0xff2d95;
+        if (primaryBg != 0xff2d95 || !textAccentApplied
                 || (iosTheme && disabledBg != 0x00b894)) {
             throw new AssertionError("Palette override missing in " + suffix
                     + ": Raised.bg=" + Integer.toHexString(primaryBg)
                     + " Button.fg=" + Integer.toHexString(textFg)
+                    + " Button.bg=" + Integer.toHexString(textBg)
                     + " Raised.disabled.bg=" + Integer.toHexString(disabledBg));
         }
     }
