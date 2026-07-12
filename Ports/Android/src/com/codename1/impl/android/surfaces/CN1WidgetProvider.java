@@ -45,7 +45,14 @@ import org.json.JSONObject;
 ///
 /// Entry flips are scheduled with an *inexact* `AlarmManager.setWindow` (30 second window): no
 /// `SCHEDULE_EXACT_ALARM` permission is required and second-precision countdowns are covered by
-/// the natively ticking `Chronometer`, not by re-renders. When an `atEnd` timeline is exhausted
+/// the natively ticking `Chronometer`, not by re-renders. Apps that need to-the-second entry
+/// flips can opt in with the `android.surfaces.exactAlarms=true` build hint (default `false`):
+/// the build then declares `SCHEDULE_EXACT_ALARM` and records the choice in the
+/// `com.codename1.surfaces.EXACT_ALARMS` application meta-data entry this provider reads. With
+/// the hint on, flips use `setExactAndAllowWhileIdle` -- on Android 12+ (API 31) only while
+/// `AlarmManager.canScheduleExactAlarms()` reports the special app access is still granted,
+/// silently falling back to the inexact window when the user revokes it; below API 31 exact
+/// alarms need no special access. When an `atEnd` timeline is exhausted
 /// (or nothing was published yet) the last known content stays on screen while the widget pulls
 /// the app: if the app declares `com.codename1.background.BackgroundFetch` its fetch service is
 /// started -- throttled to once per 15 minutes per kind -- so it can fetch data and re-publish
@@ -240,13 +247,52 @@ public abstract class CN1WidgetProvider extends AppWidgetProvider {
             }
             PendingIntent pi = PendingIntent.getBroadcast(context, getKindId().hashCode(),
                     intent, flags);
-            if (Build.VERSION.SDK_INT >= 19) {
+            if (exactAlarmsRequested(context) && canScheduleExactAlarms(am)) {
+                if (Build.VERSION.SDK_INT >= 23) {
+                    am.setExactAndAllowWhileIdle(AlarmManager.RTC, next, pi);
+                } else if (Build.VERSION.SDK_INT >= 19) {
+                    am.setExact(AlarmManager.RTC, next, pi);
+                } else {
+                    am.set(AlarmManager.RTC, next, pi);
+                }
+            } else if (Build.VERSION.SDK_INT >= 19) {
                 am.setWindow(AlarmManager.RTC, next, FLIP_WINDOW_MILLIS, pi);
             } else {
                 am.set(AlarmManager.RTC, next, pi);
             }
         } catch (Throwable t) {
             Log.w(TAG, "Failed to schedule the next timeline entry flip", t);
+        }
+    }
+
+    /// True when the build injected the `com.codename1.surfaces.EXACT_ALARMS` application
+    /// meta-data entry, i.e. the app opted in with the `android.surfaces.exactAlarms` build
+    /// hint. Any failure reads as "not requested" so the inexact default keeps working.
+    private static boolean exactAlarmsRequested(Context context) {
+        try {
+            android.content.pm.ApplicationInfo ai = context.getPackageManager()
+                    .getApplicationInfo(context.getPackageName(),
+                            android.content.pm.PackageManager.GET_META_DATA);
+            return ai != null && ai.metaData != null
+                    && ai.metaData.getBoolean("com.codename1.surfaces.EXACT_ALARMS", false);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /// On Android 12+ (API 31) `SCHEDULE_EXACT_ALARM` is special app access the user can
+    /// revoke, so `AlarmManager.canScheduleExactAlarms()` gates every exact schedule; the
+    /// method is invoked reflectively because the port compiles against an older SDK. Below
+    /// API 31 exact alarms need no special access.
+    private static boolean canScheduleExactAlarms(AlarmManager am) {
+        if (Build.VERSION.SDK_INT < 31) {
+            return true;
+        }
+        try {
+            Object can = am.getClass().getMethod("canScheduleExactAlarms").invoke(am);
+            return Boolean.TRUE.equals(can);
+        } catch (Throwable t) {
+            return false;
         }
     }
 }

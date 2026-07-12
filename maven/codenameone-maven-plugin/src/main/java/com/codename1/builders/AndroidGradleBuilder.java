@@ -2208,6 +2208,15 @@ public class AndroidGradleBuilder extends Executor {
                     .append("                  android:excludeFromRecents=\"true\"\n")
                     .append("                  android:noHistory=\"true\"\n")
                     .append("                  android:taskAffinity=\"\" />\n");
+            if ("true".equals(request.getArg("android.surfaces.exactAlarms", "false"))) {
+                // opt-in exact timeline entry flips: declare the special-access permission
+                // and surface the choice to the runtime provider through application
+                // meta-data (read via PackageManager.getApplicationInfo). The provider
+                // still falls back to inexact setWindow when the user revokes the access.
+                surfaceReceivers.append("        <meta-data android:name=\"com.codename1.surfaces.EXACT_ALARMS\" android:value=\"true\" />\n");
+                permissions += permissionAdd(request, "\"android.permission.SCHEDULE_EXACT_ALARM\"",
+                        "    <uses-permission android:name=\"android.permission.SCHEDULE_EXACT_ALARM\" />\n");
+            }
             surfacesManifestEntries = surfaceReceivers.toString();
             if (surfacesLiveActivities) {
                 // live activities lower to ongoing notifications; Android 13+ needs the
