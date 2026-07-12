@@ -2452,19 +2452,19 @@ public class CSSTheme {
 
                 currToken = "border";
                 if (!el.requiresImageBorder(unselectedStyles) && !el.requiresBackgroundImageGeneration(unselectedStyles)) {
-                    res.setThemeProperty(themeName, unselId+".border", el.getThemeBorder(unselectedStyles));
+                    res.setThemeProperty(themeName, unselId+".border", el.getUnselected().getThemeBorder(unselectedStyles));
                 }
                 currToken = "selected border";
                 if (!el.requiresImageBorder(selectedStyles) && !el.requiresBackgroundImageGeneration(selectedStyles)) {
-                    res.setThemeProperty(themeName, selId+"#border", el.getThemeBorder(selectedStyles));
+                    res.setThemeProperty(themeName, selId+"#border", el.getSelected().getThemeBorder(selectedStyles));
                 }
                 currToken = "pressed border";
                 if (!el.requiresImageBorder(pressedStyles) && !el.requiresBackgroundImageGeneration(pressedStyles)) {
-                    res.setThemeProperty(themeName, pressedId+"#border", el.getThemeBorder(pressedStyles));
+                    res.setThemeProperty(themeName, pressedId+"#border", el.getPressed().getThemeBorder(pressedStyles));
                 }
                 currToken = "disabled border";
                 if (!el.requiresImageBorder(disabledStyles) && !el.requiresBackgroundImageGeneration(disabledStyles)) {
-                    res.setThemeProperty(themeName, disabledId+"#border", el.getThemeBorder(disabledStyles));
+                    res.setThemeProperty(themeName, disabledId+"#border", el.getDisabled().getThemeBorder(disabledStyles));
                 }
 
             
@@ -5731,7 +5731,8 @@ public class CSSTheme {
         }
         
         
-        private com.codename1.ui.plaf.Border createRoundBorder(Map<String,LexicalUnit> styles) {
+        private com.codename1.ui.plaf.Border createRoundBorder(Map<String,LexicalUnit> styles,
+                boolean runtimeBackgroundBinding) {
             // We create a round border
             LexicalUnit backgroundColor = styles.get("background-color");
 
@@ -5793,8 +5794,9 @@ public class CSSTheme {
                 // own field. Only flip when the binding is present so
                 // legacy themes that rely on the baked-color path keep
                 // their existing rendering.
-                if (backgroundColor instanceof ScaledUnit
-                        && ((ScaledUnit) backgroundColor).bindingVarName != null) {
+                if (runtimeBackgroundBinding
+                        || (backgroundColor instanceof ScaledUnit
+                        && ((ScaledUnit) backgroundColor).bindingVarName != null)) {
                     out.uiid(true);
                 }
             } else {
@@ -6256,7 +6258,14 @@ public class CSSTheme {
             
             
             if (cn1BackgroundType != null && usesRoundBorder(styles)) {
-                return createRoundBorder(styles);
+                // Flattened style maps can retain the resolved var() color while
+                // losing ScaledUnit.bindingVarName. resolveBinding() is the
+                // authoritative source used to emit @cn1-bind metadata, and the
+                // state Element on which this method is invoked preserves it.
+                // A bound pill must paint through Style.bgColor at runtime or its
+                // RoundBorder will keep showing the compile-time fallback color.
+                return createRoundBorder(styles,
+                        resolveBinding("background-color") != null);
             }
             // Prefer RoundRectBorder for the simple border-radius case
             // (no border-image, no compound per-side borders). The JS

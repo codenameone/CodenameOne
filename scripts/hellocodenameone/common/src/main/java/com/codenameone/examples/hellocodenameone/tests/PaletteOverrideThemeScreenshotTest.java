@@ -191,7 +191,7 @@ public class PaletteOverrideThemeScreenshotTest extends DualAppearanceBaseTest {
                 || suffix.startsWith("ios_");
         if (primaryBg != 0xff2d95 || textFg != 0xff2d95
                 || (iosTheme && disabledBg != 0x00b894)) {
-            fail("Palette override missing in " + suffix
+            throw new AssertionError("Palette override missing in " + suffix
                     + ": Raised.bg=" + Integer.toHexString(primaryBg)
                     + " Button.fg=" + Integer.toHexString(textFg)
                     + " Raised.disabled.bg=" + Integer.toHexString(disabledBg));

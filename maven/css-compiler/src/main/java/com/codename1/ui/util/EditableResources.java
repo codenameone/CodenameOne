@@ -2293,8 +2293,12 @@ public class EditableResources extends Resources implements TreeModel {
     private void writeBorder(DataOutputStream output, Border border, boolean newVersion) throws IOException {
         
         if(border instanceof RoundBorder) {
-            output.writeShort(0xff12);
             RoundBorder rb = (RoundBorder)border;
+            // 0xff12 has no room for RoundBorder.uiid. Preserve its legacy
+            // layout for ordinary borders and use 0xff17 only when the border
+            // must paint through the component Style (e.g. a runtime-bound
+            // accent pill).
+            output.writeShort(rb.getUIID() ? 0xff17 : 0xff12);
             output.writeBoolean(rb.isRectangle());
             output.writeInt(rb.getColor());
             output.writeInt(rb.getOpacity());
@@ -2308,6 +2312,9 @@ public class EditableResources extends Resources implements TreeModel {
             output.writeBoolean(rb.isShadowMM());
             output.writeFloat(rb.getShadowX());
             output.writeFloat(rb.getShadowY());
+            if (rb.getUIID()) {
+                output.writeBoolean(true);
+            }
             return;
         }
         if (border instanceof CSSBorder) {

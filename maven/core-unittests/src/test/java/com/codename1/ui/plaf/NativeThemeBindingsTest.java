@@ -12,6 +12,7 @@ import java.util.Hashtable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * End-to-end check: load the shipped iOS Modern native theme `.res`,
@@ -61,6 +62,12 @@ public class NativeThemeBindingsTest extends UITestBase {
         assertEquals("accent-disabled-color", theme.get("@cn1-bind:RaisedButton.dis#bgColor"));
         assertEquals("accent-color-dark", theme.get("@cn1-bind:$DarkButton.fgColor"));
         assertEquals("accent-disabled-color-dark", theme.get("@cn1-bind:$DarkRaisedButton.dis#bgColor"));
+        assertTrue(theme.get("RaisedButton.border") instanceof RoundBorder);
+        assertTrue(((RoundBorder) theme.get("RaisedButton.border")).getUIID(),
+                "A var()-bound pill must paint from Style.bgColor so runtime palette overrides are visible");
+        assertTrue(theme.get("RaisedButton.dis#border") instanceof RoundBorder);
+        assertTrue(((RoundBorder) theme.get("RaisedButton.dis#border")).getUIID(),
+                "Disabled var()-bound pills must also paint from their rebound Style.bgColor");
         // `#Constants { --accent-color: #007aff; }` in the native
         // theme.css is exported as a `@accent-color` theme constant so
         // a user app's theme.css can override it via the same syntax.
