@@ -654,7 +654,10 @@ pthread_mutex_t* getMemoryAccessMutex() {
 }
 
 int findPointerPosInHeap(JAVA_OBJECT obj) {
-    if(obj == 0) {
+    // Tagged Integers are immediate values, not heap objects, and therefore have
+    // no header/heap position to read.  Keep this low-level helper total so a
+    // caller can never turn a legal boxed Integer into a tagged-pointer fault.
+    if(obj == 0 || CN1_IS_TAGGED(obj)) {
         return -1;
     }
     return obj->__heapPosition;
@@ -1626,6 +1629,15 @@ void codenameOneGCSweep() {
 }
 
 JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
+    // A tagged Integer has no heap entry to remove (and no object header).  Static
+    // final boxed values reach this path because the translator historically
+    // removes immutable static finals from the heap collection.  Treat the
+    // immediate as already outside the heap instead of falling through to a
+    // header dereference in findPointerPosInHeap().
+    if(o != JAVA_NULL && CN1_IS_TAGGED(o)) {
+        return JAVA_TRUE;
+    }
+
     // Initialize allObjectsInHeap if it hasn't been initialized yet
     // This can happen if GC runs before any objects are allocated
     if(allObjectsInHeap == 0) {
