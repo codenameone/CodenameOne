@@ -49,18 +49,36 @@
  * the bridge premultiplies while copying. Reading/writing whole uint32 values
  * keeps the channel layout correct on both little and big endian hosts.
  *
- * WAYLAND HONESTY: a Wayland compositor exposes no global window positioning,
- * no keep-above and no stick to ordinary clients -- gtk_window_move /
+ * WAYLAND: a Wayland compositor exposes no global window positioning, no
+ * keep-above and no stick to ordinary clients -- gtk_window_move /
  * gtk_window_set_keep_above / gtk_window_stick are silent no-ops there, and
- * configure-event reports (0,0). Widgets degrade to plain floating windows the
- * user positions manually (interactive moves via gtk_window_begin_move_drag
- * still work); the full applet behavior needs X11 or XWayland. Layering the
- * widgets properly under Wayland via gtk-layer-shell (dlopen'd, like libnotify)
- * is a noted future enhancement. Like the rest of this port, this unit has not
- * yet been exercised on real GTK hardware.
+ * configure-event reports (0,0). The behavior matrix is therefore:
+ *
+ *   - X11 (and XWayland):  the EWMH recipe above; gtk_window_move positions
+ *     globally, configure-event feeds the position cache, interactive moves go
+ *     through gtk_window_begin_move_drag. Unchanged.
+ *   - Wayland + layer-shell (wlroots family: Sway/Hyprland/Wayfire, and KDE
+ *     Plasma): gtk-layer-shell is dlopen'd (never linked, mirroring the
+ *     optional-library convention of cn1_linux_services.c) and each window
+ *     becomes a zwlr_layer_shell_v1 surface -- widgets on LAYER_BOTTOM (above
+ *     the wallpaper, under normal windows, the conventional desktop-applet
+ *     slot), the live-activity pill on LAYER_TOP. Position maps to LEFT/TOP
+ *     anchors + margins, so the persisted x/y round-trips as margins; the
+ *     pill's x == -1 centering sentinel anchors TOP only (layer-shell centers
+ *     a surface anchored to neither horizontal edge). Layer surfaces cannot
+ *     use gtk_window_begin_move_drag, so dragging is manual: a press outside
+ *     the hit-rects starts an implicit-grab drag that live-updates the margins
+ *     from motion deltas and pushes "moved" for persistence on release.
+ *   - Wayland without layer-shell (GNOME Mutter, or the library missing):
+ *     plain floating windows the user positions manually via the
+ *     compositor-driven gtk_window_begin_move_drag; no global placement.
+ *
+ * Like the rest of this port, this unit has not yet been exercised on real
+ * GTK hardware.
  */
 
 #include "cn1_linux_gfx.h"
+#include <dlfcn.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -68,6 +86,81 @@
 
 extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char* str);
 extern GtkWidget* cn1LinuxWindowWidget(void);
+
+/* --- gtk-layer-shell (libgtk-layer-shell.so.0) ------------------------------
+ * dlopen'd at first widget creation, following the optional-library loader
+ * convention of cn1_linux_services.c (libnotify et al). One deliberate
+ * difference: the services unit includes the optional headers and types its
+ * pointers with __typeof__, but gtk-layer-shell's -dev package is far less
+ * ubiquitous than libnotify's, so the handful of entry points and enum values
+ * are declared here verbatim from gtk-layer-shell.h (they are stable ABI since
+ * 0.6). A missing library, a missing symbol or gtk_layer_is_supported() ==
+ * FALSE all leave cn1_layershell_state at -1 and the pre-existing EWMH code
+ * path runs untouched. */
+
+#define CN1_LAYER_SHELL_LAYER_BOTTOM 1      /* GTK_LAYER_SHELL_LAYER_BOTTOM */
+#define CN1_LAYER_SHELL_LAYER_TOP 2         /* GTK_LAYER_SHELL_LAYER_TOP */
+#define CN1_LAYER_SHELL_EDGE_LEFT 0         /* GTK_LAYER_SHELL_EDGE_LEFT */
+#define CN1_LAYER_SHELL_EDGE_RIGHT 1        /* GTK_LAYER_SHELL_EDGE_RIGHT */
+#define CN1_LAYER_SHELL_EDGE_TOP 2          /* GTK_LAYER_SHELL_EDGE_TOP */
+#define CN1_LAYER_SHELL_KEYBOARD_MODE_NONE 0 /* GTK_LAYER_SHELL_KEYBOARD_MODE_NONE */
+
+/* The real signatures take GtkLayerShellLayer/Edge/KeyboardMode enums; plain C
+ * enums have int-compatible calling conventions on every ABI this port targets,
+ * so int parameters keep these declarations header-free. */
+static void (*p_gtk_layer_init_for_window)(GtkWindow* window);
+static gboolean (*p_gtk_layer_is_supported)(void);
+static void (*p_gtk_layer_set_layer)(GtkWindow* window, int layer);
+static void (*p_gtk_layer_set_anchor)(GtkWindow* window, int edge, gboolean anchorToEdge);
+static void (*p_gtk_layer_set_margin)(GtkWindow* window, int edge, int marginSize);
+static void (*p_gtk_layer_set_exclusive_zone)(GtkWindow* window, int exclusiveZone);
+static void (*p_gtk_layer_set_keyboard_mode)(GtkWindow* window, int mode);
+static int cn1_layershell_state = 0; /* 0 = untried, 1 = active, -1 = unavailable */
+
+/* GTK main thread only: gtk_layer_is_supported() inspects the default display,
+ * and the state variable is unsynchronized by design (every reader runs on the
+ * GTK main loop). Returns 1 when layer-shell surfaces can actually be created. */
+static int cn1LoadLayerShell(void) {
+    void* h;
+    int ok = 1;
+    if (cn1_layershell_state) {
+        return cn1_layershell_state > 0;
+    }
+    h = dlopen("libgtk-layer-shell.so.0", RTLD_LAZY | RTLD_GLOBAL);
+    if (!h) {
+        h = dlopen("libgtk-layer-shell.so", RTLD_LAZY | RTLD_GLOBAL);
+    }
+    if (!h) {
+        cn1_layershell_state = -1;
+        if (g_getenv("WAYLAND_DISPLAY")) {
+            cn1LinuxStubOnce("gtk-layer-shell not installed; Wayland widgets degrade to plain floating windows");
+        }
+        return 0;
+    }
+#define CN1_LAYER_SYM(ptr, name) do { *(void**)(&ptr) = dlsym(h, name); if (!(ptr)) { ok = 0; } } while (0)
+    CN1_LAYER_SYM(p_gtk_layer_init_for_window, "gtk_layer_init_for_window");
+    CN1_LAYER_SYM(p_gtk_layer_is_supported, "gtk_layer_is_supported");
+    CN1_LAYER_SYM(p_gtk_layer_set_layer, "gtk_layer_set_layer");
+    CN1_LAYER_SYM(p_gtk_layer_set_anchor, "gtk_layer_set_anchor");
+    CN1_LAYER_SYM(p_gtk_layer_set_margin, "gtk_layer_set_margin");
+    CN1_LAYER_SYM(p_gtk_layer_set_exclusive_zone, "gtk_layer_set_exclusive_zone");
+    CN1_LAYER_SYM(p_gtk_layer_set_keyboard_mode, "gtk_layer_set_keyboard_mode");
+#undef CN1_LAYER_SYM
+    if (!ok) {
+        cn1_layershell_state = -1;
+        cn1LinuxStubOnce("gtk-layer-shell present but an expected symbol was missing; Wayland widgets degrade to plain floating windows");
+        return 0;
+    }
+    if (!p_gtk_layer_is_supported()) {
+        /* X11 session (layer-shell is a Wayland protocol) or a Wayland
+         * compositor without zwlr_layer_shell_v1 (GNOME Mutter). Quiet: this is
+         * the normal, documented degradation, not a missing dependency. */
+        cn1_layershell_state = -1;
+        return 0;
+    }
+    cn1_layershell_state = 1;
+    return 1;
+}
 
 /* ------------------------------------------------------------- slot table */
 
@@ -84,8 +177,13 @@ typedef struct {
     int imgW, imgH;             /* pixel-buffer size (draw scales to winW/winH) */
     int* hitRects;              /* x,y,w,h quads, window coords; cn1WidgetLock */
     int hitRectCount;           /* number of quads; cn1WidgetLock */
-    int x, y;                   /* last known window position; cn1WidgetLock */
+    int x, y;                   /* last known window position; cn1WidgetLock.
+                                 * Under layer-shell these are the LEFT/TOP
+                                 * margins (x == -1 = centered horizontally). */
     gint64 lastMovePush;        /* monotonic us of the last "moved" event; GTK thread */
+    int layered;                /* window is a layer-shell surface; GTK thread */
+    int dragging;               /* manual layer-shell drag in flight; GTK thread */
+    double dragPressX, dragPressY; /* press point, window coords; GTK thread */
 } CN1WidgetSlot;
 
 static CN1WidgetSlot cn1Widgets[CN1_WIDGET_SLOTS];
@@ -146,6 +244,34 @@ char* cn1LinuxWidgetPollEvent(void) {
     return msg;
 }
 
+/* Applies an x/y position to a layer-shell surface: anchored to the output's
+ * top-left corner with the coordinates as margins, so the persisted geometry
+ * round-trips 1:1 through widgetGetX/Y. x == -1 (the live-activity pill's
+ * docking sentinel) anchors TOP only -- layer-shell centers a surface anchored
+ * to neither horizontal edge -- and promotes the surface to LAYER_TOP so the
+ * pill floats above normal windows like a system status surface, while
+ * ordinary widgets sit on LAYER_BOTTOM above the wallpaper. GTK main thread
+ * only; the caller updates the cached slot x/y itself. */
+static void cn1WidgetLayerPosition(GtkWidget* win, int x, int y) {
+    GtkWindow* w = GTK_WINDOW(win);
+    if (y < 0) {
+        y = 0;
+    }
+    if (x < 0) {
+        p_gtk_layer_set_anchor(w, CN1_LAYER_SHELL_EDGE_LEFT, FALSE);
+        p_gtk_layer_set_anchor(w, CN1_LAYER_SHELL_EDGE_RIGHT, FALSE);
+        p_gtk_layer_set_margin(w, CN1_LAYER_SHELL_EDGE_LEFT, 0);
+        p_gtk_layer_set_layer(w, CN1_LAYER_SHELL_LAYER_TOP);
+    } else {
+        p_gtk_layer_set_anchor(w, CN1_LAYER_SHELL_EDGE_RIGHT, FALSE);
+        p_gtk_layer_set_anchor(w, CN1_LAYER_SHELL_EDGE_LEFT, TRUE);
+        p_gtk_layer_set_margin(w, CN1_LAYER_SHELL_EDGE_LEFT, x);
+        p_gtk_layer_set_layer(w, CN1_LAYER_SHELL_LAYER_BOTTOM);
+    }
+    p_gtk_layer_set_anchor(w, CN1_LAYER_SHELL_EDGE_TOP, TRUE);
+    p_gtk_layer_set_margin(w, CN1_LAYER_SHELL_EDGE_TOP, y);
+}
+
 /* --------------------------------------------------------- GTK callbacks */
 
 static gboolean cn1WidgetOnDraw(GtkWidget* widget, cairo_t* cr, gpointer data) {
@@ -191,13 +317,90 @@ static gboolean cn1WidgetOnButton(GtkWidget* widget, GdkEventButton* e, gpointer
     pthread_mutex_unlock(&cn1WidgetLock);
     if (hit) {
         cn1WidgetPushEvent(id, "click", x, y);
+    } else if (s->layered) {
+        /* Layer-shell surfaces cannot be moved by gtk_window_begin_move_drag
+         * (the compositor does not treat them as movable toplevels): run a
+         * manual drag off the implicit pointer grab instead. Motion deltas
+         * from the press point update the margins live; releasing pushes the
+         * final "moved" event for persistence. */
+        s->dragging = 1;
+        s->dragPressX = e->x;
+        s->dragPressY = e->y;
     } else {
-        /* Anywhere outside an action rectangle drags the applet. Under Wayland
-         * this is the ONE positioning primitive that still works (the
-         * compositor drives the move). */
+        /* Anywhere outside an action rectangle drags the applet. On plain
+         * Wayland (no layer-shell) this is the ONE positioning primitive that
+         * still works (the compositor drives the move). */
         gtk_window_begin_move_drag(GTK_WINDOW(widget), (gint) e->button,
                 (gint) e->x_root, (gint) e->y_root, e->time);
     }
+    return TRUE;
+}
+
+static gboolean cn1WidgetOnMotion(GtkWidget* widget, GdkEventMotion* e, gpointer data) {
+    CN1WidgetSlot* s = (CN1WidgetSlot*) data;
+    int dx, dy, nx, ny;
+    gint64 id, now;
+    (void) widget;
+    if (!s->dragging || !s->window) {
+        return FALSE;
+    }
+    /* Window-relative delta from the press point: applying it to the margins
+     * moves the surface under the pointer, which drives the next event's
+     * window coordinates back toward the press point (the classic manual-drag
+     * feedback loop, needed because Wayland exposes no global pointer). */
+    dx = (int) (e->x - s->dragPressX);
+    dy = (int) (e->y - s->dragPressY);
+    if (dx == 0 && dy == 0) {
+        return TRUE;
+    }
+    pthread_mutex_lock(&cn1WidgetLock);
+    id = s->id;
+    nx = s->x;
+    ny = s->y;
+    pthread_mutex_unlock(&cn1WidgetLock);
+    if (nx >= 0) {
+        /* A centered surface (x == -1, the pill) stays centered: only the
+         * vertical margin follows the drag. */
+        nx += dx;
+        if (nx < 0) {
+            nx = 0;
+        }
+    }
+    ny += dy;
+    if (ny < 0) {
+        ny = 0;
+    }
+    cn1WidgetLayerPosition(s->window, nx, ny);
+    pthread_mutex_lock(&cn1WidgetLock);
+    s->x = nx;
+    s->y = ny;
+    pthread_mutex_unlock(&cn1WidgetLock);
+    now = g_get_monotonic_time();
+    if (now - s->lastMovePush >= CN1_WIDGET_MOVE_THROTTLE_US) {
+        s->lastMovePush = now;
+        cn1WidgetPushEvent(id, "moved", nx, ny);
+    }
+    return TRUE;
+}
+
+static gboolean cn1WidgetOnRelease(GtkWidget* widget, GdkEventButton* e, gpointer data) {
+    CN1WidgetSlot* s = (CN1WidgetSlot*) data;
+    gint64 id;
+    int x, y;
+    (void) widget;
+    (void) e;
+    if (!s->dragging) {
+        return FALSE;
+    }
+    s->dragging = 0;
+    pthread_mutex_lock(&cn1WidgetLock);
+    id = s->id;
+    x = s->x;
+    y = s->y;
+    pthread_mutex_unlock(&cn1WidgetLock);
+    /* Unthrottled: the drop position is what the Java side persists. */
+    s->lastMovePush = g_get_monotonic_time();
+    cn1WidgetPushEvent(id, "moved", x, y);
     return TRUE;
 }
 
@@ -206,6 +409,11 @@ static gboolean cn1WidgetOnConfigure(GtkWidget* widget, GdkEventConfigure* e, gp
     gint64 id = 0;
     int movedNow = 0;
     (void) widget;
+    if (s->layered) {
+        /* Wayland configure-events carry no meaningful position; the margins
+         * cached by cn1WidgetLayerPosition are the authoritative geometry. */
+        return FALSE;
+    }
     pthread_mutex_lock(&cn1WidgetLock);
     if (s->x != e->x || s->y != e->y) {
         s->x = e->x;
@@ -273,14 +481,17 @@ static gboolean cn1WidgetCreateOnMain(gpointer data) {
     }
     gtk_window_set_default_size(GTK_WINDOW(win), s->winW, s->winH);
     gtk_widget_set_events(win, gtk_widget_get_events(win)
-            | GDK_BUTTON_PRESS_MASK | GDK_STRUCTURE_MASK);
+            | GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK
+            | GDK_BUTTON_MOTION_MASK | GDK_STRUCTURE_MASK);
     g_signal_connect(win, "draw", G_CALLBACK(cn1WidgetOnDraw), s);
     g_signal_connect(win, "button-press-event", G_CALLBACK(cn1WidgetOnButton), s);
+    g_signal_connect(win, "motion-notify-event", G_CALLBACK(cn1WidgetOnMotion), s);
+    g_signal_connect(win, "button-release-event", G_CALLBACK(cn1WidgetOnRelease), s);
     g_signal_connect(win, "configure-event", G_CALLBACK(cn1WidgetOnConfigure), s);
     g_signal_connect(win, "delete-event", G_CALLBACK(cn1WidgetOnDelete), s);
     /* Default placement near the top-right, cascading by slot so several
      * widgets do not stack exactly; the bridge overrides with the persisted
-     * position right after create (idles run in order). No-op under Wayland. */
+     * position right after create (idles run in order). */
     index = (int) (s - cn1Widgets);
     defX = 100;
     if (screen) {
@@ -290,7 +501,19 @@ static gboolean cn1WidgetCreateOnMain(gpointer data) {
         }
     }
     defY = 60 + (index % 8) * 40;
-    gtk_window_move(GTK_WINDOW(win), defX, defY);
+    if (cn1LoadLayerShell()) {
+        /* MUST run before the window is realized/shown: gtk-layer-shell hooks
+         * the surface creation. The EWMH hints set above become harmless
+         * no-ops on the layer surface. */
+        p_gtk_layer_init_for_window(GTK_WINDOW(win));
+        p_gtk_layer_set_keyboard_mode(GTK_WINDOW(win), CN1_LAYER_SHELL_KEYBOARD_MODE_NONE);
+        p_gtk_layer_set_exclusive_zone(GTK_WINDOW(win), 0);
+        cn1WidgetLayerPosition(win, defX, defY);
+        s->layered = 1;
+    } else {
+        /* Silent no-op on Wayland without layer-shell (see the file header). */
+        gtk_window_move(GTK_WINDOW(win), defX, defY);
+    }
     pthread_mutex_lock(&cn1WidgetLock);
     s->window = win;
     s->x = defX;
@@ -435,15 +658,26 @@ static gboolean cn1WidgetMoveOnMain(gpointer data) {
     s = cn1WidgetById(op->id);
     pthread_mutex_unlock(&cn1WidgetLock);
     if (s && s->window) {
-        if (x < 0) {
-            /* x == -1 centers horizontally (the live-activity pill docks
-             * top-center without the Java side needing a screen-size native). */
-            GdkScreen* screen = gtk_widget_get_screen(s->window);
-            int sw = screen ? gdk_screen_get_width(screen) : 0;
-            x = sw > s->winW ? (sw - s->winW) / 2 : 0;
+        if (s->layered) {
+            /* Anchors + margins; x stays -1 for a centered (pill) surface so
+             * widgetGetX round-trips the centering sentinel. Clamp y here too
+             * so the cached value matches the applied margin. */
+            if (op->y < 0) {
+                op->y = 0;
+            }
+            cn1WidgetLayerPosition(s->window, x, op->y);
+        } else {
+            if (x < 0) {
+                /* x == -1 centers horizontally (the live-activity pill docks
+                 * top-center without the Java side needing a screen-size
+                 * native). */
+                GdkScreen* screen = gtk_widget_get_screen(s->window);
+                int sw = screen ? gdk_screen_get_width(screen) : 0;
+                x = sw > s->winW ? (sw - s->winW) / 2 : 0;
+            }
+            /* Silent no-op under Wayland (see the file header). */
+            gtk_window_move(GTK_WINDOW(s->window), x, op->y);
         }
-        /* Silent no-op under Wayland (see the file header). */
-        gtk_window_move(GTK_WINDOW(s->window), x, op->y);
         pthread_mutex_lock(&cn1WidgetLock);
         s->x = x;
         s->y = op->y;
