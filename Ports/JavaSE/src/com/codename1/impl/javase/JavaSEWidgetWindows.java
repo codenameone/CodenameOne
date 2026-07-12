@@ -273,10 +273,40 @@ class JavaSEWidgetWindows implements JavaSEWidgetBridge.Listener {
     }
 
     private void focusMainWindow() {
-        if (mainWindow != null) {
-            mainWindow.setState(java.awt.Frame.NORMAL);
-            mainWindow.toFront();
-            mainWindow.requestFocus();
+        JFrame w = mainWindow;
+        if (w == null) {
+            // desktop mode: the port never assigns its window field (the app owns the frame the
+            // canvas was added to), so resolve the frame from the canvas ancestry instead
+            JavaSEPort port = JavaSEPort.instance;
+            if (port != null && port.canvas != null) {
+                java.awt.Container top = port.canvas.getTopLevelAncestor();
+                if (top instanceof JFrame) {
+                    w = (JFrame) top;
+                }
+            }
+        }
+        if (w != null) {
+            requestAppForeground();
+            w.setState(java.awt.Frame.NORMAL);
+            w.toFront();
+            w.requestFocus();
+        }
+    }
+
+    /**
+     * Activates this application so toFront can actually raise the main window over other apps.
+     * On macOS clicking a floating widget doesn't activate the app and focus-stealing prevention
+     * makes a plain toFront a no-op; Desktop.requestForeground (Java 9+, invoked reflectively
+     * because this module compiles at an older source level) performs a real app activation.
+     */
+    private static void requestAppForeground() {
+        try {
+            java.awt.Desktop desktop = java.awt.Desktop.getDesktop();
+            java.lang.reflect.Method m = java.awt.Desktop.class.getMethod(
+                    "requestForeground", boolean.class);
+            m.invoke(desktop, Boolean.TRUE);
+        } catch (Throwable t) {
+            // Java 8 runtime or platform without APP_REQUEST_FOREGROUND: best effort only
         }
     }
 
@@ -505,7 +535,23 @@ class JavaSEWidgetWindows implements JavaSEWidgetBridge.Listener {
             } else {
                 Rectangle screen = GraphicsEnvironment.getLocalGraphicsEnvironment()
                         .getMaximumWindowBounds();
-                setLocation(screen.x + screen.width - getWidth() - 40, screen.y + 60);
+                int x = screen.x + screen.width - getWidth() - 40;
+                int y = screen.y + 60;
+                // cascade below existing widget windows so successive default placements
+                // don't stack on top of each other in the top-right corner
+                boolean moved = true;
+                while (moved) {
+                    moved = false;
+                    Rectangle mine = new Rectangle(x, y, getWidth(), getHeight());
+                    for (WidgetWindow other : windows.values()) {
+                        if (other.getBounds().intersects(mine)) {
+                            y = other.getY() + other.getHeight() + 16;
+                            moved = true;
+                            break;
+                        }
+                    }
+                }
+                setLocation(clampToScreen(new Point(x, y)));
             }
         }
 
