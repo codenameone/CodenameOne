@@ -12947,12 +12947,16 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         try {
             AccessibilityManager manager = (AccessibilityManager)getContext()
                     .getSystemService(Context.ACCESSIBILITY_SERVICE);
-            return android.os.Build.VERSION.SDK_INT >= 21 && manager != null
-                    && manager.isHighTextContrastEnabled();
+            if (android.os.Build.VERSION.SDK_INT >= 21 && manager != null) {
+                Object enabled = AccessibilityManager.class.getMethod("isHighTextContrastEnabled")
+                        .invoke(manager);
+                return enabled instanceof Boolean && ((Boolean)enabled).booleanValue();
+            }
         } catch (Throwable t) {
-            return secureSettingEnabled("high_text_contrast_enabled")
-                    || secureSettingEnabled("accessibility_display_high_text_contrast_enabled");
+            // Fall through to the secure settings used by older Android stubs.
         }
+        return secureSettingEnabled("high_text_contrast_enabled")
+                || secureSettingEnabled("accessibility_display_high_text_contrast_enabled");
     }
 
     @Override
