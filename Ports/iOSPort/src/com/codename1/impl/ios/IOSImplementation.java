@@ -1652,6 +1652,51 @@ public class IOSImplementation extends CodenameOneImplementation {
     public float getLargerTextScale() {
         return nativeInstance.getLargerTextScale();
     }
+
+    @Override
+    public boolean isHighContrastEnabled() {
+        return nativeInstance.isHighContrastEnabled();
+    }
+
+    @Override
+    public boolean isDifferentiateWithoutColorEnabled() {
+        return nativeInstance.isDifferentiateWithoutColorEnabled();
+    }
+
+    @Override
+    public boolean isReduceMotionEnabled() {
+        return nativeInstance.isReduceMotionEnabled();
+    }
+
+    @Override
+    public boolean isReduceTransparencyEnabled() {
+        return nativeInstance.isReduceTransparencyEnabled();
+    }
+
+    @Override
+    public boolean isBoldTextEnabled() {
+        return nativeInstance.isBoldTextEnabled();
+    }
+
+    @Override
+    public boolean isInvertColorsEnabled() {
+        return nativeInstance.isInvertColorsEnabled();
+    }
+
+    @Override
+    public boolean isGrayscaleEnabled() {
+        return nativeInstance.isGrayscaleEnabled();
+    }
+
+    @Override
+    public boolean isOnOffSwitchLabelsEnabled() {
+        return nativeInstance.isOnOffSwitchLabelsEnabled();
+    }
+
+    @Override
+    public boolean isScreenReaderEnabled() {
+        return nativeInstance.isScreenReaderEnabled();
+    }
     
 
     public void flushGraphics() {

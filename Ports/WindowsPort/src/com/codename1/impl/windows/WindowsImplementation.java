@@ -61,6 +61,21 @@ import java.util.Locale;
  * minimal in this first cut and grow in later phases.</p>
  */
 public class WindowsImplementation extends CodenameOneImplementation {
+
+    @Override
+    public boolean isHighContrastEnabled() {
+        return WindowsNative.isHighContrastEnabled();
+    }
+
+    @Override
+    public boolean isReduceMotionEnabled() {
+        return WindowsNative.isReduceMotionEnabled();
+    }
+
+    @Override
+    public boolean isScreenReaderEnabled() {
+        return WindowsNative.isScreenReaderEnabled();
+    }
     private static WindowsImplementation INSTANCE;
 
     // Event type codes; must mirror the CN1EventType enum in cn1_windows.h.

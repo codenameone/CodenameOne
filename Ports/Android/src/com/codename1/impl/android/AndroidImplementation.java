@@ -54,6 +54,7 @@ import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Vibrator;
 import android.os.PowerManager;
+import android.provider.Settings;
 import android.telephony.TelephonyManager;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -61,6 +62,7 @@ import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityManager;
 import android.view.Window;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -68,6 +70,7 @@ import android.webkit.WebViewClient;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.AccessibilityColorVisionDeficiency;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Font;
@@ -12937,6 +12940,94 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             }
         });
+    }
+
+    @Override
+    public boolean isHighContrastEnabled() {
+        try {
+            AccessibilityManager manager = (AccessibilityManager)getContext()
+                    .getSystemService(Context.ACCESSIBILITY_SERVICE);
+            return android.os.Build.VERSION.SDK_INT >= 21 && manager != null
+                    && manager.isHighTextContrastEnabled();
+        } catch (Throwable t) {
+            return secureSettingEnabled("high_text_contrast_enabled")
+                    || secureSettingEnabled("accessibility_display_high_text_contrast_enabled");
+        }
+    }
+
+    @Override
+    public boolean isDifferentiateWithoutColorEnabled() {
+        return secureSettingEnabled("accessibility_display_daltonizer_enabled");
+    }
+
+    @Override
+    public AccessibilityColorVisionDeficiency getColorVisionDeficiency() {
+        if (!secureSettingEnabled("accessibility_display_daltonizer_enabled")) {
+            return AccessibilityColorVisionDeficiency.NONE;
+        }
+        try {
+            int mode = Settings.Secure.getInt(getContext().getContentResolver(),
+                    "accessibility_display_daltonizer");
+            switch (mode) {
+                case 0: return AccessibilityColorVisionDeficiency.MONOCHROMACY;
+                case 11: return AccessibilityColorVisionDeficiency.PROTANOPIA;
+                case 12: return AccessibilityColorVisionDeficiency.DEUTERANOPIA;
+                case 13: return AccessibilityColorVisionDeficiency.TRITANOPIA;
+                default: return AccessibilityColorVisionDeficiency.UNKNOWN;
+            }
+        } catch (Throwable t) {
+            return AccessibilityColorVisionDeficiency.UNKNOWN;
+        }
+    }
+
+    @Override
+    public boolean isReduceMotionEnabled() {
+        try {
+            return Settings.Global.getFloat(getContext().getContentResolver(),
+                    Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    @Override
+    public boolean isBoldTextEnabled() {
+        try {
+            Object value = Configuration.class.getField("fontWeightAdjustment")
+                    .get(getContext().getResources().getConfiguration());
+            return value instanceof Integer && ((Integer)value).intValue() >= 300;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    @Override
+    public boolean isInvertColorsEnabled() {
+        return secureSettingEnabled("accessibility_display_inversion_enabled");
+    }
+
+    @Override
+    public boolean isGrayscaleEnabled() {
+        return getColorVisionDeficiency() == AccessibilityColorVisionDeficiency.MONOCHROMACY;
+    }
+
+    @Override
+    public boolean isScreenReaderEnabled() {
+        try {
+            AccessibilityManager manager = (AccessibilityManager)getContext()
+                    .getSystemService(Context.ACCESSIBILITY_SERVICE);
+            return manager != null && manager.isEnabled() && manager.isTouchExplorationEnabled();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private boolean secureSettingEnabled(String key) {
+        try {
+            return Settings.Secure.getInt(getContext().getContentResolver(), key, 0) == 1;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     @Override

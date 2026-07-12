@@ -1,28 +1,11 @@
 /*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- * This code is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Codename One designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
- *
- * This code is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * version 2 for more details (a copy is included in the LICENSE file that
- * accompanied this code).
- *
- * You should have received a copy of the GNU General Public License version
- * 2 along with this work; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Please contact Codename One through http://www.codenameone.com/ if you
- * need additional information or have any questions.
+ * Copyright (c) 2026 Codename One and contributors. All rights reserved.
  */
 package com.codenameone.developerguide.snippets;
 
 import com.codename1.ui.Button;
+import com.codename1.ui.AccessibilityColorVisionDeficiency;
+import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
@@ -165,7 +148,63 @@ public class AccessibilitySemanticsSnippets {
         return diagnosticJson + (hit == null ? "" : hit.getLabel());
     }
 
+    public void adaptToAccessibilityPreferences(Component animatedChart, Label connectionStatus) {
+        // tag::accessibility-preferences[]
+        if (CN.isHighContrastEnabled()) {
+            animatedChart.setUIID("HighContrastChart");
+        }
+
+        // Important state always uses text or an icon as well as color. The
+        // preference is an extra signal, not permission to use color alone.
+        if (CN.isDifferentiateWithoutColorEnabled()
+                || CN.getColorVisionDeficiency() != AccessibilityColorVisionDeficiency.NONE) {
+            connectionStatus.setText("Disconnected: action required");
+        }
+
+        if (CN.isReduceMotionEnabled()) {
+            animatedChart.putClientProperty("animate", Boolean.FALSE);
+        }
+        if (CN.isReduceTransparencyEnabled()) {
+            animatedChart.setUIID("OpaqueChart");
+        }
+        // end::accessibility-preferences[]
+    }
+
+    public void repairCustomControl(Component iconOnlyButton) {
+        // tag::accessibility-repair[]
+        iconOnlyButton.getSemantics()
+                .setRole(AccessibilityRole.BUTTON)
+                .setLabel("Delete message")
+                .setHint("Removes this message from the conversation")
+                .setIdentifier("message-delete")
+                .addAction(new AccessibilityAction(
+                        AccessibilityAction.ACTIVATE,
+                        null,
+                        new AccessibilityAction.Handler() {
+                            public boolean perform(Component component, Object argument) {
+                                deleteMessage();
+                                return true;
+                            }
+                        }));
+        // end::accessibility-repair[]
+    }
+
+    public void assertAccessibleForm(Form form) {
+        // tag::accessibility-regression-assertions[]
+        AccessibilityTreeSnapshot tree = AccessibilityInspector.snapshot(form);
+        AccessibilityAssertions.assertNoErrors(tree);
+        AccessibilityAssertions.assertNoUnlabeledInteractiveNodes(tree);
+
+        AccessibilityNodeSnapshot save = tree.getNodeByIdentifier("profile-save");
+        assert save.getRole() == AccessibilityRole.BUTTON;
+        assert save.getAction(AccessibilityAction.ACTIVATE) != null;
+        // end::accessibility-regression-assertions[]
+    }
+
     private void archiveMessage() {
+    }
+
+    private void deleteMessage() {
     }
 
     /** Minimal model contract used by the virtual-descendant example. */

@@ -5754,6 +5754,48 @@ JAVA_FLOAT com_codename1_impl_ios_IOSNative_getLargerTextScale___R_float(CN1_THR
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isHighContrastEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return UIAccessibilityDarkerSystemColorsEnabled() ? 1 : 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDifferentiateWithoutColorEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    if (@available(iOS 13.0, macCatalyst 13.1, *)) {
+        return UIAccessibilityShouldDifferentiateWithoutColor() ? 1 : 0;
+    }
+    return 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isReduceMotionEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return UIAccessibilityIsReduceMotionEnabled() ? 1 : 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isReduceTransparencyEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return UIAccessibilityIsReduceTransparencyEnabled() ? 1 : 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBoldTextEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return UIAccessibilityIsBoldTextEnabled() ? 1 : 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isInvertColorsEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return UIAccessibilityIsInvertColorsEnabled() ? 1 : 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGrayscaleEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return UIAccessibilityIsGrayscaleEnabled() ? 1 : 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isOnOffSwitchLabelsEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    if (@available(iOS 13.0, macCatalyst 13.1, *)) {
+        return UIAccessibilityIsOnOffSwitchLabelsEnabled() ? 1 : 0;
+    }
+    return 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isScreenReaderEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return UIAccessibilityIsVoiceOverRunning() ? 1 : 0;
+}
+
 #ifdef INCLUDE_LOCATION_USAGE
 CLLocationManager* com_codename1_impl_ios_IOSNative_createCLLocation = nil;
 #endif

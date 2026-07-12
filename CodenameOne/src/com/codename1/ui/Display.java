@@ -771,6 +771,57 @@ public final class Display extends CN1Constants {
         return impl.getLargerTextScale();
     }
 
+    /// Returns true when the user requests stronger foreground/background contrast.
+    public boolean isHighContrastEnabled() {
+        return impl.isHighContrastEnabled();
+    }
+
+    /// Returns true when the user requests that information isn't conveyed by color alone.
+    public boolean isDifferentiateWithoutColorEnabled() {
+        return impl.isDifferentiateWithoutColorEnabled();
+    }
+
+    /// Returns the selected color-vision correction, or {@link AccessibilityColorVisionDeficiency#UNKNOWN}
+    /// when the platform doesn't expose it.
+    public AccessibilityColorVisionDeficiency getColorVisionDeficiency() {
+        return impl.getColorVisionDeficiency();
+    }
+
+    /// Returns true when the user requests reduced or disabled nonessential motion.
+    public boolean isReduceMotionEnabled() {
+        return impl.isReduceMotionEnabled();
+    }
+
+    /// Returns true when the user requests reduced transparency and blur effects.
+    public boolean isReduceTransparencyEnabled() {
+        return impl.isReduceTransparencyEnabled();
+    }
+
+    /// Returns true when the user requests heavier text weight.
+    public boolean isBoldTextEnabled() {
+        return impl.isBoldTextEnabled();
+    }
+
+    /// Returns true when the operating system is inverting displayed colors.
+    public boolean isInvertColorsEnabled() {
+        return impl.isInvertColorsEnabled();
+    }
+
+    /// Returns true when the operating system requests a grayscale presentation.
+    public boolean isGrayscaleEnabled() {
+        return impl.isGrayscaleEnabled();
+    }
+
+    /// Returns true when switches should include visible on/off labels.
+    public boolean isOnOffSwitchLabelsEnabled() {
+        return impl.isOnOffSwitchLabelsEnabled();
+    }
+
+    /// Returns true when a screen reader or touch-exploration service is active.
+    public boolean isScreenReaderEnabled() {
+        return impl.isScreenReaderEnabled();
+    }
+
     /// Checks if async stack traces are enabled.  If enabled, the stack trace
     /// at the point of `#callSerially(java.lang.Runnable)` calls will
     /// be recorded, and logged in the case that there is an uncaught exception.

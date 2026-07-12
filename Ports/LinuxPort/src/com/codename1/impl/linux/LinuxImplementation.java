@@ -70,6 +70,23 @@ import java.util.Locale;
  * headless (see {@code Ports/LinuxPort/status.md}).</p>
  */
 public class LinuxImplementation extends CodenameOneImplementation {
+
+    @Override
+    public boolean isHighContrastEnabled() {
+        String theme = System.getenv("GTK_THEME");
+        return theme != null && theme.toLowerCase().indexOf("highcontrast") >= 0;
+    }
+
+    @Override
+    public boolean isReduceMotionEnabled() {
+        return "0".equals(System.getenv("GTK_ENABLE_ANIMATIONS"));
+    }
+
+    @Override
+    public boolean isScreenReaderEnabled() {
+        String modules = System.getenv("GTK_MODULES");
+        return modules != null && (modules.indexOf("atk-bridge") >= 0 || modules.indexOf("gail") >= 0);
+    }
     private static LinuxImplementation INSTANCE;
 
     // Event type codes; must mirror the CN1EventType enum in cn1_linux.h.

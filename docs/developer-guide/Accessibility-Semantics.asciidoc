@@ -83,6 +83,53 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/A
 
 Form changes and nodes with a pane title produce screen or pane transition notifications. `Display.announceForAccessibility()` remains available for an exceptional announcement that isn't represented by persistent UI. Prefer a live region for state that's visible on screen.
 
+== User accessibility preferences
+
+Semantics describe what a control means. Accessibility preferences describe how the user wants the interface presented. Read these preferences through `Display` or the matching static shortcuts in `CN`:
+
+[cols="2,3"]
+|===
+|API |Meaning
+
+|`isHighContrastEnabled()`
+|The user requests stronger foreground and background contrast.
+
+|`isDifferentiateWithoutColorEnabled()`
+|The user requests labels, shapes, or patterns in addition to color.
+
+|`getColorVisionDeficiency()`
+|Returns `NONE`, `PROTANOPIA`, `DEUTERANOPIA`, `TRITANOPIA`, `MONOCHROMACY`, or `UNKNOWN`.
+
+|`isReduceMotionEnabled()`
+|Nonessential motion should be removed or replaced with an instant or cross-fade change.
+
+|`isReduceTransparencyEnabled()`
+|Blur and translucent surfaces should use an opaque alternative.
+
+|`isBoldTextEnabled()`
+|The system requests a heavier text weight.
+
+|`isInvertColorsEnabled()` and `isGrayscaleEnabled()`
+|The operating system is transforming the displayed colors.
+
+|`isOnOffSwitchLabelsEnabled()`
+|Switches should include a visible on/off distinction.
+
+|`isScreenReaderEnabled()`
+|A screen reader or touch-exploration service is active.
+|===
+
+An unavailable preference returns `false`; an unavailable color-vision mode returns `UNKNOWN`. Don't hide accessibility support behind `isScreenReaderEnabled()`. A screen reader can start after the application launches, and other assistive technologies consume the same semantic tree.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AccessibilitySemanticsSnippets.java[tag=accessibility-preferences,indent=0]
+----
+
+IMPORTANT: Never use `getColorVisionDeficiency() == NONE` as permission to convey information only through color. The setting can be unavailable, a person might not enable a system filter, and contrast can change with lighting and display hardware. Design the default interface with redundant cues, then use preferences for further adaptation.
+
+Preference detection uses each platform's public signals. iOS and Mac Catalyst expose contrast, differentiate-without-color, motion, transparency, bold text, inversion, grayscale, switch labels, and VoiceOver; Apple doesn't expose the selected color-filter type, so the deficiency value is `UNKNOWN`. Android reads high-text contrast, display inversion and daltonizer mode, animation scale, font-weight adjustment, and touch exploration. Windows reads High Contrast, client-area animation, and screen-reader settings. Linux detects the GTK HighContrast theme, disabled GTK animation, and ATK bridge activation. JavaScript uses `forced-colors`, `prefers-contrast`, `prefers-reduced-motion`, and `prefers-reduced-transparency`. The Java SE simulator provides deterministic controls for every portable signal.
+
 == Collections
 
 `AccessibilityCollectionInfo` describes row and column counts, hierarchy, and selection mode. `AccessibilityCollectionItemInfo` describes row and column index, spans, position and size in a set, nesting level, and header status.
@@ -102,6 +149,48 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/A
 `AccessibilityAssertions.audit()` reports machine-readable `AccessibilityIssue` values for unlabeled controls, invalid ranges, duplicate identifiers or actions, invalid collection positions, missing parents, cycles, unnamed dialogs, and unlabeled custom actions. Warnings also identify suspicious role/state combinations and empty bounds.
 
 The Java SE Component Inspector provides *Copy Accessibility Tree JSON* and *Audit Accessibility Tree* actions. Tests should assert resolved semantic properties instead of platform-specific spoken sentences. The `scripts/hellocodenameone` suite contains the cross-port conformance fixture used by native CI.
+
+== Diagnosing and correcting an inaccessible screen
+
+Accessibility review works best as a repeatable loop instead of a final checklist:
+
+. Use the keyboard to reach every operation. Verify visible focus, logical order, escape from modal UI, and operation without pointer gestures.
+. Open *Tools → Component Inspector*. Select the form or a suspicious component, then choose *Audit Accessibility Tree*. Start with errors, such as an unlabeled interactive node, invalid range, or unnamed dialog.
+. Choose *Copy Accessibility Tree JSON* and inspect the resolved role, label, value, state, actions, bounds, and child order. This catches cases where the visual component hierarchy doesn't match the virtual accessibility hierarchy.
+. Use *Simulate → Accessibility Preferences* to test high contrast, reduced motion, reduced transparency, inversion, grayscale, and each color-vision filter. Also test *Simulate → Larger Text* at Accessibility 5. Look for clipped text, color-only state, invisible focus, unreadable overlays, and motion that remains essential to understanding the result.
+. Correct the component API or theme. Run the audit again, add a focused assertion, and verify the native screen reader before considering the issue closed.
+
+The simulator menu changes the values returned by `Display` and `CN`. Color-vision, inversion, and grayscale choices also filter the simulator canvas, so screenshots show approximately what remains distinguishable. These filters are diagnostic approximations; they don't replace testing with platform display filters or users.
+
+.Accessibility preferences in the Java SE simulator
+image::accessibility-simulator-preferences.png[Java SE simulator with the Accessibility Preferences menu open,scaledwidth=80%]
+
+The following icon-only custom control is painted and responds to a pointer, but initially has no usable name, role, or keyboard-equivalent action. The audit reports it as an unlabeled interactive node. Repair the semantic contract at the custom-control boundary:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AccessibilitySemanticsSnippets.java[tag=accessibility-repair,indent=0]
+----
+
+Don't fix the warning by adding a label alone if the role, current state, range, or available actions are still wrong. For example, a custom switch needs `SWITCH`, checked state, and activation; a chart needs virtual descendants for its meaningful data points; a renderer-backed grid needs collection and item metadata.
+
+.Auditing the semantic tree in the Component Inspector
+image::accessibility-component-inspector-audit.png[Component Inspector showing an accessibility audit,scaledwidth=80%]
+
+=== Assertions that prevent regressions
+
+Snapshot the finished form and assert behavior that matters to a user. Prefer stable identifiers and resolved semantics over implementation class names or platform-specific speech:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AccessibilitySemanticsSnippets.java[tag=accessibility-regression-assertions,indent=0]
+----
+
+Keep targeted assertions for traversal order, validation errors, live-region behavior, ranges, and stable virtual keys. The `scripts/hellocodenameone` accessibility fixture invokes every portable preference API and exercises the resolved semantic tree on each native CI platform.
+
+=== Native verification
+
+The simulator finds portable problems, but the final pass must use VoiceOver, TalkBack, Narrator, Orca, or the browser accessibility tree. Navigate in both directions, activate every action, change adjustable values, enter and leave collections, trigger errors, and confirm that focus moves sensibly after a dialog, navigation, deletion, or live update. Record the platform, assistive-technology version, input method, and failed semantic node in the bug report; attach the inspector JSON when the native result differs from the portable snapshot.
 
 == Platform mappings
 

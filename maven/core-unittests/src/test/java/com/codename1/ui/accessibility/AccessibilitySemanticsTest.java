@@ -1,34 +1,17 @@
 /*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- * This code is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Codename One designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
- *
- * This code is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * version 2 for more details (a copy is included in the LICENSE file that
- * accompanied this code).
- *
- * You should have received a copy of the GNU General Public License version
- * 2 along with this work; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Please contact Codename One through http://www.codenameone.com/ if you
- * need additional information or have any questions.
+ * Copyright (c) 2026 Codename One and contributors. All rights reserved.
  */
 package com.codename1.ui.accessibility;
 
 import com.codename1.junit.UITestBase;
 import com.codename1.junit.FormTest;
 import com.codename1.ui.Button;
+import com.codename1.ui.AccessibilityColorVisionDeficiency;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
+import com.codename1.ui.Display;
 import com.codename1.ui.Label;
 import com.codename1.ui.Slider;
 import com.codename1.ui.TextField;
@@ -38,6 +21,21 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AccessibilitySemanticsTest extends UITestBase {
+
+    @FormTest
+    void exposesPortableAccessibilityPreferencesWithSafeDefaults() {
+        Display display = Display.getInstance();
+        assertEquals(AccessibilityColorVisionDeficiency.UNKNOWN, display.getColorVisionDeficiency());
+        assertFalse(display.isHighContrastEnabled());
+        assertFalse(display.isDifferentiateWithoutColorEnabled());
+        assertFalse(display.isReduceMotionEnabled());
+        assertFalse(display.isReduceTransparencyEnabled());
+        assertFalse(display.isBoldTextEnabled());
+        assertFalse(display.isInvertColorsEnabled());
+        assertFalse(display.isGrayscaleEnabled());
+        assertFalse(display.isOnOffSwitchLabelsEnabled());
+        assertFalse(display.isScreenReaderEnabled());
+    }
 
     @FormTest
     void infersRolesStatesValuesAndActionsForBuiltInControls() {
@@ -60,6 +58,9 @@ class AccessibilitySemanticsTest extends UITestBase {
 
         assertEquals(AccessibilityRole.BUTTON, buttonNode.getRole());
         assertEquals("Save", buttonNode.getLabel());
+        button.getSemantics().setIdentifier("save-button");
+        tree = AccessibilityInspector.snapshot(form);
+        assertEquals(button, tree.getNodeByIdentifier("save-button").getComponent());
         assertNotNull(buttonNode.getAction(AccessibilityAction.ACTIVATE));
         assertEquals(AccessibilityRole.CHECKBOX, checkNode.getRole());
         assertEquals(AccessibilityCheckedState.CHECKED, checkNode.getChecked());

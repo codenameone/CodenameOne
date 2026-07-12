@@ -191,6 +191,15 @@ public final class IOSNative {
     
     native boolean isLargerTextEnabled();
     native float getLargerTextScale();
+    native boolean isHighContrastEnabled();
+    native boolean isDifferentiateWithoutColorEnabled();
+    native boolean isReduceMotionEnabled();
+    native boolean isReduceTransparencyEnabled();
+    native boolean isBoldTextEnabled();
+    native boolean isInvertColorsEnabled();
+    native boolean isGrayscaleEnabled();
+    native boolean isOnOffSwitchLabelsEnabled();
+    native boolean isScreenReaderEnabled();
 
     // SJH Nov. 17, 2015 : Removing native isMinimized() method because it conflicted with
     // tracking on the java side.  It caused the app to still be minimized inside start()

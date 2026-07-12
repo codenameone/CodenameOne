@@ -156,6 +156,12 @@ public final class WindowsNative {
      */
     public static native boolean isTouchDevice();
 
+    public static native boolean isHighContrastEnabled();
+
+    public static native boolean isReduceMotionEnabled();
+
+    public static native boolean isScreenReaderEnabled();
+
     /**
      * Parks the calling (main) thread to keep the process alive in headless
      * screenshot mode, where there is no window message loop. The EDT exits the

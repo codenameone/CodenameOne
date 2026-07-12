@@ -11177,6 +11177,56 @@ public abstract class CodenameOneImplementation {
         return 1.0f;
     }
 
+    /// Returns true when the user requests stronger foreground/background contrast.
+    public boolean isHighContrastEnabled() {
+        return false;
+    }
+
+    /// Returns true when the user requests that information isn't conveyed by color alone.
+    public boolean isDifferentiateWithoutColorEnabled() {
+        return false;
+    }
+
+    /// Returns the selected color-vision correction mode.
+    public com.codename1.ui.AccessibilityColorVisionDeficiency getColorVisionDeficiency() {
+        return com.codename1.ui.AccessibilityColorVisionDeficiency.UNKNOWN;
+    }
+
+    /// Returns true when the user requests reduced or disabled nonessential motion.
+    public boolean isReduceMotionEnabled() {
+        return false;
+    }
+
+    /// Returns true when the user requests reduced transparency and blur effects.
+    public boolean isReduceTransparencyEnabled() {
+        return false;
+    }
+
+    /// Returns true when the user requests heavier text weight.
+    public boolean isBoldTextEnabled() {
+        return false;
+    }
+
+    /// Returns true when the operating system is inverting displayed colors.
+    public boolean isInvertColorsEnabled() {
+        return false;
+    }
+
+    /// Returns true when the operating system requests a grayscale presentation.
+    public boolean isGrayscaleEnabled() {
+        return false;
+    }
+
+    /// Returns true when switches should include visible on/off labels.
+    public boolean isOnOffSwitchLabelsEnabled() {
+        return false;
+    }
+
+    /// Returns true when a screen reader or touch-exploration service is active.
+    public boolean isScreenReaderEnabled() {
+        return false;
+    }
+
     /// Returns the stack trace from the exception on the given
     /// thread. This API isn't supported on all platforms and may
     /// return a blank string when unavailable.

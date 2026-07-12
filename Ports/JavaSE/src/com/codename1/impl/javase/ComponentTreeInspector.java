@@ -109,6 +109,31 @@ public class ComponentTreeInspector extends JPanel {
         frame.setVisible(true);
         return frame;
     }
+
+    /** Audits the current form and displays the result. */
+    public void showAccessibilityAudit() {
+        com.codename1.ui.CN.callSerially(new Runnable() {
+            public void run() {
+                Form form = Display.getInstance().getCurrent();
+                if (form == null) return;
+                AccessibilityTreeSnapshot snapshot = AccessibilityInspector.snapshot(form);
+                final List<AccessibilityIssue> issues = AccessibilityAssertions.audit(snapshot);
+                final StringBuilder message = new StringBuilder();
+                for (AccessibilityIssue issue : issues) {
+                    if (message.length() > 0) message.append('\n');
+                    message.append(issue.toString());
+                }
+                SwingUtilities.invokeLater(new Runnable() {
+                    public void run() {
+                        JOptionPane.showMessageDialog(ComponentTreeInspector.this,
+                                issues.isEmpty() ? "No accessibility issues found" : message.toString(),
+                                "Accessibility Audit", issues.isEmpty()
+                                ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.WARNING_MESSAGE);
+                    }
+                });
+            }
+        });
+    }
     
     public void dispose() {
         if (frame != null) {
@@ -208,27 +233,7 @@ public class ComponentTreeInspector extends JPanel {
         JMenuItem auditAccessibilityTree = new JMenuItem("Audit Accessibility Tree");
         auditAccessibilityTree.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                com.codename1.ui.CN.callSerially(new Runnable() {
-                    public void run() {
-                        Form form = Display.getInstance().getCurrent();
-                        if (form == null) return;
-                        AccessibilityTreeSnapshot snapshot = AccessibilityInspector.snapshot(form);
-                        final List<AccessibilityIssue> issues = AccessibilityAssertions.audit(snapshot);
-                        final StringBuilder message = new StringBuilder();
-                        for (AccessibilityIssue issue : issues) {
-                            if (message.length() > 0) message.append('\n');
-                            message.append(issue.toString());
-                        }
-                        SwingUtilities.invokeLater(new Runnable() {
-                            public void run() {
-                                JOptionPane.showMessageDialog(ComponentTreeInspector.this,
-                                        issues.isEmpty() ? "No accessibility issues found" : message.toString(),
-                                        "Accessibility Audit", issues.isEmpty()
-                                        ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.WARNING_MESSAGE);
-                            }
-                        });
-                    }
-                });
+                showAccessibilityAudit();
             }
         });
         contextMenu.add(auditAccessibilityTree);

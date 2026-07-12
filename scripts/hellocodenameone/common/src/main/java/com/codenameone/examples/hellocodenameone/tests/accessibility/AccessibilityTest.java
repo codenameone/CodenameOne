@@ -1,6 +1,7 @@
 package com.codenameone.examples.hellocodenameone.tests.accessibility;
 
 import com.codename1.ui.Button;
+import com.codename1.ui.AccessibilityColorVisionDeficiency;
 import com.codename1.ui.CN;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
@@ -45,6 +46,7 @@ public class AccessibilityTest extends BaseTest {
     }
 
     private void runSemanticAssertions() {
+        assertAccessibilityPreferencesAvailable();
         final Form form = new Form("Accessibility conformance");
         size(form, 0, 0, 600, 1200);
         size(form.getContentPane(), 0, 0, 600, 1200);
@@ -212,6 +214,31 @@ public class AccessibilityTest extends BaseTest {
                 }
             }
         });
+    }
+
+    private void assertAccessibilityPreferencesAvailable() {
+        AccessibilityColorVisionDeficiency colorVision = Display.getInstance().getColorVisionDeficiency();
+        assertTrue(colorVision != null, "color-vision preference has a portable value");
+        assertTrue(Display.getInstance().getLargerTextScale() > 0,
+                "larger-text scale is positive");
+
+        // Invoke every portable preference on every native CI target. The values
+        // legitimately depend on the host, but none of these calls may throw or
+        // require an initialized semantic tree.
+        Display.getInstance().isHighContrastEnabled();
+        Display.getInstance().isDifferentiateWithoutColorEnabled();
+        Display.getInstance().isReduceMotionEnabled();
+        Display.getInstance().isReduceTransparencyEnabled();
+        Display.getInstance().isBoldTextEnabled();
+        Display.getInstance().isInvertColorsEnabled();
+        Display.getInstance().isGrayscaleEnabled();
+        Display.getInstance().isOnOffSwitchLabelsEnabled();
+        Display.getInstance().isScreenReaderEnabled();
+
+        if (colorVision == AccessibilityColorVisionDeficiency.MONOCHROMACY) {
+            assertTrue(Display.getInstance().isGrayscaleEnabled(),
+                    "monochromacy implies grayscale presentation");
+        }
     }
 
     private <T extends Component> T add(Container parent, T component, int x, int y, int width, int height) {

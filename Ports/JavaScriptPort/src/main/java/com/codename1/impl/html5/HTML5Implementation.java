@@ -59,6 +59,7 @@ import com.codename1.teavm.jso.util.EventUtil;
 import com.codename1.teavm.jso.util.JSDateFormat;
 import com.codename1.teavm.jso.util.JSNumberFormat;
 import com.codename1.ui.Accessor;
+import com.codename1.ui.AccessibilityColorVisionDeficiency;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.BrowserWindow;
 import com.codename1.ui.Button;
@@ -10809,6 +10810,35 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public Boolean isDarkMode() {
         return isDarkMode_();
+    }
+
+    @JSBody(params={"query"}, script="return !!(window.matchMedia && window.matchMedia(query).matches);")
+    private static native boolean matchesMediaQuery(String query);
+
+    @Override
+    public boolean isHighContrastEnabled() {
+        return matchesMediaQuery("(forced-colors: active)")
+                || matchesMediaQuery("(prefers-contrast: more)");
+    }
+
+    @Override
+    public boolean isDifferentiateWithoutColorEnabled() {
+        return matchesMediaQuery("(forced-colors: active)");
+    }
+
+    @Override
+    public AccessibilityColorVisionDeficiency getColorVisionDeficiency() {
+        return AccessibilityColorVisionDeficiency.UNKNOWN;
+    }
+
+    @Override
+    public boolean isReduceMotionEnabled() {
+        return matchesMediaQuery("(prefers-reduced-motion: reduce)");
+    }
+
+    @Override
+    public boolean isReduceTransparencyEnabled() {
+        return matchesMediaQuery("(prefers-reduced-transparency: reduce)");
     }
     
     
