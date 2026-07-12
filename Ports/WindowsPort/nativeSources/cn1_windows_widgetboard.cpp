@@ -120,9 +120,13 @@
 #include <winrt/Microsoft.Windows.Widgets.Providers.h>
 #include <MddBootstrap.h>
 
-#endif /* CN1_WIDGETBOARD */
+/* Deliberately NOT including cn1_windows.h: it pulls cn1_globals.h, whose C11
+ * stdatomic.h usage conflicts with the C++ <atomic> the winrt headers pull
+ * into this TU. The only symbol this file needs from the port is the logger,
+ * forward-declared with matching C linkage. */
+extern "C" void cn1WindowsLog(const char* message);
 
-#include "cn1_windows.h"
+#endif /* CN1_WIDGETBOARD */
 
 #ifdef CN1_WIDGETBOARD
 

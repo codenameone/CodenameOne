@@ -330,11 +330,19 @@ public class WindowsNativeBuilder extends Executor {
         if (cross) {
             addCrossCompileConfigure(configure, triple, arch, xwinSysroot,
                     widgetBoardCompileFlags, msix ? widgetBoardLinkFlags(winAppSdk, arch) : "");
+            if (msix) {
+                // same C++20 requirement as the Windows-host branch below
+                configure.add("-DCMAKE_CXX_STANDARD=20");
+            }
         } else {
             configure.add("-DCMAKE_C_FLAGS=--target=" + triple + widgetBoardCompileFlags);
             configure.add("-DCMAKE_CXX_FLAGS=--target=" + triple + widgetBoardCompileFlags);
             if (msix) {
                 configure.add("-DCMAKE_EXE_LINKER_FLAGS=" + widgetBoardLinkFlags(winAppSdk, arch).trim());
+                // C++/WinRT at C++17 falls back to <experimental/coroutine>, which the
+                // modern MSVC STL rejects under clang-cl; the generated CMakeLists only
+                // defaults CMAKE_CXX_STANDARD when it is not supplied here.
+                configure.add("-DCMAKE_CXX_STANDARD=20");
             }
         }
 

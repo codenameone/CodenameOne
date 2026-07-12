@@ -735,21 +735,20 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           clang-cl --version
-          # A translated app supplies the generated cn1_class_method_index.h;
-          # this standalone compile check stubs the only constant cn1_globals.h
-          # needs from it (the class/method-id macros it defines with it are
-          # never expanded by these two TUs).
-          New-Item -ItemType Directory -Force stub-index | Out-Null
-          "#define cn1_array_start_offset 1000" | Set-Content stub-index/cn1_class_method_index.h -Encoding ascii
-          $inc = @(
-            '/Iwinrt-gen',
-            "/I$env:CN1_WASDK_DIR/include",
-            '/Istub-index',
-            '/Ivm/ByteCodeTranslator/src'
-          )
-          clang-cl /c /std:c++17 /EHsc /DCN1_WIDGETBOARD=1 $inc `
+          # The widgetboard TU deliberately avoids the cn1 headers (cn1_globals.h's
+          # C11 stdatomic conflicts with the C++ <atomic> the winrt headers pull) and
+          # compiles at C++20: C++/WinRT at C++17 falls back to
+          # <experimental/coroutine>, which the modern MSVC STL rejects under clang
+          # (STL1009). This mirrors the -DCMAKE_CXX_STANDARD=20 WindowsNativeBuilder
+          # passes for windows.msix=true builds.
+          clang-cl /c /std:c++20 /EHsc /DCN1_WIDGETBOARD=1 /Iwinrt-gen "/I$env:CN1_WASDK_DIR/include" `
             Ports/WindowsPort/nativeSources/cn1_windows_widgetboard.cpp /Fowidgetboard.obj
           if ($LASTEXITCODE -ne 0) { throw "cn1_windows_widgetboard.cpp failed to compile with CN1_WIDGETBOARD=1" }
+          # A translated app supplies the generated cn1_class_method_index.h; the
+          # floating-widget TU includes cn1_windows.h -> cn1_globals.h, which only
+          # needs this one constant from it here.
+          New-Item -ItemType Directory -Force stub-index | Out-Null
+          "#define cn1_array_start_offset 1000" | Set-Content stub-index/cn1_class_method_index.h -Encoding ascii
           clang-cl /c /std:c++17 /EHsc /Istub-index /Ivm/ByteCodeTranslator/src `
             Ports/WindowsPort/nativeSources/cn1_windows_widgets.cpp /Fowidgets.obj
           if ($LASTEXITCODE -ne 0) { throw "cn1_windows_widgets.cpp failed to compile" }
