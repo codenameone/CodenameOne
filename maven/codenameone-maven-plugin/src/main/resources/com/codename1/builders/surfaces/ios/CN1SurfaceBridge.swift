@@ -152,6 +152,11 @@ public class CN1SurfaceBridge: NSObject {
     /// descriptorJson carries the complete `images` reference list, so a content-hash blob
     /// survives while any activity still references it and is reclaimed once none do -- fixing the
     /// unbounded growth of the shared cn1surfaces/activities directory.
+    ///
+    /// Guarded like every other ActivityKit member here: ActivityKit is absent on Mac Catalyst,
+    /// tvOS and watchOS (where this app-target glue still compiles), so both the body and its
+    /// call sites live inside this same condition.
+    #if canImport(ActivityKit) && !targetEnvironment(macCatalyst)
     @available(iOS 16.1, *)
     static func cn1SweepActivityImages() {
         // Resolve the activities image dir inline from the app-group constant: this bridge is
@@ -186,4 +191,5 @@ public class CN1SurfaceBridge: NSObject {
             }
         }
     }
+    #endif
 }
