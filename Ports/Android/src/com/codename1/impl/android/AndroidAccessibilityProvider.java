@@ -31,11 +31,14 @@ final class AndroidAccessibilityProvider extends AccessibilityNodeProvider {
     private static final String ROLE_DESCRIPTION_KEY = "AccessibilityNodeInfo.roleDescription";
     private final View host;
     private final AndroidImplementation implementation;
+    private final android.view.accessibility.AccessibilityManager nativeAccessibilityManager;
     private int accessibilityFocusedId = Integer.MIN_VALUE;
 
     AndroidAccessibilityProvider(View host, AndroidImplementation implementation) {
         this.host = host;
         this.implementation = implementation;
+        nativeAccessibilityManager = (android.view.accessibility.AccessibilityManager) host.getContext()
+                .getSystemService(android.content.Context.ACCESSIBILITY_SERVICE);
         host.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
     }
 
@@ -284,8 +287,16 @@ final class AndroidAccessibilityProvider extends AccessibilityNodeProvider {
     }
 
     private void send(AccessibilityEvent event) {
+        if (nativeAccessibilityManager == null || !nativeAccessibilityManager.isEnabled()) {
+            event.recycle();
+            return;
+        }
         ViewParent parent = host.getParent();
-        if (parent != null) parent.requestSendAccessibilityEvent(host, event);
+        if (parent != null) {
+            parent.requestSendAccessibilityEvent(host, event);
+        } else {
+            event.recycle();
+        }
     }
 
     private void setBounds(AccessibilityNodeInfo info, AccessibilityNodeSnapshot node) {

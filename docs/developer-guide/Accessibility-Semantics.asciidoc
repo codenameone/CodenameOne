@@ -163,7 +163,7 @@ Accessibility review works best as a repeatable loop instead of a final checklis
 The simulator menu changes the values returned by `Display` and `CN`. Color-vision, inversion, and grayscale choices also filter the simulator canvas, so screenshots show approximately what remains distinguishable. These filters are diagnostic approximations; they don't replace testing with platform display filters or users.
 
 .Accessibility preferences in the Java SE simulator
-image::accessibility-simulator-preferences.png[Java SE simulator with the Accessibility Preferences menu open,scaledwidth=80%]
+image::img/accessibility-simulator-preferences.png[Java SE simulator with the Accessibility Preferences menu open,scaledwidth=80%]
 
 The following icon-only custom control is painted and responds to a pointer, but initially has no usable name, role, or keyboard-equivalent action. The audit reports it as an unlabeled interactive node. Repair the semantic contract at the custom-control boundary:
 
@@ -175,7 +175,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/A
 Don't fix the warning by adding a label alone if the role, current state, range, or available actions are still wrong. For example, a custom switch needs `SWITCH`, checked state, and activation; a chart needs virtual descendants for its meaningful data points; a renderer-backed grid needs collection and item metadata.
 
 .Auditing the semantic tree in the Component Inspector
-image::accessibility-component-inspector-audit.png[Component Inspector showing an accessibility audit,scaledwidth=80%]
+image::img/accessibility-component-inspector-audit.png[Component Inspector showing an accessibility audit,scaledwidth=80%]
 
 === Assertions that prevent regressions
 
