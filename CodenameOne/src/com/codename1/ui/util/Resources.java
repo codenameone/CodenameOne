@@ -2073,24 +2073,6 @@ public class Resources {
                         shadowX(input.readFloat()).
                         shadowY(input.readFloat());
 
-            // round border with style-backed background flag. 0xff12 predates
-            // RoundBorder.uiid and must retain its exact byte layout for old
-            // resources, so the extra flag lives in a new border record type.
-            case 0xff17:
-                return RoundBorder.create().
-                        rectangle(input.readBoolean()).
-                        color(input.readInt()).
-                        opacity(input.readInt()).
-                        stroke(input.readFloat(), input.readBoolean()).
-                        strokeColor(input.readInt()).
-                        strokeOpacity(input.readInt()).
-                        shadowBlur(input.readFloat()).
-                        shadowOpacity(input.readInt()).
-                        shadowSpread(input.readInt(), input.readBoolean()).
-                        shadowX(input.readFloat()).
-                        shadowY(input.readFloat()).
-                        uiid(input.readBoolean());
-
             // round rect border
             case 0xff13:
                 RoundRectBorder out = RoundRectBorder.create().

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Hashtable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Verifies the runtime theme-binding pass installed in
@@ -57,6 +58,27 @@ public class UIManagerThemeBindingsTest extends UITestBase {
         Button raised = new Button("raised");
         raised.setUIID("RaisedButton");
         assertEquals(0xff2d95, raised.getUnselectedStyle().getBgColor());
+    }
+
+    @Test
+    public void boundBackgroundUpdatesLegacyRoundBorderWithoutChangingGeometryMode() {
+        Hashtable theme = new Hashtable();
+        RoundBorder border = RoundBorder.create().rectangle(false).color(0x007aff);
+        theme.put("IconButton.bgColor", "007aff");
+        theme.put("IconButton.border", border);
+        theme.put("@cn1-bind:IconButton.bgColor", "accent-color");
+        UIManager.getInstance().setThemeProps(theme);
+
+        Hashtable override = new Hashtable();
+        override.put("@accent-color", "ff2d95");
+        UIManager.getInstance().addThemeProps(override);
+
+        Button icon = new Button();
+        icon.setUIID("IconButton");
+        RoundBorder rebound = (RoundBorder) icon.getUnselectedStyle().getBorder();
+        assertEquals(0xff2d95, rebound.getColor());
+        assertFalse(rebound.isRectangle(), "A circular border must remain circular after palette rebinding");
+        assertFalse(rebound.getUIID(), "Palette rebinding must not opt into UIID painter mode");
     }
 
     @Test
