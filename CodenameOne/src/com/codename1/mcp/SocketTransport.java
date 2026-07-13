@@ -88,6 +88,9 @@ public class SocketTransport implements MCPTransport {
 
     @Override
     public void writeMessage(String message) throws IOException {
+        if (writer == null) {
+            throw new IOException("Socket transport is not open");
+        }
         writer.write(message);
         writer.write('\n');
         writer.flush();

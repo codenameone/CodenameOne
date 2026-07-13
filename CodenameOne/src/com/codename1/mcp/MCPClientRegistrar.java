@@ -176,7 +176,7 @@ public final class MCPClientRegistrar {
                 os.close();
             }
             return true;
-        } catch (Exception ex) {
+        } catch (Throwable ex) {
             Log.e(ex);
             return false;
         }
@@ -188,11 +188,11 @@ public final class MCPClientRegistrar {
                 return null;
             }
             String json = Util.readToString(fs.openInputStream(storagePath), "UTF-8");
-            if (json == null || json.trim().length() == 0) {
+            if (json.trim().length() == 0) {
                 return null;
             }
             return JSONParser.parseJSON(json);
-        } catch (Exception ex) {
+        } catch (Throwable ex) {
             Log.e(ex);
             return null;
         }

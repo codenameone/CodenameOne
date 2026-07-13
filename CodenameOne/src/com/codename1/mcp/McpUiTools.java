@@ -81,7 +81,7 @@ final class McpUiTools {
                         Map<String, Object> args = parse(argumentsJson);
                         long nodeId = longArg(args, "nodeId", -1);
                         String actionId = JSONParser.getString(args, "actionId");
-                        Object argument = args == null ? null : args.get("argument");
+                        Object argument = args.get("argument");
                         return JSONParser.toJson(performAction(nodeId, actionId, argument));
                     }
                 }));
