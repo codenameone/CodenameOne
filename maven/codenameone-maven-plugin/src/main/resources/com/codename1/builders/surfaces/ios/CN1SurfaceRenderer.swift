@@ -63,20 +63,39 @@ private func cn1RenderStack(_ node: [String: Any], _ ctx: CN1RenderContext, dept
     let spacing = cn1CGFloat(node["spacing"]) ?? 0
     var childCtx = ctx
     childCtx.parentAxis = axis
+    // `align` is a node's alignment inside its PARENT (the API contract), so each child aligns
+    // itself on this stack's cross axis by its OWN align -- the container's align is consumed by
+    // ITS parent, not imposed on its children. SwiftUI stacks share one alignment, so a child
+    // that sets an align is expanded to the full cross-axis extent and pinned inside it, exactly
+    // like cn1RenderBox does per child; un-aligned children keep their natural size and centre.
     if axis == .vertical {
-        let alignment = cn1HorizontalAlignment(node["align"])
-        return AnyView(VStack(alignment: alignment, spacing: spacing) {
+        return AnyView(VStack(alignment: .center, spacing: spacing) {
             ForEach(0..<children.count, id: \.self) { i in
-                cn1RenderNode(children[i], childCtx, depth: depth + 1)
+                cn1CrossAligned(cn1RenderNode(children[i], childCtx, depth: depth + 1),
+                                children[i]["align"], axis: .vertical)
             }
         })
     }
-    let alignment = cn1VerticalAlignment(node["align"])
-    return AnyView(HStack(alignment: alignment, spacing: spacing) {
+    return AnyView(HStack(alignment: .center, spacing: spacing) {
         ForEach(0..<children.count, id: \.self) { i in
-            cn1RenderNode(children[i], childCtx, depth: depth + 1)
+            cn1CrossAligned(cn1RenderNode(children[i], childCtx, depth: depth + 1),
+                            children[i]["align"], axis: .horizontal)
         }
     })
+}
+
+/// Positions a stack child on the cross axis by its own `align`: only children that set an
+/// alignment are expanded to the full cross extent and pinned; others render at natural size.
+private func cn1CrossAligned(_ view: AnyView, _ align: Any?, axis: Axis) -> AnyView {
+    guard align is String else {
+        return view
+    }
+    if axis == .vertical {
+        return AnyView(view.frame(maxWidth: .infinity,
+                alignment: Alignment(horizontal: cn1HorizontalAlignment(align), vertical: .center)))
+    }
+    return AnyView(view.frame(maxHeight: .infinity,
+            alignment: Alignment(horizontal: .center, vertical: cn1VerticalAlignment(align))))
 }
 
 private func cn1RenderBox(_ node: [String: Any], _ ctx: CN1RenderContext, depth: Int) -> AnyView {

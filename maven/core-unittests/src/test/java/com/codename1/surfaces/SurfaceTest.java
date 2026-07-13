@@ -455,6 +455,64 @@ class SurfaceTest {
     }
 
     @Test
+    void concurrentDispatchAndHandlerInstallStrandsNothing() throws Exception {
+        // Reproduces the cold-start stranding race: a dispatch reads a null handler and enqueues
+        // while setActionHandler concurrently installs and drains. If the read+enqueue and the
+        // install+drain are not one atomic boundary, an event can be added to the queue after the
+        // drain already ran, stranding it. Hammer the interleaving many times; every dispatched
+        // event must be delivered exactly once (Display uninitialized -> deliver is synchronous).
+        final int perRun = 200;
+        for (int run = 0; run < 150; run++) {
+            Surfaces.reset();
+            final java.util.concurrent.atomic.AtomicInteger delivered =
+                    new java.util.concurrent.atomic.AtomicInteger();
+            final SurfaceActionHandler handler = new SurfaceActionHandler() {
+                public void onSurfaceAction(SurfaceActionEvent evt) {
+                    delivered.incrementAndGet();
+                }
+            };
+            final java.util.concurrent.CountDownLatch start =
+                    new java.util.concurrent.CountDownLatch(1);
+            Thread dispatcher = new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        start.await();
+                    } catch (InterruptedException ignore) {
+                        return;
+                    }
+                    for (int i = 0; i < perRun; i++) {
+                        Surfaces.dispatchAction("s", "a", null);
+                    }
+                }
+            });
+            Thread installer = new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        start.await();
+                    } catch (InterruptedException ignore) {
+                        return;
+                    }
+                    Surfaces.setActionHandler(handler);
+                }
+            });
+            dispatcher.start();
+            installer.start();
+            start.countDown();
+            dispatcher.join();
+            installer.join();
+            // No rescue flush here on purpose: with the fix, every event dispatched while the
+            // handler was null was queued and drained by the install (the enqueue and the drain
+            // share one lock, so an enqueue can never land after the drain while the handler is
+            // still seen as null), and every later event was delivered directly -- so the count is
+            // exact with nothing stranded. A rescue setActionHandler() would hide a real leak.
+            assertEquals(perRun, delivered.get(),
+                    "every dispatched action must be delivered exactly once, nothing stranded (run "
+                            + run + ")");
+        }
+        Surfaces.reset();
+    }
+
+    @Test
     void stateSerializationSortsKeys() {
         Map<String, Object> state = new LinkedHashMap<String, Object>();
         state.put("zebra", Integer.valueOf(1));

@@ -121,8 +121,11 @@ final class IOSSurfaceBridge implements SurfaceBridge {
     public String startLiveActivity(String descriptorJson, Map<String, byte[]> images) {
         String container = containerPath();
         if (container != null && images != null && !images.isEmpty()) {
-            // Image names are content hashes so a shared directory dedups across activities;
-            // the descriptor references them by name exactly like a widget timeline does.
+            // Image names are content hashes so a shared directory dedups across activities; the
+            // descriptor references them by name exactly like a widget timeline does. The Swift
+            // bridge sweeps this directory against the still-live/lingering Activity.activities
+            // set on every start and end, so blobs from ended activities (and from a start that
+            // then fails) are reclaimed instead of growing without bound.
             try {
                 String actDir = container + "/cn1surfaces/activities";
                 mkdirs(container, "cn1surfaces/activities");

@@ -99,9 +99,14 @@ public class CN1SurfaceBridge: NSObject {
                 // the extension's 16.1 deployment target keeps working.
                 let activity = try Activity<CN1SurfaceAttributes>.request(
                         attributes: attributes, contentState: contentState, pushType: nil)
+                // Reclaim any image blobs left by a prior activity that has fully ended.
+                cn1SweepActivityImages()
                 return activity.id
             } catch {
                 NSLog("CN1SurfaceBridge: failed to start live activity: %@", String(describing: error))
+                // The Java bridge wrote this start's images before calling us; the request
+                // failed so no activity references them -- reclaim them now.
+                cn1SweepActivityImages()
                 return ""
             }
         }
@@ -132,8 +137,47 @@ public class CN1SurfaceBridge: NSObject {
                 for activity in Activity<CN1SurfaceAttributes>.activities where activity.id == id {
                     await activity.end(using: finalState, dismissalPolicy: immediate ? .immediate : .default)
                 }
+                // Reclaim image blobs after the end resolves: a non-immediate dismissal leaves the
+                // activity lingering in Activity.activities (and its artwork referenced), so only a
+                // truly-gone activity's images are swept.
+                cn1SweepActivityImages()
             }
         }
         #endif
+    }
+
+    /// Deletes live-activity image blobs no longer referenced by ANY tracked activity.
+    /// Activity.activities is authoritative for what is still live OR lingering after end() (a
+    /// dismissed activity remains there until the system removes it), and every activity's
+    /// descriptorJson carries the complete `images` reference list, so a content-hash blob
+    /// survives while any activity still references it and is reclaimed once none do -- fixing the
+    /// unbounded growth of the shared cn1surfaces/activities directory.
+    @available(iOS 16.1, *)
+    static func cn1SweepActivityImages() {
+        guard let dir = cn1SurfacesActivitiesDir() else {
+            return
+        }
+        var referenced = Set<String>()
+        for activity in Activity<CN1SurfaceAttributes>.activities {
+            guard let data = activity.attributes.descriptorJson.data(using: .utf8),
+                  let doc = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  let names = doc["images"] as? [Any] else {
+                continue
+            }
+            for name in names {
+                if let s = name as? String {
+                    referenced.insert(s)
+                }
+            }
+        }
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else {
+            return
+        }
+        for url in entries where url.pathExtension == "png" {
+            if !referenced.contains(url.deletingPathExtension().lastPathComponent) {
+                try? fm.removeItem(at: url)
+            }
+        }
     }
 }

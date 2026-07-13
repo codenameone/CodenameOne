@@ -179,20 +179,23 @@ public final class Surfaces {
     ///
     /// - `handler`: the handler, or null to clear
     public static void setActionHandler(SurfaceActionHandler handler) {
-        actionHandler = handler;
-        if (handler == null) {
-            return;
-        }
-        List<SurfaceActionEvent> queued;
+        // Install the handler and drain the cold-start queue atomically under the same lock
+        // dispatchAction() uses, so an in-flight dispatch cannot observe a null handler and then
+        // enqueue an event after this method already flushed an empty queue (which would strand
+        // it forever). Either dispatch's read-and-enqueue happens entirely before this install
+        // (the event is drained here) or entirely after (dispatch sees the handler and delivers).
+        List<SurfaceActionEvent> queued = null;
         synchronized (pendingActions) {
-            if (pendingActions.isEmpty()) {
-                return;
+            actionHandler = handler;
+            if (handler != null && !pendingActions.isEmpty()) {
+                queued = new ArrayList<SurfaceActionEvent>(pendingActions);
+                pendingActions.clear();
             }
-            queued = new ArrayList<SurfaceActionEvent>(pendingActions);
-            pendingActions.clear();
         }
-        for (SurfaceActionEvent evt : queued) {
-            deliver(evt);
+        if (queued != null) {
+            for (SurfaceActionEvent evt : queued) {
+                deliver(handler, evt);
+            }
         }
     }
 
@@ -209,14 +212,18 @@ public final class Surfaces {
     /// - `params`: the action parameters, may be null
     public static void dispatchAction(String source, String actionId, Map<String, Object> params) {
         SurfaceActionEvent evt = new SurfaceActionEvent(source, actionId, params);
-        if (actionHandler == null) {
-            evt.setColdStart(true);
-            synchronized (pendingActions) {
+        SurfaceActionHandler h;
+        // Read the handler and decide queue-vs-deliver atomically under the same lock
+        // setActionHandler() installs it and drains under -- see the note there.
+        synchronized (pendingActions) {
+            h = actionHandler;
+            if (h == null) {
+                evt.setColdStart(true);
                 pendingActions.add(evt);
+                return;
             }
-            return;
         }
-        deliver(evt);
+        deliver(h, evt);
     }
 
     /// Framework/port/test entry point: overrides the bridge resolved from the platform port.
@@ -249,15 +256,14 @@ public final class Surfaces {
     static void reset() {
         bridge = null;
         bridgeOverridden = false;
-        actionHandler = null;
         synchronized (pendingActions) {
+            actionHandler = null;
             pendingActions.clear();
         }
         registeredKinds.clear();
     }
 
-    private static void deliver(final SurfaceActionEvent evt) {
-        final SurfaceActionHandler h = actionHandler;
+    private static void deliver(final SurfaceActionHandler h, final SurfaceActionEvent evt) {
         if (h == null) {
             return;
         }
