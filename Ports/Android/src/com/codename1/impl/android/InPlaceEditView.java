@@ -651,6 +651,7 @@ public class InPlaceEditView extends FrameLayout{
         final int scrollX;
         final int scrollY;
         final int verticalAlignment;
+        final int absoluteAlignment;
         final int height;
         final int width;
         final int fontHeight;
@@ -694,6 +695,10 @@ public class InPlaceEditView extends FrameLayout{
             return verticalAlignment;
         }
 
+        int getAbsoluteAlignment() {
+            return absoluteAlignment;
+        }
+
         boolean isRTL() {
             return isRTL;
         }
@@ -733,6 +738,7 @@ public class InPlaceEditView extends FrameLayout{
             paddingBottom = s.getPaddingBottom();
             isTextField = (ta instanceof TextField);
             verticalAlignment = ta.getVerticalAlignment();
+            absoluteAlignment = ta.getAbsoluteAlignment();
             height = ta.getHeight();
             width = ta.getWidth();
             fontHeight = s.getFont().getHeight();
@@ -874,10 +880,20 @@ public class InPlaceEditView extends FrameLayout{
 
         mEditText.setLayoutParams(mEditLayoutParams);
 
-        if(textArea.isRTL()){
-            mEditText.setGravity(Gravity.RIGHT | Gravity.TOP);
-        }else{
-            mEditText.setGravity(Gravity.LEFT | Gravity.TOP);
+        // Honor the field's horizontal alignment (issue #5370) so a right- or
+        // center-aligned field doesn't jump to the left when the native editor
+        // takes over. getAbsoluteAlignment() already resolves LEFT/RIGHT for RTL,
+        // so it covers the previous RTL-only behavior too.
+        switch (textArea.getAbsoluteAlignment()) { // snapshot value, safe off the EDT
+            case Component.RIGHT:
+                mEditText.setGravity(Gravity.RIGHT | Gravity.TOP);
+                break;
+            case Component.CENTER:
+                mEditText.setGravity(Gravity.CENTER_HORIZONTAL | Gravity.TOP);
+                break;
+            default:
+                mEditText.setGravity(Gravity.LEFT | Gravity.TOP);
+                break;
         }
 
         mEditText.setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom);
