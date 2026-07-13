@@ -1,6 +1,7 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.ui.Button;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BoxLayout;
@@ -50,7 +51,9 @@ import java.util.Hashtable;
  * matching `-dark` palette variables.
  *
  * Suite hygiene: this test installs the `@`-prefixed override
- * constants once during the light populate(). DualAppearanceBaseTest's
+ * constants at the start of each light-theme pass. This is necessary because
+ * a capture retry and HTML5's Material-to-iOS pass both reload the native
+ * theme and clear constants. DualAppearanceBaseTest's
  * `finish()` runs after the dark capture and reloads `/theme` via
  * {@link UIManager#initFirstTheme}, which routes through
  * `setThemePropsImpl` and clears `themeConstants` before re-populating
@@ -72,8 +75,6 @@ public class PaletteOverrideThemeScreenshotTest extends DualAppearanceBaseTest {
     /// magenta accent so the disabled RaisedButton on the form reads
     /// as a third independent colour at a glance.
     private static final String OVERRIDE_ACCENT_DISABLED = "00b894";
-    private boolean overrideInstalled;
-
     @Override
     protected String baseName() {
         return "PaletteOverrideTheme";
@@ -86,9 +87,11 @@ public class PaletteOverrideThemeScreenshotTest extends DualAppearanceBaseTest {
 
     @Override
     protected void populate(Form form, String suffix) {
-        if (!overrideInstalled) {
+        // Reinstall for every light phase. The same test instance is reused when
+        // a native capture retries and when HTML5 switches from Material to the
+        // iOS theme; both paths reload the base theme and clear theme constants.
+        if ("light".equals(suffix) || "ios_light".equals(suffix)) {
             installPaletteOverride();
-            overrideInstalled = true;
         }
 
         form.add(new Label("Primary / accent UIIDs"));
@@ -105,6 +108,8 @@ public class PaletteOverrideThemeScreenshotTest extends DualAppearanceBaseTest {
         disabled.setUIID("RaisedButton");
         disabled.setEnabled(false);
         form.add(disabled);
+
+        assertPaletteApplied(primary, text, disabled, suffix);
 
         Label footer = new Label("Magenta override active in both appearances");
         footer.setUIID("SecondaryLabel");
@@ -176,5 +181,30 @@ public class PaletteOverrideThemeScreenshotTest extends DualAppearanceBaseTest {
         override.put("@accent-on-container-color", OVERRIDE_ACCENT_TEXT);
         override.put("@accent-on-container-color-dark", OVERRIDE_ACCENT_TEXT);
         UIManager.getInstance().addThemeProps(override);
+    }
+
+    private void assertPaletteApplied(Button primary, Button text, Button disabled, String suffix) {
+        int primaryBg = primary.getUnselectedStyle().getBgColor();
+        int textFg = text.getUnselectedStyle().getFgColor();
+        int textBg = text.getUnselectedStyle().getBgColor();
+        int disabledBg = disabled.getDisabledStyle().getBgColor();
+        boolean iosTheme = "ios".equals(Display.getInstance().getPlatformName())
+                || suffix.startsWith("ios_");
+        // iOS Button is a text-accent glass pill. Material Button is the
+        // filled primary action, so its background (not foreground) carries
+        // the accent while the label remains on-primary white.
+        // Fail fast only for the iOS theme whose serialized pill-border
+        // bindings this regression test protects. Material ports don't expose
+        // one uniform Style fg/bg representation for their painted buttons;
+        // their rendered palette behavior remains covered by the goldens.
+        boolean textAccentApplied = textFg == 0xff2d95;
+        if (iosTheme && (primaryBg != 0xff2d95 || !textAccentApplied
+                || disabledBg != 0x00b894)) {
+            throw new AssertionError("Palette override missing in " + suffix
+                    + ": Raised.bg=" + Integer.toHexString(primaryBg)
+                    + " Button.fg=" + Integer.toHexString(textFg)
+                    + " Button.bg=" + Integer.toHexString(textBg)
+                    + " Raised.disabled.bg=" + Integer.toHexString(disabledBg));
+        }
     }
 }

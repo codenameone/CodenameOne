@@ -304,11 +304,10 @@ SpanLabelText { cn1-derive: Label; background-color: transparent; }
    degenerate to a circle when width<=height - RoundBorder paints a
    circle in that case, border-radius always keeps the corner radius. */
 Button {
-    /* iOS 26 .glass() system button: a translucent FROSTED-WHITE capsule (the
-       backdrop reads through, washed toward white) with a near-black label -- NOT a
-       bare blue text label. The pill fill is the defining part of the look; without
-       it the button reads as plain text over the backdrop. */
-    color: #000000;
+    /* Keep Button as an accent-bearing UIID while adopting the iOS 26 glass
+       material. Apps have long used the primary palette to brand Button text;
+       the translucent capsule changes the surface, not that theming contract. */
+    color: var(--accent-color, #007aff);
     /* Compact glass capsule: very little padding. */
     padding: 1mm 2.5mm 1mm 2.5mm;
     /* Breathing room like a native iOS form: buttons aren't flush to the
@@ -340,20 +339,20 @@ Button {
 /* Held-down dim: 0.88 x the normal glass render. With the thinner 0.20 fill,
    alpha_p = 0.12 + 0.88 x 0.20 = 0.30 and fill_p = 0.88 x 0.20 x 255 / 0.30 ~=
    150. Reads as a clearly pressed grey pill; matches the held native reference. */
-Button.pressed { color: #000000; background-color: rgba(150,150,158,0.30); border: 0.25mm solid rgba(0,0,0,0.16); cn1-background-type: cn1-pill-border; }
-Button.disabled { color: rgba(0,0,0,0.3); background-color: rgba(255,255,255,0.40); border: 0.25mm solid rgba(0,0,0,0.08); cn1-background-type: cn1-pill-border; }
+Button.pressed { color: var(--accent-pressed-color, #0064d1); background-color: rgba(150,150,158,0.30); border: 0.25mm solid rgba(0,0,0,0.16); cn1-background-type: cn1-pill-border; }
+Button.disabled { color: var(--accent-disabled-color, #b3d4ff); background-color: rgba(255,255,255,0.40); border: 0.25mm solid rgba(0,0,0,0.08); cn1-background-type: cn1-pill-border; }
 
 RaisedButton {
     cn1-derive: Button;
-    color: #ffffff;
+    color: var(--accent-on-color, #ffffff);
     background-color: var(--accent-color, #007aff);
     cn1-background-type: cn1-pill-border;
     text-align: center;
 }
-RaisedButton.pressed { color: #ffffff; background-color: var(--accent-pressed-color, #0064d1); cn1-background-type: cn1-pill-border; }
-/* Disabled prominent-glass button is almost fully transparent (just a hint of the
-   tint), with greyed text. */
-RaisedButton.disabled { background-color: rgba(255,255,255,0.5); color: rgba(60,60,67,0.45); cn1-background-type: cn1-pill-border; }
+RaisedButton.pressed { color: var(--accent-on-color, #ffffff); background-color: var(--accent-pressed-color, #0064d1); cn1-background-type: cn1-pill-border; }
+/* Disabled remains palette-driven so branded themes can provide a distinct
+   accessible disabled accent while retaining the prominent glass capsule. */
+RaisedButton.disabled { background-color: var(--accent-disabled-color, #b3d4ff); color: var(--accent-on-color, #ffffff); cn1-background-type: cn1-pill-border; }
 
 /* clearGlass FlatButton: a MORE translucent capsule than the .glass() Button (more
    backdrop shows through) with a blue label. */
@@ -1024,27 +1023,26 @@ PopupContent {
     SpanLabel { color: #ffffff; background-color: transparent; }
     SpanLabelText { color: #ffffff; background-color: transparent; }
 
-    /* Dark glass button: a translucent blue capsule with white text. */
-    /* Dark .glass() button: a DARK translucent capsule (darkens the backdrop) with a
-       white label -- not a blue fill. */
+    /* Dark .glass() button: a DARK translucent capsule (darkens the backdrop)
+       whose label continues to follow the app's primary accent. */
     /* Hairline light rim (see the light-mode Button comment): the native dark
        glass capsule keeps a faint brighter edge, and over a FLAT black app
        background the dark translucent fill alone disappears completely. */
-    Button { color: #ffffff; background-color: rgba(20,20,24,0.24); border: 0.25mm solid rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); }
+    Button { color: var(--accent-color-dark, #0a84ff); background-color: rgba(20,20,24,0.24); border: 0.25mm solid rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); }
     /* Held-down dim (dark glass): 0.88 x the normal render. alpha_p = 0.12 +
        0.88 x 0.36 = 0.44, fill_p = 0.88 x 0.36 x 20 / 0.44 ~= 14. (Was 40,40,44
        0.6 -- a BRIGHTEN, the wrong direction for a held dim.) */
-    Button.pressed { color: #ffffff; background-color: rgba(13,13,16,0.33); border: 0.25mm solid rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; }
-    Button.disabled { color: rgba(255,255,255,0.4); background-color: rgba(20,20,24,0.58); border: 0.25mm solid rgba(255,255,255,0.10); cn1-background-type: cn1-pill-border; }
+    Button.pressed { color: var(--accent-pressed-color-dark, #64b1ff); background-color: rgba(13,13,16,0.33); border: 0.25mm solid rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; }
+    Button.disabled { color: var(--accent-disabled-color-dark, #004a99); background-color: rgba(20,20,24,0.58); border: 0.25mm solid rgba(255,255,255,0.10); cn1-background-type: cn1-pill-border; }
     /* Dark FlatButton matches light: iOS 26's flat glass button is a light cream
        pill with DARK text in BOTH appearances (native ref). White text flipped it
        to the dark "charcoal" material; dark text uses the light pass-through frost. */
     FlatButton { color: #000000; background-color: rgba(255,255,255,0.16); border: 0.25mm solid rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); padding: 1mm 2.1mm 1mm 2.1mm; }
     FlatButton.pressed { color: #000000; background-color: rgba(138,138,144,0.26); border: 0.25mm solid rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; padding: 1mm 2.1mm 1mm 2.1mm; }
 
-    RaisedButton { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
-    RaisedButton.pressed { color: #ffffff; background-color: var(--accent-pressed-color-dark, #64b1ff); cn1-background-type: cn1-pill-border; }
-    RaisedButton.disabled { color: rgba(235,235,245,0.45); background-color: rgba(0,0,0,0.32); cn1-background-type: cn1-pill-border; }
+    RaisedButton { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
+    RaisedButton.pressed { color: var(--accent-on-color, #ffffff); background-color: var(--accent-pressed-color-dark, #64b1ff); cn1-background-type: cn1-pill-border; }
+    RaisedButton.disabled { color: var(--accent-on-color, #ffffff); background-color: var(--accent-disabled-color-dark, #004a99); cn1-background-type: cn1-pill-border; }
 
     /* Dark grouped cell: #2c2c2e contrasts with the #1c1c1e form (was #1c1c1e ==
        form -> invisible field). Hairline + blur for the glass character. */

@@ -1969,6 +1969,24 @@ public class UIManager {
                 }
             }
             themeProps.put(themeKey, overrideValue);
+            syncBoundRoundBorderColor(themeKey, overrideValue);
+        }
+    }
+
+    /// A RoundBorder paints its own serialized color rather than Style.bgColor.
+    /// Keep that legacy representation and geometry intact, but synchronize the
+    /// border when a compiler-emitted background-color binding is applied.
+    /// This avoids switching the border into UIID painter mode, which is not
+    /// supported consistently across ports and can change circle/pill geometry.
+    private void syncBoundRoundBorderColor(String themeKey, String colorValue) {
+        final String suffix = "bgColor";
+        if (!themeKey.endsWith(suffix)) {
+            return;
+        }
+        String borderKey = themeKey.substring(0, themeKey.length() - suffix.length()) + "border";
+        Object border = themeProps.get(borderKey);
+        if (border instanceof RoundBorder) {
+            ((RoundBorder) border).color(Integer.parseInt(colorValue, 16));
         }
     }
 
