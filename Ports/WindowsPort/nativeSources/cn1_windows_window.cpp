@@ -471,6 +471,8 @@ static int cn1WinHandleGesture(HWND hwnd, LPARAM lParam) {
 
 LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
+        case WM_GETOBJECT:
+            return cn1WinAccessibilityObject(hwnd, wParam, lParam);
         case WM_LBUTTONDOWN:
             cn1WinButtonDown(hwnd, CN1_PE_MASK_PRIMARY);
             cn1WinPushEvent(CN1_EVENT_POINTER_PRESSED, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam),
@@ -879,6 +881,29 @@ JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_isTouchDevice___R_boolean(
     }
 #endif
     return JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_isHighContrastEnabled___R_boolean(CODENAME_ONE_THREAD_STATE) {
+    HIGHCONTRASTW contrast = {};
+    contrast.cbSize = sizeof(contrast);
+    if (!SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(contrast), &contrast, 0)) return JAVA_FALSE;
+    return (contrast.dwFlags & HCF_HIGHCONTRASTON) != 0 ? JAVA_TRUE : JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_isReduceMotionEnabled___R_boolean(CODENAME_ONE_THREAD_STATE) {
+#ifdef SPI_GETCLIENTAREAANIMATION
+    BOOL animationsEnabled = TRUE;
+    if (!SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, &animationsEnabled, 0)) return JAVA_FALSE;
+    return animationsEnabled ? JAVA_FALSE : JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_windows_WindowsNative_isScreenReaderEnabled___R_boolean(CODENAME_ONE_THREAD_STATE) {
+    BOOL screenReader = FALSE;
+    if (!SystemParametersInfoW(SPI_GETSCREENREADER, 0, &screenReader, 0)) return JAVA_FALSE;
+    return screenReader ? JAVA_TRUE : JAVA_FALSE;
 }
 
 JAVA_INT com_codename1_impl_windows_WindowsNative_getDisplayHeight___R_int(CODENAME_ONE_THREAD_STATE) {

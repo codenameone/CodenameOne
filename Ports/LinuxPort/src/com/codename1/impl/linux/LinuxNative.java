@@ -125,6 +125,15 @@ public final class LinuxNative {
     /** Real horizontal screen DPI (96 == 100% scale). */
     public static native int screenDpi();
 
+    /** True when the GTK theme requests high contrast. */
+    public static native boolean isHighContrastEnabled();
+
+    /** True when GTK animations are disabled. */
+    public static native boolean isReduceMotionEnabled();
+
+    /** True when the GTK accessibility bridge is active. */
+    public static native boolean isScreenReaderEnabled();
+
     /** The window's graphics peer (a Direct2D render target wrapper). */
     public static native long getWindowGraphics();
 
@@ -144,6 +153,13 @@ public final class LinuxNative {
      * constants in cn1_linux.h for the type codes.
      */
     public static native boolean pollEvent(int[] out);
+
+    /** Rebuilds the GTK/ATK virtual accessibility hierarchy. */
+    public static native void accessibilityBegin();
+    public static native void accessibilityNode(long id, long parentId, String role, String label,
+            String description, String value, int x, int y, int width, int height, int stateFlags);
+    public static native void accessibilityAction(long nodeId, String actionId, int actionHash, String label);
+    public static native void accessibilityEnd(int changeType);
 
     /**
      * True when the default seat has a touchscreen device, used for

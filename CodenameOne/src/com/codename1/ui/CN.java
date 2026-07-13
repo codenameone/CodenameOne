@@ -1072,6 +1072,56 @@ public class CN extends CN1Constants {
         return Display.INSTANCE.isDarkMode();
     }
 
+    /// Returns true when the user requests stronger foreground/background contrast.
+    public static boolean isHighContrastEnabled() {
+        return Display.INSTANCE.isHighContrastEnabled();
+    }
+
+    /// Returns true when the user requests that information isn't conveyed by color alone.
+    public static boolean isDifferentiateWithoutColorEnabled() {
+        return Display.INSTANCE.isDifferentiateWithoutColorEnabled();
+    }
+
+    /// Returns the selected color-vision correction mode.
+    public static AccessibilityColorVisionDeficiency getColorVisionDeficiency() {
+        return Display.INSTANCE.getColorVisionDeficiency();
+    }
+
+    /// Returns true when the user requests reduced or disabled nonessential motion.
+    public static boolean isReduceMotionEnabled() {
+        return Display.INSTANCE.isReduceMotionEnabled();
+    }
+
+    /// Returns true when the user requests reduced transparency and blur effects.
+    public static boolean isReduceTransparencyEnabled() {
+        return Display.INSTANCE.isReduceTransparencyEnabled();
+    }
+
+    /// Returns true when the user requests heavier text weight.
+    public static boolean isBoldTextEnabled() {
+        return Display.INSTANCE.isBoldTextEnabled();
+    }
+
+    /// Returns true when the operating system is inverting displayed colors.
+    public static boolean isInvertColorsEnabled() {
+        return Display.INSTANCE.isInvertColorsEnabled();
+    }
+
+    /// Returns true when the operating system requests a grayscale presentation.
+    public static boolean isGrayscaleEnabled() {
+        return Display.INSTANCE.isGrayscaleEnabled();
+    }
+
+    /// Returns true when switches should include visible on/off labels.
+    public static boolean isOnOffSwitchLabelsEnabled() {
+        return Display.INSTANCE.isOnOffSwitchLabelsEnabled();
+    }
+
+    /// Returns true when a screen reader or touch-exploration service is active.
+    public static boolean isScreenReaderEnabled() {
+        return Display.INSTANCE.isScreenReaderEnabled();
+    }
+
     /// Override the default dark mode setting
     ///
     /// #### Parameters

@@ -35,6 +35,9 @@ import com.codename1.ui.Image;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Shape;
+import com.codename1.ui.accessibility.AccessibilityAction;
+import com.codename1.ui.accessibility.AccessibilityNodeSnapshot;
+import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
@@ -42,7 +45,12 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Native Linux (GTK3, desktop) implementation of the Codename One platform
@@ -66,6 +74,21 @@ import java.util.Locale;
  * headless (see {@code Ports/LinuxPort/status.md}).</p>
  */
 public class LinuxImplementation extends CodenameOneImplementation {
+
+    @Override
+    public boolean isHighContrastEnabled() {
+        return LinuxNative.isHighContrastEnabled();
+    }
+
+    @Override
+    public boolean isReduceMotionEnabled() {
+        return LinuxNative.isReduceMotionEnabled();
+    }
+
+    @Override
+    public boolean isScreenReaderEnabled() {
+        return LinuxNative.isScreenReaderEnabled();
+    }
     private static LinuxImplementation INSTANCE;
 
     // Event type codes; must mirror the CN1EventType enum in cn1_linux.h.
@@ -80,6 +103,7 @@ public class LinuxImplementation extends CodenameOneImplementation {
     private static final int EVENT_MOUSE_HWHEEL = 9;
     private static final int EVENT_PINCH = 10;
     private static final int EVENT_ROTATE = 11;
+    private static final int EVENT_ACCESSIBILITY_ACTION = 12;
 
     // The native gesture events encode their float (incremental scale / radians) as
     // an int in 1/10000 units; see CN1_GESTURE_FIXED in cn1_linux.h.
@@ -97,6 +121,10 @@ public class LinuxImplementation extends CodenameOneImplementation {
     private L10NManager l10n;
     private com.codename1.ui.util.ImageIO imageIO;
     private final int[] eventScratch = new int[4];
+    private final Map<String, Integer> accessibilityActionTokens = new HashMap<String, Integer>();
+    private final Map<Integer, AccessibilityActionTarget> accessibilityActionTargets =
+            new HashMap<Integer, AccessibilityActionTarget>();
+    private int nextAccessibilityActionToken = 1;
 
     /**
      * Registers the singleton so the Win32 native bootstrap and message loop can
@@ -681,6 +709,12 @@ public class LinuxImplementation extends CodenameOneImplementation {
                 case EVENT_CLOSE:
                     Display.getInstance().exitApplication();
                     break;
+                case EVENT_ACCESSIBILITY_ACTION:
+                    AccessibilityActionTarget actionTarget = accessibilityActionTargets.get(Integer.valueOf(key));
+                    if (actionTarget != null) {
+                        performAccessibilityAction(actionTarget.nodeId, actionTarget.actionId, null);
+                    }
+                    break;
                 default:
                     break;
             }
@@ -717,6 +751,97 @@ public class LinuxImplementation extends CodenameOneImplementation {
             widgetBridge = new LinuxWidgetBridge();
         }
         return widgetBridge;
+    }
+
+    @Override
+    public void accessibilityTreeChanged(int changeType) {
+        AccessibilityTreeSnapshot tree = getAccessibilityTreeSnapshot();
+        Set<String> liveActionKeys = new HashSet<String>();
+        LinuxNative.accessibilityBegin();
+        for (AccessibilityNodeSnapshot node : tree.getNodes().values()) {
+            int flags = (node.isFocusable() ? 1 : 0) | (node.isFocused() ? 2 : 0)
+                    | (Boolean.TRUE.equals(node.getEnabled()) ? 4 : 0)
+                    | (Boolean.TRUE.equals(node.getSelected()) ? 8 : 0)
+                    | (node.getChecked().ordinal() << 4)
+                    | (Boolean.TRUE.equals(node.getExpanded()) ? 64 : 0)
+                    | (Boolean.TRUE.equals(node.getInvalid()) ? 128 : 0);
+            com.codename1.ui.geom.Rectangle b = node.getBounds();
+            LinuxNative.accessibilityNode(node.getId(), node.getParentId(), node.getRole().name(), node.getLabel(),
+                    joinDescription(node), node.getValue(), b.getX(), b.getY(), b.getWidth(), b.getHeight(), flags);
+            for (AccessibilityAction action : node.getActions()) {
+                if (action.isEnabled()) {
+                    String actionKey = accessibilityActionKey(node.getId(), action.getId());
+                    liveActionKeys.add(actionKey);
+                    LinuxNative.accessibilityAction(node.getId(), action.getId(),
+                            accessibilityActionToken(node.getId(), action.getId()),
+                            action.getLabel() == null ? action.getId() : action.getLabel());
+                }
+            }
+        }
+        LinuxNative.accessibilityEnd(changeType);
+        Iterator<Map.Entry<String, Integer>> iterator = accessibilityActionTokens.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, Integer> entry = iterator.next();
+            if (!liveActionKeys.contains(entry.getKey())) {
+                accessibilityActionTargets.remove(entry.getValue());
+                iterator.remove();
+            }
+        }
+    }
+
+    private int accessibilityActionToken(long nodeId, String actionId) {
+        String key = accessibilityActionKey(nodeId, actionId);
+        Integer existing = accessibilityActionTokens.get(key);
+        if (existing != null) {
+            accessibilityActionTargets.put(existing, new AccessibilityActionTarget(nodeId, actionId));
+            return existing.intValue();
+        }
+        int candidate = nextAccessibilityActionToken;
+        while (accessibilityActionTargets.containsKey(Integer.valueOf(candidate))) {
+            candidate = nextAccessibilityActionToken(candidate);
+        }
+        nextAccessibilityActionToken = nextAccessibilityActionToken(candidate);
+        Integer token = Integer.valueOf(candidate);
+        accessibilityActionTokens.put(key, token);
+        accessibilityActionTargets.put(token, new AccessibilityActionTarget(nodeId, actionId));
+        return candidate;
+    }
+
+    private int nextAccessibilityActionToken(int current) {
+        return current == Integer.MAX_VALUE ? 1 : current + 1;
+    }
+
+    private String accessibilityActionKey(long nodeId, String actionId) {
+        return nodeId + "\n" + actionId;
+    }
+
+    private static final class AccessibilityActionTarget {
+        final long nodeId;
+        final String actionId;
+
+        AccessibilityActionTarget(long nodeId, String actionId) {
+            this.nodeId = nodeId;
+            this.actionId = actionId;
+        }
+    }
+
+    private String joinDescription(AccessibilityNodeSnapshot node) {
+        StringBuilder out = new StringBuilder();
+        if (node.getHint() != null) out.append(node.getHint());
+        if (node.getDescription() != null) {
+            if (out.length() > 0) out.append(". ");
+            out.append(node.getDescription());
+        }
+        if (node.getValidationError() != null) {
+            if (out.length() > 0) out.append(". ");
+            out.append(node.getValidationError());
+        }
+        return out.length() == 0 ? null : out.toString();
+    }
+
+    @Override
+    public boolean isAccessibilityTreeSupported() {
+        return true;
     }
 
     /* --------------------------------------------------- local notifications

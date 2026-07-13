@@ -101,7 +101,8 @@ typedef enum {
      * ROTATE. drainInput decodes these into Display.fireMagnifyGesture /
      * fireRotationGesture, the same hooks the macOS trackpad drives. */
     CN1_EVENT_PINCH = 10,
-    CN1_EVENT_ROTATE = 11
+    CN1_EVENT_ROTATE = 11,
+    CN1_EVENT_ACCESSIBILITY_ACTION = 12
 } CN1EventType;
 
 /* Fixed-point scale for the gesture keyCode field (see CN1_EVENT_PINCH). */
@@ -255,6 +256,7 @@ int  cn1WinCreateWindow(const char* utf8Title, int width, int height);
 void cn1WinPushEvent(CN1EventType type, int x, int y, int keyCode);
 int  cn1WinPollEvent(CN1Event* out);
 LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+LRESULT cn1WinAccessibilityObject(HWND hwnd, WPARAM wParam, LPARAM lParam);
 
 /* BrowserComponent / WebView2 peer (cn1_windows_browser.cpp). The EDT-facing
  * native methods marshal each WebView2 operation to the main (pump) thread by

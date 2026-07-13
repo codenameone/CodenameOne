@@ -1683,6 +1683,51 @@ public class IOSImplementation extends CodenameOneImplementation {
     public float getLargerTextScale() {
         return nativeInstance.getLargerTextScale();
     }
+
+    @Override
+    public boolean isHighContrastEnabled() {
+        return nativeInstance.isHighContrastEnabled();
+    }
+
+    @Override
+    public boolean isDifferentiateWithoutColorEnabled() {
+        return nativeInstance.isDifferentiateWithoutColorEnabled();
+    }
+
+    @Override
+    public boolean isReduceMotionEnabled() {
+        return nativeInstance.isReduceMotionEnabled();
+    }
+
+    @Override
+    public boolean isReduceTransparencyEnabled() {
+        return nativeInstance.isReduceTransparencyEnabled();
+    }
+
+    @Override
+    public boolean isBoldTextEnabled() {
+        return nativeInstance.isBoldTextEnabled();
+    }
+
+    @Override
+    public boolean isInvertColorsEnabled() {
+        return nativeInstance.isInvertColorsEnabled();
+    }
+
+    @Override
+    public boolean isGrayscaleEnabled() {
+        return nativeInstance.isGrayscaleEnabled();
+    }
+
+    @Override
+    public boolean isOnOffSwitchLabelsEnabled() {
+        return nativeInstance.isOnOffSwitchLabelsEnabled();
+    }
+
+    @Override
+    public boolean isScreenReaderEnabled() {
+        return nativeInstance.isScreenReaderEnabled();
+    }
     
 
     public void flushGraphics() {
@@ -12030,6 +12075,22 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public void announceForAccessibility(final Component cmp, final String text) {
         IOSNative.announceForAccessibility(text);
+    }
+
+    @Override
+    public void accessibilityTreeChanged(int changeType) {
+        IOSNative.updateAccessibilityTree(getAccessibilityTreeSnapshot().toJson(), changeType);
+    }
+
+    @Override
+    public boolean isAccessibilityTreeSupported() {
+        return true;
+    }
+
+    public static void performAccessibilityActionFromNative(long nodeId, String actionId, String argument) {
+        if (instance != null) {
+            instance.performAccessibilityAction(nodeId, actionId, argument);
+        }
     }
 
     // ================================================================

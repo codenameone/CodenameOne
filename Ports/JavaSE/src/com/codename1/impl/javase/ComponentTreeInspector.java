@@ -22,8 +22,14 @@ import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.list.ContainerList;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
+import com.codename1.ui.accessibility.AccessibilityAssertions;
+import com.codename1.ui.accessibility.AccessibilityInspector;
+import com.codename1.ui.accessibility.AccessibilityIssue;
+import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
 import java.awt.BorderLayout;
 import java.awt.Desktop;
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -103,6 +109,31 @@ public class ComponentTreeInspector extends JPanel {
         frame.setVisible(true);
         return frame;
     }
+
+    /** Audits the current form and displays the result. */
+    public void showAccessibilityAudit() {
+        com.codename1.ui.CN.callSerially(new Runnable() {
+            public void run() {
+                Form form = Display.getInstance().getCurrent();
+                if (form == null) return;
+                AccessibilityTreeSnapshot snapshot = AccessibilityInspector.snapshot(form);
+                final List<AccessibilityIssue> issues = AccessibilityAssertions.audit(snapshot);
+                final StringBuilder message = new StringBuilder();
+                for (AccessibilityIssue issue : issues) {
+                    if (message.length() > 0) message.append('\n');
+                    message.append(issue.toString());
+                }
+                SwingUtilities.invokeLater(new Runnable() {
+                    public void run() {
+                        JOptionPane.showMessageDialog(ComponentTreeInspector.this,
+                                issues.isEmpty() ? "No accessibility issues found" : message.toString(),
+                                "Accessibility Audit", issues.isEmpty()
+                                ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.WARNING_MESSAGE);
+                    }
+                });
+            }
+        });
+    }
     
     public void dispose() {
         if (frame != null) {
@@ -178,6 +209,34 @@ public class ComponentTreeInspector extends JPanel {
             
         });
         contextMenu.add(printComponent);
+
+        JMenuItem copyAccessibilityTree = new JMenuItem("Copy Accessibility Tree JSON");
+        copyAccessibilityTree.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                com.codename1.ui.CN.callSerially(new Runnable() {
+                    public void run() {
+                        Form form = Display.getInstance().getCurrent();
+                        if (form == null) return;
+                        final String json = AccessibilityInspector.snapshot(form).toJson();
+                        SwingUtilities.invokeLater(new Runnable() {
+                            public void run() {
+                                Toolkit.getDefaultToolkit().getSystemClipboard().setContents(
+                                        new StringSelection(json), null);
+                            }
+                        });
+                    }
+                });
+            }
+        });
+        contextMenu.add(copyAccessibilityTree);
+
+        JMenuItem auditAccessibilityTree = new JMenuItem("Audit Accessibility Tree");
+        auditAccessibilityTree.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                showAccessibilityAudit();
+            }
+        });
+        contextMenu.add(auditAccessibilityTree);
 
         //if (currentComponent instanceof Container) {
             JMenuItem revalidate = new JMenuItem("Revalidate");
