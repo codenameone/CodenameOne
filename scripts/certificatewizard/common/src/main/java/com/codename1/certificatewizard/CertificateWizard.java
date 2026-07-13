@@ -164,7 +164,7 @@ public class CertificateWizard extends Lifecycle {
         assumedCredentialConfigured = true;
         String keyId = Preferences.get(PREF_CREDENTIAL_KEY_ID, "Stored");
         String issuerId = Preferences.get(PREF_CREDENTIAL_ISSUER_ID, "");
-        state = new SigningState(new SigningState.Credential(true, keyId, issuerId), null, null, null, null, null);
+        state = new SigningState(new SigningState.Credential(true, keyId, issuerId), null, null, null, null, null, null);
     }
 
     private void initTableState() {
@@ -456,7 +456,8 @@ public class CertificateWizard extends Lifecycle {
                 r -> {
                     if (r.ok) {
                         state = new SigningState(new SigningState.Credential(true, key.getText(), issuer.getText()),
-                                state.certificates, state.bundleIds, state.devices, state.profiles, state.apnsKeys);
+                                state.certificates, state.bundleIds, state.devices, state.profiles, state.apnsKeys,
+                                state.appGroups);
                         storeCredentialState();
                     }
                     afterMutation(r, "Credential stored");
@@ -466,7 +467,8 @@ public class CertificateWizard extends Lifecycle {
                 "Delete", () -> service.deleteCredential(r -> {
                     if (r.ok) {
                         state = new SigningState(new SigningState.Credential(false, null, null),
-                                state.certificates, state.bundleIds, state.devices, state.profiles, state.apnsKeys);
+                                state.certificates, state.bundleIds, state.devices, state.profiles, state.apnsKeys,
+                                state.appGroups);
                         storeCredentialState();
                     }
                     afterMutation(r, "Credential deleted");
@@ -1000,11 +1002,25 @@ public class CertificateWizard extends Lifecycle {
         }
         CheckBox push = new CheckBox("Enable Push Notifications");
         push.setUIID(uiid("CWFieldLabel"));
-        d.add(id).add(name).add(push);
+        CheckBox appGroups = new CheckBox("Enable App Groups (widgets / live activities)");
+        appGroups.setUIID(uiid("CWFieldLabel"));
+        d.add(id).add(name).add(push).add(appGroups);
         Button save = primary("Register", "modal.bundle.submit");
         save.addActionListener(e -> {
             d.dispose();
-            service.createBundleId(id.getText(), name.getText(), push.isSelected(), r -> afterMutation(r, "Bundle ID registered"));
+            final String bundleIdentifier = id.getText();
+            final boolean withGroups = appGroups.isSelected();
+            service.createBundleId(bundleIdentifier, name.getText(), push.isSelected(), r -> {
+                if (!r.ok) {
+                    showPageMessage(r.message, true);
+                    return;
+                }
+                if (withGroups) {
+                    enableAppGroupsForBundle(bundleIdentifier);
+                } else {
+                    afterMutation(r, "Bundle ID registered");
+                }
+            });
         });
         addDialogActions(d, save);
         showModal(d);
@@ -1191,7 +1207,8 @@ public class CertificateWizard extends Lifecycle {
                 () -> autoSetupCertificate(bundleIdentifier, appName, PROFILE_APP_STORE,
                         () -> autoSetupMacProject(PROFILE_MAC_STORE,
                                 () -> autoSetupMacProject(PROFILE_MAC_DIRECT,
-                                        () -> showPageMessage("Automatic signing setup completed.", false)))));
+                                        () -> autoSetupWidgetExtension(bundleIdentifier, appName,
+                                                () -> showPageMessage("Automatic signing setup completed.", false))))));
     }
 
     private void autoSetupMacProject(String profileType) {
@@ -1222,6 +1239,185 @@ public class CertificateWizard extends Lifecycle {
         } else {
             autoSetupCertificate(defaults.bundleId, defaults.appName, profileType, next);
         }
+    }
+
+    private void enableAppGroupsForBundle(String bundleIdentifier) {
+        ProjectDefaults defaults = projectDefaults();
+        String groupId = resolveAppGroupIdentifier(defaults);
+        String groupName = defaults.appName + " Shared";
+        showPageMessage("Enabling App Groups for " + bundleIdentifier + "...", false);
+        findOrCreateAppGroup(groupId, groupName, group -> refreshForAutoSetup(() -> {
+            SigningState.BundleId bundle = findBundleByIdentifier(bundleIdentifier, "IOS");
+            if (bundle == null) {
+                showPageMessage("Bundle ID was created but could not be found after refresh.", true);
+                return;
+            }
+            List<String> ids = new ArrayList<String>();
+            ids.add(group.id());
+            service.enableAppGroupCapability(bundle.id(), ids, rr -> {
+                if (!rr.ok) {
+                    showPageMessage(rr.message, true);
+                    return;
+                }
+                clearPageMessage();
+                ToastBar.showMessage("App Groups enabled", FontImage.MATERIAL_CHECK);
+                reload();
+            });
+        }));
+    }
+
+    private String resolveAppGroupIdentifier(ProjectDefaults defaults) {
+        String fromManifest = binding == null ? null
+                : surfacesAppGroup(ProjectIO.readSurfacesManifest(binding.projectDir()));
+        return firstNonEmpty(fromManifest, WizardDecisions.defaultAppGroup(defaults.packageName));
+    }
+
+    private static String surfacesAppGroup(ProjectIO.SurfacesManifest manifest) {
+        return manifest == null ? null : manifest.appGroup();
+    }
+
+    /// Reuses an App Group already known to the current state, otherwise creates it.
+    private void findOrCreateAppGroup(String identifier, String name,
+                                      com.codename1.util.OnComplete<SigningState.AppGroup> onGroup) {
+        for (SigningState.AppGroup g : state.appGroups) {
+            if (g.identifier() != null && g.identifier().equals(identifier)) {
+                onGroup.completed(g);
+                return;
+            }
+        }
+        service.createAppGroup(identifier, name, r -> {
+            if (!r.ok || r.value == null) {
+                showPageMessage(r.ok ? "Server returned no App Group" : r.message, true);
+                return;
+            }
+            onGroup.completed(r.value);
+        });
+    }
+
+    private void autoSetupWidgetExtension(String bundleIdentifier, String appName, Runnable next) {
+        if (binding == null || ProjectIO.readSurfacesManifest(binding.projectDir()) == null) {
+            next.run();
+            return;
+        }
+        ProjectDefaults defaults = projectDefaults();
+        final String groupId = resolveAppGroupIdentifier(defaults);
+        final String extIdentifier = WizardDecisions.widgetExtensionBundleId(defaults.packageName);
+        if (extIdentifier == null || groupId == null) {
+            next.run();
+            return;
+        }
+        showPageMessage("Setting up widget extension signing...", false);
+        findOrCreateAppGroup(groupId, appName + " Shared", group -> refreshForAutoSetup(() ->
+                autoSetupWidgetExtensionAfterGroup(bundleIdentifier, appName, defaults, groupId, extIdentifier,
+                        group, next)));
+    }
+
+    private void autoSetupWidgetExtensionAfterGroup(String bundleIdentifier, String appName,
+            ProjectDefaults defaults, String groupId, String extIdentifier, SigningState.AppGroup group,
+            Runnable next) {
+        SigningState.BundleId mainBundle = findBundleByIdentifier(bundleIdentifier, "IOS");
+        if (mainBundle == null) {
+            showPageMessage("Main bundle ID could not be found after refresh.", true);
+            return;
+        }
+        List<String> groupIds = new ArrayList<String>();
+        groupIds.add(group.id());
+        service.enableAppGroupCapability(mainBundle.id(), groupIds, r -> {
+            if (!r.ok) {
+                showPageMessage(r.message, true);
+                return;
+            }
+            ensureWidgetExtensionBundle(appName, defaults, extIdentifier, groupIds, next);
+        });
+    }
+
+    private void ensureWidgetExtensionBundle(String appName, ProjectDefaults defaults, String extIdentifier,
+            List<String> groupIds, Runnable next) {
+        SigningState.BundleId ext = findBundleByIdentifier(extIdentifier, "IOS");
+        if (ext != null) {
+            enableWidgetExtensionGroupAndProfile(appName, defaults, extIdentifier, groupIds, next);
+            return;
+        }
+        showPageMessage("Creating widget extension bundle ID " + extIdentifier + "...", false);
+        service.createBundleId(extIdentifier, appName + " Widgets", true, r -> {
+            if (!r.ok) {
+                showPageMessage(r.message, true);
+                return;
+            }
+            refreshForAutoSetup(() ->
+                    enableWidgetExtensionGroupAndProfile(appName, defaults, extIdentifier, groupIds, next));
+        });
+    }
+
+    private void enableWidgetExtensionGroupAndProfile(String appName, ProjectDefaults defaults,
+            String extIdentifier, List<String> groupIds, Runnable next) {
+        SigningState.BundleId ext = findBundleByIdentifier(extIdentifier, "IOS");
+        if (ext == null) {
+            showPageMessage("Widget extension bundle ID could not be found after refresh.", true);
+            return;
+        }
+        service.enableAppGroupCapability(ext.id(), groupIds, r -> {
+            if (!r.ok) {
+                showPageMessage(r.message, true);
+                return;
+            }
+            createWidgetExtensionProfile(appName, defaults, extIdentifier, next);
+        });
+    }
+
+    private void createWidgetExtensionProfile(String appName, ProjectDefaults defaults, String extIdentifier,
+            Runnable next) {
+        SigningState.Profile existing = findProfile(extIdentifier, PROFILE_APP_STORE);
+        if (existing != null) {
+            downloadWidgetExtensionProfile(defaults, existing, next);
+            return;
+        }
+        SigningState.BundleId ext = findBundleByIdentifier(extIdentifier, "IOS");
+        List<SigningState.Certificate> compatible = WizardDecisions.compatibleCertificates(state, PROFILE_APP_STORE);
+        if (ext == null || compatible.isEmpty()) {
+            showPageMessage("No distribution certificate was available for the widget extension profile.", true);
+            return;
+        }
+        List<String> certs = new ArrayList<String>();
+        certs.add(compatible.get(0).appleCertId());
+        String profileName = appName + " Widgets App Store";
+        showPageMessage("Creating widget extension provisioning profile...", false);
+        service.createProfile(profileName, PROFILE_APP_STORE, ext.id(), certs, new ArrayList<String>(), r -> {
+            if (!r.ok) {
+                showPageMessage(r.message, true);
+                return;
+            }
+            refreshForAutoSetup(() -> {
+                SigningState.Profile created = findProfile(extIdentifier, PROFILE_APP_STORE);
+                if (created == null) {
+                    showPageMessage("Widget extension profile was created but could not be found after refresh.", true);
+                    return;
+                }
+                downloadWidgetExtensionProfile(defaults, created, next);
+            });
+        });
+    }
+
+    private void downloadWidgetExtensionProfile(ProjectDefaults defaults, SigningState.Profile profile,
+            Runnable next) {
+        service.downloadProfile(profile.id(), "CN1Widgets.mobileprovision", r -> {
+            if (!r.ok) {
+                showPageMessage(r.message, true);
+                return;
+            }
+            try {
+                String groupId = resolveAppGroupIdentifier(defaults);
+                SigningAssetInstaller.applyWidgetExtensionSigning(binding.settings(), groupId, r.value);
+                clearPageMessage();
+                ToastBar.showMessage("Widget extension signing installed", FontImage.MATERIAL_CHECK);
+                if (next != null) {
+                    next.run();
+                }
+            } catch (Exception ex) {
+                Log.e(ex);
+                showPageMessage("Failed to update widget extension settings: " + friendlyMessage(ex), true);
+            }
+        });
     }
 
     private void generateAndroidKeystore(String alias, String password, String dname) {
@@ -1384,7 +1580,7 @@ public class CertificateWizard extends Lifecycle {
         String appName = firstNonEmpty(readSetting(settings, "codename1.displayName"),
                 readSetting(settings, "codename1.mainName"), "Codename One App");
         String bundleId = firstNonEmpty(packageName, stripTeamPrefix(iosAppId), "com.example.app");
-        return new ProjectDefaults(appName, bundleId);
+        return new ProjectDefaults(appName, bundleId, firstNonEmpty(packageName, bundleId));
     }
 
     private String readSetting(String settingsPath, String key) {
@@ -1477,7 +1673,7 @@ public class CertificateWizard extends Lifecycle {
         }
         SigningState.Credential credential = new SigningState.Credential(true, keyId, issuerId);
         return new SigningState(credential, refreshed.certificates, refreshed.bundleIds, refreshed.devices,
-                refreshed.profiles, refreshed.apnsKeys);
+                refreshed.profiles, refreshed.apnsKeys, refreshed.appGroups);
     }
 
     private void storeCredentialState() {
@@ -2301,10 +2497,13 @@ public class CertificateWizard extends Lifecycle {
     private static final class ProjectDefaults {
         final String appName;
         final String bundleId;
+        final String packageName;
 
-        ProjectDefaults(String appName, String bundleId) {
+        ProjectDefaults(String appName, String bundleId, String packageName) {
             this.appName = appName == null || appName.trim().isEmpty() ? "Codename One App" : appName.trim();
             this.bundleId = bundleId == null || bundleId.trim().isEmpty() ? "com.example.app" : bundleId.trim();
+            this.packageName = packageName == null || packageName.trim().isEmpty()
+                    ? this.bundleId : packageName.trim();
         }
     }
 

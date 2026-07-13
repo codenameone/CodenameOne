@@ -1,0 +1,14 @@
+{
+  "_comment": "Build-time widget kinds manifest for the cn1ss device suite. Referencing com.codename1.surfaces from the suite (Surfaces* tests) makes the iOS/Android builders require this manifest: widget kinds are compiled into the native widget gallery, so they cannot be registered at runtime only. The id mirrors the runtime Surfaces.registerWidgetKind call in SurfacesPublishTest. liveActivities keeps the ActivityKit lowering (CN1LiveActivityWidget.swift, NSSupportsLiveActivities, the Android ongoing-notification manager) compiled and exercised by every platform CI leg.",
+  "liveActivities": true,
+  "kinds": [
+    {
+      "id": "cn1ss_status",
+      "name": "CN1SS Status",
+      "description": "Surfaces suite status widget",
+      "iosFamilies": ["small", "medium"],
+      "androidMinWidthDp": 180,
+      "androidMinHeightDp": 60
+    }
+  ]
+}

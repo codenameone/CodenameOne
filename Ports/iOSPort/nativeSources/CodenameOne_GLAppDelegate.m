@@ -37,6 +37,11 @@
 #include "com_codename1_impl_ios_IOSNative.h"
 #include "com_codename1_push_PushContent.h"
 #include "com_codename1_ui_Display.h"
+#ifdef CN1_USE_WIDGETS
+// CodenameOne_GLViewController.h (imported above) carries the CN1_USE_WIDGETS define flipped
+// by the builder for apps that reference com.codename1.surfaces.
+#include "com_codename1_impl_ios_IOSSurfaceCallbacks.h"
+#endif
 #ifdef NEW_CODENAME_ONE_VM
 #include "java_lang_System.h"
 int mallocWhileSuspended = 0;
@@ -348,9 +353,41 @@ static void installSignalHandlers() {
         return fbRes;
     }
 #endif
-    
+
+#ifdef CN1_USE_WIDGETS
+    // Surface action deep link (cn1surface://a?src=..&id=..&p=<url-encoded JSON>) from a widget
+    // or live activity tap. Decode and hand it straight to the Java framework;
+    // Surfaces.dispatchAction queues internally until the app registers its action handler, so
+    // cold-start taps are safe (every openURL path -- delegate, legacy handleOpenURL and the
+    // scene delegate's connection/openURLContexts callbacks -- funnels through cn1OpenURL after
+    // the VM is up, exactly like the shouldApplicationHandleURL call below). These URLs are
+    // consumed here: do NOT store them in AppArg and report them handled so no other machinery
+    // sees them.
+    if (url.scheme != nil && [@"cn1surface" caseInsensitiveCompare:url.scheme] == NSOrderedSame) {
+        NSURLComponents *cn1SurfaceComponents = [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:NO];
+        NSString *cn1SurfaceSrc = nil;
+        NSString *cn1SurfaceActionId = nil;
+        NSString *cn1SurfaceParams = nil;
+        for (NSURLQueryItem *item in cn1SurfaceComponents.queryItems) {
+            if ([item.name isEqualToString:@"src"]) {
+                cn1SurfaceSrc = item.value;
+            } else if ([item.name isEqualToString:@"id"]) {
+                cn1SurfaceActionId = item.value;
+            } else if ([item.name isEqualToString:@"p"]) {
+                // NSURLQueryItem.value is already percent-decoded JSON.
+                cn1SurfaceParams = item.value;
+            }
+        }
+        JAVA_OBJECT jSurfaceSrc = cn1SurfaceSrc == nil ? JAVA_NULL : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG cn1SurfaceSrc);
+        JAVA_OBJECT jSurfaceActionId = cn1SurfaceActionId == nil ? JAVA_NULL : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG cn1SurfaceActionId);
+        JAVA_OBJECT jSurfaceParams = cn1SurfaceParams == nil ? JAVA_NULL : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG cn1SurfaceParams);
+        com_codename1_impl_ios_IOSSurfaceCallbacks_nativeSurfaceAction___java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG jSurfaceSrc, jSurfaceActionId, jSurfaceParams);
+        return YES;
+    }
+#endif // CN1_USE_WIDGETS
+
     //openURLMarkerEntry
-    
+
 #ifdef NEW_CODENAME_ONE_VM
     JAVA_BOOLEAN b = com_codename1_impl_ios_IOSImplementation_shouldApplicationHandleURL___java_lang_String_java_lang_String_R_boolean(CN1_THREAD_GET_STATE_PASS_ARG str1, str2);
 #else

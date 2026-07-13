@@ -98,6 +98,20 @@ void cn1LinuxPushEvent(int type, int x, int y, int keyCode);
  */
 int cn1LinuxPopEvent(int* out);
 
+/* --------------------------------------------------------------- widgets */
+
+/*
+ * Surfaces applet windows (cn1_linux_widgets.c): frameless GTK toplevels that
+ * display rasterized widget/live-activity pixels outside the main window.
+ * Events queue as "<id>;click;<x>;<y>" / "<id>;moved;<x>;<y>" strings drained
+ * by the main-thread input pump. The returned string is owned by the caller
+ * (g_free), NULL when the queue is empty.
+ */
+char* cn1LinuxWidgetPollEvent(void);
+
+/* Presents (raises + focuses) the main app window; marshaled to the GTK loop. */
+void cn1LinuxWidgetFocusApp(void);
+
 /* ------------------------------------------------------------- resources */
 
 /*

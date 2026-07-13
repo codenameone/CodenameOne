@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Codename One surfaces: rounded background used for nodes with a corner radius. The white
+     fill is recolored at runtime through setBackgroundTintList (API 31+); the 12dp radius is
+     fixed because RemoteViews cannot alter drawable geometry. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#ffffffff" />
+    <corners android:radius="12dp" />
+</shape>

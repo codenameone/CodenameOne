@@ -5878,6 +5878,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return b != null && b.isConnected();
     }
 
+    private com.codename1.surfaces.spi.SurfaceBridge surfaceBridge;
+
+    @Override
+    public com.codename1.surfaces.spi.SurfaceBridge getSurfaceBridge() {
+        if (surfaceBridge == null) {
+            surfaceBridge = new com.codename1.impl.android.surfaces.AndroidSurfaceBridge();
+        }
+        return surfaceBridge;
+    }
+
+    /// Invoked once the app has started (from the generated stub, next to
+    /// `deliverPendingSharedContent`) to flush surface actions that arrived through the
+    /// `CN1SurfaceActionActivity` trampoline before the app instance existed.
+    public static void deliverPendingSurfaceActions() {
+        com.codename1.impl.android.surfaces.AndroidSurfaceBridge.deliverPendingActions();
+    }
+
     /**
      * Executes r on the UI thread and blocks the EDT to completion
      * @param r runnable to execute
@@ -11974,6 +11991,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         } else {
             return null;
         }
+    }
+
+    /**
+     * Returns the fully qualified class name of the app's background fetch listener, or null
+     * when the app does not implement {@link com.codename1.background.BackgroundFetch}. The
+     * surfaces plumbing persists this name on publish so a home screen widget that rendered an
+     * exhausted timeline can start {@link BackgroundFetchHandler} and let the app republish
+     * fresh content while no activity exists.
+     *
+     * @return the listener class name or null
+     */
+    public static String getBackgroundFetchListenerClassName() {
+        if (instance == null) {
+            return null;
+        }
+        BackgroundFetch listener = instance.getBackgroundFetchListener();
+        return listener == null ? null : listener.getClass().getName();
     }
 
     public void scheduleLocalNotification(LocalNotification notif, long firstTime, int repeat) {

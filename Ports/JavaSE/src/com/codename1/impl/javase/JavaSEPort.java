@@ -370,6 +370,23 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
     }
 
+    /// Returns the JavaSE external-surfaces bridge, created lazily on first use. In simulator mode
+    /// published widget timelines render in the Widgets preview window (Widgets menu); in desktop
+    /// mode they render in frameless always-on-top floating windows that persist across runs.
+    @Override
+    public com.codename1.surfaces.spi.SurfaceBridge getSurfaceBridge() {
+        if (surfaceBridge == null) {
+            File surfacesHome = new File(System.getProperty("user.home")
+                    + File.separator + getAppHomeDir(), "cn1surfaces");
+            surfaceBridge = new JavaSEWidgetBridge(surfacesHome, isSimulator());
+            if (!isSimulator()) {
+                widgetWindows = new JavaSEWidgetWindows(surfaceBridge, window);
+                surfaceBridge.setDesktopWindows(widgetWindows);
+            }
+        }
+        return surfaceBridge;
+    }
+
     private void fireDesktopWindowEvent(com.codename1.ui.events.WindowEvent.Type type) {
         if (!isDesktop() || !Display.isInitialized()) {
             return;
@@ -927,6 +944,12 @@ public class JavaSEPort extends CodenameOneImplementation {
     // Simulated in-car (CarPlay / Android Auto) head unit, created from the Car menu. Lets developers
     // see and click through their com.codename1.car experience locally without a real head unit.
     private JavaSECarBridge carBridge;
+    // External surfaces (com.codename1.surfaces): feeds the simulator Widgets preview window in
+    // simulator mode and the desktop floating widget windows in desktop mode. Created lazily so
+    // apps that never touch the surfaces API pay nothing.
+    private JavaSEWidgetBridge surfaceBridge;
+    // Desktop floating widget windows manager, created beside the bridge in desktop mode only.
+    private JavaSEWidgetWindows widgetWindows;
     // Application frame used for simulator
     private AppFrame appFrame;
     private long lastIdleTime;
@@ -1168,6 +1191,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                         });
                         sysTray.add(tray);
                         desktopNotificationTray = tray;
+                        if (widgetWindows != null) {
+                            // desktop widgets piggyback on the persistent tray icon: an
+                            // "Add widget: ..." item per registered kind
+                            widgetWindows.installTrayMenu(tray);
+                        }
                     }
                     lastDesktopNotificationId = notif.getId();
                     desktopNotificationTray.displayMessage(notif.getAlertTitle(), notif.getAlertBody(),
@@ -5168,6 +5196,34 @@ public class JavaSEPort extends CodenameOneImplementation {
         return carMenu;
     }
 
+    /// Builds the simulator "Widgets" menu, which opens the Widgets preview window rendering the
+    /// app's published `com.codename1.surfaces` timelines and live activities locally -- kind list,
+    /// size selector, light/dark toggle, timeline auto-advance and a mock Dynamic Island.
+    private JMenu buildWidgetsMenu() {
+        JMenu widgetsMenu = new JMenu("Widgets");
+        registerMenuWithBlit(widgetsMenu);
+        JMenuItem preview = new JMenuItem("Widgets Preview");
+        preview.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                SimulatorWidgets.showWindow((JavaSEWidgetBridge) getSurfaceBridge(), window);
+            }
+        });
+        widgetsMenu.add(preview);
+        if (Boolean.getBoolean("cn1.surfaces.autodemo")) {
+            // Demo/automation hook: -Dcn1.surfaces.autodemo=true opens the Widgets preview
+            // window on startup so scripted runs (screenshots, samples CI) can observe
+            // published surfaces without interacting with the menu.
+            SwingUtilities.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    SimulatorWidgets.showWindow((JavaSEWidgetBridge) getSurfaceBridge(), window);
+                }
+            });
+        }
+        return widgetsMenu;
+    }
+
     private static Component findStatusBarComponent(Form f) {
         if (f == null || f.getToolbar() == null) {
             return null;
@@ -6626,6 +6682,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 bar.add(extensionMenu);
             }
             bar.add(buildCarMenu());
+            bar.add(buildWidgetsMenu());
             bar.add(helpMenu);
         }
 

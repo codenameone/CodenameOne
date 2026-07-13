@@ -14074,6 +14074,215 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isCarPlayConnected___R_boolean(CN1
     return com_codename1_impl_ios_IOSNative_isCarPlayConnected__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
+// --- External surfaces (WidgetKit + ActivityKit) ---------------------------
+// Gated by CN1_USE_WIDGETS: the builder uncomments the define (in
+// CodenameOne_GLViewController.h, imported near the top of this file), generates the
+// CN1Widgets extension target and injects the CN1SurfacesAppGroup Info.plist key when the
+// app references com.codename1.surfaces. Builds without it compile the stub branch.
+// WidgetKit/ActivityKit are Swift-only, so the real implementations are thin trampolines
+// onto the Swift CN1SurfaceBridge class (compiled into the app target by the builder),
+// reached via NSClassFromString + typed objc_msgSend casts. The Swift side owns its own
+// threading (WidgetCenter is thread safe; ActivityKit updates run in Tasks), so these
+// call it directly on the calling (CN1) thread.
+#ifdef CN1_USE_WIDGETS
+
+static NSString *cn1SurfacesGroupId() {
+    id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1SurfacesAppGroup"];
+    return ([v isKindOfClass:[NSString class]] && [(NSString *)v length] > 0) ? (NSString *)v : nil;
+}
+
+static NSString *cn1SurfacesContainerPath() {
+    NSString *group = cn1SurfacesGroupId();
+    if (group == nil) {
+        return nil;
+    }
+    NSURL *container = [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:group];
+    return container == nil ? nil : container.path;
+}
+
+static Class cn1SurfacesBridgeClass() {
+    return NSClassFromString(@"CN1SurfaceBridge");
+}
+
+// True when the running OS meets the CN1Widgets extension's deployment target
+// (CN1SurfacesMinOS Info.plist key, injected by the builder from
+// ios.surfaces.deploymentTarget; defaults to 16.1). Below that version the
+// extension cannot run or appear in the widget gallery, so the API must not
+// report widget support even though WidgetKit itself shipped with iOS 14.
+static BOOL cn1SurfacesMinOSSupported() {
+    NSString *min = nil;
+    id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1SurfacesMinOS"];
+    if ([v isKindOfClass:[NSString class]] && [(NSString *)v length] > 0) {
+        min = (NSString *)v;
+    } else {
+        min = @"16.1";
+    }
+    NSArray *parts = [min componentsSeparatedByString:@"."];
+    NSOperatingSystemVersion required;
+    required.majorVersion = parts.count > 0 ? [[parts objectAtIndex:0] integerValue] : 16;
+    required.minorVersion = parts.count > 1 ? [[parts objectAtIndex:1] integerValue] : 1;
+    required.patchVersion = parts.count > 2 ? [[parts objectAtIndex:2] integerValue] : 0;
+    return [[NSProcessInfo processInfo] isOperatingSystemAtLeastVersion:required];
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getSurfacesContainerPath__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    POOL_BEGIN();
+    NSString *path = cn1SurfacesContainerPath();
+    JAVA_OBJECT result = fromNSString(CN1_THREAD_STATE_PASS_ARG (path == nil ? @"" : path));
+    POOL_END();
+    return result;
+}
+
+void com_codename1_impl_ios_IOSNative_surfacesReloadTimelines___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT kind) {
+    if (@available(iOS 14.0, *)) {
+        POOL_BEGIN();
+        Class bridge = cn1SurfacesBridgeClass();
+        if (bridge != nil) {
+            NSString *k = (kind == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG kind);
+            ((void (*)(id, SEL, NSString *))objc_msgSend)((id)bridge,
+                    NSSelectorFromString(@"reloadTimelines:"), k);
+        }
+        POOL_END();
+    }
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_surfacesInstalledCount___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT kind) {
+    if (@available(iOS 14.0, *)) {
+        POOL_BEGIN();
+        JAVA_INT count = 0;
+        Class bridge = cn1SurfacesBridgeClass();
+        if (bridge != nil) {
+            NSString *k = (kind == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG kind);
+            count = (JAVA_INT)((NSInteger (*)(id, SEL, NSString *))objc_msgSend)((id)bridge,
+                    NSSelectorFromString(@"installedCount:"), k);
+        }
+        POOL_END();
+        return count;
+    }
+    return 0;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_surfacesStartActivity___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT descriptorJson) {
+    if (@available(iOS 16.1, *)) {
+        POOL_BEGIN();
+        JAVA_OBJECT result = JAVA_NULL;
+        Class bridge = cn1SurfacesBridgeClass();
+        if (bridge != nil && descriptorJson != JAVA_NULL) {
+            NSString *json = toNSString(CN1_THREAD_STATE_PASS_ARG descriptorJson);
+            NSString *activityId = ((NSString *(*)(id, SEL, NSString *))objc_msgSend)((id)bridge,
+                    NSSelectorFromString(@"startActivity:"), json);
+            if (activityId != nil && [activityId length] > 0) {
+                result = fromNSString(CN1_THREAD_STATE_PASS_ARG activityId);
+            }
+        }
+        POOL_END();
+        return result;
+    }
+    return JAVA_NULL;
+}
+
+void com_codename1_impl_ios_IOSNative_surfacesUpdateActivity___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT activityId, JAVA_OBJECT stateJson) {
+    if (@available(iOS 16.1, *)) {
+        POOL_BEGIN();
+        Class bridge = cn1SurfacesBridgeClass();
+        if (bridge != nil && activityId != JAVA_NULL) {
+            NSString *aid = toNSString(CN1_THREAD_STATE_PASS_ARG activityId);
+            NSString *state = (stateJson == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG stateJson);
+            ((void (*)(id, SEL, NSString *, NSString *))objc_msgSend)((id)bridge,
+                    NSSelectorFromString(@"updateActivity:stateJson:"), aid, state);
+        }
+        POOL_END();
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_surfacesEndActivity___java_lang_String_java_lang_String_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT activityId, JAVA_OBJECT finalStateJson, JAVA_BOOLEAN dismissImmediately) {
+    if (@available(iOS 16.1, *)) {
+        POOL_BEGIN();
+        Class bridge = cn1SurfacesBridgeClass();
+        if (bridge != nil && activityId != JAVA_NULL) {
+            NSString *aid = toNSString(CN1_THREAD_STATE_PASS_ARG activityId);
+            NSString *state = (finalStateJson == JAVA_NULL) ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG finalStateJson);
+            ((void (*)(id, SEL, NSString *, NSString *, BOOL))objc_msgSend)((id)bridge,
+                    NSSelectorFromString(@"endActivity:finalStateJson:immediate:"),
+                    aid, state, dismissImmediately == JAVA_TRUE);
+        }
+        POOL_END();
+    }
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesWidgetsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (@available(iOS 14.0, *)) {
+        POOL_BEGIN();
+        BOOL supported = cn1SurfacesMinOSSupported()
+                && cn1SurfacesBridgeClass() != nil && cn1SurfacesContainerPath() != nil;
+        POOL_END();
+        return supported ? JAVA_TRUE : JAVA_FALSE;
+    }
+    return JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (@available(iOS 16.1, *)) {
+        POOL_BEGIN();
+        BOOL supported = NO;
+        Class bridge = cn1SurfacesBridgeClass();
+        if (bridge != nil) {
+            // The Swift side checks ActivityAuthorizationInfo().areActivitiesEnabled.
+            supported = ((BOOL (*)(id, SEL))objc_msgSend)((id)bridge,
+                    NSSelectorFromString(@"activitiesEnabled"));
+        }
+        POOL_END();
+        return supported ? JAVA_TRUE : JAVA_FALSE;
+    }
+    return JAVA_FALSE;
+}
+
+#else // CN1_USE_WIDGETS
+
+// Surfaces not enabled: no WidgetKit/ActivityKit references, everything answers unsupported.
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getSurfacesContainerPath__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_NULL;
+}
+void com_codename1_impl_ios_IOSNative_surfacesReloadTimelines___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT kind) {
+}
+JAVA_INT com_codename1_impl_ios_IOSNative_surfacesInstalledCount___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT kind) {
+    return 0;
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_surfacesStartActivity___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT descriptorJson) {
+    return JAVA_NULL;
+}
+void com_codename1_impl_ios_IOSNative_surfacesUpdateActivity___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT activityId, JAVA_OBJECT stateJson) {
+}
+void com_codename1_impl_ios_IOSNative_surfacesEndActivity___java_lang_String_java_lang_String_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT activityId, JAVA_OBJECT finalStateJson, JAVA_BOOLEAN dismissImmediately) {
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesWidgetsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+#endif // CN1_USE_WIDGETS
+
+// New-VM (return-type-encoded) manglings for the value-returning surfaces natives. Defined
+// here, after the implementations/stubs above, so each call is to an already-declared
+// function. The void surfaces* methods need no _R_ wrapper. Always defined (real or stub)
+// regardless of CN1_USE_WIDGETS.
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getSurfacesContainerPath___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_getSurfacesContainerPath__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_INT com_codename1_impl_ios_IOSNative_surfacesInstalledCount___java_lang_String_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT kind) {
+    return com_codename1_impl_ios_IOSNative_surfacesInstalledCount___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, kind);
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_surfacesStartActivity___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT descriptorJson) {
+    return com_codename1_impl_ios_IOSNative_surfacesStartActivity___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, descriptorJson);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesWidgetsSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_surfacesWidgetsSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
 void com_codename1_impl_ios_IOSNative_setSecureStorageAccessGroup___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT accessGroup) {
     if (cn1_keychainAccessGroup != nil) {
         [cn1_keychainAccessGroup release];

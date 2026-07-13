@@ -15,6 +15,8 @@ public interface SigningService {
         createBundleId(identifier, name, "IOS", push, callback);
     }
     void createBundleId(String identifier, String name, String platform, boolean push, OnComplete<Result<Void>> callback);
+    void createAppGroup(String identifier, String name, OnComplete<Result<SigningState.AppGroup>> callback);
+    void enableAppGroupCapability(String bundleIdAppleId, List<String> appGroupIds, OnComplete<Result<Void>> callback);
     void registerDevice(String name, String udid, OnComplete<Result<Void>> callback);
     void createProfile(String name, String profileType, String bundleIdAppleId, List<String> certificateAppleIds,
                        List<String> deviceAppleIds, OnComplete<Result<Void>> callback);

@@ -1015,6 +1015,56 @@ public final class IOSNative {
     /** Shows a transient CarPlay alert/banner with the supplied message for {@code seconds}. */
     native void carPlayShowToast(String message, int seconds);
 
+    // --- External surfaces (WidgetKit + ActivityKit) -------------------------
+    // All gated natively by CN1_USE_WIDGETS (the build flips it on when the app references
+    // com.codename1.surfaces). When the define is off these compile to harmless stubs so the
+    // symbols always resolve. WidgetKit/ActivityKit are Swift-only frameworks; the real
+    // implementations trampoline into the Swift CN1SurfaceBridge class (compiled into the app
+    // target by the builder) via NSClassFromString. The Java side (IOSSurfaceBridge) persists
+    // the serialized payloads into the App Group container before calling these.
+
+    /**
+     * Returns the filesystem path of the App Group container shared with the CN1Widgets
+     * extension (group id from the CN1SurfacesAppGroup Info.plist key), or an empty string
+     * when no usable app group exists.
+     */
+    native String getSurfacesContainerPath();
+
+    /**
+     * Asks WidgetCenter to re-render the widgets of {@code kind} from their persisted
+     * timelines; an empty string reloads all kinds.
+     */
+    native void surfacesReloadTimelines(String kind);
+
+    /**
+     * Number of widget instances of {@code kind} the user placed on their home/lock screen.
+     * WidgetCenter answers asynchronously so this returns the last cached answer, 0 when
+     * still unknown.
+     */
+    native int surfacesInstalledCount(String kind);
+
+    /**
+     * Starts an ActivityKit live activity from the serialized descriptor (which embeds the
+     * initial state). Returns the platform activity id, or an empty string on failure.
+     */
+    native String surfacesStartActivity(String descriptorJson);
+
+    /** Pushes a fresh state map into a running live activity; the views re-interpolate locally. */
+    native void surfacesUpdateActivity(String activityId, String stateJson);
+
+    /**
+     * Ends a live activity, optionally showing {@code finalStateJson} before dismissal.
+     * {@code dismissImmediately} removes the surface right away instead of letting iOS
+     * linger on the final state.
+     */
+    native void surfacesEndActivity(String activityId, String finalStateJson, boolean dismissImmediately);
+
+    /** True when this build/device can render WidgetKit widgets (iOS 14+, app group resolvable). */
+    native boolean surfacesWidgetsSupported();
+
+    /** True when ActivityKit live activities are available and enabled (iOS 16.1+). */
+    native boolean surfacesActivitiesSupported();
+
     // --- Secure storage (Security.framework keychain) -----------------------
 
     /** Sets the kSecAttrAccessGroup applied to subsequent keychain operations. {@code null} clears. */

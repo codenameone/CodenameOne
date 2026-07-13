@@ -835,7 +835,13 @@ public class ByteCodeTranslator {
             // supported by clang/clang-cl, gcc and Xcode's clang alike.
             writer.append("set(CMAKE_C_STANDARD 11)\n");
             if (windows) {
-                writer.append("set(CMAKE_CXX_STANDARD 17)\n");
+                // Overridable from the configure line (-DCMAKE_CXX_STANDARD=20): the
+                // Widgets Board provider (windows.msix=true) needs C++20 because
+                // C++/WinRT at C++17 falls back to <experimental/coroutine>, which the
+                // modern MSVC STL rejects under clang-cl.
+                writer.append("if(NOT DEFINED CMAKE_CXX_STANDARD)\n");
+                writer.append("  set(CMAKE_CXX_STANDARD 17)\n");
+                writer.append("endif()\n");
             }
             writer.append("set(CN1_APP_SOURCE_ROOT \"")
                     .append(escapeCmakePath(srcRootPath))

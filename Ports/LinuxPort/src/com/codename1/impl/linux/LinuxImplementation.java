@@ -691,6 +691,32 @@ public class LinuxImplementation extends CodenameOneImplementation {
         if (clicked != null) {
             dispatchLocalNotification(clicked);
         }
+        // Applet widget windows queue their click / moved events on the same
+        // native pump; the bridge routes clicks through Surfaces.dispatchAction.
+        LinuxWidgetBridge bridge = widgetBridge;
+        if (bridge != null) {
+            bridge.drainNativeEvents();
+        }
+    }
+
+    /* ------------------------------------------------------------ surfaces */
+
+    /**
+     * The bridge behind {@code com.codename1.surfaces} on this port: pinned widget
+     * kinds render as frameless always-on-top GTK "applet" windows and a live
+     * activity docks a pill window top-center (full behavior on X11/XWayland;
+     * plain floating windows under Wayland -- see cn1_linux_widgets.c). Volatile
+     * because it is created lazily on the EDT and read by the main pump thread's
+     * {@link #drainInput()}.
+     */
+    private volatile LinuxWidgetBridge widgetBridge;
+
+    @Override
+    public com.codename1.surfaces.spi.SurfaceBridge getSurfaceBridge() {
+        if (widgetBridge == null) {
+            widgetBridge = new LinuxWidgetBridge();
+        }
+        return widgetBridge;
     }
 
     /* --------------------------------------------------- local notifications

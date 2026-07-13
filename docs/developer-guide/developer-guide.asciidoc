@@ -87,6 +87,8 @@ include::Push-Notifications.asciidoc[]
 
 include::Notifications-And-Background-Execution.asciidoc[]
 
+include::External-Surfaces.asciidoc[]
+
 include::Maps.asciidoc[]
 
 include::In-Car-Experiences.asciidoc[]

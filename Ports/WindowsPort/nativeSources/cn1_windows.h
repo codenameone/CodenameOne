@@ -302,6 +302,27 @@ void cn1WinShareHandleMessage(WPARAM wParam);
 #define WM_CN1_PRINTDLG (WM_APP + 23)
 LRESULT cn1WinPrintDialogHandleMessage(WPARAM wParam);
 
+/* Floating layered widget windows (cn1_windows_widgets.cpp): the desktop
+ * lowering of com.codename1.surfaces. Widget windows must be created, updated
+ * and destroyed on the window-owning pump thread (a window belongs to the
+ * thread that created it), so the EDT-facing widget natives post WM_CN1_WIDGET
+ * to cn1Win.hwnd with a heap-allocated op struct (create / destroy / setpixels
+ * / setpos / sethitrects / focusapp) that the handler frees -- the same
+ * marshaling pattern WM_CN1_NOTIFY uses, never a blocking SendMessage from the
+ * EDT. Events flow back through a mutex-guarded string queue the EDT polls
+ * (widgetPollEvent), mirroring browserPollEvent. */
+#define WM_CN1_WIDGET (WM_APP + 24)
+void cn1WinWidgetHandleMessage(WPARAM wParam);
+
+#ifdef CN1_WIDGETBOARD
+/* Windows 11 Widgets Board provider (cn1_windows_widgetboard.cpp), compiled
+ * only when the MSIX build defines CN1_WIDGETBOARD (windows.msix=true). When
+ * Windows activated this exe with -RegisterProcessAsComServer the call runs the
+ * out-of-process COM widget provider and exits the process; in a normal app
+ * launch it returns immediately. */
+void cn1WidgetBoardMaybeRunComServer(void);
+#endif
+
 /* graphics (cn1_windows_graphics.c) */
 CN1Graphics* cn1WinCreateGraphics(ID2D1RenderTarget* target);
 void cn1WinBeginFrame(CN1Graphics* g);

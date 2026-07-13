@@ -129,7 +129,24 @@ Lasting fixes shipped on this branch
    - `CLASS_WIPE` — cached wrapper class about to be overwritten with
      null
 
-8. **Initializr "Generate" end-to-end** (`dfff3e809` and the followups):
+8. **`StringBuilder.append(Object)` virtual toString dispatch**
+   (`vm/ByteCodeTranslator/src/javascript/parparvm_runtime.js:5257`):
+   the native used the synchronous `jvm.toNativeString(obj)`, whose
+   last-resort fallback is `"" + value` -- for any heap object (boxed
+   Integer/Long/Double included) that yields the JS
+   `"[object Object]"` instead of the Java `toString()`. JSONWriter
+   emits numbers via `sb.append(o)`, so every serialized number became
+   `[object Object]` -- the `[` opened a phantom JSON array on re-parse
+   and mangled the whole document (the `surfacesJsonRoundTrip` /
+   `surfacesRasterizerNpe` park reasons, plus the previously-failing
+   SurfacesTimelineLogicTest). The append(Object) native is now a
+   generator: strings keep the fast sync path, everything else goes
+   through `runtimeToNativeString`'s virtual `toString()` dispatch.
+   All three surfaces tests are un-parked; A/B full-suite runs (old vs
+   new runtime, same bundle) delivered byte-identical PNGs for all 135
+   other tests.
+
+9. **Initializr "Generate" end-to-end** (`dfff3e809` and the followups):
    5 layered workarounds for build-script path, HTTP-status check in
    `getArrayBufferInputStream`, custom `DownloadNative`/`InflateNative`
    bypasses for broken LocalForage and zipme codepaths, manual STORED

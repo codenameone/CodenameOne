@@ -367,6 +367,20 @@ public class IOSImplementation extends CodenameOneImplementation {
         return nativeInstance.isCarPlayConnected();
     }
 
+    private IOSSurfaceBridge surfaceBridge;
+
+    @Override
+    public com.codename1.surfaces.spi.SurfaceBridge getSurfaceBridge() {
+        // Only meaningful in builds that linked the surfaces natives (CN1_USE_WIDGETS, flipped by
+        // the builder when the app references com.codename1.surfaces). Always returned: the
+        // bridge's own is...Supported methods answer honestly through the natives, which stub to
+        // unsupported when the define is off.
+        if (surfaceBridge == null) {
+            surfaceBridge = IOSSurfaceCallbacks.getBridge(nativeInstance);
+        }
+        return surfaceBridge;
+    }
+
     @Override
     public void addCookie(Cookie c) {
         if(isUseNativeCookieStore()) {

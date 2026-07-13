@@ -5875,6 +5875,17 @@ public abstract class CodenameOneImplementation {
         return b != null && b.isConnected();
     }
 
+    /// Returns the platform bridge used by the `com.codename1.surfaces` API to render external
+    /// surfaces (home-screen widgets and live activities). Ports supporting surfaces override
+    /// this; the base implementation returns null which renders the whole API an inert no-op.
+    ///
+    /// #### Returns
+    ///
+    /// the surface bridge, or null when unsupported
+    public com.codename1.surfaces.spi.SurfaceBridge getSurfaceBridge() {
+        return null;
+    }
+
     /// True if the device is a foldable or dual screen device. False on the base implementation.
     public boolean isFoldable() {
         return false;
