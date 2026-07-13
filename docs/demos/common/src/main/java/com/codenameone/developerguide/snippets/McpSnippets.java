@@ -48,6 +48,7 @@ public class McpSnippets {
                 "Returns the signed in user",
                 "{\"type\":\"object\",\"properties\":{}}",
                 new ToolHandler() {
+                    @Override
                     public String invoke(String argumentsJson) {
                         return "{\"name\":\"" + signedInUser + "\"}";
                     }

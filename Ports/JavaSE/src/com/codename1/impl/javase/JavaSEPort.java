@@ -8720,8 +8720,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     sb.append("No MCP hosts detected on this machine.");
                 } else {
                     sb.append("Detected MCP hosts:\n\n");
-                    for (int i = 0; i < clients.size(); i++) {
-                        com.codename1.mcp.MCPClientRegistrar.MCPClient c = clients.get(i);
+                    for (com.codename1.mcp.MCPClientRegistrar.MCPClient c : clients) {
                         sb.append(c.getDisplayName())
                                 .append(c.isWritable() ? " (auto-configurable)" : " (manual config)")
                                 .append("\n  ").append(c.getConfigPath()).append("\n");

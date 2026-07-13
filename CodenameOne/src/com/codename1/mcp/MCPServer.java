@@ -69,8 +69,7 @@ public class MCPServer {
 
     public MCPServer() {
         List<Tool> builtIn = McpUiTools.builtInTools();
-        for (int i = 0; i < builtIn.size(); i++) {
-            Tool t = builtIn.get(i);
+        for (Tool t : builtIn) {
             tools.put(t.getName(), t);
         }
     }

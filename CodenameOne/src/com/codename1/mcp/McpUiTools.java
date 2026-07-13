@@ -258,8 +258,8 @@ final class McpUiTools {
         bounds.add(Integer.valueOf(b.getHeight()));
         out.put("bounds", bounds);
         List<Object> actions = new ArrayList<Object>();
-        for (int i = 0; i < node.getActions().size(); i++) {
-            actions.add(node.getActions().get(i).getId());
+        for (AccessibilityAction action : node.getActions()) {
+            actions.add(action.getId());
         }
         out.put("actions", actions);
         matches.add(out);

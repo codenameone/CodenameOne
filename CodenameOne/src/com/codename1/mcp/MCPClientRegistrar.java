@@ -87,8 +87,7 @@ public final class MCPClientRegistrar {
             return found;
         }
         FileSystemStorage fs = FileSystemStorage.getInstance();
-        for (int i = 0; i < knownClients.size(); i++) {
-            KnownClient known = knownClients.get(i);
+        for (KnownClient known : knownClients) {
             String path = known.absolutePath(home);
             if (path == null) {
                 continue;
@@ -113,8 +112,7 @@ public final class MCPClientRegistrar {
         if (descriptor == null || clients == null) {
             return updated;
         }
-        for (int i = 0; i < clients.size(); i++) {
-            MCPClient client = clients.get(i);
+        for (MCPClient client : clients) {
             if (!client.isWritable()) {
                 continue;
             }
@@ -133,8 +131,7 @@ public final class MCPClientRegistrar {
             return updated;
         }
         List<MCPClient> clients = detectClients();
-        for (int i = 0; i < clients.size(); i++) {
-            MCPClient client = clients.get(i);
+        for (MCPClient client : clients) {
             if (client.isWritable() && writeEntry(client, serverName, null)) {
                 updated.add(client);
             }
