@@ -200,7 +200,7 @@ public class FidelityGate {
             if (out.getParent() != null) {
                 Files.createDirectories(out.getParent());
             }
-            Files.writeString(out, JsonUtil.stringify(root) + "\n", StandardCharsets.UTF_8);
+            Files.writeString(out, JsonUtil.stringifyPretty(root) + "\n", StandardCharsets.UTF_8);
             System.out.println("[gate] WARNING: baseline UPDATED at " + out + " with " + merged.size()
                     + " pair(s). This bypasses the regression gate and must be reviewed in the PR.");
         } catch (IOException ex) {
@@ -399,6 +399,16 @@ class JsonUtil {
         return sb.toString();
     }
 
+    /// Produces stable, reviewable JSON for committed fidelity baselines.
+    /// Object keys are sorted recursively and nested values are indented so a
+    /// baseline refresh yields a focused line diff instead of rewriting one
+    /// opaque line.
+    public static String stringifyPretty(Object value) {
+        StringBuilder sb = new StringBuilder();
+        writeValuePretty(sb, value, 0);
+        return sb.toString();
+    }
+
     @SuppressWarnings("unchecked")
     public static Map<String, Object> asObject(Object value) {
         if (value instanceof Map<?, ?> map) {
@@ -459,6 +469,72 @@ class JsonUtil {
             sb.append(']');
         } else {
             writeString(sb, value.toString());
+        }
+    }
+
+    private static void writeValuePretty(StringBuilder sb, Object value, int depth) {
+        if (value == null) {
+            sb.append("null");
+        } else if (value instanceof String s) {
+            writeString(sb, s);
+        } else if (value instanceof Number number) {
+            writeNumber(sb, number);
+        } else if (value instanceof Boolean) {
+            sb.append(value.toString());
+        } else if (value instanceof Map<?, ?> map) {
+            Map<String, Object> sorted = new TreeMap<>();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                if (entry.getKey() instanceof String key) {
+                    sorted.put(key, entry.getValue());
+                }
+            }
+            if (sorted.isEmpty()) {
+                sb.append("{}");
+                return;
+            }
+            sb.append("{\n");
+            boolean first = true;
+            for (Map.Entry<String, Object> entry : sorted.entrySet()) {
+                if (!first) {
+                    sb.append(",\n");
+                }
+                first = false;
+                indent(sb, depth + 1);
+                writeString(sb, entry.getKey());
+                sb.append(": ");
+                writeValuePretty(sb, entry.getValue(), depth + 1);
+            }
+            sb.append('\n');
+            indent(sb, depth);
+            sb.append('}');
+        } else if (value instanceof List<?> list) {
+            if (list.isEmpty()) {
+                sb.append("[]");
+                return;
+            }
+            sb.append("[\n");
+            for (int i = 0; i < list.size(); i++) {
+                if (i > 0) {
+                    sb.append(",\n");
+                }
+                indent(sb, depth + 1);
+                writeValuePretty(sb, list.get(i), depth + 1);
+            }
+            sb.append('\n');
+            indent(sb, depth);
+            sb.append(']');
+        } else {
+            writeString(sb, value.toString());
+        }
+    }
+
+    private static void writeNumber(StringBuilder sb, Number number) {
+        sb.append(number.toString());
+    }
+
+    private static void indent(StringBuilder sb, int depth) {
+        for (int i = 0; i < depth; i++) {
+            sb.append("  ");
         }
     }
 

@@ -1,1 +1,414 @@
-{"pairs":{"Button_disabled_dark":85.85,"Button_disabled_light":77.85,"Button_normal_dark":74.34,"Button_normal_light":89.85,"Button_pressed_dark":76.01,"Button_pressed_light":91.18,"CheckBox_disabled_dark":95.76,"CheckBox_disabled_light":92.71,"CheckBox_normal_dark":96.52,"CheckBox_normal_light":92.16,"CheckBox_selected_dark":97.79,"CheckBox_selected_light":95.8,"Dialog_normal_dark":96.97,"Dialog_normal_light":97.09,"FlatButton_normal_dark":87.88,"FlatButton_normal_light":88.16,"FlatButton_pressed_dark":87.79,"FlatButton_pressed_light":88.4,"GlassIcon_normal_dark":98.59,"GlassIcon_normal_light":98.67,"GlassPanelGrad_normal_dark":98.43,"GlassPanelGrad_normal_light":98.24,"GlassPanelGrey_normal_dark":98.42,"GlassPanelGrey_normal_light":98.38,"GlassPanelPhoto_normal_dark":96.17,"GlassPanelPhoto_normal_light":96.08,"GlassPanelRed_normal_dark":98.57,"GlassPanelRed_normal_light":98.43,"GlassText_normal_dark":98.59,"GlassText_normal_light":98.69,"ProgressBar_normal_dark":94.44,"ProgressBar_normal_light":95.41,"RadioButton_disabled_dark":95.76,"RadioButton_disabled_light":92.71,"RadioButton_normal_dark":96.52,"RadioButton_normal_light":92.16,"RadioButton_selected_dark":96.81,"RadioButton_selected_light":94.84,"RaisedButton_disabled_dark":84.4,"RaisedButton_disabled_light":87.85,"RaisedButton_normal_dark":90.88,"RaisedButton_normal_light":89.72,"RaisedButton_pressed_dark":91.35,"RaisedButton_pressed_light":90.22,"Slider_disabled_dark":92.44,"Slider_disabled_light":94.01,"Slider_normal_dark":92.74,"Slider_normal_light":95.13,"Spinner_normal_dark":91.47,"Spinner_normal_light":91.79,"Switch_disabled_dark":95.53,"Switch_disabled_light":96.31,"Switch_normal_dark":96.8,"Switch_normal_light":95.51,"Switch_selected_dark":95.9,"Switch_selected_light":92.13,"TabOne_normal_dark":96.04,"TabOne_normal_light":95.62,"TabsGeom_normal_dark":93.01,"TabsGeom_normal_light":93.02,"Tabs_normal_dark":83.45,"Tabs_normal_light":86.44,"TextField_disabled_dark":97.34,"TextField_disabled_light":91.35,"TextField_normal_dark":97.08,"TextField_normal_light":90.4,"Toolbar_normal_dark":87.7,"Toolbar_normal_light":87.64},"geometry":{"Button_disabled_dark":{"center_offset":11.1,"width_ratio":1.0995,"height_ratio":0.9684},"Button_disabled_light":{"center_offset":11.1,"width_ratio":1.0995,"height_ratio":0.9684},"Button_normal_dark":{"center_offset":11.1,"width_ratio":1.0995,"height_ratio":0.9684},"Button_normal_light":{"center_offset":11.1,"width_ratio":1.0995,"height_ratio":0.9684},"Button_pressed_dark":{"center_offset":11.1,"width_ratio":1.0995,"height_ratio":0.9684},"Button_pressed_light":{"center_offset":11.1,"width_ratio":1.0995,"height_ratio":0.9684},"CheckBox_disabled_dark":{"center_offset":2.24,"width_ratio":1.0,"height_ratio":1.0233},"CheckBox_disabled_light":{"center_offset":2.24,"width_ratio":1.0,"height_ratio":1.0233},"CheckBox_normal_dark":{"center_offset":2.0,"width_ratio":1.0,"height_ratio":1.0},"CheckBox_normal_light":{"center_offset":1.5,"width_ratio":1.0,"height_ratio":1.0114},"CheckBox_selected_dark":{"center_offset":2.0,"width_ratio":1.0,"height_ratio":1.0},"CheckBox_selected_light":{"center_offset":1.5,"width_ratio":1.0,"height_ratio":1.0114},"Dialog_normal_dark":{"center_offset":0.0,"width_ratio":1.0,"height_ratio":1.0},"Dialog_normal_light":{"center_offset":0.0,"width_ratio":1.0,"height_ratio":1.0},"FlatButton_normal_dark":{"center_offset":4.74,"width_ratio":1.0621,"height_ratio":0.9684},"FlatButton_normal_light":{"center_offset":4.74,"width_ratio":1.0621,"height_ratio":0.9684},"FlatButton_pressed_dark":{"center_offset":4.74,"width_ratio":1.0621,"height_ratio":0.9684},"FlatButton_pressed_light":{"center_offset":4.74,"width_ratio":1.0621,"height_ratio":0.9684},"GlassIcon_normal_dark":{"center_offset":1.12,"width_ratio":0.999,"height_ratio":1.0},"GlassIcon_normal_light":{"center_offset":0.5,"width_ratio":1.0,"height_ratio":1.0046},"GlassPanelGrad_normal_dark":{"center_offset":0.5,"width_ratio":0.9981,"height_ratio":0.9954},"GlassPanelGrad_normal_light":{"center_offset":0.5,"width_ratio":1.0,"height_ratio":1.0046},"GlassPanelGrey_normal_dark":{"center_offset":1.0,"width_ratio":0.9981,"height_ratio":1.0},"GlassPanelGrey_normal_light":{"center_offset":0.5,"width_ratio":1.0,"height_ratio":1.0046},"GlassPanelPhoto_normal_dark":{"center_offset":0.5,"width_ratio":1.0,"height_ratio":1.0046},"GlassPanelPhoto_normal_light":{"center_offset":0.5,"width_ratio":1.0,"height_ratio":1.0046},"GlassPanelRed_normal_dark":{"center_offset":0.5,"width_ratio":0.9981,"height_ratio":0.9954},"GlassPanelRed_normal_light":{"center_offset":0.5,"width_ratio":1.0,"height_ratio":1.0046},"GlassText_normal_dark":{"center_offset":1.12,"width_ratio":0.999,"height_ratio":1.0},"GlassText_normal_light":{"center_offset":0.5,"width_ratio":1.0,"height_ratio":1.0046},"ProgressBar_normal_dark":{"center_offset":1.0,"width_ratio":1.0,"height_ratio":1.2},"ProgressBar_normal_light":{"center_offset":1.0,"width_ratio":1.0,"height_ratio":1.2},"RadioButton_disabled_dark":{"center_offset":2.24,"width_ratio":1.0,"height_ratio":1.0233},"RadioButton_disabled_light":{"center_offset":2.24,"width_ratio":1.0,"height_ratio":1.0233},"RadioButton_normal_dark":{"center_offset":2.0,"width_ratio":1.0,"height_ratio":1.0},"RadioButton_normal_light":{"center_offset":1.5,"width_ratio":1.0,"height_ratio":1.0114},"RadioButton_selected_dark":{"center_offset":2.0,"width_ratio":1.0,"height_ratio":1.0},"RadioButton_selected_light":{"center_offset":1.5,"width_ratio":1.0,"height_ratio":1.0114},"RaisedButton_disabled_dark":{"center_offset":11.6,"width_ratio":1.1095,"height_ratio":0.9684},"RaisedButton_disabled_light":{"center_offset":11.1,"width_ratio":1.1043,"height_ratio":0.9684},"RaisedButton_normal_dark":{"center_offset":11.1,"width_ratio":1.1043,"height_ratio":0.9684},"RaisedButton_normal_light":{"center_offset":11.1,"width_ratio":1.1043,"height_ratio":0.9684},"RaisedButton_pressed_dark":{"center_offset":11.1,"width_ratio":1.1043,"height_ratio":0.9684},"RaisedButton_pressed_light":{"center_offset":11.1,"width_ratio":1.1043,"height_ratio":0.9684},"Slider_disabled_dark":{"center_offset":0.5,"width_ratio":1.0,"height_ratio":1.0147},"Slider_disabled_light":{"center_offset":2.5,"width_ratio":1.0,"height_ratio":4.5},"Slider_normal_dark":{"center_offset":0.0,"width_ratio":1.0,"height_ratio":1.0},"Slider_normal_light":{"center_offset":0.5,"width_ratio":1.0,"height_ratio":0.9643},"Spinner_normal_dark":{"center_offset":1.0,"width_ratio":1.0444,"height_ratio":1.0822},"Spinner_normal_light":{"center_offset":0.71,"width_ratio":1.0454,"height_ratio":1.0849},"Switch_disabled_dark":{"center_offset":2.06,"width_ratio":1.0227,"height_ratio":1.013},"Switch_disabled_light":{"center_offset":6.5,"width_ratio":0.9602,"height_ratio":1.0},"Switch_normal_dark":{"center_offset":2.06,"width_ratio":1.0227,"height_ratio":1.013},"Switch_normal_light":{"center_offset":2.06,"width_ratio":1.0227,"height_ratio":1.013},"Switch_selected_dark":{"center_offset":1.58,"width_ratio":1.0169,"height_ratio":1.013},"Switch_selected_light":{"center_offset":2.69,"width_ratio":1.0282,"height_ratio":1.026},"TabOne_normal_dark":{"center_offset":39.53,"width_ratio":0.7465,"height_ratio":0.5434},"TabOne_normal_light":{"center_offset":39.53,"width_ratio":0.7465,"height_ratio":0.5434},"TabsGeom_normal_dark":{"center_offset":1.8,"width_ratio":0.9729,"height_ratio":1.0116},"TabsGeom_normal_light":{"center_offset":1.8,"width_ratio":0.9729,"height_ratio":1.0116},"Tabs_normal_dark":{"center_offset":1.8,"width_ratio":0.9729,"height_ratio":1.0116},"Tabs_normal_light":{"center_offset":1.8,"width_ratio":0.9728,"height_ratio":1.0116},"TextField_disabled_dark":{"center_offset":0.0,"width_ratio":1.0,"height_ratio":1.0},"TextField_disabled_light":{"center_offset":0.0,"width_ratio":1.0,"height_ratio":1.0},"TextField_normal_dark":{"center_offset":0.0,"width_ratio":1.0,"height_ratio":1.0},"TextField_normal_light":{"center_offset":0.0,"width_ratio":1.0,"height_ratio":1.0},"Toolbar_normal_dark":{"center_offset":3.2,"width_ratio":0.987,"height_ratio":0.9187},"Toolbar_normal_light":{"center_offset":3.54,"width_ratio":0.987,"height_ratio":0.9262}}}
+{
+  "geometry": {
+    "Button_disabled_dark": {
+      "center_offset": 11.1,
+      "height_ratio": 0.9684,
+      "width_ratio": 1.0995
+    },
+    "Button_disabled_light": {
+      "center_offset": 11.1,
+      "height_ratio": 0.9684,
+      "width_ratio": 1.0995
+    },
+    "Button_normal_dark": {
+      "center_offset": 11.1,
+      "height_ratio": 0.9684,
+      "width_ratio": 1.0995
+    },
+    "Button_normal_light": {
+      "center_offset": 11.1,
+      "height_ratio": 0.9684,
+      "width_ratio": 1.0995
+    },
+    "Button_pressed_dark": {
+      "center_offset": 11.1,
+      "height_ratio": 0.9684,
+      "width_ratio": 1.0995
+    },
+    "Button_pressed_light": {
+      "center_offset": 11.1,
+      "height_ratio": 0.9684,
+      "width_ratio": 1.0995
+    },
+    "CheckBox_disabled_dark": {
+      "center_offset": 2.24,
+      "height_ratio": 1.0233,
+      "width_ratio": 1.0
+    },
+    "CheckBox_disabled_light": {
+      "center_offset": 2.24,
+      "height_ratio": 1.0233,
+      "width_ratio": 1.0
+    },
+    "CheckBox_normal_dark": {
+      "center_offset": 2.0,
+      "height_ratio": 1.0,
+      "width_ratio": 1.0
+    },
+    "CheckBox_normal_light": {
+      "center_offset": 1.5,
+      "height_ratio": 1.0114,
+      "width_ratio": 1.0
+    },
+    "CheckBox_selected_dark": {
+      "center_offset": 2.0,
+      "height_ratio": 1.0,
+      "width_ratio": 1.0
+    },
+    "CheckBox_selected_light": {
+      "center_offset": 1.5,
+      "height_ratio": 1.0114,
+      "width_ratio": 1.0
+    },
+    "Dialog_normal_dark": {
+      "center_offset": 0.0,
+      "height_ratio": 1.0,
+      "width_ratio": 1.0
+    },
+    "Dialog_normal_light": {
+      "center_offset": 0.0,
+      "height_ratio": 1.0,
+      "width_ratio": 1.0
+    },
+    "FlatButton_normal_dark": {
+      "center_offset": 4.74,
+      "height_ratio": 0.9684,
+      "width_ratio": 1.0621
+    },
+    "FlatButton_normal_light": {
+      "center_offset": 4.74,
+      "height_ratio": 0.9684,
+      "width_ratio": 1.0621
+    },
+    "FlatButton_pressed_dark": {
+      "center_offset": 4.74,
+      "height_ratio": 0.9684,
+      "width_ratio": 1.0621
+    },
+    "FlatButton_pressed_light": {
+      "center_offset": 4.74,
+      "height_ratio": 0.9684,
+      "width_ratio": 1.0621
+    },
+    "GlassIcon_normal_dark": {
+      "center_offset": 1.12,
+      "height_ratio": 1.0,
+      "width_ratio": 0.999
+    },
+    "GlassIcon_normal_light": {
+      "center_offset": 0.5,
+      "height_ratio": 1.0046,
+      "width_ratio": 1.0
+    },
+    "GlassPanelGrad_normal_dark": {
+      "center_offset": 0.5,
+      "height_ratio": 0.9954,
+      "width_ratio": 0.9981
+    },
+    "GlassPanelGrad_normal_light": {
+      "center_offset": 0.5,
+      "height_ratio": 1.0046,
+      "width_ratio": 1.0
+    },
+    "GlassPanelGrey_normal_dark": {
+      "center_offset": 1.0,
+      "height_ratio": 1.0,
+      "width_ratio": 0.9981
+    },
+    "GlassPanelGrey_normal_light": {
+      "center_offset": 0.5,
+      "height_ratio": 1.0046,
+      "width_ratio": 1.0
+    },
+    "GlassPanelPhoto_normal_dark": {
+      "center_offset": 0.5,
+      "height_ratio": 1.0046,
+      "width_ratio": 1.0
+    },
+    "GlassPanelPhoto_normal_light": {
+      "center_offset": 0.5,
+      "height_ratio": 1.0046,
+      "width_ratio": 1.0
+    },
+    "GlassPanelRed_normal_dark": {
+      "center_offset": 0.5,
+      "height_ratio": 0.9954,
+      "width_ratio": 0.9981
+    },
+    "GlassPanelRed_normal_light": {
+      "center_offset": 0.5,
+      "height_ratio": 1.0046,
+      "width_ratio": 1.0
+    },
+    "GlassText_normal_dark": {
+      "center_offset": 1.12,
+      "height_ratio": 1.0,
+      "width_ratio": 0.999
+    },
+    "GlassText_normal_light": {
+      "center_offset": 0.5,
+      "height_ratio": 1.0046,
+      "width_ratio": 1.0
+    },
+    "ProgressBar_normal_dark": {
+      "center_offset": 1.0,
+      "height_ratio": 1.2,
+      "width_ratio": 1.0
+    },
+    "ProgressBar_normal_light": {
+      "center_offset": 1.0,
+      "height_ratio": 1.2,
+      "width_ratio": 1.0
+    },
+    "RadioButton_disabled_dark": {
+      "center_offset": 2.24,
+      "height_ratio": 1.0233,
+      "width_ratio": 1.0
+    },
+    "RadioButton_disabled_light": {
+      "center_offset": 2.24,
+      "height_ratio": 1.0233,
+      "width_ratio": 1.0
+    },
+    "RadioButton_normal_dark": {
+      "center_offset": 2.0,
+      "height_ratio": 1.0,
+      "width_ratio": 1.0
+    },
+    "RadioButton_normal_light": {
+      "center_offset": 1.5,
+      "height_ratio": 1.0114,
+      "width_ratio": 1.0
+    },
+    "RadioButton_selected_dark": {
+      "center_offset": 2.0,
+      "height_ratio": 1.0,
+      "width_ratio": 1.0
+    },
+    "RadioButton_selected_light": {
+      "center_offset": 1.5,
+      "height_ratio": 1.0114,
+      "width_ratio": 1.0
+    },
+    "RaisedButton_disabled_dark": {
+      "center_offset": 11.6,
+      "height_ratio": 0.9684,
+      "width_ratio": 1.1095
+    },
+    "RaisedButton_disabled_light": {
+      "center_offset": 11.1,
+      "height_ratio": 0.9684,
+      "width_ratio": 1.1043
+    },
+    "RaisedButton_normal_dark": {
+      "center_offset": 11.1,
+      "height_ratio": 0.9684,
+      "width_ratio": 1.1043
+    },
+    "RaisedButton_normal_light": {
+      "center_offset": 11.1,
+      "height_ratio": 0.9684,
+      "width_ratio": 1.1043
+    },
+    "RaisedButton_pressed_dark": {
+      "center_offset": 11.1,
+      "height_ratio": 0.9684,
+      "width_ratio": 1.1043
+    },
+    "RaisedButton_pressed_light": {
+      "center_offset": 11.1,
+      "height_ratio": 0.9684,
+      "width_ratio": 1.1043
+    },
+    "Slider_disabled_dark": {
+      "center_offset": 0.5,
+      "height_ratio": 1.0147,
+      "width_ratio": 1.0
+    },
+    "Slider_disabled_light": {
+      "center_offset": 2.5,
+      "height_ratio": 4.5,
+      "width_ratio": 1.0
+    },
+    "Slider_normal_dark": {
+      "center_offset": 0.0,
+      "height_ratio": 1.0,
+      "width_ratio": 1.0
+    },
+    "Slider_normal_light": {
+      "center_offset": 0.5,
+      "height_ratio": 0.9643,
+      "width_ratio": 1.0
+    },
+    "Spinner_normal_dark": {
+      "center_offset": 1.0,
+      "height_ratio": 1.0822,
+      "width_ratio": 1.0444
+    },
+    "Spinner_normal_light": {
+      "center_offset": 0.71,
+      "height_ratio": 1.0849,
+      "width_ratio": 1.0454
+    },
+    "Switch_disabled_dark": {
+      "center_offset": 2.06,
+      "height_ratio": 1.013,
+      "width_ratio": 1.0227
+    },
+    "Switch_disabled_light": {
+      "center_offset": 6.5,
+      "height_ratio": 1.0,
+      "width_ratio": 0.9602
+    },
+    "Switch_normal_dark": {
+      "center_offset": 2.06,
+      "height_ratio": 1.013,
+      "width_ratio": 1.0227
+    },
+    "Switch_normal_light": {
+      "center_offset": 2.06,
+      "height_ratio": 1.013,
+      "width_ratio": 1.0227
+    },
+    "Switch_selected_dark": {
+      "center_offset": 1.58,
+      "height_ratio": 1.013,
+      "width_ratio": 1.0169
+    },
+    "Switch_selected_light": {
+      "center_offset": 2.69,
+      "height_ratio": 1.026,
+      "width_ratio": 1.0282
+    },
+    "TabOne_normal_dark": {
+      "center_offset": 39.53,
+      "height_ratio": 0.5434,
+      "width_ratio": 0.7465
+    },
+    "TabOne_normal_light": {
+      "center_offset": 39.53,
+      "height_ratio": 0.5434,
+      "width_ratio": 0.7465
+    },
+    "TabsGeom_normal_dark": {
+      "center_offset": 1.8,
+      "height_ratio": 1.0116,
+      "width_ratio": 0.9729
+    },
+    "TabsGeom_normal_light": {
+      "center_offset": 1.8,
+      "height_ratio": 1.0116,
+      "width_ratio": 0.9729
+    },
+    "Tabs_normal_dark": {
+      "center_offset": 1.8,
+      "height_ratio": 1.0116,
+      "width_ratio": 0.9729
+    },
+    "Tabs_normal_light": {
+      "center_offset": 1.8,
+      "height_ratio": 1.0116,
+      "width_ratio": 0.9728
+    },
+    "TextField_disabled_dark": {
+      "center_offset": 0.0,
+      "height_ratio": 1.0,
+      "width_ratio": 1.0
+    },
+    "TextField_disabled_light": {
+      "center_offset": 0.0,
+      "height_ratio": 1.0,
+      "width_ratio": 1.0
+    },
+    "TextField_normal_dark": {
+      "center_offset": 0.0,
+      "height_ratio": 1.0,
+      "width_ratio": 1.0
+    },
+    "TextField_normal_light": {
+      "center_offset": 0.0,
+      "height_ratio": 1.0,
+      "width_ratio": 1.0
+    },
+    "Toolbar_normal_dark": {
+      "center_offset": 3.2,
+      "height_ratio": 0.9187,
+      "width_ratio": 0.987
+    },
+    "Toolbar_normal_light": {
+      "center_offset": 3.54,
+      "height_ratio": 0.9262,
+      "width_ratio": 0.987
+    }
+  },
+  "pairs": {
+    "Button_disabled_dark": 85.85,
+    "Button_disabled_light": 77.85,
+    "Button_normal_dark": 74.34,
+    "Button_normal_light": 89.85,
+    "Button_pressed_dark": 76.01,
+    "Button_pressed_light": 91.18,
+    "CheckBox_disabled_dark": 95.76,
+    "CheckBox_disabled_light": 92.71,
+    "CheckBox_normal_dark": 96.52,
+    "CheckBox_normal_light": 92.16,
+    "CheckBox_selected_dark": 97.79,
+    "CheckBox_selected_light": 95.8,
+    "Dialog_normal_dark": 96.97,
+    "Dialog_normal_light": 97.09,
+    "FlatButton_normal_dark": 87.88,
+    "FlatButton_normal_light": 88.16,
+    "FlatButton_pressed_dark": 87.79,
+    "FlatButton_pressed_light": 88.4,
+    "GlassIcon_normal_dark": 98.59,
+    "GlassIcon_normal_light": 98.67,
+    "GlassPanelGrad_normal_dark": 98.43,
+    "GlassPanelGrad_normal_light": 98.24,
+    "GlassPanelGrey_normal_dark": 98.42,
+    "GlassPanelGrey_normal_light": 98.38,
+    "GlassPanelPhoto_normal_dark": 96.17,
+    "GlassPanelPhoto_normal_light": 96.08,
+    "GlassPanelRed_normal_dark": 98.57,
+    "GlassPanelRed_normal_light": 98.43,
+    "GlassText_normal_dark": 98.59,
+    "GlassText_normal_light": 98.69,
+    "ProgressBar_normal_dark": 94.44,
+    "ProgressBar_normal_light": 95.41,
+    "RadioButton_disabled_dark": 95.76,
+    "RadioButton_disabled_light": 92.71,
+    "RadioButton_normal_dark": 96.52,
+    "RadioButton_normal_light": 92.16,
+    "RadioButton_selected_dark": 96.81,
+    "RadioButton_selected_light": 94.84,
+    "RaisedButton_disabled_dark": 84.4,
+    "RaisedButton_disabled_light": 87.85,
+    "RaisedButton_normal_dark": 90.88,
+    "RaisedButton_normal_light": 89.72,
+    "RaisedButton_pressed_dark": 91.35,
+    "RaisedButton_pressed_light": 90.22,
+    "Slider_disabled_dark": 92.44,
+    "Slider_disabled_light": 94.01,
+    "Slider_normal_dark": 92.74,
+    "Slider_normal_light": 95.13,
+    "Spinner_normal_dark": 91.47,
+    "Spinner_normal_light": 91.79,
+    "Switch_disabled_dark": 95.53,
+    "Switch_disabled_light": 96.31,
+    "Switch_normal_dark": 96.8,
+    "Switch_normal_light": 95.51,
+    "Switch_selected_dark": 95.9,
+    "Switch_selected_light": 92.13,
+    "TabOne_normal_dark": 96.04,
+    "TabOne_normal_light": 95.62,
+    "TabsGeom_normal_dark": 93.01,
+    "TabsGeom_normal_light": 93.02,
+    "Tabs_normal_dark": 83.45,
+    "Tabs_normal_light": 86.44,
+    "TextField_disabled_dark": 97.34,
+    "TextField_disabled_light": 91.35,
+    "TextField_normal_dark": 97.08,
+    "TextField_normal_light": 90.4,
+    "Toolbar_normal_dark": 87.7,
+    "Toolbar_normal_light": 87.64
+  }
+}
