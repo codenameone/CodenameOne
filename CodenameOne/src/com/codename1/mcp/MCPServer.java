@@ -63,9 +63,8 @@ public class MCPServer {
     private String serverName = "Codename One MCP";
     private String serverVersion = "1.0";
     private boolean screenshotEnabled = true;
-    private volatile boolean running;
+    private boolean running;
     private MCPTransport transport;
-    private Thread readerThread;
 
     public MCPServer() {
         List<Tool> builtIn = McpUiTools.builtInTools();
@@ -106,14 +105,14 @@ public class MCPServer {
         return running;
     }
 
-    /// Starts serving over the given transport on a dedicated daemon reader thread.
+    /// Starts serving over the given transport on a dedicated reader thread.
     public synchronized void start(MCPTransport transport) {
         if (running) {
             return;
         }
         this.transport = transport;
         running = true;
-        readerThread = new Thread(new Runnable() {
+        Thread readerThread = new Thread(new Runnable() {
             @Override
             public void run() {
                 runLoop();
@@ -186,7 +185,7 @@ public class MCPServer {
                 return hasId ? errorEnvelope(id, INVALID_REQUEST, "Invalid Request") : null;
             }
             if (!hasId) {
-                handleNotification(method, params);
+                // A notification (no id) such as notifications/initialized needs no reply.
                 return null;
             }
             return dispatch(id, method, params);
@@ -216,10 +215,6 @@ public class MCPServer {
             return resourcesRead(id, params);
         }
         return errorEnvelope(id, METHOD_NOT_FOUND, "Method not found: " + method);
-    }
-
-    private void handleNotification(String method, Map<String, Object> params) {
-        // notifications/initialized and cancellation notices need no action here.
     }
 
     private Map<String, Object> initializeResult(Map<String, Object> params) {

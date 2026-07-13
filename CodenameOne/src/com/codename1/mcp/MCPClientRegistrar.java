@@ -26,7 +26,6 @@ import com.codename1.io.FileSystemStorage;
 import com.codename1.io.JSONParser;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -39,7 +38,7 @@ import java.util.Map;
 ///
 /// This is a plain reusable API. It is meant to be driven by Codename One tooling (the
 /// certificate wizard, Game Builder, Settings, the simulator) and by applications
-/// themselves, and it is exposed to the maven plugin as the `cn1:mcp-setup` goal.
+/// themselves.
 ///
 /// Registration is a desktop concern. File access goes through
 /// {@link com.codename1.io.FileSystemStorage} so the class links on every target, but

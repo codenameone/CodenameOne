@@ -43,7 +43,7 @@ import com.codename1.ai.Tool;
 /// // Publish domain tools alongside the automatic UI driving tools:
 /// MCP.addTool(myTool);
 /// ```
-public class MCP {
+public final class MCP {
     private static MCPServer server;
     private static StdioTransportFactory stdioTransportFactory;
 

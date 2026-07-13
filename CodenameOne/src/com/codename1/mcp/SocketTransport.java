@@ -40,7 +40,15 @@ import java.io.Writer;
 /// server API so it links on every target, while only functioning where
 /// {@link com.codename1.io.Socket#isServerSocketSupported()} is true.
 public class SocketTransport implements MCPTransport {
-    private static volatile SocketTransport active;
+    private static SocketTransport active;
+
+    private static synchronized void setActive(SocketTransport transport) {
+        active = transport;
+    }
+
+    private static synchronized SocketTransport currentActive() {
+        return active;
+    }
 
     private final int port;
     private final Object connectionLock = new Object();
@@ -63,14 +71,16 @@ public class SocketTransport implements MCPTransport {
         if (!Socket.isServerSocketSupported()) {
             throw new IOException("Server sockets are not supported on this platform");
         }
-        active = this;
+        setActive(this);
         stopListening = Socket.listen(port, Bridge.class);
         synchronized (connectionLock) {
             while (in == null) {
                 try {
                     connectionLock.wait();
                 } catch (InterruptedException ex) {
-                    throw new IOException("Interrupted while awaiting MCP client connection");
+                    IOException io = new IOException("Interrupted while awaiting MCP client connection");
+                    io.initCause(ex);
+                    throw io;
                 }
             }
         }
@@ -106,7 +116,7 @@ public class SocketTransport implements MCPTransport {
             }
             stopListening = null;
         }
-        active = null;
+        setActive(null);
     }
 
     void onConnection(InputStream is, OutputStream os) {
@@ -128,7 +138,7 @@ public class SocketTransport implements MCPTransport {
 
         @Override
         public void connectionEstablished(InputStream is, OutputStream os) {
-            SocketTransport transport = active;
+            SocketTransport transport = currentActive();
             if (transport != null) {
                 transport.onConnection(is, os);
             }
