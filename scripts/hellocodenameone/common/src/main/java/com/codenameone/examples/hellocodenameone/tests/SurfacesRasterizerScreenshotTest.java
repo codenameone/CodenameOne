@@ -58,6 +58,16 @@ public class SurfacesRasterizerScreenshotTest extends BaseTest {
 
     @Override
     public boolean runTest() {
+        // External surfaces (home-screen widgets / live activities) do not exist on tvOS or
+        // watchOS -- there is no widget surface to render into -- so this preview screenshot has
+        // no meaning there and no golden is kept. Matches how the other non-phone-form-factor
+        // tests self-skip (see LocalNotificationOverrideTest / BrowserComponentScreenshotTest).
+        if (com.codename1.ui.CN.isTV() || com.codename1.ui.CN.isWatch()) {
+            System.out.println("CN1SS:INFO:test=" + NAME
+                    + " status=SKIPPED reason=surfaces-not-on-tv-or-watch");
+            done();
+            return true;
+        }
         try {
             prepareDescriptor();
             // sanity-check the Result contract once before capturing so a rasterizer
