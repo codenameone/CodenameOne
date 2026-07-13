@@ -5352,6 +5352,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         };
         buildHintEditor.addActionListener(l);
         toolsMenu.add(buildHintEditor);
+        addMcpMenu(toolsMenu);
 
         final JCheckBoxMenuItem useAppFrameMenu = new JCheckBoxMenuItem("Single Window Mode", useAppFrame);
         useAppFrameMenu.setToolTipText("Check this option to enable Single Window mode, in which the simulator, component inspector, network monitor and other tools are all included in a single, multi-panel window");
@@ -6727,6 +6728,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         }
         toolsMenu.addSeparator();
         toolsMenu.add(buildHintEditor);
+        addMcpMenu(toolsMenu);
         toolsMenu.add(autoLocalizationMenu);
         toolsMenu.add(clean);
 
@@ -8676,9 +8678,69 @@ public class JavaSEPort extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
+    // Model Context Protocol: expose the running simulator to an LLM agent, and detect
+    // installed MCP hosts. The socket server lets an agent attach to the live session and
+    // drive it through the accessibility semantics tree.
+    private void addMcpMenu(JMenu toolsMenu) {
+        JMenu mcpMenu = new JMenu("Model Context Protocol");
+        registerMenuWithBlit(mcpMenu);
+        final java.util.prefs.Preferences mcpPref =
+                java.util.prefs.Preferences.userNodeForPackage(JavaSEPort.class);
+        final int mcpPort = mcpPref.getInt("cn1.mcp.port", 8765);
+        final JCheckBoxMenuItem mcpServerMenu = new JCheckBoxMenuItem("Expose App To Agents (MCP)",
+                com.codename1.mcp.MCP.isRunning());
+        mcpServerMenu.setToolTipText("Starts a local MCP server on port " + mcpPort
+                + " so an LLM agent can read and drive this running app");
+        mcpServerMenu.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (mcpServerMenu.isSelected()) {
+                    com.codename1.mcp.MCP.startSocketServer(mcpPort);
+                    JOptionPane.showMessageDialog(canvas,
+                            "MCP server listening on 127.0.0.1:" + mcpPort
+                                    + ".\nPoint an MCP host at this port to drive the app.",
+                            "MCP Server Started", JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    com.codename1.mcp.MCP.stop();
+                }
+            }
+        });
+        mcpMenu.add(mcpServerMenu);
+
+        JMenuItem mcpDetect = new JMenuItem("Detect MCP Clients...");
+        mcpDetect.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                com.codename1.mcp.MCPClientRegistrar registrar =
+                        com.codename1.mcp.MCPClientRegistrar.getInstance();
+                java.util.List<com.codename1.mcp.MCPClientRegistrar.MCPClient> clients =
+                        registrar.detectClients();
+                StringBuilder sb = new StringBuilder();
+                if (clients.isEmpty()) {
+                    sb.append("No MCP hosts detected on this machine.");
+                } else {
+                    sb.append("Detected MCP hosts:\n\n");
+                    for (int i = 0; i < clients.size(); i++) {
+                        com.codename1.mcp.MCPClientRegistrar.MCPClient c = clients.get(i);
+                        sb.append(c.getDisplayName())
+                                .append(c.isWritable() ? " (auto-configurable)" : " (manual config)")
+                                .append("\n  ").append(c.getConfigPath()).append("\n");
+                    }
+                }
+                JOptionPane.showMessageDialog(canvas, sb.toString(), "MCP Clients",
+                        JOptionPane.INFORMATION_MESSAGE);
+            }
+        });
+        mcpMenu.add(mcpDetect);
+        toolsMenu.add(mcpMenu);
+    }
+
     public void init(Object m) {
         inInit = true;
         installGeneratedSvgRegistry();
+
+        // Make the desktop stdio MCP transport available to com.codename1.mcp.MCP.
+        MCPStdioTransport.register();
 
         // Fire-and-forget probe so LlmClient.simulatorRedirect=auto
         // can detect a local Ollama install without blocking startup.

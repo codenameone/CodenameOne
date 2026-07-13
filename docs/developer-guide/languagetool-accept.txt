@@ -610,3 +610,10 @@ screenY
 # AR / VR terms (Augmented-Reality.asciidoc, Virtual-Reality.asciidoc)
 raycasts?
 equirectangular
+
+# MCP headless API terms (MCP-Headless-API.asciidoc)
+opencode
+stdio
+JSON-RPC
+subprocess
+Codex
