@@ -42,7 +42,12 @@ import com.codename1.ui.accessibility.AccessibilityRole;
 import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /** Android virtual-view adapter for Codename One's lightweight semantic tree. */
 final class AndroidAccessibilityProvider extends AccessibilityNodeProvider {
@@ -51,6 +56,15 @@ final class AndroidAccessibilityProvider extends AccessibilityNodeProvider {
     private final View host;
     private final AndroidImplementation implementation;
     private final android.view.accessibility.AccessibilityManager nativeAccessibilityManager;
+    private final android.view.accessibility.AccessibilityManager.AccessibilityStateChangeListener stateListener;
+    private final Object touchListener;
+    private final Map<Long, Integer> virtualIds = new HashMap<Long, Integer>();
+    private final Map<Integer, Long> semanticIds = new HashMap<Integer, Long>();
+    private final Map<String, Integer> customActionIds = new HashMap<String, Integer>();
+    private final Map<Integer, String> customActionKeys = new HashMap<Integer, String>();
+    private long mappedGeneration = Long.MIN_VALUE;
+    private int nextVirtualId = 1;
+    private int nextCustomActionId = CUSTOM_ACTION_BASE;
     private int accessibilityFocusedId = Integer.MIN_VALUE;
 
     AndroidAccessibilityProvider(View host, AndroidImplementation implementation) {
@@ -58,16 +72,73 @@ final class AndroidAccessibilityProvider extends AccessibilityNodeProvider {
         this.implementation = implementation;
         nativeAccessibilityManager = (android.view.accessibility.AccessibilityManager) host.getContext()
                 .getSystemService(android.content.Context.ACCESSIBILITY_SERVICE);
+        stateListener = new android.view.accessibility.AccessibilityManager.AccessibilityStateChangeListener() {
+            @Override
+            public void onAccessibilityStateChanged(boolean enabled) {
+                accessibilityConsumerChanged();
+            }
+        };
+        touchListener = Build.VERSION.SDK_INT >= 19 && nativeAccessibilityManager != null
+                ? Api19TouchExploration.register(nativeAccessibilityManager, this) : null;
+        if (nativeAccessibilityManager != null) {
+            nativeAccessibilityManager.addAccessibilityStateChangeListener(stateListener);
+        }
         host.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+        accessibilityConsumerChanged();
+    }
+
+    void dispose() {
+        implementation.setAccessibilityTreeUpdateRequired(false);
+        if (nativeAccessibilityManager != null) {
+            nativeAccessibilityManager.removeAccessibilityStateChangeListener(stateListener);
+            if (Build.VERSION.SDK_INT >= 19 && touchListener != null) {
+                Api19TouchExploration.unregister(nativeAccessibilityManager, touchListener);
+            }
+        }
+        virtualIds.clear();
+        semanticIds.clear();
+        customActionIds.clear();
+        customActionKeys.clear();
+    }
+
+    private void accessibilityConsumerChanged() {
+        boolean active = implementation.isScreenReaderEnabled();
+        implementation.setAccessibilityTreeUpdateRequired(active);
+        if (active) {
+            AccessibilityManager.getInstance().invalidateAll();
+        }
+    }
+
+    private static final class Api19TouchExploration {
+        private Api19TouchExploration() {
+        }
+
+        static Object register(android.view.accessibility.AccessibilityManager manager,
+                final AndroidAccessibilityProvider provider) {
+            android.view.accessibility.AccessibilityManager.TouchExplorationStateChangeListener listener =
+                    new android.view.accessibility.AccessibilityManager.TouchExplorationStateChangeListener() {
+                        @Override
+                        public void onTouchExplorationStateChanged(boolean enabled) {
+                            provider.accessibilityConsumerChanged();
+                        }
+                    };
+            manager.addTouchExplorationStateChangeListener(listener);
+            return listener;
+        }
+
+        static void unregister(android.view.accessibility.AccessibilityManager manager, Object value) {
+            manager.removeTouchExplorationStateChangeListener(
+                    (android.view.accessibility.AccessibilityManager.TouchExplorationStateChangeListener)value);
+        }
     }
 
     @Override
     public AccessibilityNodeInfo createAccessibilityNodeInfo(int virtualViewId) {
-        AccessibilityTreeSnapshot tree = implementation.getAccessibilityTreeSnapshot();
+        AccessibilityTreeSnapshot tree = currentTree();
         if (virtualViewId == AccessibilityNodeProvider.HOST_VIEW_ID) {
             return createHostNode(tree);
         }
-        AccessibilityNodeSnapshot node = tree.getNode(virtualViewId);
+        AccessibilityNodeSnapshot node = nodeForVirtualId(tree, virtualViewId);
         return node == null ? null : createVirtualNode(tree, node, virtualViewId);
     }
 
@@ -78,7 +149,7 @@ final class AndroidAccessibilityProvider extends AccessibilityNodeProvider {
         info.setPackageName(host.getContext().getPackageName());
         info.setScrollable(false);
         for (Long rootId : tree.getRootIds()) {
-            info.addChild(host, toVirtualId(rootId.longValue()));
+            info.addChild(host, virtualIdFor(rootId.longValue()));
         }
         return info;
     }
@@ -90,8 +161,8 @@ final class AndroidAccessibilityProvider extends AccessibilityNodeProvider {
         info.setClassName(className(node.getRole()));
         info.setSource(host, virtualViewId);
         if (node.getParentId() < 0) info.setParent(host);
-        else info.setParent(host, toVirtualId(node.getParentId()));
-        for (Long childId : node.getChildIds()) info.addChild(host, toVirtualId(childId.longValue()));
+        else info.setParent(host, virtualIdFor(node.getParentId()));
+        for (Long childId : node.getChildIds()) info.addChild(host, virtualIdFor(childId.longValue()));
 
         String label = node.getLabel();
         if (usesText(node.getRole())) info.setText(label);
@@ -185,13 +256,14 @@ final class AndroidAccessibilityProvider extends AccessibilityNodeProvider {
         if (hasAction(node, AccessibilityAction.DECREMENT)) info.addAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);
         if (hasAction(node, AccessibilityAction.SCROLL_FORWARD)) info.addAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
         if (hasAction(node, AccessibilityAction.SCROLL_BACKWARD)) info.addAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);
-        info.addAction(accessibilityFocusedId == toVirtualId(node.getId())
+        info.addAction(accessibilityFocusedId == virtualIdFor(node.getId())
                 ? AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS
                 : AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS);
         if (Build.VERSION.SDK_INT >= 21) {
             for (AccessibilityAction action : node.getActions()) {
                 if (isStandard(action.getId())) continue;
-                info.addAction(new AccessibilityNodeInfo.AccessibilityAction(customActionId(action.getId()),
+                info.addAction(new AccessibilityNodeInfo.AccessibilityAction(
+                        customActionId(node.getId(), action.getId()),
                         action.getLabel() == null ? action.getId() : action.getLabel()));
             }
             if (hasAction(node, AccessibilityAction.SET_TEXT)) {
@@ -205,7 +277,8 @@ final class AndroidAccessibilityProvider extends AccessibilityNodeProvider {
         if (virtualViewId == AccessibilityNodeProvider.HOST_VIEW_ID) {
             return host.performAccessibilityAction(action, arguments);
         }
-        AccessibilityNodeSnapshot node = implementation.getAccessibilityTreeSnapshot().getNode(virtualViewId);
+        AccessibilityTreeSnapshot tree = currentTree();
+        AccessibilityNodeSnapshot node = nodeForVirtualId(tree, virtualViewId);
         if (node == null) return false;
         if (action == AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS) {
             if (accessibilityFocusedId == virtualViewId) return false;
@@ -239,7 +312,8 @@ final class AndroidAccessibilityProvider extends AccessibilityNodeProvider {
             if (argument != null) argument = argument.toString();
         } else {
             for (AccessibilityAction candidate : node.getActions()) {
-                if (customActionId(candidate.getId()) == action) {
+                if (!isStandard(candidate.getId())
+                        && customActionId(node.getId(), candidate.getId()) == action) {
                     actionId = candidate.getId();
                     break;
                 }
@@ -253,11 +327,11 @@ final class AndroidAccessibilityProvider extends AccessibilityNodeProvider {
         if (searched == null) return Collections.emptyList();
         String lower = searched.toLowerCase();
         List<AccessibilityNodeInfo> result = new ArrayList<AccessibilityNodeInfo>();
-        AccessibilityTreeSnapshot tree = implementation.getAccessibilityTreeSnapshot();
+        AccessibilityTreeSnapshot tree = currentTree();
         for (AccessibilityNodeSnapshot node : tree.getNodes().values()) {
             if (contains(node.getLabel(), lower) || contains(node.getValue(), lower)
                     || contains(node.getDescription(), lower)) {
-                result.add(createVirtualNode(tree, node, toVirtualId(node.getId())));
+                result.add(createVirtualNode(tree, node, virtualIdFor(node.getId())));
             }
         }
         return result;
@@ -265,14 +339,14 @@ final class AndroidAccessibilityProvider extends AccessibilityNodeProvider {
 
     @Override
     public AccessibilityNodeInfo findFocus(int focus) {
-        AccessibilityTreeSnapshot tree = implementation.getAccessibilityTreeSnapshot();
+        AccessibilityTreeSnapshot tree = currentTree();
         if (focus == AccessibilityNodeInfo.FOCUS_ACCESSIBILITY && accessibilityFocusedId != Integer.MIN_VALUE) {
-            AccessibilityNodeSnapshot node = tree.getNode(accessibilityFocusedId);
+            AccessibilityNodeSnapshot node = nodeForVirtualId(tree, accessibilityFocusedId);
             return node == null ? null : createVirtualNode(tree, node, accessibilityFocusedId);
         }
         if (focus == AccessibilityNodeInfo.FOCUS_INPUT) {
             for (AccessibilityNodeSnapshot node : tree.getNodes().values()) {
-                if (node.isFocused()) return createVirtualNode(tree, node, toVirtualId(node.getId()));
+                if (node.isFocused()) return createVirtualNode(tree, node, virtualIdFor(node.getId()));
             }
         }
         return null;
@@ -405,11 +479,101 @@ final class AndroidAccessibilityProvider extends AccessibilityNodeProvider {
                 || AccessibilityAction.SCROLL_FORWARD.equals(id) || AccessibilityAction.SCROLL_BACKWARD.equals(id);
     }
 
-    private int customActionId(String id) {
-        return CUSTOM_ACTION_BASE | (id.hashCode() & 0x00ffffff);
+    private AccessibilityTreeSnapshot currentTree() {
+        AccessibilityTreeSnapshot tree = implementation.getAccessibilityTreeSnapshot();
+        synchronizeIds(tree);
+        return tree;
     }
 
-    private int toVirtualId(long id) {
-        return (int)id;
+    private void synchronizeIds(AccessibilityTreeSnapshot tree) {
+        if (mappedGeneration == tree.getGeneration()) {
+            return;
+        }
+        Set<Long> liveSemanticIds = tree.getNodes().keySet();
+        Iterator<Map.Entry<Long, Integer>> virtualIterator = virtualIds.entrySet().iterator();
+        while (virtualIterator.hasNext()) {
+            Map.Entry<Long, Integer> entry = virtualIterator.next();
+            if (!liveSemanticIds.contains(entry.getKey())) {
+                semanticIds.remove(entry.getValue());
+                virtualIterator.remove();
+            }
+        }
+        for (Long semanticId : liveSemanticIds) {
+            virtualIdFor(semanticId.longValue());
+        }
+
+        Set<String> liveActionKeys = new HashSet<String>();
+        for (AccessibilityNodeSnapshot node : tree.getNodes().values()) {
+            for (AccessibilityAction action : node.getActions()) {
+                if (!isStandard(action.getId())) {
+                    liveActionKeys.add(actionKey(node.getId(), action.getId()));
+                }
+            }
+        }
+        Iterator<Map.Entry<String, Integer>> actionIterator = customActionIds.entrySet().iterator();
+        while (actionIterator.hasNext()) {
+            Map.Entry<String, Integer> entry = actionIterator.next();
+            if (!liveActionKeys.contains(entry.getKey())) {
+                customActionKeys.remove(entry.getValue());
+                actionIterator.remove();
+            }
+        }
+        if (accessibilityFocusedId != Integer.MIN_VALUE && !semanticIds.containsKey(
+                Integer.valueOf(accessibilityFocusedId))) {
+            accessibilityFocusedId = Integer.MIN_VALUE;
+        }
+        mappedGeneration = tree.getGeneration();
+    }
+
+    private AccessibilityNodeSnapshot nodeForVirtualId(AccessibilityTreeSnapshot tree, int virtualId) {
+        Long semanticId = semanticIds.get(Integer.valueOf(virtualId));
+        return semanticId == null ? null : tree.getNode(semanticId.longValue());
+    }
+
+    private int virtualIdFor(long semanticId) {
+        Long key = Long.valueOf(semanticId);
+        Integer existing = virtualIds.get(key);
+        if (existing != null) {
+            return existing.intValue();
+        }
+        int candidate = nextVirtualId;
+        while (candidate == AccessibilityNodeProvider.HOST_VIEW_ID
+                || semanticIds.containsKey(Integer.valueOf(candidate))) {
+            candidate = nextVirtualId(candidate);
+        }
+        nextVirtualId = nextVirtualId(candidate);
+        Integer virtualId = Integer.valueOf(candidate);
+        virtualIds.put(key, virtualId);
+        semanticIds.put(virtualId, key);
+        return candidate;
+    }
+
+    private int nextVirtualId(int current) {
+        return current == Integer.MAX_VALUE ? 1 : current + 1;
+    }
+
+    private int customActionId(long nodeId, String id) {
+        String key = actionKey(nodeId, id);
+        Integer existing = customActionIds.get(key);
+        if (existing != null) {
+            return existing.intValue();
+        }
+        int candidate = nextCustomActionId;
+        while (customActionKeys.containsKey(Integer.valueOf(candidate))) {
+            candidate = nextCustomActionId(candidate);
+        }
+        nextCustomActionId = nextCustomActionId(candidate);
+        Integer actionId = Integer.valueOf(candidate);
+        customActionIds.put(key, actionId);
+        customActionKeys.put(actionId, key);
+        return candidate;
+    }
+
+    private int nextCustomActionId(int current) {
+        return current == Integer.MAX_VALUE ? CUSTOM_ACTION_BASE : current + 1;
+    }
+
+    private String actionKey(long nodeId, String actionId) {
+        return nodeId + "\n" + actionId;
     }
 }

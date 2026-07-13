@@ -322,6 +322,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
     CodenameOneSurface myView = null;
     private AndroidAccessibilityProvider accessibilityProvider;
+    private volatile boolean accessibilityTreeUpdateRequired;
     CodenameOneTextPaint defaultFont;
     private final char[] tmpchar = new char[1];
     private final Rect tmprect = new Rect();
@@ -1585,6 +1586,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                         for (int i = 0; i < nativePeers.size(); i++) {
                             ((AndroidImplementation.AndroidPeer) nativePeers.elementAt(i)).deinit();
                         }
+                    }
+                    if (accessibilityProvider != null) {
+                        accessibilityProvider.dispose();
+                        accessibilityProvider = null;
                     }
                     if (relativeLayout != null) {
                         relativeLayout.removeAllViews();
@@ -13048,6 +13053,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public boolean isAccessibilityTreeSupported() {
         return Build.VERSION.SDK_INT >= 16;
+    }
+
+    @Override
+    public boolean isAccessibilityTreeUpdateRequired() {
+        return accessibilityTreeUpdateRequired;
+    }
+
+    void setAccessibilityTreeUpdateRequired(boolean required) {
+        accessibilityTreeUpdateRequired = required;
     }
 
     // ================================================================

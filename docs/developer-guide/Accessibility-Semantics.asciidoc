@@ -139,9 +139,13 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/A
 
 Row and column indexes are zero-based. Position and set size are one-based; use `-1` when unknown. Lists, tables, tabs, and their items infer this metadata where possible.
 
+Renderer-backed lists keep the full model size in their collection metadata but materialize only the visible rows, a small navigation buffer, and the selected row as virtual children. Forward and backward semantic scroll actions move the window. This keeps accessibility-tree work proportional to the viewport instead of invoking a cell renderer for every row whenever a large list scrolls.
+
 == Inspecting and testing semantics
 
 `AccessibilityInspector` returns an immutable snapshot. A snapshot is safe to inspect without racing native accessibility callbacks and includes stable IDs, hierarchy, bounds, resolved state, actions, range and collection data. `toJson()` is suitable for diagnostic reports and tooling.
+
+Semantic setters always mark the cached tree dirty. Pull-based native ports rebuild it on the Codename One EDT only while assistive technology is active or when a tool explicitly requests a snapshot; the browser keeps its off-screen ARIA projection synchronized continuously. Applications should still publish complete semantics unconditionally—this runtime optimization is deliberately transparent to application code.
 
 [source,java]
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AccessibilitySemanticsSnippets.java[tag=accessibility-semantics-inspection,indent=0]

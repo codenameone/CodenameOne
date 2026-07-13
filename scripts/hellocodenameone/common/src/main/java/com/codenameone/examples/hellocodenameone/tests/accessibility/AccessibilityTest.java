@@ -25,6 +25,8 @@ import com.codename1.ui.accessibility.AccessibilityRange;
 import com.codename1.ui.accessibility.AccessibilityRole;
 import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.list.DefaultListModel;
+import com.codename1.ui.list.ListCellRenderer;
 import com.codenameone.examples.hellocodenameone.tests.BaseTest;
 
 /** Cross-port semantics conformance test.  This runs in every native cn1ss job. */
@@ -47,9 +49,15 @@ public class AccessibilityTest extends BaseTest {
 
     private void runSemanticAssertions() {
         assertAccessibilityPreferencesAvailable();
+        AccessibilityNode validation = new AccessibilityNode("validation-state");
+        validation.setValidationError("Required");
+        assertEqual(Boolean.TRUE, validation.getInvalid(), "validation error implies invalid state");
+        validation.setValidationError(null);
+        assertEqual(null, validation.getInvalid(), "clearing validation error clears invalid state");
+
         final Form form = new Form("Accessibility conformance");
-        size(form, 0, 0, 600, 1200);
-        size(form.getContentPane(), 0, 0, 600, 1200);
+        size(form, 0, 0, 600, 1400);
+        size(form.getContentPane(), 0, 0, 600, 1400);
         form.getSemantics().setPaneTitle("Settings").setRole(AccessibilityRole.GENERIC);
 
         Label heading = add(form, new Label("Preferences"), 10, 10, 300, 40);
@@ -123,6 +131,29 @@ public class AccessibilityTest extends BaseTest {
         Button disabled = add(form, new Button("Unavailable action"), 10, 920, 220, 40);
         disabled.setEnabled(false);
 
+        String[] rows = new String[1000];
+        for (int i = 0; i < rows.length; i++) {
+            rows[i] = "Row " + i;
+        }
+        final int[] rendererCalls = new int[1];
+        final Label rendererLabel = new Label();
+        com.codename1.ui.List<String> largeList = new com.codename1.ui.List<String>(
+                new DefaultListModel<String>(rows));
+        largeList.setRenderer(new ListCellRenderer<String>() {
+            public Component getListCellRendererComponent(com.codename1.ui.List list,
+                    String value, int index, boolean selected) {
+                rendererCalls[0]++;
+                rendererLabel.setText(value);
+                return rendererLabel;
+            }
+
+            public Component getListFocusComponent(com.codename1.ui.List list) {
+                return null;
+            }
+        });
+        add(form, largeList, 10, 980, 300, 160);
+        rendererCalls[0] = 0;
+
         AccessibilityTreeSnapshot first = AccessibilityInspector.snapshot(form);
         AccessibilityNodeSnapshot headingNode = find(first, heading);
         AccessibilityNodeSnapshot saveNode = find(first, save);
@@ -136,6 +167,7 @@ public class AccessibilityTest extends BaseTest {
         AccessibilityNodeSnapshot tabNode = find(first, semanticTab);
         AccessibilityNodeSnapshot dialogNode = find(first, semanticDialog);
         AccessibilityNodeSnapshot virtualHostNode = find(first, virtualHost);
+        AccessibilityNodeSnapshot largeListNode = find(first, largeList);
 
         assertEqual(AccessibilityRole.HEADING, headingNode.getRole(), "heading role");
         assertEqual(2, headingNode.getHeadingLevel(), "heading level");
@@ -173,6 +205,15 @@ public class AccessibilityTest extends BaseTest {
         assertEqual("result-42", virtualNode.getVirtualKey(), "stable virtual key");
         assertEqual(AccessibilityRole.LIST_ITEM, virtualNode.getRole(), "virtual child role");
         assertEqual("Virtual result", first.getNodeAt(20, 830).getLabel(), "virtual child hit testing");
+        assertEqual(1000, largeListNode.getCollectionInfo().getRowCount(), "large list collection size");
+        assertTrue(largeListNode.getChildIds().size() < 50,
+                "large list semantics are bounded to the viewport");
+        assertTrue(rendererCalls[0] < 100,
+                "large list semantics do not render every model row");
+        assertTrue(largeListNode.getAction(AccessibilityAction.SCROLL_FORWARD) != null,
+                "large list exposes forward semantic scrolling");
+        assertTrue(largeListNode.getAction(AccessibilityAction.SCROLL_BACKWARD) != null,
+                "large list exposes backward semantic scrolling");
 
         AccessibilityNodeSnapshot formNode = find(first, form);
         int checkboxPosition = formNode.getChildIds().indexOf(Long.valueOf(checkboxNode.getId()));

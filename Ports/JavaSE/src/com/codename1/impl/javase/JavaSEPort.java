@@ -40,6 +40,7 @@ import com.codename1.payment.PromotionalOffer;
 import com.codename1.printing.PrintResult;
 import com.codename1.printing.PrintResultListener;
 import com.codename1.ui.AccessibilityColorVisionDeficiency;
+import com.codename1.ui.accessibility.AccessibilityManager;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
@@ -2509,8 +2510,13 @@ public class JavaSEPort extends CodenameOneImplementation {
         public javax.accessibility.AccessibleContext getAccessibleContext() {
             if (cn1Accessibility == null) {
                 cn1Accessibility = new JavaSEAccessibility(this, JavaSEPort.this);
+                AccessibilityManager.getInstance().invalidateAll();
             }
             return cn1Accessibility.getContext();
+        }
+
+        boolean isAccessibilityContextRequested() {
+            return cn1Accessibility != null;
         }
 
         void accessibilityChanged(int changeType) {
@@ -3808,6 +3814,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public boolean isAccessibilityTreeSupported() {
         return true;
+    }
+
+    @Override
+    public boolean isAccessibilityTreeUpdateRequired() {
+        return screenReaderEnabled || canvas != null && canvas.isAccessibilityContextRequested();
     }
 
     public void paintDirty() {
@@ -7688,7 +7699,12 @@ public class JavaSEPort extends CodenameOneImplementation {
             case 5: invertColorsEnabled = enabled; break;
             case 6: grayscaleEnabled = enabled; break;
             case 7: onOffSwitchLabelsEnabled = enabled; break;
-            case 8: screenReaderEnabled = enabled; break;
+            case 8:
+                screenReaderEnabled = enabled;
+                if (enabled) {
+                    AccessibilityManager.getInstance().invalidateAll();
+                }
+                break;
             default: throw new IllegalArgumentException("Unknown accessibility preference: " + preference);
         }
     }

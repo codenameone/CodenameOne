@@ -41,7 +41,6 @@ import com.codename1.ui.util.WeakHashMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,7 +64,8 @@ public final class AccessibilityManager {
 
     private static final AccessibilityManager INSTANCE = new AccessibilityManager();
     private final Map<Component, Long> componentIds = new WeakHashMap<Component, Long>();
-    private final Map<String, Long> virtualIds = new HashMap<String, Long>();
+    private final Map<Component, Map<String, Long>> virtualIds =
+            new WeakHashMap<Component, Map<String, Long>>();
     private long nextId = 1;
     private long generation;
     private boolean dirty = true;
@@ -86,6 +86,14 @@ public final class AccessibilityManager {
         dirty = true;
         pendingChanges |= changeType;
         try {
+            // Most mutations only need to make the cached snapshot stale. Ports
+            // that can pull the tree do so on demand, and ports such as Android
+            // opt into eager projection only while assistive technology is active.
+            // This keeps layout, scrolling, and text setters at O(1) when nobody
+            // is consuming the semantic tree.
+            if (!Display.getInstance().isAccessibilityTreeUpdateRequired()) {
+                return;
+            }
             if (!refreshScheduled) {
                 refreshScheduled = true;
                 Display.getInstance().callSerially(new Runnable() {
@@ -115,7 +123,7 @@ public final class AccessibilityManager {
 
     public AccessibilityTreeSnapshot getCurrentSnapshot() {
         synchronized (this) {
-            if (dirty && !Display.getInstance().isEdt()) {
+            if (!Display.getInstance().isEdt()) {
                 return snapshot;
             }
         }
@@ -124,6 +132,12 @@ public final class AccessibilityManager {
 
     @SuppressWarnings("PMD.CompareObjectsWithEquals")
     public synchronized AccessibilityTreeSnapshot getSnapshot(Form form) {
+        // Walking a live lightweight component hierarchy off the Codename One
+        // EDT is unsafe. Native bridges on other threads receive the last
+        // immutable snapshot; active bridges arrange eager refreshes on the EDT.
+        if (!Display.getInstance().isEdt()) {
+            return snapshot;
+        }
         if (!dirty && form == snapshotForm) {
             return snapshot;
         }
@@ -173,23 +187,6 @@ public final class AccessibilityManager {
         return true;
     }
 
-    /// Dispatches an action selected by a native bridge that can transport only an integer token.
-    public boolean performActionByHash(long nodeId, int actionIdHash, Object argument) {
-        AccessibilityNodeSnapshot node;
-        synchronized (this) {
-            node = snapshot.getNode(nodeId);
-        }
-        if (node == null) {
-            return false;
-        }
-        for (AccessibilityAction action : node.getActions()) {
-            if (action.getId().hashCode() == actionIdHash) {
-                return performAction(nodeId, action.getId(), argument);
-            }
-        }
-        return false;
-    }
-
     private long idFor(Component component) {
         Long id = componentIds.get(component);
         if (id == null) {
@@ -200,11 +197,15 @@ public final class AccessibilityManager {
     }
 
     private long idForVirtual(Component host, String path) {
-        String key = idFor(host) + ":" + path;
-        Long id = virtualIds.get(key);
+        Map<String, Long> hostIds = virtualIds.get(host);
+        if (hostIds == null) {
+            hostIds = new LinkedHashMap<String, Long>();
+            virtualIds.put(host, hostIds);
+        }
+        Long id = hostIds.get(path);
         if (id == null) {
             id = Long.valueOf(nextId++);
-            virtualIds.put(key, id);
+            hostIds.put(path, id);
         }
         return id.longValue();
     }
@@ -379,7 +380,8 @@ public final class AccessibilityManager {
 
     private void addListChildren(final com.codename1.ui.List list, List<BuildNode> destination) {
         int size = list.size();
-        for (int i = 0; i < size; i++) {
+        int[] visibleItems = list.getAccessibilityVisibleItemIndices();
+        for (int i : visibleItems) {
             final int index = i;
             AccessibilityNode item = new AccessibilityNode("item-" + i)
                                              .setRole(AccessibilityRole.LIST_ITEM)
@@ -410,6 +412,17 @@ public final class AccessibilityManager {
             if (slider.isEditable() && !hasAction(builder.actions, AccessibilityAction.DECREMENT)) {
                 builder.actions.add(new AccessibilityAction(AccessibilityAction.DECREMENT, null,
                                                             new SliderAdjustmentHandler(slider, -1)));
+            }
+        }
+        if (component instanceof com.codename1.ui.List) {
+            final com.codename1.ui.List list = (com.codename1.ui.List) component;
+            if (list.size() > 0 && !hasAction(builder.actions, AccessibilityAction.SCROLL_FORWARD)) {
+                builder.actions.add(new AccessibilityAction(AccessibilityAction.SCROLL_FORWARD, null,
+                                                            new ListScrollHandler(list, 1)));
+            }
+            if (list.size() > 0 && !hasAction(builder.actions, AccessibilityAction.SCROLL_BACKWARD)) {
+                builder.actions.add(new AccessibilityAction(AccessibilityAction.SCROLL_BACKWARD, null,
+                                                            new ListScrollHandler(list, -1)));
             }
         }
         if (component instanceof TextArea) {
@@ -802,6 +815,34 @@ public final class AccessibilityManager {
             }
             list.setSelectedIndex(index);
             list.keyReleased(Display.getInstance().getKeyCode(Display.GAME_FIRE));
+            return true;
+        }
+    }
+
+    private static final class ListScrollHandler implements AccessibilityAction.Handler {
+        private final com.codename1.ui.List list;
+        private final int direction;
+
+        private ListScrollHandler(com.codename1.ui.List list, int direction) {
+            this.list = list;
+            this.direction = direction;
+        }
+
+        @Override
+        public boolean perform(Component source, Object argument) {
+            if (!list.isEnabled() || list.size() == 0) {
+                return false;
+            }
+            int selected = list.getSelectedIndex();
+            if (selected < 0) {
+                selected = direction > 0 ? 0 : list.size() - 1;
+            } else {
+                selected = Math.max(0, Math.min(list.size() - 1, selected + direction));
+            }
+            if (selected == list.getSelectedIndex()) {
+                return false;
+            }
+            list.setSelectedIndex(selected);
             return true;
         }
     }

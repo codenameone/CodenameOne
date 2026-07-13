@@ -35,6 +35,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.Slider;
 import com.codename1.ui.TextField;
 import com.codename1.ui.list.DefaultListModel;
+import com.codename1.ui.list.ListCellRenderer;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -166,6 +167,53 @@ class AccessibilitySemanticsTest extends UITestBase {
         AccessibilityNodeSnapshot secondList = find(second, list);
         assertEquals(stableId, secondList.getChildIds().get(1).longValue());
         assertEquals(Boolean.FALSE, second.getNode(stableId).getSelected());
+    }
+
+    @FormTest
+    void largeRendererBackedListsOnlyMaterializeTheViewport() {
+        Form form = form();
+        String[] values = new String[1000];
+        for (int i = 0; i < values.length; i++) {
+            values[i] = "Row " + i;
+        }
+        final int[] rendererCalls = new int[1];
+        final Label rendererLabel = new Label();
+        com.codename1.ui.List<String> list = new com.codename1.ui.List<String>(
+                new DefaultListModel<String>(values));
+        list.setRenderer(new ListCellRenderer<String>() {
+            public Component getListCellRendererComponent(com.codename1.ui.List list,
+                    String value, int index, boolean selected) {
+                rendererCalls[0]++;
+                rendererLabel.setText(value);
+                return rendererLabel;
+            }
+
+            public Component getListFocusComponent(com.codename1.ui.List list) {
+                return null;
+            }
+        });
+        place(form, list, 0, 0, 200, 120);
+        rendererCalls[0] = 0;
+
+        AccessibilityTreeSnapshot tree = AccessibilityInspector.snapshot(form);
+        AccessibilityNodeSnapshot listNode = find(tree, list);
+        assertTrue(listNode.getChildIds().size() < 50,
+                "A 1000-row list should expose only its viewport-sized virtual window");
+        assertTrue(rendererCalls[0] < 100,
+                "Building list semantics must not invoke the renderer for every model row");
+        assertEquals(1000, listNode.getCollectionInfo().getRowCount());
+        assertNotNull(listNode.getAction(AccessibilityAction.SCROLL_FORWARD));
+        assertNotNull(listNode.getAction(AccessibilityAction.SCROLL_BACKWARD));
+    }
+
+    @FormTest
+    void clearingAValidationErrorClearsTheImpliedInvalidState() {
+        AccessibilityNode node = new AccessibilityNode("validation-test");
+        node.setValidationError("Required");
+        assertEquals(Boolean.TRUE, node.getInvalid());
+        node.setValidationError(null);
+        assertNull(node.getValidationError());
+        assertNull(node.getInvalid());
     }
 
     @FormTest

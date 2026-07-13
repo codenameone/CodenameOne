@@ -650,6 +650,13 @@ public final class Display extends CN1Constants {
         return impl.isAccessibilityTreeSupported();
     }
 
+    /// Returns true when the active port currently needs semantic changes to be
+    /// projected eagerly. This is an internal bridge used to avoid rebuilding
+    /// an unused accessibility tree from hot component setters.
+    public boolean isAccessibilityTreeUpdateRequired() {
+        return impl.isAccessibilityTreeUpdateRequired();
+    }
+
     /// Returns the status of the show during edit flag
     ///
     /// #### Returns

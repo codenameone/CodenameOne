@@ -1092,11 +1092,11 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `x`: the current x coordinate of the components origin
     public void setX(int x) {
-        if (bounds.getX() == x) {
-            return;
-        }
+        boolean changed = bounds.getX() != x;
         bounds.setX(x);
-        accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
+        if (changed) {
+            accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
+        }
         if (Form.activePeerCount > 0) {
             onParentPositionChange();
         }
@@ -1139,11 +1139,11 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `y`: the current y coordinate of the components origin
     public void setY(int y) {
-        if (bounds.getY() == y) {
-            return;
-        }
+        boolean changed = bounds.getY() != y;
         bounds.setY(y);
-        accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
+        if (changed) {
+            accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
+        }
         if (Form.activePeerCount > 0) {
             onParentPositionChange();
         }
@@ -1378,11 +1378,11 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - #setPreferredSize
     public void setWidth(int width) {
-        if (bounds.getSize().getWidth() == width) {
-            return;
-        }
+        boolean changed = bounds.getSize().getWidth() != width;
         bounds.getSize().setWidth(width);
-        accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
+        if (changed) {
+            accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
+        }
     }
 
     /// Gets the outer width of this component. This is the width of the component including horizontal margins.
@@ -1426,11 +1426,11 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - #setPreferredSize
     public void setHeight(int height) {
-        if (bounds.getSize().getHeight() == height) {
-            return;
-        }
+        boolean changed = bounds.getSize().getHeight() != height;
         bounds.getSize().setHeight(height);
-        accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
+        if (changed) {
+            accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
+        }
     }
 
     /// Gets the outer height of this component.  This is the height of the component including vertical margins.

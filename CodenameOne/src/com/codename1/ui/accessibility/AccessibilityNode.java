@@ -144,7 +144,7 @@ public class AccessibilityNode {
     }
     public AccessibilityNode setValidationError(String error) {
         this.validationError = error;
-        this.invalid = error == null ? invalid : Boolean.TRUE;
+        this.invalid = error == null ? null : Boolean.TRUE;
         return changed(AccessibilityManager.CHANGE_STATE);
     }
     public String getPaneTitle() {

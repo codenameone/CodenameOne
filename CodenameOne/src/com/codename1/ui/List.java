@@ -479,6 +479,71 @@ public class List<T> extends Component implements ActionSource {
         return text;
     }
 
+    /// Returns the model indices that should currently be materialized as
+    /// virtual accessibility children. The result contains the visible window,
+    /// a small one-item navigation buffer on each side, and the selected item.
+    /// It is intentionally bounded by the viewport so building a semantic tree
+    /// for a large renderer-backed list doesn't instantiate every row renderer.
+    public int[] getAccessibilityVisibleItemIndices() {
+        int modelSize = size();
+        if (modelSize == 0) {
+            return new int[0];
+        }
+
+        Dimension rendererSize = getElementSize(false, true);
+        Style style = getStyle();
+        int itemExtent = orientation == HORIZONTAL ? rendererSize.getWidth() : rendererSize.getHeight();
+        int viewportExtent = orientation == HORIZONTAL
+                ? getWidth() - style.getHorizontalPadding()
+                : getHeight() - style.getVerticalPadding();
+        int stride = Math.max(1, itemExtent + itemGap);
+        int windowSize = Math.min(modelSize, Math.max(1, viewportExtent / stride + 3));
+        int selected = getSelectedIndex();
+        int[] result = new int[Math.min(modelSize, windowSize + 1)];
+        int count = 0;
+
+        if (fixedSelection > FIXED_NONE_BOUNDRY) {
+            int center = selected >= 0 && selected < modelSize ? selected : 0;
+            int start = center - windowSize / 2;
+            for (int offset = 0; offset < windowSize; offset++) {
+                int index = (start + offset) % modelSize;
+                if (index < 0) {
+                    index += modelSize;
+                }
+                result[count++] = index;
+            }
+        } else {
+            int scroll = orientation == HORIZONTAL ? getScrollX() : getScrollY();
+            int padding = orientation == HORIZONTAL ? style.getPaddingLeftNoRTL() : style.getPaddingTop();
+            int first = Math.max(0, (scroll - padding) / stride - 1);
+            if (first + windowSize > modelSize) {
+                first = Math.max(0, modelSize - windowSize);
+            }
+            for (int index = first; index < first + windowSize; index++) {
+                result[count++] = index;
+            }
+        }
+
+        if (selected >= 0 && selected < modelSize && !containsIndex(result, count, selected)) {
+            result[count++] = selected;
+        }
+        if (count == result.length) {
+            return result;
+        }
+        int[] trimmed = new int[count];
+        System.arraycopy(result, 0, trimmed, 0, count);
+        return trimmed;
+    }
+
+    private boolean containsIndex(int[] indices, int length, int wanted) {
+        for (int i = 0; i < length; i++) {
+            if (indices[i] == wanted) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /// Returns the visual selection during a drag operation, otherwise equivalent to model.getSelectedIndex
     ///
     /// #### Returns

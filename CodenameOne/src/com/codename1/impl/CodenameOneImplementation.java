@@ -11155,6 +11155,14 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// Returns true when semantic invalidations should be projected eagerly.
+    /// Pull-based ports should override this to return true only while assistive
+    /// technology is active. Ports whose semantic projection must always remain
+    /// attached, such as web ARIA, may return true unconditionally.
+    public boolean isAccessibilityTreeUpdateRequired() {
+        return isAccessibilityTreeSupported();
+    }
+
     /// Returns true if the user has selected larger type fonts in the system settings.
     /// Default implementation returns false.
     ///
