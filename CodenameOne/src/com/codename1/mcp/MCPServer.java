@@ -119,7 +119,6 @@ public class MCPServer {
                 runLoop();
             }
         }, "cn1-mcp-server");
-        readerThread.setDaemon(true);
         readerThread.start();
     }
 
