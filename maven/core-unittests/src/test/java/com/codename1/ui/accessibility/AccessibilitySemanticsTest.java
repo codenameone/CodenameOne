@@ -180,6 +180,7 @@ class AccessibilitySemanticsTest extends UITestBase {
         final Label rendererLabel = new Label();
         com.codename1.ui.List<String> list = new com.codename1.ui.List<String>(
                 new DefaultListModel<String>(values));
+        list.getSemantics().setLabel("Large result list");
         list.setRenderer(new ListCellRenderer<String>() {
             public Component getListCellRendererComponent(com.codename1.ui.List list,
                     String value, int index, boolean selected) {
@@ -204,6 +205,7 @@ class AccessibilitySemanticsTest extends UITestBase {
         assertEquals(1000, listNode.getCollectionInfo().getRowCount());
         assertNotNull(listNode.getAction(AccessibilityAction.SCROLL_FORWARD));
         assertNotNull(listNode.getAction(AccessibilityAction.SCROLL_BACKWARD));
+        AccessibilityAssertions.assertNoErrors(tree);
     }
 
     @FormTest

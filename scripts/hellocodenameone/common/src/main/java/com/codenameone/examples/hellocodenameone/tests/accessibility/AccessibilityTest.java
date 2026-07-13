@@ -139,6 +139,7 @@ public class AccessibilityTest extends BaseTest {
         final Label rendererLabel = new Label();
         com.codename1.ui.List<String> largeList = new com.codename1.ui.List<String>(
                 new DefaultListModel<String>(rows));
+        largeList.getSemantics().setLabel("Large result list");
         largeList.setRenderer(new ListCellRenderer<String>() {
             public Component getListCellRendererComponent(com.codename1.ui.List list,
                     String value, int index, boolean selected) {

@@ -145,7 +145,7 @@ Renderer-backed lists keep the full model size in their collection metadata but 
 
 `AccessibilityInspector` returns an immutable snapshot. A snapshot is safe to inspect without racing native accessibility callbacks and includes stable IDs, hierarchy, bounds, resolved state, actions, range and collection data. `toJson()` is suitable for diagnostic reports and tooling.
 
-Semantic setters always mark the cached tree dirty. Pull-based native ports rebuild it on the Codename One EDT only while assistive technology is active or when a tool explicitly requests a snapshot; the browser keeps its off-screen ARIA projection synchronized continuously. Applications should still publish complete semantics unconditionally—this runtime optimization is deliberately transparent to application code.
+Semantic setters always mark the cached tree dirty. Pull-based native ports rebuild it on the Codename One EDT only while assistive technology is active or when a tool explicitly requests a snapshot; the browser keeps its off-screen ARIA projection synchronized continuously. Applications should still publish complete semantics unconditionally—this runtime optimization is transparent to application code.
 
 [source,java]
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/AccessibilitySemanticsSnippets.java[tag=accessibility-semantics-inspection,indent=0]
