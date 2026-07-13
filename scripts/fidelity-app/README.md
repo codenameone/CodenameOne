@@ -131,8 +131,9 @@ xcodebuild -workspace <FidelityApp.xcworkspace> -scheme FidelityApp \
 To re-seed in a fresh environment:
 `FIDELITY_UPDATE_GOLDENS=1 FIDELITY_UPDATE_BASELINE=1 ./scripts/run-...`.
 
-CI runs both platforms in `.github/workflows/scripts-fidelity.yml`, gating each
-PR that touches the native themes, the app, or the renderers.
+CI runs both platforms in `.github/workflows/scripts-fidelity.yml`, gating PRs
+that change the iOS Modern or Android Material CSS theme sources. Other changes
+can be tested deliberately with the workflow's manual dispatch.
 
 ## Current standing
 

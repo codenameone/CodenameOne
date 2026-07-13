@@ -10,39 +10,13 @@ name: Native theme fidelity
 # are re-seedable drift artifacts (FIDELITY_UPDATE_GOLDENS / _BASELINE).
 
 'on':
-  # Manual dispatch: this PR's changed-file count exceeds GitHub's paths-filter
-  # diff limit, so pull_request triggers stopped firing -- dispatch with
-  #   gh workflow run <file> --ref <branch>
+  # Keep manual dispatch available for deliberate fidelity runs outside the
+  # native-theme CSS change workflow.
   workflow_dispatch:
   pull_request:
     paths:
-      - '.github/workflows/scripts-fidelity.yml'
-      - 'scripts/setup-workspace.sh'
-      - 'scripts/build-android-port.sh'
-      - 'scripts/build-ios-port.sh'
-      - 'scripts/build-android-app.sh'
-      - 'scripts/build-ios-app.sh'
-      - 'scripts/build-fidelity-app.sh'
-      - 'scripts/run-android-fidelity-tests.sh'
-      - 'scripts/run-ios-fidelity-tests.sh'
-      - 'scripts/lib/cn1ss.sh'
-      - 'scripts/common/java/**'
-      - 'scripts/fidelity-app/**'
-      - 'native-themes/ios-modern/**'
-      - '!native-themes/ios-modern/**/*.md'
-      - 'native-themes/android-material/**'
-      - '!native-themes/android-material/**/*.md'
-      - 'CodenameOne/src/**'
-      - '!CodenameOne/src/**/*.md'
-      - 'Ports/Android/**'
-      - '!Ports/Android/**/*.md'
-      - 'Ports/iOSPort/**'
-      - '!Ports/iOSPort/**/*.md'
-      - 'vm/**'
-      - '!vm/**/*.md'
-      - 'maven/**'
-      - '!maven/core-unittests/**'
-      - '!docs/**'
+      - 'native-themes/ios-modern/theme.css'
+      - 'native-themes/android-material/theme.css'
   push:
     branches: [master]
     paths:
