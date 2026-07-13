@@ -1133,6 +1133,7 @@ public abstract class LookAndFeel {
         Dialog.setDefaultDialogPosition(manager.getThemeConstant("dialogPosition", Dialog.getDefaultDialogPosition()));
         Dialog.setCommandsAsButtons(manager.isThemeConstant("dialogButtonCommandsBool", Dialog.isCommandsAsButtons()));
         Dialog.setDefaultBlurBackgroundRadius(manager.getThemeConstant("dialogBlurRadiusInt", (int) Dialog.getDefaultBlurBackgroundRadius()));
+        Dialog.setDefaultTitleCentered(manager.isThemeConstant("dialogTitleCenterBool", false));
 
         List.setDefaultIgnoreFocusComponentWhenUnfocused(manager.isThemeConstant("ignorListFocusBool", List.isDefaultIgnoreFocusComponentWhenUnfocused()));
 

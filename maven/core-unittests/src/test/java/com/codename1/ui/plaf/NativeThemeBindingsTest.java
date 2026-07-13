@@ -61,6 +61,8 @@ public class NativeThemeBindingsTest extends UITestBase {
         // `#Constants { --accent-color: #007aff; }` is exported as a `@accent-color`
         // theme constant so a user app can override it via the same syntax.
         assertEquals("007AFF", theme.get("@accent-color"));
+        assertEquals("DialogButton", theme.get("@dlgButtonCommandUIID"));
+        assertEquals("c6c6c8", theme.get("@dlgInvisibleButtons"));
 
         UIManager.getInstance().setThemeProps(theme);
 
@@ -121,8 +123,15 @@ public class NativeThemeBindingsTest extends UITestBase {
         // through the runtime binding pass to every UIID bound to
         // --accent-color in this parent theme.
         assertEquals("6750A4", theme.get("@accent-color"));
+        assertEquals("DialogButton", theme.get("@dlgButtonCommandUIID"));
+        assertEquals("cac4d0", theme.get("@dlgInvisibleButtons"));
 
         UIManager.getInstance().setThemeProps(theme);
+
+        Button dialogButton = new Button("dialog command");
+        dialogButton.setUIID("DialogButton");
+        assertEquals(0, dialogButton.getStyle().getHorizontalMargins(),
+                "Android dialog command cells must meet the card edges and each other");
 
         Button defaultBtn = new Button("default");
         defaultBtn.setUIID("Button");

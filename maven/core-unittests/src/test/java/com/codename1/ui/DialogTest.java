@@ -7,10 +7,70 @@ import com.codename1.ui.Command;
 import com.codename1.ui.Container;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+import java.util.Hashtable;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class DialogTest extends UITestBase {
+
+    @FormTest
+    void centeredTitleSupportsThemeDefaultAndRuntimeToggle() {
+        Hashtable<String, Object> theme = new Hashtable<String, Object>();
+        theme.put("@dialogTitleCenterBool", "true");
+        theme.put("@dlgCommandGridBool", "true");
+        theme.put("Dialog.padding", "5,5,5,5");
+        theme.put("Dialog.padUnit", new byte[]{
+                Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS,
+                Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+        theme.put("DialogCommandArea.padding", "5,5,5,5");
+        theme.put("DialogCommandArea.padUnit", new byte[]{
+                Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS,
+                Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+        UIManager.getInstance().setThemeProps(theme);
+
+        Dialog dialog = new Dialog("Centered", new BorderLayout());
+        Label replacementTitle = new Label("Replacement");
+        dialog.setTitleComponent(replacementTitle);
+        dialog.placeButtonCommands(new Command[]{new Command("OK")});
+
+        assertTrue(Dialog.isDefaultTitleCentered());
+        assertTrue(dialog.isTitleCentered());
+
+        Container root = dialog.getDialogComponent();
+        Container titleArea = replacementTitle.getParent();
+        Container titleBody = titleArea.getParent();
+        BorderLayout rootLayout = (BorderLayout) root.getLayout();
+        BorderLayout titleAreaLayout = (BorderLayout) titleArea.getLayout();
+        BorderLayout titleBodyLayout = (BorderLayout) titleBody.getLayout();
+
+        assertEquals(BorderLayout.CENTER, rootLayout.getComponentConstraint(titleBody));
+        assertEquals(BorderLayout.CENTER, titleBodyLayout.getComponentConstraint(titleArea));
+        assertEquals(BorderLayout.SOUTH, titleBodyLayout.getComponentConstraint(dialog.getContentPane()));
+        assertEquals(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE, titleAreaLayout.getCenterBehavior());
+        Container commandArea = (Container) rootLayout.getSouth();
+        assertNotNull(commandArea, "command area must retain the outer SOUTH slot");
+        assertEquals(0, root.getStyle().getHorizontalPadding(),
+                "native command grids must reach the dialog card edges");
+        assertEquals(0, commandArea.getStyle().getHorizontalPadding());
+        assertEquals(0, commandArea.getStyle().getPaddingBottom());
+
+        dialog.setTitleCentered(false);
+
+        assertFalse(dialog.isTitleCentered());
+        assertSame(root, replacementTitle.getParent());
+        assertEquals(BorderLayout.NORTH, rootLayout.getComponentConstraint(replacementTitle));
+        assertSame(root, dialog.getContentPane().getParent());
+        assertEquals(BorderLayout.CENTER, rootLayout.getComponentConstraint(dialog.getContentPane()));
+        assertNotNull(rootLayout.getSouth(), "runtime toggle must preserve the command area");
+
+        Dialog.setDefaultTitleCentered(false);
+        assertFalse(new Dialog("Traditional").isTitleCentered());
+        Dialog.setDefaultTitleCentered(true);
+        assertTrue(new Dialog("Runtime default").isTitleCentered());
+    }
 
     @FormTest
     void disposeWhenPointerOutOfBoundsClosesDialog() {

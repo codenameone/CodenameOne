@@ -259,6 +259,9 @@
        boolean constants below tune button-area rendering (compact
        title, grid commands) but don't affect outer sizing. */
     dialogPosition: Center;
+    /* iOS alerts place the title in the absolute center and lay the supporting
+       body out below it instead of treating the title as a top bar. */
+    dialogTitleCenterBool: true;
     /* Cap the alert width so a long body wraps into an iOS-style card instead of
        stretching full-width on wide screens (tablet / landscape / desktop): ~72% is the UIAlertController proportion (density-robust). */
     dialogMaxWidthPercentInt: 72;
@@ -266,6 +269,9 @@
     shrinkPopupTitleBool: true;
     dialogButtonCommandsBool: true;
     dlgCommandGridBool: true;
+    /* Alert actions are part of the card, not regular glass Button pills. */
+    dlgButtonCommandUIID: "DialogButton";
+    dlgInvisibleButtons: "c6c6c8";
 }
 
 Component {

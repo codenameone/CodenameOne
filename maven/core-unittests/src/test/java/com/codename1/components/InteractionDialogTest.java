@@ -2,16 +2,22 @@ package com.codename1.components;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.Button;
+import com.codename1.ui.Command;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
+import java.util.Hashtable;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -29,6 +35,88 @@ class InteractionDialogTest extends UITestBase {
         assertEquals("Dialog", dialog.getUIID());
         assertEquals("DialogTitle", dialog.getTitleComponent().getUIID());
         assertEquals("DialogContentPane", dialog.getContentPane().getUIID());
+    }
+
+    @Test
+    void centeredTitleSupportsThemeDefaultAndRuntimeToggle() {
+        Hashtable<String, Object> theme = new Hashtable<String, Object>();
+        theme.put("@dialogTitleCenterBool", "true");
+        UIManager.getInstance().setThemeProps(theme);
+
+        InteractionDialog dialog = new InteractionDialog("Centered", new BorderLayout());
+        Container titleArea = dialog.getTitleComponent().getParent();
+        Container dialogBody = titleArea.getParent();
+        BorderLayout titleLayout = (BorderLayout) titleArea.getLayout();
+        BorderLayout bodyLayout = (BorderLayout) dialogBody.getLayout();
+
+        assertTrue(dialog.isTitleCentered());
+        assertSame(dialog, dialogBody.getParent());
+        assertSame(dialogBody, dialog.getContentPane().getParent());
+        assertEquals(BorderLayout.CENTER, bodyLayout.getComponentConstraint(titleArea));
+        assertEquals(BorderLayout.SOUTH, bodyLayout.getComponentConstraint(dialog.getContentPane()));
+        assertEquals(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE, titleLayout.getCenterBehavior());
+
+        dialog.setTitleCentered(false);
+
+        assertFalse(dialog.isTitleCentered());
+        assertSame(dialog, dialogBody.getParent());
+        assertSame(dialogBody, dialog.getContentPane().getParent());
+        assertEquals(BorderLayout.NORTH, bodyLayout.getComponentConstraint(titleArea));
+        assertEquals(BorderLayout.CENTER, bodyLayout.getComponentConstraint(dialog.getContentPane()));
+        assertEquals(BorderLayout.CENTER_BEHAVIOR_SCALE, titleLayout.getCenterBehavior());
+    }
+
+    @Test
+    void commandButtonsHonorNativeDialogThemeConstants() {
+        Hashtable<String, Object> theme = new Hashtable<String, Object>();
+        theme.put("@dlgCommandGridBool", "true");
+        theme.put("@dlgButtonCommandUIID", "DialogButton");
+        theme.put("@dlgInvisibleButtons", "c6c6c8");
+        theme.put("@dlgCommandButtonSizeInt", "80");
+        theme.put("Dialog.padding", "5,5,5,5");
+        theme.put("Dialog.padUnit", new byte[]{
+                Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS,
+                Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+        theme.put("DialogCommandArea.padding", "5,5,5,5");
+        theme.put("DialogCommandArea.padUnit", new byte[]{
+                Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS,
+                Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+        UIManager.getInstance().setThemeProps(theme);
+
+        InteractionDialog dialog = new InteractionDialog("Commands", new BorderLayout());
+        dialog.configureCommands(new Command[]{
+                new Command("Cancel"),
+                new Command("Continue")
+        }, true);
+
+        Container commandArea = null;
+        for (int iter = 0; iter < dialog.getComponentCount(); iter++) {
+            if ("DialogCommandArea".equals(dialog.getComponentAt(iter).getUIID())) {
+                commandArea = (Container) dialog.getComponentAt(iter);
+                break;
+            }
+        }
+        assertNotNull(commandArea);
+        assertSame(dialog, commandArea.getParent(),
+                "dialog commands must stay outside the padded content pane");
+        assertEquals(0, dialog.getStyle().getHorizontalPadding(),
+                "native command grids must reach the dialog card edges");
+        assertEquals(0, commandArea.getStyle().getHorizontalPadding());
+        assertEquals(0, commandArea.getStyle().getPaddingBottom());
+        assertInstanceOf(GridLayout.class, commandArea.getLayout());
+        assertEquals("DialogCommandArea", commandArea.getUIID());
+        assertEquals(2, commandArea.getComponentCount());
+
+        Button cancel = (Button) commandArea.getComponentAt(0);
+        Button proceed = (Button) commandArea.getComponentAt(1);
+        assertEquals("DialogButton", cancel.getUIID());
+        assertEquals("DialogButton", proceed.getUIID());
+        assertEquals(cancel.getPreferredW(), proceed.getPreferredW());
+        assertTrue(cancel.getPreferredW() >= 80);
+        assertNotNull(cancel.getUnselectedStyle().getBorder());
+        assertSame(cancel.getUnselectedStyle().getBorder(), cancel.getSelectedStyle().getBorder());
+        assertSame(cancel.getUnselectedStyle().getBorder(), cancel.getPressedStyle().getBorder());
+        assertNotNull(proceed.getUnselectedStyle().getBorder());
     }
 
     @Test

@@ -153,6 +153,7 @@ public class Dialog extends Form implements AbstractDialog {
     private static float defaultBlurBackgroundRadius = -1;
     private static boolean defaultInteractionDialogMode;
     private static boolean defaultInteractionDialogModeInitialized;
+    private static boolean defaultTitleCentered;
     /// Indicates whether the dialog has been disposed
     private boolean disposed;
     /// Indicates the time in which the alert should be disposed
@@ -186,6 +187,8 @@ public class Dialog extends Form implements AbstractDialog {
     private boolean disposedDueToRotation;
     private Label dialogTitle;
     private Container dialogContentPane;
+    private Container centeredTitleBody;
+    private Container centeredTitleArea;
     /// Indicates if we want to enforce directional bias for the popup dialog. If null this field is ignored but if
     /// its set to a value it biases the system towards a fixed direction for the popup dialog.
     private Boolean popupDirectionBiasPortrait;
@@ -195,6 +198,7 @@ public class Dialog extends Form implements AbstractDialog {
     private float blurBackgroundRadius = defaultBlurBackgroundRadius;
     private boolean isUIIDByPopupPosition;
     private boolean interactionDialogMode = defaultInteractionDialogMode;
+    private boolean titleCentered = defaultTitleCentered;
 
     /// Constructs a Dialog with a title
     ///
@@ -798,6 +802,27 @@ public class Dialog extends Form implements AbstractDialog {
         defaultBlurBackgroundRadius = aDefaultBlurBackgroundRadius;
     }
 
+    /// Indicates whether newly-created dialogs place their title in the absolute
+    /// center, with the body below it. This default can be configured with the
+    /// `dialogTitleCenterBool` theme constant.
+    ///
+    /// #### Returns
+    ///
+    /// true when newly-created dialogs use the centered title layout
+    public static boolean isDefaultTitleCentered() {
+        return defaultTitleCentered;
+    }
+
+    /// Sets whether newly-created `Dialog` and `InteractionDialog` instances place
+    /// their title in the absolute center, with the body below it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultTitleCentered`: true to use the centered title layout by default
+    public static void setDefaultTitleCentered(boolean defaultTitleCentered) {
+        Dialog.defaultTitleCentered = defaultTitleCentered;
+    }
+
     private static void initDefaultInteractionDialogMode() {
         if (!defaultInteractionDialogModeInitialized) {
             defaultInteractionDialogModeInitialized = true;
@@ -855,19 +880,7 @@ public class Dialog extends Form implements AbstractDialog {
         dialogContentPane.setUIID("DialogContentPane");
         dialogTitle = new Label("", dialogTitleUIID);
         super.getContentPane().setLayout(new BorderLayout());
-        // Liquid-glass / iOS alert layout: the title sits as the prominent centred
-        // text and the body (content pane) drops BELOW it, rather than the title being
-        // a top bar with the body filling the centre. Opt in via dialogTitleCenterBool
-        // so existing dialogs are unaffected. The title Label is centred; an app that
-        // needs a wrapping multi-line title can supply one via setTitleComponent.
-        if (UIManager.getInstance().isThemeConstant("dialogTitleCenterBool", false)) {
-            dialogTitle.getAllStyles().setAlignment(Component.CENTER);
-            super.getContentPane().addComponent(BorderLayout.CENTER, dialogTitle);
-            super.getContentPane().addComponent(BorderLayout.SOUTH, dialogContentPane);
-        } else {
-            super.getContentPane().addComponent(BorderLayout.NORTH, dialogTitle);
-            super.getContentPane().addComponent(BorderLayout.CENTER, dialogContentPane);
-        }
+        updateTitleLayout();
         super.getContentPane().setScrollable(false);
         super.getContentPane().setAlwaysTensile(false);
 
@@ -969,9 +982,67 @@ public class Dialog extends Form implements AbstractDialog {
     /// {@inheritDoc}
     @Override
     public void setTitleComponent(Label title) {
-        super.getContentPane().removeComponent(dialogTitle);
+        Container parent = dialogTitle.getParent();
+        if (parent != null) {
+            parent.removeComponent(dialogTitle);
+        }
         dialogTitle = title;
-        super.getContentPane().addComponent(BorderLayout.NORTH, dialogTitle);
+        updateTitleLayout();
+    }
+
+    /// Returns whether this dialog places its title in the absolute center with
+    /// the body below it.
+    ///
+    /// #### Returns
+    ///
+    /// true when the centered title layout is active
+    public boolean isTitleCentered() {
+        return titleCentered;
+    }
+
+    /// Places the title in the absolute center with the body below it. Passing
+    /// false restores the traditional title-at-top layout.
+    ///
+    /// #### Parameters
+    ///
+    /// - `titleCentered`: true to use the centered title layout
+    public void setTitleCentered(boolean titleCentered) {
+        if (this.titleCentered == titleCentered) {
+            return;
+        }
+        this.titleCentered = titleCentered;
+        updateTitleLayout();
+        revalidate();
+    }
+
+    private void updateTitleLayout() {
+        Container root = super.getContentPane();
+        if (dialogTitle.getParent() != null) {
+            dialogTitle.remove();
+        }
+        if (dialogContentPane.getParent() != null) {
+            dialogContentPane.remove();
+        }
+        if (centeredTitleBody != null && centeredTitleBody.getParent() != null) {
+            centeredTitleBody.remove();
+        }
+        if (titleCentered) {
+            if (centeredTitleBody == null) {
+                centeredTitleBody = new Container(new BorderLayout());
+                centeredTitleBody.setUIID("Container");
+                centeredTitleArea = new Container(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE));
+                centeredTitleArea.setUIID("Container");
+            }
+            centeredTitleArea.removeAll();
+            centeredTitleBody.removeAll();
+            centeredTitleArea.addComponent(BorderLayout.CENTER, dialogTitle);
+            centeredTitleBody.addComponent(BorderLayout.CENTER, centeredTitleArea);
+            centeredTitleBody.addComponent(BorderLayout.SOUTH, dialogContentPane);
+            root.addComponent(BorderLayout.CENTER, centeredTitleBody);
+        } else {
+            root.addComponent(BorderLayout.NORTH, dialogTitle);
+            root.addComponent(BorderLayout.CENTER, dialogContentPane);
+        }
     }
 
     /// {@inheritDoc}
@@ -998,7 +1069,10 @@ public class Dialog extends Form implements AbstractDialog {
     /// {@inheritDoc}
     @Override
     public void setTitleComponent(Label title, Transition t) {
-        super.getContentPane().replace(dialogTitle, title, t);
+        Container parent = dialogTitle.getParent();
+        if (parent != null) {
+            parent.replace(dialogTitle, title, t);
+        }
         dialogTitle = title;
     }
 
@@ -1307,12 +1381,23 @@ public class Dialog extends Form implements AbstractDialog {
     public void placeButtonCommands(Command[] cmds) {
         buttonCommands = cmds;
         Container buttonArea;
-        if (getUIManager().isThemeConstant("dlgCommandGridBool", false)) {
+        boolean commandGrid = getUIManager().isThemeConstant("dlgCommandGridBool", false);
+        if (commandGrid) {
             buttonArea = new Container(new GridLayout(1, cmds.length));
         } else {
             buttonArea = new Container(new FlowLayout(CENTER));
         }
         buttonArea.setUIID("DialogCommandArea");
+        if (commandGrid) {
+            // Native dialog actions are card chrome rather than inset body
+            // content. Keep the theme's top spacing, but let the grid and its
+            // separators meet the left, right, and bottom card edges.
+            super.getContentPane().getAllStyles().setPadding(0, 0, 0, 0);
+            Style commandAreaStyle = buttonArea.getAllStyles();
+            commandAreaStyle.setPadding(LEFT, 0);
+            commandAreaStyle.setPadding(RIGHT, 0);
+            commandAreaStyle.setPadding(BOTTOM, 0);
+        }
         String uiid = getUIManager().getThemeConstant("dlgButtonCommandUIID", null);
         addButtonBar(buttonArea);
         if (cmds.length > 0) {

@@ -30,6 +30,7 @@ import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
@@ -79,6 +80,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
 
     private final Label title = new Label();
     private final Container titleArea = new Container(new BorderLayout());
+    private final Container dialogBody = new Container(new BorderLayout());
     private final Container contentPane;
     private boolean animateShow = true;
     private boolean repositionAnimation = true;
@@ -87,6 +89,7 @@ public class InteractionDialog extends Container implements AbstractDialog {
     private int animationSpeed = -1;
     private Runnable showAnimationSetup;
     private Runnable disposeAnimationSetup;
+    private boolean titleCentered = Dialog.isDefaultTitleCentered();
 
     /// Whether the interaction dialog uses the form layered pane of the regular layered pane
     private boolean formMode;
@@ -155,9 +158,9 @@ public class InteractionDialog extends Container implements AbstractDialog {
         setUIIDFinal("Dialog");
         title.setUIID("DialogTitle");
         contentPane.setUIID("DialogContentPane");
-        super.addComponent(BorderLayout.NORTH, titleArea);
+        dialogBody.setUIID("Container");
         titleArea.addComponent(BorderLayout.CENTER, title);
-        super.addComponent(BorderLayout.CENTER, contentPane);
+        updateTitleLayout();
         setGrabsPointerEvents(true);
     }
 
@@ -271,6 +274,48 @@ public class InteractionDialog extends Container implements AbstractDialog {
     /// The title label component.
     public Label getTitleComponent() {
         return title;
+    }
+
+    /// Returns whether this interaction dialog places its title in the absolute
+    /// center with the body below it.
+    ///
+    /// #### Returns
+    ///
+    /// true when the centered title layout is active
+    public boolean isTitleCentered() {
+        return titleCentered;
+    }
+
+    /// Places the title in the absolute center with the body below it. Passing
+    /// false restores the traditional title-at-top layout.
+    ///
+    /// #### Parameters
+    ///
+    /// - `titleCentered`: true to use the centered title layout
+    public void setTitleCentered(boolean titleCentered) {
+        if (this.titleCentered == titleCentered) {
+            return;
+        }
+        this.titleCentered = titleCentered;
+        updateTitleLayout();
+        revalidate();
+    }
+
+    private void updateTitleLayout() {
+        dialogBody.removeAll();
+        BorderLayout titleLayout = (BorderLayout) titleArea.getLayout();
+        if (titleCentered) {
+            titleLayout.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
+            dialogBody.addComponent(BorderLayout.CENTER, titleArea);
+            dialogBody.addComponent(BorderLayout.SOUTH, contentPane);
+        } else {
+            titleLayout.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
+            dialogBody.addComponent(BorderLayout.NORTH, titleArea);
+            dialogBody.addComponent(BorderLayout.CENTER, contentPane);
+        }
+        if (dialogBody.getParent() == null) {
+            super.addComponent(BorderLayout.CENTER, dialogBody);
+        }
     }
 
     private int resolveAnimationSpeed() {
@@ -1311,18 +1356,54 @@ public class InteractionDialog extends Container implements AbstractDialog {
         if (cmds == null || cmds.length == 0) {
             return;
         }
+        UIManager manager = UIManager.getInstance();
         Container buttonArea;
-        if (UIManager.getInstance().isThemeConstant("dlgCommandGridBool", false)) {
+        boolean commandGrid = manager.isThemeConstant("dlgCommandGridBool", false);
+        if (commandGrid) {
             buttonArea = new Container(new GridLayout(1, cmds.length));
         } else {
             buttonArea = new Container(new FlowLayout(CENTER));
         }
         buttonArea.setUIID("DialogCommandArea");
-        String uiid = UIManager.getInstance().getThemeConstant("dlgButtonCommandUIID", null);
-        for (final Command command : cmds) {
+        if (commandGrid) {
+            // Native command grids are dialog chrome, not padded body content.
+            // Preserve the theme's top spacing while extending the grid and
+            // separator to the other three card edges.
+            getAllStyles().setPadding(0, 0, 0, 0);
+            Style commandAreaStyle = buttonArea.getAllStyles();
+            commandAreaStyle.setPadding(LEFT, 0);
+            commandAreaStyle.setPadding(RIGHT, 0);
+            commandAreaStyle.setPadding(BOTTOM, 0);
+        }
+        String uiid = manager.getThemeConstant("dlgButtonCommandUIID", null);
+        String lineColor = manager.getThemeConstant("dlgInvisibleButtons", null);
+        if (cmds.length > 3) {
+            lineColor = null;
+        }
+        int largest = Integer.parseInt(manager.getThemeConstant("dlgCommandButtonSizeInt", "0"));
+        for (int iter = 0; iter < cmds.length; iter++) {
+            final Command command = cmds[iter];
             Button b = new Button(command);
             if (uiid != null) {
                 b.setUIID(uiid);
+            }
+            if (Button.isCapsTextDefault()) {
+                b.setCapsText(true);
+            }
+            largest = Math.max(b.getPreferredW(), largest);
+            if (lineColor != null && lineColor.length() > 0) {
+                int color = Integer.parseInt(lineColor, 16);
+                Border border;
+                if (iter < cmds.length - 1) {
+                    border = Border.createCompoundBorder(Border.createLineBorder(1, color), null,
+                            null, Border.createLineBorder(1, color));
+                } else {
+                    border = Border.createCompoundBorder(Border.createLineBorder(1, color), null,
+                            null, null);
+                }
+                b.getUnselectedStyle().setBorder(border);
+                b.getSelectedStyle().setBorder(border);
+                b.getPressedStyle().setBorder(border);
             }
             b.addActionListener(new ActionListener<ActionEvent>() {
                 @Override
@@ -1333,7 +1414,14 @@ public class InteractionDialog extends Container implements AbstractDialog {
             });
             buttonArea.addComponent(b);
         }
-        getContentPane().addComponent(BorderLayout.SOUTH, buttonArea);
+        for (int iter = 0; iter < cmds.length; iter++) {
+            buttonArea.getComponentAt(iter).setPreferredW(largest);
+        }
+        buttonArea.getComponentAt(0).requestFocus();
+        // Commands are dialog chrome, not body content. Keeping this in the
+        // outer SOUTH slot lets the command grid span the card edge-to-edge
+        // regardless of DialogContentPane padding.
+        super.addComponent(BorderLayout.SOUTH, buttonArea);
     }
 
     /// {@inheritDoc}
