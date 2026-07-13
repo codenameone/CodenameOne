@@ -923,6 +923,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-07-13T15:01:19+00:00"
+      },
+      "devto": {
+        "id": 4134931,
+        "url": "https://dev.to/codenameone/commerce-and-secrets-without-an-iap-tax-1n9b",
+        "syndicated_at": "2026-07-13T15:39:12+00:00"
       }
     }
   }
