@@ -154,9 +154,15 @@ public class CN1SurfaceBridge: NSObject {
     /// unbounded growth of the shared cn1surfaces/activities directory.
     @available(iOS 16.1, *)
     static func cn1SweepActivityImages() {
-        guard let dir = cn1SurfacesActivitiesDir() else {
+        // Resolve the activities image dir inline from the app-group constant: this bridge is
+        // compiled into the APP target, which does not include CN1SurfaceModel.swift (its
+        // cn1SurfacesActivitiesDir lives only in the widget extension), so mirror the same path.
+        guard let container = FileManager.default.containerURL(
+                forSecurityApplicationGroupIdentifier: cn1SurfacesAppGroup) else {
             return
         }
+        let dir = container.appendingPathComponent("cn1surfaces", isDirectory: true)
+                .appendingPathComponent("activities", isDirectory: true)
         var referenced = Set<String>()
         for activity in Activity<CN1SurfaceAttributes>.activities {
             guard let data = activity.attributes.descriptorJson.data(using: .utf8),
