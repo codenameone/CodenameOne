@@ -11,16 +11,12 @@ The API is supported by the JavaSE port, which powers the simulator and the desk
 Invoking the API is the switch. There is no build hint or property to set. The socket server lets an agent attach to a session a person is watching, which is the usual choice in the simulator:
 
 [source,java]
-----
-MCP.startSocketServer(8765);
-----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/McpSnippets.java[tag=mcp-start-socket,indent=0]
 
 A tool that a host launches as a subprocess can serve over standard input and output instead:
 
 [source,java]
-----
-MCP.startStdioServer();
-----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/McpSnippets.java[tag=mcp-start-stdio,indent=0]
 
 The stdio transport is the standard MCP local transport, exchanging newline delimited JSON-RPC messages. While it runs, application logging is redirected away from standard output so it can't corrupt the protocol stream. The stdio transport lives in the JavaSE port because it needs process standard input, which isn't available on every target.
 
@@ -37,17 +33,7 @@ Actions run on the Codename One EDT, so an agent never touches the live componen
 An application publishes its own data and actions as MCP tools. A `Tool` has a name, a description, a JSON schema for its parameters, and a handler:
 
 [source,java]
-----
-MCP.addTool(new Tool(
-        "current_user",
-        "Returns the signed in user",
-        "{\"type\":\"object\",\"properties\":{}}",
-        new ToolHandler() {
-            public String invoke(String argumentsJson) {
-                return "{\"name\":\"" + session.getUser().getName() + "\"}";
-            }
-        }));
-----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/McpSnippets.java[tag=mcp-add-tool,indent=0]
 
 The server merges these tools with the built-in tools when a host lists the available tools, and routes each call to the matching handler. The same `Tool` type is used by the Codename One AI client, so a tool defined once serves both a hosted agent and an in-application model.
 
