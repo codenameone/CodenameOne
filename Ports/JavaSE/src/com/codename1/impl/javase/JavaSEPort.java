@@ -9368,6 +9368,23 @@ public class JavaSEPort extends CodenameOneImplementation {
                 });
                 */
             }
+            // Honor the field's horizontal alignment (issue #5370) so a right- or
+            // center-aligned field doesn't jump to the left when the native editor
+            // takes over. getAbsoluteAlignment() already resolves LEFT/RIGHT for RTL.
+            // Both JTextField and JPasswordField (a JTextField subclass) support this.
+            if (t instanceof JTextField) {
+                switch (((com.codename1.ui.TextArea)cmp).getAbsoluteAlignment()) {
+                    case com.codename1.ui.Component.RIGHT:
+                        ((JTextField)t).setHorizontalAlignment(JTextField.RIGHT);
+                        break;
+                    case com.codename1.ui.Component.CENTER:
+                        ((JTextField)t).setHorizontalAlignment(JTextField.CENTER);
+                        break;
+                    default:
+                        ((JTextField)t).setHorizontalAlignment(JTextField.LEADING);
+                        break;
+                }
+            }
             swingT = t;
             textCmp = swingT;
         } else {
