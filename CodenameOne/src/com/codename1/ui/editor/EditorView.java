@@ -1191,6 +1191,13 @@ public class EditorView extends Component implements TextInputClient {
     }
 
     private void scrollCaretVisible() {
+        if (contentHeight() <= 0) {
+            // The component has not been laid out yet (height is 0, so contentHeight() is
+            // negative once padding is subtracted). Scrolling to the caret here would push
+            // scrollY to roughly one line, hiding the first line under the title bar once the
+            // real bounds arrive. Defer until laidOut() runs with a real viewport.
+            return;
+        }
         int cl = doc.lineOfOffset(caret);
         int top = lineTopContent(cl);
         int bottom = top + lineHeightAt(cl);
@@ -1231,6 +1238,16 @@ public class EditorView extends Component implements TextInputClient {
     private void resetBlink() {
         caretOn = true;
         lastBlink = System.currentTimeMillis();
+    }
+
+    @Override
+    protected void laidOut() {
+        super.laidOut();
+        // Now that the real viewport height is known, apply any scroll-to-caret that was
+        // deferred while the component was unlaid-out (see scrollCaretVisible), and re-clamp
+        // a stale scroll offset into range.
+        scrollY = clampInt(scrollY, 0, maxScroll());
+        scrollCaretVisible();
     }
 
     // ---- focus + input source lifecycle ----

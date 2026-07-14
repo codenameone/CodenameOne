@@ -79,4 +79,28 @@ class EditorFirstLineTest extends UITestBase {
                 "the editor must show line 0 at the top (first line not scrolled under the title bar)");
         assertEquals(0, v.getVerticalScroll(), "vertical scroll must be 0 after loading content");
     }
+
+    /// Reproduces the device/simulator ordering: the backend flushes the queued setText BEFORE the
+    /// component is laid out (height still 0). Previously scrollCaretVisible() ran against a negative
+    /// contentHeight() and pushed scrollY to ~one line, hiding the first line under the title bar.
+    @FormTest
+    void codeViewShowsFirstLineWhenTextSetBeforeLayout() {
+        Toolbar.setGlobalToolbar(true);
+        CodeView v = new CodeView(new NoopHost());
+        // set text while the component is still unlaid-out (height == 0), as the backend does on device
+        assertEquals(0, v.getHeight(), "precondition: component not laid out yet");
+        v.setText("line1\nline2\nline3\nline4\nline5");
+        Form f = new Form("Code", new BorderLayout());
+        f.setToolbar(new Toolbar());
+        f.setTitle("Code");
+        f.add(BorderLayout.CENTER, v);
+        f.show();
+        for (int i = 0; i < 6; i++) {
+            flushSerialCalls();
+        }
+        assertEquals(0, v.getVerticalScroll(),
+                "vertical scroll must be 0 even when text is set before the first layout");
+        assertEquals(0, v.firstVisibleLine(),
+                "line 0 must be visible at the top even when text is set before the first layout");
+    }
 }
