@@ -1884,7 +1884,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         EventQueue.invokeLater(new Runnable() {
             @Override
             public void run() {
-                frame.setJMenuBar(buildNativeMenuBar(snapshot));
+                frame.setJMenuBar(buildNativeMenuBar(snapshot, frame));
                 frame.revalidate();
             }
         });
@@ -1894,11 +1894,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// menus by each command's desktop-menu placement hint (Command.getDesktopMenu()); commands
     /// with no hint fall under a default "Commands" menu. Each menu item dispatches back onto the
     /// Codename One EDT before invoking the command's action.
-    private JMenuBar buildNativeMenuBar(java.util.List<com.codename1.ui.Command> commands) {
+    private JMenuBar buildNativeMenuBar(java.util.List<com.codename1.ui.Command> commands, JFrame frame) {
         JMenuBar bar = new JMenuBar();
-        if (commands.isEmpty()) {
-            return bar;
-        }
         // preserve first-seen order of the menu groups
         java.util.LinkedHashMap<String, JMenu> menus = new java.util.LinkedHashMap<String, JMenu>();
         for (int i = 0; i < commands.size(); i++) {
@@ -1931,6 +1928,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
             menu.add(item);
         }
+        // Every desktop Codename One tool gets the native MCP menu so it can be exposed
+        // to and driven by an LLM agent.
+        bar.add(MCPDesktopMenu.build(frame != null ? frame.getTitle() : null, frame));
         return bar;
     }
 
@@ -6739,6 +6739,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             bar.add(buildCarMenu());
             bar.add(buildWidgetsMenu());
+            bar.add(MCPDesktopMenu.build("Codename One Simulator", window));
             bar.add(helpMenu);
         }
 
@@ -8679,6 +8680,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void init(Object m) {
         inInit = true;
         installGeneratedSvgRegistry();
+
+        // Make the desktop stdio and loopback socket MCP transports available to
+        // com.codename1.mcp.MCP.
+        MCPStdioTransport.register();
+        MCPSocketTransport.register();
 
         // Fire-and-forget probe so LlmClient.simulatorRedirect=auto
         // can detect a local Ollama install without blocking startup.

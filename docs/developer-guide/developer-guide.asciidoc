@@ -59,6 +59,8 @@ include::The-Components-Of-Codename-One.asciidoc[]
 
 include::Accessibility-Semantics.asciidoc[]
 
+include::MCP-Headless-API.asciidoc[]
+
 include::Media-And-Audio.asciidoc[]
 
 include::Animations.asciidoc[]

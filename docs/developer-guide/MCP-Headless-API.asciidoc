@@ -1,0 +1,73 @@
+= MCP Headless API
+
+The Model Context Protocol (MCP) headless API lets an application expose itself to a large language model agent. An agent such as Claude Desktop, Claude Code, Codex, or opencode can read the current screen, drive the user interface, and call tools the application publishes.
+
+The API reuses the accessibility semantics tree. The same immutable tree that describes the screen to VoiceOver and TalkBack also describes it to the agent, so any application is drivable without extra code. Application specific data and actions are exposed through the existing `com.codename1.ai.Tool` contract.
+
+The API is supported by the JavaSE port, which powers the simulator and the desktop tooling. It's not part of a packaged application build, and it's inert on mobile and web targets.
+
+== The MCP menu
+
+Every desktop Codename One tool, including the simulator and Codename One Settings, gets a native `MCP` pull-down menu. The menu is added by the JavaSE port, so a tool gets it without any code of its own. It's the main way a user turns a tool into something an agent can drive.
+
+The menu has these items:
+
+- *Expose This Tool To Agents* starts and stops the loopback MCP server for the running tool.
+- *Install in MCP Hosts* registers this tool with the MCP hosts detected on the machine, such as Claude Desktop, Claude Code, Codex, and opencode. After a host restarts, the tool appears as an MCP server the agent can use.
+- *Remove From MCP Hosts* removes that registration.
+- *Detect MCP Hosts* lists the hosts found on the machine and where their configuration lives.
+- *Debug Logging* controls how much of the MCP conversation is echoed to the log.
+
+Install writes a command that launches `MCPStdioLauncher`, a small bridge that relays the host's standard input and output to the running tool's socket. Hosts speak stdio and the tool serves a socket, so the bridge lets a stdio host such as Claude Desktop drive the already-running, human-visible tool.
+
+== Starting the server
+
+Invoking the API is the switch. There is no build hint or property to set. The socket server lets an agent attach to a session a person is watching, which is the usual choice in the simulator:
+
+[source,java]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/McpSnippets.java[tag=mcp-start-socket,indent=0]
+
+A tool that a host launches as a subprocess can serve over standard input and output instead:
+
+[source,java]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/McpSnippets.java[tag=mcp-start-stdio,indent=0]
+
+The stdio transport is the standard MCP local transport, exchanging newline delimited JSON-RPC messages. While it runs, application logging is redirected away from standard output so it can't corrupt the protocol stream. The stdio transport lives in the JavaSE port because it needs process standard input, which isn't available on every target.
+
+== Built-in user interface tools
+
+Every server registers a small set of tools that read and drive the screen through the accessibility tree. An agent calls `ui_snapshot` to get the semantics tree of the current form as JSON, including the identifier, role, label, value, and state of each node, and the identifiers of the actions each node supports.
+
+The agent drives the screen with `ui_perform_action`, which performs an action such as `activate` or `setText` on a node from the snapshot. The convenience tools `ui_activate` and `ui_set_text` wrap the common cases, and `ui_find` locates nodes by identifier, by label, or by screen coordinate.
+
+Actions run on the Codename One EDT, so an agent never touches the live component tree directly. Each action returns whether it succeeded together with a fresh snapshot.
+
+== Publishing application tools
+
+An application publishes its own data and actions as MCP tools. A `Tool` has a name, a description, a JSON schema for its parameters, and a handler:
+
+[source,java]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/McpSnippets.java[tag=mcp-add-tool,indent=0]
+
+The server merges these tools with the built-in tools when a host lists the available tools, and routes each call to the matching handler. The same `Tool` type is used by the Codename One AI client, so a tool defined once serves both a hosted agent and an in-application model.
+
+== Screenshots and the simulator
+
+The server exposes a screenshot of the current form as an MCP image resource, so a vision capable model can see the screen alongside the semantic tree. The resource is enabled by default and can be disabled per server.
+
+The JavaSE simulator drives the same MCP menu described above, so an application can be exposed and driven from the running simulator during development.
+
+== Debug logging
+
+Because an agent drives the tool on its own, it helps to watch what it does. The server echoes the MCP conversation to the Codename One log at a level chosen through the menu's *Debug Logging* item or in code:
+
+[source,java]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/McpSnippets.java[tag=mcp-verbosity,indent=0]
+
+The levels of `MCPVerbosity` are, from quietest to loudest: `OFF`, `ERRORS` (only failed calls), `SUMMARY` (one line per call), and `FULL` (every request and response). Each level includes the one below it.
+
+== Registering with installed hosts
+
+The Install and Remove items in the MCP menu call `MCPClientRegistrar`, which detects the MCP hosts installed on the machine and writes a server entry into each host configuration, so an end user doesn't edit configuration by hand. Detection and registration are available to any Codename One tool, and they run inside the runtime because they use the portable `FileSystemStorage`.
+
+A caller describes the server with an `MCPClientDescriptor` (a name and the command that launches it) and registers it with the detected hosts. Hosts whose configuration format isn't yet supported are reported so the user can add the entry manually.
