@@ -87,6 +87,14 @@
     --accent-disabled-color-dark: #004a99;
     --accent-on-color: #ffffff;
 
+    /* iOS 26 releases a button by DISSOLVING the pressed/held dim back to the
+       normal fill over a few frames rather than snapping it off in one frame.
+       Button reads this (millis) and, when > 0, snapshots the pressed background
+       on release and fades it out over the settled fill. Opt-in per theme so
+       other platforms (e.g. Material ripple) are unaffected. ~180ms matches the
+       native settle without feeling laggy. */
+    buttonReleaseFadeDurationInt: 180;
+
     includeNativeBool: false;
     darkModeBool: true;
     /* When true, FontImage.createSFOrMaterial renders real Apple SF Symbols on
@@ -300,14 +308,14 @@ SpanLabel { cn1-derive: Label; background-color: transparent; }
 SpanLabelText { cn1-derive: Label; background-color: transparent; }
 
 /* iOS 26 buttons are Liquid Glass CAPSULES (full pills). Using cn1-pill-border so
-   the sides are fully rounded like the native UIButton. The fills are only lightly
-   translucent (near-opaque, like the native pills over their warm backdrop) and
-   deliberately carry NO backdrop-filter: on iOS the live-screen blur samples the
-   accumulated framebuffer, which retains the button's OWN previous frame, so a
-   pressed darkening washes out over several frames on release via that feedback
-   loop. Solid fills make the press feedback crisp (and match the near-opaque
-   goldens). RaisedButton is an OPAQUE accent pill. Text is black on the light
-   glass (white in dark), white on the accent. */
+   the sides are fully rounded like the native UIButton. The fills are near-opaque,
+   like the native pills read over their warm backdrop (and matching the goldens).
+   The pressed HELD dim + its release DISSOLVE are handled by the framework
+   (Button.pressed below for the held look, buttonReleaseFadeDurationInt above for
+   the fade-out on release) rather than by a backdrop-filter, so the fade is a real
+   animation independent of translucency and also works on the OPAQUE RaisedButton.
+   RaisedButton is an OPAQUE accent pill. Text is black on the light glass (white in
+   dark), white on the accent. */
 Button {
     color: #000000;
     padding: 1.1mm 2.8mm 1.1mm 2.8mm;

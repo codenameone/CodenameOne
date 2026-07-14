@@ -3460,6 +3460,14 @@ public class Component implements Animation, StyleListener, Editable {
         }
     }
 
+    /// Hook that lets a subclass paint a fading overlay directly over its own
+    /// background, right after the background (and ripple) are drawn. Used by
+    /// {@link com.codename1.ui.Button} for the iOS-style release dim-out that
+    /// fades the pressed background back to normal over a few frames. No-op by
+    /// default so components that don't opt in pay nothing.
+    void paintReleaseFadeOverlay(Graphics g) {
+    }
+
     /// Normally returns getStyle().getBorder() but some subclasses might use this
     /// to programmatically replace the border in runtime e.g. for a pressed border effect
     ///
@@ -3517,6 +3525,7 @@ public class Component implements Animation, StyleListener, Editable {
             if (b != null && b.isBackgroundPainter()) {
                 b.paintBorderBackground(g, this);
                 paintRippleEffect(g);
+                paintReleaseFadeOverlay(g);
                 return;
             }
         }
@@ -3525,6 +3534,7 @@ public class Component implements Animation, StyleListener, Editable {
         }
         paintBackground(g);
         paintRippleEffect(g);
+        paintReleaseFadeOverlay(g);
     }
 
     /// This method paints the Component background, it should be overriden
