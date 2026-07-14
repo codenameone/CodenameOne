@@ -181,6 +181,7 @@ public abstract class AbstractEditorComponent extends Container implements Edito
     /// - `type`: the event type
     ///
     /// - `value`: optional payload, may be null
+    @Override
     public void fireEditorEvent(final String type, final String value) {
         if (CN.isEdt()) {
             onEditorEvent(type, value);
@@ -352,26 +353,31 @@ public abstract class AbstractEditorComponent extends Container implements Edito
     // ---- EditorHost (pure backend bridge to the platform text input source) ----
 
     /// {@inheritDoc}
+    @Override
     public boolean isTextInputSupported() {
         return Display.impl.isTextInputSupported();
     }
 
     /// {@inheritDoc}
+    @Override
     public Object startTextInput(TextInputClient client, TextInputConfig config) {
         return Display.impl.startTextInput(client, config);
     }
 
     /// {@inheritDoc}
+    @Override
     public void updateTextInputState(Object handle, TextInputState state) {
         Display.impl.updateTextInputState(handle, state);
     }
 
     /// {@inheritDoc}
+    @Override
     public void stopTextInput(Object handle) {
         Display.impl.stopTextInput(handle);
     }
 
     /// {@inheritDoc}
+    @Override
     public void editorChanged() {
         onEditorEvent("change", null);
     }

@@ -1990,7 +1990,7 @@ The public API of both `RichTextArea` and `CodeEditor` is unchanged, so this eng
 
 === CodeEditor
 
-The https://www.codenameone.com/javadoc/com/codename1/ui/CodeEditor.html[CodeEditor] is an IDE-style source editor with syntax highlighting, a line-number gutter, light/dark themes and asynchronous code completion. Like `RichTextArea` it's designed for both touch devices (with the virtual keyboard) and desktops (with a physical keyboard), and it is implemented by the same pure Codename One text engine that renders the document itself and binds to the platform text input source. A platform port MAY still transparently supply a fully native editor peer (through `com.codename1.impl.CodenameOneImplementation#createNativeEditorPeer(AbstractEditorComponent, String)`) without any change to your code.
+The https://www.codenameone.com/javadoc/com/codename1/ui/CodeEditor.html[CodeEditor] is an IDE-style source editor with syntax highlighting, a line-number gutter, light/dark themes and asynchronous code completion. Like `RichTextArea` it's designed for both touch devices (with the virtual keyboard) and desktops (with a physical keyboard), and it's implemented by the same pure Codename One text engine that renders the document itself and binds to the platform text input source. A platform port MAY still transparently supply a fully native editor peer (through `com.codename1.impl.CodenameOneImplementation#createNativeEditorPeer(AbstractEditorComponent, String)`) without any change to your code.
 
 [source,java]
 ----
@@ -2011,7 +2011,7 @@ Each https://www.codenameone.com/javadoc/com/codename1/ui/CodeCompletion.html[Co
 
 ==== Diagnostics
 
-The editor can underline problem ranges with wavy squiggles. Pass a list of https://www.codenameone.com/javadoc/com/codename1/ui/CodeDiagnostic.html[CodeDiagnostic] entries to `setDiagnostics(List)`; each entry marks a span of the source (for example the output of a compiler or linter) so errors and warnings are drawn directly in the gutter and text. This pairs naturally with an asynchronous `CodeCompletionProvider` backed by a language server.
+The editor can underline problem ranges with wavy squiggles. Pass a list of https://www.codenameone.com/javadoc/com/codename1/ui/CodeDiagnostic.html[CodeDiagnostic] entries to `setDiagnostics(List)`; each entry marks a span of the source (for example the output of a compiler or linter) so errors and warnings are drawn directly in the line-number gutter and the source text. This pairs well with an asynchronous `CodeCompletionProvider` backed by a language server.
 
 The editor honors light and dark themes through `setTheme(String)`:
 

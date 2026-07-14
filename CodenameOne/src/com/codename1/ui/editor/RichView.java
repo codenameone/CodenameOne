@@ -23,7 +23,6 @@
  */
 package com.codename1.ui.editor;
 
-import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
@@ -82,7 +81,7 @@ public class RichView extends EditorView {
     /// - `perChar`: one style per character (may be shorter; missing entries default)
     ///
     /// - `blockList`: one block attribute per paragraph (may be shorter; missing entries default)
-    public void importContent(String text, java.util.List<TextStyle> perChar, java.util.List<RichBlocks.BlockAttr> blockList) {
+    public void importContent(String text, List<TextStyle> perChar, List<RichBlocks.BlockAttr> blockList) {
         setText(text);
         for (int i = 0; i < perChar.size() && i < inline.length(); i++) {
             inline.setAt(i, perChar.get(i));
@@ -113,7 +112,7 @@ public class RichView extends EditorView {
 
     private Font fontFor(boolean bold, boolean italic, int px) {
         Font base = super.getEditorFont();
-        if (base != baseTtf) {
+        if (base != baseTtf) { // NOPMD - intentional identity comparison
             // the style font changed (skin / theme reload) - drop stale derived fonts
             baseTtf = base;
             fontCache.clear();
@@ -330,8 +329,8 @@ public class RichView extends EditorView {
     // text lays out, hit tests and paints correctly while each atom keeps its own font. ----
 
     /// Splits a line into atoms in logical order. Each atom is `{logStart, logEnd, level, isImage}`.
-    private java.util.List<int[]> richAtomsLogical(String text, int lineStart, byte[] levels) {
-        java.util.List<int[]> atoms = new java.util.ArrayList<int[]>();
+    private List<int[]> richAtomsLogical(String text, int lineStart, byte[] levels) {
+        List<int[]> atoms = new ArrayList<int[]>();
         int c = 0;
         int n = text.length();
         while (c < n) {
@@ -374,7 +373,7 @@ public class RichView extends EditorView {
     /// Visual (left to right) atom layout: each entry is `{logStart, logEnd, level, isImage, xLeft, width}`.
     private int[][] richVisualAtoms(int line, String text, int lineStart) {
         byte[] levels = BidiUtil.resolveLevels(text, isRTL());
-        java.util.List<int[]> logical = richAtomsLogical(text, lineStart, levels);
+        List<int[]> logical = richAtomsLogical(text, lineStart, levels);
         byte[] al = new byte[logical.size()];
         for (int i = 0; i < al.length; i++) {
             al[i] = (byte) logical.get(i)[2];
@@ -398,12 +397,16 @@ public class RichView extends EditorView {
         RichBlocks.BlockAttr b = blocks.get(line);
         if (!BidiUtil.isTrivialLtr(text, isRTL())) {
             int[][] atoms = richVisualAtoms(line, text, lineStart);
-            for (int i = 0; i < atoms.length; i++) {
-                int as = atoms[i][0], ae = atoms[i][1], lvl = atoms[i][2], img = atoms[i][3], ax = atoms[i][4];
+            for (int[] atom : atoms) {
+                int as = atom[0];
+                int ae = atom[1];
+                int lvl = atom[2];
+                int img = atom[3];
+                int ax = atom[4];
                 if (col >= as && col <= ae) {
                     if (img == 1) {
                         boolean before = (lvl & 1) == 0 ? col == as : col == ae;
-                        return before ? ax : ax + atoms[i][5];
+                        return before ? ax : ax + atom[5];
                     }
                     if ((lvl & 1) == 0) {
                         return ax + styledWidth(text, lineStart, as, col, b);
@@ -444,7 +447,12 @@ public class RichView extends EditorView {
         RichBlocks.BlockAttr b = blocks.get(line);
         int[][] atoms = richVisualAtoms(line, text, lineStart);
         for (int i = 0; i < atoms.length; i++) {
-            int as = atoms[i][0], ae = atoms[i][1], lvl = atoms[i][2], img = atoms[i][3], ax = atoms[i][4], aw = atoms[i][5];
+            int as = atoms[i][0];
+            int ae = atoms[i][1];
+            int lvl = atoms[i][2];
+            int img = atoms[i][3];
+            int ax = atoms[i][4];
+            int aw = atoms[i][5];
             boolean last = i == atoms.length - 1;
             if (localX < ax + aw || last) {
                 if (img == 1) {
@@ -489,15 +497,21 @@ public class RichView extends EditorView {
         int lineStart = getDocument().getLineStart(line);
         RichBlocks.BlockAttr b = blocks.get(line);
         int[][] atoms = richVisualAtoms(line, text, lineStart);
-        java.util.List<int[]> segs = new java.util.ArrayList<int[]>();
-        for (int i = 0; i < atoms.length; i++) {
-            int as = atoms[i][0], ae = atoms[i][1], lvl = atoms[i][2], img = atoms[i][3], ax = atoms[i][4], aw = atoms[i][5];
+        List<int[]> segs = new ArrayList<int[]>();
+        for (int[] atom : atoms) {
+            int as = atom[0];
+            int ae = atom[1];
+            int lvl = atom[2];
+            int img = atom[3];
+            int ax = atom[4];
+            int aw = atom[5];
             int a = Math.max(from, as);
             int e = Math.min(to, ae);
             if (a >= e) {
                 continue;
             }
-            int xl, xr;
+            int xl;
+            int xr;
             if (img == 1) {
                 xl = ax;
                 xr = ax + aw;
@@ -526,9 +540,8 @@ public class RichView extends EditorView {
             off += baseSize() / 2;
         }
         int prefixW = prefixWidth(line, b);
-        int lineStart = getDocument().getLineStart(line);
         String text = getDocument().getLineText(line);
-        int totalW = prefixW + measureLine(line, lineStart, text, b);
+        int totalW = prefixW + measureLine(line, text);
         int avail = contentWidth() - off;
         if (b.align == RichBlocks.ALIGN_CENTER && totalW < avail) {
             off += (avail - totalW) / 2;
@@ -612,7 +625,7 @@ public class RichView extends EditorView {
         }
     }
 
-    private int measureLine(int line, int lineStart, String text, RichBlocks.BlockAttr b) {
+    private int measureLine(int line, String text) {
         return measureColumnX(line, text, text.length(), getEditorFont());
     }
 
@@ -652,6 +665,7 @@ public class RichView extends EditorView {
             return;
         }
         inline.transformRange(s, e, new InlineStyles.StyleTransform() {
+            @Override
             public TextStyle apply(TextStyle st) {
                 return withFlag(st, w, value);
             }
@@ -674,6 +688,7 @@ public class RichView extends EditorView {
 
     private boolean isSetInRange(int s, int e, final int which) {
         return inline.allInRange(s, e, new InlineStyles.StylePredicate() {
+            @Override
             public boolean test(TextStyle st) {
                 switch (which) {
                     case 0:
@@ -712,6 +727,7 @@ public class RichView extends EditorView {
     /// Sets the foreground color on the selection.
     public void setForeColor(final int rgb) {
         applyStyle(new InlineStyles.StyleTransform() {
+            @Override
             public TextStyle apply(TextStyle st) {
                 return st.withForeColor(rgb);
             }
@@ -721,6 +737,7 @@ public class RichView extends EditorView {
     /// Sets the highlight color on the selection.
     public void setHighlight(final int rgb) {
         applyStyle(new InlineStyles.StyleTransform() {
+            @Override
             public TextStyle apply(TextStyle st) {
                 return st.withHighlight(rgb);
             }
@@ -730,6 +747,7 @@ public class RichView extends EditorView {
     /// Sets the relative font size level (1..7) on the selection.
     public void setFontSizeLevel(final int level) {
         applyStyle(new InlineStyles.StyleTransform() {
+            @Override
             public TextStyle apply(TextStyle st) {
                 return st.withFontSizeLevel(level);
             }
@@ -745,6 +763,7 @@ public class RichView extends EditorView {
             return;
         }
         inline.transformRange(s, e, new InlineStyles.StyleTransform() {
+            @Override
             public TextStyle apply(TextStyle st) {
                 return TextStyle.DEFAULT;
             }
@@ -793,6 +812,7 @@ public class RichView extends EditorView {
     public void setBlockFormat(String tag) {
         final int type = blockTypeForTag(tag);
         forEachSelectedBlock(new BlockOp() {
+            @Override
             public void apply(RichBlocks.BlockAttr b) {
                 b.type = type;
                 b.listType = RichBlocks.LIST_NONE;
@@ -822,6 +842,7 @@ public class RichView extends EditorView {
     /// Sets the alignment on the selected paragraphs.
     public void setAlign(final int align) {
         forEachSelectedBlock(new BlockOp() {
+            @Override
             public void apply(RichBlocks.BlockAttr b) {
                 b.align = align;
             }
@@ -835,6 +856,7 @@ public class RichView extends EditorView {
         boolean allSame = blocks.get(firstLine).listType == listType;
         final int target = allSame ? RichBlocks.LIST_NONE : listType;
         forEachSelectedBlock(new BlockOp() {
+            @Override
             public void apply(RichBlocks.BlockAttr b) {
                 b.listType = target;
             }
@@ -844,6 +866,7 @@ public class RichView extends EditorView {
     /// Increases the indentation of the selected paragraphs.
     public void indentBlocks() {
         forEachSelectedBlock(new BlockOp() {
+            @Override
             public void apply(RichBlocks.BlockAttr b) {
                 b.indent++;
             }
@@ -853,6 +876,7 @@ public class RichView extends EditorView {
     /// Decreases the indentation of the selected paragraphs.
     public void outdentBlocks() {
         forEachSelectedBlock(new BlockOp() {
+            @Override
             public void apply(RichBlocks.BlockAttr b) {
                 if (b.indent > 0) {
                     b.indent--;
@@ -865,6 +889,7 @@ public class RichView extends EditorView {
     /// this model; links round-trip as styled text.
     public void applyLink() {
         applyStyle(new InlineStyles.StyleTransform() {
+            @Override
             public TextStyle apply(TextStyle st) {
                 return st.withUnderline(true).withForeColor(0x1a73e8);
             }
@@ -874,6 +899,7 @@ public class RichView extends EditorView {
     /// Removes the link appearance from the selection.
     public void removeLinkStyle() {
         applyStyle(new InlineStyles.StyleTransform() {
+            @Override
             public TextStyle apply(TextStyle st) {
                 return st.withUnderline(false).withForeColor(-1);
             }

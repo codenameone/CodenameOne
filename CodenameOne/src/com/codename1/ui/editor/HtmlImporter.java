@@ -63,7 +63,7 @@ public final class HtmlImporter {
         }
     }
 
-    private final StringBuilder text = new StringBuilder();
+    private final StringBuilder text = new StringBuilder(); // NOPMD - intentional owned buffer
     private final List<TextStyle> styles = new ArrayList<TextStyle>();
     private final List<RichBlocks.BlockAttr> paras = new ArrayList<RichBlocks.BlockAttr>();
     private boolean freshParagraph = true;
@@ -285,7 +285,7 @@ public final class HtmlImporter {
         if (dataIndent != null) {
             try {
                 attr.indent = Integer.parseInt(dataIndent.trim());
-            } catch (NumberFormatException err) {
+            } catch (NumberFormatException err) { // NOPMD - malformed input, intentionally ignored
                 // ignore
             }
         }

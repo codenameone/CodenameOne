@@ -104,7 +104,7 @@ public class CodePureEditor extends PureEditor {
             if (list instanceof List) {
                 return (List<Object>) list;
             }
-        } catch (Throwable t) {
+        } catch (Throwable t) { // NOPMD - malformed input, intentionally ignored
             // malformed payload, treat as empty
         }
         return new ArrayList<Object>();
@@ -113,8 +113,7 @@ public class CodePureEditor extends PureEditor {
     private List<CodeDiagnostic> parseDiagnostics(String json) {
         List<CodeDiagnostic> out = new ArrayList<CodeDiagnostic>();
         List<Object> arr = parseArray(json);
-        for (int i = 0; i < arr.size(); i++) {
-            Object o = arr.get(i);
+        for (Object o : arr) {
             if (!(o instanceof Map)) {
                 continue;
             }
@@ -133,8 +132,7 @@ public class CodePureEditor extends PureEditor {
     private List<CodeCompletion> parseCompletions(String json) {
         List<CodeCompletion> out = new ArrayList<CodeCompletion>();
         List<Object> arr = parseArray(json);
-        for (int i = 0; i < arr.size(); i++) {
-            Object o = arr.get(i);
+        for (Object o : arr) {
             if (!(o instanceof Map)) {
                 continue;
             }

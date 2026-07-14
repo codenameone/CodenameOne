@@ -40,8 +40,8 @@ public final class LanguageDef {
     private LanguageDef(String[] keywords, boolean lineCommentSlash, boolean lineCommentHash,
                         boolean blockComment, boolean templateString, boolean plain) {
         this.keywords = new HashSet<String>();
-        for (int i = 0; i < keywords.length; i++) {
-            this.keywords.add(keywords[i]);
+        for (String keyword : keywords) {
+            this.keywords.add(keyword);
         }
         this.lineCommentSlash = lineCommentSlash;
         this.lineCommentHash = lineCommentHash;

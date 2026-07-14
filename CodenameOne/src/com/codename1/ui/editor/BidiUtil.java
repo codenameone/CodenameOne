@@ -36,7 +36,7 @@ package com.codename1.ui.editor;
 /// document line is one paragraph. The implementation follows the resolution phases of UAX #9: character
 /// typing, the weak type rules W1-W7, the neutral rules N1-N2, the implicit level rules I1-I2 and the
 /// reordering rule L2.
-class BidiUtil {
+final class BidiUtil {
     // Bidirectional character types (a subset of UAX #9 sufficient for the editor).
     static final byte L = 0;    // Left-to-Right (strong)
     static final byte R = 1;    // Right-to-Left (strong)

@@ -53,11 +53,6 @@ public final class TextInputConfig {
     private boolean multiline = true;
     private int actionType = ACTION_DEFAULT;
 
-    /// Creates a config with prose oriented defaults (autocorrect and autocapitalize enabled, multiline,
-    /// `TextArea#ANY` constraint).
-    public TextInputConfig() {
-    }
-
     /// Returns the `TextArea` style constraint bits describing the keyboard type.
     public int getConstraint() {
         return constraint;

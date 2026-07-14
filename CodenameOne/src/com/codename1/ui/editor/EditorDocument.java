@@ -31,7 +31,7 @@ package com.codename1.ui.editor;
 /// what the caret, selection, undo stack and the platform text input source all operate on. Line
 /// oriented feature layers (syntax highlighting, the gutter) sit on top of the line index.
 public class EditorDocument {
-    private final StringBuilder buf = new StringBuilder();
+    private final StringBuilder buf = new StringBuilder(); // NOPMD - intentional owned buffer
     private String cachedText;
     private int[] lineStarts = new int[]{0};
     private int lineCount = 1;

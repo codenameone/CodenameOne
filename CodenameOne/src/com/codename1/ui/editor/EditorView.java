@@ -34,7 +34,6 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.WheelEvent;
 import com.codename1.ui.geom.Dimension;
-import com.codename1.ui.plaf.Style;
 
 /// The pure Codename One text editing surface. It renders a plain text `EditorDocument` with its own
 /// `Graphics` code, owns the caret and selection, handles pointer and keyboard interaction, and captures
@@ -86,6 +85,7 @@ public class EditorView extends Component implements TextInputClient {
         // handle the mouse wheel / trackpad (shift = horizontal) ourselves so scrolling works without a
         // scrollable ancestor; consuming the event stops the default scroll gesture from selecting text
         addMouseWheelListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 if (evt instanceof WheelEvent) {
                     WheelEvent we = (WheelEvent) evt;
@@ -196,7 +196,7 @@ public class EditorView extends Component implements TextInputClient {
         if (sf == null) {
             sf = Font.getDefaultFont();
         }
-        if (cachedBase != null && cachedFrom == sf) {
+        if (cachedBase != null && cachedFrom == sf) { // NOPMD - intentional identity comparison
             return cachedBase;
         }
         cachedFrom = sf;
@@ -370,7 +370,7 @@ public class EditorView extends Component implements TextInputClient {
     /// theme/skin change regenerates it.
     private Font loupeFont() {
         Font base = getEditorFont();
-        if (loupeFontCache == null || loupeBaseFont != base) {
+        if (loupeFontCache == null || loupeBaseFont != base) { // NOPMD - intentional identity comparison
             loupeBaseFont = base;
             loupeFontCache = base.derive(base.getHeight() * 1.5f, Font.STYLE_PLAIN);
         }
@@ -723,8 +723,8 @@ public class EditorView extends Component implements TextInputClient {
         // Draw each directional run as its own substring at its visual x; the platform font engine shapes
         // and orders the glyphs within the (single-direction) run.
         int[][] runs = bidiRuns(text, f);
-        for (int r = 0; r < runs.length; r++) {
-            g.drawString(text.substring(runs[r][0], runs[r][1]), x + runs[r][3], y);
+        for (int[] run : runs) {
+            g.drawString(text.substring(run[0], run[1]), x + run[3], y);
         }
     }
 
@@ -764,6 +764,7 @@ public class EditorView extends Component implements TextInputClient {
     /// - `absX`: absolute x
     ///
     /// - `absY`: absolute y
+    @Override
     public int offsetAtPoint(int absX, int absY) {
         Font f = getEditorFont();
         // pointer coordinates are absolute (form space); convert to content-local
@@ -1053,8 +1054,11 @@ public class EditorView extends Component implements TextInputClient {
             return f.substringWidth(text, 0, col);
         }
         int[][] runs = bidiRuns(text, f);
-        for (int r = 0; r < runs.length; r++) {
-            int lo = runs[r][0], hi = runs[r][1], lvl = runs[r][2], rx = runs[r][3];
+        for (int[] run : runs) {
+            int lo = run[0];
+            int hi = run[1];
+            int lvl = run[2];
+            int rx = run[3];
             if (col >= lo && col <= hi) {
                 if ((lvl & 1) == 0) {
                     return rx + subw(f, text, lo, col);
@@ -1083,7 +1087,10 @@ public class EditorView extends Component implements TextInputClient {
         }
         int[][] runs = bidiRuns(text, f);
         for (int r = 0; r < runs.length; r++) {
-            int lo = runs[r][0], hi = runs[r][1], lvl = runs[r][2], rx = runs[r][3];
+            int lo = runs[r][0];
+            int hi = runs[r][1];
+            int lvl = runs[r][2];
+            int rx = runs[r][3];
             int rw = subw(f, text, lo, hi);
             boolean lastRun = r == runs.length - 1;
             if (localX < rx + rw || lastRun) {
@@ -1165,14 +1172,18 @@ public class EditorView extends Component implements TextInputClient {
         }
         int[][] runs = bidiRuns(text, f);
         java.util.List<int[]> segs = new java.util.ArrayList<int[]>();
-        for (int r = 0; r < runs.length; r++) {
-            int lo = runs[r][0], hi = runs[r][1], lvl = runs[r][2], rx = runs[r][3];
+        for (int[] run : runs) {
+            int lo = run[0];
+            int hi = run[1];
+            int lvl = run[2];
+            int rx = run[3];
             int a = Math.max(from, lo);
             int b = Math.min(to, hi);
             if (a >= b) {
                 continue;
             }
-            int xl, xr;
+            int xl;
+            int xr;
             if ((lvl & 1) == 0) {
                 xl = rx + subw(f, text, lo, a);
                 xr = rx + subw(f, text, lo, b);

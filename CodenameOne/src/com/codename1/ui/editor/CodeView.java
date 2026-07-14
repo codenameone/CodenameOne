@@ -163,8 +163,7 @@ public class CodeView extends EditorView {
         }
         int color = -1;
         int rank = -1;
-        for (int i = 0; i < diagnostics.size(); i++) {
-            CodeDiagnostic d = diagnostics.get(i);
+        for (CodeDiagnostic d : diagnostics) {
             if (d == null) {
                 continue;
             }
@@ -267,8 +266,7 @@ public class CodeView extends EditorView {
         if (diagnostics == null) {
             return;
         }
-        for (int i = 0; i < diagnostics.size(); i++) {
-            CodeDiagnostic d = diagnostics.get(i);
+        for (CodeDiagnostic d : diagnostics) {
             if (d == null || line < d.getLine() - 1 || line > d.getEndLine() - 1) {
                 continue;
             }
@@ -421,15 +419,7 @@ public class CodeView extends EditorView {
                 break;
             }
         }
-        boolean extra = false;
-        for (int i = col - 1; i >= 0 && i < line.length(); i--) {
-            char ch = line.charAt(i);
-            if (ch == ' ' || ch == '\t') {
-                continue;
-            }
-            extra = ch == '{' || ch == ':' || ch == '(' || ch == '[';
-            break;
-        }
+        boolean extra = lastNonSpaceOpensBlock(line, col);
         StringBuilder ins = new StringBuilder("\n").append(indent);
         if (extra) {
             for (int i = 0; i < tabSize; i++) {
@@ -437,6 +427,20 @@ public class CodeView extends EditorView {
             }
         }
         replaceRange(getSelectionStart(), getSelectionEnd(), ins.toString(), true);
+    }
+
+    /// Returns whether the last non-whitespace character before `col` on `line` opens a block
+    /// (one of `{`, `:`, `(`, `[`).
+    private static boolean lastNonSpaceOpensBlock(String line, int col) {
+        int i = col - 1;
+        while (i >= 0 && i < line.length() && (line.charAt(i) == ' ' || line.charAt(i) == '\t')) {
+            i--;
+        }
+        if (i < 0 || i >= line.length()) {
+            return false;
+        }
+        char ch = line.charAt(i);
+        return ch == '{' || ch == ':' || ch == '(' || ch == '[';
     }
 
     // ---- completion ----
@@ -497,8 +501,7 @@ public class CodeView extends EditorView {
         }
         String prefix = getDocument().substring(completionAnchor, caret).toLowerCase();
         List<CodeCompletion> filtered = new ArrayList<CodeCompletion>();
-        for (int i = 0; i < completionAll.size(); i++) {
-            CodeCompletion cc = completionAll.get(i);
+        for (CodeCompletion cc : completionAll) {
             if (cc == null) {
                 continue;
             }
@@ -569,8 +572,7 @@ public class CodeView extends EditorView {
     private String diagnosticMessageAt(int off, int localX) {
         int line = getDocument().lineOfOffset(off);
         boolean inGutter = localX < getContentLeftInset();
-        for (int i = 0; i < diagnostics.size(); i++) {
-            CodeDiagnostic d = diagnostics.get(i);
+        for (CodeDiagnostic d : diagnostics) {
             if (d == null) {
                 continue;
             }
@@ -647,8 +649,7 @@ public class CodeView extends EditorView {
         int visible = Math.min(completionFiltered.size(), 8);
         int itemH = lh;
         int boxW = 0;
-        for (int i = 0; i < completionFiltered.size(); i++) {
-            CodeCompletion cc = completionFiltered.get(i);
+        for (CodeCompletion cc : completionFiltered) {
             String d = cc.getDisplayText() != null ? cc.getDisplayText() : cc.getInsertText();
             if (d != null) {
                 boxW = Math.max(boxW, f.stringWidth(d));
@@ -660,7 +661,7 @@ public class CodeView extends EditorView {
         if (boxY + boxH > getY() + getHeight()) {
             boxY = top - boxH;
         }
-        boolean dark = palette == ThemePalette.DARK;
+        boolean dark = palette == ThemePalette.DARK; // NOPMD - intentional identity comparison
         int popupBg = dark ? 0x252526 : 0xffffff;
         int border = dark ? 0x454545 : 0xc0c0c0;
         g.setColor(popupBg);
