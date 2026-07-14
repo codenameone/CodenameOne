@@ -111,4 +111,14 @@ public final class MCP {
     public static void addTool(Tool tool) {
         getServer().addTool(tool);
     }
+
+    /// Sets how much of the MCP conversation is echoed to the Codename One log so a
+    /// developer can watch and debug what an agent is doing.
+    public static void setVerbosity(MCPVerbosity verbosity) {
+        getServer().setVerbosity(verbosity);
+    }
+
+    public static MCPVerbosity getVerbosity() {
+        return getServer().getVerbosity();
+    }
 }

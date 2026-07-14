@@ -65,6 +65,17 @@ public class MCPServer {
     private boolean screenshotEnabled = true;
     private boolean running;
     private MCPTransport transport;
+    private MCPVerbosity verbosity = MCPVerbosity.OFF;
+
+    /// Sets how much of the MCP conversation is echoed to the Codename One log for
+    /// debugging. Defaults to {@link MCPVerbosity#OFF}.
+    public void setVerbosity(MCPVerbosity verbosity) {
+        this.verbosity = verbosity == null ? MCPVerbosity.OFF : verbosity;
+    }
+
+    public MCPVerbosity getVerbosity() {
+        return verbosity;
+    }
 
     public MCPServer() {
         List<Tool> builtIn = McpUiTools.builtInTools();
@@ -167,6 +178,12 @@ public class MCPServer {
     /// when the message is a notification that warrants no reply. Never throws; every
     /// failure is turned into a JSON-RPC error response.
     public String handleMessage(String line) {
+        String response = handleMessageInternal(line);
+        logConversation(line, response);
+        return response;
+    }
+
+    private String handleMessageInternal(String line) {
         Map<String, Object> request;
         try {
             request = JSONParser.parseJSON(line);
@@ -192,6 +209,38 @@ public class MCPServer {
         } catch (Exception ex) {
             return errorEnvelope(hasId ? id : null, INTERNAL_ERROR,
                     "Internal error: " + messageOf(ex));
+        }
+    }
+
+    /// Echoes the exchange to the log according to the configured verbosity. Never throws.
+    private void logConversation(String request, String response) {
+        if (verbosity == MCPVerbosity.OFF) {
+            return;
+        }
+        try {
+            boolean isError = response != null && (response.indexOf("\"error\"") >= 0
+                    || response.indexOf("\"isError\":true") >= 0);
+            if (verbosity == MCPVerbosity.ERRORS && !isError) {
+                return;
+            }
+            if (verbosity.includes(MCPVerbosity.FULL)) {
+                Log.p("MCP >> " + request);
+                if (response != null) {
+                    Log.p("MCP << " + response);
+                }
+                return;
+            }
+            // SUMMARY / ERRORS: one concise line
+            Map<String, Object> req = JSONParser.parseJSON(request);
+            String method = req == null ? "?" : JSONParser.getString(req, "method");
+            String detail = "";
+            Map<String, Object> params = req == null ? null : JSONParser.asMap(req.get("params"));
+            if (params != null && "tools/call".equals(method)) {
+                detail = " " + JSONParser.getString(params, "name");
+            }
+            Log.p("MCP " + method + detail + (isError ? " -> error" : " -> ok"));
+        } catch (Throwable ignored) {
+            // logging must never disrupt the protocol
         }
     }
 

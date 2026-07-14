@@ -25,9 +25,17 @@ package com.codenameone.developerguide.snippets;
 import com.codename1.ai.Tool;
 import com.codename1.ai.ToolHandler;
 import com.codename1.mcp.MCP;
+import com.codename1.mcp.MCPVerbosity;
 
 /** Compiled source snippets for the MCP headless API guide chapter. */
 public class McpSnippets {
+
+    public void setVerbosity() {
+        // tag::mcp-verbosity[]
+        // Echo every request and response to the log while debugging an agent:
+        MCP.setVerbosity(MCPVerbosity.FULL);
+        // end::mcp-verbosity[]
+    }
 
     public void startSocketServer() {
         // tag::mcp-start-socket[]

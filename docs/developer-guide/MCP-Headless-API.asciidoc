@@ -6,6 +6,20 @@ The API reuses the accessibility semantics tree. The same immutable tree that de
 
 The API is supported by the JavaSE port, which powers the simulator and the desktop tooling. It's not part of a packaged application build, and it's inert on mobile and web targets.
 
+== The MCP menu
+
+Every desktop Codename One tool, including the simulator and Codename One Settings, gets a native `MCP` pull-down menu. The menu is added by the JavaSE port, so a tool gets it without any code of its own. It's the main way a user turns a tool into something an agent can drive.
+
+The menu has these items:
+
+- *Expose This Tool To Agents* starts and stops the loopback MCP server for the running tool.
+- *Install in MCP Hosts* registers this tool with the MCP hosts detected on the machine, such as Claude Desktop, Claude Code, Codex, and opencode. After a host restarts, the tool appears as an MCP server the agent can use.
+- *Remove From MCP Hosts* removes that registration.
+- *Detect MCP Hosts* lists the hosts found on the machine and where their configuration lives.
+- *Debug Logging* controls how much of the MCP conversation is echoed to the log.
+
+Install writes a command that launches `MCPStdioLauncher`, a small bridge that relays the host's standard input and output to the running tool's socket. Hosts speak stdio and the tool serves a socket, so the bridge lets a stdio host such as Claude Desktop drive the already-running, human-visible tool.
+
 == Starting the server
 
 Invoking the API is the switch. There is no build hint or property to set. The socket server lets an agent attach to a session a person is watching, which is the usual choice in the simulator:
@@ -41,10 +55,19 @@ The server merges these tools with the built-in tools when a host lists the avai
 
 The server exposes a screenshot of the current form as an MCP image resource, so a vision capable model can see the screen alongside the semantic tree. The resource is enabled by default and can be disabled per server.
 
-The JavaSE simulator exposes the socket server through a Tools menu, so an application can be driven from the running simulator during development. The same menu detects the MCP hosts installed on the machine.
+The JavaSE simulator drives the same MCP menu described above, so an application can be exposed and driven from the running simulator during development.
+
+== Debug logging
+
+Because an agent drives the tool on its own, it helps to watch what it does. The server echoes the MCP conversation to the Codename One log at a level chosen through the menu's *Debug Logging* item or in code:
+
+[source,java]
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/McpSnippets.java[tag=mcp-verbosity,indent=0]
+
+The levels of `MCPVerbosity` are, from quietest to loudest: `OFF`, `ERRORS` (only failed calls), `SUMMARY` (one line per call), and `FULL` (every request and response). Each level includes the one below it.
 
 == Registering with installed hosts
 
-`MCPClientRegistrar` detects the MCP hosts installed on the machine and writes a server entry into each host configuration, so an end user doesn't edit configuration by hand. Detection and registration are available to any Codename One tool, and they run inside the runtime because they use the portable `FileSystemStorage`.
+The Install and Remove items in the MCP menu call `MCPClientRegistrar`, which detects the MCP hosts installed on the machine and writes a server entry into each host configuration, so an end user doesn't edit configuration by hand. Detection and registration are available to any Codename One tool, and they run inside the runtime because they use the portable `FileSystemStorage`.
 
 A caller describes the server with an `MCPClientDescriptor` (a name and the command that launches it) and registers it with the detected hosts. Hosts whose configuration format isn't yet supported are reported so the user can add the entry manually.
