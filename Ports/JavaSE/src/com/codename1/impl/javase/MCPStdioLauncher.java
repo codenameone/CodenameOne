@@ -41,7 +41,7 @@ public final class MCPStdioLauncher {
 
     public static void main(String[] args) throws Exception {
         // Reserve stdout for the protocol; everything else goes to stderr.
-        PrintStream hostOut = System.out;
+        final PrintStream hostOut = System.out;
         System.setOut(System.err);
 
         int port = 8765;
