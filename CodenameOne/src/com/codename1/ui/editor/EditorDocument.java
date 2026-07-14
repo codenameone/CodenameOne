@@ -57,13 +57,14 @@ public class EditorDocument {
     /// - `text`: the initial text, or null for an empty document
     public EditorDocument(String text) {
         if (text != null) {
-            buf.append(normalize(text));
+            buf.append(normalizeText(text));
         }
         linesDirty = true;
         cachedText = null;
     }
 
-    private static String normalize(String text) {
+    /// Normalizes platform line endings into the document's canonical LF representation.
+    public static String normalizeText(String text) {
         // collapse CRLF / CR to LF so the linear offset space matches what the platform delivers
         if (text.indexOf('\r') < 0) {
             return text;
@@ -115,7 +116,7 @@ public class EditorDocument {
     public void setText(String text) {
         buf.setLength(0);
         if (text != null) {
-            buf.append(normalize(text));
+            buf.append(normalizeText(text));
         }
         linesDirty = true;
         cachedText = null;
@@ -132,7 +133,7 @@ public class EditorDocument {
         if (text == null || text.length() == 0) {
             return;
         }
-        buf.insert(offset, normalize(text));
+        buf.insert(offset, normalizeText(text));
         linesDirty = true;
         cachedText = null;
     }

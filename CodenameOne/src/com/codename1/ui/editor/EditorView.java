@@ -168,6 +168,16 @@ public class EditorView extends Component implements TextInputClient {
         return editable;
     }
 
+    /// Relinquishes focus and stops the active platform text-input session.
+    public void blur() {
+        com.codename1.ui.Form form = getComponentForm();
+        if (form != null && form.getFocused() == this) {
+            form.setFocused(null);
+        } else {
+            stopInput();
+        }
+    }
+
     // ---- font / geometry ----
 
     private Font cachedBase;
@@ -693,6 +703,11 @@ public class EditorView extends Component implements TextInputClient {
         return scrollY;
     }
 
+    /// Returns the largest valid vertical content offset.
+    protected int getMaximumVerticalScroll() {
+        return maxScroll();
+    }
+
     /// Paints a single line of text. Subclasses override to add syntax coloring; the base implementation
     /// draws the whole line in the default text color.
     ///
@@ -798,17 +813,18 @@ public class EditorView extends Component implements TextInputClient {
             start = end;
             end = t;
         }
-        String value = text == null ? "" : text;
+        String value = EditorDocument.normalizeText(text == null ? "" : text);
         String removed = doc.substring(start, end);
+        Object beforeState = record ? captureDocumentState() : null;
         doc.delete(start, end);
         doc.insert(start, value);
-        if (record) {
-            undo.record(start, removed, value);
-        }
         caret = start + value.length();
         anchor = -1;
         documentEdited(start);
         documentReplaced(start, removed, value);
+        if (record) {
+            undo.record(start, removed, value, beforeState, captureDocumentState());
+        }
         onDocumentChanged();
     }
 
@@ -834,6 +850,21 @@ public class EditorView extends Component implements TextInputClient {
     /// Hook invoked when the whole document is reset (e.g. by `#setText(String)`), so feature layers can
     /// rebuild their parallel models. The default is a no-op.
     protected void documentReset() {
+    }
+
+    /// Captures feature-layer state associated with the document for undo/redo. Plain and code editors
+    /// return null; rich editors override this to snapshot formatting, blocks, links and images.
+    protected Object captureDocumentState() {
+        return null;
+    }
+
+    /// Restores a feature-layer snapshot captured by `#captureDocumentState()`.
+    protected void restoreDocumentState(Object state) {
+    }
+
+    /// Refreshes the most recent undo unit after a feature layer finishes decorating an inserted range.
+    protected final void refreshUndoAfterState() {
+        undo.updateLastAfterState(captureDocumentState());
     }
 
     /// Inserts text at the caret, replacing any active selection.
@@ -1327,10 +1358,26 @@ public class EditorView extends Component implements TextInputClient {
     private int lastClickOffset = -1;
     private int clickCount;
     private boolean multiClickSelecting;
+    private boolean touchPointerGesture;
+    private boolean touchScrolling;
+    private int pointerPressX;
+    private int pointerPressY;
+    private int pointerPressScrollX;
+    private int pointerPressScrollY;
+    private int pointerPressCaret;
+    private int pointerPressAnchor;
 
     @Override
     public void pointerPressed(int x, int y) {
         requestFocus();
+        touchPointerGesture = !Display.getInstance().isDesktop();
+        touchScrolling = false;
+        pointerPressX = x;
+        pointerPressY = y;
+        pointerPressScrollX = scrollX;
+        pointerPressScrollY = scrollY;
+        pointerPressCaret = caret;
+        pointerPressAnchor = anchor;
         if (handleTouchSelectionPress(x, y)) {
             return;
         }
@@ -1381,6 +1428,22 @@ public class EditorView extends Component implements TextInputClient {
             repaint();
             return;
         }
+        if (touchPointerGesture && !multiClickSelecting) {
+            int dx = x - pointerPressX;
+            int dy = y - pointerPressY;
+            int threshold = Math.max(4, getEditorFont().getHeight() / 3);
+            if (touchScrolling || Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
+                touchScrolling = true;
+                caret = pointerPressCaret;
+                anchor = pointerPressAnchor;
+                scrollX = clampInt(pointerPressScrollX - dx, 0, maxScrollX());
+                scrollY = clampInt(pointerPressScrollY - dy, 0, maxScroll());
+                clickCount = 0;
+                lastClickOffset = -1;
+                repaint();
+            }
+            return;
+        }
         if (multiClickSelecting) {
             return;
         }
@@ -1394,6 +1457,12 @@ public class EditorView extends Component implements TextInputClient {
     public void pointerReleased(int x, int y) {
         boolean wasLoupe = loupeActive;
         loupeActive = false;
+        if (touchScrolling) {
+            touchScrolling = false;
+            pushInputState();
+            repaint();
+            return;
+        }
         if (draggingHandle != 0) {
             caret = offsetAtPoint(x, y);
             draggingHandle = 0;
@@ -1636,7 +1705,7 @@ public class EditorView extends Component implements TextInputClient {
         if (!editable) {
             return;
         }
-        String value = text == null ? "" : text;
+        String value = EditorDocument.normalizeText(text == null ? "" : text);
         int start;
         int end;
         if (composingStart >= 0) {
@@ -1745,22 +1814,26 @@ public class EditorView extends Component implements TextInputClient {
 
     /// Undoes the last edit.
     public void performUndo() {
-        int c = undo.undo(doc);
-        if (c >= 0) {
-            caret = doc.clamp(c);
+        UndoManager.Edit edit = undo.undoEdit(doc);
+        if (edit != null) {
+            caret = doc.clamp(edit.start + edit.removed.length());
             anchor = -1;
-            documentEdited(0);
+            documentEdited(edit.start);
+            documentReplaced(edit.start, edit.inserted, edit.removed);
+            restoreDocumentState(edit.beforeState);
             onDocumentChanged();
         }
     }
 
     /// Redoes the last undone edit.
     public void performRedo() {
-        int c = undo.redo(doc);
-        if (c >= 0) {
-            caret = doc.clamp(c);
+        UndoManager.Edit edit = undo.redoEdit(doc);
+        if (edit != null) {
+            caret = doc.clamp(edit.start + edit.inserted.length());
             anchor = -1;
-            documentEdited(0);
+            documentEdited(edit.start);
+            documentReplaced(edit.start, edit.removed, edit.inserted);
+            restoreDocumentState(edit.afterState);
             onDocumentChanged();
         }
     }

@@ -23,6 +23,8 @@
  */
 package com.codename1.ui.editor;
 
+import java.util.List;
+
 /// Serializes the pure rich text editor model (text + `InlineStyles` + `RichBlocks`) back into an HTML
 /// string for `RichTextArea#getHtml`. The output is model canonical rather than byte identical, which
 /// matches how a `contenteditable` surface normalized HTML in the previous backend.
@@ -39,7 +41,8 @@ public final class HtmlSerializer {
     /// - `inline`: the inline style model
     ///
     /// - `blocks`: the block attribute model
-    public static String serialize(EditorDocument doc, InlineStyles inline, RichBlocks blocks) {
+    public static String serialize(EditorDocument doc, InlineStyles inline, RichBlocks blocks,
+                                   List<String> links, List<String> imageSources) {
         StringBuilder sb = new StringBuilder();
         String currentList = null;
         int lineCount = doc.getLineCount();
@@ -58,7 +61,7 @@ public final class HtmlSerializer {
             }
             String tag = desiredList != null ? "li" : tagForType(b.type);
             sb.append("<").append(tag).append(alignAttr(b.align)).append(indentAttr(b.indent)).append(">");
-            appendInline(sb, doc, inline, p);
+            appendInline(sb, doc, inline, links, imageSources, p);
             sb.append("</").append(tag).append(">");
         }
         if (currentList != null) {
@@ -67,22 +70,39 @@ public final class HtmlSerializer {
         return sb.toString();
     }
 
-    private static void appendInline(StringBuilder sb, EditorDocument doc, InlineStyles inline, int paragraph) {
+    private static void appendInline(StringBuilder sb, EditorDocument doc, InlineStyles inline,
+                                     List<String> links, List<String> imageSources, int paragraph) {
         int start = doc.getLineStart(paragraph);
         String text = doc.getLineText(paragraph);
         int col = 0;
         while (col < text.length()) {
+            int offset = start + col;
+            String imageSource = valueAt(imageSources, offset);
+            String href = valueAt(links, offset);
+            if (text.charAt(col) == '\uFFFC' && imageSource != null) {
+                if (href != null) {
+                    sb.append("<a href=\"").append(escapeAttribute(href)).append("\">");
+                }
+                sb.append("<img src=\"").append(escapeAttribute(imageSource)).append("\">");
+                if (href != null) {
+                    sb.append("</a>");
+                }
+                col++;
+                continue;
+            }
             TextStyle st = inline.styleAt(start + col);
             int end = col + 1;
-            while (end < text.length() && inline.styleAt(start + end).equals(st)) {
+            while (end < text.length() && text.charAt(end) != '\uFFFC'
+                    && inline.styleAt(start + end).equals(st)
+                    && eq(href, valueAt(links, start + end))) {
                 end++;
             }
-            appendRun(sb, st, text.substring(col, end));
+            appendRun(sb, st, href, text.substring(col, end));
             col = end;
         }
     }
 
-    private static void appendRun(StringBuilder sb, TextStyle st, String text) {
+    private static void appendRun(StringBuilder sb, TextStyle st, String href, String text) {
         StringBuilder span = new StringBuilder();
         if (st.getForeColor() >= 0) {
             span.append("color:").append(css(st.getForeColor())).append(";");
@@ -96,6 +116,9 @@ public final class HtmlSerializer {
         boolean hasSpan = span.length() > 0;
         if (hasSpan) {
             sb.append("<span style=\"").append(span).append("\">");
+        }
+        if (href != null) {
+            sb.append("<a href=\"").append(escapeAttribute(href)).append("\">");
         }
         if (st.isBold()) {
             sb.append("<b>");
@@ -121,6 +144,9 @@ public final class HtmlSerializer {
         }
         if (st.isBold()) {
             sb.append("</b>");
+        }
+        if (href != null) {
+            sb.append("</a>");
         }
         if (hasSpan) {
             sb.append("</span>");
@@ -188,12 +214,35 @@ public final class HtmlSerializer {
         return a == null ? b == null : a.equals(b);
     }
 
+    private static String valueAt(List<String> values, int index) {
+        return index >= 0 && index < values.size() ? values.get(index) : null;
+    }
+
+    private static String escapeAttribute(String value) {
+        StringBuilder sb = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '&') {
+                sb.append("&amp;");
+            } else if (c == '<') {
+                sb.append("&lt;");
+            } else if (c == '>') {
+                sb.append("&gt;");
+            } else if (c == '"') {
+                sb.append("&quot;");
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
     private static String escape(String s) {
         StringBuilder sb = new StringBuilder(s.length());
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             if (c == '\uFFFC') {
-                // object-replacement char for an inline image; images are not serialized to HTML yet
+                sb.append("&#xfffc;");
                 continue;
             }
             if (c == '&') {

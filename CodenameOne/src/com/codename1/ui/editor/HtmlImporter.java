@@ -40,11 +40,18 @@ public final class HtmlImporter {
         private final String text;
         private final List<TextStyle> styles;
         private final List<RichBlocks.BlockAttr> blocks;
+        private final List<String> links;
+        private final List<String> imageSources;
+        private final boolean blockContent;
 
-        Result(String text, List<TextStyle> styles, List<RichBlocks.BlockAttr> blocks) {
+        Result(String text, List<TextStyle> styles, List<RichBlocks.BlockAttr> blocks,
+                List<String> links, List<String> imageSources, boolean blockContent) {
             this.text = text;
             this.styles = styles;
             this.blocks = blocks;
+            this.links = links;
+            this.imageSources = imageSources;
+            this.blockContent = blockContent;
         }
 
         /// The plain text.
@@ -61,16 +68,36 @@ public final class HtmlImporter {
         public List<RichBlocks.BlockAttr> getBlocks() {
             return blocks;
         }
+
+        /// One hyperlink target per character, null outside links.
+        public List<String> getLinks() {
+            return links;
+        }
+
+        /// One image source per character, non-null only for object-replacement characters.
+        public List<String> getImageSources() {
+            return imageSources;
+        }
+
+        /// True when the fragment explicitly contained block-level markup.
+        public boolean hasBlockContent() {
+            return blockContent;
+        }
     }
 
     private final StringBuilder text = new StringBuilder(); // NOPMD - intentional owned buffer
     private final List<TextStyle> styles = new ArrayList<TextStyle>();
+    private final List<String> links = new ArrayList<String>();
+    private final List<String> imageSources = new ArrayList<String>();
     private final List<RichBlocks.BlockAttr> paras = new ArrayList<RichBlocks.BlockAttr>();
     private boolean freshParagraph = true;
     private boolean lastWasSpace = true;
 
     private TextStyle current = TextStyle.DEFAULT;
     private final List<TextStyle> styleStack = new ArrayList<TextStyle>();
+    private final List<String> linkStack = new ArrayList<String>();
+    private String currentHref;
+    private boolean blockContent;
     // list context stack: each entry is {listType, indent}
     private final List<int[]> listStack = new ArrayList<int[]>();
 
@@ -84,7 +111,8 @@ public final class HtmlImporter {
         if (imp.paras.isEmpty()) {
             imp.paras.add(new RichBlocks.BlockAttr());
         }
-        return new Result(imp.text.toString(), imp.styles, imp.paras);
+        return new Result(imp.text.toString(), imp.styles, imp.paras, imp.links, imp.imageSources,
+                imp.blockContent);
     }
 
     // ---- streaming tokenizer ----
@@ -197,23 +225,36 @@ public final class HtmlImporter {
 
     private void startTag(String name, Map<String, String> attrs) {
         if ("br".equals(name)) {
+            blockContent = true;
             newParagraph(currentBlockCtx());
             return;
         }
-        if ("img".equals(name) || "hr".equals(name)) {
+        if ("img".equals(name)) {
+            appendImage(attrs.get("src"));
+            return;
+        }
+        if ("hr".equals(name)) {
             return;
         }
         if ("ol".equals(name) || "ul".equals(name)) {
+            blockContent = true;
             listStack.add(new int[]{"ol".equals(name) ? RichBlocks.LIST_ORDERED : RichBlocks.LIST_UNORDERED, 0});
             return;
         }
         if (isBlockTag(name) || "li".equals(name)) {
+            blockContent = true;
             startBlock(blockAttrFor(name, attrs));
             return;
         }
         // inline tag
-        styleStack.add(current);
-        current = applyInlineTag(name, current, attrs);
+        if (isInlineTag(name)) {
+            styleStack.add(current);
+            linkStack.add(currentHref);
+            current = applyInlineTag(name, current, attrs);
+            if ("a".equals(name)) {
+                currentHref = attrs.get("href");
+            }
+        }
     }
 
     private void endTag(String name) {
@@ -226,6 +267,9 @@ public final class HtmlImporter {
         if (isInlineTag(name)) {
             if (!styleStack.isEmpty()) {
                 current = styleStack.remove(styleStack.size() - 1);
+            }
+            if (!linkStack.isEmpty()) {
+                currentHref = linkStack.remove(linkStack.size() - 1);
             }
         }
     }
@@ -354,6 +398,8 @@ public final class HtmlImporter {
         if (!freshParagraph) {
             text.append('\n');
             styles.add(TextStyle.DEFAULT);
+            links.add(null);
+            imageSources.add(null);
             paras.add(attr);
             freshParagraph = true;
             lastWasSpace = true;
@@ -370,6 +416,8 @@ public final class HtmlImporter {
         }
         text.append('\n');
         styles.add(TextStyle.DEFAULT);
+        links.add(null);
+        imageSources.add(null);
         paras.add(attr);
         freshParagraph = true;
         lastWasSpace = true;
@@ -390,15 +438,31 @@ public final class HtmlImporter {
                 }
                 text.append(' ');
                 styles.add(current);
+                links.add(currentHref);
+                imageSources.add(null);
                 lastWasSpace = true;
                 freshParagraph = false;
             } else {
                 text.append(c);
                 styles.add(current);
+                links.add(currentHref);
+                imageSources.add(null);
                 lastWasSpace = false;
                 freshParagraph = false;
             }
         }
+    }
+
+    private void appendImage(String source) {
+        if (paras.isEmpty()) {
+            paras.add(new RichBlocks.BlockAttr());
+        }
+        text.append('\uFFFC');
+        styles.add(current);
+        links.add(currentHref);
+        imageSources.add(source == null ? "" : source);
+        lastWasSpace = false;
+        freshParagraph = false;
     }
 
     // ---- entities ----

@@ -59,7 +59,7 @@ class TheComponentsOfCodenameOneJava115Snippet {
         // tag::the-components-of-codename-one-java-115[]
         Form hi = new Form("Compose", new BorderLayout());
         RichTextArea editor = new RichTextArea();
-        editor.setPlaceholder("Write somethingnull");
+        editor.setPlaceholder("Write something...");
         editor.setHtml("<h2>Trip itinerary</h2><p>Meet at the <b>main lobby</b>.</p>");
 
         Toolbar tb = hi.getToolbar();

@@ -30,15 +30,19 @@ import java.util.ArrayList;
 /// `inserted`. Consecutive single character insertions are coalesced into one undo unit so a burst of
 /// typing undoes as a word rather than a keystroke at a time.
 public class UndoManager {
-    private static final class Edit {
+    static final class Edit {
         int start;
         String removed;
         String inserted;
+        Object beforeState;
+        Object afterState;
 
-        Edit(int start, String removed, String inserted) {
+        Edit(int start, String removed, String inserted, Object beforeState, Object afterState) {
             this.start = start;
             this.removed = removed;
             this.inserted = inserted;
+            this.beforeState = beforeState;
+            this.afterState = afterState;
         }
     }
 
@@ -56,6 +60,10 @@ public class UndoManager {
     ///
     /// - `inserted`: the text that was inserted (empty for a pure delete)
     public void record(int start, String removed, String inserted) {
+        record(start, removed, inserted, null, null);
+    }
+
+    void record(int start, String removed, String inserted, Object beforeState, Object afterState) {
         redo.clear();
         if (coalesceAllowed && removed.length() == 0 && inserted.length() == 1
                 && inserted.charAt(0) != '\n' && !undo.isEmpty()) {
@@ -63,11 +71,19 @@ public class UndoManager {
             if (last.removed.length() == 0 && last.start + last.inserted.length() == start
                     && last.inserted.length() > 0 && last.inserted.charAt(last.inserted.length() - 1) != '\n') {
                 last.inserted = last.inserted + inserted;
+                last.afterState = afterState;
                 return;
             }
         }
-        undo.add(new Edit(start, removed, inserted));
+        undo.add(new Edit(start, removed, inserted, beforeState, afterState));
         coalesceAllowed = removed.length() == 0 && inserted.length() == 1;
+    }
+
+    /// Updates the post-edit feature-model snapshot of the most recent undo unit.
+    void updateLastAfterState(Object afterState) {
+        if (!undo.isEmpty()) {
+            undo.get(undo.size() - 1).afterState = afterState;
+        }
     }
 
     /// Breaks the current coalescing run so the next recorded insert starts a fresh undo unit. Called on
@@ -96,15 +112,20 @@ public class UndoManager {
     ///
     /// the caret offset after the undo, or -1 when there was nothing to undo
     public int undo(EditorDocument doc) {
+        Edit edit = undoEdit(doc);
+        return edit == null ? -1 : edit.start + edit.removed.length();
+    }
+
+    Edit undoEdit(EditorDocument doc) {
         if (undo.isEmpty()) {
-            return -1;
+            return null;
         }
         coalesceAllowed = false;
         Edit e = undo.remove(undo.size() - 1);
         doc.delete(e.start, e.start + e.inserted.length());
         doc.insert(e.start, e.removed);
         redo.add(e);
-        return e.start + e.removed.length();
+        return e;
     }
 
     /// Redoes the most recently undone mutation against the supplied document.
@@ -117,15 +138,20 @@ public class UndoManager {
     ///
     /// the caret offset after the redo, or -1 when there was nothing to redo
     public int redo(EditorDocument doc) {
+        Edit edit = redoEdit(doc);
+        return edit == null ? -1 : edit.start + edit.inserted.length();
+    }
+
+    Edit redoEdit(EditorDocument doc) {
         if (redo.isEmpty()) {
-            return -1;
+            return null;
         }
         coalesceAllowed = false;
         Edit e = redo.remove(redo.size() - 1);
         doc.delete(e.start, e.start + e.removed.length());
         doc.insert(e.start, e.inserted);
         undo.add(e);
-        return e.start + e.inserted.length();
+        return e;
     }
 
     /// Clears all recorded history.

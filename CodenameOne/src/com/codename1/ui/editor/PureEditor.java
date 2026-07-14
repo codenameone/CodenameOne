@@ -93,6 +93,10 @@ public class PureEditor {
             view.requestFocus();
             return;
         }
+        if ("blur".equals(name)) {
+            view.blur();
+            return;
+        }
         if ("undo".equals(name)) {
             view.performUndo();
             return;

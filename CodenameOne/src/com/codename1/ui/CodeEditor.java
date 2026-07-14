@@ -36,10 +36,10 @@ import java.util.List;
 /// desktops (with a physical keyboard). Code completion is driven by a `CodeCompletionProvider`, which
 /// can resolve proposals locally or from a remote language server.
 ///
-/// Like `RichTextArea`, the editor is implemented with the pure Codename One text engine
-/// (`com.codename1.ui.editor`) - it renders the document itself with a built-in incremental syntax
-/// highlighter and binds to the platform text input source - and can be transparently upgraded to a
-/// native code editor by a platform port.
+/// Like `RichTextArea`, ports with low-level text input use the pure Codename One text engine
+/// (`com.codename1.ui.editor`) with a built-in incremental syntax highlighter. Ports without that input
+/// contract use an editable `BrowserComponent` fallback, and a port can transparently supply a native
+/// code editor instead.
 ///
 /// #### Example
 ///
@@ -259,19 +259,19 @@ public class CodeEditor extends AbstractEditorComponent {
         return sb.toString();
     }
 
-    /// Deprecated: the `BrowserComponent` custom-engine escape hatch has been removed. The value is
-    /// stored for source compatibility but ignored; the pure Codename One code engine is always used.
+    /// Points the browser fallback at a custom editor page in the app hierarchy. Ports with low-level
+    /// text input continue to use the pure editor; this URL is used only where the browser fallback is
+    /// required.
     ///
     /// #### Parameters
     ///
-    /// - `url`: ignored
-    @Deprecated
+    /// - `url`: an app-hierarchy URL, or null for the built-in page
     public void setEngineURL(String url) {
         this.engineUrl = url;
     }
 
-    /// Deprecated: returns the value last passed to `#setEngineURL(String)` (ignored by the engine).
-    @Deprecated
+    /// Returns the custom browser-engine URL, or null for the built-in page.
+    @Override
     public String getEngineURL() {
         return engineUrl;
     }
@@ -391,6 +391,11 @@ public class CodeEditor extends AbstractEditorComponent {
             }
         }
         return sb.toString();
+    }
+
+    @Override
+    String createEditorHtml() {
+        return CodeEditorHtml.PAGE;
     }
 
 }

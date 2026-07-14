@@ -42,11 +42,14 @@ public class RichView extends EditorView {
     private InlineStyles inline = new InlineStyles(0);
     private RichBlocks blocks = new RichBlocks(1);
     private TextStyle pendingStyle;
+    private String pendingLink;
     private String placeholder = "";
 
     // parallel to the document characters: an inline image for each object-replacement char, else null
     private static final char OBJ = '\uFFFC';
     private final List<Image> imageRuns = new ArrayList<Image>();
+    private final List<String> imageSources = new ArrayList<String>();
+    private final List<String> linkRuns = new ArrayList<String>();
 
     private Font baseTtf;
     private final Map<Long, Font> fontCache = new HashMap<Long, Font>();
@@ -71,6 +74,16 @@ public class RichView extends EditorView {
         return blocks;
     }
 
+    /// Returns the hyperlink target parallel model.
+    public List<String> getLinkRuns() {
+        return linkRuns;
+    }
+
+    /// Returns the image source parallel model.
+    public List<String> getImageSources() {
+        return imageSources;
+    }
+
     /// Replaces the document with imported content: text plus per character styles and per paragraph
     /// block attributes. Used by the HTML importer.
     ///
@@ -81,10 +94,22 @@ public class RichView extends EditorView {
     /// - `perChar`: one style per character (may be shorter; missing entries default)
     ///
     /// - `blockList`: one block attribute per paragraph (may be shorter; missing entries default)
-    public void importContent(String text, List<TextStyle> perChar, List<RichBlocks.BlockAttr> blockList) {
+    public void importContent(String text, List<TextStyle> perChar, List<RichBlocks.BlockAttr> blockList,
+                              List<String> links, List<Image> images, List<String> sources) {
         setText(text);
         for (int i = 0; i < perChar.size() && i < inline.length(); i++) {
             inline.setAt(i, perChar.get(i));
+        }
+        for (int i = 0; i < inline.length(); i++) {
+            if (i < links.size()) {
+                linkRuns.set(i, links.get(i));
+            }
+            if (i < images.size()) {
+                imageRuns.set(i, images.get(i));
+            }
+            if (i < sources.size()) {
+                imageSources.set(i, sources.get(i));
+            }
         }
         for (int i = 0; i < blockList.size() && i < blocks.count(); i++) {
             RichBlocks.BlockAttr dst = blocks.get(i);
@@ -96,6 +121,48 @@ public class RichView extends EditorView {
         }
         invalidateLayout();
         repaint();
+    }
+
+    /// Inserts imported rich content at the selection while preserving its inline and block metadata.
+    public void insertContent(String text, List<TextStyle> perChar, List<RichBlocks.BlockAttr> blockList,
+                              List<String> links, List<Image> images, List<String> sources,
+                              boolean blockContent) {
+        int at = getSelectionStart();
+        getUndoManager().breakRun();
+        replaceRange(getSelectionStart(), getSelectionEnd(), text, true);
+        int insertedLength = EditorDocument.normalizeText(text == null ? "" : text).length();
+        for (int i = 0; i < insertedLength; i++) {
+            int offset = at + i;
+            if (i < perChar.size()) {
+                inline.setAt(offset, perChar.get(i));
+            }
+            if (offset < linkRuns.size() && i < links.size()) {
+                linkRuns.set(offset, links.get(i));
+            }
+            if (offset < imageRuns.size() && i < images.size()) {
+                imageRuns.set(offset, images.get(i));
+            }
+            if (offset < imageSources.size() && i < sources.size()) {
+                imageSources.set(offset, sources.get(i));
+            }
+        }
+        if (blockContent) {
+            int firstLine = getDocument().lineOfOffset(at);
+            for (int i = 0; i < blockList.size() && firstLine + i < blocks.count(); i++) {
+                copyBlock(blocks.get(firstLine + i), blockList.get(i));
+            }
+        }
+        refreshUndoAfterState();
+        getUndoManager().breakRun();
+        invalidateLayout();
+        repaint();
+    }
+
+    private static void copyBlock(RichBlocks.BlockAttr destination, RichBlocks.BlockAttr source) {
+        destination.type = source.type;
+        destination.align = source.align;
+        destination.listType = source.listType;
+        destination.indent = source.indent;
     }
 
     /// Sets the placeholder text shown when the document is empty.
@@ -227,11 +294,16 @@ public class RichView extends EditorView {
         inline.reset(getDocument().length());
         blocks.reset(getDocument().getLineCount());
         imageRuns.clear();
+        imageSources.clear();
+        linkRuns.clear();
         int len = getDocument().length();
         for (int i = 0; i < len; i++) {
             imageRuns.add(null);
+            imageSources.add(null);
+            linkRuns.add(null);
         }
         pendingStyle = null;
+        pendingLink = null;
         invalidateLayout();
     }
 
@@ -243,12 +315,70 @@ public class RichView extends EditorView {
         int rem = removed.length();
         for (int i = 0; i < rem && start < imageRuns.size(); i++) {
             imageRuns.remove(start);
+            imageSources.remove(start);
+            linkRuns.remove(start);
         }
         for (int i = 0; i < inserted.length(); i++) {
             imageRuns.add(Math.min(start + i, imageRuns.size()), null);
+            imageSources.add(Math.min(start + i, imageSources.size()), null);
+            linkRuns.add(Math.min(start + i, linkRuns.size()), pendingLink);
         }
         int para = getDocument().lineOfOffset(start);
         blocks.applyEdit(para, countNewlines(removed), countNewlines(inserted));
+        invalidateLayout();
+    }
+
+    private static final class RichState {
+        final List<TextStyle> styles = new ArrayList<TextStyle>();
+        final List<RichBlocks.BlockAttr> blockAttrs = new ArrayList<RichBlocks.BlockAttr>();
+        final List<Image> images = new ArrayList<Image>();
+        final List<String> sources = new ArrayList<String>();
+        final List<String> links = new ArrayList<String>();
+        TextStyle pendingStyle;
+        String pendingLink;
+    }
+
+    @Override
+    protected Object captureDocumentState() {
+        RichState state = new RichState();
+        for (int i = 0; i < inline.length(); i++) {
+            state.styles.add(inline.styleAt(i));
+            state.images.add(i < imageRuns.size() ? imageRuns.get(i) : null);
+            state.sources.add(i < imageSources.size() ? imageSources.get(i) : null);
+            state.links.add(i < linkRuns.size() ? linkRuns.get(i) : null);
+        }
+        for (int i = 0; i < blocks.count(); i++) {
+            state.blockAttrs.add(blocks.get(i).copy());
+        }
+        state.pendingStyle = pendingStyle;
+        state.pendingLink = pendingLink;
+        return state;
+    }
+
+    @Override
+    protected void restoreDocumentState(Object snapshot) {
+        if (!(snapshot instanceof RichState)) {
+            return;
+        }
+        RichState state = (RichState) snapshot;
+        inline.reset(getDocument().length());
+        imageRuns.clear();
+        imageSources.clear();
+        linkRuns.clear();
+        for (int i = 0; i < getDocument().length(); i++) {
+            if (i < state.styles.size()) {
+                inline.setAt(i, state.styles.get(i));
+            }
+            imageRuns.add(i < state.images.size() ? state.images.get(i) : null);
+            imageSources.add(i < state.sources.size() ? state.sources.get(i) : null);
+            linkRuns.add(i < state.links.size() ? state.links.get(i) : null);
+        }
+        blocks.reset(getDocument().getLineCount());
+        for (int i = 0; i < state.blockAttrs.size() && i < blocks.count(); i++) {
+            copyBlock(blocks.get(i), state.blockAttrs.get(i));
+        }
+        pendingStyle = state.pendingStyle;
+        pendingLink = state.pendingLink;
         invalidateLayout();
     }
 
@@ -270,15 +400,19 @@ public class RichView extends EditorView {
     }
 
     /// Inserts an inline image at the caret (replacing any selection).
-    public void insertImageObject(Image img) {
+    public void insertImageObject(Image img, String source) {
         if (!isEditableState() || img == null) {
             return;
         }
         int at = getSelectionStart();
+        getUndoManager().breakRun();
         replaceRange(getSelectionStart(), getSelectionEnd(), String.valueOf(OBJ), true);
         if (at < imageRuns.size()) {
             imageRuns.set(at, img);
+            imageSources.set(at, source);
         }
+        refreshUndoAfterState();
+        getUndoManager().breakRun();
         invalidateLayout();
         repaint();
     }
@@ -296,6 +430,7 @@ public class RichView extends EditorView {
     @Override
     public void moveCaret(int newCaret, boolean extend) {
         pendingStyle = null;
+        pendingLink = null;
         super.moveCaret(newCaret, extend);
     }
 
@@ -885,9 +1020,17 @@ public class RichView extends EditorView {
         });
     }
 
-    /// Applies a link appearance (underline + link color) to the selection. The href is not persisted in
-    /// this model; links round-trip as styled text.
-    public void applyLink() {
+    /// Applies a hyperlink target and its default appearance to the selection.
+    public void applyLink(String url) {
+        int start = getSelectionStart();
+        int end = getSelectionEnd();
+        if (start == end) {
+            pendingLink = url;
+        } else {
+            for (int i = start; i < end && i < linkRuns.size(); i++) {
+                linkRuns.set(i, url);
+            }
+        }
         applyStyle(new InlineStyles.StyleTransform() {
             @Override
             public TextStyle apply(TextStyle st) {
@@ -898,6 +1041,15 @@ public class RichView extends EditorView {
 
     /// Removes the link appearance from the selection.
     public void removeLinkStyle() {
+        int start = getSelectionStart();
+        int end = getSelectionEnd();
+        if (start == end) {
+            pendingLink = null;
+        } else {
+            for (int i = start; i < end && i < linkRuns.size(); i++) {
+                linkRuns.set(i, null);
+            }
+        }
         applyStyle(new InlineStyles.StyleTransform() {
             @Override
             public TextStyle apply(TextStyle st) {

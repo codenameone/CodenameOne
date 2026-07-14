@@ -23,6 +23,9 @@
  */
 package com.codename1.ui.editor;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /// The pure rich text editor backend. It maps the `RichTextArea` command / query vocabulary onto a
 /// `RichView`, converting the HTML exchanged with the application to and from the editor's inline / block
 /// model.
@@ -44,18 +47,20 @@ public class RichPureEditor extends PureEditor {
     public void cmd(String name, String arg) {
         if ("setHtml".equals(name)) {
             HtmlImporter.Result r = HtmlImporter.parse(arg == null ? "" : arg);
-            rich.importContent(r.getText(), r.getStyles(), r.getBlocks());
+            rich.importContent(r.getText(), r.getStyles(), r.getBlocks(), r.getLinks(),
+                    loadImages(r.getImageSources()), r.getImageSources());
             return;
         }
         if ("insertHtml".equals(name)) {
             HtmlImporter.Result r = HtmlImporter.parse(arg == null ? "" : arg);
-            rich.insertText(r.getText());
+            rich.insertContent(r.getText(), r.getStyles(), r.getBlocks(), r.getLinks(),
+                    loadImages(r.getImageSources()), r.getImageSources(), r.hasBlockContent());
             return;
         }
         if ("insertImage".equals(name)) {
             com.codename1.ui.Image img = loadImage(arg);
             if (img != null) {
-                rich.insertImageObject(img);
+                rich.insertImageObject(img, arg);
             }
             return;
         }
@@ -108,7 +113,7 @@ public class RichPureEditor extends PureEditor {
             return;
         }
         if ("createLink".equals(name)) {
-            rich.applyLink();
+            rich.applyLink(arg);
             return;
         }
         if ("unlink".equals(name)) {
@@ -141,7 +146,8 @@ public class RichPureEditor extends PureEditor {
     @Override
     public String query(String name, String arg) {
         if ("getHtml".equals(name)) {
-            return HtmlSerializer.serialize(rich.getDocument(), rich.getInlineStyles(), rich.getBlocks());
+            return HtmlSerializer.serialize(rich.getDocument(), rich.getInlineStyles(), rich.getBlocks(),
+                    rich.getLinkRuns(), rich.getImageSources());
         }
         if ("getText".equals(name)) {
             return rich.getText();
@@ -203,6 +209,14 @@ public class RichPureEditor extends PureEditor {
         } catch (Throwable t) {
             return null;
         }
+    }
+
+    private static List<com.codename1.ui.Image> loadImages(List<String> sources) {
+        List<com.codename1.ui.Image> out = new ArrayList<com.codename1.ui.Image>(sources.size());
+        for (String source : sources) {
+            out.add(source == null || source.length() == 0 ? null : loadImage(source));
+        }
+        return out;
     }
 
     private static int parseInt(String s) {

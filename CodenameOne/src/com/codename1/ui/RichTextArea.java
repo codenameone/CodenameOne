@@ -33,10 +33,10 @@ import com.codename1.util.SuccessCallback;
 /// headings and more - and exchange the result as HTML with your application. It works on phones and
 /// tablets (with the on screen virtual keyboard) as well as on desktops (with a physical keyboard).
 ///
-/// The editor is implemented with the pure Codename One text engine (`com.codename1.ui.editor`): it
-/// renders the document itself and binds to the platform text input source (soft keyboard, hardware
-/// keyboard and IME), which makes it 100% cross platform with correct keyboard, selection and IME
-/// behavior. A platform port may transparently replace this with a fully native editing widget; see
+/// On ports with low-level text input the editor uses the pure Codename One text engine
+/// (`com.codename1.ui.editor`), which renders the document itself and binds to the soft keyboard,
+/// hardware keyboard and IME. Ports without that contract use an editable `BrowserComponent` fallback.
+/// A platform port may transparently replace either with a fully native editing widget; see
 /// `com.codename1.impl.CodenameOneImplementation#createNativeEditorPeer(Object, String)`.
 ///
 /// #### Basic usage
@@ -301,5 +301,40 @@ public class RichTextArea extends AbstractEditorComponent {
             s = "0" + s;
         }
         return "#" + s;
+    }
+
+    @Override
+    String createEditorHtml() {
+        return "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
+            + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no\">"
+            + "<meta name=\"color-scheme\" content=\"light\">"
+            + "<style>"
+            + "html,body{margin:0;padding:0;height:100%;-webkit-text-size-adjust:100%;background:#fff;color:#24292e;color-scheme:light;}"
+            + "*{-webkit-tap-highlight-color:rgba(0,0,0,0);box-sizing:border-box;}"
+            + "#ed{min-height:100%;padding:8px;outline:none;font:16px -apple-system,Roboto,'Segoe UI',sans-serif;"
+            + "line-height:1.4;word-wrap:break-word;-webkit-user-select:text;user-select:text;}"
+            + "#ed:empty:before{content:attr(data-ph);color:#9aa0a6;pointer-events:none;}"
+            + "#ed img{max-width:100%;height:auto;}#ed[contenteditable=false]{opacity:.7;}"
+            + "</style></head><body><div id=\"ed\" contenteditable=\"true\" data-ph=\"\"></div><script>"
+            + "var ed=document.getElementById('ed');"
+            + "function cn1post(m){try{if(window.cn1PostMessage){window.cn1PostMessage(m);}"
+            + "else if(window.parent&&window.parent!==window){window.parent.postMessage(m,'*');}}catch(e){}}"
+            + "function fire(t,v){cn1post('cn1ed:'+t+(v==null?'':(':'+v)));}"
+            + "ed.addEventListener('input',function(){fire('change',null);});"
+            + "document.addEventListener('selectionchange',function(){fire('selection',null);});"
+            + "function exec(c,a){try{document.execCommand(c,false,a);}catch(e){}ed.focus();}"
+            + "window.cn1editor={cmd:function(name,arg){switch(name){"
+            + "case 'setHtml':ed.innerHTML=arg||'';fire('change',null);break;"
+            + "case 'insertHtml':exec('insertHTML',arg);break;case 'insertImage':exec('insertImage',arg);break;"
+            + "case 'setPlaceholder':ed.setAttribute('data-ph',arg||'');break;"
+            + "case 'setEditable':ed.setAttribute('contenteditable',arg=='1'?'true':'false');break;"
+            + "case 'focus':ed.focus();break;case 'blur':ed.blur();break;"
+            + "case 'createLink':exec('createLink',arg);break;case 'foreColor':exec('foreColor',arg);break;"
+            + "case 'hiliteColor':if(!document.execCommand('hiliteColor',false,arg)){exec('backColor',arg);}break;"
+            + "case 'formatBlock':exec('formatBlock',arg);break;case 'fontSize':exec('fontSize',arg);break;"
+            + "default:exec(name,arg);break;}},query:function(name,arg){switch(name){"
+            + "case 'getHtml':return ed.innerHTML;case 'getText':return ed.innerText||ed.textContent||'';"
+            + "case 'state':try{return document.queryCommandState(arg)?'1':'0';}catch(e){return '0';}"
+            + "default:return '';}}};fire('ready',null);</script></body></html>";
     }
 }

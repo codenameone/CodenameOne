@@ -57,6 +57,8 @@ include::css.asciidoc[]
 
 include::The-Components-Of-Codename-One.asciidoc[]
 
+include::Rich-Text-And-Code-Editing.asciidoc[]
+
 include::Media-And-Audio.asciidoc[]
 
 include::Animations.asciidoc[]

@@ -3198,8 +3198,11 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
             boolean editorFocused = isPureEditorFocused();
             lastInputEvent = e;
+            if (ignore) {
+                return;
+            }
             // block key combos that might generate unreadable events, unless a pure editor is focused
-            if (!editorFocused && (ignore || e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown())) {
+            if (!editorFocused && (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown())) {
                 return;
             }
             if (editorFocused && !editorHandlesKey(e)) {

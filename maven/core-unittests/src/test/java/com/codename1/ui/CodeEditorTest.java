@@ -236,4 +236,16 @@ class CodeEditorTest extends UITestBase {
         pump();
         assertEquals("class A {}", text.get());
     }
+
+    @FormTest
+    void testBrowserFallbackUsedWithoutLowLevelTextInput() {
+        implementation.setTextInputSupported(false);
+        CodeEditor editor = new CodeEditor("java", "class A {}");
+        Form f = new Form("code", new BorderLayout());
+        f.add(BorderLayout.CENTER, editor);
+        f.show();
+        pump();
+        assertFalse(editor.isNativeEditor());
+        assertNotNull(editor.getInternalBrowser());
+    }
 }
