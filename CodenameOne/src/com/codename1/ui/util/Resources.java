@@ -2059,8 +2059,8 @@ public class Resources {
                 return readScaledImageBorder(input);
 
             // round border
-            case 0xff12:
-                return RoundBorder.create().
+            case 0xff12: {
+                RoundBorder roundBorder = RoundBorder.create().
                         rectangle(input.readBoolean()).
                         color(input.readInt()).
                         opacity(input.readInt()).
@@ -2072,6 +2072,17 @@ public class Resources {
                         shadowSpread(input.readInt(), input.readBoolean()).
                         shadowX(input.readFloat()).
                         shadowY(input.readFloat());
+                // Gradient-stroke fields were added in resource format 1.15
+                if (minorVersion >= 15) {
+                    boolean strokeGradient = input.readBoolean();
+                    int strokeColor2 = input.readInt();
+                    float strokeGradientAngle = input.readFloat();
+                    if (strokeGradient) {
+                        roundBorder.strokeColor2(strokeColor2).strokeGradientAngle(strokeGradientAngle);
+                    }
+                }
+                return roundBorder;
+            }
 
             // round rect border
             case 0xff13:

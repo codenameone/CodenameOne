@@ -69,9 +69,17 @@ cn1ss_setup() {
     return 0
   fi
 
+  # Invalidate on CONTENT, not mtime. A git checkout / branch switch / cross-session
+  # cache can leave source mtimes OLDER than a newer stamp, so an `-newer` check would
+  # happily reuse stale classes -- e.g. a FidelityGate.java that gained
+  # JsonUtil.stringifyPretty keeps serving a pre-method JsonUtil.class and the baseline
+  # update dies with NoSuchMethodError. Digest every helper source (content + path) and
+  # recompile whenever that digest changes.
+  local src_hash
+  src_hash="$(find "$CN1SS_SOURCE_PATH" -type f -name '*.java' -exec shasum {} + 2>/dev/null | awk '{print $1, $2}' | sort | shasum | awk '{print $1}')"
   local need_compile=1
   if [ -d "$CN1SS_CLASS_DIR" ] && [ -f "$CN1SS_STAMP_FILE" ]; then
-    if ! find "$CN1SS_SOURCE_PATH" -type f -name '*.java' -newer "$CN1SS_STAMP_FILE" -print -quit | grep -q .; then
+    if [ "$(cat "$CN1SS_STAMP_FILE" 2>/dev/null)" = "$src_hash" ]; then
       need_compile=0
     fi
   fi
@@ -103,7 +111,7 @@ cn1ss_setup() {
         return 1
       fi
     done
-    touch "$CN1SS_STAMP_FILE" 2>/dev/null || true
+    printf '%s\n' "$src_hash" > "$CN1SS_STAMP_FILE" 2>/dev/null || true
   else
     cn1ss_log "Reusing CN1SS helpers in $CN1SS_CLASS_DIR"
   fi

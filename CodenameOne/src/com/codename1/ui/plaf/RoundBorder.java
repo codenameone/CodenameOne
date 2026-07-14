@@ -28,6 +28,9 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.ImageFactory;
+import com.codename1.ui.LinearGradientPaint;
+import com.codename1.ui.MultipleGradientPaint;
+import com.codename1.ui.Paint;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
@@ -116,6 +119,15 @@ public final class RoundBorder extends Border {
     private int strokeColor;
     /// The opacity of the edge of the border if applicable
     private int strokeOpacity = 255;
+    /// When true the stroke is painted as a two-colour linear gradient
+    /// (`strokeColor` -&gt; `strokeColor2`) rather than a solid line. Used by the
+    /// iOS Liquid Glass native theme's gradient-rim pill buttons.
+    private boolean strokeGradient;
+    /// The second (end) colour of the gradient stroke when `strokeGradient` is true
+    private int strokeColor2;
+    /// The angle of the gradient stroke in degrees where 0 runs top (`strokeColor`)
+    /// to bottom (`strokeColor2`) and increases clockwise
+    private float strokeGradientAngle;
     private Stroke stroke;
     /// The thickness of the edge of the border if applicable, 0 if no stroke is needed
     private float strokeThickness;
@@ -247,6 +259,55 @@ public final class RoundBorder extends Border {
     /// border instance so these calls can be chained
     public RoundBorder strokeColor(int strokeColor) {
         this.strokeColor = strokeColor;
+        modificationTime = System.currentTimeMillis();
+        return this;
+    }
+
+    /// Turns the stroke into a two-colour linear gradient running from `strokeColor`
+    /// to the supplied end colour. The stroke thickness/opacity keep applying; only
+    /// the colour along the rim changes. Requires shape-clip support (all modern
+    /// ports); on ports without it the stroke falls back to the solid `strokeColor`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `strokeColor2`: the end colour of the gradient stroke
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
+    public RoundBorder strokeColor2(int strokeColor2) {
+        this.strokeColor2 = strokeColor2;
+        this.strokeGradient = true;
+        modificationTime = System.currentTimeMillis();
+        return this;
+    }
+
+    /// Sets the direction of the gradient stroke.
+    ///
+    /// #### Parameters
+    ///
+    /// - `strokeGradientAngle`: the angle in degrees, 0 = top-to-bottom, increasing clockwise
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
+    public RoundBorder strokeGradientAngle(float strokeGradientAngle) {
+        this.strokeGradientAngle = strokeGradientAngle;
+        modificationTime = System.currentTimeMillis();
+        return this;
+    }
+
+    /// Explicitly enables/disables the gradient stroke without changing the colours.
+    ///
+    /// #### Parameters
+    ///
+    /// - `strokeGradient`: true to paint the stroke as a gradient
+    ///
+    /// #### Returns
+    ///
+    /// border instance so these calls can be chained
+    public RoundBorder strokeGradient(boolean strokeGradient) {
+        this.strokeGradient = strokeGradient;
         modificationTime = System.currentTimeMillis();
         return this;
     }
@@ -626,7 +687,22 @@ public final class RoundBorder extends Border {
                 // probably won't be visible anyway so do nothing, otherwise it might throw an exception
                 return;
             }
-            if (stroke && this.stroke != null) {
+            if (stroke && this.stroke != null && strokeGradient && strokeAngle == 360 && g.isShapeClipSupported()) {
+                // Gradient-stroked circle: fill the full circle with the stroke
+                // gradient, then lay the background over an inset circle so only
+                // a `sw`-wide gradient ring (the stroke) shows at the edge.
+                int sw = (int) Math.ceil(this.stroke.getLineWidth());
+                GeneralPath outer = new GeneralPath();
+                outer.arc(x, y, size, size, 0, 2 * Math.PI);
+                GeneralPath innerBg = new GeneralPath();
+                innerBg.arc(x + sw, y + sw, size - sw * 2, size - sw * 2, 0, 2 * Math.PI);
+                g.setColor(makeStrokePaint(width, height));
+                g.setAlpha(strokeOpacity);
+                g.fillShape(outer);
+                g.setColor(color);
+                g.setAlpha(opacity);
+                g.fillShape(innerBg);
+            } else if (stroke && this.stroke != null) {
                 int sw = (int) Math.ceil(this.stroke.getLineWidth());
                 GeneralPath arc = new GeneralPath();
                 arc.arc(x + sw / 2, y + sw / 2, size - sw, size - sw, 0, 2 * Math.PI);
@@ -642,24 +718,22 @@ public final class RoundBorder extends Border {
                 g.fillArc(x, y, size, size, 0, 360);
             }
         } else {
-            GeneralPath gp = new GeneralPath();
             float sw = (stroke && this.stroke != null) ? this.stroke.getLineWidth() : 0;
-            gp.moveTo(height / 2.0, sw);
-            if (onlyLeftRounded) {
-                gp.lineTo(width, sw);
-                gp.lineTo(width, height - sw);
-            } else {
-                gp.lineTo(width - (height / 2.0), sw);
-                gp.arcTo(width - (height / 2.0), height / 2.0, width - (height / 2.0), height - sw, true);
+            if (stroke && this.stroke != null && strokeGradient && g.isShapeClipSupported()) {
+                // Gradient-stroked pill: fill the full pill with the stroke
+                // gradient, then lay the background over an inset pill so only a
+                // `sw`-wide gradient ring (the stroke) shows at the edge.
+                GeneralPath outer = createPillPath(width, height, 0);
+                GeneralPath innerBg = createPillPath(width, height, sw);
+                g.setColor(makeStrokePaint(width, height));
+                g.setAlpha(strokeOpacity);
+                g.fillShape(outer);
+                g.setColor(color);
+                g.setAlpha(opacity);
+                g.fillShape(innerBg);
+                return;
             }
-            if (onlyRightRounded) {
-                gp.lineTo(sw, height - sw);
-                gp.lineTo(sw, sw);
-            } else {
-                gp.lineTo(height / 2.0, height - sw);
-                gp.arcTo(height / 2.0, height / 2.0, height / 2.0, sw, true);
-            }
-            gp.closePath();
+            GeneralPath gp = createPillPath(width, height, sw);
             g.fillShape(gp);
             if (stroke && this.stroke != null) {
                 g.setAlpha(strokeOpacity);
@@ -667,6 +741,47 @@ public final class RoundBorder extends Border {
                 g.drawShape(gp, this.stroke);
             }
         }
+    }
+
+    /// Builds the capsule (pill) outline inset from the edges by `sw` on every side.
+    private GeneralPath createPillPath(float width, float height, float sw) {
+        GeneralPath gp = new GeneralPath();
+        gp.moveTo(height / 2.0, sw);
+        if (onlyLeftRounded) {
+            gp.lineTo(width, sw);
+            gp.lineTo(width, height - sw);
+        } else {
+            gp.lineTo(width - (height / 2.0), sw);
+            gp.arcTo(width - (height / 2.0), height / 2.0, width - (height / 2.0), height - sw, true);
+        }
+        if (onlyRightRounded) {
+            gp.lineTo(sw, height - sw);
+            gp.lineTo(sw, sw);
+        } else {
+            gp.lineTo(height / 2.0, height - sw);
+            gp.arcTo(height / 2.0, height / 2.0, height / 2.0, sw, true);
+        }
+        gp.closePath();
+        return gp;
+    }
+
+    /// Builds the linear-gradient paint used to fill the stroke ring, running from
+    /// `strokeColor` to `strokeColor2` along `strokeGradientAngle`.
+    private Paint makeStrokePaint(float width, float height) {
+        double a = Math.toRadians(strokeGradientAngle);
+        double dirX = Math.sin(a);
+        double dirY = -Math.cos(a);
+        double cx = width / 2.0;
+        double cy = height / 2.0;
+        double ext = Math.abs(dirX) * width / 2.0 + Math.abs(dirY) * height / 2.0;
+        double sx = cx + dirX * ext;
+        double sy = cy + dirY * ext;
+        double ex = cx - dirX * ext;
+        double ey = cy - dirY * ext;
+        return new LinearGradientPaint(sx, sy, ex, ey,
+                new float[]{0f, 1f}, new int[]{strokeColor, strokeColor2},
+                MultipleGradientPaint.CycleMethod.NO_CYCLE,
+                MultipleGradientPaint.ColorSpaceType.SRGB, null);
     }
 
     @Override
@@ -699,6 +814,33 @@ public final class RoundBorder extends Border {
     /// the strokeColor
     public int getStrokeColor() {
         return strokeColor;
+    }
+
+    /// True if the stroke is painted as a two-colour gradient
+    ///
+    /// #### Returns
+    ///
+    /// the strokeGradient flag
+    public boolean isStrokeGradient() {
+        return strokeGradient;
+    }
+
+    /// The end colour of the gradient stroke when `#isStrokeGradient` is true
+    ///
+    /// #### Returns
+    ///
+    /// the strokeColor2
+    public int getStrokeColor2() {
+        return strokeColor2;
+    }
+
+    /// The angle of the gradient stroke in degrees
+    ///
+    /// #### Returns
+    ///
+    /// the strokeGradientAngle
+    public float getStrokeGradientAngle() {
+        return strokeGradientAngle;
     }
 
     /// The opacity of the edge of the border if applicable

@@ -200,7 +200,7 @@ public class FidelityGate {
             if (out.getParent() != null) {
                 Files.createDirectories(out.getParent());
             }
-            Files.writeString(out, JsonUtil.stringifyPretty(root) + "\n", StandardCharsets.UTF_8);
+            Files.writeString(out, stringifyPretty(root) + "\n", StandardCharsets.UTF_8);
             System.out.println("[gate] WARNING: baseline UPDATED at " + out + " with " + merged.size()
                     + " pair(s). This bypasses the regression gate and must be reviewed in the PR.");
         } catch (IOException ex) {
@@ -384,6 +384,105 @@ public class FidelityGate {
             return new Arguments(compare, baseline, update, epsilon, geometryEpsilonPx, geometryEpsilonRatio);
         }
     }
+
+    // Pretty JSON printing for committed baselines. Kept as FidelityGate methods
+    // (NOT in the shared default-package JsonUtil) because several sibling tools each
+    // define their own `class JsonUtil`, and cn1ss.sh compiles them one file at a time
+    // into ONE output dir -- last file alphabetically wins. A JsonUtil.stringifyPretty
+    // here would be silently overwritten by a sibling JsonUtil that lacks it, so the
+    // baseline update died with NoSuchMethodError. Owning these in FidelityGate makes
+    // them collision-proof. Object keys are sorted + indented for reviewable diffs.
+    static String stringifyPretty(Object value) {
+        StringBuilder sb = new StringBuilder();
+        writeValuePretty(sb, value, 0);
+        return sb.toString();
+    }
+
+    private static void writeValuePretty(StringBuilder sb, Object value, int depth) {
+        if (value == null) {
+            sb.append("null");
+        } else if (value instanceof String s) {
+            writeStringPretty(sb, s);
+        } else if (value instanceof Number number) {
+            sb.append(number.toString());
+        } else if (value instanceof Boolean) {
+            sb.append(value.toString());
+        } else if (value instanceof Map<?, ?> map) {
+            Map<String, Object> sorted = new TreeMap<>();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                if (entry.getKey() instanceof String key) {
+                    sorted.put(key, entry.getValue());
+                }
+            }
+            if (sorted.isEmpty()) {
+                sb.append("{}");
+                return;
+            }
+            sb.append("{\n");
+            boolean first = true;
+            for (Map.Entry<String, Object> entry : sorted.entrySet()) {
+                if (!first) {
+                    sb.append(",\n");
+                }
+                first = false;
+                indentPretty(sb, depth + 1);
+                writeStringPretty(sb, entry.getKey());
+                sb.append(": ");
+                writeValuePretty(sb, entry.getValue(), depth + 1);
+            }
+            sb.append('\n');
+            indentPretty(sb, depth);
+            sb.append('}');
+        } else if (value instanceof List<?> list) {
+            if (list.isEmpty()) {
+                sb.append("[]");
+                return;
+            }
+            sb.append("[\n");
+            for (int i = 0; i < list.size(); i++) {
+                if (i > 0) {
+                    sb.append(",\n");
+                }
+                indentPretty(sb, depth + 1);
+                writeValuePretty(sb, list.get(i), depth + 1);
+            }
+            sb.append('\n');
+            indentPretty(sb, depth);
+            sb.append(']');
+        } else {
+            writeStringPretty(sb, value.toString());
+        }
+    }
+
+    private static void indentPretty(StringBuilder sb, int depth) {
+        for (int i = 0; i < depth; i++) {
+            sb.append("  ");
+        }
+    }
+
+    private static void writeStringPretty(StringBuilder sb, String value) {
+        sb.append('"');
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            switch (ch) {
+                case '"' -> sb.append("\\\"");
+                case '\\' -> sb.append("\\\\");
+                case '\b' -> sb.append("\\b");
+                case '\f' -> sb.append("\\f");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                default -> {
+                    if (ch < 0x20) {
+                        sb.append(String.format("\\u%04x", (int) ch));
+                    } else {
+                        sb.append(ch);
+                    }
+                }
+            }
+        }
+        sb.append('"');
+    }
 }
 
 class JsonUtil {
@@ -396,16 +495,6 @@ class JsonUtil {
     public static String stringify(Object value) {
         StringBuilder sb = new StringBuilder();
         writeValue(sb, value);
-        return sb.toString();
-    }
-
-    /// Produces stable, reviewable JSON for committed fidelity baselines.
-    /// Object keys are sorted recursively and nested values are indented so a
-    /// baseline refresh yields a focused line diff instead of rewriting one
-    /// opaque line.
-    public static String stringifyPretty(Object value) {
-        StringBuilder sb = new StringBuilder();
-        writeValuePretty(sb, value, 0);
         return sb.toString();
     }
 
@@ -469,72 +558,6 @@ class JsonUtil {
             sb.append(']');
         } else {
             writeString(sb, value.toString());
-        }
-    }
-
-    private static void writeValuePretty(StringBuilder sb, Object value, int depth) {
-        if (value == null) {
-            sb.append("null");
-        } else if (value instanceof String s) {
-            writeString(sb, s);
-        } else if (value instanceof Number number) {
-            writeNumber(sb, number);
-        } else if (value instanceof Boolean) {
-            sb.append(value.toString());
-        } else if (value instanceof Map<?, ?> map) {
-            Map<String, Object> sorted = new TreeMap<>();
-            for (Map.Entry<?, ?> entry : map.entrySet()) {
-                if (entry.getKey() instanceof String key) {
-                    sorted.put(key, entry.getValue());
-                }
-            }
-            if (sorted.isEmpty()) {
-                sb.append("{}");
-                return;
-            }
-            sb.append("{\n");
-            boolean first = true;
-            for (Map.Entry<String, Object> entry : sorted.entrySet()) {
-                if (!first) {
-                    sb.append(",\n");
-                }
-                first = false;
-                indent(sb, depth + 1);
-                writeString(sb, entry.getKey());
-                sb.append(": ");
-                writeValuePretty(sb, entry.getValue(), depth + 1);
-            }
-            sb.append('\n');
-            indent(sb, depth);
-            sb.append('}');
-        } else if (value instanceof List<?> list) {
-            if (list.isEmpty()) {
-                sb.append("[]");
-                return;
-            }
-            sb.append("[\n");
-            for (int i = 0; i < list.size(); i++) {
-                if (i > 0) {
-                    sb.append(",\n");
-                }
-                indent(sb, depth + 1);
-                writeValuePretty(sb, list.get(i), depth + 1);
-            }
-            sb.append('\n');
-            indent(sb, depth);
-            sb.append(']');
-        } else {
-            writeString(sb, value.toString());
-        }
-    }
-
-    private static void writeNumber(StringBuilder sb, Number number) {
-        sb.append(number.toString());
-    }
-
-    private static void indent(StringBuilder sb, int depth) {
-        for (int i = 0; i < depth; i++) {
-            sb.append("  ");
         }
     }
 

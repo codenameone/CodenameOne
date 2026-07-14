@@ -1,34 +1,34 @@
 {
   "geometry": {
     "Button_disabled_dark": {
-      "center_offset": 11.1,
-      "height_ratio": 0.9684,
-      "width_ratio": 1.0995
+      "center_offset": 11.5,
+      "height_ratio": 1.0,
+      "width_ratio": 1.1041
     },
     "Button_disabled_light": {
-      "center_offset": 11.1,
-      "height_ratio": 0.9684,
-      "width_ratio": 1.0995
+      "center_offset": 11.5,
+      "height_ratio": 1.0,
+      "width_ratio": 1.1041
     },
     "Button_normal_dark": {
-      "center_offset": 11.1,
-      "height_ratio": 0.9684,
-      "width_ratio": 1.0995
+      "center_offset": 11.5,
+      "height_ratio": 1.0,
+      "width_ratio": 1.1041
     },
     "Button_normal_light": {
-      "center_offset": 11.1,
-      "height_ratio": 0.9684,
-      "width_ratio": 1.0995
+      "center_offset": 11.5,
+      "height_ratio": 1.0,
+      "width_ratio": 1.1041
     },
     "Button_pressed_dark": {
-      "center_offset": 11.1,
-      "height_ratio": 0.9684,
-      "width_ratio": 1.0995
+      "center_offset": 11.5,
+      "height_ratio": 1.0,
+      "width_ratio": 1.1041
     },
     "Button_pressed_light": {
-      "center_offset": 11.1,
-      "height_ratio": 0.9684,
-      "width_ratio": 1.0995
+      "center_offset": 11.5,
+      "height_ratio": 1.0,
+      "width_ratio": 1.1041
     },
     "CheckBox_disabled_dark": {
       "center_offset": 2.24,
@@ -71,24 +71,24 @@
       "width_ratio": 1.0
     },
     "FlatButton_normal_dark": {
-      "center_offset": 4.74,
-      "height_ratio": 0.9684,
-      "width_ratio": 1.0621
+      "center_offset": 36.7,
+      "height_ratio": 0.6842,
+      "width_ratio": 0.869
     },
     "FlatButton_normal_light": {
-      "center_offset": 4.74,
-      "height_ratio": 0.9684,
-      "width_ratio": 1.0621
+      "center_offset": 13.5,
+      "height_ratio": 1.0,
+      "width_ratio": 1.1862
     },
     "FlatButton_pressed_dark": {
-      "center_offset": 4.74,
-      "height_ratio": 0.9684,
-      "width_ratio": 1.0621
+      "center_offset": 34.44,
+      "height_ratio": 0.6842,
+      "width_ratio": 0.8759
     },
     "FlatButton_pressed_light": {
-      "center_offset": 4.74,
-      "height_ratio": 0.9684,
-      "width_ratio": 1.0621
+      "center_offset": 22.67,
+      "height_ratio": 0.6842,
+      "width_ratio": 0.9034
     },
     "GlassIcon_normal_dark": {
       "center_offset": 1.12,
@@ -191,34 +191,34 @@
       "width_ratio": 1.0
     },
     "RaisedButton_disabled_dark": {
-      "center_offset": 11.6,
-      "height_ratio": 0.9684,
-      "width_ratio": 1.1095
+      "center_offset": 13.0,
+      "height_ratio": 1.0,
+      "width_ratio": 1.1238
     },
     "RaisedButton_disabled_light": {
-      "center_offset": 11.1,
-      "height_ratio": 0.9684,
-      "width_ratio": 1.1043
+      "center_offset": 25.81,
+      "height_ratio": 0.6842,
+      "width_ratio": 0.9052
     },
     "RaisedButton_normal_dark": {
-      "center_offset": 11.1,
-      "height_ratio": 0.9684,
-      "width_ratio": 1.1043
+      "center_offset": 12.5,
+      "height_ratio": 1.0,
+      "width_ratio": 1.1185
     },
     "RaisedButton_normal_light": {
-      "center_offset": 11.1,
-      "height_ratio": 0.9684,
-      "width_ratio": 1.1043
+      "center_offset": 12.5,
+      "height_ratio": 1.0,
+      "width_ratio": 1.1185
     },
     "RaisedButton_pressed_dark": {
-      "center_offset": 11.1,
-      "height_ratio": 0.9684,
-      "width_ratio": 1.1043
+      "center_offset": 12.5,
+      "height_ratio": 1.0,
+      "width_ratio": 1.1185
     },
     "RaisedButton_pressed_light": {
-      "center_offset": 11.1,
-      "height_ratio": 0.9684,
-      "width_ratio": 1.1043
+      "center_offset": 12.5,
+      "height_ratio": 1.0,
+      "width_ratio": 1.1185
     },
     "Slider_disabled_dark": {
       "center_offset": 0.5,
@@ -342,12 +342,12 @@
     }
   },
   "pairs": {
-    "Button_disabled_dark": 85.85,
-    "Button_disabled_light": 77.85,
-    "Button_normal_dark": 74.34,
-    "Button_normal_light": 89.85,
-    "Button_pressed_dark": 76.01,
-    "Button_pressed_light": 91.18,
+    "Button_disabled_dark": 93.52,
+    "Button_disabled_light": 94.35,
+    "Button_normal_dark": 91.84,
+    "Button_normal_light": 92.37,
+    "Button_pressed_dark": 89.93,
+    "Button_pressed_light": 92.88,
     "CheckBox_disabled_dark": 95.76,
     "CheckBox_disabled_light": 92.71,
     "CheckBox_normal_dark": 96.52,
@@ -356,10 +356,10 @@
     "CheckBox_selected_light": 95.8,
     "Dialog_normal_dark": 96.97,
     "Dialog_normal_light": 97.09,
-    "FlatButton_normal_dark": 87.88,
-    "FlatButton_normal_light": 88.16,
-    "FlatButton_pressed_dark": 87.79,
-    "FlatButton_pressed_light": 88.4,
+    "FlatButton_normal_dark": 87.96,
+    "FlatButton_normal_light": 92.86,
+    "FlatButton_pressed_dark": 90.59,
+    "FlatButton_pressed_light": 88.87,
     "GlassIcon_normal_dark": 98.59,
     "GlassIcon_normal_light": 98.67,
     "GlassPanelGrad_normal_dark": 98.43,
@@ -380,17 +380,17 @@
     "RadioButton_normal_light": 92.16,
     "RadioButton_selected_dark": 96.81,
     "RadioButton_selected_light": 94.84,
-    "RaisedButton_disabled_dark": 84.4,
-    "RaisedButton_disabled_light": 87.85,
-    "RaisedButton_normal_dark": 90.88,
-    "RaisedButton_normal_light": 89.72,
-    "RaisedButton_pressed_dark": 91.35,
-    "RaisedButton_pressed_light": 90.22,
+    "RaisedButton_disabled_dark": 91.4,
+    "RaisedButton_disabled_light": 91.61,
+    "RaisedButton_normal_dark": 92.88,
+    "RaisedButton_normal_light": 92.61,
+    "RaisedButton_pressed_dark": 93.1,
+    "RaisedButton_pressed_light": 92.76,
     "Slider_disabled_dark": 92.44,
     "Slider_disabled_light": 94.01,
     "Slider_normal_dark": 92.74,
     "Slider_normal_light": 95.13,
-    "Spinner_normal_dark": 91.47,
+    "Spinner_normal_dark": 89.81,
     "Spinner_normal_light": 91.79,
     "Switch_disabled_dark": 95.53,
     "Switch_disabled_light": 96.31,
@@ -404,10 +404,10 @@
     "TabsGeom_normal_light": 93.02,
     "Tabs_normal_dark": 83.45,
     "Tabs_normal_light": 86.44,
-    "TextField_disabled_dark": 97.34,
-    "TextField_disabled_light": 91.35,
-    "TextField_normal_dark": 97.08,
-    "TextField_normal_light": 90.4,
+    "TextField_disabled_dark": 97.19,
+    "TextField_disabled_light": 91.13,
+    "TextField_normal_dark": 96.88,
+    "TextField_normal_light": 90.03,
     "Toolbar_normal_dark": 87.7,
     "Toolbar_normal_light": 87.64
   }
