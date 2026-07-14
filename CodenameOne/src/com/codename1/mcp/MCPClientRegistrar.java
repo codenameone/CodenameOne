@@ -26,6 +26,8 @@ import com.codename1.io.FileSystemStorage;
 import com.codename1.io.JSONParser;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
+import java.io.ByteArrayInputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -170,7 +172,10 @@ public final class MCPClientRegistrar {
             }
             OutputStream os = fs.openOutputStream(storagePath);
             try {
-                os.write(JSONParser.toJson(root).getBytes("UTF-8"));
+                // mapToJson preserves booleans, integers and null values, so writing the
+                // host config back never changes the user's other settings. toJson would
+                // drop null-valued entries.
+                os.write(JSONParser.mapToJson(root).getBytes("UTF-8"));
             } finally {
                 os.close();
             }
@@ -190,7 +195,14 @@ public final class MCPClientRegistrar {
             if (json.trim().length() == 0) {
                 return null;
             }
-            return JSONParser.parseJSON(json);
+            // Parse faithfully: keep booleans as Boolean, integers as Long, and null
+            // values, so rewriting the config does not turn the user's other settings
+            // into strings or floats. The default static parser does not preserve these.
+            JSONParser parser = new JSONParser();
+            parser.setUseBooleanInstance(true);
+            parser.setUseLongsInstance(true);
+            parser.setIncludeNullsInstance(true);
+            return parser.parseJSON(new InputStreamReader(new ByteArrayInputStream(json.getBytes("UTF-8")), "UTF-8"));
         } catch (Throwable ex) {
             Log.e(ex);
             return null;
