@@ -46,6 +46,7 @@ import com.codename1.ai.Tool;
 public final class MCP {
     private static MCPServer server;
     private static StdioTransportFactory stdioTransportFactory;
+    private static SocketTransportFactory socketTransportFactory;
 
     private MCP() {
     }
@@ -58,14 +59,33 @@ public final class MCP {
         MCPTransport createStdioTransport();
     }
 
+    /// Supplies the platform loopback socket transport. The socket transport lives outside
+    /// the portable core because it binds a real server socket to the loopback interface,
+    /// which the portable {@link com.codename1.io.Socket} API does not allow (it binds the
+    /// wildcard address, exposing the channel on every network interface). The JavaSE port
+    /// registers its implementation during initialization.
+    public interface SocketTransportFactory {
+        MCPTransport createSocketTransport(int port);
+    }
+
     /// Registers the platform stdio transport factory. Called by the JavaSE port.
     public static void setStdioTransportFactory(StdioTransportFactory factory) {
         stdioTransportFactory = factory;
     }
 
+    /// Registers the platform socket transport factory. Called by the JavaSE port.
+    public static void setSocketTransportFactory(SocketTransportFactory factory) {
+        socketTransportFactory = factory;
+    }
+
     /// Whether an stdio transport is available on this platform.
     public static boolean isStdioSupported() {
         return stdioTransportFactory != null;
+    }
+
+    /// Whether a loopback socket transport is available on this platform.
+    public static boolean isSocketSupported() {
+        return socketTransportFactory != null;
     }
 
     /// Returns the shared server, creating it on first use.
@@ -94,9 +114,14 @@ public final class MCP {
     }
 
     /// Starts a loopback socket server so an agent can attach to this running process.
+    /// Requires a platform socket transport factory (registered by the JavaSE port).
     public static synchronized MCPServer startSocketServer(int port) {
+        if (socketTransportFactory == null) {
+            throw new IllegalStateException(
+                    "No socket MCP transport is available on this platform. Run on the JavaSE port.");
+        }
         MCPServer s = getServer();
-        s.start(new SocketTransport(port));
+        s.start(socketTransportFactory.createSocketTransport(port));
         return s;
     }
 

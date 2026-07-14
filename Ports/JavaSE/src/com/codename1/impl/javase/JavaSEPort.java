@@ -8681,8 +8681,10 @@ public class JavaSEPort extends CodenameOneImplementation {
         inInit = true;
         installGeneratedSvgRegistry();
 
-        // Make the desktop stdio MCP transport available to com.codename1.mcp.MCP.
+        // Make the desktop stdio and loopback socket MCP transports available to
+        // com.codename1.mcp.MCP.
         MCPStdioTransport.register();
+        MCPSocketTransport.register();
 
         // Fire-and-forget probe so LlmClient.simulatorRedirect=auto
         // can detect a local Ollama install without blocking startup.

@@ -54,8 +54,24 @@ public class MCPServer {
     public static final int INTERNAL_ERROR = -32603;
     public static final int RESOURCE_NOT_FOUND = -32002;
 
-    /// MCP protocol revision advertised when the client does not request one.
+    /// MCP protocol revision advertised when the client does not request one, or requests
+    /// one this server does not implement.
     public static final String DEFAULT_PROTOCOL_VERSION = "2024-11-05";
+
+    /// The MCP protocol revisions this server actually implements.
+    private static final String[] SUPPORTED_PROTOCOL_VERSIONS = {"2024-11-05"};
+
+    private static boolean isSupportedProtocol(String version) {
+        if (version == null) {
+            return false;
+        }
+        for (String v : SUPPORTED_PROTOCOL_VERSIONS) {
+            if (v.equals(version)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private static final String SCREEN_RESOURCE_URI = "cn1://screen.png";
 
@@ -186,7 +202,7 @@ public class MCPServer {
     private String handleMessageInternal(String line) {
         Map<String, Object> request;
         try {
-            request = JSONParser.parseJSON(line);
+            request = MCPJson.parse(line);
         } catch (Exception ex) {
             return errorEnvelope(null, PARSE_ERROR, "Parse error");
         }
@@ -231,7 +247,7 @@ public class MCPServer {
                 return;
             }
             // SUMMARY / ERRORS: one concise line
-            Map<String, Object> req = JSONParser.parseJSON(request);
+            Map<String, Object> req = MCPJson.parse(request);
             String method = req == null ? "?" : JSONParser.getString(req, "method");
             String detail = "";
             Map<String, Object> params = req == null ? null : JSONParser.asMap(req.get("params"));
@@ -267,10 +283,10 @@ public class MCPServer {
     }
 
     private Map<String, Object> initializeResult(Map<String, Object> params) {
-        String protocol = params == null ? null : JSONParser.getString(params, "protocolVersion");
-        if (protocol == null || protocol.length() == 0) {
-            protocol = DEFAULT_PROTOCOL_VERSION;
-        }
+        // Only echo a protocol version we actually implement. MCP requires an unsupported
+        // request to be answered with a version the server supports, not the client's.
+        String requested = params == null ? null : JSONParser.getString(params, "protocolVersion");
+        String protocol = isSupportedProtocol(requested) ? requested : DEFAULT_PROTOCOL_VERSION;
         Map<String, Object> capabilities = new LinkedHashMap<String, Object>();
         capabilities.put("tools", new LinkedHashMap<String, Object>());
         capabilities.put("resources", new LinkedHashMap<String, Object>());
@@ -311,7 +327,7 @@ public class MCPServer {
             return errorEnvelope(id, METHOD_NOT_FOUND, "Unknown tool: " + name);
         }
         Object argObj = params.get("arguments");
-        String argumentsJson = argObj == null ? "{}" : JSONParser.toJson(argObj);
+        String argumentsJson = argObj == null ? "{}" : MCPJson.toJson(argObj);
         String text;
         boolean isError;
         try {

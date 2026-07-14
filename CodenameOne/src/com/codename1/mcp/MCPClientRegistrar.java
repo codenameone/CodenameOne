@@ -23,11 +23,8 @@
 package com.codename1.mcp;
 
 import com.codename1.io.FileSystemStorage;
-import com.codename1.io.JSONParser;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
-import java.io.ByteArrayInputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -93,7 +90,18 @@ public final class MCPClientRegistrar {
             if (path == null) {
                 continue;
             }
-            boolean present = safeExists(fs, fsPath(path)) || safeExists(fs, fsPath(parentOf(path)));
+            boolean present = safeExists(fs, fsPath(path));
+            if (!present) {
+                // The config file itself is absent. A present parent directory can still
+                // signal the host is installed (e.g. .../Application Support/Claude/), but
+                // only when that parent is a dedicated subdirectory. A dotfile such as
+                // ~/.claude.json has the home directory as its parent, which exists on
+                // every desktop and would otherwise be a false positive.
+                String parent = parentOf(path);
+                if (parent != null && !samePath(parent, home)) {
+                    present = safeExists(fs, fsPath(parent));
+                }
+            }
             if (present) {
                 found.add(new MCPClient(known.id, known.displayName, path, known.writable));
             }
@@ -145,8 +153,22 @@ public final class MCPClientRegistrar {
             FileSystemStorage fs = FileSystemStorage.getInstance();
             String path = client.getConfigPath();
             String storagePath = fsPath(path);
-            Map<String, Object> root = readJson(fs, storagePath);
-            if (root == null) {
+            Map<String, Object> root;
+            if (safeExists(fs, storagePath)) {
+                root = readExistingConfig(fs, storagePath);
+                if (root == null) {
+                    // The file is there but could not be read, or is not a complete JSON
+                    // object (a truncated or corrupt config). Codename One's parser is
+                    // lenient and would hand back a partial map, so rewriting would drop
+                    // the user's other settings. Leave the file untouched instead.
+                    Log.p("MCP: leaving " + path + " unchanged; it could not be safely parsed");
+                    return false;
+                }
+            } else {
+                if (entry == null) {
+                    // Nothing to remove from a config that does not exist.
+                    return false;
+                }
                 root = new LinkedHashMap<String, Object>();
             }
             Object serversObj = root.get("mcpServers");
@@ -162,6 +184,76 @@ public final class MCPClientRegistrar {
                 servers.put(serverName, entry);
             }
             root.put("mcpServers", servers);
+            return writeConfigAtomic(fs, path, storagePath, root);
+        } catch (Throwable ex) {
+            Log.e(ex);
+            return false;
+        }
+    }
+
+    /// Reads an existing host config, returning null when it cannot be trusted so the
+    /// caller refuses to overwrite it. An empty file is treated as a fresh, empty config.
+    private Map<String, Object> readExistingConfig(FileSystemStorage fs, String storagePath) {
+        try {
+            String json = Util.readToString(fs.openInputStream(storagePath), "UTF-8");
+            String trimmed = json.trim();
+            if (trimmed.length() == 0) {
+                return new LinkedHashMap<String, Object>();
+            }
+            if (!isCompleteJsonObject(trimmed)) {
+                return null;
+            }
+            // Parse faithfully so rewriting keeps booleans, integers and nulls intact.
+            return MCPJson.parse(json);
+        } catch (Throwable ex) {
+            Log.e(ex);
+            return null;
+        }
+    }
+
+    /// Lightweight structural check that the text is a single, complete JSON object with
+    /// balanced braces, brackets and quotes. Codename One's JSON parser does not throw on
+    /// malformed input (it returns a partial map), so this guards against silently writing
+    /// over a truncated or corrupt config.
+    static boolean isCompleteJsonObject(String s) {
+        int n = s.length();
+        if (n < 2 || s.charAt(0) != '{' || s.charAt(n - 1) != '}') {
+            return false;
+        }
+        int depth = 0;
+        boolean inString = false;
+        boolean escaped = false;
+        for (int i = 0; i < n; i++) {
+            char c = s.charAt(i);
+            if (inString) {
+                if (escaped) {
+                    escaped = false;
+                } else if (c == '\\') {
+                    escaped = true;
+                } else if (c == '"') {
+                    inString = false;
+                }
+                continue;
+            }
+            if (c == '"') {
+                inString = true;
+            } else if (c == '{' || c == '[') {
+                depth++;
+            } else if (c == '}' || c == ']') {
+                depth--;
+                if (depth < 0) {
+                    return false;
+                }
+            }
+        }
+        return depth == 0 && !inString;
+    }
+
+    /// Writes the config through a temporary file that is renamed into place, so an
+    /// interrupted write can never truncate the user's existing config.
+    private boolean writeConfigAtomic(FileSystemStorage fs, String path, String storagePath,
+                                      Map<String, Object> root) {
+        try {
             String parent = parentOf(path);
             if (parent != null) {
                 try {
@@ -170,42 +262,33 @@ public final class MCPClientRegistrar {
                     // parent likely already exists
                 }
             }
-            OutputStream os = fs.openOutputStream(storagePath);
+            String fileName = fileNameOf(path);
+            String tmpName = fileName + ".cn1mcp-tmp";
+            String tmpPath = parent == null ? fsPath(tmpName) : fsPath(parent + "/" + tmpName);
+            // mapToJson preserves booleans, integers and null values, so the user's other
+            // settings survive the round trip; toJson would drop null-valued entries.
+            byte[] data = MCPJson.toJson(root).getBytes("UTF-8");
+            OutputStream os = fs.openOutputStream(tmpPath);
             try {
-                // mapToJson preserves booleans, integers and null values, so writing the
-                // host config back never changes the user's other settings. toJson would
-                // drop null-valued entries.
-                os.write(JSONParser.mapToJson(root).getBytes("UTF-8"));
+                os.write(data);
             } finally {
                 os.close();
             }
+            // rename() takes a bare name and moves within the same directory. renameTo
+            // cannot overwrite an existing target on every platform, so remove it first;
+            // the temporary file is already fully written, so there is no truncation risk.
+            if (safeExists(fs, storagePath)) {
+                try {
+                    fs.delete(storagePath);
+                } catch (Throwable ignored) {
+                    // fall through and let rename report the real failure
+                }
+            }
+            fs.rename(tmpPath, fileName);
             return true;
         } catch (Throwable ex) {
             Log.e(ex);
             return false;
-        }
-    }
-
-    private Map<String, Object> readJson(FileSystemStorage fs, String storagePath) {
-        try {
-            if (!fs.exists(storagePath)) {
-                return null;
-            }
-            String json = Util.readToString(fs.openInputStream(storagePath), "UTF-8");
-            if (json.trim().length() == 0) {
-                return null;
-            }
-            // Parse faithfully: keep booleans as Boolean, integers as Long, and null
-            // values, so rewriting the config does not turn the user's other settings
-            // into strings or floats. The default static parser does not preserve these.
-            JSONParser parser = new JSONParser();
-            parser.setUseBooleanInstance(true);
-            parser.setUseLongsInstance(true);
-            parser.setIncludeNullsInstance(true);
-            return parser.parseJSON(new InputStreamReader(new ByteArrayInputStream(json.getBytes("UTF-8")), "UTF-8"));
-        } catch (Throwable ex) {
-            Log.e(ex);
-            return null;
         }
     }
 
@@ -255,6 +338,32 @@ public final class MCPClientRegistrar {
             return null;
         }
         return path.substring(0, slash);
+    }
+
+    private static String fileNameOf(String path) {
+        if (path == null) {
+            return null;
+        }
+        String forward = path.replace('\\', '/');
+        int slash = forward.lastIndexOf('/');
+        return slash < 0 ? path : path.substring(slash + 1);
+    }
+
+    /// True when two paths refer to the same location, ignoring separator style and
+    /// trailing separators.
+    private static boolean samePath(String a, String b) {
+        if (a == null || b == null) {
+            return false;
+        }
+        return normalizePath(a).equals(normalizePath(b));
+    }
+
+    private static String normalizePath(String p) {
+        String forward = p.replace('\\', '/');
+        while (forward.length() > 1 && forward.charAt(forward.length() - 1) == '/') {
+            forward = forward.substring(0, forward.length() - 1);
+        }
+        return forward;
     }
 
     private static String homePath() {

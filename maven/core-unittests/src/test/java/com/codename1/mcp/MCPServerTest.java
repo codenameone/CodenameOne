@@ -70,6 +70,36 @@ class MCPServerTest extends UITestBase {
     }
 
     @FormTest
+    void initializeRejectsUnsupportedProtocolVersionAndOffersOurOwn() throws Exception {
+        MCPServer server = new MCPServer();
+        Map<String, Object> result = asMap(parse(server.handleMessage(
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\","
+                        + "\"params\":{\"protocolVersion\":\"2099-01-01\"}}")).get("result"));
+        // MCP requires an unsupported request to be answered with a version the server
+        // implements, not the version the client asked for.
+        assertEquals(MCPServer.DEFAULT_PROTOCOL_VERSION, result.get("protocolVersion"));
+    }
+
+    @FormTest
+    void toolArgumentsPreserveJsonTypes() throws Exception {
+        MCPServer server = new MCPServer();
+        server.addTool(new Tool("echo", "echoes arguments",
+                "{\"type\":\"object\",\"properties\":{}}", echoHandler()));
+
+        Map<String, Object> result = asMap(parse(server.handleMessage(
+                "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\","
+                        + "\"params\":{\"name\":\"echo\","
+                        + "\"arguments\":{\"flag\":true,\"count\":1,\"nothing\":null}}}")).get("result"));
+        String echoed = (String) asMap(asList(result.get("content")).get(0)).get("text");
+        String compact = echoed.replaceAll("\\s+", "");
+        // The developer tool must receive booleans, integers and nulls unchanged, not the
+        // string "true", the float 1.0, or a dropped null that the default parser produces.
+        assertTrue(compact.indexOf("\"flag\":true") >= 0, echoed);
+        assertTrue(compact.indexOf("\"count\":1") >= 0 && compact.indexOf("\"count\":1.0") < 0, echoed);
+        assertTrue(compact.indexOf("\"nothing\":null") >= 0, echoed);
+    }
+
+    @FormTest
     void toolsListIncludesBuiltInAndDeveloperTools() throws Exception {
         MCPServer server = new MCPServer();
         server.addTool(new Tool("current_user", "Returns the user",
