@@ -390,7 +390,7 @@
     "Slider_disabled_light": 94.01,
     "Slider_normal_dark": 92.74,
     "Slider_normal_light": 95.13,
-    "Spinner_normal_dark": 89.81,
+    "Spinner_normal_dark": 91.47,
     "Spinner_normal_light": 91.79,
     "Switch_disabled_dark": 95.53,
     "Switch_disabled_light": 96.31,
@@ -404,10 +404,10 @@
     "TabsGeom_normal_light": 93.02,
     "Tabs_normal_dark": 83.45,
     "Tabs_normal_light": 86.44,
-    "TextField_disabled_dark": 97.19,
-    "TextField_disabled_light": 91.13,
-    "TextField_normal_dark": 96.88,
-    "TextField_normal_light": 90.03,
+    "TextField_disabled_dark": 97.34,
+    "TextField_disabled_light": 91.35,
+    "TextField_normal_dark": 97.08,
+    "TextField_normal_light": 90.4,
     "Toolbar_normal_dark": 87.7,
     "Toolbar_normal_light": 87.64
   }

@@ -1077,12 +1077,15 @@ PopupContent {
     ProgressBarFull { background-color: var(--accent-color-dark, #0a84ff); }
     /* Dark picker wheel: white labels, lighter translucent selection band. */
     /* Item 11: on the dark wheel the perspective-faded (background) rows were
-       nearly invisible and the centred (foreground) value was blown-out white.
-       Make the background rows a visible light grey, the selection band a
-       visible light-grey fill, and the foreground value a softer greyish white. */
-    SpinnerRenderer { color: #a8a8ad; background-color: transparent; }
-    SpinnerRenderer.selected { color: #bcbcc1; background-color: rgba(130,130,136,0.24); border-radius: 2.5mm; }
-    SpinnerRendererFocus { color: #bcbcc1; background-color: rgba(130,130,136,0.32); border-radius: 2mm; }
+       nearly invisible. The rows must start WHITE: the ios7Spinner perspective
+       fade multiplies each off-centre row's alpha down toward the black
+       background, so a white base lands on native's readable off-centre grey
+       while the centred value stays bright -- exactly matching the native wheel.
+       A grey base (#a8a8ad) faded to near-black and made value 1/2/4/5 invisible,
+       which also scored WORSE against the native reference. */
+    SpinnerRenderer { color: #ffffff; background-color: transparent; }
+    SpinnerRenderer.selected { color: #ffffff; background-color: rgba(120,120,128,0.18); border-radius: 2.5mm; }
+    SpinnerRendererFocus { color: #ffffff; background-color: rgba(120,120,128,0.26); border-radius: 2mm; }
     SpinnerOverlay { background-color: transparent; }
 
     OnOffSwitch { color: var(--accent-color-dark, #0a84ff); background-color: #2c2c2e; }
