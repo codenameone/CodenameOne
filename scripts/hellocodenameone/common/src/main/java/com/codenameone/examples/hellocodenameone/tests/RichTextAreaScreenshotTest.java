@@ -40,7 +40,7 @@ public class RichTextAreaScreenshotTest extends BaseTest {
         captured = false;
         readyRunnable = null;
         form = createForm("Rich Text", new BorderLayout(), "RichTextArea");
-        RichTextArea editor = new RichTextArea();
+        RichTextArea editor = new ScreenshotPureEditors.Rich();
         editor.setEditable(false);
         editor.setHtml("<h2>Trip itinerary</h2>"
                 + "<p>Meet at the <b>main lobby</b> by <i>9:00 AM</i>. Bring a "

@@ -26,7 +26,7 @@ public class CodeEditorScreenshotTest extends BaseTest {
             return true;
         }
         form = createForm("Code Editor", new BorderLayout(), "CodeEditor");
-        CodeEditor editor = new CodeEditor();
+        CodeEditor editor = new ScreenshotPureEditors.Code();
         editor.setLanguage("java");
         editor.setShowLineNumbers(true);
         editor.setReadOnly(true);

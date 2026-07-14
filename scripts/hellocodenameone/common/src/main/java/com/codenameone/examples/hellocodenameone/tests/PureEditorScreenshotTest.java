@@ -1,9 +1,7 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
-import com.codename1.ui.CodeEditor;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
-import com.codename1.ui.RichTextArea;
 import com.codename1.ui.layouts.BoxLayout;
 
 /**
@@ -22,7 +20,7 @@ public class PureEditorScreenshotTest extends BaseTest {
     public boolean runTest() {
         Form form = createForm("Pure Editors", BoxLayout.y(), "PureEditors");
 
-        CodeEditor code = new CodeEditor("java",
+        ScreenshotPureEditors.Code code = new ScreenshotPureEditors.Code("java",
                 "public class Greeting {\n"
                 + "    // " + SHALOM + " means hello\n"
                 + "    String msg = \"" + SHALOM + "\";\n"
@@ -32,7 +30,7 @@ public class PureEditorScreenshotTest extends BaseTest {
         code.setPreferredH(Display.getInstance().getDisplayHeight() / 2);
         form.add(code);
 
-        RichTextArea rich = new RichTextArea(
+        ScreenshotPureEditors.Rich rich = new ScreenshotPureEditors.Rich(
                 "<p>Hello <b>world</b> and <i>" + SHALOM + "</i></p>"
                 + "<ul><li>one</li><li>two</li></ul>");
         rich.setPreferredH(Display.getInstance().getDisplayHeight() / 3);
