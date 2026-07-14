@@ -688,6 +688,11 @@ public class EditorView extends Component implements TextInputClient {
         return scrollX;
     }
 
+    /// Returns the current vertical scroll offset in pixels.
+    protected int getVerticalScroll() {
+        return scrollY;
+    }
+
     /// Paints a single line of text. Subclasses override to add syntax coloring; the base implementation
     /// draws the whole line in the default text color.
     ///

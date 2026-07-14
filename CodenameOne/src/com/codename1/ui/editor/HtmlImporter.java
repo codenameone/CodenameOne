@@ -430,6 +430,18 @@ public final class HtmlImporter {
         return sb.toString();
     }
 
+    // Common named HTML entities (typography and symbols) as name/replacement pairs. Values use unicode
+    // escapes to keep the source ASCII only.
+    private static final String[] NAMED_ENTITIES = {
+        "mdash", "\u2014", "ndash", "\u2013", "hellip", "\u2026",
+        "lsquo", "\u2018", "rsquo", "\u2019", "ldquo", "\u201C", "rdquo", "\u201D",
+        "laquo", "\u00AB", "raquo", "\u00BB", "bull", "\u2022", "middot", "\u00B7",
+        "copy", "\u00A9", "reg", "\u00AE", "trade", "\u2122",
+        "deg", "\u00B0", "plusmn", "\u00B1", "times", "\u00D7", "divide", "\u00F7",
+        "euro", "\u20AC", "pound", "\u00A3", "cent", "\u00A2", "yen", "\u00A5",
+        "sect", "\u00A7", "para", "\u00B6"
+    };
+
     private static String entity(String ent) {
         if ("amp".equals(ent)) {
             return "&";
@@ -448,6 +460,11 @@ public final class HtmlImporter {
         }
         if ("nbsp".equals(ent)) {
             return " ";
+        }
+        for (int k = 0; k < NAMED_ENTITIES.length; k += 2) {
+            if (NAMED_ENTITIES[k].equals(ent)) {
+                return NAMED_ENTITIES[k + 1];
+            }
         }
         if (ent.length() > 1 && ent.charAt(0) == '#') {
             try {
