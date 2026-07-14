@@ -161,6 +161,17 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         super.done();
     }
 
+    /**
+     * Completes this test without starting either appearance capture.  A
+     * platform-specific skip cannot call {@link #done()} directly because the
+     * dual-appearance completion gate intentionally ignores calls until both
+     * capture phases finish.
+     */
+    protected final synchronized void skipAppearances() {
+        bothPhasesComplete = true;
+        super.done();
+    }
+
     private void runAppearance(boolean dark, final String suffix, final Runnable next) {
         Display.getInstance().setDarkMode(dark);
         // UIManager caches resolved Style objects per UIID; without this call

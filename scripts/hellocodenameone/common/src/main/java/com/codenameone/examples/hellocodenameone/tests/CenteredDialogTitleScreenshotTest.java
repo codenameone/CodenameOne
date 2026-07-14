@@ -24,7 +24,7 @@ public class CenteredDialogTitleScreenshotTest extends DualAppearanceBaseTest {
     public boolean runTest() {
         if (CN.isWatch()) {
             System.out.println("CN1SS:INFO:test=CenteredDialogTitle status=SKIPPED reason=phone-dialog-on-watch");
-            done();
+            skipAppearances();
             return true;
         }
         return super.runTest();
