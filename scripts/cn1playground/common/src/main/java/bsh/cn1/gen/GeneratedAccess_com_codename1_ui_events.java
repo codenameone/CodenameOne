@@ -59,6 +59,9 @@ public final class GeneratedAccess_com_codename1_ui_events {
         if ("PromptPromise".equals(simpleName)) {
             return com.codename1.ui.events.MessageEvent.PromptPromise.class;
         }
+        if ("PointerEvent".equals(simpleName)) {
+            return com.codename1.ui.events.PointerEvent.class;
+        }
         if ("ScrollListener".equals(simpleName)) {
             return com.codename1.ui.events.ScrollListener.class;
         }
@@ -67,6 +70,9 @@ public final class GeneratedAccess_com_codename1_ui_events {
         }
         if ("StyleListener".equals(simpleName)) {
             return com.codename1.ui.events.StyleListener.class;
+        }
+        if ("WheelEvent".equals(simpleName)) {
+            return com.codename1.ui.events.WheelEvent.class;
         }
         if ("WindowEvent".equals(simpleName)) {
             return com.codename1.ui.events.WindowEvent.class;
@@ -146,6 +152,18 @@ public final class GeneratedAccess_com_codename1_ui_events {
                 return new com.codename1.ui.events.MessageEvent.PromptPromise();
             }
         }
+        if (type == com.codename1.ui.events.PointerEvent.class) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
+                return new com.codename1.ui.events.PointerEvent(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4]), ((Number) adaptedArgs[5]).floatValue(), ((Number) adaptedArgs[6]).floatValue(), ((Number) adaptedArgs[7]).floatValue(), ((Number) adaptedArgs[8]).floatValue(), toIntValue(adaptedArgs[9]), ((Boolean) adaptedArgs[10]).booleanValue());
+            }
+        }
+        if (type == com.codename1.ui.events.WheelEvent.class) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class, java.lang.Integer.class}, false);
+                return new com.codename1.ui.events.WheelEvent((java.lang.Object) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), toIntValue(adaptedArgs[4]), ((Boolean) adaptedArgs[5]).booleanValue(), toIntValue(adaptedArgs[6]));
+            }
+        }
         if (type == com.codename1.ui.events.WindowEvent.class) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Display.class, com.codename1.ui.events.WindowEvent.Type.class, com.codename1.ui.geom.Rectangle.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Display.class, com.codename1.ui.events.WindowEvent.Type.class, com.codename1.ui.geom.Rectangle.class}, false);
@@ -177,79 +195,93 @@ public final class GeneratedAccess_com_codename1_ui_events {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.ui.events.WheelEvent) {
+            try {
+                return invoke2((com.codename1.ui.events.WheelEvent) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.ui.events.WindowEvent) {
             try {
-                return invoke2((com.codename1.ui.events.WindowEvent) target, name, safeArgs);
+                return invoke3((com.codename1.ui.events.WindowEvent) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.events.ActionEvent) {
             try {
-                return invoke3((com.codename1.ui.events.ActionEvent) target, name, safeArgs);
+                return invoke4((com.codename1.ui.events.ActionEvent) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.events.MessageEvent.PromptPromise) {
             try {
-                return invoke4((com.codename1.ui.events.MessageEvent.PromptPromise) target, name, safeArgs);
+                return invoke5((com.codename1.ui.events.MessageEvent.PromptPromise) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.ui.events.PointerEvent) {
+            try {
+                return invoke6((com.codename1.ui.events.PointerEvent) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.events.ActionListener) {
             try {
-                return invoke5((com.codename1.ui.events.ActionListener) target, name, safeArgs);
+                return invoke7((com.codename1.ui.events.ActionListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.events.ActionSource) {
             try {
-                return invoke6((com.codename1.ui.events.ActionSource) target, name, safeArgs);
+                return invoke8((com.codename1.ui.events.ActionSource) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.events.BrowserNavigationCallback) {
             try {
-                return invoke7((com.codename1.ui.events.BrowserNavigationCallback) target, name, safeArgs);
+                return invoke9((com.codename1.ui.events.BrowserNavigationCallback) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.events.DataChangedListener) {
             try {
-                return invoke8((com.codename1.ui.events.DataChangedListener) target, name, safeArgs);
+                return invoke10((com.codename1.ui.events.DataChangedListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.events.FocusListener) {
             try {
-                return invoke9((com.codename1.ui.events.FocusListener) target, name, safeArgs);
+                return invoke11((com.codename1.ui.events.FocusListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.events.ScrollListener) {
             try {
-                return invoke10((com.codename1.ui.events.ScrollListener) target, name, safeArgs);
+                return invoke12((com.codename1.ui.events.ScrollListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.events.SelectionListener) {
             try {
-                return invoke11((com.codename1.ui.events.SelectionListener) target, name, safeArgs);
+                return invoke13((com.codename1.ui.events.SelectionListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.events.StyleListener) {
             try {
-                return invoke12((com.codename1.ui.events.StyleListener) target, name, safeArgs);
+                return invoke14((com.codename1.ui.events.StyleListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -301,6 +333,11 @@ public final class GeneratedAccess_com_codename1_ui_events {
                 return typedTarget.getKeyEvent();
             }
         }
+        if ("getPointerEvent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPointerEvent();
+            }
+        }
         if ("getProgress".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getProgress();
@@ -339,6 +376,12 @@ public final class GeneratedAccess_com_codename1_ui_events {
         if ("isPointerPressedDuringDrag".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isPointerPressedDuringDrag();
+            }
+        }
+        if ("setPointerEvent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.PointerEvent.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.PointerEvent.class}, false);
+                typedTarget.setPointerEvent((com.codename1.ui.events.PointerEvent) adaptedArgs[0]); return null;
             }
         }
         if ("setPointerPressedDuringDrag".equals(name)) {
@@ -401,6 +444,11 @@ public final class GeneratedAccess_com_codename1_ui_events {
                 return typedTarget.getMessage();
             }
         }
+        if ("getPointerEvent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPointerEvent();
+            }
+        }
         if ("getProgress".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getProgress();
@@ -451,6 +499,12 @@ public final class GeneratedAccess_com_codename1_ui_events {
                 return typedTarget.isPromptForAudioRecorder();
             }
         }
+        if ("setPointerEvent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.PointerEvent.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.PointerEvent.class}, false);
+                typedTarget.setPointerEvent((com.codename1.ui.events.PointerEvent) adaptedArgs[0]); return null;
+            }
+        }
         if ("setPointerPressedDuringDrag".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
@@ -460,7 +514,143 @@ public final class GeneratedAccess_com_codename1_ui_events {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke2(com.codename1.ui.events.WindowEvent typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke2(com.codename1.ui.events.WheelEvent typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("consume".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.consume(); return null;
+            }
+        }
+        if ("getActualComponent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getActualComponent();
+            }
+        }
+        if ("getCommand".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCommand();
+            }
+        }
+        if ("getComponent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getComponent();
+            }
+        }
+        if ("getDeltaX".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDeltaX();
+            }
+        }
+        if ("getDeltaY".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDeltaY();
+            }
+        }
+        if ("getDraggedComponent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDraggedComponent();
+            }
+        }
+        if ("getDropTarget".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDropTarget();
+            }
+        }
+        if ("getEventType".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getEventType();
+            }
+        }
+        if ("getKeyEvent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getKeyEvent();
+            }
+        }
+        if ("getModifiers".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getModifiers();
+            }
+        }
+        if ("getPointerEvent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPointerEvent();
+            }
+        }
+        if ("getProgress".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getProgress();
+            }
+        }
+        if ("getSource".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSource();
+            }
+        }
+        if ("getX".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getX();
+            }
+        }
+        if ("getY".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getY();
+            }
+        }
+        if ("isAltDown".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isAltDown();
+            }
+        }
+        if ("isConsumed".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isConsumed();
+            }
+        }
+        if ("isControlDown".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isControlDown();
+            }
+        }
+        if ("isLongEvent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isLongEvent();
+            }
+        }
+        if ("isMetaDown".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isMetaDown();
+            }
+        }
+        if ("isPointerPressedDuringDrag".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isPointerPressedDuringDrag();
+            }
+        }
+        if ("isPrecise".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isPrecise();
+            }
+        }
+        if ("isShiftDown".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isShiftDown();
+            }
+        }
+        if ("setPointerEvent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.PointerEvent.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.PointerEvent.class}, false);
+                typedTarget.setPointerEvent((com.codename1.ui.events.PointerEvent) adaptedArgs[0]); return null;
+            }
+        }
+        if ("setPointerPressedDuringDrag".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                typedTarget.setPointerPressedDuringDrag(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke3(com.codename1.ui.events.WindowEvent typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("consume".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.consume(); return null;
@@ -506,6 +696,11 @@ public final class GeneratedAccess_com_codename1_ui_events {
                 return typedTarget.getKeyEvent();
             }
         }
+        if ("getPointerEvent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPointerEvent();
+            }
+        }
         if ("getProgress".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getProgress();
@@ -546,6 +741,12 @@ public final class GeneratedAccess_com_codename1_ui_events {
                 return typedTarget.isPointerPressedDuringDrag();
             }
         }
+        if ("setPointerEvent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.PointerEvent.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.PointerEvent.class}, false);
+                typedTarget.setPointerEvent((com.codename1.ui.events.PointerEvent) adaptedArgs[0]); return null;
+            }
+        }
         if ("setPointerPressedDuringDrag".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
@@ -555,7 +756,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke3(com.codename1.ui.events.ActionEvent typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke4(com.codename1.ui.events.ActionEvent typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("consume".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.consume(); return null;
@@ -596,6 +797,11 @@ public final class GeneratedAccess_com_codename1_ui_events {
                 return typedTarget.getKeyEvent();
             }
         }
+        if ("getPointerEvent".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPointerEvent();
+            }
+        }
         if ("getProgress".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getProgress();
@@ -631,6 +837,12 @@ public final class GeneratedAccess_com_codename1_ui_events {
                 return typedTarget.isPointerPressedDuringDrag();
             }
         }
+        if ("setPointerEvent".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.PointerEvent.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.PointerEvent.class}, false);
+                typedTarget.setPointerEvent((com.codename1.ui.events.PointerEvent) adaptedArgs[0]); return null;
+            }
+        }
         if ("setPointerPressedDuringDrag".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
@@ -640,7 +852,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke4(com.codename1.ui.events.MessageEvent.PromptPromise typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke5(com.codename1.ui.events.MessageEvent.PromptPromise typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.util.AsyncResource.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.util.AsyncResource.class}, false);
@@ -763,7 +975,126 @@ public final class GeneratedAccess_com_codename1_ui_events {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke5(com.codename1.ui.events.ActionListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke6(com.codename1.ui.events.PointerEvent typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getButton".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getButton();
+            }
+        }
+        if ("getButtonMask".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getButtonMask();
+            }
+        }
+        if ("getContactSize".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getContactSize();
+            }
+        }
+        if ("getModifiers".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getModifiers();
+            }
+        }
+        if ("getPointerType".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPointerType();
+            }
+        }
+        if ("getPressure".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPressure();
+            }
+        }
+        if ("getTiltX".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTiltX();
+            }
+        }
+        if ("getTiltY".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTiltY();
+            }
+        }
+        if ("getX".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getX();
+            }
+        }
+        if ("getY".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getY();
+            }
+        }
+        if ("isAltDown".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isAltDown();
+            }
+        }
+        if ("isControlDown".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isControlDown();
+            }
+        }
+        if ("isEraser".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isEraser();
+            }
+        }
+        if ("isHovering".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isHovering();
+            }
+        }
+        if ("isMetaDown".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isMetaDown();
+            }
+        }
+        if ("isMiddleButton".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isMiddleButton();
+            }
+        }
+        if ("isMouse".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isMouse();
+            }
+        }
+        if ("isPrimaryButton".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isPrimaryButton();
+            }
+        }
+        if ("isSecondaryButton".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isSecondaryButton();
+            }
+        }
+        if ("isShiftDown".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isShiftDown();
+            }
+        }
+        if ("isStylus".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isStylus();
+            }
+        }
+        if ("isTouch".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isTouch();
+            }
+        }
+        if ("toString".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.toString();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke7(com.codename1.ui.events.ActionListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("actionPerformed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false);
@@ -773,7 +1104,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke6(com.codename1.ui.events.ActionSource typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke8(com.codename1.ui.events.ActionSource typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addActionListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
@@ -789,7 +1120,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke7(com.codename1.ui.events.BrowserNavigationCallback typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke9(com.codename1.ui.events.BrowserNavigationCallback typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("shouldNavigate".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -799,7 +1130,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke8(com.codename1.ui.events.DataChangedListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke10(com.codename1.ui.events.DataChangedListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("dataChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
@@ -809,7 +1140,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke9(com.codename1.ui.events.FocusListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke11(com.codename1.ui.events.FocusListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("focusGained".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -825,7 +1156,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke10(com.codename1.ui.events.ScrollListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke12(com.codename1.ui.events.ScrollListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("scrollChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
@@ -835,7 +1166,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke11(com.codename1.ui.events.SelectionListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke13(com.codename1.ui.events.SelectionListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("selectionChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
@@ -845,7 +1176,7 @@ public final class GeneratedAccess_com_codename1_ui_events {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke12(com.codename1.ui.events.StyleListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke14(com.codename1.ui.events.StyleListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("styleChanged".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.plaf.Style.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.ui.plaf.Style.class}, false);
@@ -858,7 +1189,8 @@ public final class GeneratedAccess_com_codename1_ui_events {
     public static Object getStaticField(Class<?> type, String name) throws Exception {
         if (type == com.codename1.ui.events.ActionEvent.Type.class) return getStaticField0(name);
         if (type == com.codename1.ui.events.DataChangedListener.class) return getStaticField1(name);
-        if (type == com.codename1.ui.events.WindowEvent.Type.class) return getStaticField2(name);
+        if (type == com.codename1.ui.events.PointerEvent.class) return getStaticField2(name);
+        if (type == com.codename1.ui.events.WindowEvent.Type.class) return getStaticField3(name);
         throw unsupportedStaticField(type, name);
     }
 
@@ -884,6 +1216,8 @@ public final class GeneratedAccess_com_codename1_ui_events {
         if ("PointerDrag".equals(name)) return com.codename1.ui.events.ActionEvent.Type.PointerDrag;
         if ("PointerPressed".equals(name)) return com.codename1.ui.events.ActionEvent.Type.PointerPressed;
         if ("PointerReleased".equals(name)) return com.codename1.ui.events.ActionEvent.Type.PointerReleased;
+        if ("PointerWheel".equals(name)) return com.codename1.ui.events.ActionEvent.Type.PointerWheel;
+        if ("PostureChange".equals(name)) return com.codename1.ui.events.ActionEvent.Type.PostureChange;
         if ("Progress".equals(name)) return com.codename1.ui.events.ActionEvent.Type.Progress;
         if ("Response".equals(name)) return com.codename1.ui.events.ActionEvent.Type.Response;
         if ("Show".equals(name)) return com.codename1.ui.events.ActionEvent.Type.Show;
@@ -901,6 +1235,30 @@ public final class GeneratedAccess_com_codename1_ui_events {
     }
 
     private static Object getStaticField2(String name) throws Exception {
+        if ("BUTTON_BACK".equals(name)) return com.codename1.ui.events.PointerEvent.BUTTON_BACK;
+        if ("BUTTON_FORWARD".equals(name)) return com.codename1.ui.events.PointerEvent.BUTTON_FORWARD;
+        if ("BUTTON_MIDDLE".equals(name)) return com.codename1.ui.events.PointerEvent.BUTTON_MIDDLE;
+        if ("BUTTON_NONE".equals(name)) return com.codename1.ui.events.PointerEvent.BUTTON_NONE;
+        if ("BUTTON_PRIMARY".equals(name)) return com.codename1.ui.events.PointerEvent.BUTTON_PRIMARY;
+        if ("BUTTON_SECONDARY".equals(name)) return com.codename1.ui.events.PointerEvent.BUTTON_SECONDARY;
+        if ("MASK_BACK".equals(name)) return com.codename1.ui.events.PointerEvent.MASK_BACK;
+        if ("MASK_FORWARD".equals(name)) return com.codename1.ui.events.PointerEvent.MASK_FORWARD;
+        if ("MASK_MIDDLE".equals(name)) return com.codename1.ui.events.PointerEvent.MASK_MIDDLE;
+        if ("MASK_PRIMARY".equals(name)) return com.codename1.ui.events.PointerEvent.MASK_PRIMARY;
+        if ("MASK_SECONDARY".equals(name)) return com.codename1.ui.events.PointerEvent.MASK_SECONDARY;
+        if ("MODIFIER_ALT".equals(name)) return com.codename1.ui.events.PointerEvent.MODIFIER_ALT;
+        if ("MODIFIER_CONTROL".equals(name)) return com.codename1.ui.events.PointerEvent.MODIFIER_CONTROL;
+        if ("MODIFIER_META".equals(name)) return com.codename1.ui.events.PointerEvent.MODIFIER_META;
+        if ("MODIFIER_SHIFT".equals(name)) return com.codename1.ui.events.PointerEvent.MODIFIER_SHIFT;
+        if ("TYPE_ERASER".equals(name)) return com.codename1.ui.events.PointerEvent.TYPE_ERASER;
+        if ("TYPE_MOUSE".equals(name)) return com.codename1.ui.events.PointerEvent.TYPE_MOUSE;
+        if ("TYPE_STYLUS".equals(name)) return com.codename1.ui.events.PointerEvent.TYPE_STYLUS;
+        if ("TYPE_TOUCH".equals(name)) return com.codename1.ui.events.PointerEvent.TYPE_TOUCH;
+        if ("TYPE_UNKNOWN".equals(name)) return com.codename1.ui.events.PointerEvent.TYPE_UNKNOWN;
+        throw unsupportedStaticField(com.codename1.ui.events.PointerEvent.class, name);
+    }
+
+    private static Object getStaticField3(String name) throws Exception {
         if ("Hidden".equals(name)) return com.codename1.ui.events.WindowEvent.Type.Hidden;
         if ("Minimized".equals(name)) return com.codename1.ui.events.WindowEvent.Type.Minimized;
         if ("Moved".equals(name)) return com.codename1.ui.events.WindowEvent.Type.Moved;
@@ -971,6 +1329,9 @@ public final class GeneratedAccess_com_codename1_ui_events {
             return true;
         }
         if (type == com.codename1.ui.events.SelectionListener.class) {
+            return true;
+        }
+        if (type == com.codename1.printing.PrintResultListener.class) {
             return true;
         }
         return false;
@@ -1048,6 +1409,17 @@ public final class GeneratedAccess_com_codename1_ui_events {
                 public void selectionChanged(int arg0, int arg1) {
                     try {
                         lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.printing.PrintResultListener.class) {
+            return new com.codename1.printing.PrintResultListener() {
+                public void onResult(com.codename1.printing.PrintResult arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
                     } catch (bsh.EvalError ex) {
                         throw new RuntimeException(ex);
                     }

@@ -1272,7 +1272,6 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             prefW = Math.max(style.getBgImage().getWidth(), prefW);
             prefH = Math.max(style.getBgImage().getHeight(), prefH);
         }
-
         return new Dimension(prefW, prefH);
     }
 
@@ -2594,6 +2593,46 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         updateRadioButtonConstants(m, true, "Focus");
     }
 
+    /// Builds a check-box / radio glyph. When sizeMM is non-null it sizes the box
+    /// in millimetres (decoupled from the label font, so a native theme's box can
+    /// be larger than its text); otherwise the box is sized to the style font
+    /// height (legacy behaviour, leaving existing themes untouched).
+    private static Image stateIcon(char icon, Style s, String sizeMM) {
+        // Opt-in SF Symbol state glyphs (iosSFStateIconsBool): on iOS the box /
+        // circle renders as the real Apple symbol (thin ring + large dot for the
+        // selected radio) instead of the Material glyph, whose ring/dot ratio is
+        // visibly different. Off (the default) keeps legacy Material rendering.
+        boolean sf = UIManager.getInstance().isThemeConstant("iosSFStateIconsBool", false);
+        float mm = -1f;
+        if (sizeMM != null) {
+            try {
+                mm = Float.parseFloat(sizeMM.trim());
+            } catch (NumberFormatException ignore) {
+                // malformed constant -> fall back to font-height sizing
+            }
+        }
+        if (sf) {
+            if (mm < 0) {
+                // derive mm from the style font height so the SF image matches
+                // the size the Material glyph would have had
+                Font f = s.getFont();
+                if (f != null) {
+                    float pxPerMm = Display.getInstance().convertToPixels(10f) / 10f;
+                    if (pxPerMm > 0) {
+                        mm = f.getHeight() / pxPerMm;
+                    }
+                }
+            }
+            if (mm > 0) {
+                return FontImage.createSFOrMaterial(icon, s, mm);
+            }
+        }
+        if (mm > 0) {
+            return FontImage.createMaterial(icon, s, mm);
+        }
+        return FontImage.createMaterial(icon, s);
+    }
+
     private void updateCheckBoxConstants(UIManager m, boolean focus, String append) {
         Image checkSel = m.getThemeImageConstant("checkBoxChecked" + append + "Image");
         if (checkSel != null) {
@@ -2637,15 +2676,47 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     "checkBoxCheckedIconInt", FontImage.MATERIAL_CHECK_BOX);
             char uncheckedIcon = (char) uim.getThemeConstant(
                     "checkBoxUncheckedIconInt", FontImage.MATERIAL_CHECK_BOX_OUTLINE_BLANK);
-            FontImage checkedDis = FontImage.createMaterial(checkedIcon, dis);
-            FontImage uncheckedDis = FontImage.createMaterial(uncheckedIcon, sel);
+            // Optional explicit box size in mm. Without it the box is sized to the
+            // label font height (legacy). A native theme whose box is larger than
+            // its text (Material's 18dp box vs 14sp label) sets checkBoxIconSizeMM
+            // so the box matches the native control independent of the text.
+            String iconMM = uim.getThemeConstant("checkBoxIconSizeMM", null);
+            // Material's UNCHECKED box outline is on-surface-variant (a mid grey),
+            // distinct from the on-surface label colour. A theme names a UIID via
+            // checkBoxUncheckedColorUIID whose fg supplies that colour; createStyle
+            // resolves its dark ($Dark) variant too. Themes that do not set it keep
+            // the legacy behaviour (box == label colour).
+            Style uncheckedBox = unsel;
+            String boxUIID = uim.getThemeConstant("checkBoxUncheckedColorUIID", null);
+            if (boxUIID != null) {
+                uncheckedBox = uim.createStyle(boxUIID + ".", "", false);
+            }
+            Image checkedDis = stateIcon(checkedIcon, dis, iconMM);
+            // Disabled-unchecked uses the disabled style (greyed), NOT the
+            // selected style - otherwise a disabled, unchecked box/circle is
+            // tinted with the accent colour (very visible in dark mode where
+            // the accent is a bright purple), which does not match native.
+            // When a theme names an unchecked-colour UIID, the disabled box draws
+            // from that UIID's OWN disabled variant rather than the disabled label
+            // style, so the greyed box outline can differ from the (darker) disabled
+            // label text - which is what Material renders.
+            Style uncheckedBoxDis = dis;
+            if (boxUIID != null) {
+                uncheckedBoxDis = uim.createStyle(boxUIID + ".", "dis#", false);
+            }
+            Image uncheckedDis = stateIcon(uncheckedIcon, uncheckedBoxDis, iconMM);
             if (focus) {
-                FontImage checkedSelected = FontImage.createMaterial(checkedIcon, sel);
-                FontImage uncheckedSelected = FontImage.createMaterial(uncheckedIcon, sel);
+                Image checkedSelected = stateIcon(checkedIcon, sel, iconMM);
+                Image uncheckedSelected = stateIcon(uncheckedIcon, sel, iconMM);
                 setCheckBoxFocusImages(checkedSelected, uncheckedSelected, checkedDis, uncheckedDis);
             } else {
-                FontImage checkedUnselected = FontImage.createMaterial(checkedIcon, unsel);
-                FontImage uncheckedUnselected = FontImage.createMaterial(uncheckedIcon, unsel);
+                // The checked glyph reflects the selected style so a theme that
+                // defines a distinct CheckBox.selected colour (e.g. a native
+                // Material/iOS theme using its accent) tints the checked box with
+                // it. Themes whose selected colour equals the unselected colour
+                // are unaffected.
+                Image checkedUnselected = stateIcon(checkedIcon, sel, iconMM);
+                Image uncheckedUnselected = stateIcon(uncheckedIcon, uncheckedBox, iconMM);
                 setCheckBoxImages(checkedUnselected, uncheckedUnselected, checkedDis, uncheckedDis);
             }
         }
@@ -2684,15 +2755,40 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     "radioCheckedIconInt", FontImage.MATERIAL_RADIO_BUTTON_CHECKED);
             char uncheckedIcon = (char) uim.getThemeConstant(
                     "radioUncheckedIconInt", FontImage.MATERIAL_RADIO_BUTTON_UNCHECKED);
-            FontImage checkedDis = FontImage.createMaterial(checkedIcon, dis);
-            FontImage uncheckedDis = FontImage.createMaterial(uncheckedIcon, sel);
+            // See updateCheckBoxConstants: optional explicit circle size in mm,
+            // decoupled from the label font for native-matching geometry.
+            String iconMM = uim.getThemeConstant("radioIconSizeMM", null);
+            // See updateCheckBoxConstants: Material's unchecked circle is the mid-grey
+            // on-surface-variant, not the on-surface label colour. radioUncheckedColorUIID
+            // names a UIID whose fg supplies it (dark-resolved); unset keeps legacy.
+            Style uncheckedBox = unsel;
+            String boxUIID = uim.getThemeConstant("radioUncheckedColorUIID", null);
+            if (boxUIID != null) {
+                uncheckedBox = uim.createStyle(boxUIID + ".", "", false);
+            }
+            Image checkedDis = stateIcon(checkedIcon, dis, iconMM);
+            // Disabled-unchecked uses the disabled style (greyed), NOT the
+            // selected style - otherwise a disabled, unchecked box/circle is
+            // tinted with the accent colour (very visible in dark mode where
+            // the accent is a bright purple), which does not match native.
+            // When a theme names an unchecked-colour UIID, the disabled box draws
+            // from that UIID's OWN disabled variant rather than the disabled label
+            // style, so the greyed box outline can differ from the (darker) disabled
+            // label text - which is what Material renders.
+            Style uncheckedBoxDis = dis;
+            if (boxUIID != null) {
+                uncheckedBoxDis = uim.createStyle(boxUIID + ".", "dis#", false);
+            }
+            Image uncheckedDis = stateIcon(uncheckedIcon, uncheckedBoxDis, iconMM);
             if (focus) {
-                FontImage checkedSelected = FontImage.createMaterial(checkedIcon, sel);
-                FontImage uncheckedSelected = FontImage.createMaterial(uncheckedIcon, sel);
+                Image checkedSelected = stateIcon(checkedIcon, sel, iconMM);
+                Image uncheckedSelected = stateIcon(uncheckedIcon, sel, iconMM);
                 setRadioButtonFocusImages(checkedSelected, uncheckedSelected, checkedDis, uncheckedDis);
             } else {
-                FontImage checkedUnselected = FontImage.createMaterial(checkedIcon, unsel);
-                FontImage uncheckedUnselected = FontImage.createMaterial(uncheckedIcon, unsel);
+                // See updateCheckBoxConstants: the checked glyph reflects the
+                // selected style so native themes tint it with their accent.
+                Image checkedUnselected = stateIcon(checkedIcon, sel, iconMM);
+                Image uncheckedUnselected = stateIcon(uncheckedIcon, uncheckedBox, iconMM);
                 setRadioButtonImages(checkedUnselected, uncheckedUnselected, checkedDis, uncheckedDis);
             }
         }

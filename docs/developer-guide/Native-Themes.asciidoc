@@ -488,6 +488,104 @@ mode. Both modern themes set this; user themes that want dark
 mode also need to set it.
 |===
 
+=== iOS 26 Liquid Glass tab selection morph
+
+When the iOS modern theme renders `Tabs` as a bottom bar
+(`tabPlacementInt: 2`) the selected tab is marked by a *Liquid Glass
+drop* -- a frosted, magnifying glass capsule painted over the (dark)
+icons rather than a flat highlight. On a selection change the drop springs
+across to the new tab, elongating while it travels and settling with a
+small overshoot. The selected blue is supplied by the drop itself (a
+luminance-keyed dark->accent tint of the glyph beneath it), so the color
+travels with the drop instead of snapping between tabs.
+
+ifndef::backend-pdf[]
+image::img/ios-modern-tab-morph.gif[iOS 26 Liquid Glass tab selection morph,scaledwidth=70%]
+endif::[]
+ifdef::backend-pdf[]
+image::img/ios-modern-tab-morph-still.png[iOS 26 Liquid Glass tab selection morph mid-flight,scaledwidth=70%]
+endif::[]
+
+On iOS the drop is rendered live by a Metal fragment shader that samples
+the bar beneath it on the GPU, so the morph runs at frame rate with no
+screen read-back; other platforms and the simulator use the equivalent CPU
+lens. The effect is opt-in: the iOS modern theme sets
+`tabsSelectionCapsuleBool: true` and `glassMaterialBool: true`. Without the
+glass flag the capsule degrades to a plain translucent pill.
+
+The morph is developed against the real OS control: the frame-by-frame
+comparison below shows the native iOS 26 tab bar (left) and the Codename
+One render (right) at matching moments of the selection travel.
+
+image::img/ios-modern-tab-morph-fidelity.png[Native iOS 26 tab bar vs the Codename One morph, frame by frame,scaledwidth=70%]
+
+The animation is controlled by a *named motion preset* plus a handful of
+high-level knobs. The detailed envelopes (stretch, squash, lift, lens
+magnification, aberration, tint timing) live inside the preset in the
+motion model (`TabSelectionMorph`), where they're pinned by unit test and
+validated frame-by-frame by the fidelity suite -- a theme picks a preset
+and scales it rather than tuning a dozen loose constants:
+
+[cols="3,1,4", options="header"]
+|===
+|Constant |iOS modern |Effect
+
+|`@tabsSelectionCapsuleBool`
+|`true`
+|Master switch for the selection drop. Off falls back to the legacy
+colored underline indicator (`tabsAnimatedIndicatorBool`).
+
+|`@tabsMorphPreset`
+|`ios26`
+|The named motion preset: `ios26` (the measured Liquid Glass morph) or
+`subtle` (half the deformation and optics, for a calmer selection change).
+
+|`@tabsAnimatedIndicatorDurationInt`
+|`480`
+|Morph duration in milliseconds. Lower is snappier.
+
+|`@tabsMorphLensIntensityPct`
+|`100`
+|Scales the drop's *optics* (magnification, chromatic aberration, accent
+tint) around the preset: `0` is an optically flat drop, `200` doubles the
+lens strength. Geometry is unaffected.
+
+|`@tabsMorphSpringPct`
+|`100`
+|Scales the settle overshoot: `0` stops dead on a plain ease-out, `200`
+doubles the bounce.
+
+|`@tabSelLensTintColorInt`
+|`0x0a84ff`
+|The accent the dark glyph is tinted to inside the drop.
+|===
+
+Similarly, the *Liquid Glass backdrop materials* themselves are typed,
+named recipes (`GlassRecipe`): a theme assigns `chrome` (edge-anchored
+bars), `pill` (the floating tab bar) or `panel` (buttons, dialogs, panels
+-- the default) per UIID with `<UIID>GlassRecipe` constants, e.g.
+`ToolbarGlassRecipe: "chrome"`. Each recipe bundles the measured
+saturation/scale/offset color transform and edge optics of one native
+material, so similar glass surfaces can't drift apart one constant at a
+time.
+
+NOTE: The drop's glass cues (rim shrink, refraction, glare, edge shadow)
+fade out as it settles, so a resting selection reads as a calm frosted
+pill rather than a distorting lens. Every motion preset is validated
+deterministically: the fidelity suite freezes the morph at the fixed
+progress points 0, 10, 25, 50, 75, 90 and 100 percent, regression-compares
+each frame, and pins the same points numerically against the motion model
+in unit tests. The `Switch` thumb uses the same discipline for its liquid
+*droplet* morph (`switchLiquidGlassBool`, stretch/squash while sliding,
+frame-validated):
+
+ifndef::backend-pdf[]
+image::img/ios-modern-switch-droplet.gif[iOS 26 liquid-glass switch droplet,scaledwidth=35%]
+endif::[]
+ifdef::backend-pdf[]
+image::img/ios-modern-switch-droplet-still.png[iOS 26 liquid-glass switch droplet mid-slide,scaledwidth=35%]
+endif::[]
+
 === Customizing in your own theme
 
 Your app's `theme.css` inherits from the installed native theme:

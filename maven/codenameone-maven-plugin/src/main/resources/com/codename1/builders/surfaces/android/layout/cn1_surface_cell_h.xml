@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Codename One surfaces: unweighted cell wrapping each child of a row. RemoteViews cannot
+     set layout params at runtime, so per-orientation params are pre-baked here. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/cn1_surface_root"
+    android:layout_width="wrap_content"
+    android:layout_height="match_parent" />

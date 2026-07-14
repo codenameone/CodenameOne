@@ -64,6 +64,8 @@ typedef NS_ENUM(NSInteger, CN1MetalPipeline) {
                                        // subsequent draws can stencil-test
                                        // against the reference value.
     CN1MetalPipelineMultiStopGradient, // CSS-style multi-stop gradient (linear / radial / conic).
+    CN1MetalPipelineLens,              // iOS-26 selection-drop lens (samples a blitted bar
+                                       // region on-GPU; warp + tint + light, see cn1_fs_lens).
     CN1MetalPipelineCount
 };
 
@@ -181,6 +183,14 @@ void CN1MetalFillPolygon(const float *xCoords, const float *yCoords, int num,
 // Texture is owned by the caller (typically a GLUIImage); it is retained
 // only for the current command buffer.
 void CN1MetalDrawImage(id<MTLTexture> texture, int alpha, int x, int y, int width, int height);
+
+// iOS-26 selection-drop LENS: draws the lens quad at (x,y,w,h) logical coords sampling
+// `texture` (a fw x fh px blitted copy of the bar region) with the cn1_fs_lens shader.
+// magnify/aberration/tintColor/tintStrength/cornerRadiusPx mirror glassApplyLens
+// (cornerRadiusPx < 0 = capsule). All on the GPU -- no readback.
+void CN1MetalDrawLens(id<MTLTexture> texture, int x, int y, int w, int h,
+                      int fw, int fh, float magnify, float aberration,
+                      int tintColor, float tintStrength, float cornerRadiusPx);
 
 // Tile an RGBA image across (x,y,w,h). imageWidth/imageHeight are the
 // natural size of the source UIImage. Issues one textured quad per

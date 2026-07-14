@@ -71,11 +71,14 @@ class SpinnerComponentCoverageTest extends UITestBase {
         list.setFixedSelection(List.FIXED_CENTER);
         list.setSelectedIndex(1);
 
+        // Distance d maps to FRONT_ANGLE -/+ d so the ADJACENT row gets the
+        // mildest tilt (the distortion arrays grow toward the ends). The old
+        // raw-distance mapping handed the adjacent row the heaviest wedge.
         renderer.getCellRendererComponent(list, model, "A", 0, false);
-        assertEquals(1, renderer.perspective);
+        assertEquals(3, renderer.perspective);
 
         renderer.getCellRendererComponent(list, model, "C", 2, false);
-        assertEquals(6, renderer.perspective);
+        assertEquals(5, renderer.perspective);
     }
 
     @FormTest

@@ -9,6 +9,7 @@ import org.apache.maven.shared.invoker.*;
 
 import java.io.File;
 import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 
 /**
@@ -34,7 +35,7 @@ public abstract class AbstractBuildWrapperMojo extends AbstractMojo {
         }
         InvocationRequest request = new DefaultInvocationRequest();
         request.setPomFile(new File("pom.xml"));
-        request.setGoals(Collections.singletonList("package"));
+        request.setGoals(getGoals());
 
         Properties properties = new Properties();
         properties.setProperty("skipTests", "true");
@@ -62,6 +63,10 @@ public abstract class AbstractBuildWrapperMojo extends AbstractMojo {
 
     protected abstract String getPlatform();
     protected abstract String getBuildTarget();
+
+    protected List<String> getGoals() {
+        return Collections.singletonList("package");
+    }
 
     protected boolean buildExecutableJar() {
         return false;

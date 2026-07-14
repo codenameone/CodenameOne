@@ -3,7 +3,9 @@ package com.codename1.certificatewizard.api;
 import com.codename1.util.OnComplete;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public final class MockSigningService implements SigningService {
     private SigningState.Credential credential = new SigningState.Credential(true, "ABCD1234EF",
@@ -13,6 +15,8 @@ public final class MockSigningService implements SigningService {
     private final List<SigningState.Device> devices = new ArrayList<SigningState.Device>();
     private final List<SigningState.Profile> profiles = new ArrayList<SigningState.Profile>();
     private final List<SigningState.ApnsKey> apns = new ArrayList<SigningState.ApnsKey>();
+    private final List<SigningState.AppGroup> appGroups = new ArrayList<SigningState.AppGroup>();
+    private final Map<String, List<String>> appGroupAssociations = new LinkedHashMap<String, List<String>>();
     private long seq = 100;
 
     public MockSigningService() {
@@ -86,6 +90,30 @@ public final class MockSigningService implements SigningService {
         callback.completed(Result.ok(null));
     }
 
+    public void createAppGroup(String identifier, String name, OnComplete<Result<SigningState.AppGroup>> callback) {
+        for (SigningState.AppGroup g : appGroups) {
+            if (g.identifier() != null && g.identifier().equals(identifier)) {
+                callback.completed(Result.ok(g));
+                return;
+            }
+        }
+        SigningState.AppGroup created = new SigningState.AppGroup("GRP_" + (++seq), identifier, name);
+        appGroups.add(created);
+        callback.completed(Result.ok(created));
+    }
+
+    public void enableAppGroupCapability(String bundleIdAppleId, List<String> appGroupIds,
+                                         OnComplete<Result<Void>> callback) {
+        appGroupAssociations.put(bundleIdAppleId,
+                appGroupIds == null ? new ArrayList<String>() : new ArrayList<String>(appGroupIds));
+        callback.completed(Result.ok(null));
+    }
+
+    public List<String> appGroupAssociation(String bundleIdAppleId) {
+        List<String> assoc = appGroupAssociations.get(bundleIdAppleId);
+        return assoc == null ? new ArrayList<String>() : new ArrayList<String>(assoc);
+    }
+
     public void registerDevice(String name, String udid, OnComplete<Result<Void>> callback) {
         devices.add(new SigningState.Device("DEV_" + (++seq), name, udid, "IOS", "ENABLED"));
         callback.completed(Result.ok(null));
@@ -135,6 +163,8 @@ public final class MockSigningService implements SigningService {
         devices.clear();
         profiles.clear();
         apns.clear();
+        appGroups.clear();
+        appGroupAssociations.clear();
         callback.completed(Result.ok(null));
     }
 
@@ -147,6 +177,6 @@ public final class MockSigningService implements SigningService {
     }
 
     private SigningState snapshot() {
-        return new SigningState(credential, certificates, bundles, devices, profiles, apns);
+        return new SigningState(credential, certificates, bundles, devices, profiles, apns, appGroups);
     }
 }

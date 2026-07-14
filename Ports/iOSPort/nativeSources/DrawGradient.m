@@ -170,7 +170,13 @@ static GLuint getOGLProgram(){
         CGContextClearRect(context, CGRectMake(0, 0, p2w, p2h));
         
         UIGraphicsPushContext(context);
-        
+        // The CG bitmap origin is bottom-left: content drawn at y in [0, height)
+        // lands in the LAST height rows of the byte buffer, while the quad's
+        // texcoords sample the FIRST height rows (t in [0, height/p2h]). When
+        // height is not a power of two the sampled window misses the gradient
+        // by p2h - height rows. Shift the drawing into the sampled window.
+        CGContextTranslateCTM(context, 0, p2h - height);
+
         float alpha1 = 1.0;
         if (((startColor >> 24) & 0xff) != 0) {
             alpha1 = ((float)((startColor >> 24) & 0xff))/255.0;
@@ -320,7 +326,10 @@ static GLuint getOGLProgram(){
         CGContextClearRect(context, CGRectMake(0, 0, p2w, p2h));
         
         UIGraphicsPushContext(context);
-        CGFloat components[8] = { 
+        // See the ES2 branch above: align the bottom-left-origin CG drawing
+        // with the first-height-rows window the texcoords sample.
+        CGContextTranslateCTM(context, 0, p2h - height);
+        CGFloat components[8] = {
             ((float)((startColor >> 16) & 0xff))/255.0, 
             ((float)((startColor >> 8) & 0xFF))/255.0,
             ((float)(startColor & 0xff))/255.0, 

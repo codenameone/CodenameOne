@@ -1669,6 +1669,11 @@ public class Resources {
                 continue;
             }
 
+            if (key.endsWith("letterSpacing")) {
+                theme.put(key, input.readFloat());
+                continue;
+            }
+
             if (key.endsWith("iconGapUnit")) {
                 theme.put(key, input.readByte());
                 continue;

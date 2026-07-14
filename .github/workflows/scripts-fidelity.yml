@@ -1,0 +1,249 @@
+---
+name: Native theme fidelity
+
+# Measures how close Codename One's native themes render to the REAL native OS
+# widgets. Runs the fidelity app on an Android emulator (Material 3) and an iOS
+# simulator (Modern theme, Metal pipeline): each component is rendered as the CN1
+# widget AND the native widget IN THE SAME ENVIRONMENT, and the two are diffed.
+# Comparing same-environment renders makes the score robust to the subtle
+# rendering differences between CI machines; the committed goldens + baselines
+# are re-seedable drift artifacts (FIDELITY_UPDATE_GOLDENS / _BASELINE).
+
+'on':
+  # Keep manual dispatch available for deliberate fidelity runs outside the
+  # native-theme CSS change workflow.
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'native-themes/ios-modern/theme.css'
+      - 'native-themes/android-material/theme.css'
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/scripts-fidelity.yml'
+      - 'scripts/build-fidelity-app.sh'
+      - 'scripts/run-android-fidelity-tests.sh'
+      - 'scripts/run-ios-fidelity-tests.sh'
+      - 'scripts/lib/cn1ss.sh'
+      - 'scripts/common/java/**'
+      - 'scripts/fidelity-app/**'
+      - 'native-themes/ios-modern/**'
+      - 'native-themes/android-material/**'
+      - 'CodenameOne/src/**'
+      - 'Ports/Android/**'
+      - 'Ports/iOSPort/**'
+      - 'vm/**'
+      - 'maven/**'
+      - '!maven/core-unittests/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  fidelity-android:
+    name: Fidelity (Android, Material 3)
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      CN1SS_FAIL_ON_MISMATCH: '1'
+      CN1SS_FIDELITY_EPSILON: '2.0'
+      # CI renders differ subtly from a developer machine, so the committed
+      # goldens captured elsewhere will not match here. Re-seed goldens AND
+      # baseline from this environment's own native renders, then the same-run
+      # comparison + ratchet gate are evaluated against this environment.
+      # Refresh the per-environment native goldens (drift artifact); the
+      # ratchet gates the CN1-vs-native SCORE against the committed baseline,
+      # which is portable across environments because both sides are rendered
+      # here. A score gap beyond the epsilon fails loudly, surfacing a real
+      # environment/theme difference to investigate (then reseed deliberately).
+      FIDELITY_UPDATE_GOLDENS: '1'
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
+      - name: Cache codenameone-tools
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-fidelity-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+      - name: Cache Gradle
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-fidelity-${{ hashFiles('scripts/fidelity-app/**/gradle*') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+      - name: Setup workspace
+        run: ./scripts/setup-workspace.sh -q -DskipTests
+      - name: Build Android port
+        run: ./scripts/build-android-port.sh -q -DskipTests
+      - name: Regenerate native themes from CSS
+        # The fidelity app bundles a committed .res; theme.css is the source of
+        # truth. Recompile here so a stale committed copy can never silently
+        # render an old theme (the cause of phantom "regressions").
+        run: ./scripts/build-native-themes.sh
+      - name: Build fidelity app (Android)
+        id: build
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          ./scripts/build-fidelity-app.sh android -q -DskipTests
+      - name: Enable KVM for Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run fidelity suite (emulator)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          # The emulator profile is part of the android-m3 golden-set contract:
+          # the committed native references (scripts/build-android-native-ref.sh)
+          # are captured LOCALLY on the same API level AND the same 480x800 @
+          # 160dpi screen, so CI never generates references -- it only renders
+          # the CN1 side and diffs. The wm size/density override below is
+          # load-bearing: the runner's default AVD screen (320x640) is narrower
+          # than the 60mm tile (377px at 160dpi), which silently clamped every
+          # CN1 tile to the 320px screen width and skewed all comparator scores.
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          disk-size: 2048M
+          # The committed baseline is the ratchet floor: the gate fails the job
+          # on any regression. To re-anchor intentionally, run locally with
+          # FIDELITY_UPDATE_BASELINE=1 and commit the updated baseline JSON.
+          script: adb shell wm size 480x800 && adb shell wm density 160 && ./scripts/run-android-fidelity-tests.sh "${{ steps.build.outputs.gradle_project_dir }}"
+      - name: Upload fidelity artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-fidelity
+          path: |
+            artifacts/android-fidelity/**
+            scripts/fidelity-app/baseline/android-m3-fidelity-baseline.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  fidelity-ios-metal:
+    name: Fidelity (iOS Modern, Metal)
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      CN1SS_FAIL_ON_MISMATCH: '1'
+      CN1SS_FIDELITY_EPSILON: '2.0'
+      # iOS native references are COMMITTED goldens generated offline by
+      # scripts/build-ios-native-ref.sh (a real-UIWindow native app); they are not
+      # regenerated here, so no FIDELITY_UPDATE_GOLDENS.
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
+      - name: Cache codenameone-tools
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+      - name: Cache Maven repository
+        uses: actions/cache@v5
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-fidelity-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
+      - name: Setup workspace
+        run: ./scripts/setup-workspace.sh -q -DskipTests
+      - name: Build iOS port
+        run: ./scripts/build-ios-port.sh -q -DskipTests
+      - name: Regenerate native themes from CSS
+        # The fidelity app bundles a committed .res; theme.css is the source of
+        # truth. Recompile here so a stale committed copy can never silently
+        # render an old theme (the cause of phantom "regressions").
+        run: ./scripts/build-native-themes.sh
+      - name: Install Metal toolchain
+        run: xcodebuild -downloadComponent MetalToolchain || true
+      - name: Build fidelity app (iOS, Metal)
+        id: build
+        run: |
+          mkdir -p ~/.codenameone
+          cp maven/UpdateCodenameOne.jar ~/.codenameone/
+          ./scripts/build-fidelity-app.sh ios -q -DskipTests
+      - name: Build simulator app
+        id: simapp
+        run: |
+          set -euo pipefail
+          WS="$(find scripts/fidelity-app/ios/target -name '*.xcworkspace' -maxdepth 3 | head -n1)"
+          PROJ_DIR="$(dirname "$WS")"
+          SCHEME="$(xcodebuild -workspace "$WS" -list 2>/dev/null | awk '/Schemes:/{f=1;next} f&&NF{print $1; exit}')"
+          DD="$PROJ_DIR/dd"
+          # arm64-only: the macos-15 runner is Apple Silicon and the x86_64
+          # simulator slice fails to build the ParparVM SIMD code (clang
+          # '_Builtin_intrinsics.arm.neon requires feature neon' module error).
+          xcodebuild -workspace "$WS" -scheme "$SCHEME" -sdk iphonesimulator \
+            -configuration Debug -derivedDataPath "$DD" \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES VALID_ARCHS=arm64 \
+            CODE_SIGNING_ALLOWED=NO build
+          APP="$(find "$DD/Build/Products" -maxdepth 2 -name '*.app' -type d | head -n1)"
+          echo "app_path=$APP" >> "$GITHUB_OUTPUT"
+      - name: Boot simulator (runtime matching the golden set)
+        id: sim
+        run: |
+          set -euo pipefail
+          # The golden set names the OS design generation it was captured on
+          # (ios-26-metal). The suite MUST run on a matching runtime: a different
+          # iOS generation renders different SF fonts/glyphs and produces phantom
+          # regressions. Fail loudly if the runner lacks the runtime -- the fix is
+          # pinning a runner image/Xcode that ships it, never regenerating
+          # references on whatever the runner happens to have.
+          RUNTIME="$(xcrun simctl list runtimes | grep -Eo 'com.apple.CoreSimulator.SimRuntime.iOS-26[0-9-]*' | head -n1)"
+          if [ -z "$RUNTIME" ]; then
+            echo "::error::No iOS 26 simulator runtime on this runner (required by golden set ios-26-metal)."
+            xcrun simctl list runtimes
+            exit 78
+          fi
+          UDID="$(xcrun simctl list devices "$RUNTIME" available | grep -E 'iPhone 16 \(' | grep -Eo '[0-9A-F-]{36}' | head -n1 || true)"
+          if [ -z "$UDID" ]; then
+            UDID="$(xcrun simctl create "iPhone16-fidelity" "iPhone 16" "$RUNTIME")"
+          fi
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+      - name: Run fidelity suite (simulator, Metal)
+        # The committed baseline is the ratchet floor: the gate fails the job
+        # on any regression. To re-anchor intentionally, run locally with
+        # FIDELITY_UPDATE_BASELINE=1 and commit the updated baseline JSON.
+        run: ./scripts/run-ios-fidelity-tests.sh "${{ steps.simapp.outputs.app_path }}" "${{ steps.sim.outputs.udid }}"
+      - name: Upload fidelity artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-fidelity
+          path: |
+            artifacts/ios-fidelity/**
+            scripts/fidelity-app/baseline/ios-26-metal-fidelity-baseline.json
+          if-no-files-found: warn
+          retention-days: 14

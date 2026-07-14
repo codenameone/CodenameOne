@@ -151,6 +151,11 @@ mkdir -p "$SCREENSHOT_RAW_DIR" "$SCREENSHOT_PREVIEW_DIR"
 export CN1SS_OUTPUT_DIR="$SCREENSHOT_RAW_DIR"
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 
+# Tight golden gate (see run-ios-ui-tests.sh): the stock 0.30% default lets
+# widget-level regressions pass silently on full-screen captures. Mac Catalyst
+# renders deterministically; noisy screens carry per-test .tolerance files.
+export CN1SS_MAX_MISMATCH_PERCENT="${CN1SS_MAX_MISMATCH_PERCENT:-0.05}"
+
 # Start the host-side WebSocket screenshot server on the fixed standard port.
 # The Mac Catalyst app runs on this host, so the device-runner defaults to
 # ws://127.0.0.1:8765 with no per-launch URL injection (see

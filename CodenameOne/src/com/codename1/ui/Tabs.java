@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.accessibility.AccessibilityManager;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -124,6 +125,11 @@ public class Tabs extends Container {
     private EventDispatcher selectionListener;
     private boolean tabsFillRows;
     private boolean tabsGridLayout;
+    // Equal-width tab cells (each = row width / tab count), like a native UITabBar --
+    // so a longer label can't widen its cell and shove the others over. Opt in via
+    // `tabsEqualWidthBool`. Uses a non-scrolling GridLayout so cells fill the row
+    // width evenly (plain grid sizes to the widest cell and overflows).
+    private boolean tabsEqualWidth;
     private int textPosition = -1;
     private boolean changeTabOnFocus;
     private boolean changeTabContainerStyleOnFocus;
@@ -144,9 +150,20 @@ public class Tabs extends Container {
     // underline drawn under the currently-selected tab tweens its
     // x/width between the previous and new tabs on selection change.
     private boolean animatedIndicator;
+    // iOS 26 sliding selection capsule: a single Liquid Glass blob behind the
+    // selected tab that slides between tabs on selection change (reuses the
+    // indicator motion below). Opt in via `tabsSelectionCapsuleBool`.
+    private boolean selectionCapsule;
     private int animatedIndicatorDurationMs = 200;
     private int animatedIndicatorThicknessMm = 1; // 1mm-tall underline
     private Motion indicatorAnimMotion;
+    // The tab index the indicator morph is currently travelling TO. Lets a re-entrant
+    // setSelectedIndex (e.g. the content-slide finishing) recognise that a morph to the
+    // same tab is already in flight and NOT restart it mid-travel.
+    private int indicatorTargetIndex = -1;
+    // TEST-ONLY: when >=0, paintSelectionCapsule renders the morph at this fixed
+    // 0..120 progress instead of the live motion (for the JavaSE capture probe).
+    private int morphTestValue = -1;
     // Tab bounds at the start of the indicator animation.
     private int indicatorFromX;
     private int indicatorFromW;
@@ -182,6 +199,12 @@ public class Tabs extends Container {
             @Override
             public void paint(Graphics g) {
                 super.paint(g);
+                // The iOS 26 selection "drop" is a LENS painted OVER the bar + the
+                // (black) glyphs -- it magnifies, chromatically aberrates and
+                // dark->accent tints the content beneath it, so the selected blue
+                // exists only inside the drop. Painted AFTER super.paint for that.
+                paintSelectionCapsule(g);
+                paintBottomDivider(g);
                 paintAnimatedIndicator(g);
             }
         };
@@ -198,10 +221,23 @@ public class Tabs extends Container {
         tabsContainer.setSafeArea(tabsSafeAreaOnPill);
         tabsContainer.setUIID("TabsContainer");
         tabsContainer.setScrollVisible(false);
-        tabsContainer.getStyle().setMargin(0, 0, 0, 0);
-        if (!tabsSafeAreaOnPill) {
+        if (tabsSafeAreaOnPill) {
+            // Legacy / flush full-width bar: the background reaches the screen
+            // edges, so the bar carries no margin.
+            tabsContainer.getStyle().setMargin(0, 0, 0, 0);
+        } else {
+            // Modern floating glass pill: KEEP the theme's TabsContainer margin
+            // (e.g. iOS-modern's 0.5mm/1mm) so the pill insets from the screen
+            // edges and reads as a floating capsule rather than a full-width bar.
+            // Forcing the margin to 0 here defeated the float. The host below is a
+            // transparent spacer that only absorbs the safe-area inset; the pill
+            // itself paints the glass, so the host must not tint behind it.
             tabsContainerHost = new Container(new BorderLayout());
-            tabsContainerHost.setUIID("Container");
+            // Dedicated UIID so a theme can tune the host (e.g. a negative bottom
+            // margin to pull the floating pill closer to the home indicator).
+            // Defaults to transparent so only the pill paints the glass.
+            tabsContainerHost.setUIID("TabsContainerHost");
+            tabsContainerHost.getStyle().setBgTransparency(0);
             tabsContainerHost.setSafeArea(true);
             tabsContainerHost.add(BorderLayout.CENTER, tabsContainer);
         }
@@ -226,6 +262,7 @@ public class Tabs extends Container {
         setUIIDFinal("Tabs");
         // Opt-in animated indicator (Material 3 NavigationBar style).
         animatedIndicator = getUIManager().isThemeConstant("tabsAnimatedIndicatorBool", false);
+        selectionCapsule = getUIManager().isThemeConstant("tabsSelectionCapsuleBool", false);
         animatedIndicatorDurationMs = getUIManager().getThemeConstant("tabsAnimatedIndicatorDurationInt", 200);
         BorderLayout bd = (BorderLayout) super.getLayout();
         if (bd != null) {
@@ -248,11 +285,16 @@ public class Tabs extends Container {
 
     private void checkTabsCanBeSeen() {
         if (UIManager.getInstance().isThemeConstant("tabsOnTopBool", false)) {
+            // The whole bar's height -- the floating pill PLUS the safe-area host
+            // wrapper when present -- so the last scrollable rows clear the bar
+            // (the content scrolls UNDER the translucent pill, native style).
+            Component bar = tabsContainerHost != null ? tabsContainerHost : tabsContainer;
+            int barH = bar.getPreferredH();
             for (int iter = 0; iter < getTabCount(); iter++) {
                 Component c = getTabComponentAt(iter);
                 if (c.isScrollableY()) {
-                    if (c.getStyle().getPaddingBottom() < tabsContainer.getPreferredH()) {
-                        c.getStyle().setPadding(BOTTOM, tabsContainer.getPreferredH());
+                    if (c.getStyle().getPaddingBottom() < barH) {
+                        c.getStyle().setPadding(BOTTOM, barH);
                     }
                 }
             }
@@ -266,6 +308,7 @@ public class Tabs extends Container {
         int tabPlace = manager.getThemeConstant("tabPlacementInt", -1);
         tabsFillRows = manager.isThemeConstant("tabsFillRowsBool", false);
         tabsGridLayout = manager.isThemeConstant("tabsGridBool", false);
+        tabsEqualWidth = manager.isThemeConstant("tabsEqualWidthBool", false);
         changeTabOnFocus = manager.isThemeConstant("changeTabOnFocusBool", false);
         BorderLayout bd = (BorderLayout) super.getLayout();
         if (bd != null) {
@@ -357,6 +400,18 @@ public class Tabs extends Container {
         if (indicatorAnimMotion != null) {
             if (indicatorAnimMotion.isFinished()) {
                 indicatorAnimMotion = null;
+                indicatorTargetIndex = -1;
+                // Paint ONE more frame now that the morph is over so the SETTLED capsule
+                // (animating==false -> a clean, un-stretched pill at the target) replaces the
+                // last in-flight frame. Without this the final animated frame -- often still
+                // elongated/overshot, especially at a low frame rate -- lingered until the
+                // next unrelated repaint ("settle is stretched too far right, recovers on
+                // repaint").
+                tabsContainer.repaint();
+                b = true;
+                // The morph drove the registration (possibly past a shorter content-slide);
+                // release it now that it is done (no-op if a slide is still in flight).
+                deregisterAnimatedInternal();
             } else {
                 tabsContainer.repaint();
                 b = true;
@@ -410,7 +465,11 @@ public class Tabs extends Container {
 
     @Override
     void deregisterAnimatedInternal() {
-        if (slideToDestMotion == null || (slideToDestMotion.isFinished())) {
+        // Only stop ticking the Tabs animation when BOTH the content-slide AND the
+        // indicator morph are done. Previously a finished 200ms slide deregistered the
+        // animation while the 550ms morph was still in flight, freezing the drop mid-travel.
+        if ((slideToDestMotion == null || slideToDestMotion.isFinished())
+                && (indicatorAnimMotion == null || indicatorAnimMotion.isFinished())) {
             Form f = getComponentForm();
             if (f != null) {
                 f.deregisterAnimatedInternal(this);
@@ -1300,6 +1359,7 @@ public class Tabs extends Container {
         if (index == activeComponent) {
             return;
         }
+        accessibilityChanged(AccessibilityManager.CHANGE_STATE | AccessibilityManager.CHANGE_PANE);
         // Snapshot the current tab bounds *before* we mutate state, so the
         // animated indicator can tween from where it visibly is to the new
         // selection's bounds.
@@ -1375,8 +1435,21 @@ public class Tabs extends Container {
         return animatedIndicator;
     }
 
+    /// Duration in milliseconds of the selection morph -- both the Material
+    /// underline tween and the iOS 26 Liquid Glass selection-capsule spring.
+    /// Defaults to the `tabsAnimatedIndicatorDurationInt` theme constant.
+    public void setAnimatedIndicatorDuration(int durationMs) {
+        this.animatedIndicatorDurationMs = durationMs;
+    }
+
+    /// Returns the selection-morph duration in milliseconds. See
+    /// `#setAnimatedIndicatorDuration(int)`.
+    public int getAnimatedIndicatorDuration() {
+        return animatedIndicatorDurationMs;
+    }
+
     private void startIndicatorAnimation(int fromIndex, int toIndex) {
-        if (!animatedIndicator || tabsContainer == null) {
+        if ((!animatedIndicator && !selectionCapsule) || tabsContainer == null) {
             return;
         }
         if (fromIndex < 0 || fromIndex >= tabsContainer.getComponentCount()
@@ -1385,25 +1458,322 @@ public class Tabs extends Container {
         }
         Component fromTab = tabsContainer.getComponentAt(fromIndex);
         Component toTab = tabsContainer.getComponentAt(toIndex);
+        // The selection capsule fills the whole CELL (and hugs the pill edge for the
+        // first/last tab); the Material underline tracks the tab's own bounds. Pick the
+        // matching geometry so the resting and animated positions agree.
+        int[] from = new int[2];
+        int[] to = new int[2];
+        if (selectionCapsule) {
+            int cInset = selectionCapsuleInsetPx();
+            capsuleCellBounds(fromIndex, cInset, from);
+            capsuleCellBounds(toIndex, cInset, to);
+        } else {
+            from[0] = fromTab.getX(); from[1] = fromTab.getWidth();
+            to[0] = toTab.getX(); to[1] = toTab.getWidth();
+        }
         // If a motion is already in flight, start from the *current*
         // interpolated position, not from the previous tab -- otherwise
         // rapid double-clicks jump back to a stale baseline.
         if (indicatorAnimMotion != null && !indicatorAnimMotion.isFinished()) {
+            if (toIndex == indicatorTargetIndex) {
+                // A morph to this SAME tab is already running. The content-slide finishing
+                // re-invokes setSelectedIndex(active) to finalise the selection; restarting
+                // the morph here froze/jumped the drop mid-travel ("stops before the end").
+                // Let the in-flight morph run to completion instead.
+                return;
+            }
             int v = indicatorAnimMotion.getValue();
             indicatorFromX = indicatorFromX + ((indicatorToX - indicatorFromX) * v / 100);
             indicatorFromW = indicatorFromW + ((indicatorToW - indicatorFromW) * v / 100);
         } else {
-            indicatorFromX = fromTab.getX();
-            indicatorFromW = fromTab.getWidth();
+            indicatorFromX = from[0];
+            indicatorFromW = from[1];
         }
-        indicatorToX = toTab.getX();
-        indicatorToW = toTab.getWidth();
-        indicatorAnimMotion = Motion.createEaseInOutMotion(0, 100, animatedIndicatorDurationMs);
+        indicatorToX = to[0];
+        indicatorToW = to[1];
+        indicatorTargetIndex = toIndex;
+        // LINEAR-TIME motion: the value is the morph timeline 0..100 and
+        // paintSelectionCapsule derives the spring position (springEaseTabs, an
+        // ease-out-back overshoot) AND the height/squash envelopes from it -- so the
+        // bubble stays tall while travelling and compresses at the stop. (The non-glass
+        // Material underline path reads the same value as a plain position fraction.)
+        indicatorAnimMotion = Motion.createLinearMotion(0, 100, animatedIndicatorDurationMs);
         indicatorAnimMotion.start();
         Form f = getComponentForm();
         if (f != null) {
             f.registerAnimatedInternal(this);
         }
+    }
+
+    /// Material 3 tab strips carry a full-width hairline divider along the bottom
+    /// edge of the tab row (the surfaceVariant outline separating the bar from the
+    /// content below). A CSS `border-bottom` cannot be relied on here -- the tab
+    /// row is a custom Container whose painting path does not surface the underline
+    /// border -- so themes opt in via the `tabsBottomDividerBool` constant and we
+    /// paint it directly. The colour comes from the `TabsDivider` UIID's background
+    /// (so it tracks light/dark automatically, like `TabIndicator`);
+    /// `tabsBottomDividerThicknessMm` (default 0.15mm) sets the line weight.
+    void paintBottomDivider(Graphics g) {
+        if (!getUIManager().isThemeConstant("tabsBottomDividerBool", false)) {
+            return;
+        }
+        int color = getUIManager().getComponentStyle("TabsDivider").getBgColor();
+        float thickMm = 0.15f;
+        try {
+            thickMm = Float.parseFloat(getUIManager().getThemeConstant("tabsBottomDividerThicknessMm", "0.15"));
+        } catch (NumberFormatException ignore) {
+            // malformed constant -> keep the 0.15mm default
+        }
+        int thickness = Display.getInstance().convertToPixels(thickMm);
+        if (thickness < 1) {
+            thickness = 1;
+        }
+        int oldColor = g.getColor();
+        int oldAlpha = g.getAlpha();
+        g.setColor(color);
+        g.setAlpha(255);
+        int y = tabsContainer.getY() + tabsContainer.getHeight() - thickness;
+        g.fillRect(tabsContainer.getX(), y, tabsContainer.getWidth(), thickness);
+        g.setColor(oldColor);
+        g.setAlpha(oldAlpha);
+    }
+
+    // Position easing (springEaseTabs) + smoothstep (lensSmooth) now live in the pure
+    // TabSelectionMorph model (springEase / smooth) so the morph math is unit-testable.
+
+    /// The thin frost rim left around the selection capsule (tabSelInsetMm, default a hair).
+    private int selectionCapsuleInsetPx() {
+        float insetMm = 0.1f;
+        String iv = getUIManager().getThemeConstant("tabSelInsetMm", null);
+        if (iv != null) {
+            try {
+                insetMm = Float.parseFloat(iv.trim());
+            } catch (NumberFormatException ignore) {
+                insetMm = 0.1f;   // malformed constant -> keep the hairline default
+            }
+        }
+        return Display.getInstance().convertToPixels(insetMm);
+    }
+
+    /// Horizontal bounds of the selection capsule for tab `index`, in the
+    /// tabsContainer inner coordinate space (add getInnerX()). The capsule fills the
+    /// whole CELL -- midpoint-to-midpoint between neighbours -- and hugs the pill's
+    /// outer edge (minus the thin rim) for the first/last tab, like a native UITabBar.
+    /// out[0]=x, out[1]=w.
+    private void capsuleCellBounds(int index, int inset, int[] out) {
+        int n = tabsContainer.getComponentCount();
+        Component t = tabsContainer.getComponentAt(index);
+        int padLeft = tabsContainer.getInnerX() - tabsContainer.getX();
+        int padRight = (tabsContainer.getX() + tabsContainer.getWidth())
+                - (tabsContainer.getInnerX() + tabsContainer.getInnerWidth());
+        int left;
+        int right;
+        // Tab.getX() is tabsContainer-relative (it INCLUDES the container's left
+        // padding). paintSelectionCapsule adds getInnerX() (which also includes that
+        // padding), so the midpoint branches must subtract padLeft to land in the
+        // same inner-x space as the first/last branches -- otherwise every non-first
+        // tab's capsule drifts right by padLeft (the first tab compensated, hiding it).
+        if (index <= 0) {
+            left = -padLeft + inset;                       // pill outer left edge
+        } else {
+            Component p = tabsContainer.getComponentAt(index - 1);
+            left = (p.getX() + p.getWidth() + t.getX()) / 2 - padLeft;   // midpoint to previous tab
+        }
+        if (index >= n - 1) {
+            right = tabsContainer.getInnerWidth() + padRight - inset;   // pill outer right edge
+        } else {
+            Component nx = tabsContainer.getComponentAt(index + 1);
+            right = (t.getX() + t.getWidth() + nx.getX()) / 2 - padLeft;          // midpoint to next tab
+        }
+        out[0] = left;
+        out[1] = right - left;
+    }
+
+    /// TEST-ONLY hook: render the selection morph frozen at a fixed progress
+    /// (`value` 0..120, where 100 is the target and &gt;100 is the settle overshoot)
+    /// travelling from `fromIndex` to `toIndex`, so a JavaSE probe can capture exact
+    /// frames of the animation without racing the real-time motion. Pass `value` &lt; 0
+    /// to clear and resume normal behaviour.
+    public void setMorphTestState(int fromIndex, int toIndex, int value) {
+        if (tabsContainer == null || tabsContainer.getComponentCount() == 0) {
+            return;
+        }
+        if (value >= 0) {
+            int cInset = selectionCapsuleInsetPx();
+            int[] from = new int[2];
+            int[] to = new int[2];
+            capsuleCellBounds(fromIndex, cInset, from);
+            capsuleCellBounds(toIndex, cInset, to);
+            indicatorFromX = from[0];
+            indicatorFromW = from[1];
+            indicatorToX = to[0];
+            indicatorToW = to[1];
+            activeComponent = toIndex;
+        }
+        morphTestValue = value;
+        tabsContainer.repaint();
+    }
+
+    /// The iOS "selected cell" background: a subtle grey capsule kept at bar height
+    /// (the lens drop, drawn over it, bulges taller). Travels + elongates with the
+    /// drop. systemFill grey so it reads neutral, not blue. Alpha via tabSelPillAlphaInt.
+    private void drawSelectionPill(Graphics g, int capX, int capY, int w, int capH, float bump) {
+        int pillInset = capH * 7 / 100;                 // pill a hair shorter than the lens
+        int py = capY + pillInset;
+        int ph = capH - 2 * pillInset;
+        if (ph <= 0) {
+            return;
+        }
+        // FADE the grey pill out as the drop travels: the settled "selected cell"
+        // background is grey, but MID-FLIGHT the bubble is pure transparent glass
+        // (otherwise the grey shows through the gap between tabs as an empty blob).
+        int baseAlpha = getUIManager().getThemeConstant("tabSelPillAlphaInt", 34);
+        int alpha = (int) (baseAlpha * (1f - 0.85f * bump));
+        if (alpha <= 0) {
+            return;
+        }
+        int oldC = g.getColor();
+        int oldA = g.getAlpha();
+        boolean aa = g.isAntiAliased();
+        g.setAntiAliased(true);
+        g.setColor(getUIManager().getThemeConstant("tabSelPillColorInt", 0x767680));
+        g.setAlpha(alpha);
+        g.fillRoundRect(capX, py, w, ph, ph, ph);
+        g.setAntiAliased(aa);
+        g.setColor(oldC);
+        g.setAlpha(oldA);
+    }
+
+    /// Draws the iOS 26 sliding selection capsule -- a single Liquid Glass blob
+    /// behind the selected tab that tweens between tabs on selection change (reusing
+    /// the indicator motion). Painted BEHIND the tab content so the icon/label sit on
+    /// top. Opt in with `tabsSelectionCapsuleBool`. The glass material is rendered via
+    /// Graphics.glassRegion when `glassMaterialBool` is set (iOS); other platforms get
+    /// a translucent rounded-capsule fallback. The selected tab's own background must
+    /// be transparent so only this single capsule shows.
+    void paintSelectionCapsule(Graphics g) {
+        if (!selectionCapsule || tabsContainer == null || tabsContainer.getComponentCount() == 0) {
+            return;
+        }
+        if (activeComponent < 0 || activeComponent >= tabsContainer.getComponentCount()) {
+            return;
+        }
+        // The selection capsule should fill (almost) the full pill height like native --
+        // a large inset leaves a bright bar-frost band above/below it (reads as a
+        // separate inset pill / "ring"). Tunable via tabSelInsetMm (default a hair).
+        int inset = selectionCapsuleInsetPx();
+        // Bar vertical geometry: span the OUTER pill height (not the padded inner box) so
+        // the capsule reaches the pill edge like native -- using getInnerY()/Height()
+        // leaves the bar's padding as a bright frost band above/below (the visible "ring").
+        int padTopPx = tabsContainer.getInnerY() - tabsContainer.getY();
+        int padBotPx = (tabsContainer.getY() + tabsContainer.getHeight())
+                - (tabsContainer.getInnerY() + tabsContainer.getInnerHeight());
+        int innerX = tabsContainer.getInnerX();
+        int capYBase = tabsContainer.getInnerY() - padTopPx + inset;
+        int capHBase = tabsContainer.getInnerHeight() + padTopPx + padBotPx - 2 * inset;
+        if (capHBase <= 0) {
+            return;
+        }
+
+        // Source/target cell bounds (inner-x space). morphTestValue (>=0) renders a fixed
+        // LINEAR-TIME progress for the probe; otherwise the live motion drives t. When not
+        // animating we settle by asking the model for t=1 with from==to==the active cell.
+        int fromX;
+        int fromW;
+        int toX;
+        int toW;
+        float t;
+        if (morphTestValue >= 0 || indicatorAnimMotion != null) {
+            int v = morphTestValue >= 0 ? morphTestValue : indicatorAnimMotion.getValue();
+            t = (v < 0 ? 0 : (v > 100 ? 100 : v)) / 100f;
+            fromX = indicatorFromX;
+            fromW = indicatorFromW;
+            toX = indicatorToX;
+            toW = indicatorToW;
+        } else {
+            int[] cb = new int[2];
+            capsuleCellBounds(activeComponent, inset, cb);
+            fromX = cb[0];
+            fromW = cb[1];
+            toX = cb[0];
+            toW = cb[1];
+            t = 1f;
+        }
+
+        // Whole-bar extent (paint space) for the grow pass.
+        int nTabs = tabsContainer.getComponentCount();
+        int[] cb0 = new int[2];
+        int[] cbN = new int[2];
+        capsuleCellBounds(0, inset, cb0);
+        capsuleCellBounds(nTabs - 1, inset, cbN);
+        int barLeftX = innerX + cb0[0];
+        int barRightX = innerX + cbN[0] + cbN[1];
+
+        // The whole frame -- pill rect, lens rect + params, bar-grow rect -- is produced by
+        // the pure, unit-tested TabSelectionMorph model so the motion can be validated
+        // deterministically (see TabSelectionMorphTest / the fidelity animation-frame probe).
+        TabSelectionMorph m = TabSelectionMorph.compute(t, fromX, fromW, toX, toW,
+                innerX, capYBase, capHBase, barLeftX, barRightX, morphTokens());
+        if (m.capW <= 0 || m.capH <= 0) {
+            return;
+        }
+
+        // Dark/light by the bar's fg luma -- the TabsContainer fg is distinguishable
+        // (text-secondary), unlike the accent-blue selected-tab fg.
+        int fg = tabsContainer.getStyle().getFgColor();
+        int fgLuma = (int) (0.2126f * ((fg >> 16) & 0xff) + 0.7152f * ((fg >> 8) & 0xff) + 0.0722f * (fg & 0xff));
+        boolean dark = fgLuma > 128;
+        if (getUIManager().isThemeConstant("glassMaterialBool", false)) {
+            // iOS 26 selection DROP: a subtle grey selection PILL at bar height plus a glass
+            // LENS painted OVER the (dark) glyphs that magnifies + chromatically aberrates +
+            // dark->accent tints the content beneath, so the blue exists ONLY inside the
+            // drop. A brief WHOLE-BAR GROW (uniform magnify, no tint) swells the bar at the
+            // very start. All rects/params come from the morph model above.
+            if (m.barGrow) {
+                g.lensRegion(m.barGrowX, m.barGrowY, m.barGrowW, m.barGrowH,
+                        -1f, m.barGrowMag, 0f, 0x000000, 0f);
+            }
+            drawSelectionPill(g, m.capX, m.capY, m.capW, m.capH, m.flight);
+            // Accent supplied by the lens in LIGHT mode only: the keying tints DARK
+            // pixels toward the accent, which is right over a light frost (the
+            // deliberately-dark glyphs turn blue) but floods a dark bar solid blue,
+            // because everything under the drop is dark there. On dark bars the
+            // glyphs carry the accent directly (theme) and the lens keeps only its
+            // magnify/aberration optics.
+            int tint = getUIManager().getThemeConstant("tabSelLensTintColorInt", 0x0a84ff);
+            g.lensRegion(m.lensX, m.lensY, m.lensW, m.lensH, -1f, m.magnify, m.aberration, tint, dark ? 0f : m.tintStrength);
+            return;
+        }
+        // Non-glass platforms: a translucent rounded capsule.
+        int oldA = g.getAlpha();
+        int oldC = g.getColor();
+        boolean aa = g.isAntiAliased();
+        g.setAntiAliased(true);
+        g.setColor(dark ? 0x8e8e93 : 0xffffff);
+        g.setAlpha(dark ? 120 : 205);
+        g.fillRoundRect(m.capX, m.capY, m.capW, m.capH, m.capH, m.capH);
+        g.setAntiAliased(aa);
+        g.setColor(oldC);
+        g.setAlpha(oldA);
+    }
+
+    /// Resolves the selection-morph tokens from the theme's HIGH-LEVEL controls
+    /// only (review: fewer, coherent morph knobs): tabsMorphPreset picks a named
+    /// envelope set inside the motion model ("ios26" default / "subtle"),
+    /// tabsMorphLensIntensityPct scales the lens optics around the preset (100 =
+    /// as authored) and tabsMorphSpringPct scales the settle overshoot (100 =
+    /// preset bounce, 0 = plain stop). Duration remains
+    /// tabsAnimatedIndicatorDurationInt. The mm lengths carried by the preset
+    /// are converted to px here so the model stays Display-free.
+    private TabSelectionMorph.Tokens morphTokens() {
+        UIManager uim = getUIManager();
+        TabSelectionMorph.Tokens tk = TabSelectionMorph.Tokens.preset(
+                uim.getThemeConstant("tabsMorphPreset", "ios26"));
+        tk.scaleLensIntensity(uim.getThemeConstant("tabsMorphLensIntensityPct", 100) / 100f);
+        tk.spring = uim.getThemeConstant("tabsMorphSpringPct", 100) / 100f;
+        tk.liftPx = Display.getInstance().convertToPixels(tk.liftMm);
+        tk.downBiasPx = Display.getInstance().convertToPixels(tk.downBiasMm);
+        return tk;
     }
 
     /// Draws the animated indicator inside `tabsContainer`'s paint flow. Called
@@ -1424,7 +1794,18 @@ public class Tabs extends Container {
             x = active.getX();
             w = active.getWidth();
         }
-        int thicknessMm = getUIManager().getThemeConstant("tabsAnimatedIndicatorThicknessMm", animatedIndicatorThicknessMm);
+        // Read as a FLOAT mm value: the Material 3 indicator is ~0.45mm, but an
+        // int read truncates fractional millimetres (and a non-integer constant
+        // like "0.45" fails int parsing, silently falling back to the 1mm default
+        // -- a ~2x-too-thick indicator). Parse the string form so sub-mm
+        // thicknesses survive.
+        float thicknessMm = animatedIndicatorThicknessMm;
+        try {
+            thicknessMm = Float.parseFloat(getUIManager().getThemeConstant(
+                    "tabsAnimatedIndicatorThicknessMm", String.valueOf(animatedIndicatorThicknessMm)));
+        } catch (NumberFormatException ignore) {
+            // malformed constant -> keep the default indicator thickness
+        }
         int thickness = Display.getInstance().convertToPixels(thicknessMm);
         // Use TabIndicator UIID color when its fg is set; otherwise pull
         // from the selected tab's foreground. `getComponentStyle(...)`
@@ -1444,7 +1825,32 @@ public class Tabs extends Container {
         g.setColor(color);
         g.setAlpha(255);
         int y = tabsContainer.getInnerY() + tabsContainer.getInnerHeight() - thickness;
-        g.fillRect(tabsContainer.getInnerX() + x, y, w, thickness);
+        // Material 3 draws the active indicator as a SHORT rounded pill matching the
+        // selected tab's LABEL width (not the full tab cell). Opt in with
+        // tabsIndicatorPillBool; legacy themes keep the full-width square line.
+        int indX = tabsContainer.getInnerX() + x;
+        int indW = w;
+        boolean pill = getUIManager().isThemeConstant("tabsIndicatorPillBool", false);
+        if (pill) {
+            Component active = tabsContainer.getComponentAt(activeComponent);
+            if (active instanceof Button) {
+                Button ab = (Button) active;
+                // stringWidth is the glyph ADVANCE, a few px wider than the visible
+                // ink; Material's indicator matches the ink width, so trim a hair.
+                int textW = ab.getStyle().getFont().stringWidth(ab.getText())
+                        - Display.getInstance().convertToPixels(0.45f);
+                if (textW > 0 && textW < w) {
+                    indW = textW;
+                    indX = tabsContainer.getInnerX() + x + (w - indW) / 2;
+                }
+            }
+            boolean priorAa = g.isAntiAliased();
+            g.setAntiAliased(true);
+            g.fillRoundRect(indX, y, indW, thickness, thickness, thickness);
+            g.setAntiAliased(priorAa);
+        } else {
+            g.fillRect(indX, y, indW, thickness);
+        }
         g.setColor(oldColor);
         g.setAlpha(oldAlpha);
     }
@@ -1575,6 +1981,16 @@ public class Tabs extends Container {
 
     private void setTabsLayout(int tabPlacement) {
         if (tabPlacement == TOP || tabPlacement == BOTTOM) {
+            // Equal-width cells filling the row (native UITabBar even spacing): a
+            // NON-scrolling GridLayout divides the row width into equal columns, so a
+            // longer label can't widen its cell. (A scrolling grid sizes to the widest
+            // cell and overflows; fill-rows leaves cells content-sized.)
+            if (tabsEqualWidth) {
+                tabsContainer.setLayout(new GridLayout(1, Math.max(1, getTabCount())));
+                tabsContainer.setScrollableX(false);
+                tabsContainer.setScrollableY(false);
+                return;
+            }
             if (tabsFillRows) {
                 FlowLayout f = new FlowLayout();
                 f.setFillRows(true);

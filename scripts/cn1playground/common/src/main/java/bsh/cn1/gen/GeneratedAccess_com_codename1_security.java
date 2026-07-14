@@ -53,6 +53,9 @@ public final class GeneratedAccess_com_codename1_security {
         if ("CryptoException".equals(simpleName)) {
             return com.codename1.security.CryptoException.class;
         }
+        if ("DeviceIntegrity".equals(simpleName)) {
+            return com.codename1.security.DeviceIntegrity.class;
+        }
         if ("Hash".equals(simpleName)) {
             return com.codename1.security.Hash.class;
         }
@@ -82,6 +85,9 @@ public final class GeneratedAccess_com_codename1_security {
         }
         if ("SecretKey".equals(simpleName)) {
             return com.codename1.security.SecretKey.class;
+        }
+        if ("Secrets".equals(simpleName)) {
+            return com.codename1.security.Secrets.class;
         }
         if ("SecureRandom".equals(simpleName)) {
             return com.codename1.security.SecureRandom.class;
@@ -146,16 +152,18 @@ public final class GeneratedAccess_com_codename1_security {
         if (type == com.codename1.security.Base32.class) return invokeStatic0(name, safeArgs);
         if (type == com.codename1.security.Biometrics.class) return invokeStatic1(name, safeArgs);
         if (type == com.codename1.security.Cipher.class) return invokeStatic2(name, safeArgs);
-        if (type == com.codename1.security.Hash.class) return invokeStatic3(name, safeArgs);
-        if (type == com.codename1.security.Hmac.class) return invokeStatic4(name, safeArgs);
-        if (type == com.codename1.security.Jwt.class) return invokeStatic5(name, safeArgs);
-        if (type == com.codename1.security.KeyGenerator.class) return invokeStatic6(name, safeArgs);
-        if (type == com.codename1.security.Otp.class) return invokeStatic7(name, safeArgs);
-        if (type == com.codename1.security.PrivateKey.class) return invokeStatic8(name, safeArgs);
-        if (type == com.codename1.security.PublicKey.class) return invokeStatic9(name, safeArgs);
-        if (type == com.codename1.security.SecureRandom.class) return invokeStatic10(name, safeArgs);
-        if (type == com.codename1.security.SecureStorage.class) return invokeStatic11(name, safeArgs);
-        if (type == com.codename1.security.Signature.class) return invokeStatic12(name, safeArgs);
+        if (type == com.codename1.security.DeviceIntegrity.class) return invokeStatic3(name, safeArgs);
+        if (type == com.codename1.security.Hash.class) return invokeStatic4(name, safeArgs);
+        if (type == com.codename1.security.Hmac.class) return invokeStatic5(name, safeArgs);
+        if (type == com.codename1.security.Jwt.class) return invokeStatic6(name, safeArgs);
+        if (type == com.codename1.security.KeyGenerator.class) return invokeStatic7(name, safeArgs);
+        if (type == com.codename1.security.Otp.class) return invokeStatic8(name, safeArgs);
+        if (type == com.codename1.security.PrivateKey.class) return invokeStatic9(name, safeArgs);
+        if (type == com.codename1.security.PublicKey.class) return invokeStatic10(name, safeArgs);
+        if (type == com.codename1.security.Secrets.class) return invokeStatic11(name, safeArgs);
+        if (type == com.codename1.security.SecureRandom.class) return invokeStatic12(name, safeArgs);
+        if (type == com.codename1.security.SecureStorage.class) return invokeStatic13(name, safeArgs);
+        if (type == com.codename1.security.Signature.class) return invokeStatic14(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
@@ -213,6 +221,52 @@ public final class GeneratedAccess_com_codename1_security {
     }
 
     private static Object invokeStatic3(String name, Object[] safeArgs) throws Exception {
+        if ("getCompromiseReasons".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.security.DeviceIntegrity.getCompromiseReasons();
+            }
+        }
+        if ("getEnabledAccessibilityServices".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.security.DeviceIntegrity.getEnabledAccessibilityServices();
+            }
+        }
+        if ("hasUntrustedAccessibilityService".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String[].class}, true)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String[].class}, true);
+                java.lang.String[] varArgs = new java.lang.String[adaptedArgs.length - 0];
+                for (int i = 0; i < adaptedArgs.length; i++) {
+                    varArgs[i - 0] = (java.lang.String) adaptedArgs[i];
+                }
+                return com.codename1.security.DeviceIntegrity.hasUntrustedAccessibilityService(varArgs);
+            }
+        }
+        if ("isAttestationSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.security.DeviceIntegrity.isAttestationSupported();
+            }
+        }
+        if ("isDeviceCompromised".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.security.DeviceIntegrity.isDeviceCompromised();
+            }
+        }
+        if ("requestIntegrityToken".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.security.DeviceIntegrity.requestIntegrityToken((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("setSecureScreen".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                com.codename1.security.DeviceIntegrity.setSecureScreen(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        throw unsupportedStatic(com.codename1.security.DeviceIntegrity.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic4(String name, Object[] safeArgs) throws Exception {
         if ("create".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -270,7 +324,7 @@ public final class GeneratedAccess_com_codename1_security {
         throw unsupportedStatic(com.codename1.security.Hash.class, name, safeArgs);
     }
 
-    private static Object invokeStatic4(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic5(String name, Object[] safeArgs) throws Exception {
         if ("constantTimeEquals".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, byte[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, byte[].class}, false);
@@ -322,7 +376,7 @@ public final class GeneratedAccess_com_codename1_security {
         throw unsupportedStatic(com.codename1.security.Hmac.class, name, safeArgs);
     }
 
-    private static Object invokeStatic5(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic6(String name, Object[] safeArgs) throws Exception {
         if ("parse".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
@@ -366,7 +420,7 @@ public final class GeneratedAccess_com_codename1_security {
         throw unsupportedStatic(com.codename1.security.Jwt.class, name, safeArgs);
     }
 
-    private static Object invokeStatic6(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic7(String name, Object[] safeArgs) throws Exception {
         if ("aes".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
@@ -388,7 +442,7 @@ public final class GeneratedAccess_com_codename1_security {
         throw unsupportedStatic(com.codename1.security.KeyGenerator.class, name, safeArgs);
     }
 
-    private static Object invokeStatic7(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic8(String name, Object[] safeArgs) throws Exception {
         if ("hotp".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{byte[].class, java.lang.Long.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class, java.lang.Long.class, java.lang.Integer.class}, false);
@@ -436,7 +490,7 @@ public final class GeneratedAccess_com_codename1_security {
         throw unsupportedStatic(com.codename1.security.Otp.class, name, safeArgs);
     }
 
-    private static Object invokeStatic8(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic9(String name, Object[] safeArgs) throws Exception {
         if ("fromPkcs8".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, byte[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, byte[].class}, false);
@@ -452,7 +506,7 @@ public final class GeneratedAccess_com_codename1_security {
         throw unsupportedStatic(com.codename1.security.PrivateKey.class, name, safeArgs);
     }
 
-    private static Object invokeStatic9(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic10(String name, Object[] safeArgs) throws Exception {
         if ("fromX509".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, byte[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, byte[].class}, false);
@@ -468,7 +522,33 @@ public final class GeneratedAccess_com_codename1_security {
         throw unsupportedStatic(com.codename1.security.PublicKey.class, name, safeArgs);
     }
 
-    private static Object invokeStatic10(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic11(String name, Object[] safeArgs) throws Exception {
+        if ("clear".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                com.codename1.security.Secrets.clear((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("get".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.security.Secrets.get((java.lang.String) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                return com.codename1.security.Secrets.get((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+        }
+        if ("refresh".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.security.Secrets.refresh((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedStatic(com.codename1.security.Secrets.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic12(String name, Object[] safeArgs) throws Exception {
         if ("bytes".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
@@ -496,7 +576,7 @@ public final class GeneratedAccess_com_codename1_security {
         throw unsupportedStatic(com.codename1.security.SecureRandom.class, name, safeArgs);
     }
 
-    private static Object invokeStatic11(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic13(String name, Object[] safeArgs) throws Exception {
         if ("getInstance".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.security.SecureStorage.getInstance();
@@ -505,7 +585,7 @@ public final class GeneratedAccess_com_codename1_security {
         throw unsupportedStatic(com.codename1.security.SecureStorage.class, name, safeArgs);
     }
 
-    private static Object invokeStatic12(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic14(String name, Object[] safeArgs) throws Exception {
         if ("sign".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.security.PrivateKey.class, byte[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, com.codename1.security.PrivateKey.class, byte[].class}, false);
@@ -1172,6 +1252,9 @@ public final class GeneratedAccess_com_codename1_security {
         if (type == com.codename1.ui.events.SelectionListener.class) {
             return true;
         }
+        if (type == com.codename1.printing.PrintResultListener.class) {
+            return true;
+        }
         return false;
     }
 
@@ -1247,6 +1330,17 @@ public final class GeneratedAccess_com_codename1_security {
                 public void selectionChanged(int arg0, int arg1) {
                     try {
                         lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.printing.PrintResultListener.class) {
+            return new com.codename1.printing.PrintResultListener() {
+                public void onResult(com.codename1.printing.PrintResult arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
                     } catch (bsh.EvalError ex) {
                         throw new RuntimeException(ex);
                     }

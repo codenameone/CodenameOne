@@ -16,6 +16,20 @@ read_cn1_version() {
 
 USE_LOCAL_SOURCES="${CN1_ACCESS_USE_LOCAL_SOURCES:-false}"
 
+# A SNAPSHOT pin means "the in-repo framework" (see the root pom comment):
+# Maven Central has no source jars for it, and the matching sources are the
+# repo checkout itself. Auto-select local-source mode so every caller (the
+# maven exec hook, the smoke tests, manual runs) behaves consistently.
+if [ "$USE_LOCAL_SOURCES" != "true" ]; then
+  PIN_VERSION="${CN1_VERSION:-$(read_cn1_version)}"
+  case "$PIN_VERSION" in
+    *-SNAPSHOT)
+      echo "cn1.version is $PIN_VERSION; switching to local workspace sources." >&2
+      USE_LOCAL_SOURCES="true"
+      ;;
+  esac
+fi
+
 CN1_SOURCE_ROOTS_VALUE=""
 if [ "$USE_LOCAL_SOURCES" = "true" ]; then
   if [ ! -d "$LOCAL_CORE_SRC" ] || [ ! -d "$LOCAL_CLDC_SRC" ]; then

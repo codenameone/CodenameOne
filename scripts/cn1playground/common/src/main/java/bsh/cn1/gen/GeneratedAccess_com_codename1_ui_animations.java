@@ -56,6 +56,9 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if ("MorphTransition".equals(simpleName)) {
             return com.codename1.ui.animations.MorphTransition.class;
         }
+        if ("MorphElement".equals(simpleName)) {
+            return com.codename1.ui.animations.MorphTransition.MorphElement.class;
+        }
         if ("Motion".equals(simpleName)) {
             return com.codename1.ui.animations.Motion.class;
         }
@@ -113,8 +116,9 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if (type == com.codename1.ui.animations.CommonTransitions.class) return invokeStatic2(name, safeArgs);
         if (type == com.codename1.ui.animations.ComponentAnimation.class) return invokeStatic3(name, safeArgs);
         if (type == com.codename1.ui.animations.MorphTransition.class) return invokeStatic4(name, safeArgs);
-        if (type == com.codename1.ui.animations.Motion.class) return invokeStatic5(name, safeArgs);
-        if (type == com.codename1.ui.animations.Timeline.class) return invokeStatic6(name, safeArgs);
+        if (type == com.codename1.ui.animations.MorphTransition.MorphElement.class) return invokeStatic5(name, safeArgs);
+        if (type == com.codename1.ui.animations.Motion.class) return invokeStatic6(name, safeArgs);
+        if (type == com.codename1.ui.animations.Timeline.class) return invokeStatic7(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
@@ -267,6 +271,20 @@ public final class GeneratedAccess_com_codename1_ui_animations {
     }
 
     private static Object invokeStatic5(String name, Object[] safeArgs) throws Exception {
+        if ("create".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
+                return com.codename1.ui.animations.MorphTransition.MorphElement.create((com.codename1.ui.Component) adaptedArgs[0]);
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class}, false);
+                return com.codename1.ui.animations.MorphTransition.MorphElement.create((com.codename1.ui.Image) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedStatic(com.codename1.ui.animations.MorphTransition.MorphElement.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic6(String name, Object[] safeArgs) throws Exception {
         if ("createCriticalDampedSpringMotion".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
@@ -359,7 +377,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         throw unsupportedStatic(com.codename1.ui.animations.Motion.class, name, safeArgs);
     }
 
-    private static Object invokeStatic6(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic7(String name, Object[] safeArgs) throws Exception {
         if ("createTimeline".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.animations.AnimationObject[].class, com.codename1.ui.geom.Dimension.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, com.codename1.ui.animations.AnimationObject[].class, com.codename1.ui.geom.Dimension.class}, false);
@@ -421,30 +439,37 @@ public final class GeneratedAccess_com_codename1_ui_animations {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.ui.animations.MorphTransition.MorphElement) {
+            try {
+                return invoke7((com.codename1.ui.animations.MorphTransition.MorphElement) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.ui.animations.Motion) {
             try {
-                return invoke7((com.codename1.ui.animations.Motion) target, name, safeArgs);
+                return invoke8((com.codename1.ui.animations.Motion) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.animations.Timeline) {
             try {
-                return invoke8((com.codename1.ui.animations.Timeline) target, name, safeArgs);
+                return invoke9((com.codename1.ui.animations.Timeline) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.animations.Transition) {
             try {
-                return invoke9((com.codename1.ui.animations.Transition) target, name, safeArgs);
+                return invoke10((com.codename1.ui.animations.Transition) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.ui.animations.Animation) {
             try {
-                return invoke10((com.codename1.ui.animations.Animation) target, name, safeArgs);
+                return invoke11((com.codename1.ui.animations.Animation) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -714,9 +739,32 @@ public final class GeneratedAccess_com_codename1_ui_animations {
                 return typedTarget.copy(((Boolean) adaptedArgs[0]).booleanValue());
             }
         }
+        if ("getCurrentOpacity".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getCurrentOpacity((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("getCurrentRotation".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getCurrentRotation((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("getCurrentScale".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getCurrentScale((java.lang.String) adaptedArgs[0]);
+            }
+        }
         if ("getDestination".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getDestination();
+            }
+        }
+        if ("getProgress".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getProgress();
             }
         }
         if ("getSource".equals(name)) {
@@ -735,12 +783,21 @@ public final class GeneratedAccess_com_codename1_ui_animations {
                 typedTarget.initTransition(); return null;
             }
         }
+        if ("isScrubbing".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isScrubbing();
+            }
+        }
         if ("isSnapshotMode".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isSnapshotMode();
             }
         }
         if ("morph".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.animations.MorphTransition.MorphElement.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.animations.MorphTransition.MorphElement.class}, false);
+                return typedTarget.morph((com.codename1.ui.animations.MorphTransition.MorphElement) adaptedArgs[0]);
+            }
             if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
                 return typedTarget.morph((java.lang.String) adaptedArgs[0]);
@@ -750,10 +807,34 @@ public final class GeneratedAccess_com_codename1_ui_animations {
                 return typedTarget.morph((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
             }
         }
+        if ("opacity".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Float.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Float.class, java.lang.Float.class}, false);
+                return typedTarget.opacity((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue());
+            }
+        }
         if ("paint".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Graphics.class}, false);
                 typedTarget.paint((com.codename1.ui.Graphics) adaptedArgs[0]); return null;
+            }
+        }
+        if ("rotation".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Float.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Float.class, java.lang.Float.class}, false);
+                return typedTarget.rotation((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue());
+            }
+        }
+        if ("scale".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Float.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Float.class, java.lang.Float.class}, false);
+                return typedTarget.scale((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue());
+            }
+        }
+        if ("setProgress".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Double.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Double.class}, false);
+                return typedTarget.setProgress(((Number) adaptedArgs[0]).doubleValue());
             }
         }
         if ("snapshotMode".equals(name)) {
@@ -916,7 +997,76 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke7(com.codename1.ui.animations.Motion typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke7(com.codename1.ui.animations.MorphTransition.MorphElement typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("from".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.from(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]));
+            }
+        }
+        if ("getCurrentHeight".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCurrentHeight();
+            }
+        }
+        if ("getCurrentOpacity".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCurrentOpacity();
+            }
+        }
+        if ("getCurrentRotation".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCurrentRotation();
+            }
+        }
+        if ("getCurrentScale".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCurrentScale();
+            }
+        }
+        if ("getCurrentWidth".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCurrentWidth();
+            }
+        }
+        if ("getCurrentX".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCurrentX();
+            }
+        }
+        if ("getCurrentY".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getCurrentY();
+            }
+        }
+        if ("opacity".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
+                return typedTarget.opacity(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
+            }
+        }
+        if ("rotation".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
+                return typedTarget.rotation(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
+            }
+        }
+        if ("scale".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class}, false);
+                return typedTarget.scale(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue());
+            }
+        }
+        if ("to".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class}, false);
+                return typedTarget.to(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]));
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke8(com.codename1.ui.animations.Motion typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("countAvailableVelocitySamplingPoints".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.countAvailableVelocitySamplingPoints();
@@ -993,7 +1143,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke8(com.codename1.ui.animations.Timeline typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke9(com.codename1.ui.animations.Timeline typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addActionListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
@@ -1334,7 +1484,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke9(com.codename1.ui.animations.Transition typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke10(com.codename1.ui.animations.Transition typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("animate".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.animate();
@@ -1381,7 +1531,7 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke10(com.codename1.ui.animations.Animation typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke11(com.codename1.ui.animations.Animation typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("animate".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.animate();
@@ -1477,6 +1627,9 @@ public final class GeneratedAccess_com_codename1_ui_animations {
         if (type == com.codename1.ui.events.SelectionListener.class) {
             return true;
         }
+        if (type == com.codename1.printing.PrintResultListener.class) {
+            return true;
+        }
         return false;
     }
 
@@ -1552,6 +1705,17 @@ public final class GeneratedAccess_com_codename1_ui_animations {
                 public void selectionChanged(int arg0, int arg1) {
                     try {
                         lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.printing.PrintResultListener.class) {
+            return new com.codename1.printing.PrintResultListener() {
+                public void onResult(com.codename1.printing.PrintResult arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
                     } catch (bsh.EvalError ex) {
                         throw new RuntimeException(ex);
                     }

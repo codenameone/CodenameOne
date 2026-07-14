@@ -121,7 +121,13 @@ export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 "$MAVEN_HOME/bin/mvn" -version
 
 run_maven() {
-  xvfb-run -a "$MAVEN_HOME/bin/mvn" "$@"
+  # xvfb-run only exists on the Linux CI runners (headless X for AWT-touching
+  # build steps); on macOS Maven runs directly against the window server.
+  if command -v xvfb-run >/dev/null 2>&1; then
+    xvfb-run -a "$MAVEN_HOME/bin/mvn" "$@"
+  else
+    "$MAVEN_HOME/bin/mvn" "$@"
+  fi
 }
 
 BUILD_CLIENT="$HOME/.codenameone/CodeNameOneBuildClient.jar"

@@ -54,6 +54,7 @@ import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Vibrator;
 import android.os.PowerManager;
+import android.provider.Settings;
 import android.telephony.TelephonyManager;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -61,6 +62,7 @@ import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityManager;
 import android.view.Window;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -68,6 +70,7 @@ import android.webkit.WebViewClient;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.AccessibilityColorVisionDeficiency;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Font;
@@ -448,6 +451,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
     }
     CodenameOneSurface myView = null;
+    private AndroidAccessibilityProvider accessibilityProvider;
+    private volatile boolean accessibilityTreeUpdateRequired;
     CodenameOneTextPaint defaultFont;
     private final char[] tmpchar = new char[1];
     private final Rect tmprect = new Rect();
@@ -1712,6 +1717,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             ((AndroidImplementation.AndroidPeer) nativePeers.elementAt(i)).deinit();
                         }
                     }
+                    if (accessibilityProvider != null) {
+                        accessibilityProvider.dispose();
+                        accessibilityProvider = null;
+                    }
                     if (relativeLayout != null) {
                         relativeLayout.removeAllViews();
                     }
@@ -1759,6 +1768,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 myView = new AndroidAsyncView(getActivity(), AndroidImplementation.this);
             }
             myView.getAndroidView().setVisibility(View.VISIBLE);
+
+            if (Build.VERSION.SDK_INT >= 16) {
+                final View semanticHost = myView.getAndroidView();
+                accessibilityProvider = new AndroidAccessibilityProvider(semanticHost, this);
+                semanticHost.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+                    @Override
+                    public android.view.accessibility.AccessibilityNodeProvider getAccessibilityNodeProvider(View host) {
+                        return accessibilityProvider;
+                    }
+                });
+            }
 
             relativeLayout.addView(myView.getAndroidView());
             myView.getAndroidView().setVisibility(View.VISIBLE);
@@ -2338,6 +2358,20 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    /// Returns a copy of the given native font with its paint's letter spacing set
+    /// to the supplied value (Android letter spacing is in EM units, independent of
+    /// font size). Used by Style.letterSpacing so a per-UIID spacing -- matching the
+    /// Material text-appearance for each component -- is baked into the SAME paint
+    /// that does both measureText (layout) and drawText (render), keeping advances
+    /// consistent. Other ports get the default no-op.
+    @Override
+    public Object deriveTrueTypeFontWithLetterSpacing(Object font, float letterSpacing) {
+        NativeFont fnt = (NativeFont) font;
+        CodenameOneTextPaint copy = new CodenameOneTextPaint((CodenameOneTextPaint) fnt.font);
+        copy.setLetterSpacing(letterSpacing);
+        return new NativeFont(fnt.face, fnt.style, fnt.size, copy, fnt.fileName, fnt.height, fnt.weight);
+    }
+
     @Override
     public Object deriveTrueTypeFont(Object font, float size, int weight) {
         NativeFont fnt = (NativeFont)font;
@@ -2355,6 +2389,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         CodenameOneTextPaint newPaint = new CodenameOneTextPaint(type);
         newPaint.setTextSize(size);
         newPaint.setAntiAlias(true);
+        // preserve any letter spacing already configured on the source paint
+        newPaint.setLetterSpacing(paint.getLetterSpacing());
         NativeFont n = new NativeFont(com.codename1.ui.Font.FACE_SYSTEM, weight, com.codename1.ui.Font.SIZE_MEDIUM, newPaint, fnt.fileName, size, weight);
         return n;
     }
@@ -2487,6 +2523,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     @Override
     public Object getNativeGraphics(Object image) {
         AndroidGraphics g =  new AndroidGraphics(this, new Canvas((Bitmap) image), true);
+        g.underlyingBitmap = (Bitmap) image;
         g.setClip(0, 0, ((Bitmap)image).getWidth(), ((Bitmap)image).getHeight());
         return g;
     }
@@ -5989,6 +6026,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public boolean isCarConnected() {
         com.codename1.car.spi.CarBridge b = AndroidCarSupport.getBridge();
         return b != null && b.isConnected();
+    }
+
+    private com.codename1.surfaces.spi.SurfaceBridge surfaceBridge;
+
+    @Override
+    public com.codename1.surfaces.spi.SurfaceBridge getSurfaceBridge() {
+        if (surfaceBridge == null) {
+            surfaceBridge = new com.codename1.impl.android.surfaces.AndroidSurfaceBridge();
+        }
+        return surfaceBridge;
+    }
+
+    /// Invoked once the app has started (from the generated stub, next to
+    /// `deliverPendingSharedContent`) to flush surface actions that arrived through the
+    /// `CN1SurfaceActionActivity` trampoline before the app instance existed.
+    public static void deliverPendingSurfaceActions() {
+        com.codename1.impl.android.surfaces.AndroidSurfaceBridge.deliverPendingActions();
     }
 
     /**
@@ -12089,6 +12143,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    /**
+     * Returns the fully qualified class name of the app's background fetch listener, or null
+     * when the app does not implement {@link com.codename1.background.BackgroundFetch}. The
+     * surfaces plumbing persists this name on publish so a home screen widget that rendered an
+     * exhausted timeline can start {@link BackgroundFetchHandler} and let the app republish
+     * fresh content while no activity exists.
+     *
+     * @return the listener class name or null
+     */
+    public static String getBackgroundFetchListenerClassName() {
+        if (instance == null) {
+            return null;
+        }
+        BackgroundFetch listener = instance.getBackgroundFetchListener();
+        return listener == null ? null : listener.getClass().getName();
+    }
+
     public void scheduleLocalNotification(LocalNotification notif, long firstTime, int repeat) {
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             if(!checkForPermission("android.permission.POST_NOTIFICATIONS", "This is required to receive notifications")){
@@ -12676,6 +12747,59 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return (!brokenGaussian) && android.os.Build.VERSION.SDK_INT >= 11;
     }
 
+    @Override
+    public boolean blurRegion(Object graphics, int x, int y, int width, int height, float radius) {
+        if (radius <= 0f || width <= 0 || height <= 0 || !isGaussianBlurSupported()) {
+            return radius <= 0f || width <= 0 || height <= 0;
+        }
+        // In-place CSS backdrop-filter:blur on a mutable-image target. Read/write the
+        // backing Bitmap directly at absolute coordinates (bypassing the canvas
+        // transform), Gaussian-blur the region via RenderScript. The live screen
+        // canvas has no backing Bitmap here -> returns false (component paints
+        // without the blur).
+        if (!(graphics instanceof AndroidGraphics)) {
+            return false;
+        }
+        Bitmap dest = ((AndroidGraphics) graphics).underlyingBitmap;
+        if (dest == null || !dest.isMutable()) {
+            return false;
+        }
+        try {
+            int rx = Math.max(0, x), ry = Math.max(0, y);
+            int rw = Math.min(width, dest.getWidth() - rx);
+            int rh = Math.min(height, dest.getHeight() - ry);
+            if (rw <= 0 || rh <= 0) {
+                return true;
+            }
+            int[] pix = new int[rw * rh];
+            dest.getPixels(pix, 0, rw, rx, ry, rw, rh);
+            Bitmap region = Bitmap.createBitmap(pix, rw, rh, Bitmap.Config.ARGB_8888);
+            Bitmap blurred = Bitmap.createBitmap(region);
+            RenderScript rs = RenderScript.create(getContext());
+            try {
+                ScriptIntrinsicBlur theIntrinsic = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
+                Allocation tmpIn = Allocation.createFromBitmap(rs, region);
+                Allocation tmpOut = Allocation.createFromBitmap(rs, blurred);
+                // RenderScript blur radius is capped at 25.
+                theIntrinsic.setRadius(Math.min(25f, radius));
+                theIntrinsic.setInput(tmpIn);
+                theIntrinsic.forEach(tmpOut);
+                tmpOut.copyTo(blurred);
+                tmpIn.destroy();
+                tmpOut.destroy();
+                theIntrinsic.destroy();
+            } finally {
+                rs.destroy();
+            }
+            blurred.getPixels(pix, 0, rw, 0, 0, rw, rh);
+            dest.setPixels(pix, 0, rw, rx, ry, rw, rh);
+            return true;
+        } catch (Throwable t) {
+            brokenGaussian = true;
+            return false;
+        }
+    }
+
     public static boolean checkForPermission(String permission, String description){
         return checkForPermission(permission, description, false);
     }
@@ -13055,6 +13179,123 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             }
         });
+    }
+
+    @Override
+    public boolean isHighContrastEnabled() {
+        try {
+            AccessibilityManager manager = (AccessibilityManager)getContext()
+                    .getSystemService(Context.ACCESSIBILITY_SERVICE);
+            if (android.os.Build.VERSION.SDK_INT >= 21 && manager != null) {
+                Object enabled = AccessibilityManager.class.getMethod("isHighTextContrastEnabled")
+                        .invoke(manager);
+                return enabled instanceof Boolean && ((Boolean)enabled).booleanValue();
+            }
+        } catch (Throwable t) {
+            // Fall through to the secure settings used by older Android stubs.
+        }
+        return secureSettingEnabled("high_text_contrast_enabled")
+                || secureSettingEnabled("accessibility_display_high_text_contrast_enabled");
+    }
+
+    @Override
+    public boolean isDifferentiateWithoutColorEnabled() {
+        return secureSettingEnabled("accessibility_display_daltonizer_enabled");
+    }
+
+    @Override
+    public AccessibilityColorVisionDeficiency getColorVisionDeficiency() {
+        if (!secureSettingEnabled("accessibility_display_daltonizer_enabled")) {
+            return AccessibilityColorVisionDeficiency.NONE;
+        }
+        try {
+            int mode = Settings.Secure.getInt(getContext().getContentResolver(),
+                    "accessibility_display_daltonizer");
+            switch (mode) {
+                case 0: return AccessibilityColorVisionDeficiency.MONOCHROMACY;
+                case 11: return AccessibilityColorVisionDeficiency.PROTANOPIA;
+                case 12: return AccessibilityColorVisionDeficiency.DEUTERANOPIA;
+                case 13: return AccessibilityColorVisionDeficiency.TRITANOPIA;
+                default: return AccessibilityColorVisionDeficiency.UNKNOWN;
+            }
+        } catch (Throwable t) {
+            return AccessibilityColorVisionDeficiency.UNKNOWN;
+        }
+    }
+
+    @Override
+    public boolean isReduceMotionEnabled() {
+        try {
+            return Settings.Global.getFloat(getContext().getContentResolver(),
+                    Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    @Override
+    public boolean isBoldTextEnabled() {
+        try {
+            Object value = Configuration.class.getField("fontWeightAdjustment")
+                    .get(getContext().getResources().getConfiguration());
+            return value instanceof Integer && ((Integer)value).intValue() >= 300;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    @Override
+    public boolean isInvertColorsEnabled() {
+        return secureSettingEnabled("accessibility_display_inversion_enabled");
+    }
+
+    @Override
+    public boolean isGrayscaleEnabled() {
+        return getColorVisionDeficiency() == AccessibilityColorVisionDeficiency.MONOCHROMACY;
+    }
+
+    @Override
+    public boolean isScreenReaderEnabled() {
+        try {
+            AccessibilityManager manager = (AccessibilityManager)getContext()
+                    .getSystemService(Context.ACCESSIBILITY_SERVICE);
+            return manager != null && manager.isEnabled() && manager.isTouchExplorationEnabled();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private boolean secureSettingEnabled(String key) {
+        try {
+            return Settings.Secure.getInt(getContext().getContentResolver(), key, 0) == 1;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    @Override
+    public void accessibilityTreeChanged(final int changeType) {
+        final Activity act = getActivity();
+        if (act == null || accessibilityProvider == null) return;
+        act.runOnUiThread(new Runnable() {
+            public void run() {
+                if (accessibilityProvider != null) accessibilityProvider.invalidate(changeType);
+            }
+        });
+    }
+
+    @Override
+    public boolean isAccessibilityTreeSupported() {
+        return Build.VERSION.SDK_INT >= 16;
+    }
+
+    @Override
+    public boolean isAccessibilityTreeUpdateRequired() {
+        return accessibilityTreeUpdateRequired;
+    }
+
+    void setAccessibilityTreeUpdateRequired(boolean required) {
+        accessibilityTreeUpdateRequired = required;
     }
 
     // ================================================================

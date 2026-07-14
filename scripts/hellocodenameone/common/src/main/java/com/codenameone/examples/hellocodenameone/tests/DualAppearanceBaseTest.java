@@ -121,8 +121,32 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
     @Override
     public boolean runTest() {
         installModernThemeIfRequested();
-        runAppearance(false, "light", () -> runAppearance(true, "dark", this::finish));
+        runAppearance(false, "light", () -> runAppearance(true, "dark", () -> {
+            if (runsIosVariant()) {
+                // Second pass on the JS port only: the base pair above runs
+                // the Android Material theme (the browser has no native
+                // widgets, so the JS suite is the one place both modern
+                // themes can be validated cheaply). This pair re-runs the
+                // same populate() under the iOS Liquid Glass theme so the
+                // iOS-styled rendering has browser-side goldens too.
+                installThemeResource("/iOSModernTheme.res");
+                runAppearance(false, "ios_light", () -> runAppearance(true, "ios_dark", this::finish));
+            } else {
+                finish();
+            }
+        }));
         return true;
+    }
+
+    /**
+     * True when this test should append the iOS-modern-theme capture pair
+     * (`&lt;base&gt;_ios_light` / `&lt;base&gt;_ios_dark`) after the standard
+     * pair. JS port only: native ports already capture their own platform's
+     * modern theme, and doubling their suites would double device time for
+     * renderings the JS browser canvas reproduces faithfully.
+     */
+    private boolean runsIosVariant() {
+        return useModernTheme() && "HTML5".equals(Display.getInstance().getPlatformName());
     }
 
     @Override
@@ -297,6 +321,10 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
                     + Display.getInstance().getPlatformName());
             return;
         }
+        installThemeResource(resourceName);
+    }
+
+    private void installThemeResource(String resourceName) {
         // Try the CN1 resource path first (Display.getResourceAsStream goes
         // through each port's impl - Android via getAssets(), iOS via
         // nativeInstance.getResourceSize/NSFileInputStream), then fall back
@@ -352,15 +380,16 @@ public abstract class DualAppearanceBaseTest extends BaseTest {
         if ("and".equals(platform)) {
             return "/AndroidMaterialTheme.res";
         }
-        // The JavaScript port reports its platform as "HTML5"; it
-        // publishes ``cn1.modernThemeResource`` from HTML5Implementation's
-        // installNativeTheme() based on the detected browser OS
-        // (iOS/Mac -> iOSModernTheme.res, anything else ->
-        // AndroidMaterialTheme.res), which is the same selection
-        // logic this test would otherwise have to duplicate.
-        String published = Display.getInstance().getProperty("cn1.modernThemeResource", null);
-        if (published != null && published.length() > 0) {
-            return published;
+        // The JavaScript port reports its platform as "HTML5". Pin the base
+        // light/dark pair to the Android Material theme EXPLICITLY rather
+        // than reading the OS-detected ``cn1.modernThemeResource`` property:
+        // CI runs Linux browsers (detection resolved to Material anyway, so
+        // the existing goldens are unchanged), but a local run on a Mac
+        // browser used to detect the iOS theme and mismatch every golden.
+        // The iOS Liquid Glass rendering gets its own dedicated
+        // ``_ios_light`` / ``_ios_dark`` pair via runsIosVariant().
+        if ("HTML5".equals(platform)) {
+            return "/AndroidMaterialTheme.res";
         }
         return null;
     }

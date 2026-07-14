@@ -91,6 +91,8 @@ import com.codename1.ui.Stroke;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextSelection;
 import com.codename1.ui.Transform;
+import com.codename1.ui.accessibility.AccessibilityManager;
+import com.codename1.ui.accessibility.AccessibilityTreeSnapshot;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
@@ -3665,6 +3667,26 @@ public abstract class CodenameOneImplementation {
         return false;
     }
 
+    /// In-place region "Liquid Glass" material for backdrop-filter. Default falls
+    /// back to a plain blur (so non-iOS ports still blur, just without the colour
+    /// transform). Ports that support the full material override this.
+    public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular) {
+        return blurRegion(graphics, x, y, width, height, radius);
+    }
+
+    /// In-place iOS 26 selection-drop LENS (magnify + chromatic aberration +
+    /// dark-&gt;accent tint over the painted content). Default unsupported; the iOS
+    /// port overrides it. Returns false so callers can fall back (e.g. to a tint).
+    public boolean lensRegion(Object graphics, int x, int y, int width, int height, float cornerRadius, float magnify, float aberration, int tintColor, float tintStrength) {
+        return false;
+    }
+
+    /// Renders an Apple SF Symbol to an image. Default returns null (only iOS
+    /// implements this); callers fall back to the Material icon font.
+    public Image createSFSymbolImage(String name, int color, float sizePixels, int weight) {
+        return null;
+    }
+
     private boolean checkIntersection(Object g, int y0, int x1, int x2, int y1, int y2, int[] intersections, int intersectionsCount) {
         if (y0 > y1 && y0 < y2 || y0 > y2 && y0 < y1) {
             if (y1 == y2) {
@@ -4111,6 +4133,15 @@ public abstract class CodenameOneImplementation {
     /// scaled font instance
     public Object deriveTrueTypeFont(Object font, float size, int weight) {
         throw new RuntimeException("Unsupported operation");
+    }
+
+    /// Returns a variant of the given native TrueType font with the supplied letter
+    /// spacing (in EM units) applied to its glyph advances, or the same font when the
+    /// platform does not support letter spacing. Used by Style.letterSpacing so a
+    /// per-component spacing is carried by the font itself (consistent for layout
+    /// measurement and rendering). The default is a no-op.
+    public Object deriveTrueTypeFontWithLetterSpacing(Object font, float letterSpacing) {
+        return font;
     }
 
     /// Returns true if the system supports dynamically loading truetype fonts from
@@ -5893,6 +5924,17 @@ public abstract class CodenameOneImplementation {
     public boolean isCarConnected() {
         com.codename1.car.spi.CarBridge b = getCarBridge();
         return b != null && b.isConnected();
+    }
+
+    /// Returns the platform bridge used by the `com.codename1.surfaces` API to render external
+    /// surfaces (home-screen widgets and live activities). Ports supporting surfaces override
+    /// this; the base implementation returns null which renders the whole API an inert no-op.
+    ///
+    /// #### Returns
+    ///
+    /// the surface bridge, or null when unsupported
+    public com.codename1.surfaces.spi.SurfaceBridge getSurfaceBridge() {
+        return null;
     }
 
     /// True if the device is a foldable or dual screen device. False on the base implementation.
@@ -11181,6 +11223,35 @@ public abstract class CodenameOneImplementation {
         // should override this method.
     }
 
+    /// Called after the portable semantic tree changes. Platform ports should
+    /// invalidate their native virtual accessibility roots and request the latest
+    /// immutable snapshot with {@link #getAccessibilityTreeSnapshot()}.
+    public void accessibilityTreeChanged(int changeType) {
+    }
+
+    /// Returns the latest immutable semantic tree for the current form.
+    public AccessibilityTreeSnapshot getAccessibilityTreeSnapshot() {
+        return AccessibilityManager.getInstance().getCurrentSnapshot();
+    }
+
+    /// Dispatches an action from a native virtual accessibility node onto the EDT.
+    public boolean performAccessibilityAction(long nodeId, String actionId, Object argument) {
+        return AccessibilityManager.getInstance().performAction(nodeId, actionId, argument);
+    }
+
+    /// Returns true when this port exposes the portable virtual semantic tree.
+    public boolean isAccessibilityTreeSupported() {
+        return false;
+    }
+
+    /// Returns true when semantic invalidations should be projected eagerly.
+    /// Pull-based ports should override this to return true only while assistive
+    /// technology is active. Ports whose semantic projection must always remain
+    /// attached, such as web ARIA, may return true unconditionally.
+    public boolean isAccessibilityTreeUpdateRequired() {
+        return isAccessibilityTreeSupported();
+    }
+
     /// Returns true if the user has selected larger type fonts in the system settings.
     /// Default implementation returns false.
     ///
@@ -11201,6 +11272,56 @@ public abstract class CodenameOneImplementation {
     ///
     public float getLargerTextScale() {
         return 1.0f;
+    }
+
+    /// Returns true when the user requests stronger foreground/background contrast.
+    public boolean isHighContrastEnabled() {
+        return false;
+    }
+
+    /// Returns true when the user requests that information isn't conveyed by color alone.
+    public boolean isDifferentiateWithoutColorEnabled() {
+        return false;
+    }
+
+    /// Returns the selected color-vision correction mode.
+    public com.codename1.ui.AccessibilityColorVisionDeficiency getColorVisionDeficiency() {
+        return com.codename1.ui.AccessibilityColorVisionDeficiency.UNKNOWN;
+    }
+
+    /// Returns true when the user requests reduced or disabled nonessential motion.
+    public boolean isReduceMotionEnabled() {
+        return false;
+    }
+
+    /// Returns true when the user requests reduced transparency and blur effects.
+    public boolean isReduceTransparencyEnabled() {
+        return false;
+    }
+
+    /// Returns true when the user requests heavier text weight.
+    public boolean isBoldTextEnabled() {
+        return false;
+    }
+
+    /// Returns true when the operating system is inverting displayed colors.
+    public boolean isInvertColorsEnabled() {
+        return false;
+    }
+
+    /// Returns true when the operating system requests a grayscale presentation.
+    public boolean isGrayscaleEnabled() {
+        return false;
+    }
+
+    /// Returns true when switches should include visible on/off labels.
+    public boolean isOnOffSwitchLabelsEnabled() {
+        return false;
+    }
+
+    /// Returns true when a screen reader or touch-exploration service is active.
+    public boolean isScreenReaderEnabled() {
+        return false;
     }
 
     /// Returns the stack trace from the exception on the given

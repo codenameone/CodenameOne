@@ -135,6 +135,19 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 #undef CN1_USE_CARPLAY
 #endif
 
+// CN1_USE_WIDGETS gates the external surfaces native bridge (the IOSNative surfaces*
+// trampolines into the Swift CN1SurfaceBridge class plus the cn1surface:// deep link handling
+// in CodenameOne_GLAppDelegate). IPhoneBuilder uncomments this only when the classpath scanner
+// saw com.codename1.surfaces.*, so apps that never publish widgets or live activities ship
+// without any WidgetKit/ActivityKit references and need no app group. Lives in this central
+// header (included first by every surfaces TU) so the define is visible across translation
+// units, mirroring CN1_USE_CARPLAY.
+//#define CN1_USE_WIDGETS
+// WidgetKit home-screen widgets are unavailable on watchOS / tvOS; undo the define there.
+#if TARGET_OS_WATCH || TARGET_OS_TV
+#undef CN1_USE_WIDGETS
+#endif
+
 // CN1_INCLUDE_OIDC gates the com.codename1.io.oidc native bridge
 // (AuthenticationServices.framework import, ASWebAuthenticationSession code
 // in CN1OidcBrowser.m). IPhoneBuilder uncomments this only when the
@@ -283,6 +296,7 @@ void CN1DismissLaunchPlaceholder(void);
 -(void)drawString:(int)color alpha:(int)alpha font:(UIFont*)font str:(NSString*)str x:(int)x y:(int)y;
 -(void)drawScreen;
 -(void)drawFrame:(CGRect)rect;
+-(void)drawFrame:(CGRect)rect allowInactive:(BOOL)allowInactive;
 @end
 #else
 @interface CodenameOne_GLViewController : UIViewController<
@@ -379,6 +393,7 @@ CLLocationManagerDelegate, AVAudioRecorderDelegate
 -(void)drawString:(int)color alpha:(int)alpha font:(UIFont*)font str:(NSString*)str x:(int)x y:(int)y;
 - (void)drawScreen;
 - (void)drawFrame:(CGRect)rect;
+- (void)drawFrame:(CGRect)rect allowInactive:(BOOL)allowInactive;
 
 -(void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event;
 -(void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event;

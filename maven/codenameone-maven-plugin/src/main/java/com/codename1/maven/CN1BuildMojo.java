@@ -649,6 +649,47 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         cn1SettingsProps.setProperty("codename1.arg.hyp.beamId", logPasskey);
         cn1SettingsProps.setProperty("codename1.arg.maven.codenameone-core.version", cn1MavenVersion);
         cn1SettingsProps.setProperty("codename1.arg.maven.codenameone-maven-plugin", cn1MavenPluginVersion);
+
+        // App-extension provisioning profiles (e.g. the generated CN1Widgets WidgetKit
+        // extension) are named by the codename1.ios.appext.<Name>.provision setting, which
+        // points at a local .mobileprovision file. Cloud builds have no folder to drop the
+        // file into, so base64-encode its bytes into the ios.appext.<Name>.provisioningData
+        // build arg; the daemon decodes it back to <Name>.mobileprovision before signing.
+        // Done generically over <Name>, mirroring the daemon's per-extension plumbing.
+        String appExtPrefix = "codename1.ios.appext.";
+        String appExtSuffix = ".provision";
+        for (String settingKey : new ArrayList<String>(cn1SettingsProps.stringPropertyNames())) {
+            if (!settingKey.startsWith(appExtPrefix) || !settingKey.endsWith(appExtSuffix)) {
+                continue;
+            }
+            String extName = settingKey.substring(appExtPrefix.length(), settingKey.length() - appExtSuffix.length());
+            if (extName.isEmpty()) {
+                continue;
+            }
+            String dataKey = "codename1.arg.ios.appext." + extName + ".provisioningData";
+            if (cn1SettingsProps.containsKey(dataKey)) {
+                continue;
+            }
+            String profilePath = cn1SettingsProps.getProperty(settingKey);
+            if (profilePath == null || profilePath.trim().isEmpty()) {
+                continue;
+            }
+            File profileFile = new File(profilePath.trim());
+            if (!profileFile.exists() || !profileFile.isFile()) {
+                getLog().warn("The app extension provisioning profile referenced by " + settingKey
+                        + " was not found at " + profileFile.getAbsolutePath() + ". Skipping it; the "
+                        + extName + " extension will not receive a provisioning profile for this build.");
+                continue;
+            }
+            try {
+                byte[] profileBytes = FileUtils.readFileToByteArray(profileFile);
+                cn1SettingsProps.setProperty(dataKey, java.util.Base64.getEncoder().encodeToString(profileBytes));
+            } catch (IOException ex) {
+                getLog().warn("Failed to read the app extension provisioning profile referenced by " + settingKey
+                        + " at " + profileFile.getAbsolutePath() + ". Skipping it: " + ex.getMessage());
+            }
+        }
+
         try (FileOutputStream fos = new FileOutputStream(codenameOneSettingsCopy)) {
             cn1SettingsProps.store(fos,"");
 

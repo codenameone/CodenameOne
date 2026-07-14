@@ -1,0 +1,25 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::external-surfaces-json-001[]
+{
+  "liveActivities": true,
+  "kinds": [
+    {
+      "id": "delivery_status",
+      "name": "Delivery",
+      "description": "Track your order",
+      "iosFamilies": ["systemSmall", "systemMedium"],
+      "androidMinWidthDp": 180,
+      "androidMinHeightDp": 60
+    },
+    {
+      "id": "analog_clock",
+      "name": "Analog Clock",
+      "description": "A vector clock face",
+      "iosFamilies": ["systemSmall"],
+      "androidMinWidthDp": 110,
+      "androidMinHeightDp": 110
+    }
+  ]
+}
+// end::external-surfaces-json-001[]

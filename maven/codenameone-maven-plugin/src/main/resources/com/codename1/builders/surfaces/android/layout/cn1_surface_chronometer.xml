@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Codename One surfaces: native countdown/elapsed timer (SurfaceDynamicText timerDown /
+     timerUp). The OS ticks the Chronometer with no app wakeups; count-down mode needs
+     API 24. -->
+<Chronometer xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/cn1_surface_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center_vertical"
+    android:textSize="14dp" />

@@ -1645,8 +1645,13 @@ class CleanTargetIntegrationTest {
 
     static String helloWorldSource() {
         return "public class HelloWorld {\n" +
+                // Small boxed static finals use ParparVM's tagged-Integer representation.
+                // Their generated setter removes immutable finals from heap tracking; this
+                // exercises that path before main and guards against dereferencing the tag.
+                "    private static final Integer YEAR_OPTION_DAY_OF_YEAR = Integer.valueOf(6);\n" +
                 "    private static native void nativeHello();\n" +
                 "    public static void main(String[] args) {\n" +
+                "        if (YEAR_OPTION_DAY_OF_YEAR.intValue() != 6) { throw new AssertionError(); }\n" +
                 "        nativeHello();\n" +
                 "    }\n" +
                 "}\n";

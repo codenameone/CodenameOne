@@ -81,6 +81,19 @@ public final class IOSNative {
 
     native void nativeDrawLineMutable(int color, int alpha, int x1, int y1, int x2, int y2);
     native void nativeDrawLineGlobal(int color, int alpha, int x1, int y1, int x2, int y2);
+    // Queues a live-screen backdrop-filter:blur op (real glass). Enqueued in paint
+    // order; the drain blurs the already-drawn screenTexture region and draws it back.
+    native void nativeBlurScreenRegion(int x, int y, int width, int height, float radius);
+    // Queues a live-screen "Liquid Glass" MATERIAL op (the full backdrop-filter
+    // recipe -- material + blur + rounded-rect mask + refraction + specular),
+    // matching the offscreen IOSImplementation.glassRegion. Enqueued in paint order.
+    native void nativeGlassScreenRegion(int x, int y, int width, int height, float radius, float cornerRadius, float sat, float scale, float offset, float refract, float specular);
+    // Queues a live-screen iOS 26 selection-drop LENS op (magnify + chromatic
+    // aberration + dark->accent tint over the painted content). See lensScreenRegionX.
+    native void nativeLensScreenRegion(int x, int y, int width, int height, float cornerRadius, float magnify, float aberration, int tintColor, float tintStrength);
+    // Renders an Apple SF Symbol to a GLUIImage peer (iOS 13+). Returns 0 when the
+    // symbol is unavailable; writes the pixel width/height into widthHeight[0]/[1].
+    native long nativeCreateSFSymbol(String name, int color, float size, int weight, int[] widthHeight);
     native void nativeFillRectMutable(int color, int alpha, int x, int y, int width, int height);
     native void nativeFillRectGlobal(int color, int alpha, int x, int y, int width, int height);
     native void nativeDrawRectMutable(int color, int alpha, int x, int y, int width, int height);
@@ -195,6 +208,15 @@ public final class IOSNative {
     
     native boolean isLargerTextEnabled();
     native float getLargerTextScale();
+    native boolean isHighContrastEnabled();
+    native boolean isDifferentiateWithoutColorEnabled();
+    native boolean isReduceMotionEnabled();
+    native boolean isReduceTransparencyEnabled();
+    native boolean isBoldTextEnabled();
+    native boolean isInvertColorsEnabled();
+    native boolean isGrayscaleEnabled();
+    native boolean isOnOffSwitchLabelsEnabled();
+    native boolean isScreenReaderEnabled();
 
     // SJH Nov. 17, 2015 : Removing native isMinimized() method because it conflicted with
     // tracking on the java side.  It caused the app to still be minimized inside start()
@@ -1006,6 +1028,56 @@ public final class IOSNative {
     /** Shows a transient CarPlay alert/banner with the supplied message for {@code seconds}. */
     native void carPlayShowToast(String message, int seconds);
 
+    // --- External surfaces (WidgetKit + ActivityKit) -------------------------
+    // All gated natively by CN1_USE_WIDGETS (the build flips it on when the app references
+    // com.codename1.surfaces). When the define is off these compile to harmless stubs so the
+    // symbols always resolve. WidgetKit/ActivityKit are Swift-only frameworks; the real
+    // implementations trampoline into the Swift CN1SurfaceBridge class (compiled into the app
+    // target by the builder) via NSClassFromString. The Java side (IOSSurfaceBridge) persists
+    // the serialized payloads into the App Group container before calling these.
+
+    /**
+     * Returns the filesystem path of the App Group container shared with the CN1Widgets
+     * extension (group id from the CN1SurfacesAppGroup Info.plist key), or an empty string
+     * when no usable app group exists.
+     */
+    native String getSurfacesContainerPath();
+
+    /**
+     * Asks WidgetCenter to re-render the widgets of {@code kind} from their persisted
+     * timelines; an empty string reloads all kinds.
+     */
+    native void surfacesReloadTimelines(String kind);
+
+    /**
+     * Number of widget instances of {@code kind} the user placed on their home/lock screen.
+     * WidgetCenter answers asynchronously so this returns the last cached answer, 0 when
+     * still unknown.
+     */
+    native int surfacesInstalledCount(String kind);
+
+    /**
+     * Starts an ActivityKit live activity from the serialized descriptor (which embeds the
+     * initial state). Returns the platform activity id, or an empty string on failure.
+     */
+    native String surfacesStartActivity(String descriptorJson);
+
+    /** Pushes a fresh state map into a running live activity; the views re-interpolate locally. */
+    native void surfacesUpdateActivity(String activityId, String stateJson);
+
+    /**
+     * Ends a live activity, optionally showing {@code finalStateJson} before dismissal.
+     * {@code dismissImmediately} removes the surface right away instead of letting iOS
+     * linger on the final state.
+     */
+    native void surfacesEndActivity(String activityId, String finalStateJson, boolean dismissImmediately);
+
+    /** True when this build/device can render WidgetKit widgets (iOS 14+, app group resolvable). */
+    native boolean surfacesWidgetsSupported();
+
+    /** True when ActivityKit live activities are available and enabled (iOS 16.1+). */
+    native boolean surfacesActivitiesSupported();
+
     // --- Secure storage (Security.framework keychain) -----------------------
 
     /** Sets the kSecAttrAccessGroup applied to subsequent keychain operations. {@code null} clears. */
@@ -1216,6 +1288,8 @@ public final class IOSNative {
     native boolean isRTLString(String javaString);
 
     public static native void announceForAccessibility(String text);
+
+    public static native void updateAccessibilityTree(String json, int changeType);
 
     // ============================================================
     // Crypto bridge -- backed by CN1Crypto.{h,m} in nativeSources/.

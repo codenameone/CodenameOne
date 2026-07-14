@@ -125,6 +125,15 @@ public final class LinuxNative {
     /** Real horizontal screen DPI (96 == 100% scale). */
     public static native int screenDpi();
 
+    /** True when the GTK theme requests high contrast. */
+    public static native boolean isHighContrastEnabled();
+
+    /** True when GTK animations are disabled. */
+    public static native boolean isReduceMotionEnabled();
+
+    /** True when the GTK accessibility bridge is active. */
+    public static native boolean isScreenReaderEnabled();
+
     /** The window's graphics peer (a Direct2D render target wrapper). */
     public static native long getWindowGraphics();
 
@@ -144,6 +153,13 @@ public final class LinuxNative {
      * constants in cn1_linux.h for the type codes.
      */
     public static native boolean pollEvent(int[] out);
+
+    /** Rebuilds the GTK/ATK virtual accessibility hierarchy. */
+    public static native void accessibilityBegin();
+    public static native void accessibilityNode(long id, long parentId, String role, String label,
+            String description, String value, int x, int y, int width, int height, int stateFlags);
+    public static native void accessibilityAction(long nodeId, String actionId, int actionHash, String label);
+    public static native void accessibilityEnd(int changeType);
 
     /**
      * True when the default seat has a touchscreen device, used for
@@ -502,6 +518,60 @@ public final class LinuxNative {
      * {@code null} when none was clicked since the last poll. Drained by the EDT.
      */
     public static native String notificationPollClicked();
+
+    /* -------------------------------------------------- surfaces widgets */
+
+    /**
+     * Creates a frameless GTK "applet" window of the given logical size for a
+     * pinned surfaces widget (or the live-activity pill): undecorated, utility
+     * type hint, keep-above, sticky, skip-taskbar/pager, RGBA visual for
+     * translucent rounded corners. Returns an opaque nonzero id immediately
+     * (the window materializes asynchronously on the GTK main loop), or 0 in
+     * headless mode / when the slot table is full. Under Wayland positioning
+     * and keep-above silently degrade; see cn1_linux_widgets.c.
+     */
+    public static native long widgetCreate(int w, int h);
+
+    /**
+     * Replaces the widget's pixels with a {@code w*h} block of straight-alpha
+     * CN1 ARGB (premultiplied while converting to the cairo backing store).
+     * The pixel buffer may be larger than the window (e.g. 2x for crispness);
+     * the draw handler scales it to the window size.
+     */
+    public static native void widgetUpdatePixels(long peer, int[] argb, int w, int h);
+
+    /**
+     * Moves the widget window to screen coordinates. {@code x == -1} centers
+     * it horizontally (used to dock the live-activity pill top-center).
+     * Silently ignored by Wayland compositors.
+     */
+    public static native void widgetSetPosition(long peer, int x, int y);
+
+    /** The widget window's last known screen x (cached from configure events). */
+    public static native int widgetGetX(long peer);
+
+    /** The widget window's last known screen y (cached from configure events). */
+    public static native int widgetGetY(long peer);
+
+    /**
+     * Sets the action hit rectangles as {@code x,y,w,h} quads in window
+     * coordinates: a button press inside any rect queues a {@code click}
+     * event; a press outside starts an interactive window drag.
+     */
+    public static native void widgetSetHitRects(long peer, int[] rects);
+
+    /** Destroys the widget window and frees its slot (async, on the GTK loop). */
+    public static native void widgetDestroy(long peer);
+
+    /**
+     * Next queued widget event ({@code "<id>;click;<x>;<y>"} or
+     * {@code "<id>;moved;<x>;<y>"}, window coordinates), or {@code null} when
+     * none. Drained by the main-thread input pump alongside {@link #pollEvent}.
+     */
+    public static native String widgetPollEvent();
+
+    /** Presents (raises and focuses) the main app window after an action click. */
+    public static native void widgetFocusApp();
 
     /**
      * Shows a modal native file dialog and returns the chosen path, or

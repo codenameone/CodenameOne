@@ -2245,6 +2245,23 @@ public class CSSTheme {
                 }
 
 
+                currToken = "letterSpacing";
+                if (unselectedStyles.containsKey("letter-spacing")) {
+                    res.setThemeProperty(themeName, unselId+".letterSpacing", el.getThemeLetterSpacing(unselectedStyles));
+                }
+                currToken = "selected letterSpacing";
+                if (selectedStyles.containsKey("letter-spacing")) {
+                    res.setThemeProperty(themeName, selId+"#letterSpacing", el.getThemeLetterSpacing(selectedStyles));
+                }
+                currToken = "pressed letterSpacing";
+                if (pressedStyles.containsKey("letter-spacing")) {
+                    res.setThemeProperty(themeName, pressedId+"#letterSpacing", el.getThemeLetterSpacing(pressedStyles));
+                }
+                currToken = "disabled letterSpacing";
+                if (disabledStyles.containsKey("letter-spacing")) {
+                    res.setThemeProperty(themeName, disabledId+"#letterSpacing", el.getThemeLetterSpacing(disabledStyles));
+                }
+
                 currToken = "surface";
                 if (unselectedStyles.containsKey("surface")) {
                     res.setThemeProperty(themeName, unselId + ".surface", el.getThemeSurface(unselectedStyles));
@@ -5225,6 +5242,13 @@ public class CSSTheme {
             return -1;
         }
 
+        public float getThemeLetterSpacing(Map<String, LexicalUnit> style) {
+            if (style.containsKey("letter-spacing")) {
+                return ((ScaledUnit)style.get("letter-spacing")).getFloatValue();
+            }
+            return 0;
+        }
+
         public byte getThemeIconGapUnit(Map<String, LexicalUnit> style) {
             if (style.containsKey("icon-gap")) {
                 FloatValue value = getFloatValue(style.get("icon-gap"));
@@ -5757,21 +5781,6 @@ public class CSSTheme {
                     out.opacity(alpha);
                 } else {
                     out.opacity(255);
-                }
-                // When the source background-color came from a var()
-                // expansion, flip the RoundBorder into "uiid mode" so it
-                // paints via the Style's bgPainter (i.e. Style.bgColor)
-                // at render time instead of the static color baked into
-                // the border at compile time. Without this, a runtime
-                // `@accent-color` override updates themeProps[bgColor]
-                // correctly but the visible pill stays at the compile-
-                // time fallback because RoundBorder.fillShape uses its
-                // own field. Only flip when the binding is present so
-                // legacy themes that rely on the baked-color path keep
-                // their existing rendering.
-                if (backgroundColor instanceof ScaledUnit
-                        && ((ScaledUnit) backgroundColor).bindingVarName != null) {
-                    out.uiid(true);
                 }
             } else {
                 out.opacity(0);
@@ -6451,6 +6460,11 @@ public class CSSTheme {
 
             case "icon-gap" : {
                 style.put("icon-gap", value);
+                break;
+            }
+
+            case "letter-spacing" : {
+                style.put("letter-spacing", value);
                 break;
             }
 

@@ -38,6 +38,8 @@ tags:
     description: Registered test devices
   - name: Profiles
     description: Provisioning profiles
+  - name: App Groups
+    description: Apple App Groups for widgets and Live Activities
   - name: APNs Keys
     description: Token-based APNs auth keys (store-only)
 
@@ -367,6 +369,43 @@ paths:
         "404": { description: No such profile }
         "502": { $ref: "#/components/responses/AppleError" }
 
+  /appsec/7.0/apple/app-groups:
+    get:
+      tags: [App Groups]
+      summary: List App Groups
+      operationId: listAppGroups
+      responses:
+        "200":
+          description: App Groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AppGroupDTO" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/NotConfigured" }
+        "502": { $ref: "#/components/responses/AppleError" }
+    post:
+      tags: [App Groups]
+      summary: Find or create an App Group
+      description: "Find-or-create: if the identifier already exists at Apple, the existing group is returned rather than a 409."
+      operationId: createAppGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateAppGroupRequest" }
+      responses:
+        "201":
+          description: App Group created or found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AppGroupDTO" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/NotConfigured" }
+        "502": { $ref: "#/components/responses/AppleError" }
+
   /appsec/7.0/apple/apns-keys:
     get:
       tags: [APNs Keys]
@@ -523,7 +562,24 @@ components:
       type: object
       required: [capabilityType]
       properties:
-        capabilityType: { type: string, description: "e.g. PUSH_NOTIFICATIONS." }
+        capabilityType: { type: string, description: "e.g. PUSH_NOTIFICATIONS or APP_GROUPS." }
+        appGroupIds:
+          type: array
+          nullable: true
+          items: { type: string }
+          description: Apple App Group resource ids to associate when capabilityType is APP_GROUPS.
+    AppGroupDTO:
+      type: object
+      properties:
+        id: { type: string, description: Apple's app-group resource id. }
+        identifier: { type: string, description: The App Group identifier, e.g. group.com.example.app. }
+        name: { type: string }
+    CreateAppGroupRequest:
+      type: object
+      required: [identifier, name]
+      properties:
+        identifier: { type: string, description: The App Group identifier, e.g. group.com.example.app. }
+        name: { type: string }
 
     DeviceDTO:
       type: object

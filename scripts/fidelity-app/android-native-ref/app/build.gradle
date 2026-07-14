@@ -1,0 +1,38 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.codenameone.fidelity.nativeref'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "com.codenameone.fidelity.nativeref"
+        minSdk 26            // PixelCopy window capture
+        targetSdk 36
+        versionCode 1
+        versionName "1.0"
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+// The Tabs reference renders the same Material icon-font glyphs as the CN1
+// side; pull the font from the CN1 core sources instead of committing a
+// duplicate binary.
+tasks.register('copyMaterialFont', Copy) {
+    from rootProject.file('../../../CodenameOne/src/material-design-font.ttf')
+    into layout.buildDirectory.dir('generated/refAssets')
+}
+android.sourceSets.main.assets.srcDirs += layout.buildDirectory.dir('generated/refAssets')
+preBuild.dependsOn copyMaterialFont
+
+dependencies {
+    // Keep in sync with the fidelity app's Material dependency
+    // (scripts/fidelity-app/common/codenameone_settings.properties) -- the
+    // reference must be rendered by the same Material generation the theme
+    // targets (the android-m3 golden set).
+    implementation 'com.google.android.material:material:1.12.0'
+}

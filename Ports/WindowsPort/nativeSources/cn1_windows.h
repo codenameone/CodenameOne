@@ -101,7 +101,8 @@ typedef enum {
      * ROTATE. drainInput decodes these into Display.fireMagnifyGesture /
      * fireRotationGesture, the same hooks the macOS trackpad drives. */
     CN1_EVENT_PINCH = 10,
-    CN1_EVENT_ROTATE = 11
+    CN1_EVENT_ROTATE = 11,
+    CN1_EVENT_ACCESSIBILITY_ACTION = 12
 } CN1EventType;
 
 /* Fixed-point scale for the gesture keyCode field (see CN1_EVENT_PINCH). */
@@ -255,6 +256,7 @@ int  cn1WinCreateWindow(const char* utf8Title, int width, int height);
 void cn1WinPushEvent(CN1EventType type, int x, int y, int keyCode);
 int  cn1WinPollEvent(CN1Event* out);
 LRESULT CALLBACK cn1WinWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+LRESULT cn1WinAccessibilityObject(HWND hwnd, WPARAM wParam, LPARAM lParam);
 
 /* BrowserComponent / WebView2 peer (cn1_windows_browser.cpp). The EDT-facing
  * native methods marshal each WebView2 operation to the main (pump) thread by
@@ -301,6 +303,27 @@ void cn1WinShareHandleMessage(WPARAM wParam);
  * document is then rasterized and spooled on the worker thread. */
 #define WM_CN1_PRINTDLG (WM_APP + 23)
 LRESULT cn1WinPrintDialogHandleMessage(WPARAM wParam);
+
+/* Floating layered widget windows (cn1_windows_widgets.cpp): the desktop
+ * lowering of com.codename1.surfaces. Widget windows must be created, updated
+ * and destroyed on the window-owning pump thread (a window belongs to the
+ * thread that created it), so the EDT-facing widget natives post WM_CN1_WIDGET
+ * to cn1Win.hwnd with a heap-allocated op struct (create / destroy / setpixels
+ * / setpos / sethitrects / focusapp) that the handler frees -- the same
+ * marshaling pattern WM_CN1_NOTIFY uses, never a blocking SendMessage from the
+ * EDT. Events flow back through a mutex-guarded string queue the EDT polls
+ * (widgetPollEvent), mirroring browserPollEvent. */
+#define WM_CN1_WIDGET (WM_APP + 24)
+void cn1WinWidgetHandleMessage(WPARAM wParam);
+
+#ifdef CN1_WIDGETBOARD
+/* Windows 11 Widgets Board provider (cn1_windows_widgetboard.cpp), compiled
+ * only when the MSIX build defines CN1_WIDGETBOARD (windows.msix=true). When
+ * Windows activated this exe with -RegisterProcessAsComServer the call runs the
+ * out-of-process COM widget provider and exits the process; in a normal app
+ * launch it returns immediately. */
+void cn1WidgetBoardMaybeRunComServer(void);
+#endif
 
 /* graphics (cn1_windows_graphics.c) */
 CN1Graphics* cn1WinCreateGraphics(ID2D1RenderTarget* target);

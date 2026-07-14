@@ -126,3 +126,9 @@ package.json
 # Google Maps JS API key injected by CI for the GoogleWebMap screenshot test
 # (from the GOOGLE_MAPS_API_KEY secret). A secret value, never committed.
 /scripts/hellocodenameone/common/src/main/resources/google-maps-key.txt
+scripts/fidelity-app/common/src/main/resources/*ThemeDev.res
+
+# Native theme .res is copied into the fidelity-app bundle from Themes/ at
+# build time (common/pom.xml copy-native-themes); never commit the duplicate.
+scripts/fidelity-app/common/src/main/resources/iOSModernTheme.res
+scripts/fidelity-app/common/src/main/resources/AndroidMaterialTheme.res

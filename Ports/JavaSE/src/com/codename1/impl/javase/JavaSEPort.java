@@ -39,6 +39,8 @@ import com.codename1.messaging.Message;
 import com.codename1.payment.PromotionalOffer;
 import com.codename1.printing.PrintResult;
 import com.codename1.printing.PrintResultListener;
+import com.codename1.ui.AccessibilityColorVisionDeficiency;
+import com.codename1.ui.accessibility.AccessibilityManager;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
@@ -235,6 +237,17 @@ public class JavaSEPort extends CodenameOneImplementation {
     // font scaling, so the Larger Text menu only nags them a single time per session.
     private boolean largerTextOptInWarningShown = false;
     private static final String PREF_LARGER_TEXT_SCALE = "cn1.simulator.largerTextScale";
+    private static final String PREF_ACCESSIBILITY_PREFIX = "cn1.simulator.accessibility.";
+    private boolean highContrastEnabled;
+    private boolean differentiateWithoutColorEnabled;
+    private boolean reduceMotionEnabled;
+    private boolean reduceTransparencyEnabled;
+    private boolean boldTextEnabled;
+    private boolean invertColorsEnabled;
+    private boolean grayscaleEnabled;
+    private boolean onOffSwitchLabelsEnabled;
+    private boolean screenReaderEnabled;
+    private AccessibilityColorVisionDeficiency colorVisionDeficiency = AccessibilityColorVisionDeficiency.NONE;
 
     // Floor below which any persisted window dimension is treated as the
     // product of a layout glitch (eg. a pack() with a collapsed canvas, an
@@ -368,6 +381,23 @@ public class JavaSEPort extends CodenameOneImplementation {
             com.codename1.car.Car.endSession();
             b.close();
         }
+    }
+
+    /// Returns the JavaSE external-surfaces bridge, created lazily on first use. In simulator mode
+    /// published widget timelines render in the Widgets preview window (Widgets menu); in desktop
+    /// mode they render in frameless always-on-top floating windows that persist across runs.
+    @Override
+    public com.codename1.surfaces.spi.SurfaceBridge getSurfaceBridge() {
+        if (surfaceBridge == null) {
+            File surfacesHome = new File(System.getProperty("user.home")
+                    + File.separator + getAppHomeDir(), "cn1surfaces");
+            surfaceBridge = new JavaSEWidgetBridge(surfacesHome, isSimulator());
+            if (!isSimulator()) {
+                widgetWindows = new JavaSEWidgetWindows(surfaceBridge, window);
+                surfaceBridge.setDesktopWindows(widgetWindows);
+            }
+        }
+        return surfaceBridge;
     }
 
     private void fireDesktopWindowEvent(com.codename1.ui.events.WindowEvent.Type type) {
@@ -611,7 +641,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             IS_MAC = false;
         }
         isWindows = File.separatorChar == '\\';        
-        System.setProperty("apple.laf.useScreenMenuBar", "true");
+        if (System.getProperty("apple.laf.useScreenMenuBar") == null) {
+            System.setProperty("apple.laf.useScreenMenuBar", "true");
+        }
         
         if(isWindows) {
             fontFaceSystem = "ArialUnicodeMS";
@@ -927,6 +959,12 @@ public class JavaSEPort extends CodenameOneImplementation {
     // Simulated in-car (CarPlay / Android Auto) head unit, created from the Car menu. Lets developers
     // see and click through their com.codename1.car experience locally without a real head unit.
     private JavaSECarBridge carBridge;
+    // External surfaces (com.codename1.surfaces): feeds the simulator Widgets preview window in
+    // simulator mode and the desktop floating widget windows in desktop mode. Created lazily so
+    // apps that never touch the surfaces API pay nothing.
+    private JavaSEWidgetBridge surfaceBridge;
+    // Desktop floating widget windows manager, created beside the bridge in desktop mode only.
+    private JavaSEWidgetWindows widgetWindows;
     // Application frame used for simulator
     private AppFrame appFrame;
     private long lastIdleTime;
@@ -1168,6 +1206,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                         });
                         sysTray.add(tray);
                         desktopNotificationTray = tray;
+                        if (widgetWindows != null) {
+                            // desktop widgets piggyback on the persistent tray icon: an
+                            // "Add widget: ..." item per registered kind
+                            widgetWindows.installTrayMenu(tray);
+                        }
                     }
                     lastDesktopNotificationId = notif.getId();
                     desktopNotificationTray.displayMessage(notif.getAlertTitle(), notif.getAlertBody(),
@@ -1841,7 +1884,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         EventQueue.invokeLater(new Runnable() {
             @Override
             public void run() {
-                frame.setJMenuBar(buildNativeMenuBar(snapshot));
+                frame.setJMenuBar(buildNativeMenuBar(snapshot, frame));
                 frame.revalidate();
             }
         });
@@ -1851,11 +1894,8 @@ public class JavaSEPort extends CodenameOneImplementation {
     /// menus by each command's desktop-menu placement hint (Command.getDesktopMenu()); commands
     /// with no hint fall under a default "Commands" menu. Each menu item dispatches back onto the
     /// Codename One EDT before invoking the command's action.
-    private JMenuBar buildNativeMenuBar(java.util.List<com.codename1.ui.Command> commands) {
+    private JMenuBar buildNativeMenuBar(java.util.List<com.codename1.ui.Command> commands, JFrame frame) {
         JMenuBar bar = new JMenuBar();
-        if (commands.isEmpty()) {
-            return bar;
-        }
         // preserve first-seen order of the menu groups
         java.util.LinkedHashMap<String, JMenu> menus = new java.util.LinkedHashMap<String, JMenu>();
         for (int i = 0; i < commands.size(); i++) {
@@ -1888,6 +1928,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             });
             menu.add(item);
         }
+        // Every desktop Codename One tool gets the native MCP menu so it can be exposed
+        // to and driven by an LLM agent.
+        bar.add(MCPDesktopMenu.build(frame != null ? frame.getTitle() : null, frame));
         return bar;
     }
 
@@ -2456,6 +2499,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     protected class C extends JPanel implements KeyListener, MouseListener, MouseMotionListener, HierarchyBoundsListener, AdjustmentListener, MouseWheelListener {
+        private JavaSEAccessibility cn1Accessibility;
         private BufferedImage buffer;
         boolean painted;
         private Graphics2D g2dInstance;
@@ -2488,6 +2532,23 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             requestFocus();
+        }
+
+        @Override
+        public javax.accessibility.AccessibleContext getAccessibleContext() {
+            if (cn1Accessibility == null) {
+                cn1Accessibility = new JavaSEAccessibility(this, JavaSEPort.this);
+                AccessibilityManager.getInstance().invalidateAll();
+            }
+            return cn1Accessibility.getContext();
+        }
+
+        boolean isAccessibilityContextRequested() {
+            return cn1Accessibility != null;
+        }
+
+        void accessibilityChanged(int changeType) {
+            if (cn1Accessibility != null) cn1Accessibility.changed(changeType);
         }
 
         private void installNativeMagnificationListeners() {
@@ -2867,7 +2928,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 
                 if (isEnabled()) {
-                    g.drawImage(buffer, (int) ((getScreenCoordinates().getX() + x) * zoomLevel), (int) ((getScreenCoordinates().getY() + y) * zoomLevel), this);
+                    g.drawImage(accessibilityFilteredImage(buffer),
+                            (int) ((getScreenCoordinates().getX() + x) * zoomLevel),
+                            (int) ((getScreenCoordinates().getY() + y) * zoomLevel), this);
                 } else {
                     g.setColor(Color.WHITE);
                     g.fillRect(x + (int) (getSkin().getWidth() * zoomLevel), y, getWidth(), getHeight());
@@ -2920,7 +2983,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     bg.dispose();
                     painted = true;
                 }
-                g.drawImage(buffer, x, y, this);
+                g.drawImage(accessibilityFilteredImage(buffer), x, y, this);
             }
             ((Graphics2D)g).setTransform(t);
             return painted;
@@ -3824,6 +3887,25 @@ public class JavaSEPort extends CodenameOneImplementation {
     public JavaSEPort() {
         canvas = new C();
         instance = this;
+    }
+
+    @Override
+    public void accessibilityTreeChanged(final int changeType) {
+        EventQueue.invokeLater(new Runnable() {
+            public void run() {
+                if (canvas != null) canvas.accessibilityChanged(changeType);
+            }
+        });
+    }
+
+    @Override
+    public boolean isAccessibilityTreeSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccessibilityTreeUpdateRequired() {
+        return screenReaderEnabled || canvas != null && canvas.isAccessibilityContextRequested();
     }
 
     public void paintDirty() {
@@ -5227,6 +5309,34 @@ public class JavaSEPort extends CodenameOneImplementation {
         return carMenu;
     }
 
+    /// Builds the simulator "Widgets" menu, which opens the Widgets preview window rendering the
+    /// app's published `com.codename1.surfaces` timelines and live activities locally -- kind list,
+    /// size selector, light/dark toggle, timeline auto-advance and a mock Dynamic Island.
+    private JMenu buildWidgetsMenu() {
+        JMenu widgetsMenu = new JMenu("Widgets");
+        registerMenuWithBlit(widgetsMenu);
+        JMenuItem preview = new JMenuItem("Widgets Preview");
+        preview.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                SimulatorWidgets.showWindow((JavaSEWidgetBridge) getSurfaceBridge(), window);
+            }
+        });
+        widgetsMenu.add(preview);
+        if (Boolean.getBoolean("cn1.surfaces.autodemo")) {
+            // Demo/automation hook: -Dcn1.surfaces.autodemo=true opens the Widgets preview
+            // window on startup so scripted runs (screenshots, samples CI) can observe
+            // published surfaces without interacting with the menu.
+            SwingUtilities.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    SimulatorWidgets.showWindow((JavaSEWidgetBridge) getSurfaceBridge(), window);
+                }
+            });
+        }
+        return widgetsMenu;
+    }
+
     private static Component findStatusBarComponent(Form f) {
         if (f == null || f.getToolbar() == null) {
             return null;
@@ -6441,6 +6551,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
 
         final JMenu largerTextMenu = installLargerTextMenu(simulateMenu, pref, frm);
+        final JMenu accessibilityPreferencesMenu = installAccessibilityPreferencesMenu(pref);
 
         final JMenu notificationBackgroundMenu = installNotificationBackgroundSimulationMenu(simulateMenu);
 
@@ -6651,6 +6762,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         simulateMenu.addSeparator();
         simulateMenu.add(darkLightModeMenu);
         simulateMenu.add(largerTextMenu);
+        simulateMenu.add(accessibilityPreferencesMenu);
         simulateMenu.add(purchaseMenu);
         simulateMenu.add(permFlag);
         simulateMenu.add(notificationBackgroundMenu);
@@ -6685,6 +6797,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 bar.add(extensionMenu);
             }
             bar.add(buildCarMenu());
+            bar.add(buildWidgetsMenu());
+            bar.add(MCPDesktopMenu.build("Codename One Simulator", window));
             bar.add(helpMenu);
         }
 
@@ -7608,6 +7722,118 @@ public class JavaSEPort extends CodenameOneImplementation {
         return largerTextMenu;
     }
 
+    private JMenu installAccessibilityPreferencesMenu(final Preferences pref) {
+        highContrastEnabled = pref.getBoolean(PREF_ACCESSIBILITY_PREFIX + "highContrast", false);
+        differentiateWithoutColorEnabled = pref.getBoolean(
+                PREF_ACCESSIBILITY_PREFIX + "differentiateWithoutColor", false);
+        reduceMotionEnabled = pref.getBoolean(PREF_ACCESSIBILITY_PREFIX + "reduceMotion", false);
+        reduceTransparencyEnabled = pref.getBoolean(PREF_ACCESSIBILITY_PREFIX + "reduceTransparency", false);
+        boldTextEnabled = pref.getBoolean(PREF_ACCESSIBILITY_PREFIX + "boldText", false);
+        invertColorsEnabled = pref.getBoolean(PREF_ACCESSIBILITY_PREFIX + "invertColors", false);
+        grayscaleEnabled = pref.getBoolean(PREF_ACCESSIBILITY_PREFIX + "grayscale", false);
+        onOffSwitchLabelsEnabled = pref.getBoolean(PREF_ACCESSIBILITY_PREFIX + "switchLabels", false);
+        screenReaderEnabled = pref.getBoolean(PREF_ACCESSIBILITY_PREFIX + "screenReader", false);
+        try {
+            colorVisionDeficiency = AccessibilityColorVisionDeficiency.valueOf(
+                    pref.get(PREF_ACCESSIBILITY_PREFIX + "colorVision",
+                            AccessibilityColorVisionDeficiency.NONE.name()));
+        } catch (IllegalArgumentException ex) {
+            colorVisionDeficiency = AccessibilityColorVisionDeficiency.NONE;
+        }
+
+        JMenu menu = new JMenu("Accessibility Preferences");
+        registerMenuWithBlit(menu);
+        menu.add(accessibilityPreferenceItem("High Contrast", highContrastEnabled, pref, "highContrast", 0));
+        menu.add(accessibilityPreferenceItem("Differentiate Without Color",
+                differentiateWithoutColorEnabled, pref, "differentiateWithoutColor", 1));
+        menu.add(createColorVisionMenu(pref));
+        menu.addSeparator();
+        menu.add(accessibilityPreferenceItem("Reduce Motion", reduceMotionEnabled, pref, "reduceMotion", 2));
+        menu.add(accessibilityPreferenceItem("Reduce Transparency", reduceTransparencyEnabled,
+                pref, "reduceTransparency", 3));
+        menu.add(accessibilityPreferenceItem("Bold Text", boldTextEnabled, pref, "boldText", 4));
+        menu.add(accessibilityPreferenceItem("Invert Colors", invertColorsEnabled, pref, "invertColors", 5));
+        menu.add(accessibilityPreferenceItem("Grayscale", grayscaleEnabled, pref, "grayscale", 6));
+        menu.add(accessibilityPreferenceItem("On/Off Switch Labels", onOffSwitchLabelsEnabled,
+                pref, "switchLabels", 7));
+        menu.add(accessibilityPreferenceItem("Screen Reader Active", screenReaderEnabled,
+                pref, "screenReader", 8));
+        return menu;
+    }
+
+    private JCheckBoxMenuItem accessibilityPreferenceItem(String label, boolean selected,
+            final Preferences pref, final String key, final int preference) {
+        final JCheckBoxMenuItem item = new JCheckBoxMenuItem(label, selected);
+        item.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent event) {
+                setSimulatorAccessibilityPreference(preference, item.isSelected());
+                pref.putBoolean(PREF_ACCESSIBILITY_PREFIX + key, item.isSelected());
+                refreshThemeOnly();
+                canvas.repaint();
+            }
+        });
+        return item;
+    }
+
+    private JMenu createColorVisionMenu(final Preferences pref) {
+        JMenu menu = new JMenu("Color Vision");
+        ButtonGroup group = new ButtonGroup();
+        AccessibilityColorVisionDeficiency[] modes = {
+            AccessibilityColorVisionDeficiency.NONE,
+            AccessibilityColorVisionDeficiency.PROTANOPIA,
+            AccessibilityColorVisionDeficiency.DEUTERANOPIA,
+            AccessibilityColorVisionDeficiency.TRITANOPIA,
+            AccessibilityColorVisionDeficiency.MONOCHROMACY
+        };
+        String[] labels = {"None", "Protanopia", "Deuteranopia", "Tritanopia", "Monochromacy"};
+        for (int i = 0; i < modes.length; i++) {
+            final AccessibilityColorVisionDeficiency mode = modes[i];
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem(labels[i], colorVisionDeficiency == mode);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent event) {
+                    colorVisionDeficiency = mode;
+                    pref.put(PREF_ACCESSIBILITY_PREFIX + "colorVision", mode.name());
+                    canvas.repaint();
+                }
+            });
+            group.add(item);
+            menu.add(item);
+        }
+        return menu;
+    }
+
+    /// Sets a simulated accessibility preference. This is primarily intended for
+    /// automated simulator tests. Preference indexes follow the menu order.
+    public void setSimulatorAccessibilityPreference(int preference, boolean enabled) {
+        switch (preference) {
+            case 0: highContrastEnabled = enabled; break;
+            case 1: differentiateWithoutColorEnabled = enabled; break;
+            case 2: reduceMotionEnabled = enabled; break;
+            case 3: reduceTransparencyEnabled = enabled; break;
+            case 4: boldTextEnabled = enabled; break;
+            case 5: invertColorsEnabled = enabled; break;
+            case 6: grayscaleEnabled = enabled; break;
+            case 7: onOffSwitchLabelsEnabled = enabled; break;
+            case 8:
+                screenReaderEnabled = enabled;
+                if (enabled) {
+                    AccessibilityManager.getInstance().invalidateAll();
+                }
+                break;
+            default: throw new IllegalArgumentException("Unknown accessibility preference: " + preference);
+        }
+    }
+
+    /// Sets the simulator's color-vision filter.
+    public void setSimulatorColorVisionDeficiency(AccessibilityColorVisionDeficiency deficiency) {
+        colorVisionDeficiency = deficiency == null ? AccessibilityColorVisionDeficiency.NONE : deficiency;
+        if (canvas != null) {
+            canvas.repaint();
+        }
+    }
+
     /// The Larger Text menu only changes the on-screen fonts when the running app
     /// has opted into font scaling -- either through the `useLargerTextScaleBool`
     /// theme constant or a `UIManager.setUseLargerTextScale(true)` call at startup.
@@ -8123,6 +8349,111 @@ public class JavaSEPort extends CodenameOneImplementation {
         return largerTextScale;
     }
 
+    @Override
+    public boolean isHighContrastEnabled() {
+        return highContrastEnabled;
+    }
+
+    @Override
+    public boolean isDifferentiateWithoutColorEnabled() {
+        return differentiateWithoutColorEnabled;
+    }
+
+    @Override
+    public AccessibilityColorVisionDeficiency getColorVisionDeficiency() {
+        return colorVisionDeficiency;
+    }
+
+    @Override
+    public boolean isReduceMotionEnabled() {
+        return reduceMotionEnabled;
+    }
+
+    @Override
+    public boolean isReduceTransparencyEnabled() {
+        return reduceTransparencyEnabled;
+    }
+
+    @Override
+    public boolean isBoldTextEnabled() {
+        return boldTextEnabled;
+    }
+
+    @Override
+    public boolean isInvertColorsEnabled() {
+        return invertColorsEnabled;
+    }
+
+    @Override
+    public boolean isGrayscaleEnabled() {
+        return grayscaleEnabled || colorVisionDeficiency == AccessibilityColorVisionDeficiency.MONOCHROMACY;
+    }
+
+    @Override
+    public boolean isOnOffSwitchLabelsEnabled() {
+        return onOffSwitchLabelsEnabled;
+    }
+
+    @Override
+    public boolean isScreenReaderEnabled() {
+        return screenReaderEnabled;
+    }
+
+    private BufferedImage accessibilityFilteredImage(BufferedImage source) {
+        boolean monochrome = grayscaleEnabled
+                || colorVisionDeficiency == AccessibilityColorVisionDeficiency.MONOCHROMACY;
+        if (!invertColorsEnabled && !monochrome
+                && (colorVisionDeficiency == AccessibilityColorVisionDeficiency.NONE
+                || colorVisionDeficiency == AccessibilityColorVisionDeficiency.UNKNOWN)) {
+            return source;
+        }
+        BufferedImage result = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        int width = source.getWidth();
+        int height = source.getHeight();
+        int[] pixels = source.getRGB(0, 0, width, height, null, 0, width);
+        for (int i = 0; i < pixels.length; i++) {
+            int argb = pixels[i];
+            int transformed = transformAccessibilityColor(
+                    (argb >>> 16) & 0xFF, (argb >>> 8) & 0xFF, argb & 0xFF, monochrome);
+            if (invertColorsEnabled) {
+                transformed = 0xFFFFFF ^ transformed;
+            }
+            pixels[i] = (argb & 0xFF000000) | transformed;
+        }
+        result.setRGB(0, 0, width, height, pixels, 0, width);
+        return result;
+    }
+
+    private int transformAccessibilityColor(int red, int green, int blue, boolean monochrome) {
+        if (monochrome) {
+            int gray = clampColor(0.299 * red + 0.587 * green + 0.114 * blue);
+            return (gray << 16) | (gray << 8) | gray;
+        }
+        switch (colorVisionDeficiency) {
+            case PROTANOPIA:
+                return colorMatrix(red, green, blue, .567, .433, 0, .558, .442, 0, 0, .242, .758);
+            case DEUTERANOPIA:
+                return colorMatrix(red, green, blue, .625, .375, 0, .7, .3, 0, 0, .3, .7);
+            case TRITANOPIA:
+                return colorMatrix(red, green, blue, .95, .05, 0, 0, .433, .567, 0, .475, .525);
+            default:
+                return (red << 16) | (green << 8) | blue;
+        }
+    }
+
+    private int colorMatrix(int red, int green, int blue,
+            double rr, double rg, double rb, double gr, double gg, double gb,
+            double br, double bg, double bb) {
+        int transformedRed = clampColor(rr * red + rg * green + rb * blue);
+        int transformedGreen = clampColor(gr * red + gg * green + gb * blue);
+        int transformedBlue = clampColor(br * red + bg * green + bb * blue);
+        return (transformedRed << 16) | (transformedGreen << 8) | transformedBlue;
+    }
+
+    private int clampColor(double value) {
+        return Math.max(0, Math.min(255, (int) Math.round(value)));
+    }
+
     private void refreshSkin(final JFrame frm) {
         Display.getInstance().callSerially(new Runnable() {
 
@@ -8408,6 +8739,11 @@ public class JavaSEPort extends CodenameOneImplementation {
     public void init(Object m) {
         inInit = true;
         installGeneratedSvgRegistry();
+
+        // Make the desktop stdio and loopback socket MCP transports available to
+        // com.codename1.mcp.MCP.
+        MCPStdioTransport.register();
+        MCPSocketTransport.register();
 
         // Fire-and-forget probe so LlmClient.simulatorRedirect=auto
         // can detect a local Ollama install without blocking startup.
@@ -9426,6 +9762,23 @@ public class JavaSEPort extends CodenameOneImplementation {
                     
                 });
                 */
+            }
+            // Honor the field's horizontal alignment (issue #5370) so a right- or
+            // center-aligned field doesn't jump to the left when the native editor
+            // takes over. getAbsoluteAlignment() already resolves LEFT/RIGHT for RTL.
+            // Both JTextField and JPasswordField (a JTextField subclass) support this.
+            if (t instanceof JTextField) {
+                switch (((com.codename1.ui.TextArea)cmp).getAbsoluteAlignment()) {
+                    case com.codename1.ui.Component.RIGHT:
+                        ((JTextField)t).setHorizontalAlignment(JTextField.RIGHT);
+                        break;
+                    case com.codename1.ui.Component.CENTER:
+                        ((JTextField)t).setHorizontalAlignment(JTextField.CENTER);
+                        break;
+                    default:
+                        ((JTextField)t).setHorizontalAlignment(JTextField.LEADING);
+                        break;
+                }
             }
             swingT = t;
             textCmp = swingT;
@@ -11035,12 +11388,21 @@ public class JavaSEPort extends CodenameOneImplementation {
     /**
      * @inheritDoc
      */
+    // Maps a mutable image's raw Graphics2D back to its backing BufferedImage so the
+    // in-place region ops (blurRegion / lensRegion) can read+write the destination
+    // when drawing off-screen (headless glass/lens rendering, e.g. the capture probe).
+    // WeakHashMap: entries clear when the Graphics2D is GC'd with its CN1 Graphics.
+    private final java.util.Map<Object, BufferedImage> mutableImageGraphics =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<Object, BufferedImage>());
+
     public Object getNativeGraphics(Object image) {
         /*
          * NativeScreenGraphics n = new NativeScreenGraphics(); n.sourceImage =
          * (BufferedImage)image; return n;
          */
-        return ((BufferedImage) image).getGraphics();
+        java.awt.Graphics g = ((BufferedImage) image).getGraphics();
+        mutableImageGraphics.put(g, (BufferedImage) image);
+        return g;
     }
 
     /**
@@ -16842,26 +17204,270 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (radius <= 0f || width <= 0 || height <= 0) {
             return true;
         }
-        Graphics2D ng = getGraphics(graphics);
-        // The target buffer the simulator paints into is typically a BufferedImage
-        // accessible via getDeviceConfiguration().createCompatibleImage during paint.
-        // For backdrop-filter we snapshot whatever the destination shows under the
-        // rectangle, blur it, and draw it back. Falling back to false signals the
-        // caller to use the snapshot+drawImage path instead.
+        // In-place backdrop-filter:blur. Read the destination region, Gaussian-blur it
+        // and paint it back. We can do this when the destination is a BufferedImage we
+        // own: a mutable Image's backing raster (the off-screen tiles / Dialog blur) at
+        // 1:1, or the simulator's edtBuffer at retinaScale. An unknown raw Graphics2D
+        // target returns false so the caller skips the blur (component still paints).
         try {
-            java.awt.geom.AffineTransform tx = ng.getTransform();
-            int sx = (int) Math.round(tx.getTranslateX()) + x;
-            int sy = (int) Math.round(tx.getTranslateY()) + y;
-            BufferedImage snap = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-            java.awt.GraphicsConfiguration gc = ng.getDeviceConfiguration();
-            BufferedImage dest = (gc != null) ? gc.createCompatibleImage(width, height, java.awt.Transparency.TRANSLUCENT) : snap;
-            // Java2D doesn't easily let us read back from the destination - fall back.
-            return false;
+            BufferedImage dest;
+            double scale;
+            if (graphics instanceof NativeScreenGraphics) {
+                NativeScreenGraphics ng = (NativeScreenGraphics) graphics;
+                if (ng.sourceImage != null) {
+                    dest = ng.sourceImage;   // mutable image target (fidelity tiles, blur-to-image)
+                    scale = 1.0;
+                } else if (canvas != null && canvas.edtBuffer != null) {
+                    dest = canvas.edtBuffer;  // simulator screen buffer
+                    // edtBuffer = displayWidth * zoomLevel (device scaled to window), NOT
+                    // displayWidth * retinaScale -- retinaScale put the region off-buffer.
+                    scale = (double) dest.getWidth() / getDisplayWidthImpl();
+                } else {
+                    return false;
+                }
+            } else if (mutableImageGraphics.containsKey(graphics)) {
+                dest = mutableImageGraphics.get(graphics);   // off-screen mutable image
+                scale = 1.0;
+            } else {
+                return false;   // raw Graphics2D with no readable backing buffer
+            }
+            int rx = (int) Math.round(x * scale);
+            int ry = (int) Math.round(y * scale);
+            int rw = (int) Math.round(width * scale);
+            int rh = (int) Math.round(height * scale);
+            int dw = dest.getWidth(), dh = dest.getHeight();
+            // clamp to the destination bounds
+            if (rx < 0) { rw += rx; rx = 0; }
+            if (ry < 0) { rh += ry; ry = 0; }
+            if (rx + rw > dw) { rw = dw - rx; }
+            if (ry + rh > dh) { rh = dh - ry; }
+            if (rw <= 0 || rh <= 0) {
+                return true;
+            }
+            // Copy the region out (a fresh ARGB buffer so the filter does not read and
+            // write the same shared raster), blur it, draw it back.
+            BufferedImage src = new BufferedImage(rw, rh, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D cg = src.createGraphics();
+            cg.drawImage(dest.getSubimage(rx, ry, rw, rh), 0, 0, null);
+            cg.dispose();
+            BufferedImage blurred = new GaussianFilter((float) (radius * scale)).filter(src, null);
+            Graphics2D dg = dest.createGraphics();
+            dg.drawImage(blurred, rx, ry, null);
+            dg.dispose();
+            return true;
         } catch (Throwable t) {
             return false;
         }
     }
  
+    // iOS-26 tab selection-DROP lens constants (shared shape with METALView.m
+    // glassApplyLens). Uniform magnification in the central MAG_FLAT fraction of the
+    // radius, smooth falloff to 1.0 at the rim; chromatic aberration at the rim only;
+    // a SHARP luminance key so only dark glyphs tint (the grey pill stays grey).
+    private static final double LENS_MAG_FLAT = 0.75;
+    private static final double LENS_TINT_HI = 150;
+    private static final double LENS_TINT_LO = 55;
+    // The drop LIFTS the content under it upward (like a magnifying droplet pulling the
+    // glyph up) -- this is the "tabs grow/rise" in the native morph, not just magnify.
+    // Lift is proportional to (magnify-1) so it tracks the travel bump, peaks at centre.
+    private static final double LENS_LIFT_COEF = 0.40;
+    // The drop is a 3D GLASS droplet: a soft specular GLARE (light sheen) near the top,
+    // and a bright EDGE RIM that defines the glass boundary. Without these it reads as a
+    // flat tinted pill, not glass.
+    private static final double LENS_GLARE = 0.09;     // specular sheen strength
+    private static final double LENS_RIM = 0.06;       // edge-rim brightness
+    private static final double LENS_RIM_W = 0.06;     // rim band width (fraction of half-height)
+    private static final double LENS_REFRACT = 0.16;   // edge lensing: content bends at the rim
+    private static final double LENS_EDGE_SHADOW = 0.12; // soft dark band at the inner edge (glass depth)
+    // The periphery (bar / other tabs seen through the drop) is slightly SHRUNK while the
+    // central glyph stays enlarged -- mag falls from `magnify` at the centre to RIM_SCALE
+    // (<1) at the rim. And the glass carries a faint cool TINT inside it.
+    private static final double LENS_RIM_SCALE = 0.84;
+    private static final int LENS_GLASS_TINT = 0xbcd8ff;   // faint cool-blue glass cast
+    private static final double LENS_GLASS_TINT_STR = 0.10;
+    // The selected glyph seen through the drop reads MORE vivid/saturated than a flat
+    // tint -- native's selected blue is punchy. Boost chroma around the pixel luminance:
+    // coloured pixels (the blue glyph) push further from grey; neutral greys (the bar)
+    // are barely touched, so only the glyph gets more saturated.
+    private static final double LENS_SAT_BOOST = 1.32;
+
+    @Override
+    public boolean lensRegion(Object graphics, int x, int y, int width, int height,
+            float cornerRadius, float magnify, float aberration, int tintColor, float tintStrength) {
+        if (width <= 0 || height <= 0) {
+            return true;
+        }
+        try {
+            BufferedImage dest;
+            double scale;
+            if (graphics instanceof NativeScreenGraphics) {
+                NativeScreenGraphics ng = (NativeScreenGraphics) graphics;
+                if (ng.sourceImage != null) {
+                    dest = ng.sourceImage;
+                    scale = 1.0;
+                } else if (canvas != null && canvas.edtBuffer != null) {
+                    dest = canvas.edtBuffer;
+                    // edtBuffer = displayWidth * zoomLevel (the sim renders the device
+                    // scaled to fit the window), NOT displayWidth * retinaScale -- using
+                    // retinaScale put the region off-buffer so the op silently no-op'd.
+                    scale = (double) dest.getWidth() / getDisplayWidthImpl();
+                } else {
+                    return false;
+                }
+            } else if (mutableImageGraphics.containsKey(graphics)) {
+                dest = mutableImageGraphics.get(graphics);   // off-screen mutable image
+                scale = 1.0;
+            } else {
+                return false;
+            }
+            int rx = (int) Math.round(x * scale);
+            int ry = (int) Math.round(y * scale);
+            int rw = (int) Math.round(width * scale);
+            int rh = (int) Math.round(height * scale);
+            int dw = dest.getWidth(), dh = dest.getHeight();
+            if (rx < 0) { rw += rx; rx = 0; }
+            if (ry < 0) { rh += ry; ry = 0; }
+            if (rx + rw > dw) { rw = dw - rx; }
+            if (ry + rh > dh) { rh = dh - ry; }
+            if (rw <= 0 || rh <= 0) {
+                return true;
+            }
+            int[] src = dest.getRGB(rx, ry, rw, rh, null, 0, rw);
+            int[] out = new int[rw * rh];
+            applyLensBuffer(src, out, rw, rh, cornerRadius * scale, magnify, aberration, tintColor, tintStrength);
+            dest.setRGB(rx, ry, rw, rh, out, 0, rw);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /// In-place lens over a copied ARGB region. cornerRadius < 0 -> capsule. Mirrors
+    /// METALView.m glassApplyLens so the simulator and device agree.
+    private static void applyLensBuffer(int[] src, int[] out, int rw, int rh,
+            double cornerRadius, double magnify, double aberration, int tintColor, double tintStrength) {
+        double hw = rw / 2.0, hh = rh / 2.0;
+        double r = cornerRadius < 0 ? Math.min(hw, hh) : Math.min(cornerRadius, Math.min(hw, hh));
+        if (r < 0) r = 0;
+        int tr = (tintColor >> 16) & 0xff, tg = (tintColor >> 8) & 0xff, tb = tintColor & 0xff;
+        double liftMax = LENS_LIFT_COEF * (magnify - 1.0) * hh;   // upward pull, bump-driven
+        // The 3D-glass cues (edge refraction / edge shadow / glare) belong to the MORPH
+        // droplet, not the settled pill -- scale them by how magnified the drop is so a
+        // resting selection stays a flat subtle pill.
+        double glassAmt = lensSmoothstep(1.085, 1.25, magnify);
+        for (int yy = 0; yy < rh; yy++) {
+            double py = yy + 0.5 - hh;
+            for (int xx = 0; xx < rw; xx++) {
+                double px = xx + 0.5 - hw;
+                double dxe = Math.abs(px) - (hw - r);
+                double dye = Math.abs(py) - (hh - r);
+                double axx = Math.max(dxe, 0), ayy = Math.max(dye, 0);
+                double outside = Math.sqrt(axx * axx + ayy * ayy);
+                double inside = Math.min(Math.max(dxe, dye), 0);
+                double depth = -(outside + inside - r);
+                if (depth <= 0) { out[yy * rw + xx] = src[yy * rw + xx]; continue; }
+                double alpha = Math.min(depth, 1.0);
+                double rd = Math.min(1.0, Math.sqrt((px * px) / (hw * hw) + (py * py) / (hh * hh)));
+                double edge = lensSmoothstep(LENS_MAG_FLAT, 1.0, rd);
+                // Centre ENLARGES (magnify); periphery SHRINKS (mag -> RIM_SCALE < 1) so the
+                // bar / other tabs seen through the drop read slightly minified, while the
+                // central glyph stays big. No shrink when settled (scaled by glassAmt).
+                double rimScale = 1.0 + (LENS_RIM_SCALE - 1.0) * glassAmt;
+                double mag = magnify + (rimScale - magnify) * edge;
+                if (mag < 0.2) mag = 0.2;
+                double abr = aberration * edge;
+                double magR = mag * (1 - abr), magB = mag * (1 + abr);
+                if (magR < 0.05) magR = 0.05;
+                if (magB < 0.05) magB = 0.05;
+                // Sample from LOWER in the source (+lift) so the content appears LIFTED
+                // up; strongest at the drop centre, smooth to 0 at the rim.
+                double lift = liftMax * (1 - rd * rd);
+                // EDGE LENSING: near the rim the content bends outward (refraction band),
+                // like the curved edge of a real glass droplet -- the centre stays flat.
+                double refr = 1.0 + LENS_REFRACT * glassAmt * lensSmoothstep(0.70, 1.0, rd);
+                int sr = (lensSample(src, rw, rh, hw + (px / magR) * refr, hh + (py / magR) * refr + lift) >> 16) & 0xff;
+                int sg = (lensSample(src, rw, rh, hw + (px / mag) * refr, hh + (py / mag) * refr + lift) >> 8) & 0xff;
+                int sb = lensSample(src, rw, rh, hw + (px / magB) * refr, hh + (py / magB) * refr + lift) & 0xff;
+                double lum = 0.2126 * sr + 0.7152 * sg + 0.0722 * sb;
+                double t = tintStrength * lensSmoothstep(LENS_TINT_HI, LENS_TINT_LO, lum);
+                double fr = sr + (tr - sr) * t;
+                double fg = sg + (tg - sg) * t;
+                double fb = sb + (tb - sb) * t;
+                // Faint cool TINT through the whole glass (the drop is slightly coloured
+                // inside, not clear). Fades out when settled (glassAmt).
+                double gt = LENS_GLASS_TINT_STR * glassAmt;
+                fr += (((LENS_GLASS_TINT >> 16) & 0xff) - fr) * gt;
+                fg += (((LENS_GLASS_TINT >> 8) & 0xff) - fg) * gt;
+                fb += ((LENS_GLASS_TINT & 0xff) - fb) * gt;
+                // SATURATION boost: push coloured pixels (the blue glyph) away from their
+                // own grey so the selected blue reads vivid like native; near-neutral greys
+                // (the bar) move negligibly. Always on so the settled blue is vivid too.
+                double sl = 0.2126 * fr + 0.7152 * fg + 0.0722 * fb;
+                fr = sl + (fr - sl) * LENS_SAT_BOOST;
+                fg = sl + (fg - sl) * LENS_SAT_BOOST;
+                fb = sl + (fb - sl) * LENS_SAT_BOOST;
+                // 3D GLASS: a soft specular GLARE near the top (an elliptical sheen) plus
+                // a bright EDGE RIM (small `depth` = near the boundary) so the drop reads
+                // as a raised glass droplet, not a flat tint. Both lift the colour toward
+                // white.
+                double gx = px / hw, gy = (py + 0.42 * hh) / hh;
+                double glare = LENS_GLARE * glassAmt * Math.exp(-(gx * gx * 1.15 + gy * gy * 2.6) * 2.1);
+                double rimW = Math.max(2.0, LENS_RIM_W * hh);
+                double rim = depth < rimW ? (1.0 - depth / rimW) * LENS_RIM : 0;
+                double bright = glare + rim;
+                if (bright > 0) {
+                    fr += bright * (255 - fr);
+                    fg += bright * (255 - fg);
+                    fb += bright * (255 - fb);
+                }
+                // EDGE SHADOW: a soft dark band just inside the rim (the glass casts a
+                // shadow at its edge) -- gives the droplet depth instead of a flat cutout.
+                double esW = Math.max(2.0, 0.13 * Math.min(hw, hh));
+                if (depth < esW) {
+                    double es = (1.0 - depth / esW) * LENS_EDGE_SHADOW * glassAmt;
+                    fr *= (1 - es);
+                    fg *= (1 - es);
+                    fb *= (1 - es);
+                }
+                int fri = fr < 0 ? 0 : (fr > 255 ? 255 : (int) fr);
+                int fgi = fg < 0 ? 0 : (fg > 255 ? 255 : (int) fg);
+                int fbi = fb < 0 ? 0 : (fb > 255 ? 255 : (int) fb);
+                fr = fri; fg = fgi; fb = fbi;
+                int orig = src[yy * rw + xx];
+                int or = (orig >> 16) & 0xff, og = (orig >> 8) & 0xff, ob = orig & 0xff;
+                int mr = (int) (or + (fr - or) * alpha);
+                int mg = (int) (og + (fg - og) * alpha);
+                int mb = (int) (ob + (fb - ob) * alpha);
+                out[yy * rw + xx] = (orig & 0xff000000) | (mr << 16) | (mg << 8) | mb;
+            }
+        }
+    }
+
+    private static double lensSmoothstep(double a, double b, double x) {
+        double t = (x - a) / (b - a);
+        t = t < 0 ? 0 : (t > 1 ? 1 : t);
+        return t * t * (3 - 2 * t);
+    }
+
+    private static int lensSample(int[] buf, int w, int h, double fx, double fy) {
+        if (fx < 0) fx = 0; else if (fx > w - 1) fx = w - 1;
+        if (fy < 0) fy = 0; else if (fy > h - 1) fy = h - 1;
+        int x0 = (int) fx, y0 = (int) fy;
+        int x1 = Math.min(x0 + 1, w - 1), y1 = Math.min(y0 + 1, h - 1);
+        double tx = fx - x0, ty = fy - y0;
+        int p00 = buf[y0 * w + x0], p10 = buf[y0 * w + x1];
+        int p01 = buf[y1 * w + x0], p11 = buf[y1 * w + x1];
+        int r = lensBil((p00 >> 16) & 0xff, (p10 >> 16) & 0xff, (p01 >> 16) & 0xff, (p11 >> 16) & 0xff, tx, ty);
+        int g = lensBil((p00 >> 8) & 0xff, (p10 >> 8) & 0xff, (p01 >> 8) & 0xff, (p11 >> 8) & 0xff, tx, ty);
+        int b = lensBil(p00 & 0xff, p10 & 0xff, p01 & 0xff, p11 & 0xff, tx, ty);
+        return (r << 16) | (g << 8) | b;
+    }
+
+    private static int lensBil(int a, int b, int c, int d, double tx, double ty) {
+        double top = a + (b - a) * tx, bot = c + (d - c) * tx;
+        return (int) (top + (bot - top) * ty);
+    }
+
     class NativeImage extends Image {
 
         public NativeImage(BufferedImage nativeImage) {

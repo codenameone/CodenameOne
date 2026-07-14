@@ -47,6 +47,12 @@ public final class GeneratedAccess_com_codename1_media {
         if ("AudioBufferCallback".equals(simpleName)) {
             return com.codename1.media.AudioBuffer.AudioBufferCallback.class;
         }
+        if ("AudioEffects".equals(simpleName)) {
+            return com.codename1.media.AudioEffects.class;
+        }
+        if ("AudioMixer".equals(simpleName)) {
+            return com.codename1.media.AudioMixer.class;
+        }
         if ("CompletionAwareSoundPoolPeer".equals(simpleName)) {
             return com.codename1.media.CompletionAwareSoundPoolPeer.class;
         }
@@ -80,8 +86,44 @@ public final class GeneratedAccess_com_codename1_media {
         if ("TextToSpeech".equals(simpleName)) {
             return com.codename1.media.TextToSpeech.class;
         }
+        if ("TimedRecognitionCallback".equals(simpleName)) {
+            return com.codename1.media.TimedRecognitionCallback.class;
+        }
+        if ("Transcriber".equals(simpleName)) {
+            return com.codename1.media.Transcriber.class;
+        }
+        if ("TranscriptionRequest".equals(simpleName)) {
+            return com.codename1.media.TranscriptionRequest.class;
+        }
+        if ("TranscriptionResult".equals(simpleName)) {
+            return com.codename1.media.TranscriptionResult.class;
+        }
+        if ("TranscriptionSegment".equals(simpleName)) {
+            return com.codename1.media.TranscriptionSegment.class;
+        }
         if ("TtsOptions".equals(simpleName)) {
             return com.codename1.media.TtsOptions.class;
+        }
+        if ("VideoCodec".equals(simpleName)) {
+            return com.codename1.media.VideoCodec.class;
+        }
+        if ("VideoFrame".equals(simpleName)) {
+            return com.codename1.media.VideoFrame.class;
+        }
+        if ("VideoIO".equals(simpleName)) {
+            return com.codename1.media.VideoIO.class;
+        }
+        if ("VideoReader".equals(simpleName)) {
+            return com.codename1.media.VideoReader.class;
+        }
+        if ("FrameCallback".equals(simpleName)) {
+            return com.codename1.media.VideoReader.FrameCallback.class;
+        }
+        if ("VideoWriter".equals(simpleName)) {
+            return com.codename1.media.VideoWriter.class;
+        }
+        if ("VideoWriterBuilder".equals(simpleName)) {
+            return com.codename1.media.VideoWriterBuilder.class;
         }
         if ("VoiceCompletionListener".equals(simpleName)) {
             return com.codename1.media.VoiceCompletionListener.class;
@@ -97,6 +139,12 @@ public final class GeneratedAccess_com_codename1_media {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return new com.codename1.media.AudioBuffer(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if (type == com.codename1.media.AudioMixer.class) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Integer.class}, false);
+                return new com.codename1.media.AudioMixer(toIntValue(adaptedArgs[0]), toIntValue(adaptedArgs[1]));
             }
         }
         if (type == com.codename1.media.MediaMetaData.class) {
@@ -123,10 +171,46 @@ public final class GeneratedAccess_com_codename1_media {
                 return new com.codename1.media.RemoteControlListener();
             }
         }
+        if (type == com.codename1.media.TranscriptionRequest.class) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return new com.codename1.media.TranscriptionRequest((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if (type == com.codename1.media.TranscriptionResult.class) {
+            if (matches(safeArgs, new Class<?>[]{java.util.List.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.List.class}, false);
+                return new com.codename1.media.TranscriptionResult((java.util.List) adaptedArgs[0]);
+            }
+        }
+        if (type == com.codename1.media.TranscriptionSegment.class) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class, java.lang.Long.class, java.lang.String.class}, false);
+                return new com.codename1.media.TranscriptionSegment(((Number) adaptedArgs[0]).longValue(), ((Number) adaptedArgs[1]).longValue(), (java.lang.String) adaptedArgs[2]);
+            }
+        }
         if (type == com.codename1.media.TtsOptions.class) {
             if (matches(safeArgs, new Class<?>[0], false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.media.TtsOptions();
+            }
+        }
+        if (type == com.codename1.media.VideoCodec.class) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.Boolean.class, java.lang.Boolean.class, java.lang.Boolean.class, java.lang.Boolean.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.String[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.Boolean.class, java.lang.Boolean.class, java.lang.Boolean.class, java.lang.Boolean.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.String[].class}, false);
+                return new com.codename1.media.VideoCodec((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1], (java.lang.String) adaptedArgs[2], ((Boolean) adaptedArgs[3]).booleanValue(), ((Boolean) adaptedArgs[4]).booleanValue(), ((Boolean) adaptedArgs[5]).booleanValue(), ((Boolean) adaptedArgs[6]).booleanValue(), toIntValue(adaptedArgs[7]), toIntValue(adaptedArgs[8]), (java.lang.String[]) adaptedArgs[9]);
+            }
+        }
+        if (type == com.codename1.media.VideoFrame.class) {
+            if (matches(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Long.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Long.class}, false);
+                return new com.codename1.media.VideoFrame((int[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), ((Number) adaptedArgs[3]).longValue());
+            }
+        }
+        if (type == com.codename1.media.VideoWriterBuilder.class) {
+            if (matches(safeArgs, new Class<?>[0], false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
+                return new com.codename1.media.VideoWriterBuilder();
             }
         }
         if (type == com.codename1.media.WAVWriter.class) {
@@ -140,13 +224,98 @@ public final class GeneratedAccess_com_codename1_media {
 
     public static Object invokeStatic(Class<?> type, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
-        if (type == com.codename1.media.MediaManager.class) return invokeStatic0(name, safeArgs);
-        if (type == com.codename1.media.SpeechRecognizer.class) return invokeStatic1(name, safeArgs);
-        if (type == com.codename1.media.TextToSpeech.class) return invokeStatic2(name, safeArgs);
+        if (type == com.codename1.media.AudioEffects.class) return invokeStatic0(name, safeArgs);
+        if (type == com.codename1.media.AudioMixer.class) return invokeStatic1(name, safeArgs);
+        if (type == com.codename1.media.MediaManager.class) return invokeStatic2(name, safeArgs);
+        if (type == com.codename1.media.SpeechRecognizer.class) return invokeStatic3(name, safeArgs);
+        if (type == com.codename1.media.TextToSpeech.class) return invokeStatic4(name, safeArgs);
+        if (type == com.codename1.media.TranscriptionRequest.class) return invokeStatic5(name, safeArgs);
+        if (type == com.codename1.media.TranscriptionResult.class) return invokeStatic6(name, safeArgs);
+        if (type == com.codename1.media.VideoIO.class) return invokeStatic7(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
+        if ("equalize".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
+                return com.codename1.media.AudioEffects.equalize((com.codename1.media.AudioBuffer) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue());
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
+                return com.codename1.media.AudioEffects.equalize((com.codename1.media.AudioBuffer) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).floatValue(), ((Number) adaptedArgs[5]).floatValue());
+            }
+        }
+        if ("gain".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class, java.lang.Float.class}, false);
+                return com.codename1.media.AudioEffects.gain((com.codename1.media.AudioBuffer) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue());
+            }
+        }
+        if ("isSimdOptimizationsEnabled".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.media.AudioEffects.isSimdOptimizationsEnabled();
+            }
+        }
+        if ("isolateCenter".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class}, false);
+                return com.codename1.media.AudioEffects.isolateCenter((com.codename1.media.AudioBuffer) adaptedArgs[0]);
+            }
+        }
+        if ("midSide".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class, java.lang.Float.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class, java.lang.Float.class, java.lang.Float.class}, false);
+                return com.codename1.media.AudioEffects.midSide((com.codename1.media.AudioBuffer) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue());
+            }
+        }
+        if ("normalize".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class, java.lang.Float.class}, false);
+                return com.codename1.media.AudioEffects.normalize((com.codename1.media.AudioBuffer) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue());
+            }
+        }
+        if ("removeCenter".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class}, false);
+                return com.codename1.media.AudioEffects.removeCenter((com.codename1.media.AudioBuffer) adaptedArgs[0]);
+            }
+        }
+        if ("resetSimdOptimizationsEnabled".equals(name)) {
+            if (safeArgs.length == 0) {
+                com.codename1.media.AudioEffects.resetSimdOptimizationsEnabled(); return null;
+            }
+        }
+        if ("setSimdOptimizationsEnabled".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                com.codename1.media.AudioEffects.setSimdOptimizationsEnabled(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        throw unsupportedStatic(com.codename1.media.AudioEffects.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
+        if ("isSimdOptimizationsEnabled".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.media.AudioMixer.isSimdOptimizationsEnabled();
+            }
+        }
+        if ("resetSimdOptimizationsEnabled".equals(name)) {
+            if (safeArgs.length == 0) {
+                com.codename1.media.AudioMixer.resetSimdOptimizationsEnabled(); return null;
+            }
+        }
+        if ("setSimdOptimizationsEnabled".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                com.codename1.media.AudioMixer.setSimdOptimizationsEnabled(((Boolean) adaptedArgs[0]).booleanValue()); return null;
+            }
+        }
+        throw unsupportedStatic(com.codename1.media.AudioMixer.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
         if ("addCompletionHandler".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.media.Media.class, java.lang.Runnable.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.Media.class, java.lang.Runnable.class}, false);
@@ -259,7 +428,7 @@ public final class GeneratedAccess_com_codename1_media {
         throw unsupportedStatic(com.codename1.media.MediaManager.class, name, safeArgs);
     }
 
-    private static Object invokeStatic1(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic3(String name, Object[] safeArgs) throws Exception {
         if ("isSupported".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.media.SpeechRecognizer.isSupported();
@@ -285,7 +454,7 @@ public final class GeneratedAccess_com_codename1_media {
         throw unsupportedStatic(com.codename1.media.SpeechRecognizer.class, name, safeArgs);
     }
 
-    private static Object invokeStatic2(String name, Object[] safeArgs) throws Exception {
+    private static Object invokeStatic4(String name, Object[] safeArgs) throws Exception {
         if ("getAvailableVoices".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.media.TextToSpeech.getAvailableVoices();
@@ -314,6 +483,40 @@ public final class GeneratedAccess_com_codename1_media {
         throw unsupportedStatic(com.codename1.media.TextToSpeech.class, name, safeArgs);
     }
 
+    private static Object invokeStatic5(String name, Object[] safeArgs) throws Exception {
+        if ("file".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.media.TranscriptionRequest.file((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedStatic(com.codename1.media.TranscriptionRequest.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic6(String name, Object[] safeArgs) throws Exception {
+        if ("textOnly".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return com.codename1.media.TranscriptionResult.textOnly((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedStatic(com.codename1.media.TranscriptionResult.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic7(String name, Object[] safeArgs) throws Exception {
+        if ("getVideoIO".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.media.VideoIO.getVideoIO();
+            }
+        }
+        if ("isSupported".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.media.VideoIO.isSupported();
+            }
+        }
+        throw unsupportedStatic(com.codename1.media.VideoIO.class, name, safeArgs);
+    }
+
     public static Object invoke(Object target, String name, Object[] args) throws Exception {
         Object[] safeArgs = safeArgs(args);
         CN1AccessException unsupported = null;
@@ -331,93 +534,184 @@ public final class GeneratedAccess_com_codename1_media {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.media.AudioMixer) {
+            try {
+                return invoke2((com.codename1.media.AudioMixer) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.media.MediaMetaData) {
             try {
-                return invoke2((com.codename1.media.MediaMetaData) target, name, safeArgs);
+                return invoke3((com.codename1.media.MediaMetaData) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.media.MediaRecorderBuilder) {
             try {
-                return invoke3((com.codename1.media.MediaRecorderBuilder) target, name, safeArgs);
+                return invoke4((com.codename1.media.MediaRecorderBuilder) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.media.RecognitionOptions) {
             try {
-                return invoke4((com.codename1.media.RecognitionOptions) target, name, safeArgs);
+                return invoke5((com.codename1.media.RecognitionOptions) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.media.RemoteControlListener) {
             try {
-                return invoke5((com.codename1.media.RemoteControlListener) target, name, safeArgs);
+                return invoke6((com.codename1.media.RemoteControlListener) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.media.Transcriber) {
+            try {
+                return invoke7((com.codename1.media.Transcriber) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.media.TranscriptionRequest) {
+            try {
+                return invoke8((com.codename1.media.TranscriptionRequest) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.media.TranscriptionResult) {
+            try {
+                return invoke9((com.codename1.media.TranscriptionResult) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.media.TranscriptionSegment) {
+            try {
+                return invoke10((com.codename1.media.TranscriptionSegment) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.media.TtsOptions) {
             try {
-                return invoke6((com.codename1.media.TtsOptions) target, name, safeArgs);
+                return invoke11((com.codename1.media.TtsOptions) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.media.VideoCodec) {
+            try {
+                return invoke12((com.codename1.media.VideoCodec) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.media.VideoFrame) {
+            try {
+                return invoke13((com.codename1.media.VideoFrame) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.media.VideoIO) {
+            try {
+                return invoke14((com.codename1.media.VideoIO) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.media.VideoReader) {
+            try {
+                return invoke15((com.codename1.media.VideoReader) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.media.VideoWriter) {
+            try {
+                return invoke16((com.codename1.media.VideoWriter) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.media.VideoWriterBuilder) {
+            try {
+                return invoke17((com.codename1.media.VideoWriterBuilder) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.media.WAVWriter) {
             try {
-                return invoke7((com.codename1.media.WAVWriter) target, name, safeArgs);
+                return invoke18((com.codename1.media.WAVWriter) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.media.AsyncMedia) {
             try {
-                return invoke8((com.codename1.media.AsyncMedia) target, name, safeArgs);
+                return invoke19((com.codename1.media.AsyncMedia) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.media.AudioBuffer.AudioBufferCallback) {
             try {
-                return invoke9((com.codename1.media.AudioBuffer.AudioBufferCallback) target, name, safeArgs);
+                return invoke20((com.codename1.media.AudioBuffer.AudioBufferCallback) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.media.CompletionAwareSoundPoolPeer) {
             try {
-                return invoke10((com.codename1.media.CompletionAwareSoundPoolPeer) target, name, safeArgs);
+                return invoke21((com.codename1.media.CompletionAwareSoundPoolPeer) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.media.Media) {
             try {
-                return invoke11((com.codename1.media.Media) target, name, safeArgs);
+                return invoke22((com.codename1.media.Media) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.media.RecognitionCallback) {
             try {
-                return invoke12((com.codename1.media.RecognitionCallback) target, name, safeArgs);
+                return invoke23((com.codename1.media.RecognitionCallback) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.media.SoundPoolPeer) {
             try {
-                return invoke13((com.codename1.media.SoundPoolPeer) target, name, safeArgs);
+                return invoke24((com.codename1.media.SoundPoolPeer) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.media.TimedRecognitionCallback) {
+            try {
+                return invoke25((com.codename1.media.TimedRecognitionCallback) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
+        if (target instanceof com.codename1.media.VideoReader.FrameCallback) {
+            try {
+                return invoke26((com.codename1.media.VideoReader.FrameCallback) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.media.VoiceCompletionListener) {
             try {
-                return invoke14((com.codename1.media.VoiceCompletionListener) target, name, safeArgs);
+                return invoke27((com.codename1.media.VoiceCompletionListener) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -643,7 +937,70 @@ public final class GeneratedAccess_com_codename1_media {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke2(com.codename1.media.MediaMetaData typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke2(com.codename1.media.AudioMixer typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("addTrack".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class, java.lang.Long.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class, java.lang.Long.class, java.lang.Float.class}, false);
+                return typedTarget.addTrack((com.codename1.media.AudioBuffer) adaptedArgs[0], ((Number) adaptedArgs[1]).longValue(), ((Number) adaptedArgs[2]).floatValue());
+            }
+            if (matches(safeArgs, new Class<?>[]{float[].class, java.lang.Long.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, java.lang.Long.class, java.lang.Float.class}, false);
+                return typedTarget.addTrack((float[]) adaptedArgs[0], ((Number) adaptedArgs[1]).longValue(), ((Number) adaptedArgs[2]).floatValue());
+            }
+            if (matches(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Long.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Long.class, java.lang.Float.class}, false);
+                return typedTarget.addTrack((float[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), ((Number) adaptedArgs[3]).longValue(), ((Number) adaptedArgs[4]).floatValue());
+            }
+        }
+        if ("addTrackAtFrame".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class, java.lang.Integer.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class, java.lang.Integer.class, java.lang.Float.class}, false);
+                return typedTarget.addTrackAtFrame((com.codename1.media.AudioBuffer) adaptedArgs[0], toIntValue(adaptedArgs[1]), ((Number) adaptedArgs[2]).floatValue());
+            }
+            if (matches(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Float.class}, false);
+                return typedTarget.addTrackAtFrame((float[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), ((Number) adaptedArgs[4]).floatValue());
+            }
+        }
+        if ("clear".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.clear(); return null;
+            }
+        }
+        if ("getNumChannels".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getNumChannels();
+            }
+        }
+        if ("getOutputFrameCount".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getOutputFrameCount();
+            }
+        }
+        if ("getOutputSize".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getOutputSize();
+            }
+        }
+        if ("getSampleRate".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSampleRate();
+            }
+        }
+        if ("getTrackCount".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTrackCount();
+            }
+        }
+        if ("mix".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.mix();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke3(com.codename1.media.MediaMetaData typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getAlbumArt".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getAlbumArt();
@@ -724,7 +1081,7 @@ public final class GeneratedAccess_com_codename1_media {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke3(com.codename1.media.MediaRecorderBuilder typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke4(com.codename1.media.MediaRecorderBuilder typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("audioChannels".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
@@ -799,7 +1156,7 @@ public final class GeneratedAccess_com_codename1_media {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke4(com.codename1.media.RecognitionOptions typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke5(com.codename1.media.RecognitionOptions typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getLanguageTag".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getLanguageTag();
@@ -847,7 +1204,7 @@ public final class GeneratedAccess_com_codename1_media {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke5(com.codename1.media.RemoteControlListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke6(com.codename1.media.RemoteControlListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("fastForward".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.fastForward(); return null;
@@ -913,7 +1270,113 @@ public final class GeneratedAccess_com_codename1_media {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke6(com.codename1.media.TtsOptions typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke7(com.codename1.media.Transcriber typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getProvider".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getProvider();
+            }
+        }
+        if ("transcribe".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.media.TranscriptionRequest.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.TranscriptionRequest.class}, false);
+                return typedTarget.transcribe((com.codename1.media.TranscriptionRequest) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke8(com.codename1.media.TranscriptionRequest typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getAudioPath".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAudioPath();
+            }
+        }
+        if ("getLanguageTag".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getLanguageTag();
+            }
+        }
+        if ("getOption".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.getOption((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("getOptions".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getOptions();
+            }
+        }
+        if ("getPrompt".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPrompt();
+            }
+        }
+        if ("setLanguageTag".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.setLanguageTag((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("setOption".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.String.class}, false);
+                return typedTarget.setOption((java.lang.String) adaptedArgs[0], (java.lang.String) adaptedArgs[1]);
+            }
+        }
+        if ("setPrompt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.setPrompt((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke9(com.codename1.media.TranscriptionResult typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getSegments".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSegments();
+            }
+        }
+        if ("getText".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getText();
+            }
+        }
+        if ("toSrt".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.toSrt();
+            }
+        }
+        if ("toVtt".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.toVtt();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke10(com.codename1.media.TranscriptionSegment typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getEndTimeMs".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getEndTimeMs();
+            }
+        }
+        if ("getStartTimeMs".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getStartTimeMs();
+            }
+        }
+        if ("getText".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getText();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke11(com.codename1.media.TtsOptions typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getLanguageTag".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getLanguageTag();
@@ -972,7 +1435,412 @@ public final class GeneratedAccess_com_codename1_media {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke7(com.codename1.media.WAVWriter typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke12(com.codename1.media.VideoCodec typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getId".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getId();
+            }
+        }
+        if ("getMaxHeight".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getMaxHeight();
+            }
+        }
+        if ("getMaxWidth".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getMaxWidth();
+            }
+        }
+        if ("getMimeType".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getMimeType();
+            }
+        }
+        if ("getName".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getName();
+            }
+        }
+        if ("getSupportedContainers".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSupportedContainers();
+            }
+        }
+        if ("isDecoder".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isDecoder();
+            }
+        }
+        if ("isEncoder".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isEncoder();
+            }
+        }
+        if ("isHardwareAccelerated".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isHardwareAccelerated();
+            }
+        }
+        if ("isVideo".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isVideo();
+            }
+        }
+        if ("toString".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.toString();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke13(com.codename1.media.VideoFrame typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getARGB".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getARGB();
+            }
+        }
+        if ("getHeight".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getHeight();
+            }
+        }
+        if ("getRGBA".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
+                typedTarget.getRGBA((byte[]) adaptedArgs[0]); return null;
+            }
+        }
+        if ("getTimestampMillis".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getTimestampMillis();
+            }
+        }
+        if ("getWidth".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getWidth();
+            }
+        }
+        if ("toImage".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.toImage();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke14(com.codename1.media.VideoIO typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("createWriter".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.media.VideoWriterBuilder.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.VideoWriterBuilder.class}, false);
+                return typedTarget.createWriter((com.codename1.media.VideoWriterBuilder) adaptedArgs[0]);
+            }
+        }
+        if ("getAvailableDecoders".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAvailableDecoders();
+            }
+        }
+        if ("getAvailableEncoders".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAvailableEncoders();
+            }
+        }
+        if ("isDecoderSupported".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.isDecoderSupported((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("isEncoderSupported".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.isEncoderSupported((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("openReader".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.openReader((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke15(com.codename1.media.VideoReader typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("close".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.close(); return null;
+            }
+        }
+        if ("frameAt".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Long.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Long.class}, false);
+                return typedTarget.frameAt(((Number) adaptedArgs[0]).longValue());
+            }
+        }
+        if ("getAudioChannels".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAudioChannels();
+            }
+        }
+        if ("getAudioSampleRate".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAudioSampleRate();
+            }
+        }
+        if ("getDurationMillis".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getDurationMillis();
+            }
+        }
+        if ("getFrameRate".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getFrameRate();
+            }
+        }
+        if ("getHeight".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getHeight();
+            }
+        }
+        if ("getWidth".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getWidth();
+            }
+        }
+        if ("hasAudio".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.hasAudio();
+            }
+        }
+        if ("hasVideo".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.hasVideo();
+            }
+        }
+        if ("readAudio".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.readAudio();
+            }
+        }
+        if ("readFrames".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, com.codename1.media.VideoReader.FrameCallback.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, com.codename1.media.VideoReader.FrameCallback.class}, false);
+                typedTarget.readFrames(((Number) adaptedArgs[0]).floatValue(), (com.codename1.media.VideoReader.FrameCallback) adaptedArgs[1]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke16(com.codename1.media.VideoWriter typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("close".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.close(); return null;
+            }
+        }
+        if ("getFrameRate".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getFrameRate();
+            }
+        }
+        if ("getHeight".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getHeight();
+            }
+        }
+        if ("getWidth".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getWidth();
+            }
+        }
+        if ("writeAudio".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class, java.lang.Long.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class, java.lang.Long.class}, false);
+                typedTarget.writeAudio((com.codename1.media.AudioBuffer) adaptedArgs[0], ((Number) adaptedArgs[1]).longValue()); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{short[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Long.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{short[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Long.class}, false);
+                typedTarget.writeAudio((short[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), ((Number) adaptedArgs[3]).longValue()); return null;
+            }
+        }
+        if ("writeFrame".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, java.lang.Long.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Image.class, java.lang.Long.class}, false);
+                typedTarget.writeFrame((com.codename1.ui.Image) adaptedArgs[0], ((Number) adaptedArgs[1]).longValue()); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Long.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{int[].class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Long.class}, false);
+                typedTarget.writeFrame((int[]) adaptedArgs[0], toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), ((Number) adaptedArgs[3]).longValue()); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke17(com.codename1.media.VideoWriterBuilder typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("audioBitRate".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.audioBitRate(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("audioChannels".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.audioChannels(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("audioCodec".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.audioCodec((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("build".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.build();
+            }
+        }
+        if ("container".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.container((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("frameRate".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                return typedTarget.frameRate(((Number) adaptedArgs[0]).floatValue());
+            }
+        }
+        if ("getAudioBitRate".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAudioBitRate();
+            }
+        }
+        if ("getAudioChannels".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAudioChannels();
+            }
+        }
+        if ("getAudioCodec".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAudioCodec();
+            }
+        }
+        if ("getContainer".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getContainer();
+            }
+        }
+        if ("getFrameRate".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getFrameRate();
+            }
+        }
+        if ("getHeight".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getHeight();
+            }
+        }
+        if ("getKeyFrameInterval".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getKeyFrameInterval();
+            }
+        }
+        if ("getPath".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getPath();
+            }
+        }
+        if ("getSampleRate".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSampleRate();
+            }
+        }
+        if ("getVideoBitRate".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getVideoBitRate();
+            }
+        }
+        if ("getVideoCodec".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getVideoCodec();
+            }
+        }
+        if ("getWidth".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getWidth();
+            }
+        }
+        if ("hasAudio".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.hasAudio(((Boolean) adaptedArgs[0]).booleanValue());
+            }
+        }
+        if ("hasVideo".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.hasVideo(((Boolean) adaptedArgs[0]).booleanValue());
+            }
+        }
+        if ("height".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.height(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("isHasAudio".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isHasAudio();
+            }
+        }
+        if ("isHasVideo".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isHasVideo();
+            }
+        }
+        if ("keyFrameInterval".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                return typedTarget.keyFrameInterval(((Number) adaptedArgs[0]).floatValue());
+            }
+        }
+        if ("path".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.path((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("sampleRate".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.sampleRate(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("videoBitRate".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.videoBitRate(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("videoCodec".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                return typedTarget.videoCodec((java.lang.String) adaptedArgs[0]);
+            }
+        }
+        if ("width".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.width(toIntValue(adaptedArgs[0]));
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke18(com.codename1.media.WAVWriter typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("close".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.close(); return null;
@@ -987,7 +1855,7 @@ public final class GeneratedAccess_com_codename1_media {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke8(com.codename1.media.AsyncMedia typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke19(com.codename1.media.AsyncMedia typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("addMediaCompletionHandler".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Runnable.class}, false);
@@ -1132,7 +2000,7 @@ public final class GeneratedAccess_com_codename1_media {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke9(com.codename1.media.AudioBuffer.AudioBufferCallback typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke20(com.codename1.media.AudioBuffer.AudioBufferCallback typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("frameReceived".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.AudioBuffer.class}, false);
@@ -1142,7 +2010,7 @@ public final class GeneratedAccess_com_codename1_media {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke10(com.codename1.media.CompletionAwareSoundPoolPeer typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke21(com.codename1.media.CompletionAwareSoundPoolPeer typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("autoPause".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.autoPause(); return null;
@@ -1226,7 +2094,7 @@ public final class GeneratedAccess_com_codename1_media {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke11(com.codename1.media.Media typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke22(com.codename1.media.Media typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("cleanup".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.cleanup(); return null;
@@ -1326,7 +2194,7 @@ public final class GeneratedAccess_com_codename1_media {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke12(com.codename1.media.RecognitionCallback typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke23(com.codename1.media.RecognitionCallback typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("onEnd".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.onEnd(); return null;
@@ -1353,7 +2221,7 @@ public final class GeneratedAccess_com_codename1_media {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke13(com.codename1.media.SoundPoolPeer typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke24(com.codename1.media.SoundPoolPeer typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("autoPause".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.autoPause(); return null;
@@ -1431,7 +2299,52 @@ public final class GeneratedAccess_com_codename1_media {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke14(com.codename1.media.VoiceCompletionListener typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke25(com.codename1.media.TimedRecognitionCallback typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("onEnd".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.onEnd(); return null;
+            }
+        }
+        if ("onError".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Throwable.class}, false);
+                typedTarget.onError((java.lang.Throwable) adaptedArgs[0]); return null;
+            }
+        }
+        if ("onPartialResult".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.media.TranscriptionResult.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.TranscriptionResult.class}, false);
+                typedTarget.onPartialResult((com.codename1.media.TranscriptionResult) adaptedArgs[0]); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class}, false);
+                typedTarget.onPartialResult((java.lang.String) adaptedArgs[0]); return null;
+            }
+        }
+        if ("onResult".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.media.TranscriptionResult.class, java.lang.Float.class, java.lang.String[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.TranscriptionResult.class, java.lang.Float.class, java.lang.String[].class}, false);
+                typedTarget.onResult((com.codename1.media.TranscriptionResult) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue(), (java.lang.String[]) adaptedArgs[2]); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Float.class, java.lang.String[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.String.class, java.lang.Float.class, java.lang.String[].class}, false);
+                typedTarget.onResult((java.lang.String) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue(), (java.lang.String[]) adaptedArgs[2]); return null;
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke26(com.codename1.media.VideoReader.FrameCallback typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("frame".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{com.codename1.media.VideoFrame.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.media.VideoFrame.class}, false);
+                return typedTarget.frame((com.codename1.media.VideoFrame) adaptedArgs[0]);
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke27(com.codename1.media.VoiceCompletionListener typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("onVoiceComplete".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
@@ -1447,6 +2360,7 @@ public final class GeneratedAccess_com_codename1_media {
         if (type == com.codename1.media.AsyncMedia.MediaErrorType.class) return getStaticField2(name);
         if (type == com.codename1.media.AsyncMedia.State.class) return getStaticField3(name);
         if (type == com.codename1.media.Media.class) return getStaticField4(name);
+        if (type == com.codename1.media.VideoIO.class) return getStaticField5(name);
         throw unsupportedStaticField(type, name);
     }
 
@@ -1501,6 +2415,22 @@ public final class GeneratedAccess_com_codename1_media {
         if ("VARIABLE_BACKGROUND_TITLE".equals(name)) return com.codename1.media.Media.VARIABLE_BACKGROUND_TITLE;
         if ("VARIABLE_NATIVE_CONTRLOLS_EMBEDDED".equals(name)) return com.codename1.media.Media.VARIABLE_NATIVE_CONTRLOLS_EMBEDDED;
         throw unsupportedStaticField(com.codename1.media.Media.class, name);
+    }
+
+    private static Object getStaticField5(String name) throws Exception {
+        if ("CODEC_AAC".equals(name)) return com.codename1.media.VideoIO.CODEC_AAC;
+        if ("CODEC_AV1".equals(name)) return com.codename1.media.VideoIO.CODEC_AV1;
+        if ("CODEC_H264".equals(name)) return com.codename1.media.VideoIO.CODEC_H264;
+        if ("CODEC_HEVC".equals(name)) return com.codename1.media.VideoIO.CODEC_HEVC;
+        if ("CODEC_OPUS".equals(name)) return com.codename1.media.VideoIO.CODEC_OPUS;
+        if ("CODEC_PCM".equals(name)) return com.codename1.media.VideoIO.CODEC_PCM;
+        if ("CODEC_VP8".equals(name)) return com.codename1.media.VideoIO.CODEC_VP8;
+        if ("CODEC_VP9".equals(name)) return com.codename1.media.VideoIO.CODEC_VP9;
+        if ("CONTAINER_MKV".equals(name)) return com.codename1.media.VideoIO.CONTAINER_MKV;
+        if ("CONTAINER_MOV".equals(name)) return com.codename1.media.VideoIO.CONTAINER_MOV;
+        if ("CONTAINER_MP4".equals(name)) return com.codename1.media.VideoIO.CONTAINER_MP4;
+        if ("CONTAINER_WEBM".equals(name)) return com.codename1.media.VideoIO.CONTAINER_WEBM;
+        throw unsupportedStaticField(com.codename1.media.VideoIO.class, name);
     }
 
     public static Object getField(Object target, String name) throws Exception {
@@ -1564,6 +2494,9 @@ public final class GeneratedAccess_com_codename1_media {
             return true;
         }
         if (type == com.codename1.ui.events.SelectionListener.class) {
+            return true;
+        }
+        if (type == com.codename1.printing.PrintResultListener.class) {
             return true;
         }
         return false;
@@ -1641,6 +2574,17 @@ public final class GeneratedAccess_com_codename1_media {
                 public void selectionChanged(int arg0, int arg1) {
                     try {
                         lambda.invoke(new Object[]{arg0, arg1});
+                    } catch (bsh.EvalError ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            };
+        }
+        if (type == com.codename1.printing.PrintResultListener.class) {
+            return new com.codename1.printing.PrintResultListener() {
+                public void onResult(com.codename1.printing.PrintResult arg0) {
+                    try {
+                        lambda.invoke(new Object[]{arg0});
                     } catch (bsh.EvalError ex) {
                         throw new RuntimeException(ex);
                     }

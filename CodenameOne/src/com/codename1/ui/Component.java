@@ -40,10 +40,14 @@ import com.codename1.ui.events.ScrollListener;
 import com.codename1.ui.events.StyleListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.accessibility.AccessibilityManager;
+import com.codename1.ui.accessibility.AccessibilityNode;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.GlassRecipe;
 import com.codename1.ui.plaf.LookAndFeel;
 import com.codename1.ui.plaf.RoundBorder;
+import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
@@ -424,6 +428,7 @@ public class Component implements Animation, StyleListener, Editable {
     private EventDispatcher stateChangeListeners;
     private String tooltip;
     private String accessibilityText;
+    private AccessibilityNode semantics;
     /// The native overlay object.  Used in Javascript port for some components so that there is
     /// an inivisible "native" peer overlaid on the component itself to catch events.  E.g.
     /// TextFields on iOS can't be programmatically focused except through a user-initiated event -
@@ -1089,7 +1094,11 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `x`: the current x coordinate of the components origin
     public void setX(int x) {
+        boolean changed = bounds.getX() != x;
         bounds.setX(x);
+        if (changed) {
+            accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
+        }
         if (Form.activePeerCount > 0) {
             onParentPositionChange();
         }
@@ -1132,7 +1141,11 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `y`: the current y coordinate of the components origin
     public void setY(int y) {
+        boolean changed = bounds.getY() != y;
         bounds.setY(y);
+        if (changed) {
+            accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
+        }
         if (Form.activePeerCount > 0) {
             onParentPositionChange();
         }
@@ -1173,7 +1186,11 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `visible`: true if component is visible; otherwise false
     public void setVisible(boolean visible) {
+        if (this.visible == visible) {
+            return;
+        }
         this.visible = visible;
+        accessibilityChanged(AccessibilityManager.CHANGE_STRUCTURE);
     }
 
     void getVisibleRect(Rectangle r, boolean init) {
@@ -1363,7 +1380,11 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - #setPreferredSize
     public void setWidth(int width) {
+        boolean changed = bounds.getSize().getWidth() != width;
         bounds.getSize().setWidth(width);
+        if (changed) {
+            accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
+        }
     }
 
     /// Gets the outer width of this component. This is the width of the component including horizontal margins.
@@ -1407,7 +1428,11 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - #setPreferredSize
     public void setHeight(int height) {
+        boolean changed = bounds.getSize().getHeight() != height;
         bounds.getSize().setHeight(height);
+        if (changed) {
+            accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
+        }
     }
 
     /// Gets the outer height of this component.  This is the height of the component including vertical margins.
@@ -2038,6 +2063,7 @@ public class Component implements Animation, StyleListener, Editable {
             throw new IllegalArgumentException("Attempt to add self as parent");
         }
         this.parent = parent;
+        accessibilityChanged(AccessibilityManager.CHANGE_STRUCTURE);
     }
 
     /// Gets the "owner" of this component as set by `#setOwner(com.codename1.ui.Component)`.
@@ -2329,7 +2355,8 @@ public class Component implements Animation, StyleListener, Editable {
     void focusGainedInternal() {
         startComponentLableTicker();
         String text = getAccessibilityText();
-        if (text != null && text.length() > 0) {
+        if (text != null && text.length() > 0
+                && !Display.getInstance().isAccessibilityTreeSupported()) {
             announceForAccessibility(text);
         }
     }
@@ -2980,6 +3007,67 @@ public class Component implements Animation, StyleListener, Editable {
 
     void internalPaintImpl(Graphics g, boolean paintIntersects) {
         g.clipRect(getX(), getY(), getWidth(), getHeight());
+        // CSS backdrop-filter:blur() -- the "liquid glass" effect. Blur whatever has
+        // already been painted behind this component (the clip confines it to our
+        // bounds) BEFORE our own translucent background and content paint on top. This
+        // runs regardless of opacity, since a glass surface is by definition
+        // translucent (opaque would be false and skip paintComponentBackground). The
+        // port blurs the destination region in place; an unsupported port returns
+        // false and the component simply paints without the blur.
+        // COST/CACHING POLICY (per paint path):
+        //  * A glass surface only pays when it repaints; static chrome over static
+        //    content costs nothing between repaints.
+        //  * iOS live screen, selection lens: a pure GPU fragment shader on the
+        //    frame's own command buffer -- no sync, no readback, no cache needed.
+        //  * iOS live screen, glass material: the backdrop readback is required
+        //    (the material is a function of the pixels behind the glass), but the
+        //    composed patch is CACHED per rect+params+backdrop-hash in the port
+        //    (METALView glass patch cache), so a repaint over an unchanged
+        //    backdrop skips the colour transform + blur + optics; scrolling
+        //    content under the glass recomposes that frame from the real bytes.
+        //  * Offscreen mutable images (capture tooling) and the desktop simulator
+        //    blur per paint -- capture renders once, and the simulator is not a
+        //    shipping surface.
+        float backdropBlur = getStyle().getBackdropFilterBlurRadius();
+        if (backdropBlur > 0) {
+            // The glass surface's material INTENT comes from a typed, named
+            // recipe (GlassRecipe -- plain blur, chrome bar, floating pill,
+            // glass panel), resolved per UIID via <UIID>GlassRecipe /
+            // glassRecipeDefault. The recipe carries the bounded, measured
+            // material parameters; this paint path only forwards them to the
+            // port, so similar glass surfaces share one definition instead of
+            // reconstructing the material from loose per-parameter constants.
+            // glassMaterialBool remains the theme-wide opt-in to the Liquid
+            // Glass materials; without it backdrop-filter stays a plain blur.
+            GlassRecipe recipe = null;
+            if (getUIManager().isThemeConstant("glassMaterialBool", false)) {
+                int fg = getStyle().getFgColor();
+                int fgLuma = (int) (0.2126f * ((fg >> 16) & 0xff) + 0.7152f * ((fg >> 8) & 0xff) + 0.0722f * (fg & 0xff));
+                boolean darkMat = fgLuma > 128; // dark theme uses a light fg
+                recipe = GlassRecipe.resolve(getUIManager(), getUIID(), darkMat);
+                if (recipe.getKind() == GlassRecipe.Kind.PLAIN_BLUR) {
+                    recipe = null;
+                }
+            }
+            if (recipe != null) {
+                // Match the glass material to the component's rounded/pill shape so it
+                // does not spill into a square. RoundBorder is a capsule (-1 sentinel);
+                // RoundRectBorder carries an explicit corner radius (mm -> px); any
+                // other border leaves the patch rectangular (0).
+                Border bd = getStyle().getBorder();
+                float cornerRadius = 0f;
+                if (bd instanceof RoundBorder) {
+                    cornerRadius = -1f;
+                } else if (bd instanceof RoundRectBorder) {
+                    cornerRadius = Display.getInstance().convertToPixels(((RoundRectBorder) bd).getCornerRadius());
+                }
+                g.glassRegion(getX(), getY(), getWidth(), getHeight(), backdropBlur, cornerRadius,
+                        recipe.getSaturation(), recipe.getScale(), recipe.getOffset(),
+                        recipe.getRefraction(), recipe.getSpecular());
+            } else {
+                g.blurRegion(getX(), getY(), getWidth(), getHeight(), backdropBlur);
+            }
+        }
         paintComponentBackground(g);
 
         if (isScrollable()) {
@@ -3556,6 +3644,9 @@ public class Component implements Animation, StyleListener, Editable {
         // component back into view can't recurse infinitely (issue #5305).
         int oldScrollX = this.scrollX;
         this.scrollX = scrollXtmp;
+        if (oldScrollX != scrollXtmp) {
+            accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
+        }
         if (scrollListeners != null && oldScrollX != scrollXtmp) {
             scrollListeners.fireScrollEvent(scrollXtmp, this.scrollY, oldScrollX, this.scrollY);
         }
@@ -3581,6 +3672,7 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - `scrollY`: the Y position of the scrolling
     protected void setScrollY(int scrollY) {
+        int oldAccessibilityScrollY = this.scrollY;
         if (this.scrollY != scrollY) {
             CodenameOneImplementation ci = Display.impl;
 
@@ -3598,6 +3690,9 @@ public class Component implements Animation, StyleListener, Editable {
             int h = getScrollDimension().getHeight() - getHeight() + v;
             scrollYtmp = Math.min(scrollYtmp, h);
             scrollYtmp = Math.max(scrollYtmp, 0);
+        }
+        if (oldAccessibilityScrollY != scrollYtmp) {
+            accessibilityChanged(AccessibilityManager.CHANGE_BOUNDS);
         }
         if (isScrollableY()) {
             if (Form.activePeerCount > 0) {
@@ -4188,7 +4283,11 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// - #requestFocus
     public void setFocus(boolean focused) {
+        if (this.focused == focused) {
+            return;
+        }
         this.focused = focused;
+        accessibilityChanged(AccessibilityManager.CHANGE_FOCUS);
     }
 
     /// Returns the Component Form or null if this Component
@@ -8125,6 +8224,7 @@ public class Component implements Animation, StyleListener, Editable {
             return;
         }
         this.enabled = enabled;
+        accessibilityChanged(AccessibilityManager.CHANGE_STATE);
         repaint();
     }
 
@@ -8964,6 +9064,9 @@ public class Component implements Animation, StyleListener, Editable {
     ///
     /// accessibility description or `null` if none
     public String getAccessibilityText() {
+        if (semantics != null && semantics.getLabel() != null) {
+            return semantics.getLabel();
+        }
         if (accessibilityText != null) {
             return accessibilityText;
         }
@@ -8991,6 +9094,46 @@ public class Component implements Animation, StyleListener, Editable {
     /// - `text`: accessibility description
     public void setAccessibilityText(String text) {
         this.accessibilityText = text;
+        if (semantics != null) {
+            semantics.setLabel(text);
+        } else {
+            accessibilityChanged(AccessibilityManager.CHANGE_CONTENT);
+        }
+    }
+
+    /// Returns the portable semantic configuration for this component. The same
+    /// instance is retained for the lifetime of the component. Mutating it updates
+    /// VoiceOver, TalkBack, UI Automation, AT-SPI, Java accessibility, and web ARIA
+    /// through the active platform adapter.
+    ///
+    /// #### Returns
+    ///
+    /// this component's semantic node
+    public AccessibilityNode getSemantics() {
+        if (semantics == null) {
+            semantics = new AccessibilityNode(this);
+            if (accessibilityText != null) {
+                semantics.setLabel(accessibilityText);
+            }
+        }
+        return semantics;
+    }
+
+    /// Alias for {@link #getSemantics()} for APIs that use accessibility-node terminology.
+    public AccessibilityNode getAccessibilityNode() {
+        return getSemantics();
+    }
+
+    /// Marks this component's semantic representation dirty. Custom components
+    /// whose accessible value is computed dynamically can call this after state
+    /// changes that do not pass through a semantic setter.
+    public void accessibilityChanged() {
+        accessibilityChanged(AccessibilityManager.CHANGE_ALL);
+    }
+
+    /// Marks a specific portion of this component's semantic representation dirty.
+    public void accessibilityChanged(int changeType) {
+        AccessibilityManager.getInstance().invalidate(this, changeType);
     }
 
     /// #### Returns

@@ -16,6 +16,15 @@ public class AnimateLayoutScreenshotTest extends AbstractContainerAnimationScree
         Style cs = c.getAllStyles();
         cs.setBgColor(0xfafafa);
         cs.setBgTransparency(255);
+        // setPadding/setMargin keep whatever unit the style inherited from
+        // the theme (Style.setPadding javadoc: "Units are specified by
+        // setPaddingUnit"). The iOS/JS base themes declare Label padding in
+        // millimeters, so there the 12 below meant 12mm (~217px per side on a
+        // 460ppi phone): the text space went negative as the tiles narrowed
+        // into the grid and the labels were clipped empty in the last frames,
+        // while px-unit ports (JavaSE/mac/Android) kept the text. Pin pixels
+        // so the scene renders identically on every port.
+        cs.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
         cs.setPadding(8, 8, 8, 8);
         for (int i = 0; i < PALETTE.length; i++) {
             Label tile = new Label("Tile " + (i + 1));
@@ -23,6 +32,8 @@ public class AnimateLayoutScreenshotTest extends AbstractContainerAnimationScree
             ts.setBgColor(PALETTE[i]);
             ts.setFgColor(0xffffff);
             ts.setBgTransparency(255);
+            ts.setMarginUnit(Style.UNIT_TYPE_PIXELS);
+            ts.setPaddingUnit(Style.UNIT_TYPE_PIXELS);
             ts.setMargin(4, 4, 4, 4);
             ts.setPadding(12, 12, 12, 12);
             c.add(tile);

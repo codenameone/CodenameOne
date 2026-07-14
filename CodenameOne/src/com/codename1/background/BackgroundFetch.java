@@ -50,6 +50,16 @@ import com.codename1.util.Callback;
 /// Currently background fetch is supported on iOS, Android, and in the Simulator (simulated using timers when the app is paused).  You should
 /// use the `com.codename1.ui.Display#isBackgroundFetchSupported()` method to find out if the current platform supports it.
 ///
+/// Background Fetch and External Surfaces
+///
+/// Background fetch is the refresh engine of home-screen widgets: call
+/// `com.codename1.surfaces.Surfaces#publish(java.lang.String, com.codename1.surfaces.WidgetTimeline)` from
+/// `performBackgroundFetch(long, com.codename1.util.Callback)` to update published widget content while the
+/// app UI is not running -- publish is callable from any thread, including this callback.  On Android a
+/// widget whose `atEnd` timeline ran out will itself trigger this callback (throttled) to pull fresh
+/// content.  See `com.codename1.surfaces.Surfaces` and the `com.codename1.surfaces.spi` package
+/// documentation for the full background update story.
+///
 /// Examples
 ///
 /// ```java
@@ -203,6 +213,8 @@ public interface BackgroundFetch {
     /// - com.codename1.ui.Display.getPreferredBackgroundFetchInterval()
     ///
     /// - com.codename1.ui.Display.isBackgroundFetchSupported()
+    ///
+    /// - com.codename1.surfaces.Surfaces (publishing widget content from this callback)
     void performBackgroundFetch(long deadline, Callback<Boolean> onComplete); // PMD Fix: UnnecessaryModifier removed
 
 }

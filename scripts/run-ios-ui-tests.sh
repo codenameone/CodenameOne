@@ -213,6 +213,15 @@ mkdir -p "$SCREENSHOT_RAW_DIR" "$SCREENSHOT_PREVIEW_DIR"
 export CN1SS_OUTPUT_DIR="$SCREENSHOT_RAW_DIR"
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 
+# Tight golden gate for the iOS sim pipelines (GL + Metal). The comparator's
+# stock default (0.30% of a 1179x2556 capture = ~9k px) let widget-level
+# regressions -- e.g. the dark ChatInput +/Mic buttons rendering square
+# instead of round, ~2-3k px of corners -- pass silently, so the stale golden
+# stayed in the tree while the render had long since changed. The sim renders
+# deterministically; screens with real run-to-run noise (GPU 3D, maps, video,
+# toast timing) carry explicit per-test .tolerance files that override this.
+export CN1SS_MAX_MISMATCH_PERCENT="${CN1SS_MAX_MISMATCH_PERCENT:-0.05}"
+
 # Start the host-side WebSocket screenshot server on the fixed standard port.
 # The iOS simulator shares the host loopback, so the device-runner defaults to
 # ws://127.0.0.1:8765 with no per-launch URL injection. PNGs the app sends land
@@ -661,8 +670,35 @@ XCODE_BUILD_CMD+=("GCC_OPTIMIZATION_LEVEL=$CN1_TEST_OPT_LEVEL")
 ri_log "Building translated C at -O$CN1_TEST_OPT_LEVEL (GCC_OPTIMIZATION_LEVEL)"
 XCODE_BUILD_CMD+=(build)
 if ! "${XCODE_BUILD_CMD[@]}" | tee "$BUILD_LOG"; then
-  ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
-  exit 10
+  # CI runners occasionally lose the booted device between simctl boot and the
+  # xcodebuild connection (CoreSimulator wedges; the boot itself took minutes).
+  # When the failure is specifically "no device matching the destination", the
+  # device list -- not the build -- is at fault: restart CoreSimulator, re-boot
+  # (or recreate) the simulator and retry the build once before giving up.
+  if grep -q "Unable to find a device matching the provided destination" "$BUILD_LOG" \
+      && [ -n "$SIM_UDID" ]; then
+    ri_log "Destination '$SIM_UDID' vanished mid-job; restarting CoreSimulator and retrying the build once"
+    xcrun simctl shutdown all >/dev/null 2>&1 || true
+    launchctl remove com.apple.CoreSimulator.CoreSimulatorService >/dev/null 2>&1 || true
+    sleep 5
+    if ! xcrun simctl list devices 2>/dev/null | grep -q "$SIM_UDID"; then
+      NEW_DEST="$(create_ios_sim_destination || true)"
+      if [ -n "$NEW_DEST" ]; then
+        SIM_UDID="${NEW_DEST##*id=}"
+        SIM_DESTINATION="$NEW_DEST"
+        ri_log "Recreated simulator destination '$SIM_DESTINATION'"
+      fi
+    fi
+    xcrun simctl boot "$SIM_UDID" >/dev/null 2>&1 || true
+    XCODE_BUILD_CMD=("${XCODE_BUILD_CMD[@]/id=*/id=$SIM_UDID}")
+    if ! "${XCODE_BUILD_CMD[@]}" | tee "$BUILD_LOG"; then
+      ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG (after destination retry)"
+      exit 10
+    fi
+  else
+    ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
+    exit 10
+  fi
 fi
 COMPILE_END=$(date +%s)
 COMPILATION_TIME=$((COMPILE_END - COMPILE_START))

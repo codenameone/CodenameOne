@@ -7637,6 +7637,70 @@ public final class FontImage extends Image {
         return f;
     }
 
+    /// Maps common Material icon char constants to their nearest Apple SF Symbol
+    /// name. Used by createSFOrMaterial when SF Symbols are enabled on iOS. Only
+    /// icons with a sensible SF Symbol equivalent are listed; anything missing
+    /// simply falls back to the Material icon font.
+    private static final java.util.Map<Character, String> SF_SYMBOLS = new java.util.HashMap<Character, String>();
+    static {
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_STAR), "star.fill");
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_SEARCH), "magnifyingglass");
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_MORE_HORIZ), "ellipsis");
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_HOME), "house.fill");
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_SETTINGS), "gearshape.fill");
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_PERSON), "person.fill");
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_ADD), "plus");
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_ARROW_BACK), "chevron.left");
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_CHECK), "checkmark");
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_CLOSE), "xmark");
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_FAVORITE), "heart.fill");
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_DELETE), "trash.fill");
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_SHARE), "square.and.arrow.up");
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_MENU), "line.3.horizontal");
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_NOTIFICATIONS), "bell.fill");
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_MAIL), "envelope.fill");
+        // Selection-state glyphs (check box / radio button). The Material radio
+        // glyph draws a small dot inside a wide gap; the native iOS glyph is a
+        // thin ring with a large dot (largecircle.fill.circle), so the Material
+        // fallback and the SF rendering differ visibly here by design.
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_CHECK_CIRCLE), "checkmark.circle.fill");
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_RADIO_BUTTON_CHECKED), "largecircle.fill.circle");
+        SF_SYMBOLS.put(Character.valueOf(MATERIAL_RADIO_BUTTON_UNCHECKED), "circle");
+    }
+
+    /// Like createMaterial, but when SF Symbols are enabled (theme constant
+    /// "iosSFSymbolsBool", default true) AND running on iOS AND the icon has a known
+    /// SF Symbol mapping AND the platform can render it, returns the real Apple SF
+    /// Symbol image; otherwise falls back to createMaterial (Material icon font). The
+    /// returned Image is the SF symbol (an arbitrary Image) or a FontImage fallback.
+    ///
+    /// #### Parameters
+    ///
+    /// - `materialIcon`: the icon, one of the MATERIAL_* constants
+    ///
+    /// - `s`: the style to use; its foreground color tints the SF Symbol
+    ///
+    /// - `size`: the size in millimeters
+    ///
+    /// #### Returns
+    ///
+    /// an SF Symbol image on iOS when available, otherwise a Material FontImage
+    public static Image createSFOrMaterial(char materialIcon, Style s, float size) {
+        if (UIManager.getInstance().isThemeConstant("iosSFSymbolsBool", true)) {
+            String sf = SF_SYMBOLS.get(Character.valueOf(materialIcon));
+            if (sf != null) {
+                // size here is in mm (matching createMaterial's size param); convert to px
+                int px = Display.getInstance().convertToPixels(size);
+                int weight = 0;
+                Image img = Display.getInstance().createSFSymbolImage(sf, s.getFgColor(), px, weight);
+                if (img != null) {
+                    return img;
+                }
+            }
+        }
+        return createMaterial(materialIcon, s, size);
+    }
+
     /// Creates a material design icon font for the given style but size it in millimeters based
     /// on the size argument and not the font
     ///

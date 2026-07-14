@@ -23,6 +23,7 @@
 package com.codename1.builders;
 
 import com.codename1.util.IOSWalletExtensionBuilder;
+import com.codename1.util.IOSWidgetExtensionBuilder;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -118,6 +119,20 @@ public class IPhoneBuilder extends Executor {
     // CN1_USE_CARPLAY native define, CarPlay.framework linkage, the carplay entitlement and the
     // CarPlay scene in the Info.plist scene manifest. Apps that never touch the API see no change.
     private boolean usesCar;
+    // Set when the app references com.codename1.surfaces.* (home-screen widgets + live
+    // activities). Gates the CN1_USE_WIDGETS native define, the CN1Widgets WidgetKit extension
+    // target, the app group / CN1SurfacesAppGroup + NSSupportsLiveActivities plist injection and
+    // the cn1surface URL scheme. Apps that never touch the API see no change.
+    private boolean usesSurfaces;
+    // usesSurfaces && ios.surfaces.extension != false. When the developer opts out with
+    // ios.surfaces.extension=false the whole iOS lowering is skipped (no define flip, no
+    // extension, no Swift glue): the surfaces API compiles but answers unsupported at runtime.
+    private boolean surfacesExtensionEnabled;
+    // Resolved app group: surfaces.json appGroup > ios.surfaces.appGroup hint > group.<package>.
+    private String surfacesAppGroup;
+    private boolean surfacesLiveActivities;
+    private final List<IOSWidgetExtensionBuilder.Kind> surfacesKinds =
+            new ArrayList<IOSWidgetExtensionBuilder.Kind>();
     private boolean usesOidc;
     private boolean usesAppleSignIn;
     private boolean usesWebauthn;
@@ -227,6 +242,15 @@ public class IPhoneBuilder extends Executor {
      *  the same package) can use the same escaping helper. */
     static String escapeRubyStr(String input) {
         return escapeRuby(input);
+    }
+
+    static String createLldbSchemeSetupScript() {
+        return "lldb_init_file = File.join(File.dirname(project_file), 'cn1.lldbinit')\n"
+                + "File.write(lldb_init_file, \"# Codename One LLDB settings\\nprocess handle -s false -n false -p true SIGUSR2\\n\")\n"
+                + "configure_cn1_lldb = lambda do |scheme|\n"
+                + "  scheme.launch_action.xml_element.attributes['customLLDBInitFile'] = '$(SRCROOT)/cn1.lldbinit'\n"
+                + "  scheme.test_action.xml_element.attributes['customLLDBInitFile'] = '$(SRCROOT)/cn1.lldbinit'\n"
+                + "end\n";
     }
     
     @Override
@@ -835,6 +859,13 @@ public class IPhoneBuilder extends Executor {
                     if (!usesCar && cls.indexOf("com/codename1/car/") == 0) {
                         usesCar = true;
                     }
+                    // External surfaces (com.codename1.surfaces.*): home-screen widgets
+                    // and live activities. Gated on actual usage so the CN1Widgets
+                    // extension / app group / CN1_USE_WIDGETS natives are only added for
+                    // apps that publish external surfaces.
+                    if (!usesSurfaces && cls.indexOf("com/codename1/surfaces/") == 0) {
+                        usesSurfaces = true;
+                    }
                     // OidcClient + SystemBrowser rely on
                     // ASWebAuthenticationSession (AuthenticationServices.framework,
                     // iOS 12+).
@@ -894,6 +925,11 @@ public class IPhoneBuilder extends Executor {
             throw new BuildException("Failed to scan project classes for permissions.", ex);
         }
         stopwatch.split("Scan Classes");
+
+        // External surfaces: parse the build-time kinds manifest (surfaces.json in the project
+        // resources, delivered alongside .ios.appext archives in resDir) and resolve the app
+        // group. Widget kinds must be known at build time -- the Swift WidgetBundle is static.
+        parseSurfacesManifest(resDir, request);
 
         // Apply AI/ML dependency table hits accumulated during the
         // scan. We route iOS pods through the existing
@@ -1991,6 +2027,15 @@ public class IPhoneBuilder extends Executor {
                 replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_CARPLAY", "#define CN1_USE_CARPLAY");
             }
 
+            // com.codename1.surfaces usage compiles the WidgetKit/ActivityKit native glue (gated
+            // by CN1_USE_WIDGETS so other builds carry no surfaces symbols). The define lives in
+            // the shared CodenameOne_GLViewController.h so it is visible to every surfaces
+            // translation unit (IOSNative.m and CodenameOne_GLAppDelegate.m), mirroring
+            // CN1_USE_CARPLAY. Skipped when ios.surfaces.extension=false.
+            if (surfacesExtensionEnabled) {
+                replaceInFile(new File(buildinRes, "CodenameOne_GLViewController.h"), "//#define CN1_USE_WIDGETS", "#define CN1_USE_WIDGETS");
+            }
+
             String glAppDelegeateBody = request.getArg("ios.glAppDelegateBody", null);
             if (glAppDelegeateBody != null && glAppDelegeateBody.length() > 0) {
                 replaceInFile(glAppDelegate, "//GL_APP_DELEGATE_BODY", glAppDelegeateBody);
@@ -2342,6 +2387,20 @@ public class IPhoneBuilder extends Executor {
                 }
                 if (poi) {
                     putCarPlayEntitlement(request, "com.apple.developer.carplay-driving-task");
+                }
+            }
+
+            // External surfaces: the app target needs the shared App Group in its own
+            // entitlements (the CN1Widgets extension gets it through its generated
+            // .entitlements file). ios.app_groups is the established comma-separated hint the
+            // cloud builder's entitlement generator consumes; local Xcode builds supply the app
+            // entitlements externally via $(APP_CODE_SIGN_ENTITLEMENTS), matching the wallet
+            // extension flow.
+            if (surfacesExtensionEnabled) {
+                String appGroups = request.getArg("ios.app_groups", "");
+                if (!appGroups.contains(surfacesAppGroup)) {
+                    request.putArgument("ios.app_groups", appGroups.length() == 0
+                            ? surfacesAppGroup : appGroups + "," + surfacesAppGroup);
                 }
             }
 
@@ -2817,9 +2876,10 @@ public class IPhoneBuilder extends Executor {
                     return false;
                 }
             }
-            // Wallet extensions and .ios.appext archives mutate the Xcode project through the
-            // ruby xcodeproj gem even when CocoaPods isn't otherwise needed.
-            boolean needsXcodeProjectMutation = runPods || walletExtensionEnabled || hasAppExtensionArchives(resDir);
+            // Wallet/widget extensions and .ios.appext archives mutate the Xcode project through
+            // the ruby xcodeproj gem even when CocoaPods isn't otherwise needed.
+            boolean needsXcodeProjectMutation = runPods || walletExtensionEnabled
+                    || surfacesExtensionEnabled || hasAppExtensionArchives(resDir);
             if (needsXcodeProjectMutation) {
                 try {
                     List<File> podSpecFileList = new ArrayList<File>();
@@ -2854,6 +2914,12 @@ public class IPhoneBuilder extends Executor {
                             + "    config.build_settings['SWIFT_OBJC_BRIDGING_HEADER']='$(SRCROOT)/cn1-Bridging-Header.h'\n"
                             + "  }\n"
                             + "  xcproj.targets.each do |target|\n"
+                            + "    # App-extension targets (CN1Widgets, wallet issuer provisioning) own their\n"
+                            + "    # deployment targets. This script re-runs after pods integration, and on the\n"
+                            + "    # second pass the extension targets already exist -- without this skip the\n"
+                            + "    # pass stomps them down to the app's deployment target (seen as WidgetKit\n"
+                            + "    # sources compiling at iOS 14 instead of the extension's 16.1).\n"
+                            + "    next if target.respond_to?(:product_type) && target.product_type == 'com.apple.product-type.app-extension'\n"
                             + "    target.build_configurations.each do |config|\n"
                             + "      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '" + getDeploymentTarget(request) + "'\n"
                             + "    end\n"
@@ -2986,6 +3052,14 @@ public class IPhoneBuilder extends Executor {
                         appendWalletExtensionTargets(appExtensionsBuilder, request, new File(tmpFile, "dist"));
                     }
 
+                    if (surfacesExtensionEnabled) {
+                        // appExtensionsBuilder is appended to the schemes script AFTER the
+                        // global deployment-target pass (deploymentTargetStr), so the
+                        // extension's IPHONEOS_DEPLOYMENT_TARGET=16.1 survives it -- see the
+                        // ordering note in appendWidgetExtensionRuby.
+                        appendWidgetExtensionTargets(appExtensionsBuilder, request, new File(tmpFile, "dist"));
+                    }
+
                     String installLocalizedStrings = "";
                     if (installLocalizedStringsScript.length() > 0) {
                         installLocalizedStrings = "begin\n"+
@@ -3006,9 +3080,17 @@ public class IPhoneBuilder extends Executor {
                                 tmpDir.getAbsolutePath() + "/dist/" +
                                 request.getMainClass() + ".xcodeproj\"\n" +
                             "xcproj = Xcodeproj::Project.open(project_file)\n" +
+                            createLldbSchemeSetupScript() +
                             installLocalizedStrings  +
                             "begin\n"
-                            + "  xcproj.recreate_user_schemes\n"
+                            + "  xcproj.recreate_user_schemes do |scheme, target|\n"
+                            + "    configure_cn1_lldb.call(scheme)\n"
+                            + "  end\n"
+                            + "  Dir.glob(File.join(project_file, 'xcshareddata', 'xcschemes', '*.xcscheme')).each do |scheme_path|\n"
+                            + "    scheme = Xcodeproj::XCScheme.new(scheme_path)\n"
+                            + "    configure_cn1_lldb.call(scheme)\n"
+                            + "    scheme.save!\n"
+                            + "  end\n"
                             + "rescue => e\n"
                             + "  puts \"Error during processing: #{$!}\"\n"
                             + "  puts \"Backtrace:\\n\\t#{e.backtrace.join(\"\\n\\t\")}\"\n"
@@ -3039,9 +3121,14 @@ public class IPhoneBuilder extends Executor {
                             + "      rescue\n"
                             + "      end\n"
                             + "    end\n"
+                            // The CN1Widgets extension's Swift sources must never be swept into
+                            // the APP target: on script re-runs (post dependency integration)
+                            // the extension group already exists and this catch-all would
+                            // otherwise add WidgetKit sources to the app's compile phase.
                             + "    swift_refs = xcproj.files.select do |f|\n"
                             + "      file_name = f.path || f.name || f.display_name\n"
-                            + "      file_name && file_name.downcase.end_with?('.swift')\n"
+                            + "      file_name && file_name.downcase.end_with?('.swift') && !file_name.start_with?('"
+                            + SURFACES_EXTENSION_NAME + "/')\n"
                             + "    end\n"
                             + "    swift_refs.each do |ref|\n"
                             + "      unless main_target.source_build_phase.files_references.include?(ref)\n"
@@ -3850,6 +3937,213 @@ public class IPhoneBuilder extends Executor {
         sb.append("end\n");
     }
 
+    /** Xcode target / folder name of the generated WidgetKit extension. */
+    static final String SURFACES_EXTENSION_NAME = "CN1Widgets";
+
+    /**
+     * Parses the surfaces.json build-time manifest ({appGroup?, liveActivities?, kinds:[{id,
+     * name, description, iosFamilies?, preview?}]}) and resolves the app group. Fails the
+     * build loudly when the app uses com.codename1.surfaces without a manifest -- the widget
+     * gallery is compiled into the native app, so kinds cannot be registered at runtime only.
+     */
+    @SuppressWarnings("unchecked")
+    private void parseSurfacesManifest(File resDir, BuildRequest request) throws BuildException {
+        surfacesExtensionEnabled = usesSurfaces
+                && !"false".equals(request.getArg("ios.surfaces.extension", "true"));
+        if (!surfacesExtensionEnabled) {
+            // Either the app never touches com.codename1.surfaces, or the developer opted out
+            // with ios.surfaces.extension=false. In both cases the iOS lowering is skipped
+            // entirely (no CN1_USE_WIDGETS flip, no extension target, no plist keys): the
+            // surfaces API stays an inert no-op at runtime.
+            return;
+        }
+        File manifest = new File(resDir, "surfaces.json");
+        if (!manifest.exists()) {
+            throw new BuildException("This app uses com.codename1.surfaces but the project has "
+                    + "no surfaces.json resource. Widget kinds must be declared at build time; "
+                    + "add surfaces.json to src/main/resources, e.g.\n"
+                    + "{\"appGroup\": \"group." + request.getPackageName() + "\",\n"
+                    + " \"liveActivities\": true,\n"
+                    + " \"kinds\": [{\"id\": \"delivery\", \"name\": \"Delivery\", "
+                    + "\"description\": \"Track your order\", "
+                    + "\"iosFamilies\": [\"small\", \"medium\"]}]}\n"
+                    + "or disable the iOS widget extension with ios.surfaces.extension=false.");
+        }
+        Map<String, Object> parsed;
+        try (InputStreamReader reader = new InputStreamReader(
+                new FileInputStream(manifest), StandardCharsets.UTF_8)) {
+            parsed = new com.codename1.builders.util.JSONParser().parseJSON(reader);
+        } catch (IOException ex) {
+            throw new BuildException("Failed to parse surfaces.json", ex);
+        }
+        String manifestAppGroup = parsed.get("appGroup") instanceof String
+                ? (String) parsed.get("appGroup") : null;
+        String hintAppGroup = request.getArg("ios.surfaces.appGroup", null);
+        surfacesAppGroup = manifestAppGroup != null && manifestAppGroup.length() > 0
+                ? manifestAppGroup
+                : (hintAppGroup != null && hintAppGroup.length() > 0
+                        ? hintAppGroup : "group." + request.getPackageName());
+        if (!surfacesAppGroup.startsWith("group.")) {
+            throw new BuildException("The surfaces app group must start with 'group.' (Apple "
+                    + "requirement); found '" + surfacesAppGroup + "' (from surfaces.json "
+                    + "appGroup or the ios.surfaces.appGroup build hint)");
+        }
+        Object liveActivities = parsed.get("liveActivities");
+        surfacesLiveActivities = Boolean.TRUE.equals(liveActivities)
+                || "true".equals(liveActivities);
+        surfacesKinds.clear();
+        Object kinds = parsed.get("kinds");
+        if (kinds instanceof List) {
+            for (Object rawKind : (List<Object>) kinds) {
+                if (!(rawKind instanceof Map)) {
+                    continue;
+                }
+                Map<String, Object> kindMap = (Map<String, Object>) rawKind;
+                Object id = kindMap.get("id");
+                if (!(id instanceof String) || !((String) id).matches("[a-z][a-z0-9_]*")) {
+                    throw new BuildException("surfaces.json widget kind ids must match "
+                            + "[a-z][a-z0-9_]*; found: " + id);
+                }
+                IOSWidgetExtensionBuilder.Kind kind =
+                        new IOSWidgetExtensionBuilder.Kind((String) id);
+                if (kindMap.get("name") instanceof String) {
+                    kind.setName((String) kindMap.get("name"));
+                }
+                if (kindMap.get("description") instanceof String) {
+                    kind.setDescription((String) kindMap.get("description"));
+                }
+                if (kindMap.get("preview") instanceof String) {
+                    kind.setPreviewName((String) kindMap.get("preview"));
+                }
+                if (kindMap.get("iosFamilies") instanceof List) {
+                    List<String> families = new ArrayList<String>();
+                    for (Object family : (List<Object>) kindMap.get("iosFamilies")) {
+                        if (family instanceof String) {
+                            families.add((String) family);
+                        }
+                    }
+                    kind.setIosFamilies(families);
+                }
+                surfacesKinds.add(kind);
+            }
+        }
+        if (surfacesKinds.isEmpty() && !surfacesLiveActivities) {
+            throw new BuildException("surfaces.json declares neither widget kinds nor "
+                    + "\"liveActivities\": true; there is nothing to build");
+        }
+        // The extension is wired into the Xcode project through the ruby xcodeproj gem;
+        // fail early with a friendly message when it is missing.
+        ensureXcodeprojInstalled();
+        log("External surfaces enabled: app group " + surfacesAppGroup + ", "
+                + surfacesKinds.size() + " widget kind(s)"
+                + (surfacesLiveActivities ? ", live activities" : ""));
+    }
+
+    /**
+     * Generates the CN1Widgets WidgetKit extension folder under dist/, drops the app-side
+     * Swift glue into &lt;MainClass&gt;-src (the schemes ruby sweeps *.swift there into the
+     * APP target) and appends the ruby that wires the extension target into the generated
+     * Xcode project. Modeled on {@link #appendWalletExtensionTargets}.
+     */
+    private void appendWidgetExtensionTargets(StringBuilder sb, BuildRequest request, File distDir) throws IOException {
+        IOSWidgetExtensionBuilder widgetBuilder = new IOSWidgetExtensionBuilder()
+                .setExtensionName(SURFACES_EXTENSION_NAME)
+                .setHostBundleId(request.getPackageName())
+                .setAppGroupId(surfacesAppGroup)
+                .setDeploymentTarget(request.getArg("ios.surfaces.deploymentTarget", "16.1"))
+                .setLiveActivitiesEnabled(surfacesLiveActivities);
+        for (IOSWidgetExtensionBuilder.Kind kind : surfacesKinds) {
+            widgetBuilder.addKind(kind);
+        }
+        String extensionName = widgetBuilder.getExtensionName();
+        File extensionDir = new File(distDir, extensionName);
+        IOSWalletExtensionBuilder.writeFileMap(widgetBuilder.buildFileMap(), extensionDir);
+        // App-target glue: the Swift CN1SurfaceBridge (reached from IOSNative.m via
+        // NSClassFromString), the shared ActivityAttributes struct and the app group
+        // constant. Written into <MainClass>-src so the schemes script compiles them
+        // into the APP target, not the extension.
+        IOSWalletExtensionBuilder.writeFileMap(widgetBuilder.buildAppTargetFileMap(),
+                new File(distDir, request.getMainClass() + "-src"));
+        appendWidgetExtensionRuby(sb, request, widgetBuilder, extensionDir, distDir);
+        log("Adding WidgetKit extension target " + extensionName + " ("
+                + surfacesKinds.size() + " widget kind(s)"
+                + (surfacesLiveActivities ? " + live activities" : "") + ")");
+        sb.append("xcproj.save(project_file)\n");
+    }
+
+    private void appendWidgetExtensionRuby(StringBuilder sb, BuildRequest request,
+            IOSWidgetExtensionBuilder widgetBuilder, File extensionDir, File distDir) throws IOException {
+        String extensionName = widgetBuilder.getExtensionName();
+        Map<String, String> buildSettingsMap = new LinkedHashMap<String, String>();
+        buildSettingsMap.put("PRODUCT_NAME", "$(TARGET_NAME)");
+        buildSettingsMap.put("TARGETED_DEVICE_FAMILY", "1,2");
+        buildSettingsMap.put("LD_RUNPATH_SEARCH_PATHS", "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks");
+        buildSettingsMap.put("CLANG_ENABLE_MODULES", "YES");
+        // The builder's buildSettings.properties supplies the deployment target, Swift
+        // version, bundle id, entitlements and Info.plist paths; deleted after loading so
+        // it is not added to the Xcode group as a resource.
+        File buildSettingsProps = new File(extensionDir, "buildSettings.properties");
+        if (buildSettingsProps.exists()) {
+            Properties props = new Properties();
+            try (FileInputStream fis = new FileInputStream(buildSettingsProps)) {
+                props.load(fis);
+            }
+            for (Object key : props.keySet()) {
+                if (key instanceof String) {
+                    buildSettingsMap.put((String) key, props.getProperty((String) key));
+                }
+            }
+            buildSettingsProps.delete();
+        }
+        for (String key : request.getArgs()) {
+            if (key.startsWith("ios.surfaces.buildSettings.")) {
+                buildSettingsMap.put(key.substring("ios.surfaces.buildSettings.".length()),
+                        request.getArg(key, ""));
+            }
+        }
+        // CRITICAL ordering note: this fragment rides in appExtensionsBuilder, which the
+        // schemes script appends AFTER the global deployment-target pass
+        // (deploymentTargetStr stomps IPHONEOS_DEPLOYMENT_TARGET on every existing target).
+        // Because this target is created after that pass ran, its 16.1 deployment target
+        // below survives. Do not move this fragment before deploymentTargetStr.
+        // The whole fragment is guarded so re-running the script (the build re-executes
+        // fix_xcode_schemes.rb after dependency integration) doesn't duplicate the target.
+        // No explicit framework linkage: Swift autolinks WidgetKit/ActivityKit (weakly
+        // where guarded by canImport/@available).
+        sb.append("\nif xcproj.targets.find{|e| e.name=='" + extensionName + "'}.nil?\n"
+                + "service_target = xcproj.new_target(:app_extension, '" + extensionName + "', :ios, '"
+                + widgetBuilder.getDeploymentTarget() + "')\n"
+                + "service_group = xcproj.new_group('" + extensionName + "')\n");
+        appendFilesToXcodeProjGroup(sb, extensionDir, "service_group", "service_target", distDir);
+        sb.append("main_app_target = xcproj.targets.find{|e| e.name==main_class_name}\n"
+                + "main_app_target.add_dependency(service_target)\n"
+                + "fileref = xcproj.groups.find{|e| e.display_name=='Products'}.new_file('" + extensionName + ".appex', \"BUILT_PRODUCTS_DIR\")\n"
+                + "embed_phase = main_app_target.copy_files_build_phases.find{|p| p.name=='Embed App Extensions'} || main_app_target.new_copy_files_build_phase('Embed App Extensions')\n"
+                + "embed_phase.build_action_mask = \"2147483647\"\n"
+                + "embed_phase.dst_subfolder_spec = \"13\"\n"
+                + "embed_phase.run_only_for_deployment_postprocessing=\"0\"\n"
+                + "embed_file = embed_phase.add_file_reference(fileref)\n");
+        if (macNativeBuilder.isEnabled()) {
+            // Mac Catalyst v1 guard: this iOS build also produces a Mac Catalyst slice
+            // (macNative.enabled=true), but the CN1Widgets extension is iOS-only in v1 --
+            // MacNativeBuilder marks only the APP target SUPPORTS_MACCATALYST and its Mac
+            // entitlements carry no app group, so building/embedding the extension for the
+            // Mac destination would fail the Catalyst archive. Platform-filter the target
+            // dependency and the embed step to the iOS slice: the iOS app keeps its widgets
+            // and live activities, the Mac slice simply ships without them.
+            sb.append("dep = main_app_target.dependencies.find{|d| d.target && d.target.uuid == service_target.uuid}\n"
+                    + "dep.platform_filter = 'ios' if dep\n"
+                    + "embed_file.platform_filter = 'ios'\n");
+            buildSettingsMap.put("SUPPORTS_MACCATALYST", "NO");
+        }
+        sb.append("service_target.build_configurations.each{|e| \n");
+        for (String buildSettingKey : buildSettingsMap.keySet()) {
+            sb.append("  e.build_settings['" + buildSettingKey + "'] = \"" + buildSettingsMap.get(buildSettingKey) + "\"\n");
+        }
+        sb.append("}\n");
+        sb.append("end\n");
+    }
+
     private File[] extractAppExtensions(File sourceDirectory, File targetDirectory) throws IOException {
         if (sourceDirectory == null || !sourceDirectory.isDirectory()) {
             throw new IllegalArgumentException("extractAppExtensions sourceDirectory must be an existing directory but received "+sourceDirectory);
@@ -4248,6 +4542,40 @@ public class IPhoneBuilder extends Executor {
         if ("true".equals(request.getArg("ios.wallet.extension", "false"))
                 && walletAppGroup != null && walletAppGroup.trim().length() > 0 && !inject.contains("CN1WalletAppGroup")) {
             inject += "\n<key>CN1WalletAppGroup</key><string>" + walletAppGroup.trim() + "</string>";
+        }
+
+        // External surfaces: the Java bridge (IOSSurfaceBridge via IOSNative.m) resolves the
+        // shared App Group container through this key; the CN1Widgets extension carries its own
+        // copy in its generated Info.plist. See surfaces.json / the ios.surfaces.* build hints.
+        if (surfacesExtensionEnabled) {
+            if (!inject.contains("CN1SurfacesAppGroup")) {
+                inject += "\n<key>CN1SurfacesAppGroup</key><string>" + surfacesAppGroup + "</string>";
+            }
+            // The extension's deployment target: the runtime gates areWidgetsSupported() on it
+            // (the extension cannot run or appear in the widget gallery below this version, so
+            // WidgetKit's own iOS 14 floor is not the right check).
+            if (!inject.contains("CN1SurfacesMinOS")) {
+                inject += "\n<key>CN1SurfacesMinOS</key><string>"
+                        + request.getArg("ios.surfaces.deploymentTarget", "16.1") + "</string>";
+            }
+            // NSSupportsLiveActivities belongs in the HOST app's Info.plist (the extension only
+            // renders them). Intentionally skipped when ios.surfaces.extension=false: without
+            // the extension ActivityKit would accept the request but show nothing.
+            if (surfacesLiveActivities && !inject.contains("NSSupportsLiveActivities")) {
+                inject += "\n<key>NSSupportsLiveActivities</key><true/>";
+                if ("true".equals(request.getArg("ios.surfaces.frequentUpdates", "false"))) {
+                    inject += "\n<key>NSSupportsLiveActivitiesFrequentUpdates</key><true/>";
+                }
+            }
+            // Widget taps deep link back through cn1surface:// (handled by the app delegate and
+            // never stored in AppArg). Register the scheme by appending to ios.urlSchemes so it
+            // rides the existing CFBundleURLTypes injection below, whichever branch runs.
+            if (!inject.contains("cn1surface")) {
+                String urlSchemes = request.getArg("ios.urlSchemes", request.getArg("ios.urlScheme", ""));
+                if (!urlSchemes.contains("cn1surface")) {
+                    request.putArgument("ios.urlSchemes", urlSchemes + "<string>cn1surface</string>");
+                }
+            }
         }
 
         BufferedReader infoReader = new BufferedReader(new InputStreamReader(
