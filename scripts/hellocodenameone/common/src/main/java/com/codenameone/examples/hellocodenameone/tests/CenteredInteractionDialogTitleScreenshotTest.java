@@ -2,6 +2,7 @@ package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.components.InteractionDialog;
 import com.codename1.components.SpanLabel;
+import com.codename1.ui.CN;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
@@ -18,6 +19,16 @@ import com.codename1.ui.plaf.UIManager;
  * in the middle of the host form.
  */
 public class CenteredInteractionDialogTitleScreenshotTest extends DualAppearanceBaseTest {
+    @Override
+    public boolean runTest() {
+        if (CN.isWatch()) {
+            System.out.println("CN1SS:INFO:test=CenteredInteractionDialogTitle status=SKIPPED reason=phone-dialog-on-watch");
+            done();
+            return true;
+        }
+        return super.runTest();
+    }
+
     @Override
     protected String baseName() {
         return "CenteredInteractionDialogTitle";
