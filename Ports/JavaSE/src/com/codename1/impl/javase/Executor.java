@@ -76,7 +76,9 @@ public class Executor {
         String n = System.getProperty("os.name");
         if (n != null && n.startsWith("Mac")) {
             IS_MAC = true;
-            System.setProperty("apple.laf.useScreenMenuBar", "true");
+            if (System.getProperty("apple.laf.useScreenMenuBar") == null) {
+                System.setProperty("apple.laf.useScreenMenuBar", "true");
+            }
             System.setProperty("com.apple.mrj.application.apple.menu.about.name", "Codename One GUIBuilder");
             System.setProperty("apple.eawt.quitStrategy", "CLOSE_ALL_WINDOWS");
         } else {

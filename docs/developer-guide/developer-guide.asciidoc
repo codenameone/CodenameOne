@@ -57,6 +57,8 @@ include::css.asciidoc[]
 
 include::The-Components-Of-Codename-One.asciidoc[]
 
+include::Accessibility-Semantics.asciidoc[]
+
 include::Media-And-Audio.asciidoc[]
 
 include::Animations.asciidoc[]
@@ -86,6 +88,8 @@ include::io.asciidoc[]
 include::Push-Notifications.asciidoc[]
 
 include::Notifications-And-Background-Execution.asciidoc[]
+
+include::External-Surfaces.asciidoc[]
 
 include::Maps.asciidoc[]
 

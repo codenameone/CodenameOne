@@ -668,3 +668,88 @@ jobs:
             echo "[windows-native-port arm64] FATAL: $me screenshot(s) streamed with no stored golden (missing_expected) -- add them to $REF_DIR."; fail=1
           fi
           if [ "$fail" -ne 0 ]; then echo "Windows arm64 screenshot gate failed."; exit 1; fi
+
+  # Widgets Board provider compile check: compiles the one nativeSources TU no
+  # other CI leg ever compiles -- cn1_windows_widgetboard.cpp, which is gated
+  # behind CN1_WIDGETBOARD (the default CMake build never defines it and the
+  # Linux xwin cross leg has no Windows App SDK) -- against the real Windows App
+  # SDK winmds + cppwinrt-generated C++/WinRT projections on a Windows host.
+  # This mirrors exactly what WindowsNativeBuilder does for windows.msix=true
+  # builds: clang-cl (the port is clang-cl-only by design -- cn1_globals.h uses
+  # `_Atomic` and `__thread`, which MSVC cl.exe rejects in C++ -- and the
+  # builder sets CMAKE_CXX_COMPILER to clang-cl on Windows hosts and cross
+  # builds alike), /std:c++17 (the translator-emitted CMAKE_CXX_STANDARD),
+  # /EHsc (C++/WinRT requires exceptions) and /DCN1_WIDGETBOARD=1 plus the
+  # WinAppSDK include dir. The same step also re-compiles
+  # cn1_windows_widgets.cpp (the plain-exe floating-widget TU) with the
+  # Windows-host toolchain as a second real-compiler check beyond the Linux
+  # xwin leg. Compile-only (/c): any compile error fails the job.
+  widgetboard-compile-check:
+    name: widgetboard-compile-check (x64)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      # clang-cl uses the MSVC STL/CRT headers and the Windows SDK, which reach
+      # the compiler through the INCLUDE/LIB environment vcvarsall sets up.
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      # The Microsoft.WindowsAppSDK nupkg ships winmd metadata + MddBootstrap.h
+      # but NO prebuilt C++/WinRT headers, so the projection (winrt/base.h, the
+      # referenced Windows.* namespaces from the OS metadata, and
+      # winrt/Microsoft.Windows.Widgets[.Providers].h) is generated with
+      # cppwinrt.exe. Versions are pinned for reproducibility: the 1.5 servicing
+      # release matches the 1.5 series the provider bootstraps at runtime
+      # (CN1_WINAPPSDK_MAJORMINOR 0x00010005 in the TU). nuget.exe is
+      # preinstalled on the windows runners.
+      - name: Fetch Windows App SDK + generate C++/WinRT projections
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $wasdkVer = '1.5.250108004'
+          $cppwinrtVer = '2.0.240405.15'
+          nuget install Microsoft.WindowsAppSDK -Version $wasdkVer -OutputDirectory nupkgs -NonInteractive
+          if ($LASTEXITCODE -ne 0) { throw "nuget install Microsoft.WindowsAppSDK failed" }
+          nuget install Microsoft.Windows.CppWinRT -Version $cppwinrtVer -OutputDirectory nupkgs -NonInteractive
+          if ($LASTEXITCODE -ne 0) { throw "nuget install Microsoft.Windows.CppWinRT failed" }
+          $wasdk = "nupkgs/Microsoft.WindowsAppSDK.$wasdkVer"
+          $cppwinrt = "nupkgs/Microsoft.Windows.CppWinRT.$cppwinrtVer/bin/cppwinrt.exe"
+          # -in local merges the OS metadata (C:\Windows\System32\WinMetadata)
+          # so the Windows.Foundation types the Widgets winmd references are
+          # projected by the same cppwinrt version (mixing SDK-shipped headers
+          # with a different generator version trips base.h's version check).
+          & $cppwinrt -in "$wasdk/lib/uap10.0/Microsoft.Windows.Widgets.winmd" -in local -output winrt-gen
+          if ($LASTEXITCODE -ne 0) { throw "cppwinrt projection generation failed" }
+          if (!(Test-Path 'winrt-gen/winrt/Microsoft.Windows.Widgets.Providers.h')) {
+            throw "cppwinrt did not produce winrt/Microsoft.Windows.Widgets.Providers.h"
+          }
+          "CN1_WASDK_DIR=$wasdk" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Widgets Board provider compile check (clang-cl)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          clang-cl --version
+          # The widgetboard TU deliberately avoids the cn1 headers (cn1_globals.h's
+          # C11 stdatomic conflicts with the C++ <atomic> the winrt headers pull) and
+          # compiles at C++20: C++/WinRT at C++17 falls back to
+          # <experimental/coroutine>, which the modern MSVC STL rejects under clang
+          # (STL1009). This mirrors the -DCMAKE_CXX_STANDARD=20 WindowsNativeBuilder
+          # passes for windows.msix=true builds.
+          clang-cl /c /std:c++20 /EHsc /DCN1_WIDGETBOARD=1 /Iwinrt-gen "/I$env:CN1_WASDK_DIR/include" `
+            Ports/WindowsPort/nativeSources/cn1_windows_widgetboard.cpp /Fowidgetboard.obj
+          if ($LASTEXITCODE -ne 0) { throw "cn1_windows_widgetboard.cpp failed to compile with CN1_WIDGETBOARD=1" }
+          # A translated app supplies the generated cn1_class_method_index.h; the
+          # floating-widget TU includes cn1_windows.h -> cn1_globals.h, which only
+          # needs this one constant from it here.
+          New-Item -ItemType Directory -Force stub-index | Out-Null
+          "#define cn1_array_start_offset 1000" | Set-Content stub-index/cn1_class_method_index.h -Encoding ascii
+          clang-cl /c /std:c++17 /EHsc /Istub-index /Ivm/ByteCodeTranslator/src `
+            Ports/WindowsPort/nativeSources/cn1_windows_widgets.cpp /Fowidgets.obj
+          if ($LASTEXITCODE -ne 0) { throw "cn1_windows_widgets.cpp failed to compile" }
+          Write-Host "Widgets Board provider + floating-widget TUs compiled clean."

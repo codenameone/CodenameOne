@@ -22,6 +22,7 @@
  */
 package __PACKAGE__;
 
+import com.codename1.impl.javase.CN1Bootstrap;
 import com.codename1.impl.javase.JavaSEPort;
 import com.codename1.ui.Display;
 import java.awt.GraphicsDevice;
@@ -68,6 +69,19 @@ public class __MAIN_NAME__Stub implements Runnable, WindowListener {
     private __MAIN_NAME__ mainApp;
 
     public static void main(String[] args) {
+        // Bootstrap the classpath/native library path (CEF) the same way the
+        // simulator does before touching any CEF class. This puts the JCEF native
+        // directory (from cef.dir) on java.library.path so chrome_elf/libcef load,
+        // then re-invokes this main() inside the bootstrapped classloader. It is a
+        // no-op (returns false) once bootstrapping has already happened.
+        try {
+            if (CN1Bootstrap.run(__MAIN_NAME__Stub.class, args)) {
+                return;
+            }
+        } catch (Throwable bootstrapError) {
+            // Fall through and run without bootstrapping; CEF may be unavailable.
+            bootstrapError.printStackTrace();
+        }
         try {
             Class.forName("org.cef.CefApp");
             System.setProperty("cn1.javase.implementation", "cef");

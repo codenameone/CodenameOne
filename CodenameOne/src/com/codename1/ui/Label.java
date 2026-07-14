@@ -23,6 +23,7 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.accessibility.AccessibilityManager;
 import com.codename1.cloud.BindTarget;
 import com.codename1.io.Log;
 import com.codename1.ui.TextSelection.Char;
@@ -639,11 +640,15 @@ public class Label extends Component implements IconHolder, TextHolder {
     /// - `text`: the string that the label presents.
     @Override
     public void setText(String text) {
+        String oldText = this.text;
         widthAtLastCheck = -1;
         this.text = text;
         localize();
         stringWidthUnselected = -1;
         setShouldCalcPreferredSize(true);
+        if (oldText == null ? this.text != null : !oldText.equals(this.text)) {
+            accessibilityChanged(AccessibilityManager.CHANGE_CONTENT);
+        }
         repaint();
     }
 

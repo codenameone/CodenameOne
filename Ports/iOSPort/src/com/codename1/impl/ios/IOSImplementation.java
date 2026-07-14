@@ -367,6 +367,20 @@ public class IOSImplementation extends CodenameOneImplementation {
         return nativeInstance.isCarPlayConnected();
     }
 
+    private IOSSurfaceBridge surfaceBridge;
+
+    @Override
+    public com.codename1.surfaces.spi.SurfaceBridge getSurfaceBridge() {
+        // Only meaningful in builds that linked the surfaces natives (CN1_USE_WIDGETS, flipped by
+        // the builder when the app references com.codename1.surfaces). Always returned: the
+        // bridge's own is...Supported methods answer honestly through the natives, which stub to
+        // unsupported when the define is off.
+        if (surfaceBridge == null) {
+            surfaceBridge = IOSSurfaceCallbacks.getBridge(nativeInstance);
+        }
+        return surfaceBridge;
+    }
+
     @Override
     public void addCookie(Cookie c) {
         if(isUseNativeCookieStore()) {
@@ -1668,6 +1682,51 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public float getLargerTextScale() {
         return nativeInstance.getLargerTextScale();
+    }
+
+    @Override
+    public boolean isHighContrastEnabled() {
+        return nativeInstance.isHighContrastEnabled();
+    }
+
+    @Override
+    public boolean isDifferentiateWithoutColorEnabled() {
+        return nativeInstance.isDifferentiateWithoutColorEnabled();
+    }
+
+    @Override
+    public boolean isReduceMotionEnabled() {
+        return nativeInstance.isReduceMotionEnabled();
+    }
+
+    @Override
+    public boolean isReduceTransparencyEnabled() {
+        return nativeInstance.isReduceTransparencyEnabled();
+    }
+
+    @Override
+    public boolean isBoldTextEnabled() {
+        return nativeInstance.isBoldTextEnabled();
+    }
+
+    @Override
+    public boolean isInvertColorsEnabled() {
+        return nativeInstance.isInvertColorsEnabled();
+    }
+
+    @Override
+    public boolean isGrayscaleEnabled() {
+        return nativeInstance.isGrayscaleEnabled();
+    }
+
+    @Override
+    public boolean isOnOffSwitchLabelsEnabled() {
+        return nativeInstance.isOnOffSwitchLabelsEnabled();
+    }
+
+    @Override
+    public boolean isScreenReaderEnabled() {
+        return nativeInstance.isScreenReaderEnabled();
     }
     
 
@@ -12016,6 +12075,22 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public void announceForAccessibility(final Component cmp, final String text) {
         IOSNative.announceForAccessibility(text);
+    }
+
+    @Override
+    public void accessibilityTreeChanged(int changeType) {
+        IOSNative.updateAccessibilityTree(getAccessibilityTreeSnapshot().toJson(), changeType);
+    }
+
+    @Override
+    public boolean isAccessibilityTreeSupported() {
+        return true;
+    }
+
+    public static void performAccessibilityActionFromNative(long nodeId, String actionId, String argument) {
+        if (instance != null) {
+            instance.performAccessibilityAction(nodeId, actionId, argument);
+        }
     }
 
     // ================================================================

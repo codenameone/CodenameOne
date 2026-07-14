@@ -259,6 +259,18 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new PaletteOverrideThemeScreenshotTest(),
             new CssGradientsScreenshotTest(),
             new CssFilterBlurScreenshotTest(),
+            // External surfaces (com.codename1.surfaces): a deterministic widget descriptor
+            // rendered through the shared SurfaceRasterizer (the JavaSE/Windows/Linux desktop
+            // widget renderer) with a pinned clock, so the node-tree -> wire-JSON -> pixels
+            // pipeline has a visual baseline on every platform. The assertion-only surfaces
+            // tests (serializer round trip, timeline logic, action dispatch, publish contract)
+            // run with the other API tests near the end of the suite.
+            new SurfacesRasterizerScreenshotTest(),
+            // Android only: the REAL RemoteViews widget lowering (publish -> CN1SurfaceStore
+            // -> CN1SurfaceRenderer -> RemoteViews.apply on real views) captured through a
+            // native PeerComponent. Self-skips with a CN1SS SKIPPED line everywhere else, so
+            // only the Android leg carries a SurfacesRemoteViews golden.
+            new SurfacesRemoteViewsScreenshotTest(),
             // Modern maps API: the pure-vector MapView (real OSM basemap,
             // light/dark styles, marker + shape overlays) and the NativeMap
             // vector fallback, all rendered against the bundled real San
@@ -331,6 +343,16 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new TimeApiTest(),
             new NanoTimeApiTest(),
             new FloatingToStringTest(),
+            // External surfaces assertion tests (no screenshots): the serializer wire format
+            // round-tripped through JSONParser on the device VM, the timeline-selection helpers
+            // the desktop widget renderers use, action dispatch (cold-start queue + EDT
+            // delivery) and the publish contract that must hold whether or not the platform
+            // provides a SurfaceBridge. The visual counterpart is
+            // SurfacesRasterizerScreenshotTest above.
+            new SurfacesSerializerRoundTripTest(),
+            new SurfacesTimelineLogicTest(),
+            new SurfacesActionDispatchTest(),
+            new SurfacesPublishTest(),
             new MotionSensorDeviceTest(),
             new CryptoApiTest(),
             new Java17Tests(),

@@ -143,11 +143,24 @@ public final class WindowsNative {
      */
     public static native boolean pollEvent(int[] out);
 
+    /** Rebuilds the Windows UI Automation virtual fragment tree. */
+    public static native void accessibilityBegin();
+    public static native void accessibilityNode(long id, long parentId, String role, String label,
+            String description, String value, int x, int y, int width, int height, int stateFlags);
+    public static native void accessibilityAction(long nodeId, String actionId, int actionHash, String label);
+    public static native void accessibilityEnd(int changeType);
+
     /**
      * True when an integrated or external touch digitizer is present, used for
      * {@code Display.isTouchScreen()} (queries GetSystemMetrics(SM_DIGITIZER)).
      */
     public static native boolean isTouchDevice();
+
+    public static native boolean isHighContrastEnabled();
+
+    public static native boolean isReduceMotionEnabled();
+
+    public static native boolean isScreenReaderEnabled();
 
     /**
      * Parks the calling (main) thread to keep the process alive in headless
@@ -513,6 +526,82 @@ public final class WindowsNative {
      * {@code null} when none was clicked since the last poll. Drained by the EDT.
      */
     public static native String notificationPollClicked();
+
+    /* ------------------------------------------------ floating widget windows */
+
+    /**
+     * {@code x} sentinel for {@link #widgetSetPosition}: center the widget
+     * window horizontally on the primary work area (used by the live activity
+     * pill). A sentinel rather than a sign test because real window coordinates
+     * are legitimately negative on multi-monitor setups. Mirrors
+     * {@code CN1_WIDGET_POS_CENTER_H} in cn1_windows_widgets.cpp.
+     */
+    public static final int WIDGET_POS_CENTER_H = Integer.MIN_VALUE;
+
+    /**
+     * Creates a floating layered widget window (WS_POPUP + WS_EX_LAYERED |
+     * TOPMOST | TOOLWINDOW | NOACTIVATE) of the given pixel size -- the desktop
+     * lowering of {@code com.codename1.surfaces}. Creation is marshaled to the
+     * window-owning pump thread (WM_CN1_WIDGET); the window shows nothing until
+     * the first {@link #widgetUpdatePixels} blit. Default placement is the
+     * top-right of the primary work area. Returns an opaque peer, or 0 in
+     * headless mode.
+     */
+    public static native long widgetCreate(int w, int h);
+
+    /**
+     * Pushes {@code w*h} straight-alpha ARGB pixels (the CN1 getRGB layout,
+     * typically a {@code SurfaceRasterizer} result) into the widget window. The
+     * pixels are premultiplied into a 32-bit DIB and blitted via
+     * UpdateLayeredWindow with per-pixel alpha, which also resizes the window
+     * to {@code w x h} -- so a DPI change is handled by simply re-rendering at
+     * the new pixel size. Transparent pixels are not part of the window, giving
+     * rounded corners for free.
+     */
+    public static native void widgetUpdatePixels(long peer, int[] argb, int w, int h);
+
+    /**
+     * Moves the widget window to the given screen position;
+     * {@code x ==} {@link #WIDGET_POS_CENTER_H} centers it horizontally on the
+     * primary work area.
+     */
+    public static native void widgetSetPosition(long peer, int x, int y);
+
+    /** The widget window's current screen x (for position persistence). */
+    public static native int widgetGetX(long peer);
+
+    /** The widget window's current screen y (for position persistence). */
+    public static native int widgetGetY(long peer);
+
+    /**
+     * Sets the action hit rectangles in window (client) pixels, packed as
+     * {@code [x,y,w,h, x,y,w,h, ...]}. Clicks inside a hit-rect are queued as
+     * events ({@link #widgetPollEvent}); everywhere else the widget body is a
+     * drag handle (WM_NCHITTEST returns HTCAPTION).
+     */
+    public static native void widgetSetHitRects(long peer, int[] rects);
+
+    /** Destroys the widget window and frees the peer (marshaled; do not reuse the peer). */
+    public static native void widgetDestroy(long peer);
+
+    /**
+     * Next queued widget event, or {@code null} when none:
+     * {@code "<peer>;click;<x>;<y>"} (a click inside a hit-rect, client pixels)
+     * or {@code "<peer>;moved;<x>;<y>"} (drag finished / DPI changed, screen
+     * position). Drained by the EDT in {@code drainInput}, mirroring
+     * {@link #browserPollEvent}.
+     */
+    public static native String widgetPollEvent();
+
+    /**
+     * The widget window's current per-monitor DPI scale (96 dpi == 1.0), so
+     * the bridge rasterizes dips at the right pixel size; peer 0 reports the
+     * main window's scale as the pre-creation estimate.
+     */
+    public static native float widgetGetDpiScale(long peer);
+
+    /** Brings the main app window to the foreground (widget click routing). */
+    public static native void widgetFocusApp();
 
     /**
      * Shows a modal native file dialog and returns the chosen path, or

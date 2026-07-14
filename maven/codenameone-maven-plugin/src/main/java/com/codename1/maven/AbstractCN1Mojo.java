@@ -961,18 +961,32 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
 
     }
 
-    private File extractCefBundle(File nativeJar) {
+    private File extractCefBundle(File nativeJar, String version) {
         File extractedDir = new File(project.getBuild().getDirectory(), "cn1-cef-" + getCefPlatform());
         File cefRoot = new File(extractedDir, "cef");
         File runtimeDir = new File(cefRoot, getCefRuntimeSubdir());
         File tempExtract = new File(extractedDir, "tmp");
-        boolean needsRefresh = !runtimeDir.exists() || extractedDir.lastModified() < nativeJar.lastModified();
+        // The version stamp guards against reusing a stale extraction after a JCEF
+        // upgrade. The native binary and the jcef-api Java classes must match: a
+        // mismatch surfaces at runtime as a native<->Java skew (e.g. a
+        // NoSuchMethodError for getScreenInfo, which also silently breaks HiDPI
+        // scaling). A timestamp check alone misses this because the previously
+        // extracted directory can be newer than a freshly resolved native jar.
+        File versionStamp = new File(cefRoot, ".cn1-jcef-version");
+        boolean versionMatches = version != null && version.equals(readVersionStamp(versionStamp));
+        boolean needsRefresh = !runtimeDir.exists()
+                || extractedDir.lastModified() < nativeJar.lastModified()
+                || !versionMatches;
         if (isMac) {
             File chromiumEmbeddedFramework = new File(runtimeDir, "Chromium Embedded Framework.framework/Chromium Embedded Framework");
             needsRefresh = needsRefresh || !Files.isSymbolicLink(chromiumEmbeddedFramework.toPath());
         }
         if (!needsRefresh) {
             return cefRoot;
+        }
+        if (runtimeDir.exists() && !versionMatches) {
+            getLog().info("Refreshing CEF: extracted JCEF native version does not match "
+                    + (version == null ? "the resolved version" : version));
         }
 
         if (extractedDir.exists()) {
@@ -999,7 +1013,31 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         tar.createArg().setFile(runtimeDir);
         tar.execute();
         delTree(tempExtract);
+        writeVersionStamp(versionStamp, version);
         return cefRoot;
+    }
+
+    private String readVersionStamp(File versionStamp) {
+        if (!versionStamp.exists()) {
+            return null;
+        }
+        try {
+            return new String(Files.readAllBytes(versionStamp.toPath()), "UTF-8").trim();
+        } catch (IOException ex) {
+            getLog().debug("Could not read CEF version stamp " + versionStamp, ex);
+            return null;
+        }
+    }
+
+    private void writeVersionStamp(File versionStamp, String version) {
+        if (version == null) {
+            return;
+        }
+        try {
+            Files.write(versionStamp.toPath(), version.getBytes("UTF-8"));
+        } catch (IOException ex) {
+            getLog().debug("Could not write CEF version stamp " + versionStamp, ex);
+        }
     }
 
     private File findFileBySuffix(File root, String suffix) {
@@ -1064,12 +1102,13 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             getLog().warn("No upstream JCEF artifact is configured for this platform");
             return;
         }
-        File nativeJar = getJar("me.friwi", artifactId);
+        Artifact nativeArtifact = getArtifact("me.friwi", artifactId);
+        File nativeJar = nativeArtifact == null ? null : getJar(nativeArtifact);
         if (nativeJar == null || !nativeJar.exists()) {
             getLog().warn("Upstream JCEF native bundle " + artifactId + " not found in dependencies. Not adding CEF dependency");
             return;
         }
-        File cefDir = extractCefBundle(nativeJar);
+        File cefDir = extractCefBundle(nativeJar, nativeArtifact.getVersion());
         project.getProperties().setProperty("cef.dir", cefDir.getAbsolutePath());
         System.setProperty("cef.dir", cefDir.getAbsolutePath());
         fixCefPermissions(cefDir);

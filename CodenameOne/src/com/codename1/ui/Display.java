@@ -59,6 +59,7 @@ import com.codename1.plugin.PluginSupport;
 import com.codename1.plugin.event.IsGalleryTypeSupportedEvent;
 import com.codename1.plugin.event.OpenGalleryEvent;
 import com.codename1.system.CrashReport;
+import com.codename1.ui.accessibility.AccessibilityManager;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Transition;
@@ -633,6 +634,29 @@ public final class Display extends CN1Constants {
         announceForAccessibility(null, text);
     }
 
+    /// Notifies the native port that the portable semantic tree changed. This is
+    /// primarily an internal bridge used by the accessibility subsystem.
+    ///
+    /// #### Parameters
+    ///
+    /// - `changeType`: bit mask of `AccessibilityManager.CHANGE_*` constants
+    public void accessibilityTreeChanged(int changeType) {
+        impl.accessibilityTreeChanged(changeType);
+    }
+
+    /// Returns true when the active port exposes lightweight components through
+    /// a native virtual accessibility tree.
+    public boolean isAccessibilityTreeSupported() {
+        return impl.isAccessibilityTreeSupported();
+    }
+
+    /// Returns true when the active port currently needs semantic changes to be
+    /// projected eagerly. This is an internal bridge used to avoid rebuilding
+    /// an unused accessibility tree from hot component setters.
+    public boolean isAccessibilityTreeUpdateRequired() {
+        return impl.isAccessibilityTreeUpdateRequired();
+    }
+
     /// Returns the status of the show during edit flag
     ///
     /// #### Returns
@@ -752,6 +776,57 @@ public final class Display extends CN1Constants {
     ///
     public float getLargerTextScale() {
         return impl.getLargerTextScale();
+    }
+
+    /// Returns true when the user requests stronger foreground/background contrast.
+    public boolean isHighContrastEnabled() {
+        return impl.isHighContrastEnabled();
+    }
+
+    /// Returns true when the user requests that information isn't conveyed by color alone.
+    public boolean isDifferentiateWithoutColorEnabled() {
+        return impl.isDifferentiateWithoutColorEnabled();
+    }
+
+    /// Returns the selected color-vision correction, or {@link AccessibilityColorVisionDeficiency#UNKNOWN}
+    /// when the platform doesn't expose it.
+    public AccessibilityColorVisionDeficiency getColorVisionDeficiency() {
+        return impl.getColorVisionDeficiency();
+    }
+
+    /// Returns true when the user requests reduced or disabled nonessential motion.
+    public boolean isReduceMotionEnabled() {
+        return impl.isReduceMotionEnabled();
+    }
+
+    /// Returns true when the user requests reduced transparency and blur effects.
+    public boolean isReduceTransparencyEnabled() {
+        return impl.isReduceTransparencyEnabled();
+    }
+
+    /// Returns true when the user requests heavier text weight.
+    public boolean isBoldTextEnabled() {
+        return impl.isBoldTextEnabled();
+    }
+
+    /// Returns true when the operating system is inverting displayed colors.
+    public boolean isInvertColorsEnabled() {
+        return impl.isInvertColorsEnabled();
+    }
+
+    /// Returns true when the operating system requests a grayscale presentation.
+    public boolean isGrayscaleEnabled() {
+        return impl.isGrayscaleEnabled();
+    }
+
+    /// Returns true when switches should include visible on/off labels.
+    public boolean isOnOffSwitchLabelsEnabled() {
+        return impl.isOnOffSwitchLabelsEnabled();
+    }
+
+    /// Returns true when a screen reader or touch-exploration service is active.
+    public boolean isScreenReaderEnabled() {
+        return impl.isScreenReaderEnabled();
     }
 
     /// Checks if async stack traces are enabled.  If enabled, the stack trace
@@ -1730,6 +1805,8 @@ public final class Display extends CN1Constants {
         lastKeyPressed = 0;
         previousKeyPressed = 0;
         newForm.onShowCompletedImpl();
+        AccessibilityManager.getInstance().invalidate(newForm,
+                AccessibilityManager.CHANGE_STRUCTURE | AccessibilityManager.CHANGE_PANE);
     }
 
     private boolean applyInitialWindowSize(Form form) {
@@ -4588,6 +4665,18 @@ public final class Display extends CN1Constants {
     /// the car bridge, or null
     public com.codename1.car.spi.CarBridge getCarBridge() {
         return impl.getCarBridge();
+    }
+
+    /// Returns the platform bridge used by the `com.codename1.surfaces` API to render external
+    /// surfaces (home-screen widgets and live activities), or null when unsupported on this port.
+    /// Internal -- application code uses the `com.codename1.surfaces` API rather than this bridge
+    /// directly.
+    ///
+    /// #### Returns
+    ///
+    /// the surface bridge, or null
+    public com.codename1.surfaces.spi.SurfaceBridge getSurfaceBridge() {
+        return impl.getSurfaceBridge();
     }
 
     /// Returns true if the device has dialing capabilities

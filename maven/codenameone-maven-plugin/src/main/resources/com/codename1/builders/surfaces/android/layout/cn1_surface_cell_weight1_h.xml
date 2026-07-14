@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Codename One surfaces: weighted cell for row children carrying weight (or expanding
+     spacers). RemoteViews cannot set layout_weight, so all weights collapse to equal
+     shares of 1. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/cn1_surface_root"
+    android:layout_width="0dp"
+    android:layout_height="match_parent"
+    android:layout_weight="1" />

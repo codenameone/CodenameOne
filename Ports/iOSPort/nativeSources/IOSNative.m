@@ -5872,6 +5872,90 @@ JAVA_FLOAT com_codename1_impl_ios_IOSNative_getLargerTextScale___R_float(CN1_THR
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
 }
 
+#if TARGET_OS_WATCH
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isHighContrastEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDifferentiateWithoutColorEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isReduceMotionEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isReduceTransparencyEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBoldTextEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isInvertColorsEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGrayscaleEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isOnOffSwitchLabelsEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isScreenReaderEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return 0;
+}
+
+#else
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isHighContrastEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return UIAccessibilityDarkerSystemColorsEnabled() ? 1 : 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDifferentiateWithoutColorEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    if (@available(iOS 13.0, macCatalyst 13.1, *)) {
+        return UIAccessibilityShouldDifferentiateWithoutColor() ? 1 : 0;
+    }
+    return 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isReduceMotionEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return UIAccessibilityIsReduceMotionEnabled() ? 1 : 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isReduceTransparencyEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return UIAccessibilityIsReduceTransparencyEnabled() ? 1 : 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isBoldTextEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return UIAccessibilityIsBoldTextEnabled() ? 1 : 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isInvertColorsEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return UIAccessibilityIsInvertColorsEnabled() ? 1 : 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isGrayscaleEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return UIAccessibilityIsGrayscaleEnabled() ? 1 : 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isOnOffSwitchLabelsEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    if (@available(iOS 13.0, macCatalyst 13.1, *)) {
+        return UIAccessibilityIsOnOffSwitchLabelsEnabled() ? 1 : 0;
+    }
+    return 0;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isScreenReaderEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return UIAccessibilityIsVoiceOverRunning() ? 1 : 0;
+}
+
+#endif // TARGET_OS_WATCH
+
 #ifdef INCLUDE_LOCATION_USAGE
 CLLocationManager* com_codename1_impl_ios_IOSNative_createCLLocation = nil;
 #endif
@@ -13613,6 +13697,217 @@ void com_codename1_impl_ios_IOSNative_announceForAccessibility___java_lang_Strin
 #endif // !TARGET_OS_WATCH
 }
 
+#if !TARGET_OS_WATCH
+@interface CN1AccessibilityCustomAction : UIAccessibilityCustomAction
+@property(nonatomic, retain) NSString *cn1ActionId;
+@end
+
+@implementation CN1AccessibilityCustomAction
+@end
+
+@interface CN1AccessibilityElement : UIAccessibilityElement
+@property(nonatomic, assign) long long cn1NodeId;
+@property(nonatomic, retain) NSArray *cn1Actions;
+@end
+
+static NSString *CN1AccessibilityActionId(NSArray *actions, NSString *wanted) {
+    for (NSDictionary *action in actions) {
+        if ([wanted isEqualToString:[action objectForKey:@"id"]]
+                && ![[action objectForKey:@"enabled"] isEqual:@NO]) {
+            return wanted;
+        }
+    }
+    return nil;
+}
+
+static void CN1PerformAccessibilityAction(long long nodeId, NSString *actionId, NSString *argument) {
+    if (actionId == nil) return;
+    JAVA_OBJECT javaAction = fromNSString(CN1_THREAD_GET_STATE_PASS_ARG actionId);
+    JAVA_OBJECT javaArgument = argument == nil ? JAVA_NULL : fromNSString(CN1_THREAD_GET_STATE_PASS_ARG argument);
+    com_codename1_impl_ios_IOSImplementation_performAccessibilityActionFromNative___long_java_lang_String_java_lang_String(
+            CN1_THREAD_GET_STATE_PASS_ARG (JAVA_LONG)nodeId, javaAction, javaArgument);
+}
+
+@implementation CN1AccessibilityElement
+- (BOOL)accessibilityActivate {
+    NSString *action = CN1AccessibilityActionId(self.cn1Actions, @"activate");
+    if (action == nil) action = CN1AccessibilityActionId(self.cn1Actions, @"focus");
+    if (action == nil) return NO;
+    CN1PerformAccessibilityAction(self.cn1NodeId, action, nil);
+    return YES;
+}
+
+- (void)accessibilityIncrement {
+    CN1PerformAccessibilityAction(self.cn1NodeId,
+            CN1AccessibilityActionId(self.cn1Actions, @"increment"), nil);
+}
+
+- (void)accessibilityDecrement {
+    CN1PerformAccessibilityAction(self.cn1NodeId,
+            CN1AccessibilityActionId(self.cn1Actions, @"decrement"), nil);
+}
+
+- (BOOL)accessibilityPerformEscape {
+    NSString *action = CN1AccessibilityActionId(self.cn1Actions, @"dismiss");
+    if (action == nil) return NO;
+    CN1PerformAccessibilityAction(self.cn1NodeId, action, nil);
+    return YES;
+}
+
+- (BOOL)accessibilityScroll:(UIAccessibilityScrollDirection)direction {
+    NSString *action = nil;
+    if (direction == UIAccessibilityScrollDirectionDown || direction == UIAccessibilityScrollDirectionRight
+            || direction == UIAccessibilityScrollDirectionNext) {
+        action = CN1AccessibilityActionId(self.cn1Actions, @"scrollForward");
+    } else {
+        action = CN1AccessibilityActionId(self.cn1Actions, @"scrollBackward");
+    }
+    if (action == nil) return NO;
+    CN1PerformAccessibilityAction(self.cn1NodeId, action, nil);
+    return YES;
+}
+
+- (BOOL)cn1PerformCustomAction:(CN1AccessibilityCustomAction *)action {
+    if (action.cn1ActionId == nil) return NO;
+    CN1PerformAccessibilityAction(self.cn1NodeId, action.cn1ActionId, nil);
+    return YES;
+}
+@end
+
+static NSMutableDictionary *cn1AccessibilityLiveValues;
+
+static id CN1JSONValue(NSDictionary *node, NSString *key) {
+    id value = [node objectForKey:key];
+    return value == [NSNull null] ? nil : value;
+}
+
+static UIAccessibilityTraits CN1AccessibilityTraitsForNode(NSDictionary *node) {
+    NSString *role = CN1JSONValue(node, @"role");
+    UIAccessibilityTraits traits = UIAccessibilityTraitNone;
+    if ([role isEqualToString:@"BUTTON"] || [role isEqualToString:@"TOGGLE_BUTTON"]
+            || [role isEqualToString:@"CHECKBOX"] || [role isEqualToString:@"RADIO_BUTTON"]
+            || [role isEqualToString:@"SWITCH"] || [role isEqualToString:@"TAB"]
+            || [role isEqualToString:@"MENU_ITEM"]) traits |= UIAccessibilityTraitButton;
+    if ([role isEqualToString:@"LINK"]) traits |= UIAccessibilityTraitLink;
+    if ([role isEqualToString:@"IMAGE"]) traits |= UIAccessibilityTraitImage;
+    if ([role isEqualToString:@"STATIC_TEXT"]) traits |= UIAccessibilityTraitStaticText;
+    if ([role isEqualToString:@"SEARCH_FIELD"]) traits |= UIAccessibilityTraitSearchField;
+    if ([role isEqualToString:@"HEADING"] || [CN1JSONValue(node, @"headingLevel") intValue] > 0)
+        traits |= UIAccessibilityTraitHeader;
+    if ([role isEqualToString:@"SLIDER"] || [role isEqualToString:@"SPIN_BUTTON"])
+        traits |= UIAccessibilityTraitAdjustable;
+    if ([CN1JSONValue(node, @"selected") boolValue]) traits |= UIAccessibilityTraitSelected;
+    id enabled = CN1JSONValue(node, @"enabled");
+    if (enabled != nil && ![enabled boolValue]) traits |= UIAccessibilityTraitNotEnabled;
+    if (![[CN1JSONValue(node, @"liveRegion") description] isEqualToString:@"OFF"])
+        traits |= UIAccessibilityTraitUpdatesFrequently;
+    return traits;
+}
+
+static NSString *CN1AccessibilityValueForNode(NSDictionary *node) {
+    NSString *value = CN1JSONValue(node, @"value");
+    NSDictionary *range = CN1JSONValue(node, @"range");
+    if (value == nil && range != nil) {
+        value = CN1JSONValue(range, @"text");
+        if (value == nil) value = [[range objectForKey:@"current"] stringValue];
+    }
+    NSString *checked = CN1JSONValue(node, @"checked");
+    if ([checked isEqualToString:@"CHECKED"]) value = value == nil ? @"Checked" : [value stringByAppendingString:@", Checked"];
+    else if ([checked isEqualToString:@"UNCHECKED"]) value = value == nil ? @"Unchecked" : [value stringByAppendingString:@", Unchecked"];
+    else if ([checked isEqualToString:@"MIXED"]) value = value == nil ? @"Mixed" : [value stringByAppendingString:@", Mixed"];
+    id expanded = CN1JSONValue(node, @"expanded");
+    if (expanded != nil) {
+        NSString *state = [expanded boolValue] ? @"Expanded" : @"Collapsed";
+        value = value == nil ? state : [value stringByAppendingFormat:@", %@", state];
+    }
+    id invalid = CN1JSONValue(node, @"invalid");
+    if (invalid != nil && [invalid boolValue]) value = value == nil ? @"Invalid" : [value stringByAppendingString:@", Invalid"];
+    return value;
+}
+
+void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT json, JAVA_INT changeType) {
+    if (json == JAVA_NULL) return;
+    POOL_BEGIN();
+    NSString *jsonString = toNSString(CN1_THREAD_STATE_PASS_ARG json);
+    NSData *data = [jsonString dataUsingEncoding:NSUTF8StringEncoding];
+    NSDictionary *tree = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    NSArray *nodes = [tree objectForKey:@"nodes"];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIView *container = (UIView *)[[CodenameOne_GLViewController instance] eaglView];
+        if (container == nil) return;
+        NSMutableArray *elements = [NSMutableArray arrayWithCapacity:[nodes count]];
+        NSMutableDictionary *elementsById = [NSMutableDictionary dictionary];
+        if (cn1AccessibilityLiveValues == nil) cn1AccessibilityLiveValues = [[NSMutableDictionary alloc] init];
+        for (NSDictionary *node in nodes) {
+            CN1AccessibilityElement *element = [[CN1AccessibilityElement alloc] initWithAccessibilityContainer:container];
+            NSNumber *nodeId = [node objectForKey:@"id"];
+            element.cn1NodeId = [nodeId longLongValue];
+            element.cn1Actions = CN1JSONValue(node, @"actions");
+            element.accessibilityLabel = CN1JSONValue(node, @"label");
+            NSString *hint = CN1JSONValue(node, @"hint");
+            NSString *error = CN1JSONValue(node, @"error");
+            element.accessibilityHint = error == nil ? hint : hint == nil ? error : [NSString stringWithFormat:@"%@. %@", hint, error];
+            element.accessibilityValue = CN1AccessibilityValueForNode(node);
+            element.accessibilityIdentifier = CN1JSONValue(node, @"identifier");
+            element.accessibilityTraits = CN1AccessibilityTraitsForNode(node);
+            element.accessibilityViewIsModal = [CN1JSONValue(node, @"modal") boolValue];
+            NSArray *bounds = [node objectForKey:@"bounds"];
+            if ([bounds count] == 4) {
+                CGFloat scale = scaleValue <= 0 ? [UIScreen mainScreen].scale : scaleValue;
+                element.accessibilityFrameInContainerSpace = CGRectMake(
+                        [[bounds objectAtIndex:0] doubleValue] / scale,
+                        [[bounds objectAtIndex:1] doubleValue] / scale,
+                        [[bounds objectAtIndex:2] doubleValue] / scale,
+                        [[bounds objectAtIndex:3] doubleValue] / scale);
+            }
+            NSMutableArray *custom = [NSMutableArray array];
+            for (NSDictionary *action in element.cn1Actions) {
+                NSString *actionId = [action objectForKey:@"id"];
+                if ([actionId isEqualToString:@"activate"] || [actionId isEqualToString:@"focus"]
+                        || [actionId isEqualToString:@"increment"] || [actionId isEqualToString:@"decrement"]
+                        || [actionId isEqualToString:@"dismiss"] || [actionId isEqualToString:@"scrollForward"]
+                        || [actionId isEqualToString:@"scrollBackward"] || ![[action objectForKey:@"enabled"] boolValue]) continue;
+                NSString *name = CN1JSONValue(action, @"label");
+                if (name == nil) name = actionId;
+                CN1AccessibilityCustomAction *customAction = [[CN1AccessibilityCustomAction alloc]
+                        initWithName:name target:element selector:@selector(cn1PerformCustomAction:)];
+                customAction.cn1ActionId = actionId;
+                [custom addObject:customAction];
+            }
+            element.accessibilityCustomActions = custom;
+            [elements addObject:element];
+            [elementsById setObject:element forKey:nodeId];
+
+            NSString *live = CN1JSONValue(node, @"liveRegion");
+            if (live != nil && ![live isEqualToString:@"OFF"]) {
+                NSString *newValue = [NSString stringWithFormat:@"%@|%@", element.accessibilityLabel ?: @"", element.accessibilityValue ?: @""];
+                NSString *oldValue = [cn1AccessibilityLiveValues objectForKey:nodeId];
+                if (oldValue != nil && ![oldValue isEqualToString:newValue]) {
+                    UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification,
+                            element.accessibilityLabel ?: element.accessibilityValue);
+                }
+                [cn1AccessibilityLiveValues setObject:newValue forKey:nodeId];
+            }
+        }
+        container.isAccessibilityElement = NO;
+        container.accessibilityElements = elements;
+        if ((changeType & 256) != 0) {
+            UIAccessibilityPostNotification(UIAccessibilityScreenChangedNotification,
+                    [elements count] == 0 ? nil : [elements objectAtIndex:0]);
+        } else {
+            UIAccessibilityPostNotification(UIAccessibilityLayoutChangedNotification, nil);
+        }
+    });
+    POOL_END();
+}
+#else
+void com_codename1_impl_ios_IOSNative_updateAccessibilityTree___java_lang_String_int(
+        CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT json, JAVA_INT changeType) {
+    // watchOS uses a separate SwiftUI accessibility model.
+}
+#endif
+
 // ====================================================================
 // Crypto bridge -- implementations of the native methods on IOSNative
 // that back com.codename1.security.{Cipher,Signature,SecureRandom,
@@ -14072,6 +14367,215 @@ void com_codename1_impl_ios_IOSNative_carPlayShowToast___java_lang_String_int(CN
 // _R_ wrapper. Always defined (real or stub) regardless of CN1_USE_CARPLAY.
 JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isCarPlayConnected___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
     return com_codename1_impl_ios_IOSNative_isCarPlayConnected__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+
+// --- External surfaces (WidgetKit + ActivityKit) ---------------------------
+// Gated by CN1_USE_WIDGETS: the builder uncomments the define (in
+// CodenameOne_GLViewController.h, imported near the top of this file), generates the
+// CN1Widgets extension target and injects the CN1SurfacesAppGroup Info.plist key when the
+// app references com.codename1.surfaces. Builds without it compile the stub branch.
+// WidgetKit/ActivityKit are Swift-only, so the real implementations are thin trampolines
+// onto the Swift CN1SurfaceBridge class (compiled into the app target by the builder),
+// reached via NSClassFromString + typed objc_msgSend casts. The Swift side owns its own
+// threading (WidgetCenter is thread safe; ActivityKit updates run in Tasks), so these
+// call it directly on the calling (CN1) thread.
+#ifdef CN1_USE_WIDGETS
+
+static NSString *cn1SurfacesGroupId() {
+    id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1SurfacesAppGroup"];
+    return ([v isKindOfClass:[NSString class]] && [(NSString *)v length] > 0) ? (NSString *)v : nil;
+}
+
+static NSString *cn1SurfacesContainerPath() {
+    NSString *group = cn1SurfacesGroupId();
+    if (group == nil) {
+        return nil;
+    }
+    NSURL *container = [[NSFileManager defaultManager] containerURLForSecurityApplicationGroupIdentifier:group];
+    return container == nil ? nil : container.path;
+}
+
+static Class cn1SurfacesBridgeClass() {
+    return NSClassFromString(@"CN1SurfaceBridge");
+}
+
+// True when the running OS meets the CN1Widgets extension's deployment target
+// (CN1SurfacesMinOS Info.plist key, injected by the builder from
+// ios.surfaces.deploymentTarget; defaults to 16.1). Below that version the
+// extension cannot run or appear in the widget gallery, so the API must not
+// report widget support even though WidgetKit itself shipped with iOS 14.
+static BOOL cn1SurfacesMinOSSupported() {
+    NSString *min = nil;
+    id v = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CN1SurfacesMinOS"];
+    if ([v isKindOfClass:[NSString class]] && [(NSString *)v length] > 0) {
+        min = (NSString *)v;
+    } else {
+        min = @"16.1";
+    }
+    NSArray *parts = [min componentsSeparatedByString:@"."];
+    NSOperatingSystemVersion required;
+    required.majorVersion = parts.count > 0 ? [[parts objectAtIndex:0] integerValue] : 16;
+    required.minorVersion = parts.count > 1 ? [[parts objectAtIndex:1] integerValue] : 1;
+    required.patchVersion = parts.count > 2 ? [[parts objectAtIndex:2] integerValue] : 0;
+    return [[NSProcessInfo processInfo] isOperatingSystemAtLeastVersion:required];
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getSurfacesContainerPath__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    POOL_BEGIN();
+    NSString *path = cn1SurfacesContainerPath();
+    JAVA_OBJECT result = fromNSString(CN1_THREAD_STATE_PASS_ARG (path == nil ? @"" : path));
+    POOL_END();
+    return result;
+}
+
+void com_codename1_impl_ios_IOSNative_surfacesReloadTimelines___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT kind) {
+    if (@available(iOS 14.0, *)) {
+        POOL_BEGIN();
+        Class bridge = cn1SurfacesBridgeClass();
+        if (bridge != nil) {
+            NSString *k = (kind == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG kind);
+            ((void (*)(id, SEL, NSString *))objc_msgSend)((id)bridge,
+                    NSSelectorFromString(@"reloadTimelines:"), k);
+        }
+        POOL_END();
+    }
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_surfacesInstalledCount___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT kind) {
+    if (@available(iOS 14.0, *)) {
+        POOL_BEGIN();
+        JAVA_INT count = 0;
+        Class bridge = cn1SurfacesBridgeClass();
+        if (bridge != nil) {
+            NSString *k = (kind == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG kind);
+            count = (JAVA_INT)((NSInteger (*)(id, SEL, NSString *))objc_msgSend)((id)bridge,
+                    NSSelectorFromString(@"installedCount:"), k);
+        }
+        POOL_END();
+        return count;
+    }
+    return 0;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_surfacesStartActivity___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT descriptorJson) {
+    if (@available(iOS 16.1, *)) {
+        POOL_BEGIN();
+        JAVA_OBJECT result = JAVA_NULL;
+        Class bridge = cn1SurfacesBridgeClass();
+        if (bridge != nil && descriptorJson != JAVA_NULL) {
+            NSString *json = toNSString(CN1_THREAD_STATE_PASS_ARG descriptorJson);
+            NSString *activityId = ((NSString *(*)(id, SEL, NSString *))objc_msgSend)((id)bridge,
+                    NSSelectorFromString(@"startActivity:"), json);
+            if (activityId != nil && [activityId length] > 0) {
+                result = fromNSString(CN1_THREAD_STATE_PASS_ARG activityId);
+            }
+        }
+        POOL_END();
+        return result;
+    }
+    return JAVA_NULL;
+}
+
+void com_codename1_impl_ios_IOSNative_surfacesUpdateActivity___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT activityId, JAVA_OBJECT stateJson) {
+    if (@available(iOS 16.1, *)) {
+        POOL_BEGIN();
+        Class bridge = cn1SurfacesBridgeClass();
+        if (bridge != nil && activityId != JAVA_NULL) {
+            NSString *aid = toNSString(CN1_THREAD_STATE_PASS_ARG activityId);
+            NSString *state = (stateJson == JAVA_NULL) ? @"" : toNSString(CN1_THREAD_STATE_PASS_ARG stateJson);
+            ((void (*)(id, SEL, NSString *, NSString *))objc_msgSend)((id)bridge,
+                    NSSelectorFromString(@"updateActivity:stateJson:"), aid, state);
+        }
+        POOL_END();
+    }
+}
+
+void com_codename1_impl_ios_IOSNative_surfacesEndActivity___java_lang_String_java_lang_String_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT activityId, JAVA_OBJECT finalStateJson, JAVA_BOOLEAN dismissImmediately) {
+    if (@available(iOS 16.1, *)) {
+        POOL_BEGIN();
+        Class bridge = cn1SurfacesBridgeClass();
+        if (bridge != nil && activityId != JAVA_NULL) {
+            NSString *aid = toNSString(CN1_THREAD_STATE_PASS_ARG activityId);
+            NSString *state = (finalStateJson == JAVA_NULL) ? nil : toNSString(CN1_THREAD_STATE_PASS_ARG finalStateJson);
+            ((void (*)(id, SEL, NSString *, NSString *, BOOL))objc_msgSend)((id)bridge,
+                    NSSelectorFromString(@"endActivity:finalStateJson:immediate:"),
+                    aid, state, dismissImmediately == JAVA_TRUE);
+        }
+        POOL_END();
+    }
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesWidgetsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (@available(iOS 14.0, *)) {
+        POOL_BEGIN();
+        BOOL supported = cn1SurfacesMinOSSupported()
+                && cn1SurfacesBridgeClass() != nil && cn1SurfacesContainerPath() != nil;
+        POOL_END();
+        return supported ? JAVA_TRUE : JAVA_FALSE;
+    }
+    return JAVA_FALSE;
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    if (@available(iOS 16.1, *)) {
+        POOL_BEGIN();
+        BOOL supported = NO;
+        Class bridge = cn1SurfacesBridgeClass();
+        if (bridge != nil) {
+            // The Swift side checks ActivityAuthorizationInfo().areActivitiesEnabled.
+            supported = ((BOOL (*)(id, SEL))objc_msgSend)((id)bridge,
+                    NSSelectorFromString(@"activitiesEnabled"));
+        }
+        POOL_END();
+        return supported ? JAVA_TRUE : JAVA_FALSE;
+    }
+    return JAVA_FALSE;
+}
+
+#else // CN1_USE_WIDGETS
+
+// Surfaces not enabled: no WidgetKit/ActivityKit references, everything answers unsupported.
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getSurfacesContainerPath__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_NULL;
+}
+void com_codename1_impl_ios_IOSNative_surfacesReloadTimelines___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT kind) {
+}
+JAVA_INT com_codename1_impl_ios_IOSNative_surfacesInstalledCount___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT kind) {
+    return 0;
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_surfacesStartActivity___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT descriptorJson) {
+    return JAVA_NULL;
+}
+void com_codename1_impl_ios_IOSNative_surfacesUpdateActivity___java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT activityId, JAVA_OBJECT stateJson) {
+}
+void com_codename1_impl_ios_IOSNative_surfacesEndActivity___java_lang_String_java_lang_String_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT activityId, JAVA_OBJECT finalStateJson, JAVA_BOOLEAN dismissImmediately) {
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesWidgetsSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
+    return JAVA_FALSE;
+}
+#endif // CN1_USE_WIDGETS
+
+// New-VM (return-type-encoded) manglings for the value-returning surfaces natives. Defined
+// here, after the implementations/stubs above, so each call is to an already-declared
+// function. The void surfaces* methods need no _R_ wrapper. Always defined (real or stub)
+// regardless of CN1_USE_WIDGETS.
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getSurfacesContainerPath___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_getSurfacesContainerPath__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_INT com_codename1_impl_ios_IOSNative_surfacesInstalledCount___java_lang_String_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT kind) {
+    return com_codename1_impl_ios_IOSNative_surfacesInstalledCount___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, kind);
+}
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_surfacesStartActivity___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT descriptorJson) {
+    return com_codename1_impl_ios_IOSNative_surfacesStartActivity___java_lang_String(CN1_THREAD_STATE_PASS_ARG instanceObject, descriptorJson);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesWidgetsSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_surfacesWidgetsSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
+}
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    return com_codename1_impl_ios_IOSNative_surfacesActivitiesSupported__(CN1_THREAD_STATE_PASS_ARG instanceObject);
 }
 
 void com_codename1_impl_ios_IOSNative_setSecureStorageAccessGroup___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT accessGroup) {

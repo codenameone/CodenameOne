@@ -73,6 +73,20 @@
           <scope>provided</scope>
       </dependency>
       <!--
+        Desktop runtime binaries: the JCEF Java API + per-platform natives (for
+        the BrowserComponent) and bundled ffmpeg (for media). codenameone-javase
+        declares jcef-api as optional, so it is not inherited transitively; this
+        aggregator puts org.cef on the app classpath for every profile (simulator,
+        IntelliJ run, run-desktop, executable-jar). Without it the simulator/desktop
+        app runs but the BrowserComponent fails to initialize CEF. The plugin
+        provisions and extracts the matching native binaries at run/build time.
+      -->
+      <dependency>
+          <groupId>com.codenameone</groupId>
+          <artifactId>cn1-binaries-javase</artifactId>
+          <type>pom</type>
+      </dependency>
+      <!--
         JUnit Jupiter so Surefire (which is bound to this module's test
         phase by default) actually runs any @Test methods under
         common/src/test/java. The codenameone-javase artifact above

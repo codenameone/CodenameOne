@@ -39,6 +39,8 @@ import com.codename1.messaging.Message;
 import com.codename1.payment.PromotionalOffer;
 import com.codename1.printing.PrintResult;
 import com.codename1.printing.PrintResultListener;
+import com.codename1.ui.AccessibilityColorVisionDeficiency;
+import com.codename1.ui.accessibility.AccessibilityManager;
 import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.Font;
@@ -235,6 +237,17 @@ public class JavaSEPort extends CodenameOneImplementation {
     // font scaling, so the Larger Text menu only nags them a single time per session.
     private boolean largerTextOptInWarningShown = false;
     private static final String PREF_LARGER_TEXT_SCALE = "cn1.simulator.largerTextScale";
+    private static final String PREF_ACCESSIBILITY_PREFIX = "cn1.simulator.accessibility.";
+    private boolean highContrastEnabled;
+    private boolean differentiateWithoutColorEnabled;
+    private boolean reduceMotionEnabled;
+    private boolean reduceTransparencyEnabled;
+    private boolean boldTextEnabled;
+    private boolean invertColorsEnabled;
+    private boolean grayscaleEnabled;
+    private boolean onOffSwitchLabelsEnabled;
+    private boolean screenReaderEnabled;
+    private AccessibilityColorVisionDeficiency colorVisionDeficiency = AccessibilityColorVisionDeficiency.NONE;
 
     // Floor below which any persisted window dimension is treated as the
     // product of a layout glitch (eg. a pack() with a collapsed canvas, an
@@ -368,6 +381,23 @@ public class JavaSEPort extends CodenameOneImplementation {
             com.codename1.car.Car.endSession();
             b.close();
         }
+    }
+
+    /// Returns the JavaSE external-surfaces bridge, created lazily on first use. In simulator mode
+    /// published widget timelines render in the Widgets preview window (Widgets menu); in desktop
+    /// mode they render in frameless always-on-top floating windows that persist across runs.
+    @Override
+    public com.codename1.surfaces.spi.SurfaceBridge getSurfaceBridge() {
+        if (surfaceBridge == null) {
+            File surfacesHome = new File(System.getProperty("user.home")
+                    + File.separator + getAppHomeDir(), "cn1surfaces");
+            surfaceBridge = new JavaSEWidgetBridge(surfacesHome, isSimulator());
+            if (!isSimulator()) {
+                widgetWindows = new JavaSEWidgetWindows(surfaceBridge, window);
+                surfaceBridge.setDesktopWindows(widgetWindows);
+            }
+        }
+        return surfaceBridge;
     }
 
     private void fireDesktopWindowEvent(com.codename1.ui.events.WindowEvent.Type type) {
@@ -611,7 +641,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             IS_MAC = false;
         }
         isWindows = File.separatorChar == '\\';        
-        System.setProperty("apple.laf.useScreenMenuBar", "true");
+        if (System.getProperty("apple.laf.useScreenMenuBar") == null) {
+            System.setProperty("apple.laf.useScreenMenuBar", "true");
+        }
         
         if(isWindows) {
             fontFaceSystem = "ArialUnicodeMS";
@@ -927,6 +959,12 @@ public class JavaSEPort extends CodenameOneImplementation {
     // Simulated in-car (CarPlay / Android Auto) head unit, created from the Car menu. Lets developers
     // see and click through their com.codename1.car experience locally without a real head unit.
     private JavaSECarBridge carBridge;
+    // External surfaces (com.codename1.surfaces): feeds the simulator Widgets preview window in
+    // simulator mode and the desktop floating widget windows in desktop mode. Created lazily so
+    // apps that never touch the surfaces API pay nothing.
+    private JavaSEWidgetBridge surfaceBridge;
+    // Desktop floating widget windows manager, created beside the bridge in desktop mode only.
+    private JavaSEWidgetWindows widgetWindows;
     // Application frame used for simulator
     private AppFrame appFrame;
     private long lastIdleTime;
@@ -1168,6 +1206,11 @@ public class JavaSEPort extends CodenameOneImplementation {
                         });
                         sysTray.add(tray);
                         desktopNotificationTray = tray;
+                        if (widgetWindows != null) {
+                            // desktop widgets piggyback on the persistent tray icon: an
+                            // "Add widget: ..." item per registered kind
+                            widgetWindows.installTrayMenu(tray);
+                        }
                     }
                     lastDesktopNotificationId = notif.getId();
                     desktopNotificationTray.displayMessage(notif.getAlertTitle(), notif.getAlertBody(),
@@ -2456,6 +2499,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     }
     
     protected class C extends JPanel implements KeyListener, MouseListener, MouseMotionListener, HierarchyBoundsListener, AdjustmentListener, MouseWheelListener {
+        private JavaSEAccessibility cn1Accessibility;
         private BufferedImage buffer;
         boolean painted;
         private Graphics2D g2dInstance;
@@ -2488,6 +2532,23 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             });
             requestFocus();
+        }
+
+        @Override
+        public javax.accessibility.AccessibleContext getAccessibleContext() {
+            if (cn1Accessibility == null) {
+                cn1Accessibility = new JavaSEAccessibility(this, JavaSEPort.this);
+                AccessibilityManager.getInstance().invalidateAll();
+            }
+            return cn1Accessibility.getContext();
+        }
+
+        boolean isAccessibilityContextRequested() {
+            return cn1Accessibility != null;
+        }
+
+        void accessibilityChanged(int changeType) {
+            if (cn1Accessibility != null) cn1Accessibility.changed(changeType);
         }
 
         private void installNativeMagnificationListeners() {
@@ -2867,7 +2928,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 
                 if (isEnabled()) {
-                    g.drawImage(buffer, (int) ((getScreenCoordinates().getX() + x) * zoomLevel), (int) ((getScreenCoordinates().getY() + y) * zoomLevel), this);
+                    g.drawImage(accessibilityFilteredImage(buffer),
+                            (int) ((getScreenCoordinates().getX() + x) * zoomLevel),
+                            (int) ((getScreenCoordinates().getY() + y) * zoomLevel), this);
                 } else {
                     g.setColor(Color.WHITE);
                     g.fillRect(x + (int) (getSkin().getWidth() * zoomLevel), y, getWidth(), getHeight());
@@ -2920,7 +2983,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                     bg.dispose();
                     painted = true;
                 }
-                g.drawImage(buffer, x, y, this);
+                g.drawImage(accessibilityFilteredImage(buffer), x, y, this);
             }
             ((Graphics2D)g).setTransform(t);
             return painted;
@@ -3765,6 +3828,25 @@ public class JavaSEPort extends CodenameOneImplementation {
     public JavaSEPort() {
         canvas = new C();
         instance = this;
+    }
+
+    @Override
+    public void accessibilityTreeChanged(final int changeType) {
+        EventQueue.invokeLater(new Runnable() {
+            public void run() {
+                if (canvas != null) canvas.accessibilityChanged(changeType);
+            }
+        });
+    }
+
+    @Override
+    public boolean isAccessibilityTreeSupported() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccessibilityTreeUpdateRequired() {
+        return screenReaderEnabled || canvas != null && canvas.isAccessibilityContextRequested();
     }
 
     public void paintDirty() {
@@ -5168,6 +5250,34 @@ public class JavaSEPort extends CodenameOneImplementation {
         return carMenu;
     }
 
+    /// Builds the simulator "Widgets" menu, which opens the Widgets preview window rendering the
+    /// app's published `com.codename1.surfaces` timelines and live activities locally -- kind list,
+    /// size selector, light/dark toggle, timeline auto-advance and a mock Dynamic Island.
+    private JMenu buildWidgetsMenu() {
+        JMenu widgetsMenu = new JMenu("Widgets");
+        registerMenuWithBlit(widgetsMenu);
+        JMenuItem preview = new JMenuItem("Widgets Preview");
+        preview.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                SimulatorWidgets.showWindow((JavaSEWidgetBridge) getSurfaceBridge(), window);
+            }
+        });
+        widgetsMenu.add(preview);
+        if (Boolean.getBoolean("cn1.surfaces.autodemo")) {
+            // Demo/automation hook: -Dcn1.surfaces.autodemo=true opens the Widgets preview
+            // window on startup so scripted runs (screenshots, samples CI) can observe
+            // published surfaces without interacting with the menu.
+            SwingUtilities.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    SimulatorWidgets.showWindow((JavaSEWidgetBridge) getSurfaceBridge(), window);
+                }
+            });
+        }
+        return widgetsMenu;
+    }
+
     private static Component findStatusBarComponent(Form f) {
         if (f == null || f.getToolbar() == null) {
             return null;
@@ -6382,6 +6492,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
 
         final JMenu largerTextMenu = installLargerTextMenu(simulateMenu, pref, frm);
+        final JMenu accessibilityPreferencesMenu = installAccessibilityPreferencesMenu(pref);
 
         final JMenu notificationBackgroundMenu = installNotificationBackgroundSimulationMenu(simulateMenu);
 
@@ -6592,6 +6703,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         simulateMenu.addSeparator();
         simulateMenu.add(darkLightModeMenu);
         simulateMenu.add(largerTextMenu);
+        simulateMenu.add(accessibilityPreferencesMenu);
         simulateMenu.add(purchaseMenu);
         simulateMenu.add(permFlag);
         simulateMenu.add(notificationBackgroundMenu);
@@ -6626,6 +6738,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 bar.add(extensionMenu);
             }
             bar.add(buildCarMenu());
+            bar.add(buildWidgetsMenu());
             bar.add(helpMenu);
         }
 
@@ -7549,6 +7662,118 @@ public class JavaSEPort extends CodenameOneImplementation {
         return largerTextMenu;
     }
 
+    private JMenu installAccessibilityPreferencesMenu(final Preferences pref) {
+        highContrastEnabled = pref.getBoolean(PREF_ACCESSIBILITY_PREFIX + "highContrast", false);
+        differentiateWithoutColorEnabled = pref.getBoolean(
+                PREF_ACCESSIBILITY_PREFIX + "differentiateWithoutColor", false);
+        reduceMotionEnabled = pref.getBoolean(PREF_ACCESSIBILITY_PREFIX + "reduceMotion", false);
+        reduceTransparencyEnabled = pref.getBoolean(PREF_ACCESSIBILITY_PREFIX + "reduceTransparency", false);
+        boldTextEnabled = pref.getBoolean(PREF_ACCESSIBILITY_PREFIX + "boldText", false);
+        invertColorsEnabled = pref.getBoolean(PREF_ACCESSIBILITY_PREFIX + "invertColors", false);
+        grayscaleEnabled = pref.getBoolean(PREF_ACCESSIBILITY_PREFIX + "grayscale", false);
+        onOffSwitchLabelsEnabled = pref.getBoolean(PREF_ACCESSIBILITY_PREFIX + "switchLabels", false);
+        screenReaderEnabled = pref.getBoolean(PREF_ACCESSIBILITY_PREFIX + "screenReader", false);
+        try {
+            colorVisionDeficiency = AccessibilityColorVisionDeficiency.valueOf(
+                    pref.get(PREF_ACCESSIBILITY_PREFIX + "colorVision",
+                            AccessibilityColorVisionDeficiency.NONE.name()));
+        } catch (IllegalArgumentException ex) {
+            colorVisionDeficiency = AccessibilityColorVisionDeficiency.NONE;
+        }
+
+        JMenu menu = new JMenu("Accessibility Preferences");
+        registerMenuWithBlit(menu);
+        menu.add(accessibilityPreferenceItem("High Contrast", highContrastEnabled, pref, "highContrast", 0));
+        menu.add(accessibilityPreferenceItem("Differentiate Without Color",
+                differentiateWithoutColorEnabled, pref, "differentiateWithoutColor", 1));
+        menu.add(createColorVisionMenu(pref));
+        menu.addSeparator();
+        menu.add(accessibilityPreferenceItem("Reduce Motion", reduceMotionEnabled, pref, "reduceMotion", 2));
+        menu.add(accessibilityPreferenceItem("Reduce Transparency", reduceTransparencyEnabled,
+                pref, "reduceTransparency", 3));
+        menu.add(accessibilityPreferenceItem("Bold Text", boldTextEnabled, pref, "boldText", 4));
+        menu.add(accessibilityPreferenceItem("Invert Colors", invertColorsEnabled, pref, "invertColors", 5));
+        menu.add(accessibilityPreferenceItem("Grayscale", grayscaleEnabled, pref, "grayscale", 6));
+        menu.add(accessibilityPreferenceItem("On/Off Switch Labels", onOffSwitchLabelsEnabled,
+                pref, "switchLabels", 7));
+        menu.add(accessibilityPreferenceItem("Screen Reader Active", screenReaderEnabled,
+                pref, "screenReader", 8));
+        return menu;
+    }
+
+    private JCheckBoxMenuItem accessibilityPreferenceItem(String label, boolean selected,
+            final Preferences pref, final String key, final int preference) {
+        final JCheckBoxMenuItem item = new JCheckBoxMenuItem(label, selected);
+        item.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent event) {
+                setSimulatorAccessibilityPreference(preference, item.isSelected());
+                pref.putBoolean(PREF_ACCESSIBILITY_PREFIX + key, item.isSelected());
+                refreshThemeOnly();
+                canvas.repaint();
+            }
+        });
+        return item;
+    }
+
+    private JMenu createColorVisionMenu(final Preferences pref) {
+        JMenu menu = new JMenu("Color Vision");
+        ButtonGroup group = new ButtonGroup();
+        AccessibilityColorVisionDeficiency[] modes = {
+            AccessibilityColorVisionDeficiency.NONE,
+            AccessibilityColorVisionDeficiency.PROTANOPIA,
+            AccessibilityColorVisionDeficiency.DEUTERANOPIA,
+            AccessibilityColorVisionDeficiency.TRITANOPIA,
+            AccessibilityColorVisionDeficiency.MONOCHROMACY
+        };
+        String[] labels = {"None", "Protanopia", "Deuteranopia", "Tritanopia", "Monochromacy"};
+        for (int i = 0; i < modes.length; i++) {
+            final AccessibilityColorVisionDeficiency mode = modes[i];
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem(labels[i], colorVisionDeficiency == mode);
+            item.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent event) {
+                    colorVisionDeficiency = mode;
+                    pref.put(PREF_ACCESSIBILITY_PREFIX + "colorVision", mode.name());
+                    canvas.repaint();
+                }
+            });
+            group.add(item);
+            menu.add(item);
+        }
+        return menu;
+    }
+
+    /// Sets a simulated accessibility preference. This is primarily intended for
+    /// automated simulator tests. Preference indexes follow the menu order.
+    public void setSimulatorAccessibilityPreference(int preference, boolean enabled) {
+        switch (preference) {
+            case 0: highContrastEnabled = enabled; break;
+            case 1: differentiateWithoutColorEnabled = enabled; break;
+            case 2: reduceMotionEnabled = enabled; break;
+            case 3: reduceTransparencyEnabled = enabled; break;
+            case 4: boldTextEnabled = enabled; break;
+            case 5: invertColorsEnabled = enabled; break;
+            case 6: grayscaleEnabled = enabled; break;
+            case 7: onOffSwitchLabelsEnabled = enabled; break;
+            case 8:
+                screenReaderEnabled = enabled;
+                if (enabled) {
+                    AccessibilityManager.getInstance().invalidateAll();
+                }
+                break;
+            default: throw new IllegalArgumentException("Unknown accessibility preference: " + preference);
+        }
+    }
+
+    /// Sets the simulator's color-vision filter.
+    public void setSimulatorColorVisionDeficiency(AccessibilityColorVisionDeficiency deficiency) {
+        colorVisionDeficiency = deficiency == null ? AccessibilityColorVisionDeficiency.NONE : deficiency;
+        if (canvas != null) {
+            canvas.repaint();
+        }
+    }
+
     /// The Larger Text menu only changes the on-screen fonts when the running app
     /// has opted into font scaling -- either through the `useLargerTextScaleBool`
     /// theme constant or a `UIManager.setUseLargerTextScale(true)` call at startup.
@@ -8062,6 +8287,111 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public float getLargerTextScale() {
         return largerTextScale;
+    }
+
+    @Override
+    public boolean isHighContrastEnabled() {
+        return highContrastEnabled;
+    }
+
+    @Override
+    public boolean isDifferentiateWithoutColorEnabled() {
+        return differentiateWithoutColorEnabled;
+    }
+
+    @Override
+    public AccessibilityColorVisionDeficiency getColorVisionDeficiency() {
+        return colorVisionDeficiency;
+    }
+
+    @Override
+    public boolean isReduceMotionEnabled() {
+        return reduceMotionEnabled;
+    }
+
+    @Override
+    public boolean isReduceTransparencyEnabled() {
+        return reduceTransparencyEnabled;
+    }
+
+    @Override
+    public boolean isBoldTextEnabled() {
+        return boldTextEnabled;
+    }
+
+    @Override
+    public boolean isInvertColorsEnabled() {
+        return invertColorsEnabled;
+    }
+
+    @Override
+    public boolean isGrayscaleEnabled() {
+        return grayscaleEnabled || colorVisionDeficiency == AccessibilityColorVisionDeficiency.MONOCHROMACY;
+    }
+
+    @Override
+    public boolean isOnOffSwitchLabelsEnabled() {
+        return onOffSwitchLabelsEnabled;
+    }
+
+    @Override
+    public boolean isScreenReaderEnabled() {
+        return screenReaderEnabled;
+    }
+
+    private BufferedImage accessibilityFilteredImage(BufferedImage source) {
+        boolean monochrome = grayscaleEnabled
+                || colorVisionDeficiency == AccessibilityColorVisionDeficiency.MONOCHROMACY;
+        if (!invertColorsEnabled && !monochrome
+                && (colorVisionDeficiency == AccessibilityColorVisionDeficiency.NONE
+                || colorVisionDeficiency == AccessibilityColorVisionDeficiency.UNKNOWN)) {
+            return source;
+        }
+        BufferedImage result = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        int width = source.getWidth();
+        int height = source.getHeight();
+        int[] pixels = source.getRGB(0, 0, width, height, null, 0, width);
+        for (int i = 0; i < pixels.length; i++) {
+            int argb = pixels[i];
+            int transformed = transformAccessibilityColor(
+                    (argb >>> 16) & 0xFF, (argb >>> 8) & 0xFF, argb & 0xFF, monochrome);
+            if (invertColorsEnabled) {
+                transformed = 0xFFFFFF ^ transformed;
+            }
+            pixels[i] = (argb & 0xFF000000) | transformed;
+        }
+        result.setRGB(0, 0, width, height, pixels, 0, width);
+        return result;
+    }
+
+    private int transformAccessibilityColor(int red, int green, int blue, boolean monochrome) {
+        if (monochrome) {
+            int gray = clampColor(0.299 * red + 0.587 * green + 0.114 * blue);
+            return (gray << 16) | (gray << 8) | gray;
+        }
+        switch (colorVisionDeficiency) {
+            case PROTANOPIA:
+                return colorMatrix(red, green, blue, .567, .433, 0, .558, .442, 0, 0, .242, .758);
+            case DEUTERANOPIA:
+                return colorMatrix(red, green, blue, .625, .375, 0, .7, .3, 0, 0, .3, .7);
+            case TRITANOPIA:
+                return colorMatrix(red, green, blue, .95, .05, 0, 0, .433, .567, 0, .475, .525);
+            default:
+                return (red << 16) | (green << 8) | blue;
+        }
+    }
+
+    private int colorMatrix(int red, int green, int blue,
+            double rr, double rg, double rb, double gr, double gg, double gb,
+            double br, double bg, double bb) {
+        int transformedRed = clampColor(rr * red + rg * green + rb * blue);
+        int transformedGreen = clampColor(gr * red + gg * green + gb * blue);
+        int transformedBlue = clampColor(br * red + bg * green + bb * blue);
+        return (transformedRed << 16) | (transformedGreen << 8) | transformedBlue;
+    }
+
+    private int clampColor(double value) {
+        return Math.max(0, Math.min(255, (int) Math.round(value)));
     }
 
     private void refreshSkin(final JFrame frm) {

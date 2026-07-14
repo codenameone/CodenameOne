@@ -54,6 +54,7 @@ import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Vibrator;
 import android.os.PowerManager;
+import android.provider.Settings;
 import android.telephony.TelephonyManager;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -61,6 +62,7 @@ import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityManager;
 import android.view.Window;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -68,6 +70,7 @@ import android.webkit.WebViewClient;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.AccessibilityColorVisionDeficiency;
 
 import com.codename1.ui.Component;
 import com.codename1.ui.Font;
@@ -318,6 +321,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         
     }
     CodenameOneSurface myView = null;
+    private AndroidAccessibilityProvider accessibilityProvider;
+    private volatile boolean accessibilityTreeUpdateRequired;
     CodenameOneTextPaint defaultFont;
     private final char[] tmpchar = new char[1];
     private final Rect tmprect = new Rect();
@@ -1582,6 +1587,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                             ((AndroidImplementation.AndroidPeer) nativePeers.elementAt(i)).deinit();
                         }
                     }
+                    if (accessibilityProvider != null) {
+                        accessibilityProvider.dispose();
+                        accessibilityProvider = null;
+                    }
                     if (relativeLayout != null) {
                         relativeLayout.removeAllViews();
                     }
@@ -1629,6 +1638,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 myView = new AndroidAsyncView(getActivity(), AndroidImplementation.this);
             }
             myView.getAndroidView().setVisibility(View.VISIBLE);
+
+            if (Build.VERSION.SDK_INT >= 16) {
+                final View semanticHost = myView.getAndroidView();
+                accessibilityProvider = new AndroidAccessibilityProvider(semanticHost, this);
+                semanticHost.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+                    @Override
+                    public android.view.accessibility.AccessibilityNodeProvider getAccessibilityNodeProvider(View host) {
+                        return accessibilityProvider;
+                    }
+                });
+            }
 
             relativeLayout.addView(myView.getAndroidView());
             myView.getAndroidView().setVisibility(View.VISIBLE);
@@ -5876,6 +5896,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public boolean isCarConnected() {
         com.codename1.car.spi.CarBridge b = AndroidCarSupport.getBridge();
         return b != null && b.isConnected();
+    }
+
+    private com.codename1.surfaces.spi.SurfaceBridge surfaceBridge;
+
+    @Override
+    public com.codename1.surfaces.spi.SurfaceBridge getSurfaceBridge() {
+        if (surfaceBridge == null) {
+            surfaceBridge = new com.codename1.impl.android.surfaces.AndroidSurfaceBridge();
+        }
+        return surfaceBridge;
+    }
+
+    /// Invoked once the app has started (from the generated stub, next to
+    /// `deliverPendingSharedContent`) to flush surface actions that arrived through the
+    /// `CN1SurfaceActionActivity` trampoline before the app instance existed.
+    public static void deliverPendingSurfaceActions() {
+        com.codename1.impl.android.surfaces.AndroidSurfaceBridge.deliverPendingActions();
     }
 
     /**
@@ -11976,6 +12013,23 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    /**
+     * Returns the fully qualified class name of the app's background fetch listener, or null
+     * when the app does not implement {@link com.codename1.background.BackgroundFetch}. The
+     * surfaces plumbing persists this name on publish so a home screen widget that rendered an
+     * exhausted timeline can start {@link BackgroundFetchHandler} and let the app republish
+     * fresh content while no activity exists.
+     *
+     * @return the listener class name or null
+     */
+    public static String getBackgroundFetchListenerClassName() {
+        if (instance == null) {
+            return null;
+        }
+        BackgroundFetch listener = instance.getBackgroundFetchListener();
+        return listener == null ? null : listener.getClass().getName();
+    }
+
     public void scheduleLocalNotification(LocalNotification notif, long firstTime, int repeat) {
         if (android.os.Build.VERSION.SDK_INT >= 33) {
             if(!checkForPermission("android.permission.POST_NOTIFICATIONS", "This is required to receive notifications")){
@@ -12995,6 +13049,123 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 }
             }
         });
+    }
+
+    @Override
+    public boolean isHighContrastEnabled() {
+        try {
+            AccessibilityManager manager = (AccessibilityManager)getContext()
+                    .getSystemService(Context.ACCESSIBILITY_SERVICE);
+            if (android.os.Build.VERSION.SDK_INT >= 21 && manager != null) {
+                Object enabled = AccessibilityManager.class.getMethod("isHighTextContrastEnabled")
+                        .invoke(manager);
+                return enabled instanceof Boolean && ((Boolean)enabled).booleanValue();
+            }
+        } catch (Throwable t) {
+            // Fall through to the secure settings used by older Android stubs.
+        }
+        return secureSettingEnabled("high_text_contrast_enabled")
+                || secureSettingEnabled("accessibility_display_high_text_contrast_enabled");
+    }
+
+    @Override
+    public boolean isDifferentiateWithoutColorEnabled() {
+        return secureSettingEnabled("accessibility_display_daltonizer_enabled");
+    }
+
+    @Override
+    public AccessibilityColorVisionDeficiency getColorVisionDeficiency() {
+        if (!secureSettingEnabled("accessibility_display_daltonizer_enabled")) {
+            return AccessibilityColorVisionDeficiency.NONE;
+        }
+        try {
+            int mode = Settings.Secure.getInt(getContext().getContentResolver(),
+                    "accessibility_display_daltonizer");
+            switch (mode) {
+                case 0: return AccessibilityColorVisionDeficiency.MONOCHROMACY;
+                case 11: return AccessibilityColorVisionDeficiency.PROTANOPIA;
+                case 12: return AccessibilityColorVisionDeficiency.DEUTERANOPIA;
+                case 13: return AccessibilityColorVisionDeficiency.TRITANOPIA;
+                default: return AccessibilityColorVisionDeficiency.UNKNOWN;
+            }
+        } catch (Throwable t) {
+            return AccessibilityColorVisionDeficiency.UNKNOWN;
+        }
+    }
+
+    @Override
+    public boolean isReduceMotionEnabled() {
+        try {
+            return Settings.Global.getFloat(getContext().getContentResolver(),
+                    Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    @Override
+    public boolean isBoldTextEnabled() {
+        try {
+            Object value = Configuration.class.getField("fontWeightAdjustment")
+                    .get(getContext().getResources().getConfiguration());
+            return value instanceof Integer && ((Integer)value).intValue() >= 300;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    @Override
+    public boolean isInvertColorsEnabled() {
+        return secureSettingEnabled("accessibility_display_inversion_enabled");
+    }
+
+    @Override
+    public boolean isGrayscaleEnabled() {
+        return getColorVisionDeficiency() == AccessibilityColorVisionDeficiency.MONOCHROMACY;
+    }
+
+    @Override
+    public boolean isScreenReaderEnabled() {
+        try {
+            AccessibilityManager manager = (AccessibilityManager)getContext()
+                    .getSystemService(Context.ACCESSIBILITY_SERVICE);
+            return manager != null && manager.isEnabled() && manager.isTouchExplorationEnabled();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    private boolean secureSettingEnabled(String key) {
+        try {
+            return Settings.Secure.getInt(getContext().getContentResolver(), key, 0) == 1;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    @Override
+    public void accessibilityTreeChanged(final int changeType) {
+        final Activity act = getActivity();
+        if (act == null || accessibilityProvider == null) return;
+        act.runOnUiThread(new Runnable() {
+            public void run() {
+                if (accessibilityProvider != null) accessibilityProvider.invalidate(changeType);
+            }
+        });
+    }
+
+    @Override
+    public boolean isAccessibilityTreeSupported() {
+        return Build.VERSION.SDK_INT >= 16;
+    }
+
+    @Override
+    public boolean isAccessibilityTreeUpdateRequired() {
+        return accessibilityTreeUpdateRequired;
+    }
+
+    void setAccessibilityTreeUpdateRequired(boolean required) {
+        accessibilityTreeUpdateRequired = required;
     }
 
     // ================================================================

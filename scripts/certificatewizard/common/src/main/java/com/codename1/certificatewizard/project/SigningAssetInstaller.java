@@ -56,6 +56,21 @@ public final class SigningAssetInstaller {
         update(settingsPath, updates);
     }
 
+    public static void applyWidgetExtensionSigning(String settingsPath, String appGroupIdentifier,
+                                                   String extensionProfilePath) throws IOException {
+        Map<String, String> updates = new HashMap<String, String>();
+        if (appGroupIdentifier != null) {
+            updates.put("codename1.arg.ios.surfaces.appGroup", appGroupIdentifier);
+        }
+        if (extensionProfilePath != null) {
+            updates.put("codename1.ios.appext.CN1Widgets.provision", extensionProfilePath);
+        }
+        if (updates.isEmpty()) {
+            return;
+        }
+        update(settingsPath, updates);
+    }
+
     static void update(String settingsPath, Map<String, String> updates) throws IOException {
         String text = read(settingsPath);
         String[] lines = text.replace("\r\n", "\n").split("\n");
