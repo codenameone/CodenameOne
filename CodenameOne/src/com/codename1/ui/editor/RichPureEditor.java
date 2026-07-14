@@ -189,8 +189,14 @@ public class RichPureEditor extends PureEditor {
                 return com.codename1.ui.Image.createImage(w, h, 0xff000000 | color);
             }
             int comma = url.indexOf(',');
-            if (url.startsWith("data:") && url.indexOf(";base64,") > 0 && comma > 0) {
-                byte[] data = com.codename1.util.Base64.decode(url.substring(comma + 1).getBytes());
+            if (url.startsWith("data:") && url.indexOf(";base64,") >= 0 && comma >= 0) {
+                // the base64 payload is pure ASCII; convert to bytes without relying on the default charset
+                String b64 = url.substring(comma + 1);
+                byte[] enc = new byte[b64.length()];
+                for (int i = 0; i < enc.length; i++) {
+                    enc[i] = (byte) b64.charAt(i);
+                }
+                byte[] data = com.codename1.util.Base64.decode(enc);
                 return com.codename1.ui.Image.createImage(data, 0, data.length);
             }
             return com.codename1.ui.Image.createImage(url);

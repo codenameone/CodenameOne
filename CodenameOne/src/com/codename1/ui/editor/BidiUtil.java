@@ -79,7 +79,7 @@ class BidiUtil {
                 || c == 0x00B0 || c == 0x00B1 || c == 0x066A) {
             return ET;
         }
-        if (c == ',' || c == '.' || c == ':' || c == '/' || c == 0x00A0) {
+        if (c == ',' || c == '.' || c == ':' || c == '/') {
             return CS;
         }
         // Combining marks
@@ -294,7 +294,7 @@ class BidiUtil {
             if (lv > highest) {
                 highest = lv;
             }
-            if ((lv % 2) == 1 && lv < lowestOdd) {
+            if ((lv & 1) != 0 && lv < lowestOdd) {
                 lowestOdd = lv;
             }
         }

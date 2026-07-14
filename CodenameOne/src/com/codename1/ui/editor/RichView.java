@@ -831,7 +831,6 @@ public class RichView extends EditorView {
     /// Applies (or toggles off) an ordered / unordered list on the selected paragraphs.
     public void setList(final int listType) {
         int s = getSelectionStart();
-        int e = getSelectionEnd();
         int firstLine = getDocument().lineOfOffset(s);
         boolean allSame = blocks.get(firstLine).listType == listType;
         final int target = allSame ? RichBlocks.LIST_NONE : listType;
