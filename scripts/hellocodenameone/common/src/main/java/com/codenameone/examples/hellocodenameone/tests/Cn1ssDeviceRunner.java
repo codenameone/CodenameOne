@@ -141,6 +141,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new ComponentReplaceSlideScreenshotTest(),
             new ComponentReplaceFlipScreenshotTest(),
             new MotionShowcaseScreenshotTest(),
+            new PureEditorScreenshotTest(),
             new DrawLine(),
             new FillRect(),
             new DrawRect(),

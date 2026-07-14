@@ -216,14 +216,24 @@ class CodeEditorTest extends UITestBase {
     }
 
     @FormTest
-    void testBrowserFallbackUsesCodeEditorPage() {
-        // no native peer -> cross platform browser backend
-        CodeEditor editor = new CodeEditor();
+    void testPureBackendUsedWhenNoNativePeer() {
+        // no native peer -> pure Codename One code engine
+        CodeEditor editor = new CodeEditor("java", "class A {}");
         Form f = new Form("code", new BorderLayout());
         f.add(BorderLayout.CENTER, editor);
         f.show();
         pump();
         assertFalse(editor.isNativeEditor());
-        assertNotNull(editor.getInternalBrowser());
+        assertTrue(editor.isEditorReady());
+        assertNull(editor.getInternalBrowser());
+        final java.util.concurrent.atomic.AtomicReference<String> text =
+                new java.util.concurrent.atomic.AtomicReference<String>();
+        editor.getText(new com.codename1.util.SuccessCallback<String>() {
+            public void onSucess(String v) {
+                text.set(v);
+            }
+        });
+        pump();
+        assertEquals("class A {}", text.get());
     }
 }

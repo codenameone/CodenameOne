@@ -1380,7 +1380,227 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             }
         });
-        
+
+    }
+
+    // ---- low level text input source (pure Codename One editors) ----
+
+    private static com.codename1.ui.TextInputClient tiClient;
+
+    @Override
+    public boolean isTextInputSupported() {
+        return true;
+    }
+
+    @Override
+    public Object startTextInput(com.codename1.ui.TextInputClient client, com.codename1.ui.TextInputConfig config) {
+        tiClient = client;
+        com.codename1.ui.TextInputState st = client.getEditingState();
+        int constraint = config != null ? config.getConstraint() : 0;
+        boolean autoCorrect = config == null || config.isAutoCorrect();
+        boolean autoCap = config == null || config.isAutoCapitalize();
+        boolean multiline = config == null || config.isMultiline();
+        nativeInstance.startTextInput(constraint, autoCorrect, autoCap, multiline,
+                st.getText(), st.getSelectionStart(), st.getSelectionEnd());
+        return client;
+    }
+
+    @Override
+    public void updateTextInputState(Object handle, com.codename1.ui.TextInputState state) {
+        com.codename1.ui.TextInputClient c = tiClient;
+        int[] r = c != null ? c.getCaretRect() : new int[]{0, 0, 0, 0};
+        nativeInstance.updateTextInputState(state.getText(), state.getSelectionStart(), state.getSelectionEnd(),
+                r[0], r[1], r[2], r[3]);
+        // Push the editor component's absolute bounds so the native input view can gate its touch region to
+        // the editor (letting iOS draw its selection loupe/handles there) while passing other touches through.
+        if (c instanceof com.codename1.ui.Component) {
+            com.codename1.ui.Component comp = (com.codename1.ui.Component) c;
+            nativeInstance.setTextInputBounds(comp.getAbsoluteX(), comp.getAbsoluteY(),
+                    comp.getWidth(), comp.getHeight());
+        }
+        tiKeepNativeCallbacksAlive();
+    }
+
+    // The ti* callbacks below are invoked ONLY from native code (CN1TextInputView.m). ParparVM's dead
+    // code eliminator does not reliably retain such methods from the native-source scan, so it stubs some
+    // of them to an empty body and the native call silently does nothing. Referencing them from this
+    // reachable method (behind a guard that is always false at runtime) forces the eliminator to keep
+    // their real bodies. tiKeepAlive is never set true.
+    private static boolean tiKeepAlive = false;
+
+    private static void tiKeepNativeCallbacksAlive() {
+        if (tiKeepAlive) {
+            tiCommit("");
+            tiSetComposing("", 0);
+            tiFinishComposing();
+            tiDeleteBackward();
+            tiKeyCommand(0, 0);
+            tiEditorAction(0);
+            tiReplaceRange(0, 0, "");
+            tiSetSelection(0, 0);
+            tiTextLength();
+            tiTextRange(0, 0);
+            tiSelectionStart();
+            tiSelectionEnd();
+            tiRectForOffset(0);
+            tiOffsetAtPoint(0, 0);
+            tiSelectionRects(0, 0);
+        }
+    }
+
+    @Override
+    public void stopTextInput(Object handle) {
+        tiClient = null;
+        nativeInstance.stopTextInput();
+    }
+
+    /// Callback from native: committed text.
+    public static void tiCommit(final String text) {
+        final com.codename1.ui.TextInputClient c = tiClient;
+        if (c == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                c.commitText(text);
+            }
+        });
+    }
+
+    /// Callback from native: IME composing (marked) text.
+    public static void tiSetComposing(final String text, final int rel) {
+        final com.codename1.ui.TextInputClient c = tiClient;
+        if (c == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                c.setComposingText(text, rel);
+            }
+        });
+    }
+
+    /// Callback from native: composition finished.
+    public static void tiFinishComposing() {
+        final com.codename1.ui.TextInputClient c = tiClient;
+        if (c == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                c.finishComposing();
+            }
+        });
+    }
+
+    /// Callback from native: delete backward (one character before caret).
+    public static void tiDeleteBackward() {
+        final com.codename1.ui.TextInputClient c = tiClient;
+        if (c == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                c.deleteSurroundingText(1, 0);
+            }
+        });
+    }
+
+    /// Callback from native: a navigation / editing key command.
+    public static void tiKeyCommand(final int command, final int modifiers) {
+        final com.codename1.ui.TextInputClient c = tiClient;
+        if (c == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                c.onKeyCommand(command, modifiers);
+            }
+        });
+    }
+
+    /// Callback from native: keyboard return / action key.
+    public static void tiEditorAction(final int action) {
+        final com.codename1.ui.TextInputClient c = tiClient;
+        if (c == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                c.onEditorAction(action);
+            }
+        });
+    }
+
+    // ---- UITextInput geometry + range edits (native calls these; geometry queries run synchronously on
+    // the iOS main thread, which is also the Codename One EDT on iOS) ----
+
+    /// Total document length in UTF-16 characters.
+    public static int tiTextLength() {
+        com.codename1.ui.TextInputClient c = tiClient;
+        return c != null ? c.getTextLength() : 0;
+    }
+
+    /// Text in the range `[start, end)`.
+    public static String tiTextRange(int start, int end) {
+        com.codename1.ui.TextInputClient c = tiClient;
+        return c != null ? c.getTextRange(start, end) : "";
+    }
+
+    /// Current selection start offset.
+    public static int tiSelectionStart() {
+        com.codename1.ui.TextInputClient c = tiClient;
+        return c != null ? c.getEditingState().getSelectionStart() : 0;
+    }
+
+    /// Current selection end offset.
+    public static int tiSelectionEnd() {
+        com.codename1.ui.TextInputClient c = tiClient;
+        return c != null ? c.getEditingState().getSelectionEnd() : 0;
+    }
+
+    /// Caret rectangle for an offset, absolute screen pixels `{x, y, w, h}`.
+    public static int[] tiRectForOffset(int offset) {
+        com.codename1.ui.TextInputClient c = tiClient;
+        return c != null ? c.rectForOffset(offset) : new int[]{0, 0, 0, 0};
+    }
+
+    /// Document offset nearest an absolute screen point (pixels).
+    public static int tiOffsetAtPoint(int x, int y) {
+        com.codename1.ui.TextInputClient c = tiClient;
+        return c != null ? c.offsetAtPoint(x, y) : 0;
+    }
+
+    /// Selection rectangles for `[start, end)`, flat array of absolute-pixel `{x, y, w, h, ...}`.
+    public static int[] tiSelectionRects(int start, int end) {
+        com.codename1.ui.TextInputClient c = tiClient;
+        return c != null ? c.selectionRects(start, end) : new int[0];
+    }
+
+    /// Callback from native: replace a range with text (range based edit).
+    public static void tiReplaceRange(final int start, final int end, final String text) {
+        final com.codename1.ui.TextInputClient c = tiClient;
+        if (c == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                c.replaceRange(start, end, text);
+            }
+        });
+    }
+
+    /// Callback from native: set the selection range.
+    public static void tiSetSelection(final int start, final int end) {
+        final com.codename1.ui.TextInputClient c = tiClient;
+        if (c == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                c.setSelectionRange(start, end);
+            }
+        });
     }
 
     @Override

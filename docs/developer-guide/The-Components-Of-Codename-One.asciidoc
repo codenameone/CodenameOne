@@ -1957,9 +1957,9 @@ This is discussed further in the https://www.codenameone.com/blog/phonegap-cordo
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/RichTextArea.html[RichTextArea] is a visual editor for formatted text (a WYSIWYG / HTML editor). It lets the user select text and apply styling - bold, italic, underline, lists, links, colors, headings - and exchanges the result with your application as HTML. It works on phones and tablets with the on-screen virtual keyboard, and on desktops with a physical keyboard.
 
-`RichTextArea` derives from `AbstractEditorComponent`. By default the editing surface is a `contenteditable` document hosted inside the platform's native web widget (the same one used by `BrowserComponent`), which makes it fully cross-platform and gives correct keyboard, selection and IME behavior on every device. A platform port may transparently replace this with a fully native editing widget without any change to your code.
+`RichTextArea` derives from `AbstractEditorComponent`. The editor is implemented by the pure Codename One text engine (package `com.codename1.ui.editor`): it renders the document itself with `Graphics` and `Font` and binds to the platform text input source, so keyboard, selection and IME behavior are correct on every device. A platform port MAY still transparently supply a fully native editor peer (through `com.codename1.impl.CodenameOneImplementation#createNativeEditorPeer(AbstractEditorComponent, String)`) without any change to your code.
 
-NOTE: Because the editor is created asynchronously you should treat it like `BrowserComponent`: setters such as `setHtml(String)` are safe to call immediately (they're queued until the editor is ready) while reads such as `getHtml(SuccessCallback)` are asynchronous and deliver their result through a callback.
+NOTE: Reads such as `getHtml(SuccessCallback)` and `getText(SuccessCallback)` deliver their result through a callback, while setters such as `setHtml(String)` apply directly to the document.
 
 The following sample places a `RichTextArea` in a form and wires a couple of formatting commands into the `Toolbar`:
 
@@ -1975,19 +1975,29 @@ The formatting commands map to the operations you would expect from a word proce
 
 TIP: To keep a formatting toolbar in sync with the selection (for example, to highlight the bold button when the caret is inside bold text) register a change listener with `addChangeListener(ActionListener)` and query the active state with `queryCommandState("bold", active -> ...)`.
 
-Reading the edited content is asynchronous:
+Reading the edited content is asynchronous: call `getHtml(SuccessCallback)` for the formatted HTML or `getText(SuccessCallback)` for the plain text.
 
+==== Text input, bidirectional text and touch selection
+
+Both `RichTextArea` and `CodeEditor` share the pure text engine, so the following capabilities apply to either editor:
+
+- *Text input from every source.* The on-screen (virtual) keyboard, a hardware or Bluetooth keyboard and IME / CJK marked-text composition all feed the same document. Marked (composing) text is shown inline until the IME commits it.
+- *Bidirectional (RTL) text.* Hebrew and Arabic, as well as mixed LTR + RTL lines, are laid out with the Unicode Bidi Algorithm; the caret, the selection highlight and the rendered glyphs all follow the visual order. The base direction of a line follows the component's RTL flag, so `Component.setRTL(boolean)` and `isRTL()` control whether the paragraph is treated as right-to-left.
+- *Native-feel touch selection.* A long-press selects the word under the finger, the selection can be adjusted with draggable selection handles, a magnifier loupe appears while you place the caret or drag a handle, and a Copy / Cut / Paste / Select All toolbar is shown for the current selection.
+- *Desktop selection.* On desktop the editor uses standard mouse selection (click, drag, double-click to select a word) together with the usual keyboard shortcuts.
+
+The public API of both `RichTextArea` and `CodeEditor` is unchanged, so this engine is a drop-in replacement and existing apps keep working without modification.
 
 === CodeEditor
 
-The https://www.codenameone.com/javadoc/com/codename1/ui/CodeEditor.html[CodeEditor] is an IDE-style source editor with syntax highlighting, a line-number gutter, light/dark themes and asynchronous code completion. Like `RichTextArea` it's designed for both touch devices (with the virtual keyboard) and desktops (with a physical keyboard), and uses the same cross-platform editing backend with an optional native upgrade per platform.
+The https://www.codenameone.com/javadoc/com/codename1/ui/CodeEditor.html[CodeEditor] is an IDE-style source editor with syntax highlighting, a line-number gutter, light/dark themes and asynchronous code completion. Like `RichTextArea` it's designed for both touch devices (with the virtual keyboard) and desktops (with a physical keyboard), and it is implemented by the same pure Codename One text engine that renders the document itself and binds to the platform text input source. A platform port MAY still transparently supply a fully native editor peer (through `com.codename1.impl.CodenameOneImplementation#createNativeEditorPeer(AbstractEditorComponent, String)`) without any change to your code.
 
 [source,java]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava117Snippet.java[tag=the-components-of-codename-one-java-117,indent=0]
 ----
 
-The highlighting language is selected with `setLanguage(String)` and understands common languages such as `java`, `kotlin`, `javascript`, `python`, `css`, `xml`, `json` and `c`. The content is exchanged with `setText(String)` and the asynchronous `getText(SuccessCallback)`, and `setReadOnly(boolean)` turns the editor into a syntax-highlighted code viewer.
+The highlighting language is selected with `setLanguage(String)` and understands common languages such as `java`, `kotlin`, `javascript`, `python`, `css`, `xml`, `json` and `c`. The content is exchanged with `setText(String)` and the asynchronous `getText(SuccessCallback)`, and `setReadOnly(boolean)` turns the editor into a syntax-highlighted code viewer. The line-number gutter is toggled with `setShowLineNumbers(boolean)`, the indentation width is controlled with `setTabSize(int)`, and text can be dropped in at the caret with `insertAtCursor(String)`. You can query the caret with `getCursorPosition(SuccessCallback)`.
 
 .CodeEditor showing Java with the completion popup (light theme)
 image::img/components-codeeditor.png[CodeEditor showing Java with the completion popup,scaledwidth=35%]
@@ -1999,12 +2009,16 @@ Code completion is driven by a https://www.codenameone.com/javadoc/com/codename1
 
 Each https://www.codenameone.com/javadoc/com/codename1/ui/CodeCompletion.html[CodeCompletion] carries the text shown in the popup, the text inserted when it's chosen (which may differ), an optional category used to badge the entry (`"method"`, `"keyword"`, `"class"`, ...) and an optional detail string such as a signature.
 
+==== Diagnostics
+
+The editor can underline problem ranges with wavy squiggles. Pass a list of https://www.codenameone.com/javadoc/com/codename1/ui/CodeDiagnostic.html[CodeDiagnostic] entries to `setDiagnostics(List)`; each entry marks a span of the source (for example the output of a compiler or linter) so errors and warnings are drawn directly in the gutter and text. This pairs naturally with an asynchronous `CodeCompletionProvider` backed by a language server.
+
 The editor honors light and dark themes through `setTheme(String)`:
 
 .CodeEditor in the dark theme
 image::img/components-codeeditor-dark.png[CodeEditor in the dark theme,scaledwidth=35%]
 
-TIP: The built-in editing surface is fully self contained and works offline with no external dependencies. When an app actually references `CodeEditor` the build server can additionally bundle a richer code editor library; apps that don't use `CodeEditor` never pay that cost.
+TIP: The editor is fully self contained and works offline with no external dependencies: syntax highlighting, the line-number gutter, code completion and diagnostics are all provided by the pure Codename One text engine.
 
 === AutoCompleteTextField
 

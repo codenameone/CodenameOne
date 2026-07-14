@@ -15,8 +15,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * Deep coverage for {@link RichTextArea}. The component routes every operation through the semantic
  * command/query channel of {@link AbstractEditorComponent}; these tests drive it against the
  * deterministic native editor backend provided by the test implementation so the full command, query,
- * event and ready-queue machinery is exercised without a real web view. A couple of tests additionally
- * verify the cross-platform {@code BrowserComponent} fallback selection.
+ * event and ready-queue machinery is exercised. A couple of tests additionally verify the pure
+ * Codename One text engine that is selected when no native peer is available.
  */
 class RichTextAreaTest extends UITestBase {
 
@@ -243,41 +243,41 @@ class RichTextAreaTest extends UITestBase {
         assertEquals(1, count.get());
     }
 
-    // --- cross platform BrowserComponent fallback ---
+    // --- pure Codename One text engine (default when no native peer) ---
 
     @FormTest
-    void testBrowserFallbackSelectedWhenNoNativePeer() {
-        // editorNativePeerSupported defaults to false -> no native peer -> browser fallback
+    void testPureBackendSelectedWhenNoNativePeer() {
+        // editorNativePeerSupported defaults to false -> no native peer -> pure engine
         RichTextArea editor = new RichTextArea();
         Form f = new Form("rt", new BorderLayout());
         f.add(BorderLayout.CENTER, editor);
         f.show();
         pump();
         assertFalse(editor.isNativeEditor());
-        assertNotNull(editor.getInternalBrowser());
+        assertTrue(editor.isEditorReady());
+        assertNull(editor.getInternalBrowser());
     }
 
     @FormTest
-    void testBrowserFallbackBecomesReadyOnLoadAndRoutesCommands() {
+    void testPureBackendRoundTripsContent() {
         RichTextArea editor = new RichTextArea();
         Form f = new Form("rt", new BorderLayout());
         f.add(BorderLayout.CENTER, editor);
         f.show();
         pump();
-        assertFalse(editor.isEditorReady());
-        // simulate the web view finishing load -> editor becomes ready
-        editor.getInternalBrowser().fireWebEvent(BrowserComponent.onLoad, new com.codename1.ui.events.ActionEvent(editor));
-        pump();
         assertTrue(editor.isEditorReady());
-        editor.bold();
+        editor.setHtml("<p>hello <b>world</b></p>");
         pump();
-        boolean routed = false;
-        for (String s : implementation.getBrowserExecuted()) {
-            if (s.contains("cn1editor.cmd") && s.contains("bold")) {
-                routed = true;
-                break;
+        final java.util.concurrent.atomic.AtomicReference<String> text =
+                new java.util.concurrent.atomic.AtomicReference<String>();
+        editor.getText(new com.codename1.util.SuccessCallback<String>() {
+            public void onSucess(String v) {
+                text.set(v);
             }
-        }
-        assertTrue(routed, "bold() should be routed to the browser backend as a cn1editor.cmd call");
+        });
+        pump();
+        assertNotNull(text.get());
+        assertTrue(text.get().contains("hello"));
+        assertTrue(text.get().contains("world"));
     }
 }

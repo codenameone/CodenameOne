@@ -288,7 +288,137 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public static CodenameOneActivity getActivity() {
         return activity;
     }
-    
+
+    // ---- low level text input source (pure Codename One editors) ----
+
+    private static volatile com.codename1.ui.TextInputClient activeInputClient;
+    private static volatile com.codename1.ui.TextInputState activeInputState;
+    private static volatile com.codename1.ui.TextInputConfig activeInputConfig;
+
+    /// Returns the last editing state pushed down for the active text input client, read synchronously by
+    /// `CN1TextInputConnection` on the IME thread.
+    static com.codename1.ui.TextInputState currentInputState() {
+        return activeInputState;
+    }
+
+    static com.codename1.ui.TextInputConfig currentInputConfig() {
+        return activeInputConfig;
+    }
+
+    /// Called by the rendering view's `onCreateInputConnection` to supply the custom input connection
+    /// when a pure editor is bound. Returns null when no client is active so the view keeps its default
+    /// behavior.
+    static android.view.inputmethod.InputConnection createEditorInputConnection(android.view.View view, android.view.inputmethod.EditorInfo editorInfo) {
+        com.codename1.ui.TextInputClient client = activeInputClient;
+        if (client == null) {
+            return null;
+        }
+        configureEditorInfo(editorInfo, activeInputConfig);
+        return new CN1TextInputConnection(view, client);
+    }
+
+    /// True when a pure editor text input client is currently bound.
+    static boolean hasActiveInputClient() {
+        return activeInputClient != null;
+    }
+
+    private static void configureEditorInfo(android.view.inputmethod.EditorInfo editorInfo, com.codename1.ui.TextInputConfig cfg) {
+        int inputType = android.text.InputType.TYPE_CLASS_TEXT;
+        boolean multiline = cfg == null || cfg.isMultiline();
+        if (multiline) {
+            inputType |= android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE;
+        }
+        if (cfg != null && !cfg.isAutoCorrect()) {
+            inputType |= android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
+        }
+        if (cfg != null && cfg.isAutoCapitalize()) {
+            inputType |= android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES;
+        }
+        editorInfo.inputType = inputType;
+        editorInfo.imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI;
+        if (multiline) {
+            editorInfo.imeOptions |= android.view.inputmethod.EditorInfo.IME_ACTION_NONE;
+        }
+        editorInfo.initialSelStart = activeInputState != null ? activeInputState.getSelectionStart() : 0;
+        editorInfo.initialSelEnd = activeInputState != null ? activeInputState.getSelectionEnd() : 0;
+    }
+
+    @Override
+    public boolean isTextInputSupported() {
+        return true;
+    }
+
+    @Override
+    public Object startTextInput(com.codename1.ui.TextInputClient client, com.codename1.ui.TextInputConfig config) {
+        activeInputClient = client;
+        activeInputConfig = config;
+        activeInputState = client.getEditingState();
+        final CodenameOneActivity a = getActivity();
+        final CodenameOneSurface view = myView;
+        if (a == null || view == null) {
+            return client;
+        }
+        a.runOnUiThread(new Runnable() {
+            public void run() {
+                android.view.View v = view.getAndroidView();
+                v.setFocusable(true);
+                v.setFocusableInTouchMode(true);
+                v.requestFocus();
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
+                        a.getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.restartInput(v);
+                    imm.showSoftInput(v, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+                }
+            }
+        });
+        return client;
+    }
+
+    @Override
+    public void updateTextInputState(Object handle, com.codename1.ui.TextInputState state) {
+        activeInputState = state;
+        final CodenameOneActivity a = getActivity();
+        final CodenameOneSurface view = myView;
+        if (a == null || view == null) {
+            return;
+        }
+        a.runOnUiThread(new Runnable() {
+            public void run() {
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
+                        a.getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                if (imm != null && activeInputClient != null) {
+                    com.codename1.ui.TextInputState s = activeInputState;
+                    imm.updateSelection(view.getAndroidView(), s.getSelectionStart(), s.getSelectionEnd(),
+                            s.getComposingStart(), s.getComposingEnd());
+                }
+            }
+        });
+    }
+
+    @Override
+    public void stopTextInput(Object handle) {
+        activeInputClient = null;
+        activeInputState = null;
+        activeInputConfig = null;
+        final CodenameOneActivity a = getActivity();
+        final CodenameOneSurface view = myView;
+        if (a == null || view == null) {
+            return;
+        }
+        a.runOnUiThread(new Runnable() {
+            public void run() {
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
+                        a.getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.hideSoftInputFromWindow(view.getAndroidView().getWindowToken(), 0);
+                    imm.restartInput(view.getAndroidView());
+                }
+            }
+        });
+    }
+
+
     @Override
     public void setDisableScreenshots(final boolean disable) {
         final CodenameOneActivity a = getActivity();

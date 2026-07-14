@@ -5321,6 +5321,55 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Returns true when this platform can bind a `com.codename1.ui.TextInputClient` to a low level text
+    /// input source (soft keyboard / IME / hardware keyboard) so a component can capture raw text input
+    /// while rendering the document itself. When false the pure Codename One editors fall back to their
+    /// `BrowserComponent` backend. The default returns false.
+    public boolean isTextInputSupported() {
+        return false;
+    }
+
+    /// Binds a `com.codename1.ui.TextInputClient` to the platform text input source and shows the soft
+    /// keyboard on touch devices. The platform then routes committed text, IME composition, deletions and
+    /// key commands into the client, and reads back the client's editing state and caret rectangle. The
+    /// returned handle identifies this binding for `#updateTextInputState` and `#stopTextInput`. The
+    /// default returns null (unsupported).
+    ///
+    /// #### Parameters
+    ///
+    /// - `client`: the input client to bind
+    ///
+    /// - `config`: the desired keyboard type and input behavior
+    ///
+    /// #### Returns
+    ///
+    /// an opaque handle for this binding, or null when unsupported
+    public Object startTextInput(com.codename1.ui.TextInputClient client, com.codename1.ui.TextInputConfig config) {
+        return null;
+    }
+
+    /// Pushes the client's authoritative editing state (surrounding text, selection, composition and
+    /// caret rectangle) down to the platform input source so autocorrect, prediction and the IME
+    /// candidate window stay in sync after a Codename One side edit (programmatic change, undo, reflow).
+    /// No-op by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `handle`: the handle returned by `#startTextInput`
+    ///
+    /// - `state`: the current editing state
+    public void updateTextInputState(Object handle, com.codename1.ui.TextInputState state) {
+    }
+
+    /// Unbinds a text input client bound with `#startTextInput` and hides the soft keyboard on touch
+    /// devices. No-op by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `handle`: the handle returned by `#startTextInput`
+    public void stopTextInput(Object handle) {
+    }
+
     /// Posts a message to the window in a BrowserComponent.  This is intended to be an abstraction of the Javascript postMessage() API.
     ///
     /// This is only overridden by the Javascript port to provide proper CORS handling.  Other ports use the implementation

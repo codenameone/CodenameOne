@@ -3088,11 +3088,43 @@ public class JavaSEPort extends CodenameOneImplementation {
         // are taking action when the key is released... so we need to track whether the
         // control key was down while a key was pressed.
         private HashSet<Integer> ignorePressedKeys = new HashSet<Integer>();
+        private boolean isPureEditorFocused() {
+            com.codename1.ui.Form f = com.codename1.ui.CN.getCurrentForm();
+            return f != null && (f.getFocused() instanceof com.codename1.ui.editor.EditorView);
+        }
+
+        // True only for keys a pure editor actually consumes: real characters, navigation, and editing
+        // keys. This prevents modifier / function / home-end keys (whose key codes overlap printable
+        // ASCII) from being delivered and inserted as garbage "tofu" characters.
+        private boolean editorHandlesKey(KeyEvent e) {
+            int vk = e.getKeyCode();
+            switch (vk) {
+                case KeyEvent.VK_UP:
+                case KeyEvent.VK_DOWN:
+                case KeyEvent.VK_LEFT:
+                case KeyEvent.VK_RIGHT:
+                case KeyEvent.VK_ENTER:
+                case KeyEvent.VK_SPACE:
+                case KeyEvent.VK_BACK_SPACE:
+                case KeyEvent.VK_DELETE:
+                case KeyEvent.VK_TAB:
+                    return true;
+                default:
+                    break;
+            }
+            if ((vk >= KeyEvent.VK_A && vk <= KeyEvent.VK_Z) || (vk >= KeyEvent.VK_0 && vk <= KeyEvent.VK_9)) {
+                return true;
+            }
+            char kc = e.getKeyChar();
+            return kc != KeyEvent.CHAR_UNDEFINED && kc >= 32 && kc != 127;
+        }
+
         public void keyPressed(KeyEvent e) {
             if (!isEnabled()) {
                 return;
             }
-            if (e.isMetaDown() && e.getKeyChar() == 'c') {
+            boolean editorFocused = isPureEditorFocused();
+            if (!editorFocused && e.isMetaDown() && e.getKeyChar() == 'c') {
                 Form f = CN.getCurrentForm();
                 if (f != null) {
                     final TextSelection ts = f.getTextSelection();
@@ -3118,7 +3150,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
             }
             
-            if (e.isMetaDown() && e.getKeyChar() == 'a') {
+            if (!editorFocused && e.isMetaDown() && e.getKeyChar() == 'a') {
                 Form f = CN.getCurrentForm();
                 if (f != null) {
                     final TextSelection ts = f.getTextSelection();
@@ -3130,15 +3162,28 @@ public class JavaSEPort extends CodenameOneImplementation {
                         });
                     }
                 }
-                
+
             }
             lastInputEvent = e;
-            // block key combos that might generate unreadable events
-            if (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
+            // block key combos that might generate unreadable events, unless a pure editor is focused and
+            // wants the modifier combos (word / line navigation, clipboard shortcuts)
+            if (!editorFocused && (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown())) {
                 ignorePressedKeys.add(e.getKeyCode());
                 return;
             }
+            if (editorFocused && !editorHandlesKey(e)) {
+                return;
+            }
             int code = getCode(e);
+            // a pure editor needs the real Enter / Space characters; getCode() otherwise collapses both
+            // to the FIRE game key which the editor cannot distinguish
+            if (editorFocused) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    code = '\n';
+                } else if (e.getKeyCode() == KeyEvent.VK_SPACE) {
+                    code = ' ';
+                }
+            }
             if (testRecorder != null) {
                 testRecorder.eventKeyPressed(code);
             }
@@ -3151,12 +3196,23 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!isEnabled()) {
                 return;
             }
+            boolean editorFocused = isPureEditorFocused();
             lastInputEvent = e;
-            // block key combos that might generate unreadable events
-            if (ignore || e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
+            // block key combos that might generate unreadable events, unless a pure editor is focused
+            if (!editorFocused && (ignore || e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown())) {
+                return;
+            }
+            if (editorFocused && !editorHandlesKey(e)) {
                 return;
             }
             int code = getCode(e);
+            if (editorFocused) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    code = '\n';
+                } else if (e.getKeyCode() == KeyEvent.VK_SPACE) {
+                    code = ' ';
+                }
+            }
             if (testRecorder != null) {
                 testRecorder.eventKeyReleased(code);
             }
