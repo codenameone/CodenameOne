@@ -171,7 +171,7 @@ public class EditorView extends Component implements TextInputClient {
     /// Relinquishes focus and stops the active platform text-input session.
     public void blur() {
         com.codename1.ui.Form form = getComponentForm();
-        if (form != null && form.getFocused() == this) {
+        if (form != null && equals(form.getFocused())) {
             form.setFocused(null);
         } else {
             stopInput();
