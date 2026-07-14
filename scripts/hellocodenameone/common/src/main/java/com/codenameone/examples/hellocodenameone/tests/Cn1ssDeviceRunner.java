@@ -141,7 +141,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new ComponentReplaceSlideScreenshotTest(),
             new ComponentReplaceFlipScreenshotTest(),
             new MotionShowcaseScreenshotTest(),
-            new PureEditorScreenshotTest(),
             new DrawLine(),
             new FillRect(),
             new DrawRect(),
@@ -218,6 +217,12 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new BrowserComponentScreenshotTest(),
             new RichTextAreaScreenshotTest(),
             new CodeEditorScreenshotTest(),
+            // Runs with the other editor screenshot tests, after the graphics
+            // suite: creating a pure editor warms Android's native-font path,
+            // which perturbs the default-font rendering the graphics-draw-string
+            // / inscribed-triangle-grid goldens capture. Keeping every editor
+            // test after the graphics tests preserves their cold-font ordering.
+            new PureEditorScreenshotTest(),
             new MediaPlaybackScreenshotTest(),
             new SheetScreenshotTest(),
             new SheetSlideUpAnimationScreenshotTest(),
