@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package com.codenameone.playground.tools;
 
 import com.sun.source.tree.ClassTree;
@@ -41,6 +64,29 @@ import javax.tools.ToolProvider;
  * Generates the CN1-safe dispatch registry from CN1 source trees instead of jars.
  */
 public final class GenerateCN1AccessRegistry {
+    private static final String COPYRIGHT_HEADER =
+            "/*\n"
+            + " * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.\n"
+            + " * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.\n"
+            + " * This code is free software; you can redistribute it and/or modify it\n"
+            + " * under the terms of the GNU General Public License version 2 only, as\n"
+            + " * published by the Free Software Foundation.  Codename One designates this\n"
+            + " * particular file as subject to the \"Classpath\" exception as provided\n"
+            + " * by Oracle in the LICENSE file that accompanied this code.\n"
+            + " *\n"
+            + " * This code is distributed in the hope that it will be useful, but WITHOUT\n"
+            + " * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or\n"
+            + " * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License\n"
+            + " * version 2 for more details (a copy is included in the LICENSE file that\n"
+            + " * accompanied this code).\n"
+            + " *\n"
+            + " * You should have received a copy of the GNU General Public License version\n"
+            + " * 2 along with this work; if not, write to the Free Software Foundation,\n"
+            + " * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.\n"
+            + " *\n"
+            + " * Please contact Codename One through http://www.codenameone.com/ if you\n"
+            + " * need additional information or have any questions.\n"
+            + " */\n\n";
     private static final String ROOT_PACKAGE = "bsh.cn1";
     private static final String HELPER_PACKAGE = "bsh.cn1.gen";
     private static final String ROOT_CLASS_NAME = "GeneratedCN1Access";
@@ -1387,6 +1433,7 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
             throw new IOException("Failed to create " + parent);
         }
         try (Writer writer = new FileWriter(output)) {
+            writer.write(COPYRIGHT_HEADER);
             writer.write("package " + ROOT_PACKAGE + ";\n\n");
             writer.write("import com.codename1.ui.Form;\n");
             writer.write("import com.codenameone.playground.PlaygroundContext;\n");
@@ -1423,6 +1470,7 @@ private static List<ApiMethod> filterBridgeLikeMethods(List<ApiMethod> methods, 
         for (GeneratedPackage generatedPackage : discovery.packages) {
             File output = new File(helperDir, generatedPackage.helperClassName + ".java");
             try (Writer writer = new FileWriter(output)) {
+                writer.write(COPYRIGHT_HEADER);
                 writer.write("package " + HELPER_PACKAGE + ";\n\n");
                 writer.write("import bsh.cn1.CN1AccessException;\n\n");
                 writer.write("public final class " + generatedPackage.helperClassName + " {\n");
