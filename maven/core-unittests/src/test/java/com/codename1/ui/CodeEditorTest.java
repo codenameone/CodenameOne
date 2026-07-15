@@ -29,6 +29,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.editor.SyntaxHighlightResult;
 import com.codename1.ui.editor.SyntaxToken;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -67,7 +68,8 @@ class CodeEditorTest extends UITestBase {
         int start = CodeEditorHtml.PAGE.indexOf("<script>") + "<script>".length();
         int end = CodeEditorHtml.PAGE.lastIndexOf("</script>");
         ScriptEngine engine = new ScriptEngineManager().getEngineByName("nashorn");
-        assertTrue(engine instanceof Compilable, "Java 8 test runtime must provide Nashorn");
+        Assumptions.assumeTrue(engine instanceof Compilable,
+                "No compilable JavaScript engine is bundled with this JDK");
         ((Compilable)engine).compile(CodeEditorHtml.PAGE.substring(start, end));
     }
 
