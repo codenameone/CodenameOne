@@ -210,12 +210,11 @@ the gutter with `setShowLineNumbers(...)`, and configure indentation with `setTa
 `insertAtCursor(...)` replaces the active selection, while `getCursorPosition(...)` reports the current
 UTF-16 caret offset asynchronously.
 
-The Codename One Playground uses `CodeEditor` for its Java and CSS source panes. Its web build points
-`setEngineURL(...)` at a Monaco-based custom browser engine so it can add generated framework metadata,
-UIID completions, inline run messages, and local linting. Text changes, diagnostics, themes, focus, and
-queries still travel through the same semantic editor API. Desktop and mobile ports that provide the
-low-level input contract therefore use the lightweight engine without a separate playground-specific
-text component, while the JavaScript port retains its richer browser presentation.
+The Codename One Playground uses ordinary multiline `TextArea` components for its Java and CSS source
+panes and opts into `setLightweightEditingEnabled(true)`. The source panes therefore exercise the same
+framework-rendered caret, selection, scrolling, clipboard, virtual-keyboard, and IME path available to
+applications. Run diagnostics and inline messages are rendered with lightweight Codename One
+components beneath the source field, so the web build doesn't need a separate browser editor.
 
 ==== Asynchronous code completion
 

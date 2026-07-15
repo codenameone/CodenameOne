@@ -24,11 +24,11 @@
 package com.codenameone.playground;
 
 import com.codename1.ui.CN;
-import com.codename1.ui.CodeEditor;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.TextArea;
 
 /// Headless layout smoke test.
 ///
@@ -42,9 +42,8 @@ import com.codename1.ui.Form;
 /// split pane vs. top bar + tab strip + tab content + bottom nav). Exits
 /// with non-zero status on any failure so CI can fail the job.
 ///
-/// JavaSE exercises the framework's lightweight CodeEditor backend. The web
-/// bundle uses the same CodeEditor API with the Monaco page as its custom
-/// browser engine.
+/// Both scenarios verify that the source pane opts into TextArea's framework-
+/// rendered editing API instead of using a native or browser editor peer.
 public final class PlaygroundLayoutHarness {
     private PlaygroundLayoutHarness() {
     }
@@ -107,11 +106,15 @@ public final class PlaygroundLayoutHarness {
         }
 
         int failures = 0;
-        if (findByType(form, CodeEditor.class) == null) {
-            System.err.println("[" + label + "] framework CodeEditor NOT FOUND in form tree");
+        Component sourceEditor = findByUiid(form, "PlaygroundSourceEditor", "PlaygroundSourceEditorDark");
+        if (!(sourceEditor instanceof TextArea)) {
+            System.err.println("[" + label + "] lightweight TextArea source editor NOT FOUND in form tree");
+            failures++;
+        } else if (!((TextArea) sourceEditor).isLightweightEditingEnabled()) {
+            System.err.println("[" + label + "] source editor did not enable lightweight editing");
             failures++;
         } else {
-            System.out.println("[" + label + "] framework CodeEditor present");
+            System.out.println("[" + label + "] lightweight TextArea source editor present");
         }
         failures += expectPresent(label, form, "PlaygroundTopBar", "PlaygroundTopBarDark");
         failures += expectPresent(label, form, "PlaygroundAppIcon", "PlaygroundAppIconDark");
@@ -263,22 +266,4 @@ public final class PlaygroundLayoutHarness {
         return null;
     }
 
-    private static Component findByType(Component root, Class<?> type) {
-        if (root == null || root.isHidden() || !root.isVisible()) {
-            return null;
-        }
-        if (type.isInstance(root)) {
-            return root;
-        }
-        if (root instanceof Container) {
-            Container container = (Container) root;
-            for (int i = 0; i < container.getComponentCount(); i++) {
-                Component found = findByType(container.getComponentAt(i), type);
-                if (found != null) {
-                    return found;
-                }
-            }
-        }
-        return null;
-    }
 }

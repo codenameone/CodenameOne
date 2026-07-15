@@ -34,6 +34,19 @@ for member in 'setLightweightEditingEnabled(boolean)' 'setContent(String, RichTe
   fi
 done
 
+echo "Verifying the playground opts into lightweight TextArea editing..."
+if ! grep -q 'setLightweightEditingEnabled(true)' \
+        "$ROOT/common/src/main/java/com/codenameone/playground/PlaygroundLightweightEditor.java"; then
+  echo "Playground source editor does not enable lightweight editing" >&2
+  exit 1
+fi
+
+forbidden_editor='mona''co'
+if git -C "$ROOT/../.." grep -in "$forbidden_editor"; then
+  echo "Removed browser-editor dependency is still referenced by tracked files" >&2
+  exit 1
+fi
+
 echo "Verifying package-private/internal sentinel classes are NOT generated..."
 for cls in com.codename1.ui.Accessor com.codename1.io.IOAccessor; do
   if grep -q "index.put(\"${cls}\"" "$ROOT/common/src/main/java/bsh/cn1/GeneratedCN1Access.java"; then
