@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.tools.translator;
 
 import org.junit.jupiter.params.ParameterizedTest;
@@ -56,7 +78,7 @@ class JavaScriptPortSmokeIntegrationTest {
     }
 
     @org.junit.jupiter.api.Test
-    void javascriptPortBoundaryUsesPolyformHeaders() throws Exception {
+    void javascriptPortUsesCodenameOneGplClasspathHeaders() throws Exception {
         try (Stream<Path> paths = Files.walk(LICENSE_ROOT)) {
             paths.filter(Files::isRegularFile)
                     .filter(path -> path.toString().endsWith(".java") || path.toString().endsWith(".md"))
@@ -64,12 +86,16 @@ class JavaScriptPortSmokeIntegrationTest {
                         try {
                             String text = new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
                             if (path.toString().endsWith(".java")) {
-                                assertTrue(text.contains("PolyForm Noncommercial License 1.0.0"),
-                                        "Missing PolyForm header in " + path);
+                                assertTrue(text.contains("Codename One and/or its affiliates. All rights reserved."),
+                                        "Missing Codename One copyright in " + path);
+                                assertTrue(text.contains("GNU General Public License version 2 only"),
+                                        "Missing GPLv2 header in " + path);
+                                assertTrue(text.contains("\"Classpath\" exception"),
+                                        "Missing Classpath Exception header in " + path);
+                                assertTrue(text.contains("DO NOT ALTER OR REMOVE COPYRIGHT NOTICES"),
+                                        "Missing complete Codename One header in " + path);
                             }
-                            assertFalse(text.contains("Classpath exception"), "Inherited parent license header found in " + path);
-                            assertFalse(text.contains("GNU General Public License"), "Inherited GPL text found in " + path);
-                            assertFalse(text.contains("DO NOT ALTER OR REMOVE COPYRIGHT NOTICES"), "Inherited Oracle/CN1 header found in " + path);
+                            assertFalse(text.contains("PolyForm"), "Obsolete PolyForm license found in " + path);
                         } catch (Exception ex) {
                             throw new RuntimeException(ex);
                         }
