@@ -213,8 +213,8 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         public void actionPerformed(ActionEvent evt) {
             Form f = getComponentForm();
             if (f != null) {
-                if (isEditing() && f.getComponentAt(evt.getX(), evt.getY()) != TextArea.this
-                        && !isLightweightEditorAt(evt.getX(), evt.getY())) { //NOPMD CompareObjectsWithEquals
+                if (isEditing() && f.getComponentAt(evt.getX(), evt.getY()) != TextArea.this //NOPMD CompareObjectsWithEquals
+                        && !isLightweightEditorAt(evt.getX(), evt.getY())) {
                     fireActionEvent();
                     setSuppressActionEvent(true);
                 }
