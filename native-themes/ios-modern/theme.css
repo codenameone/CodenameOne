@@ -87,6 +87,14 @@
     --accent-disabled-color-dark: #004a99;
     --accent-on-color: #ffffff;
 
+    /* iOS 26 releases a button by DISSOLVING the pressed/held dim back to the
+       normal fill over a few frames rather than snapping it off in one frame.
+       Button reads this (millis) and, when > 0, snapshots the pressed background
+       on release and fades it out over the settled fill. Opt-in per theme so
+       other platforms (e.g. Material ripple) are unaffected. ~180ms matches the
+       native settle without feeling laggy. */
+    buttonReleaseFadeDurationInt: 180;
+
     includeNativeBool: false;
     darkModeBool: true;
     /* When true, FontImage.createSFOrMaterial renders real Apple SF Symbols on
@@ -299,71 +307,48 @@ TertiaryLabel { cn1-derive: Label; color: #8e8e93; }
 SpanLabel { cn1-derive: Label; background-color: transparent; }
 SpanLabelText { cn1-derive: Label; background-color: transparent; }
 
-/* iOS rounded-rect button style. Using border-radius (RoundRectBorder,
-   CEF-free) rather than cn1-pill-border so short-text buttons don't
-   degenerate to a circle when width<=height - RoundBorder paints a
-   circle in that case, border-radius always keeps the corner radius. */
+/* iOS 26 buttons are Liquid Glass CAPSULES (full pills). Using cn1-pill-border so
+   the sides are fully rounded like the native UIButton. The fills are near-opaque,
+   like the native pills read over their warm backdrop (and matching the goldens).
+   The pressed HELD dim + its release DISSOLVE are handled by the framework
+   (Button.pressed below for the held look, buttonReleaseFadeDurationInt above for
+   the fade-out on release) rather than by a backdrop-filter, so the fade is a real
+   animation independent of translucency and also works on the OPAQUE RaisedButton.
+   RaisedButton is an OPAQUE accent pill. Text is black on the light glass (white in
+   dark), white on the accent. */
 Button {
-    /* Keep Button as an accent-bearing UIID while adopting the iOS 26 glass
-       material. Apps have long used the primary palette to brand Button text;
-       the translucent capsule changes the surface, not that theming contract. */
-    color: var(--accent-color, #007aff);
-    /* Compact glass capsule: very little padding. */
-    padding: 1mm 2.5mm 1mm 2.5mm;
-    /* Breathing room like a native iOS form: buttons aren't flush to the
-       screen edges or stacked edge-to-edge. The fidelity tiles zero this
-       out per-widget (Cn1WidgetRenderer) so the tight native-vs-CN1
-       comparison is unaffected; this margin is purely how apps should
-       look. */
+    color: #000000;
+    padding: 1.1mm 2.8mm 1.1mm 2.8mm;
     margin: 1mm 2mm 1mm 2mm;
-    font-family: "native:MainRegular";
+    font-family: "native:MainLight";
     font-size: 2.7mm;
-    /* Real Liquid Glass is a THIN white tint (~0.1-0.2) over a blurred backdrop,
-       not a milky opaque fill. 0.34 read as a flat pill; 0.20 lets the blur carry
-       the look while the stronger hairline rim (below) keeps the capsule defined
-       over a flat app background. */
-    background-color: rgba(255,255,255,0.20);
-    /* Hairline rim: the native glass capsule always shows a faint darker
-       edge, and over a FLAT white/light app background the thin translucent
-       fill alone is invisible -- the rim carries the shape there. */
-    border: 0.25mm solid rgba(0,0,0,0.16);
-    /* iOS 26 glass buttons are capsules (fully rounded sides). */
+    background-color: rgba(255,255,255,0.82);
     cn1-background-type: cn1-pill-border;
-    /* Real Liquid Glass: blur the backdrop behind the capsule (no CEF), then the
-       light translucent tint above frosts it. The blur is most visible over busy
-       content; over a smooth backdrop the tint carries the look. */
-    backdrop-filter: blur(20px);
     text-align: center;
 }
-/* Pressed (light): the frosted capsule dims slightly. */
-/* Held-down dim: 0.88 x the normal glass render. With the thinner 0.20 fill,
-   alpha_p = 0.12 + 0.88 x 0.20 = 0.30 and fill_p = 0.88 x 0.20 x 255 / 0.30 ~=
-   150. Reads as a clearly pressed grey pill; matches the held native reference. */
-Button.pressed { color: var(--accent-pressed-color, #0064d1); background-color: rgba(150,150,158,0.30); border: 0.25mm solid rgba(0,0,0,0.16); cn1-background-type: cn1-pill-border; }
-Button.disabled { color: var(--accent-disabled-color, #b3d4ff); background-color: rgba(255,255,255,0.40); border: 0.25mm solid rgba(0,0,0,0.08); cn1-background-type: cn1-pill-border; }
+/* Press feedback: a simple darkening of the glass fill. */
+Button.pressed { color: #000000; background-color: rgba(228,228,230,0.85); cn1-background-type: cn1-pill-border; }
+/* Item 2: disabled regular button is a faded grey label on the light glass. */
+Button.disabled { color: #b0b0b5; background-color: rgba(255,255,255,0.80); cn1-background-type: cn1-pill-border; }
 
+/* Prominent filled button (.borderedProminent): WHITE label on the OPAQUE accent
+   pill. The accent stays var()-bound so an app override retints it. */
 RaisedButton {
     cn1-derive: Button;
-    color: var(--accent-on-color, #ffffff);
+    color: #ffffff;
     background-color: var(--accent-color, #007aff);
     cn1-background-type: cn1-pill-border;
     text-align: center;
 }
-RaisedButton.pressed { color: var(--accent-on-color, #ffffff); background-color: var(--accent-pressed-color, #0064d1); cn1-background-type: cn1-pill-border; }
-/* Disabled remains palette-driven so branded themes can provide a distinct
-   accessible disabled accent while retaining the prominent glass capsule. */
-RaisedButton.disabled { background-color: var(--accent-disabled-color, #b3d4ff); color: var(--accent-on-color, #ffffff); cn1-background-type: cn1-pill-border; }
+RaisedButton.pressed { color: #ffffff; background-color: var(--accent-pressed-color, #0064d1); cn1-background-type: cn1-pill-border; }
+/* Disabled prominent button: a desaturated grey-taupe pill. */
+RaisedButton.disabled { color: #ffffff; background-color: #b3a8a0; cn1-background-type: cn1-pill-border; }
 
-/* clearGlass FlatButton: a MORE translucent capsule than the .glass() Button (more
-   backdrop shows through) with a blue label. */
-/* Nearly invisible fill: the native clearGlass capsule is frost you mostly see
-   by its rim; 0.32 white read as a solid pill. Padding trimmed to the native
-   text inset (2.1mm). */
-FlatButton { cn1-derive: Button; color: #000000; background-color: rgba(255,255,255,0.16); border: 0.25mm solid rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); padding: 1mm 2.1mm 1mm 2.1mm; }
-/* Held-down dim (clear-glass): alpha_p = 0.12 + 0.88 x 0.16 = 0.26, fill_p =
-   0.88 x 0.16 x 255 / 0.26 ~= 138. (Was 0.34 white -- a BRIGHTEN, the wrong way
-   for a held press.) */
-FlatButton.pressed { color: #000000; background-color: rgba(138,138,144,0.26); border: 0.25mm solid rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; padding: 1mm 2.1mm 1mm 2.1mm; }
+/* Gray button (.gray / .bordered): dark label on a DARKER (greyer) semi-opaque pill
+   distinct from the lighter regular Button fill above. Semi-opaque, no blur -- see
+   the Button note on why the buttons avoid backdrop-filter. */
+FlatButton { cn1-derive: Button; color: #1c1c1e; background-color: rgba(199,197,198,0.80); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.8mm 1.1mm 2.8mm; }
+FlatButton.pressed { color: #1c1c1e; background-color: rgba(186,184,185,0.85); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.8mm 1.1mm 2.8mm; }
 
 TextField {
     color: #000000;
@@ -373,9 +358,12 @@ TextField {
        backdrop blur give it the iOS 26 glass character while staying legible over
        the flat form. */
     background-color: #ffffff;
-    padding: 2mm 3mm 2mm 3mm;
+    /* Item 9: larger text set slightly further left (smaller left inset) in a
+       lighter weight, matching the native iOS field. */
+    padding: 2mm 3mm 2mm 2mm;
     margin: 1mm 2mm 1mm 2mm;
-    font-family: "native:MainRegular";
+    font-family: "native:MainLight";
+    font-size: 3mm;
     /* Very faint rim: the native rounded field has almost no visible stroke -- its
        definition comes from the white-cell-vs-grey-form contrast, not a border. A
        heavier rim diverged from the native roundedRect. */
@@ -593,8 +581,11 @@ MainTitle { cn1-derive: Title; }
    glyph (no text). cn1-round-border draws the circle; rgba gives the glass fill. */
 /* Leading/trailing margins reproduce the native bar-item inset from the screen
    edge (~2.6mm); flush-to-edge circles were the single biggest Toolbar diff. */
-BackCommand { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.72); padding: 1.6mm; margin: 0.5mm 0.5mm 0.5mm 2.6mm; cn1-background-type: cn1-round-border; }
-TitleCommand { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.72); padding: 1.6mm; margin: 0.5mm 2.6mm 0.5mm 0.5mm; cn1-background-type: cn1-round-border; }
+/* Item 5: the toolbar command glyph/text is sized from the command style's font
+   height, so an explicit font-size ~1mm above the system default enlarges the
+   icon (and any command text) to the native nav-bar proportions. */
+BackCommand { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.72); padding: 1.6mm; margin: 0.5mm 0.5mm 0.5mm 2.6mm; cn1-background-type: cn1-round-border; font-size: 4mm; }
+TitleCommand { color: var(--accent-color, #007aff); background-color: rgba(255,255,255,0.72); padding: 1.6mm; margin: 0.5mm 2.6mm 0.5mm 0.5mm; cn1-background-type: cn1-round-border; font-size: 4mm; }
 
 /* ---- Desktop chrome (macOS conventions) ----
    Only used when the desktop port enables interactiveScrollBool /
@@ -1023,26 +1014,23 @@ PopupContent {
     SpanLabel { color: #ffffff; background-color: transparent; }
     SpanLabelText { color: #ffffff; background-color: transparent; }
 
-    /* Dark .glass() button: a DARK translucent capsule (darkens the backdrop)
-       whose label continues to follow the app's primary accent. */
-    /* Hairline light rim (see the light-mode Button comment): the native dark
-       glass capsule keeps a faint brighter edge, and over a FLAT black app
-       background the dark translucent fill alone disappears completely. */
-    Button { color: var(--accent-color-dark, #0a84ff); background-color: rgba(20,20,24,0.24); border: 0.25mm solid rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); }
-    /* Held-down dim (dark glass): 0.88 x the normal render. alpha_p = 0.12 +
-       0.88 x 0.36 = 0.44, fill_p = 0.88 x 0.36 x 20 / 0.44 ~= 14. (Was 40,40,44
-       0.6 -- a BRIGHTEN, the wrong direction for a held dim.) */
-    Button.pressed { color: var(--accent-pressed-color-dark, #64b1ff); background-color: rgba(13,13,16,0.33); border: 0.25mm solid rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; }
-    Button.disabled { color: var(--accent-disabled-color-dark, #004a99); background-color: rgba(20,20,24,0.58); border: 0.25mm solid rgba(255,255,255,0.10); cn1-background-type: cn1-pill-border; }
-    /* Dark FlatButton matches light: iOS 26's flat glass button is a light cream
-       pill with DARK text in BOTH appearances (native ref). White text flipped it
-       to the dark "charcoal" material; dark text uses the light pass-through frost. */
-    FlatButton { color: #000000; background-color: rgba(255,255,255,0.16); border: 0.25mm solid rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; backdrop-filter: blur(20px); padding: 1mm 2.1mm 1mm 2.1mm; }
-    FlatButton.pressed { color: #000000; background-color: rgba(138,138,144,0.26); border: 0.25mm solid rgba(255,255,255,0.55); cn1-background-type: cn1-pill-border; padding: 1mm 2.1mm 1mm 2.1mm; }
+    /* Dark iOS 26 buttons are Liquid Glass CAPSULES like the light ones. Regular =
+       WHITE label on a dark translucent glass pill; the cn1-pill-border shape is
+       repeated in every dark rule so the light/dark shapes stay identical
+       (NativeThemeLightDarkConsistencyTest). */
+    Button { color: #ffffff; background-color: rgba(30,30,32,0.74); cn1-background-type: cn1-pill-border; }
+    Button.pressed { color: #ffffff; background-color: rgba(58,58,60,0.78); cn1-background-type: cn1-pill-border; }
+    /* Item 3: disabled regular button is a faded grey label on the dark glass. */
+    Button.disabled { color: #636366; background-color: rgba(30,30,32,0.74); cn1-background-type: cn1-pill-border; }
+    /* Gray button (.gray): white label on a slightly lighter dark glass pill. */
+    FlatButton { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.8mm 1.1mm 2.8mm; }
+    FlatButton.pressed { color: #ffffff; background-color: rgba(150,143,138,0.78); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.8mm 1.1mm 2.8mm; }
 
-    RaisedButton { color: var(--accent-on-color, #ffffff); background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
-    RaisedButton.pressed { color: var(--accent-on-color, #ffffff); background-color: var(--accent-pressed-color-dark, #64b1ff); cn1-background-type: cn1-pill-border; }
-    RaisedButton.disabled { color: var(--accent-on-color, #ffffff); background-color: var(--accent-disabled-color-dark, #004a99); cn1-background-type: cn1-pill-border; }
+    /* Prominent filled button: white label on the OPAQUE dark accent pill. */
+    RaisedButton { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
+    RaisedButton.pressed { color: #ffffff; background-color: var(--accent-pressed-color-dark, #64b1ff); cn1-background-type: cn1-pill-border; }
+    /* Item 3: disabled prominent button is a desaturated dark-taupe pill. */
+    RaisedButton.disabled { color: #8e8e93; background-color: #48423e; cn1-background-type: cn1-pill-border; }
 
     /* Dark grouped cell: #2c2c2e contrasts with the #1c1c1e form (was #1c1c1e ==
        form -> invisible field). Hairline + blur for the glass character. */
@@ -1088,6 +1076,13 @@ PopupContent {
     ProgressBar { background-color: #3a3a3c; color: var(--accent-color-dark, #0a84ff); }
     ProgressBarFull { background-color: var(--accent-color-dark, #0a84ff); }
     /* Dark picker wheel: white labels, lighter translucent selection band. */
+    /* Item 11: on the dark wheel the perspective-faded (background) rows were
+       nearly invisible. The rows must start WHITE: the ios7Spinner perspective
+       fade multiplies each off-centre row's alpha down toward the black
+       background, so a white base lands on native's readable off-centre grey
+       while the centred value stays bright -- exactly matching the native wheel.
+       A grey base (#a8a8ad) faded to near-black and made value 1/2/4/5 invisible,
+       which also scored WORSE against the native reference. */
     SpinnerRenderer { color: #ffffff; background-color: transparent; }
     SpinnerRenderer.selected { color: #ffffff; background-color: rgba(120,120,128,0.18); border-radius: 2.5mm; }
     SpinnerRendererFocus { color: #ffffff; background-color: rgba(120,120,128,0.26); border-radius: 2mm; }
@@ -1100,8 +1095,9 @@ PopupContent {
     TitleArea { background-color: transparent; color: #ffffff; }
     Title { color: #ffffff; background-color: transparent; }
     MainTitle { color: #ffffff; background-color: transparent; }
-    BackCommand { color: #ffffff; background-color: rgba(24,24,26,0.80); padding: 1.6mm; margin: 0.5mm 0.5mm 0.5mm 2.6mm; cn1-background-type: cn1-round-border; }
-    TitleCommand { color: #ffffff; background-color: rgba(24,24,26,0.80); padding: 1.6mm; margin: 0.5mm 2.6mm 0.5mm 0.5mm; cn1-background-type: cn1-round-border; }
+    /* Item 5: match the light command +1mm icon/text enlargement in dark mode. */
+    BackCommand { color: #ffffff; background-color: rgba(24,24,26,0.80); padding: 1.6mm; margin: 0.5mm 0.5mm 0.5mm 2.6mm; cn1-background-type: cn1-round-border; font-size: 4mm; }
+    TitleCommand { color: #ffffff; background-color: rgba(24,24,26,0.80); padding: 1.6mm; margin: 0.5mm 2.6mm 0.5mm 0.5mm; cn1-background-type: cn1-round-border; font-size: 4mm; }
 
     /* Desktop scrollbar (macOS) dark overrides. cn1-background-type must be
        re-declared so the round primitive carries into dark mode. */
@@ -1198,12 +1194,11 @@ PopupContent {
     ChatTypingIndicator { color: #8e8e93; }
     ChatInput { background-color: #1c1c1e; }
     ChatInputField { background-color: #2c2c2e; color: #ffffff; border-radius: 3mm; }
-    /* Attach (+) and voice (Mic) derive the LIGHT Button glass and had no dark
-       override, so in dark mode they rendered a pale grey glass halo around the
-       glyph. Give them the dark Button glass so they read as dark circular
-       affordances instead of a light patch on the dark bar. */
-    ChatAttachButton { background-color: rgba(20,20,24,0.24); border: 0.25mm solid rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; color: #ffffff; padding: 1.5mm; margin: 0.5mm; }
-    ChatVoiceButton { background-color: rgba(20,20,24,0.24); border: 0.25mm solid rgba(255,255,255,0.22); cn1-background-type: cn1-pill-border; color: #ffffff; padding: 1.5mm; margin: 0.5mm; }
+    /* Attach (+) and voice (Mic) mirror the dark regular Button (blue glyph on a
+       dark glass pill) -- and must keep the SAME capsule shape as the light
+       derivation (NativeThemeLightDarkConsistencyTest). */
+    ChatAttachButton { background-color: rgba(30,30,32,0.74); cn1-background-type: cn1-pill-border; color: var(--accent-color-dark, #0a84ff); padding: 1.5mm; margin: 0.5mm; }
+    ChatVoiceButton { background-color: rgba(30,30,32,0.74); cn1-background-type: cn1-pill-border; color: var(--accent-color-dark, #0a84ff); padding: 1.5mm; margin: 0.5mm; }
 
     Separator { background-color: #38383a; }
 }

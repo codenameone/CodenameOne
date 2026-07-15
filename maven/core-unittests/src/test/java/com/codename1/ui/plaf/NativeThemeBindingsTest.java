@@ -48,31 +48,18 @@ public class NativeThemeBindingsTest extends UITestBase {
         Hashtable theme = res.getTheme(themeNames[0]);
         assertNotNull(theme);
 
-        // The iOS 26 Liquid Glass redesign gives Button a frosted capsule, but
-        // Button text and RaisedButton fill remain accent-bearing properties.
-        // The compiler must emit both the baked-in default AND each binding
-        // entry. Resources.loadTheme stores colors as
-        // the unpadded hex of their int value (Integer.toHexString), so the
-        // expected default is "7aff" rather than "007aff".
+        // iOS 26 buttons are Liquid Glass capsules. Only the RaisedButton FILL is
+        // accent-bound (it's the opaque prominent pill, retinted like iOS applies
+        // tintColor); the regular Button LABEL is a fixed neutral (black on the
+        // light glass), NOT accent-bound. The compiler must emit both the baked-in
+        // default AND the @cn1-bind entry for the accent fill. Resources.loadTheme
+        // stores colours as unpadded hex (Integer.toHexString), so 007aff -> "7aff".
         assertEquals("7aff", theme.get("RaisedButton.bgColor"));
         assertEquals("accent-color", theme.get("@cn1-bind:RaisedButton.bgColor"));
-        assertEquals("accent-color", theme.get("@cn1-bind:Button.fgColor"));
-        assertEquals("accent-pressed-color", theme.get("@cn1-bind:Button.press#fgColor"));
-        assertEquals("accent-disabled-color", theme.get("@cn1-bind:Button.dis#fgColor"));
-        assertEquals("accent-disabled-color", theme.get("@cn1-bind:RaisedButton.dis#bgColor"));
-        assertEquals("accent-color-dark", theme.get("@cn1-bind:$DarkButton.fgColor"));
-        assertEquals("accent-disabled-color-dark", theme.get("@cn1-bind:$DarkRaisedButton.dis#bgColor"));
-        RoundBorder raisedBorder = (RoundBorder) theme.get("RaisedButton.border");
-        RoundBorder disabledRaisedBorder = (RoundBorder) theme.get("RaisedButton.dis#border");
-        assertNotNull(raisedBorder);
-        assertNotNull(disabledRaisedBorder);
-        assertFalse(raisedBorder.getUIID(),
-                "Serialized native-theme borders must retain legacy RoundBorder rendering");
-        assertFalse(disabledRaisedBorder.getUIID(),
-                "Disabled borders must retain legacy RoundBorder rendering");
-        // `#Constants { --accent-color: #007aff; }` in the native
-        // theme.css is exported as a `@accent-color` theme constant so
-        // a user app's theme.css can override it via the same syntax.
+        assertEquals("accent-pressed-color", theme.get("@cn1-bind:RaisedButton.press#bgColor"));
+        assertEquals("accent-color-dark", theme.get("@cn1-bind:$DarkRaisedButton.bgColor"));
+        // `#Constants { --accent-color: #007aff; }` is exported as a `@accent-color`
+        // theme constant so a user app can override it via the same syntax.
         assertEquals("007AFF", theme.get("@accent-color"));
 
         UIManager.getInstance().setThemeProps(theme);
@@ -80,7 +67,7 @@ public class NativeThemeBindingsTest extends UITestBase {
         Button defaultBtn = new Button("default");
         defaultBtn.setUIID("RaisedButton");
         assertEquals(0x007aff, defaultBtn.getUnselectedStyle().getBgColor(),
-                "Native theme raised button should pick up the inlined fallback when no override is supplied");
+                "RaisedButton picks up the inlined accent fallback when no override is supplied");
 
         Hashtable override = new Hashtable();
         override.put("@accent-color", "ff2d95");
@@ -90,24 +77,18 @@ public class NativeThemeBindingsTest extends UITestBase {
         Button retuned = new Button("magenta");
         retuned.setUIID("RaisedButton");
         assertEquals(0xff2d95, retuned.getUnselectedStyle().getBgColor(),
-                "@accent-color override should retune every UIID bound to --accent-color");
+                "@accent-color override retunes the RaisedButton fill");
 
         Button textButton = new Button("text");
         Button disabledButton = new Button("disabled");
         disabledButton.setUIID("RaisedButton");
         disabledButton.setEnabled(false);
-        assertEquals(0xff2d95, textButton.getUnselectedStyle().getFgColor(),
-                "Liquid Glass must retain Button's primary-accent binding");
-        assertEquals(0x00b894, disabledButton.getDisabledStyle().getBgColor(),
-                "Liquid Glass must retain RaisedButton's disabled-accent binding");
-        RoundBorder reboundBorder = (RoundBorder) retuned.getUnselectedStyle().getBorder();
-        RoundBorder reboundDisabledBorder = (RoundBorder) disabledButton.getDisabledStyle().getBorder();
-        assertEquals(0xff2d95, reboundBorder.getColor(),
-                "The runtime binding must update the legacy RoundBorder color without changing its mode");
-        assertEquals(0x00b894, reboundDisabledBorder.getColor(),
-                "Disabled RoundBorder color must follow the disabled palette binding");
-        assertFalse(reboundBorder.getUIID());
-        assertFalse(reboundDisabledBorder.getUIID());
+        // The regular Button label is a fixed black (unaffected by the accent
+        // override); the disabled RaisedButton is a fixed desaturated taupe pill.
+        assertEquals(0x000000, textButton.getUnselectedStyle().getFgColor(),
+                "Button label is a fixed neutral, not accent-bound");
+        assertEquals(0xb3a8a0, disabledButton.getDisabledStyle().getBgColor(),
+                "Disabled RaisedButton is a fixed desaturated pill, not accent-bound");
     }
 
     @Test

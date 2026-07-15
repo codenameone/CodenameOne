@@ -29,8 +29,10 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.events.ComponentStateChangeEvent;
+import com.codename1.ui.animations.Motion;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.EventDispatcher;
 
@@ -92,6 +94,14 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     private boolean toggle;
     private int releaseRadius;
     private boolean autoRelease;
+    /// Duration in millis of the iOS-style release dim-out (0 disables it). Read
+    /// from the `buttonReleaseFadeDurationInt` theme constant so only themes that
+    /// opt in pay for it; see {@link #startReleaseFade()}.
+    private int releaseFadeDuration;
+    /// Motion driving the release fade alpha (255 -> 0); non-null while fading.
+    private Motion releaseFadeMotion;
+    /// Snapshot of the pressed background, faded out over the settled background.
+    private Image releaseFadeImage;
     /// A listener used to bind the state with another button.  When that button's state
     /// changes, then this button state will also change.
     ///
@@ -191,6 +201,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
         this.pressedIcon = icon;
         this.rolloverIcon = icon;
         releaseRadius = UIManager.getInstance().getThemeConstant("releaseRadiusInt", 0);
+        releaseFadeDuration = UIManager.getInstance().getThemeConstant("buttonReleaseFadeDurationInt", 0);
         setRippleEffect(buttonRippleEffectDefault);
         if (isCapsText() && text != null) {
             putClientProperty("cn1$origText", text);
@@ -733,6 +744,11 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /// - `y`: the y position if a touch event triggered this, -1 if this isn't relevant
     public void released(int x, int y) {
         if (!Display.impl.isScrollWheeling()) {
+            // Capture the pressed look BEFORE the state flips so it can fade out
+            // over the settled background (iOS-style release dim-out).
+            if (state == STATE_PRESSED && releaseFadeDuration > 0) {
+                startReleaseFade();
+            }
             if (state != STATE_ROLLOVER) {
                 state = STATE_ROLLOVER;
                 fireStateChange();
@@ -1024,6 +1040,17 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     @Override
     public boolean animate() {
         boolean a = super.animate();
+        if (releaseFadeMotion != null) {
+            if (releaseFadeMotion.isFinished()) {
+                releaseFadeMotion = null;
+                releaseFadeImage = null;
+                Form f = getComponentForm();
+                if (f != null) {
+                    f.deregisterAnimated(this);
+                }
+            }
+            a = true;
+        }
         if (!isEnabled() && disabledIcon != null) {
             a |= disabledIcon.isAnimation() && disabledIcon.animate();
         } else {
@@ -1039,6 +1066,56 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
             }
         }
         return a;
+    }
+
+    /// Snapshots the current pressed background into an image and starts the fade
+    /// motion so {@link #paintReleaseFadeOverlay(Graphics)} can dissolve it back to
+    /// the settled background over `releaseFadeDuration` millis. Mirrors the iOS
+    /// button highlight that fades out on release rather than snapping off.
+    private void startReleaseFade() {
+        int w = getWidth();
+        int h = getHeight();
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        Style pressed = getPressedStyle();
+        Image img = Image.createImage(w, h, 0);
+        Graphics ig = img.getGraphics();
+        // The border/painter draw at the component's absolute origin; shift the
+        // offscreen graphics so the capture lands at (0, 0) in the image.
+        ig.translate(-getX(), -getY());
+        Border b = pressed.getBorder();
+        if (b != null && b.isBackgroundPainter()) {
+            b.paintBorderBackground(ig, this);
+        } else if (pressed.getBgPainter() != null) {
+            pressed.getBgPainter().paint(ig, getBounds());
+        }
+        releaseFadeImage = img;
+        releaseFadeMotion = Motion.createEaseOutMotion(255, 0, releaseFadeDuration);
+        releaseFadeMotion.start();
+        Form f = getComponentForm();
+        if (f != null) {
+            f.registerAnimated(this);
+        }
+    }
+
+    /// Draws the fading pressed-background snapshot over the freshly painted
+    /// settled background, so a release dissolves the highlight instead of
+    /// dropping it in a single frame. {@inheritDoc}
+    @Override
+    void paintReleaseFadeOverlay(Graphics g) {
+        if (releaseFadeMotion != null && releaseFadeImage != null) {
+            int oldAlpha = g.getAlpha();
+            g.setAlpha(releaseFadeMotion.getValue());
+            g.drawImage(releaseFadeImage, getX(), getY());
+            g.setAlpha(oldAlpha);
+        }
+    }
+
+    /// Whether a release dim-out is currently animating; package-private probe
+    /// for tests (see ButtonReleaseFadeTest).
+    boolean isReleaseFadeActive() {
+        return releaseFadeMotion != null;
     }
 
     /// Places the check box or radio button on the opposite side at the far end
