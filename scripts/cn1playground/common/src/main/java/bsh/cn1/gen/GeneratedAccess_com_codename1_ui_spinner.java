@@ -192,6 +192,15 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
     }
 
     private static Object invoke0(com.codename1.ui.spinner.DateTimeSpinner typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("accessibilityChanged".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.accessibilityChanged(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.accessibilityChanged(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -518,6 +527,11 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
         if ("getAbsoluteY".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getAbsoluteY();
+            }
+        }
+        if ("getAccessibilityNode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessibilityNode();
             }
         }
         if ("getAccessibilityText".equals(name)) {
@@ -982,6 +996,11 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
         if ("getSelectedStyle".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getSelectedStyle();
+            }
+        }
+        if ("getSemantics".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSemantics();
             }
         }
         if ("getSideGap".equals(name)) {
@@ -2281,6 +2300,15 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
     }
 
     private static Object invoke1(com.codename1.ui.spinner.DateSpinner typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("accessibilityChanged".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.accessibilityChanged(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.accessibilityChanged(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -2607,6 +2635,11 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
         if ("getAbsoluteY".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getAbsoluteY();
+            }
+        }
+        if ("getAccessibilityNode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessibilityNode();
             }
         }
         if ("getAccessibilityText".equals(name)) {
@@ -3066,6 +3099,11 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
         if ("getSelectedStyle".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getSelectedStyle();
+            }
+        }
+        if ("getSemantics".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSemantics();
             }
         }
         if ("getSideGap".equals(name)) {
@@ -4320,6 +4358,15 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
     }
 
     private static Object invoke2(com.codename1.ui.spinner.GenericSpinner typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("accessibilityChanged".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.accessibilityChanged(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.accessibilityChanged(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -4646,6 +4693,11 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
         if ("getAbsoluteY".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getAbsoluteY();
+            }
+        }
+        if ("getAccessibilityNode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessibilityNode();
             }
         }
         if ("getAccessibilityText".equals(name)) {
@@ -5117,6 +5169,11 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
         if ("getSelectedStyle".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getSelectedStyle();
+            }
+        }
+        if ("getSemantics".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSemantics();
             }
         }
         if ("getSideGap".equals(name)) {
@@ -6363,6 +6420,15 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
     }
 
     private static Object invoke3(com.codename1.ui.spinner.NumericSpinner typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("accessibilityChanged".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.accessibilityChanged(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.accessibilityChanged(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -6689,6 +6755,11 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
         if ("getAbsoluteY".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getAbsoluteY();
+            }
+        }
+        if ("getAccessibilityNode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessibilityNode();
             }
         }
         if ("getAccessibilityText".equals(name)) {
@@ -7138,6 +7209,11 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
         if ("getSelectedStyle".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getSelectedStyle();
+            }
+        }
+        if ("getSemantics".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSemantics();
             }
         }
         if ("getSideGap".equals(name)) {
@@ -8363,6 +8439,15 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
     }
 
     private static Object invoke4(com.codename1.ui.spinner.TimeSpinner typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("accessibilityChanged".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.accessibilityChanged(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.accessibilityChanged(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -8689,6 +8774,11 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
         if ("getAbsoluteY".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getAbsoluteY();
+            }
+        }
+        if ("getAccessibilityNode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessibilityNode();
             }
         }
         if ("getAccessibilityText".equals(name)) {
@@ -9143,6 +9233,11 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
         if ("getSelectedStyle".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getSelectedStyle();
+            }
+        }
+        if ("getSemantics".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSemantics();
             }
         }
         if ("getSideGap".equals(name)) {
@@ -10397,6 +10492,15 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
     }
 
     private static Object invoke5(com.codename1.ui.spinner.BaseSpinner typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("accessibilityChanged".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.accessibilityChanged(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.accessibilityChanged(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -10723,6 +10827,11 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
         if ("getAbsoluteY".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getAbsoluteY();
+            }
+        }
+        if ("getAccessibilityNode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessibilityNode();
             }
         }
         if ("getAccessibilityText".equals(name)) {
@@ -11162,6 +11271,11 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
         if ("getSelectedStyle".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getSelectedStyle();
+            }
+        }
+        if ("getSemantics".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSemantics();
             }
         }
         if ("getSideGap".equals(name)) {
@@ -12353,6 +12467,15 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
     }
 
     private static Object invoke6(com.codename1.ui.spinner.Picker typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("accessibilityChanged".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.accessibilityChanged(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.accessibilityChanged(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
         if ("addActionListener".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionListener.class}, false);
@@ -12527,6 +12650,11 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
         if ("getAbsoluteY".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getAbsoluteY();
+            }
+        }
+        if ("getAccessibilityNode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessibilityNode();
             }
         }
         if ("getAccessibilityText".equals(name)) {
@@ -13097,6 +13225,11 @@ public final class GeneratedAccess_com_codename1_ui_spinner {
         if ("getSelectedStyle".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getSelectedStyle();
+            }
+        }
+        if ("getSemantics".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSemantics();
             }
         }
         if ("getShiftMillimeters".equals(name)) {

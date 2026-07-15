@@ -304,6 +304,8 @@ public final class IOSNative {
 
     native void setClipboardString(String s);
     native String getClipboardString();
+    native void setClipboardContent(String plain, String html, String rtf, String markdown, String asciidoc);
+    native String getClipboardContent(String mimeType);
     
     native void setPinchToZoomEnabled(long peer, boolean e);
     native void setNativeBrowserScrollingEnabled(long peer, boolean e);

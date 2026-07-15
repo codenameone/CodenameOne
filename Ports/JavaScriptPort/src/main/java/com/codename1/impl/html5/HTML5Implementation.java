@@ -1475,6 +1475,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
             public void handleEvent(Event evt) {
                 String plainText = getPasteEventData(evt, "text/plain");
                 String htmlText = getPasteEventData(evt, "text/html");
+                String rtfText = getPasteEventData(evt, "text/rtf");
+                String markdownText = getPasteEventData(evt, "text/markdown");
+                String asciidocText = getPasteEventData(evt, "text/asciidoc");
                 FileList files = getPasteEventFileList(evt);
                 String[] filePaths = null;
                 if (files != null) {
@@ -1484,6 +1487,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         Blob file = files.item(i);
                         filePaths[i] = createTempFile(file);
                     }
+                }
+                if ((rtfText != null && rtfText.length() > 0)
+                        || (markdownText != null && markdownText.length() > 0)
+                        || (asciidocText != null && asciidocText.length() > 0)) {
+                    ClipboardContent content = new ClipboardContent()
+                            .setData(ClipboardContent.MIME_TEXT, plainText == null ? "" : plainText)
+                            .setData(ClipboardContent.MIME_HTML, emptyToNull(htmlText))
+                            .setData(ClipboardContent.MIME_RTF, emptyToNull(rtfText))
+                            .setData(ClipboardContent.MIME_MARKDOWN, emptyToNull(markdownText))
+                            .setData(ClipboardContent.MIME_ASCIIDOC, emptyToNull(asciidocText));
+                    HTML5Implementation.super.copyToClipboard(content);
+                    firePasteEvent();
+                    return;
                 }
                 JavaScriptBrowserLifecycleCoordinator.handlePaste(new JavaScriptBrowserLifecycleCoordinator.PasteHooks() {
                     @Override
@@ -2450,6 +2466,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         scheduleAnimationFrame();
         
+    }
+
+    private static String emptyToNull(String value) {
+        return value == null || value.length() == 0 ? null : value;
     }
 
     @SuppressSyncErrors
@@ -10570,27 +10590,40 @@ public class HTML5Implementation extends CodenameOneImplementation {
     // main thread (the worker has no document/execCommand and no
     // navigator.clipboard), so the @JSBody below is only ever used by the legacy
     // main-thread (TeaVM) runtime, where document.execCommand is available.
-    @JSBody(params={"text"}, script=
+    @JSBody(params={"text", "html", "rtf", "markdown", "asciidoc"}, script=
         "try {" +
         "  var ta = document.createElement('textarea');" +
         "  ta.setAttribute('readonly', '');" +
         "  ta.style.position = 'fixed'; ta.style.top = '-1000px'; ta.style.left = '0'; ta.style.opacity = '0';" +
         "  document.body.appendChild(ta);" +
         "  ta.value = text;" +
+        "  var oncopy = function(e) {" +
+        "    try {" +
+        "      e.clipboardData.setData('text/plain', text || '');" +
+        "      if (html != null) e.clipboardData.setData('text/html', html);" +
+        "      if (rtf != null) e.clipboardData.setData('text/rtf', rtf);" +
+        "      if (markdown != null) e.clipboardData.setData('text/markdown', markdown);" +
+        "      if (asciidoc != null) e.clipboardData.setData('text/asciidoc', asciidoc);" +
+        "      e.preventDefault();" +
+        "    } catch (ignored) {}" +
+        "  };" +
         "  var ok = false;" +
-        "  try { ta.focus(); ta.select(); ok = !!document.execCommand('copy'); } catch (e) { ok = false; }" +
+        "  try { document.addEventListener('copy', oncopy); ta.focus(); ta.select(); ok = !!document.execCommand('copy'); } catch (e) { ok = false; }" +
+        "  document.removeEventListener('copy', oncopy);" +
         "  document.body.removeChild(ta);" +
         "  return ok;" +
         "} catch (e) { return false; }")
-    private native static boolean nativeBrowserCopyToClipboard(String text);
+    private native static boolean nativeBrowserCopyToClipboard(String text, String html, String rtf,
+            String markdown, String asciidoc);
 
     @Override
     public void copyToClipboard(Object obj) {
         final ClipboardCopyRequest request = (obj instanceof ClipboardCopyRequest) ? (ClipboardCopyRequest)obj : new ClipboardCopyRequest(obj);
         obj = request.content;
         super.copyToClipboard(obj);
-        if (obj instanceof ClipboardContent) {
-            obj = ((ClipboardContent)obj).getText(ClipboardContent.MIME_TEXT);
+        ClipboardContent rich = obj instanceof ClipboardContent ? (ClipboardContent)obj : null;
+        if (rich != null) {
+            obj = rich.getText(ClipboardContent.MIME_TEXT);
         }
         if (!(obj instanceof String)) {
             return;
@@ -10600,7 +10633,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // async clipboard API (or an execCommand fallback). This is the only
         // path that works on the worker-based port; the textarea/execCommand
         // dance below runs in the worker where document is unavailable.
-        if (nativeBrowserCopyToClipboard(selectedText)) {
+        if (nativeBrowserCopyToClipboard(selectedText,
+                rich == null ? null : rich.getText(ClipboardContent.MIME_HTML),
+                rich == null ? null : rich.getText(ClipboardContent.MIME_RTF),
+                rich == null ? null : rich.getText(ClipboardContent.MIME_MARKDOWN),
+                rich == null ? null : rich.getText(ClipboardContent.MIME_ASCIIDOC))) {
             return;
         }
         HTMLDocument doc = Window.current().getDocument();

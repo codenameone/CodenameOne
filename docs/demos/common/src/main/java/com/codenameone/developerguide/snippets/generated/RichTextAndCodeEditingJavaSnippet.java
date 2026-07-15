@@ -30,6 +30,9 @@ import com.codename1.ui.RichTextArea;
 import com.codename1.ui.RichTextFormat;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
+import com.codename1.ui.editor.SyntaxHighlighter;
+import com.codename1.ui.editor.SyntaxHighlightResult;
+import com.codename1.ui.editor.SyntaxToken;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -46,9 +49,9 @@ class RichTextAndCodeEditingJavaSnippet {
 
     void lightweightFields() {
         // tag::rich-text-and-code-editing-java-lightweight-fields[]
-        TextField title = new TextField("", "Title", 80, TextArea.ANY);
         TextArea.setLightweightEditingEnabled(true);
 
+        TextField title = new TextField("", "Title", 80, TextArea.ANY);
         TextArea notes = new TextArea("", 5, 30);
         // end::rich-text-and-code-editing-java-lightweight-fields[]
     }
@@ -65,6 +68,23 @@ class RichTextAndCodeEditingJavaSnippet {
             results.onSucess(proposals);
         });
         // end::rich-text-and-code-editing-java-completion[]
+    }
+
+    void syntaxHighlighter() {
+        // tag::rich-text-and-code-editing-java-highlighter[]
+        SyntaxHighlighter properties = (line, state) -> {
+            List<SyntaxToken> tokens = new ArrayList<>();
+            int equals = line.indexOf('=');
+            if (equals > 0) {
+                tokens.add(new SyntaxToken(0, equals, SyntaxToken.PROPERTY,
+                        0x005cc5, 0x9cdcfe));
+            }
+            return new SyntaxHighlightResult(tokens, 0);
+        };
+        CodeEditor.registerSyntaxHighlighter("properties", properties);
+
+        CodeEditor editor = new CodeEditor("properties", "accent=#0a66c2");
+        // end::rich-text-and-code-editing-java-highlighter[]
     }
 
     void diagnostics() {

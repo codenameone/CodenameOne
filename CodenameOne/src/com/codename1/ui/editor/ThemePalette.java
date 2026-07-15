@@ -88,6 +88,10 @@ public final class ThemePalette {
                 return comment;
             case Tokenizer.NUMBER:
                 return number;
+            case Tokenizer.TYPE:
+                return keyword;
+            case Tokenizer.PROPERTY:
+                return string;
             default:
                 return foreground;
         }

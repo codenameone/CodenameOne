@@ -104,8 +104,9 @@ lightweight editing components can implement the same protocol, but ordinary app
 
 `TextArea` and `TextField` normally keep their established native editing behavior. Applications that
 want Codename One to retain control of painting, selection, scrolling, focus, and clipboard handling
-can opt individual components into the shared lightweight engine. The option is off by default and is
-inherited by `TextField` from `TextArea`.
+can switch all standard text components to the shared lightweight engine. The option is a static,
+application-wide policy, is off by default, and applies to `TextField` through its `TextArea` base
+class. Set it once during application initialization rather than treating it as component state.
 
 [source,java]
 ----
@@ -120,7 +121,7 @@ when editing ends, so the `TextArea` or `TextField` remains the application-faci
 The mode requires a port implementation of the low-level text-input contract. A port that doesn't
 provide it falls back to the existing native editor rather than presenting a read-only canvas.
 Password fields also retain native editing so the platform can provide its protected text-entry
-behavior. This makes the feature safe to enable selectively while ports and applications migrate away
+behavior. This lets an application choose one editing architecture globally while ports migrate away
 from heavyweight native text overlays.
 
 === Selection, bidirectional text, and scrolling
@@ -164,22 +165,37 @@ document is saved and reloaded.
 
 ==== HTML, RTF, Markdown, and AsciiDoc
 
-`setContent(...)` and `insertContent(...)` accept a `RichTextFormat`. HTML is parsed directly;
-Markdown and AsciiDoc headings, emphasis, links, images, lists, quotes, and literal blocks are mapped
-to the same rich model. The RTF importer handles paragraph breaks, Unicode escapes, bold, italic,
+`setContent(...)` and `insertContent(...)` accept a `RichTextFormat`. HTML is parsed directly with the
+shared `HTMLParser`. Markdown and AsciiDoc use their own bidirectional model adapters; they never pass
+through HTML. Headings, emphasis, inline code, links, images, lists, quotes, and literal blocks are
+mapped directly to the rich model and serialized directly back with `getMarkdown(...)` or
+`getAsciiDoc(...)`. The RTF importer likewise maps paragraph breaks, Unicode escapes, bold, italic,
 underline, strike-through, and skips metadata destinations such as font and color tables.
+
+On a browser fallback, Markdown, AsciiDoc, and RTF remain in source mode: editing and reading the same
+format returns source text instead of silently replacing it with generated HTML. Requesting a
+different output format performs an explicit model conversion and returns canonical output, just as
+`getHtml(...)` canonicalizes a visual rich-text document.
 
 [source,java]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/RichTextAndCodeEditingJavaSnippet.java[tag=rich-text-and-code-editing-java-formats,indent=0]
 ----
 
-Rich paste uses `RichTextClipboardData`, which always carries a plain-text fallback and can also carry
-HTML, RTF, Markdown, or AsciiDoc. `RichTextArea` chooses the richest available representation; plain
-`EditorView` consumers use the fallback. Copying a rich selection publishes both canonical HTML and
-plain text. Android, Java SE, and the JavaScript port read the rich MIME types exposed by their native
-clipboards, while ports with text-only clipboard APIs preserve rich data for in-application
-round-trips and publish the plain representation to other applications.
+Rich paste uses `ClipboardContent`, a MIME-keyed container exposed by `Display.copyToClipboard(...)`
+and `Display.getClipboardContent()`. `RichTextClipboardData` is its convenience subtype for
+`text/plain`, `text/html`, `text/rtf`, `text/markdown`, and `text/asciidoc`. A writer publishes all
+representations in one operation and a reader selects the richest format it understands; plain
+`EditorView` consumers use `text/plain`. Copying a rich selection publishes canonical HTML, RTF,
+Markdown, AsciiDoc, and the required plain fallback. Java SE publishes native `DataFlavor` values,
+Android publishes native plain and HTML clip data, the JavaScript port uses `ClipboardItem` when the
+browser allows it, and iOS publishes pasteboard types. A port that only has a text clipboard still
+publishes plain text externally and retains the complete `ClipboardContent` for in-application use.
+
+The negotiation API belongs at the implementation boundary, not inside `RichTextArea`. Port authors
+override clipboard handling in `CodenameOneImplementation` and return the formats actually present on
+the system clipboard. Applications can use the same API for domain-specific formats without changing
+the editor.
 
 RTF is also recognized when a clipboard provider returns it as a string beginning with an RTF header.
 Format import is intentionally a practical interchange subset, not a layout-compatible word
@@ -215,6 +231,27 @@ uses the same language highlighting, line-number gutter, keyboard navigation, di
 diagnostic tooltips available to applications. Compiler diagnostics are passed to
 `setDiagnostics(...)` with their source ranges; status messages use lightweight Codename One
 components beneath the editor. The Playground doesn't install or bundle a separate editor engine.
+The browser fallback disables browser spelling and autocorrection for source code; the only wavy
+underlines it draws are diagnostics supplied through `setDiagnostics(...)`.
+
+==== Custom syntax highlighters
+
+Built-in languages use grammar-specific incremental lexers. JSON doesn't accept single-quoted
+strings, CSS doesn't interpret `//` as a comment, XML tracks tags and attributes, Python carries
+triple-quoted strings across lines, and C-family numeric prefixes are validated by radix. These rules
+are deliberately lexical; a compiler or language server remains the authority for diagnostics.
+
+Third-party libraries can register a `SyntaxHighlighter` under any language ID. The highlighter
+receives one line and the state returned for the preceding line, then returns ordered token spans and
+the next state. Tokens can use the built-in semantic kinds or provide explicit light and dark RGB
+colors. Registration is global; the pure renderer invokes it directly, and the browser fallback asks
+the same Java highlighter for spans and applies the returned ranges without requiring a JavaScript
+copy of the language grammar.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/RichTextAndCodeEditingJavaSnippet.java[tag=rich-text-and-code-editing-java-highlighter,indent=0]
+----
 
 ==== Asynchronous code completion
 
@@ -233,7 +270,8 @@ text, plus a type badge and detail string.
 ==== Diagnostics
 
 `setDiagnostics(...)` accepts 1-based source ranges. Errors, warnings, and informational entries appear
-as squiggly underlines, gutter markers, and messages associated with the marked range.
+under only the supplied character range, with a gutter marker for the affected line. Hover the range
+or marker on desktop, or tap it on touch devices, to display its message.
 
 [source,java]
 ----

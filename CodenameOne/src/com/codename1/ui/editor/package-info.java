@@ -50,7 +50,10 @@
 /// - `HtmlImporter` - parses the HTML fragment accepted by `RichTextArea` into
 /// the styled block/run model the engine renders.
 ///
+/// - `SyntaxHighlighter`, `SyntaxToken`, and `SyntaxHighlightResult` - the
+/// public extension contract for incremental third-party code highlighting.
+///
 /// These classes are the implementation of the two public editor components;
-/// applications interact with `RichTextArea` and `CodeEditor` rather than with
-/// the types here.
+/// applications normally interact with `RichTextArea` and `CodeEditor`, while
+/// syntax-highlighting extensions implement the public contract in this package.
 package com.codename1.ui.editor;

@@ -30,15 +30,22 @@ import java.util.Set;
 /// keyword set, comment styles, string delimiters and number syntax. The keyword lists match the ones
 /// the previous `BrowserComponent` highlighter used.
 public final class LanguageDef {
+    static final int GENERIC = 0;
+    static final int PYTHON_GRAMMAR = 1;
+    static final int CSS_GRAMMAR = 2;
+    static final int JSON_GRAMMAR = 3;
+    static final int XML_GRAMMAR = 4;
+
     private final Set<String> keywords;
     private final boolean lineCommentSlash;
     private final boolean lineCommentHash;
     private final boolean blockComment;
     private final boolean templateString;
     private final boolean plain;
+    private final int grammar;
 
     private LanguageDef(String[] keywords, boolean lineCommentSlash, boolean lineCommentHash,
-                        boolean blockComment, boolean templateString, boolean plain) {
+                        boolean blockComment, boolean templateString, boolean plain, int grammar) {
         this.keywords = new HashSet<String>();
         for (String keyword : keywords) {
             this.keywords.add(keyword);
@@ -48,6 +55,7 @@ public final class LanguageDef {
         this.blockComment = blockComment;
         this.templateString = templateString;
         this.plain = plain;
+        this.grammar = grammar;
     }
 
     /// True for plain text (no syntax highlighting at all).
@@ -78,6 +86,10 @@ public final class LanguageDef {
     /// True when backtick template strings (which may span lines) are supported.
     public boolean hasTemplateString() {
         return templateString;
+    }
+
+    int getGrammar() {
+        return grammar;
     }
 
     private static final String[] JAVA = {
@@ -125,15 +137,15 @@ public final class LanguageDef {
         "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned", "void", "volatile", "while"
     };
 
-    private static final LanguageDef DEF_JAVA = new LanguageDef(JAVA, true, false, true, false, false);
-    private static final LanguageDef DEF_KOTLIN = new LanguageDef(KOTLIN, true, false, true, false, false);
-    private static final LanguageDef DEF_JAVASCRIPT = new LanguageDef(JAVASCRIPT, true, false, true, true, false);
-    private static final LanguageDef DEF_PYTHON = new LanguageDef(PYTHON, false, true, false, false, false);
-    private static final LanguageDef DEF_CSS = new LanguageDef(CSS, false, false, true, false, false);
-    private static final LanguageDef DEF_JSON = new LanguageDef(JSON, false, false, false, false, false);
-    private static final LanguageDef DEF_XML = new LanguageDef(XML, false, false, false, false, false);
-    private static final LanguageDef DEF_C = new LanguageDef(C, true, false, true, false, false);
-    private static final LanguageDef DEF_TEXT = new LanguageDef(XML, false, false, false, false, true);
+    private static final LanguageDef DEF_JAVA = new LanguageDef(JAVA, true, false, true, false, false, GENERIC);
+    private static final LanguageDef DEF_KOTLIN = new LanguageDef(KOTLIN, true, false, true, false, false, GENERIC);
+    private static final LanguageDef DEF_JAVASCRIPT = new LanguageDef(JAVASCRIPT, true, false, true, true, false, GENERIC);
+    private static final LanguageDef DEF_PYTHON = new LanguageDef(PYTHON, false, true, false, false, false, PYTHON_GRAMMAR);
+    private static final LanguageDef DEF_CSS = new LanguageDef(CSS, false, false, true, false, false, CSS_GRAMMAR);
+    private static final LanguageDef DEF_JSON = new LanguageDef(JSON, false, false, false, false, false, JSON_GRAMMAR);
+    private static final LanguageDef DEF_XML = new LanguageDef(XML, false, false, false, false, false, XML_GRAMMAR);
+    private static final LanguageDef DEF_C = new LanguageDef(C, true, false, true, false, false, GENERIC);
+    private static final LanguageDef DEF_TEXT = new LanguageDef(XML, false, false, false, false, true, GENERIC);
 
     /// Returns the language definition for the given language id, defaulting to a plain text definition
     /// (no highlighting) for unknown ids.

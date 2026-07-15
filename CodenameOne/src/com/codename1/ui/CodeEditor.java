@@ -26,6 +26,8 @@ package com.codename1.ui;
 import com.codename1.ui.editor.CodePureEditor;
 import com.codename1.ui.editor.PureEditor;
 import com.codename1.ui.editor.SyntaxHighlighter;
+import com.codename1.ui.editor.SyntaxHighlightResult;
+import com.codename1.ui.editor.SyntaxToken;
 import com.codename1.util.SuccessCallback;
 
 import java.util.Hashtable;
@@ -124,6 +126,7 @@ public class CodeEditor extends AbstractEditorComponent {
     public void setLanguage(String language) {
         this.language = language == null ? "text" : language;
         command("setLanguage", this.language);
+        command("setCustomHighlighter", getRegisteredSyntaxHighlighter(this.language) == null ? "0" : "1");
     }
 
     /// Returns the current highlighting language id.
@@ -317,11 +320,94 @@ public class CodeEditor extends AbstractEditorComponent {
 
     @Override
     void onEditorEvent(String type, String value) {
+        if ("highlight".equals(type)) {
+            handleHighlightRequest(value);
+            return;
+        }
         if ("complete".equals(type)) {
             handleCompletionRequest(value);
             return;
         }
         super.onEditorEvent(type, value);
+    }
+
+    private void handleHighlightRequest(String value) {
+        SyntaxHighlighter highlighter = getRegisteredSyntaxHighlighter(language);
+        if (highlighter == null || value == null) return;
+        int colon = value.indexOf(':');
+        if (colon < 0) return;
+        String request = value.substring(0, colon);
+        String source = value.substring(colon + 1);
+        StringBuilder html = new StringBuilder();
+        int state = 0;
+        int lineStart = 0;
+        while (lineStart <= source.length()) {
+            int lineEnd = source.indexOf('\n', lineStart);
+            boolean lastLine = lineEnd < 0;
+            if (lastLine) lineEnd = source.length();
+            if (lineStart > 0) html.append('\n');
+            String line = source.substring(lineStart, lineEnd);
+            SyntaxHighlightResult result = highlighter.tokenize(line, state);
+            if (result == null) {
+                appendHtml(html, line, 0, line.length());
+                state = 0;
+                if (lastLine) break;
+                lineStart = lineEnd + 1;
+                continue;
+            }
+            state = result.endState;
+            int position = 0;
+            for (int i = 0; i < result.tokens.size(); i++) {
+                SyntaxToken token = result.tokens.get(i);
+                if (token == null) continue;
+                int start = Math.max(position, Math.min(line.length(), token.start));
+                int end = Math.max(start, Math.min(line.length(), token.start + token.length));
+                appendHtml(html, line, position, start);
+                if (end > start) {
+                    appendTokenStart(html, token);
+                    appendHtml(html, line, start, end);
+                    html.append("</span>");
+                }
+                position = end;
+            }
+            appendHtml(html, line, position, line.length());
+            if (lastLine) break;
+            lineStart = lineEnd + 1;
+        }
+        command("applyCustomHighlight", request + ":" + html.toString());
+    }
+
+    private static void appendTokenStart(StringBuilder out, SyntaxToken token) {
+        if (token.lightColor >= 0 || token.darkColor >= 0) {
+            int light = token.lightColor >= 0 ? token.lightColor : token.darkColor;
+            int dark = token.darkColor >= 0 ? token.darkColor : token.lightColor;
+            out.append("<span class=\"cx\" style=\"--cl:#").append(rgb(light))
+                    .append(";--cd:#").append(rgb(dark)).append("\">");
+            return;
+        }
+        String css = token.kind == SyntaxToken.KEYWORD || token.kind == SyntaxToken.TYPE ? "kw"
+                : (token.kind == SyntaxToken.STRING || token.kind == SyntaxToken.PROPERTY ? "st"
+                : (token.kind == SyntaxToken.COMMENT ? "cm"
+                : (token.kind == SyntaxToken.NUMBER ? "nu" : "")));
+        out.append("<span");
+        if (css.length() > 0) out.append(" class=\"").append(css).append('"');
+        out.append('>');
+    }
+
+    private static String rgb(int color) {
+        String value = Integer.toHexString(color & 0xffffff);
+        while (value.length() < 6) value = "0" + value;
+        return value;
+    }
+
+    private static void appendHtml(StringBuilder out, String value, int start, int end) {
+        for (int i = start; i < end; i++) {
+            char c = value.charAt(i);
+            if (c == '&') out.append("&amp;");
+            else if (c == '<') out.append("&lt;");
+            else if (c == '>') out.append("&gt;");
+            else out.append(c);
+        }
     }
 
     private void handleCompletionRequest(String value) {

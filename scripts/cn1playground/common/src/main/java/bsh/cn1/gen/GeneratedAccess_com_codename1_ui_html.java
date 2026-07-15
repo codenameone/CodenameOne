@@ -112,6 +112,10 @@ public final class GeneratedAccess_com_codename1_ui_html {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.ui.html.HTMLParser();
             }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return new com.codename1.ui.html.HTMLParser(((Boolean) adaptedArgs[0]).booleanValue());
+            }
         }
         throw unsupportedConstruct(type, safeArgs);
     }
@@ -484,6 +488,15 @@ public final class GeneratedAccess_com_codename1_ui_html {
     }
 
     private static Object invoke4(com.codename1.ui.html.HTMLComponent typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("accessibilityChanged".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.accessibilityChanged(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.accessibilityChanged(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
         if ("actionPerformed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false);
@@ -833,6 +846,11 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("getAbsoluteY".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getAbsoluteY();
+            }
+        }
+        if ("getAccessibilityNode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessibilityNode();
             }
         }
         if ("getAccessibilityText".equals(name)) {
@@ -1302,6 +1320,11 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("getSelectedStyle".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getSelectedStyle();
+            }
+        }
+        if ("getSemantics".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSemantics();
             }
         }
         if ("getSideGap".equals(name)) {

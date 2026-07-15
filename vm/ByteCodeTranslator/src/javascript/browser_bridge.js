@@ -1706,10 +1706,24 @@
     var text = (request && request.text != null) ? String(request.text) : '';
     var nav = global.navigator || (global.window && global.window.navigator);
     try {
-      if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
-        return nav.clipboard.writeText(text).then(function() {
+      if (nav && nav.clipboard && typeof nav.clipboard.write === 'function'
+          && typeof global.ClipboardItem === 'function' && request) {
+        var values = {'text/plain': new global.Blob([text], {type: 'text/plain'})};
+        var supports = typeof global.ClipboardItem.supports === 'function'
+          ? function(type) { return global.ClipboardItem.supports(type); }
+          : function(type) { return type === 'text/plain' || type === 'text/html'; };
+        if (request.html != null && supports('text/html')) values['text/html'] = new global.Blob([String(request.html)], {type: 'text/html'});
+        if (request.rtf != null && supports('text/rtf')) values['text/rtf'] = new global.Blob([String(request.rtf)], {type: 'text/rtf'});
+        if (request.markdown != null && supports('text/markdown')) values['text/markdown'] = new global.Blob([String(request.markdown)], {type: 'text/markdown'});
+        if (request.asciidoc != null && supports('text/asciidoc')) values['text/asciidoc'] = new global.Blob([String(request.asciidoc)], {type: 'text/asciidoc'});
+        return nav.clipboard.write([new global.ClipboardItem(values)]).then(function() {
           return 1;
         }, function() {
+          return execCommandClipboardFallback(text) ? 1 : 0;
+        });
+      }
+      if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
+        return nav.clipboard.writeText(text).then(function() { return 1; }, function() {
           return execCommandClipboardFallback(text) ? 1 : 0;
         });
       }

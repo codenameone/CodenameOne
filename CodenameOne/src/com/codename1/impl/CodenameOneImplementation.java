@@ -5204,7 +5204,7 @@ public abstract class CodenameOneImplementation {
     /// Copies multiple native clipboard representations in one operation. Ports should override
     /// `copyToClipboard(Object)` and publish every MIME representation they support.
     public void copyToClipboard(ClipboardContent content) {
-        copyToClipboard((Object)content);
+        copyToClipboard((Object) content);
     }
 
     /// Returns the current content of the clipboard
@@ -5221,7 +5221,7 @@ public abstract class CodenameOneImplementation {
     public ClipboardContent getClipboardContent() {
         Object value = getPasteDataFromClipboard();
         if (value instanceof ClipboardContent) {
-            return (ClipboardContent)value;
+            return (ClipboardContent) value;
         }
         if (value instanceof String) {
             return new ClipboardContent().setData(ClipboardContent.MIME_TEXT, value);

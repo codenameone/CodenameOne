@@ -167,7 +167,7 @@ public class RichView extends EditorView {
         RichTextFormat format = null;
         String content = null;
         if (data instanceof ClipboardContent) {
-            ClipboardContent clipboard = (ClipboardContent)data;
+            ClipboardContent clipboard = (ClipboardContent) data;
             String mimeType = clipboard.findPreferredMimeType(new String[] {
                     ClipboardContent.MIME_HTML, ClipboardContent.MIME_RTF,
                     ClipboardContent.MIME_MARKDOWN, ClipboardContent.MIME_ASCIIDOC,
@@ -193,7 +193,7 @@ public class RichView extends EditorView {
             super.pasteClipboardData(data);
             return;
         }
-        HtmlImporter.Result imported = HtmlImporter.parse(RichTextImporter.toHtml(content, format));
+        HtmlImporter.Result imported = RichTextImporter.parse(content, format);
         insertContent(imported.getText(), imported.getStyles(), imported.getBlocks(), imported.getLinks(),
                 RichPureEditor.loadImages(imported.getImageSources()), imported.getImageSources(),
                 imported.hasBlockContent());
@@ -224,7 +224,14 @@ public class RichView extends EditorView {
         }
         String html = HtmlSerializer.serialize(fragment, fragmentStyles, fragmentBlocks,
                 fragmentLinks, fragmentSources);
-        Display.getInstance().copyToClipboard(new RichTextClipboardData(plain).setHtml(html));
+        RichTextClipboardData clipboard = new RichTextClipboardData(plain).setHtml(html);
+        clipboard.setRtf(RichTextSerializer.serialize(fragment, fragmentStyles, fragmentBlocks,
+                fragmentLinks, fragmentSources, RichTextFormat.RTF));
+        clipboard.setMarkdown(RichTextSerializer.serialize(fragment, fragmentStyles, fragmentBlocks,
+                fragmentLinks, fragmentSources, RichTextFormat.MARKDOWN));
+        clipboard.setAsciiDoc(RichTextSerializer.serialize(fragment, fragmentStyles, fragmentBlocks,
+                fragmentLinks, fragmentSources, RichTextFormat.ASCIIDOC));
+        Display.getInstance().copyToClipboard(clipboard);
     }
 
     private static String valueAt(List<String> values, int index) {

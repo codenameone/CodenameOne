@@ -23,6 +23,8 @@
 
 package com.codename1.ui.editor;
 
+import com.codename1.ui.RichTextFormat;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -55,6 +57,18 @@ public class RichPureEditor extends PureEditor {
             HtmlImporter.Result r = HtmlImporter.parse(arg == null ? "" : arg);
             rich.insertContent(r.getText(), r.getStyles(), r.getBlocks(), r.getLinks(),
                     loadImages(r.getImageSources()), r.getImageSources(), r.hasBlockContent());
+            return;
+        }
+        RichTextFormat format = formatForCommand(name);
+        if (format != null) {
+            HtmlImporter.Result r = RichTextImporter.parse(arg == null ? "" : arg, format);
+            if (name.startsWith("set")) {
+                rich.importContent(r.getText(), r.getStyles(), r.getBlocks(), r.getLinks(),
+                        loadImages(r.getImageSources()), r.getImageSources());
+            } else {
+                rich.insertContent(r.getText(), r.getStyles(), r.getBlocks(), r.getLinks(),
+                        loadImages(r.getImageSources()), r.getImageSources(), r.hasBlockContent());
+            }
             return;
         }
         if ("insertImage".equals(name)) {
@@ -152,10 +166,44 @@ public class RichPureEditor extends PureEditor {
         if ("getText".equals(name)) {
             return rich.getText();
         }
+        RichTextFormat outputFormat = formatForQuery(name);
+        if (outputFormat != null) {
+            return RichTextSerializer.serialize(rich.getDocument(), rich.getInlineStyles(), rich.getBlocks(),
+                    rich.getLinkRuns(), rich.getImageSources(), outputFormat);
+        }
         if ("state".equals(name)) {
             return rich.queryState(arg) ? "1" : "0";
         }
         return super.query(name, arg);
+    }
+
+    private static RichTextFormat formatForCommand(String name) {
+        if ("setMarkdown".equals(name) || "insertMarkdown".equals(name)) {
+            return RichTextFormat.MARKDOWN;
+        }
+        if ("setAsciiDoc".equals(name) || "insertAsciiDoc".equals(name)) {
+            return RichTextFormat.ASCIIDOC;
+        }
+        if ("setRtf".equals(name) || "insertRtf".equals(name)) {
+            return RichTextFormat.RTF;
+        }
+        if ("setPlainText".equals(name) || "insertPlainText".equals(name)) {
+            return RichTextFormat.PLAIN_TEXT;
+        }
+        return null;
+    }
+
+    private static RichTextFormat formatForQuery(String name) {
+        if ("getMarkdown".equals(name)) {
+            return RichTextFormat.MARKDOWN;
+        }
+        if ("getAsciiDoc".equals(name)) {
+            return RichTextFormat.ASCIIDOC;
+        }
+        if ("getRtf".equals(name)) {
+            return RichTextFormat.RTF;
+        }
+        return null;
     }
 
     private static int parseCss(String v) {

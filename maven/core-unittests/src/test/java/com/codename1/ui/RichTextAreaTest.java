@@ -27,6 +27,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -306,5 +307,33 @@ class RichTextAreaTest extends UITestBase {
         assertNotNull(text.get());
         assertTrue(text.get().contains("hello"));
         assertTrue(text.get().contains("world"));
+    }
+
+    @FormTest
+    void testPureBackendRoundTripsMarkdownWithoutHtml() {
+        implementation.setEditorNativePeerSupported(false);
+        implementation.setTextInputSupported(true);
+        RichTextArea editor = new RichTextArea();
+        Form f = new Form("rt", new BorderLayout());
+        f.add(BorderLayout.CENTER, editor);
+        f.show();
+        pump();
+        editor.setMarkdown("# Title\n\n**bold** `code`");
+        AtomicReference<String> markdown = new AtomicReference<String>();
+        editor.getMarkdown(markdown::set);
+        pump();
+        assertTrue(markdown.get().contains("# Title"));
+        assertTrue(markdown.get().contains("**bold**"));
+        assertTrue(markdown.get().contains("`code`"));
+        assertFalse(markdown.get().contains("<h1>"));
+    }
+
+    @Test
+    void browserBackendKeepsSourceFormatsBidirectional() {
+        String page = new RichTextArea().createEditorHtml();
+        assertTrue(page.contains("case 'setMarkdown':sourceFormat='markdown';ed.textContent=arg||''"));
+        assertTrue(page.contains("case 'getMarkdown':return sourceFormat=='markdown'"));
+        assertTrue(page.contains("case 'setAsciiDoc':sourceFormat='asciidoc';ed.textContent=arg||''"));
+        assertTrue(page.contains("case 'getAsciiDoc':return sourceFormat=='asciidoc'"));
     }
 }

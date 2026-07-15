@@ -613,6 +613,45 @@ void com_codename1_impl_ios_IOSNative_setClipboardString___java_lang_String(CN1_
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
 }
 
+static NSString* cn1PasteboardTypeForMime(NSString* mimeType) {
+    if ([mimeType isEqualToString:@"text/plain"]) return @"public.utf8-plain-text";
+    if ([mimeType isEqualToString:@"text/html"]) return @"public.html";
+    if ([mimeType isEqualToString:@"text/rtf"]) return @"public.rtf";
+    return mimeType;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardContent___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeType) {
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+    POOL_BEGIN();
+    NSString* type = cn1PasteboardTypeForMime(toNSString(CN1_THREAD_STATE_PASS_ARG mimeType));
+    NSData* data = [[UIPasteboard generalPasteboard] dataForPasteboardType:type];
+    NSString* value = data == nil ? nil : [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    JAVA_OBJECT result = fromNSString(CN1_THREAD_STATE_PASS_ARG value);
+    POOL_END();
+    return result;
+#else
+    return JAVA_NULL;
+#endif
+}
+
+void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT plain, JAVA_OBJECT html, JAVA_OBJECT rtf, JAVA_OBJECT markdown, JAVA_OBJECT asciidoc) {
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+    POOL_BEGIN();
+    NSMutableDictionary* item = [NSMutableDictionary dictionary];
+    JAVA_OBJECT values[] = { plain, html, rtf, markdown, asciidoc };
+    NSString* types[] = { @"public.utf8-plain-text", @"public.html", @"public.rtf", @"text/markdown", @"text/asciidoc" };
+    for (int i = 0; i < 5; i++) {
+        if (values[i] != JAVA_NULL) {
+            NSString* value = toNSString(CN1_THREAD_STATE_PASS_ARG values[i]);
+            NSData* data = [value dataUsingEncoding:NSUTF8StringEncoding];
+            if (data != nil) [item setObject:data forKey:types[i]];
+        }
+    }
+    [UIPasteboard generalPasteboard].items = [NSArray arrayWithObject:item];
+    POOL_END();
+#endif
+}
+
 
 void retainCN1(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o){
     com_codename1_impl_ios_IOSImplementation_retain___java_lang_Object(CN1_THREAD_STATE_PASS_ARG o);

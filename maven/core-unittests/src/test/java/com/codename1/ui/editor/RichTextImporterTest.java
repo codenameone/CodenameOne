@@ -25,14 +25,17 @@ package com.codename1.ui.editor;
 
 import com.codename1.ui.RichTextFormat;
 import com.codename1.ui.RichTextClipboardData;
+import com.codename1.ui.ClipboardContent;
+import com.codename1.ui.Display;
 import com.codename1.ui.TextInputClient;
 import com.codename1.ui.TextInputConfig;
 import com.codename1.ui.TextInputState;
+import com.codename1.junit.UITestBase;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class RichTextImporterTest {
+class RichTextImporterTest extends UITestBase {
 
     private static final class NoopHost implements EditorHost {
         public boolean isTextInputSupported() { return false; }
@@ -46,10 +49,11 @@ class RichTextImporterTest {
     private static final class PasteView extends RichView {
         PasteView() { super(new NoopHost()); }
         void paste(Object data) { pasteClipboardData(data); }
+        void copy() { copySelection(); }
     }
 
     private static HtmlImporter.Result parse(String value, RichTextFormat format) {
-        return HtmlImporter.parse(RichTextImporter.toHtml(value, format));
+        return RichTextImporter.parse(value, format);
     }
 
     @Test
@@ -62,8 +66,11 @@ class RichTextImporterTest {
         assertTrue(result.getStyles().get(bold).isBold());
         int link = result.getText().indexOf("link");
         assertEquals("https://example.com", result.getLinks().get(link));
-        assertTrue(result.getBlocks().get(2).listType == RichBlocks.LIST_UNORDERED
-                || result.getBlocks().get(1).listType == RichBlocks.LIST_UNORDERED);
+        boolean unordered = false;
+        for (RichBlocks.BlockAttr block : result.getBlocks()) {
+            unordered |= block.listType == RichBlocks.LIST_UNORDERED;
+        }
+        assertTrue(unordered);
         assertTrue(result.getImageSources().contains("pic.png"));
     }
 
@@ -113,5 +120,85 @@ class RichTextImporterTest {
         view.paste("{\\rtf1\\ansi {\\i RTF}}");
         assertEquals("RTF", view.getText().trim());
         assertTrue(view.getInlineStyles().styleAt(view.getText().indexOf("RTF")).isItalic());
+    }
+
+    @Test
+    void markdownAndAsciiDocSerializeBackWithoutHtml() {
+        HtmlImporter.Result markdown = RichTextImporter.parse(
+                "# Title\n\nA **bold** `code` [link](https://example.com)\n\n- one",
+                RichTextFormat.MARKDOWN);
+        String markdownOut = serialize(markdown, RichTextFormat.MARKDOWN);
+        assertTrue(markdownOut.contains("# Title"));
+        assertTrue(markdownOut.contains("**bold**"));
+        assertTrue(markdownOut.contains("`code`"));
+        assertTrue(markdownOut.contains("[link](https://example.com)"));
+        assertTrue(markdownOut.contains("- one"));
+        assertFalse(markdownOut.contains("<p>"));
+
+        HtmlImporter.Result asciidoc = RichTextImporter.parse(
+                "= Title\n\nA *bold* +code+ [underline]#under# [line-through]#gone# https://example.com[link]\n\n. one",
+                RichTextFormat.ASCIIDOC);
+        String asciidocOut = serialize(asciidoc, RichTextFormat.ASCIIDOC);
+        assertTrue(asciidocOut.contains("= Title"));
+        assertTrue(asciidocOut.contains("*bold*"));
+        assertTrue(asciidocOut.contains("+code+"));
+        assertTrue(asciidocOut.contains("[underline]#under#"));
+        assertTrue(asciidocOut.contains("[line-through]#gone#"));
+        assertTrue(asciidocOut.contains("https://example.com[link]"));
+        assertTrue(asciidocOut.contains(". one"));
+        assertFalse(asciidocOut.contains("<p>"));
+    }
+
+    @Test
+    void richCopyPublishesNegotiableNativeRepresentations() {
+        PasteView view = new PasteView();
+        HtmlImporter.Result result = HtmlImporter.parse("<p><b>bold</b> <a href=\"https://example.com\">link</a></p>");
+        view.importContent(result.getText(), result.getStyles(), result.getBlocks(), result.getLinks(),
+                RichPureEditor.loadImages(result.getImageSources()), result.getImageSources());
+        view.setSelectionRange(0, view.getTextLength());
+        view.copy();
+        ClipboardContent clipboard = Display.getInstance().getClipboardContent();
+        assertNotNull(clipboard);
+        assertNotNull(clipboard.getText(ClipboardContent.MIME_TEXT));
+        assertTrue(clipboard.getText(ClipboardContent.MIME_HTML).contains("<b>bold</b>"));
+        assertTrue(clipboard.getText(ClipboardContent.MIME_RTF).startsWith("{\\rtf1"));
+        assertTrue(clipboard.getText(ClipboardContent.MIME_MARKDOWN).contains("**bold**"));
+        assertTrue(clipboard.getText(ClipboardContent.MIME_ASCIIDOC).contains("*bold*"));
+    }
+
+    @Test
+    void lightweightFormatsRoundTripEscapesAndLinkedImages() {
+        String markdownSource = "[![image](logo.png)](https://example.com) and literal \\*asterisk\\*";
+        HtmlImporter.Result markdown = RichTextImporter.parse(markdownSource, RichTextFormat.MARKDOWN);
+        int image = markdown.getText().indexOf('\uFFFC');
+        assertTrue(image >= 0);
+        assertEquals("logo.png", markdown.getImageSources().get(image));
+        assertEquals("https://example.com", markdown.getLinks().get(image));
+        assertEquals(markdownSource, serialize(markdown, RichTextFormat.MARKDOWN));
+
+        String asciidocSource = "https://example.com[image:logo.png[]] and literal \\*asterisk\\*";
+        HtmlImporter.Result asciidoc = RichTextImporter.parse(asciidocSource, RichTextFormat.ASCIIDOC);
+        image = asciidoc.getText().indexOf('\uFFFC');
+        assertTrue(image >= 0);
+        assertEquals("logo.png", asciidoc.getImageSources().get(image));
+        assertEquals("https://example.com", asciidoc.getLinks().get(image));
+        assertEquals(asciidocSource, serialize(asciidoc, RichTextFormat.ASCIIDOC));
+    }
+
+    private static String serialize(HtmlImporter.Result result, RichTextFormat format) {
+        EditorDocument doc = new EditorDocument(result.getText());
+        InlineStyles inline = new InlineStyles(doc.length());
+        for (int i = 0; i < doc.length(); i++) {
+            inline.setAt(i, result.getStyles().get(i));
+        }
+        RichBlocks blocks = new RichBlocks(doc.getLineCount());
+        for (int i = 0; i < blocks.count(); i++) {
+            RichBlocks.BlockAttr source = result.getBlocks().get(i);
+            RichBlocks.BlockAttr target = blocks.get(i);
+            target.type = source.type;
+            target.listType = source.listType;
+        }
+        return RichTextSerializer.serialize(doc, inline, blocks, result.getLinks(),
+                result.getImageSources(), format);
     }
 }

@@ -1222,6 +1222,15 @@ public final class GeneratedAccess_com_codename1_maps {
     }
 
     private static Object invoke11(com.codename1.maps.MapComponent typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("accessibilityChanged".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.accessibilityChanged(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.accessibilityChanged(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -1569,6 +1578,11 @@ public final class GeneratedAccess_com_codename1_maps {
         if ("getAbsoluteY".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getAbsoluteY();
+            }
+        }
+        if ("getAccessibilityNode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessibilityNode();
             }
         }
         if ("getAccessibilityText".equals(name)) {
@@ -2051,6 +2065,11 @@ public final class GeneratedAccess_com_codename1_maps {
         if ("getSelectedStyle".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getSelectedStyle();
+            }
+        }
+        if ("getSemantics".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSemantics();
             }
         }
         if ("getSideGap".equals(name)) {
@@ -3341,6 +3360,15 @@ public final class GeneratedAccess_com_codename1_maps {
     }
 
     private static Object invoke13(com.codename1.maps.MapView typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("accessibilityChanged".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.accessibilityChanged(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.accessibilityChanged(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -3723,6 +3751,11 @@ public final class GeneratedAccess_com_codename1_maps {
         if ("getAbsoluteY".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getAbsoluteY();
+            }
+        }
+        if ("getAccessibilityNode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessibilityNode();
             }
         }
         if ("getAccessibilityText".equals(name)) {
@@ -4189,6 +4222,11 @@ public final class GeneratedAccess_com_codename1_maps {
                 return typedTarget.getSelectedStyle();
             }
         }
+        if ("getSemantics".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSemantics();
+            }
+        }
         if ("getSideGap".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getSideGap();
@@ -4389,6 +4427,11 @@ public final class GeneratedAccess_com_codename1_maps {
         if ("isLoadingTiles".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isLoadingTiles();
+            }
+        }
+        if ("isMapReady".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isMapReady();
             }
         }
         if ("isNativeMap".equals(name)) {
@@ -5537,6 +5580,15 @@ public final class GeneratedAccess_com_codename1_maps {
     }
 
     private static Object invoke15(com.codename1.maps.NativeMap typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("accessibilityChanged".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.accessibilityChanged(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.accessibilityChanged(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -5924,6 +5976,11 @@ public final class GeneratedAccess_com_codename1_maps {
         if ("getAbsoluteY".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getAbsoluteY();
+            }
+        }
+        if ("getAccessibilityNode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessibilityNode();
             }
         }
         if ("getAccessibilityText".equals(name)) {
@@ -6383,6 +6440,11 @@ public final class GeneratedAccess_com_codename1_maps {
         if ("getSelectedStyle".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getSelectedStyle();
+            }
+        }
+        if ("getSemantics".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSemantics();
             }
         }
         if ("getSideGap".equals(name)) {

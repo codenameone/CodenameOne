@@ -7852,6 +7852,20 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public Object getPasteDataFromClipboard() {
         String s = nativeInstance.getClipboardString();
+        com.codename1.ui.ClipboardContent content = new com.codename1.ui.ClipboardContent()
+                .setData(com.codename1.ui.ClipboardContent.MIME_TEXT, s)
+                .setData(com.codename1.ui.ClipboardContent.MIME_HTML,
+                        nativeInstance.getClipboardContent(com.codename1.ui.ClipboardContent.MIME_HTML))
+                .setData(com.codename1.ui.ClipboardContent.MIME_RTF,
+                        nativeInstance.getClipboardContent(com.codename1.ui.ClipboardContent.MIME_RTF))
+                .setData(com.codename1.ui.ClipboardContent.MIME_MARKDOWN,
+                        nativeInstance.getClipboardContent(com.codename1.ui.ClipboardContent.MIME_MARKDOWN))
+                .setData(com.codename1.ui.ClipboardContent.MIME_ASCIIDOC,
+                        nativeInstance.getClipboardContent(com.codename1.ui.ClipboardContent.MIME_ASCIIDOC));
+        int mimeCount = content.getMimeTypes().length;
+        if(mimeCount > 1 || (s == null && mimeCount > 0)) {
+            return content;
+        }
         if(s != null) {
             Object lightweight = super.getPasteDataFromClipboard();
             if(lightweight instanceof com.codename1.ui.ClipboardContent
@@ -7867,8 +7881,13 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public void copyToClipboard(Object obj) {
         if(obj instanceof com.codename1.ui.ClipboardContent) {
-            nativeInstance.setClipboardString(((com.codename1.ui.ClipboardContent)obj)
-                    .getText(com.codename1.ui.ClipboardContent.MIME_TEXT));
+            com.codename1.ui.ClipboardContent content = (com.codename1.ui.ClipboardContent)obj;
+            nativeInstance.setClipboardContent(
+                    content.getText(com.codename1.ui.ClipboardContent.MIME_TEXT),
+                    content.getText(com.codename1.ui.ClipboardContent.MIME_HTML),
+                    content.getText(com.codename1.ui.ClipboardContent.MIME_RTF),
+                    content.getText(com.codename1.ui.ClipboardContent.MIME_MARKDOWN),
+                    content.getText(com.codename1.ui.ClipboardContent.MIME_ASCIIDOC));
             super.copyToClipboard(obj);
             return;
         }

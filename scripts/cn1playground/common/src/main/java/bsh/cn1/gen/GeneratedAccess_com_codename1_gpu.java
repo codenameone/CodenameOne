@@ -35,6 +35,9 @@ public final class GeneratedAccess_com_codename1_gpu {
         if ("GltfLoader".equals(simpleName)) {
             return com.codename1.gpu.GltfLoader.class;
         }
+        if ("GltfImageModel".equals(simpleName)) {
+            return com.codename1.gpu.GltfLoader.GltfImageModel.class;
+        }
         if ("GltfModel".equals(simpleName)) {
             return com.codename1.gpu.GltfLoader.GltfModel.class;
         }
@@ -67,6 +70,9 @@ public final class GeneratedAccess_com_codename1_gpu {
         }
         if ("Primitives".equals(simpleName)) {
             return com.codename1.gpu.Primitives.class;
+        }
+        if ("Quaternion".equals(simpleName)) {
+            return com.codename1.gpu.Quaternion.class;
         }
         if ("RenderState".equals(simpleName)) {
             return com.codename1.gpu.RenderState.class;
@@ -196,15 +202,26 @@ public final class GeneratedAccess_com_codename1_gpu {
         if (type == com.codename1.gpu.GltfLoader.class) return invokeStatic0(name, safeArgs);
         if (type == com.codename1.gpu.Matrix4.class) return invokeStatic1(name, safeArgs);
         if (type == com.codename1.gpu.Primitives.class) return invokeStatic2(name, safeArgs);
-        if (type == com.codename1.gpu.RenderState.class) return invokeStatic3(name, safeArgs);
+        if (type == com.codename1.gpu.Quaternion.class) return invokeStatic3(name, safeArgs);
+        if (type == com.codename1.gpu.RenderState.class) return invokeStatic4(name, safeArgs);
         throw unsupportedStatic(type, name, safeArgs);
     }
 
     private static Object invokeStatic0(String name, Object[] safeArgs) throws Exception {
         if ("load".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
+                return com.codename1.gpu.GltfLoader.load((byte[]) adaptedArgs[0]);
+            }
             if (matches(safeArgs, new Class<?>[]{com.codename1.gpu.GraphicsDevice.class, byte[].class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.gpu.GraphicsDevice.class, byte[].class}, false);
                 return com.codename1.gpu.GltfLoader.load((com.codename1.gpu.GraphicsDevice) adaptedArgs[0], (byte[]) adaptedArgs[1]);
+            }
+        }
+        if ("loadImageModel".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{byte[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{byte[].class}, false);
+                return com.codename1.gpu.GltfLoader.loadImageModel((byte[]) adaptedArgs[0]);
             }
         }
         if ("loadModel".equals(name)) {
@@ -304,10 +321,95 @@ public final class GeneratedAccess_com_codename1_gpu {
                 return com.codename1.gpu.Primitives.quad((com.codename1.gpu.GraphicsDevice) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue());
             }
         }
+        if ("sphere".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
+                return com.codename1.gpu.Primitives.sphere(((Number) adaptedArgs[0]).floatValue(), toIntValue(adaptedArgs[1]), toIntValue(adaptedArgs[2]), ((Boolean) adaptedArgs[3]).booleanValue());
+            }
+            if (matches(safeArgs, new Class<?>[]{com.codename1.gpu.GraphicsDevice.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.gpu.GraphicsDevice.class, java.lang.Float.class, java.lang.Integer.class, java.lang.Integer.class, java.lang.Boolean.class}, false);
+                return com.codename1.gpu.Primitives.sphere((com.codename1.gpu.GraphicsDevice) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue(), toIntValue(adaptedArgs[2]), toIntValue(adaptedArgs[3]), ((Boolean) adaptedArgs[4]).booleanValue());
+            }
+        }
         throw unsupportedStatic(com.codename1.gpu.Primitives.class, name, safeArgs);
     }
 
     private static Object invokeStatic3(String name, Object[] safeArgs) throws Exception {
+        if ("conjugate".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{float[].class, float[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, float[].class}, false);
+                com.codename1.gpu.Quaternion.conjugate((float[]) adaptedArgs[0], (float[]) adaptedArgs[1]); return null;
+            }
+        }
+        if ("copy".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{float[].class, float[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, float[].class}, false);
+                com.codename1.gpu.Quaternion.copy((float[]) adaptedArgs[0], (float[]) adaptedArgs[1]); return null;
+            }
+        }
+        if ("fromAxisAngle".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
+                return com.codename1.gpu.Quaternion.fromAxisAngle(((Number) adaptedArgs[0]).floatValue(), ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue());
+            }
+        }
+        if ("identity".equals(name)) {
+            if (safeArgs.length == 0) {
+                return com.codename1.gpu.Quaternion.identity();
+            }
+        }
+        if ("integrateGyro".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{float[].class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, float[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, float[].class}, false);
+                com.codename1.gpu.Quaternion.integrateGyro((float[]) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).floatValue(), (float[]) adaptedArgs[5]); return null;
+            }
+        }
+        if ("multiply".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{float[].class, float[].class, float[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, float[].class, float[].class}, false);
+                com.codename1.gpu.Quaternion.multiply((float[]) adaptedArgs[0], (float[]) adaptedArgs[1], (float[]) adaptedArgs[2]); return null;
+            }
+        }
+        if ("normalize".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{float[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class}, false);
+                com.codename1.gpu.Quaternion.normalize((float[]) adaptedArgs[0]); return null;
+            }
+        }
+        if ("rotateVector".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{float[].class, float[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, float[].class}, false);
+                com.codename1.gpu.Quaternion.rotateVector((float[]) adaptedArgs[0], (float[]) adaptedArgs[1]); return null;
+            }
+        }
+        if ("setAxisAngle".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{float[].class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class, java.lang.Float.class}, false);
+                com.codename1.gpu.Quaternion.setAxisAngle((float[]) adaptedArgs[0], ((Number) adaptedArgs[1]).floatValue(), ((Number) adaptedArgs[2]).floatValue(), ((Number) adaptedArgs[3]).floatValue(), ((Number) adaptedArgs[4]).floatValue()); return null;
+            }
+        }
+        if ("setIdentity".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{float[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class}, false);
+                com.codename1.gpu.Quaternion.setIdentity((float[]) adaptedArgs[0]); return null;
+            }
+        }
+        if ("slerp".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{float[].class, float[].class, java.lang.Float.class, float[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, float[].class, java.lang.Float.class, float[].class}, false);
+                com.codename1.gpu.Quaternion.slerp((float[]) adaptedArgs[0], (float[]) adaptedArgs[1], ((Number) adaptedArgs[2]).floatValue(), (float[]) adaptedArgs[3]); return null;
+            }
+        }
+        if ("toMatrix".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{float[].class, float[].class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{float[].class, float[].class}, false);
+                com.codename1.gpu.Quaternion.toMatrix((float[]) adaptedArgs[0], (float[]) adaptedArgs[1]); return null;
+            }
+        }
+        throw unsupportedStatic(com.codename1.gpu.Quaternion.class, name, safeArgs);
+    }
+
+    private static Object invokeStatic4(String name, Object[] safeArgs) throws Exception {
         if ("opaque".equals(name)) {
             if (safeArgs.length == 0) {
                 return com.codename1.gpu.RenderState.opaque();
@@ -331,100 +433,107 @@ public final class GeneratedAccess_com_codename1_gpu {
                 unsupported = ex;
             }
         }
+        if (target instanceof com.codename1.gpu.GltfLoader.GltfImageModel) {
+            try {
+                return invoke1((com.codename1.gpu.GltfLoader.GltfImageModel) target, name, safeArgs);
+            } catch (CN1AccessException ex) {
+                unsupported = ex;
+            }
+        }
         if (target instanceof com.codename1.gpu.GltfLoader.GltfModel) {
             try {
-                return invoke1((com.codename1.gpu.GltfLoader.GltfModel) target, name, safeArgs);
+                return invoke2((com.codename1.gpu.GltfLoader.GltfModel) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.gpu.GpuCapabilities) {
             try {
-                return invoke2((com.codename1.gpu.GpuCapabilities) target, name, safeArgs);
+                return invoke3((com.codename1.gpu.GpuCapabilities) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.gpu.GraphicsDevice) {
             try {
-                return invoke3((com.codename1.gpu.GraphicsDevice) target, name, safeArgs);
+                return invoke4((com.codename1.gpu.GraphicsDevice) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.gpu.IndexBuffer) {
             try {
-                return invoke4((com.codename1.gpu.IndexBuffer) target, name, safeArgs);
+                return invoke5((com.codename1.gpu.IndexBuffer) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.gpu.Light) {
             try {
-                return invoke5((com.codename1.gpu.Light) target, name, safeArgs);
+                return invoke6((com.codename1.gpu.Light) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.gpu.Material) {
             try {
-                return invoke6((com.codename1.gpu.Material) target, name, safeArgs);
+                return invoke7((com.codename1.gpu.Material) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.gpu.Mesh) {
             try {
-                return invoke7((com.codename1.gpu.Mesh) target, name, safeArgs);
+                return invoke8((com.codename1.gpu.Mesh) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.gpu.RenderState) {
             try {
-                return invoke8((com.codename1.gpu.RenderState) target, name, safeArgs);
+                return invoke9((com.codename1.gpu.RenderState) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.gpu.RenderView) {
             try {
-                return invoke9((com.codename1.gpu.RenderView) target, name, safeArgs);
+                return invoke10((com.codename1.gpu.RenderView) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.gpu.Texture) {
             try {
-                return invoke10((com.codename1.gpu.Texture) target, name, safeArgs);
+                return invoke11((com.codename1.gpu.Texture) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.gpu.VertexAttribute) {
             try {
-                return invoke11((com.codename1.gpu.VertexAttribute) target, name, safeArgs);
+                return invoke12((com.codename1.gpu.VertexAttribute) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.gpu.VertexBuffer) {
             try {
-                return invoke12((com.codename1.gpu.VertexBuffer) target, name, safeArgs);
+                return invoke13((com.codename1.gpu.VertexBuffer) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.gpu.VertexFormat) {
             try {
-                return invoke13((com.codename1.gpu.VertexFormat) target, name, safeArgs);
+                return invoke14((com.codename1.gpu.VertexFormat) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
         }
         if (target instanceof com.codename1.gpu.Renderer) {
             try {
-                return invoke14((com.codename1.gpu.Renderer) target, name, safeArgs);
+                return invoke15((com.codename1.gpu.Renderer) target, name, safeArgs);
             } catch (CN1AccessException ex) {
                 unsupported = ex;
             }
@@ -505,7 +614,21 @@ public final class GeneratedAccess_com_codename1_gpu {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke1(com.codename1.gpu.GltfLoader.GltfModel typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke1(com.codename1.gpu.GltfLoader.GltfImageModel typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("getBaseColorImage".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getBaseColorImage();
+            }
+        }
+        if ("getMesh".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getMesh();
+            }
+        }
+        throw unsupportedInstance(typedTarget, name, safeArgs);
+    }
+
+    private static Object invoke2(com.codename1.gpu.GltfLoader.GltfModel typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getBaseColorTexture".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getBaseColorTexture();
@@ -519,7 +642,7 @@ public final class GeneratedAccess_com_codename1_gpu {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke2(com.codename1.gpu.GpuCapabilities typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke3(com.codename1.gpu.GpuCapabilities typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getMaxTextureSize".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getMaxTextureSize();
@@ -553,7 +676,7 @@ public final class GeneratedAccess_com_codename1_gpu {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke3(com.codename1.gpu.GraphicsDevice typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke4(com.codename1.gpu.GraphicsDevice typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("clear".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Boolean.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class, java.lang.Boolean.class, java.lang.Boolean.class}, false);
@@ -638,7 +761,7 @@ public final class GeneratedAccess_com_codename1_gpu {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke4(com.codename1.gpu.IndexBuffer typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke5(com.codename1.gpu.IndexBuffer typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("clearDirty".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.clearDirty(); return null;
@@ -684,7 +807,7 @@ public final class GeneratedAccess_com_codename1_gpu {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke5(com.codename1.gpu.Light typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke6(com.codename1.gpu.Light typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getAmbientColor".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getAmbientColor();
@@ -731,7 +854,7 @@ public final class GeneratedAccess_com_codename1_gpu {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke6(com.codename1.gpu.Material typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke7(com.codename1.gpu.Material typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getColor".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getColor();
@@ -795,7 +918,7 @@ public final class GeneratedAccess_com_codename1_gpu {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke7(com.codename1.gpu.Mesh typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke8(com.codename1.gpu.Mesh typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getIndices".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getIndices();
@@ -819,7 +942,7 @@ public final class GeneratedAccess_com_codename1_gpu {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke8(com.codename1.gpu.RenderState typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke9(com.codename1.gpu.RenderState typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getBlendMode".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getBlendMode();
@@ -867,7 +990,16 @@ public final class GeneratedAccess_com_codename1_gpu {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke9(com.codename1.gpu.RenderView typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke10(com.codename1.gpu.RenderView typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("accessibilityChanged".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.accessibilityChanged(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.accessibilityChanged(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
         if ("add".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.Component.class}, false);
@@ -1194,6 +1326,11 @@ public final class GeneratedAccess_com_codename1_gpu {
         if ("getAbsoluteY".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getAbsoluteY();
+            }
+        }
+        if ("getAccessibilityNode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessibilityNode();
             }
         }
         if ("getAccessibilityText".equals(name)) {
@@ -1643,6 +1780,11 @@ public final class GeneratedAccess_com_codename1_gpu {
         if ("getSelectedStyle".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getSelectedStyle();
+            }
+        }
+        if ("getSemantics".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSemantics();
             }
         }
         if ("getSideGap".equals(name)) {
@@ -2854,7 +2996,7 @@ public final class GeneratedAccess_com_codename1_gpu {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke10(com.codename1.gpu.Texture typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke11(com.codename1.gpu.Texture typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getFilter".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getFilter();
@@ -2901,7 +3043,7 @@ public final class GeneratedAccess_com_codename1_gpu {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke11(com.codename1.gpu.VertexAttribute typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke12(com.codename1.gpu.VertexAttribute typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("getComponents".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getComponents();
@@ -2915,7 +3057,7 @@ public final class GeneratedAccess_com_codename1_gpu {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke12(com.codename1.gpu.VertexBuffer typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke13(com.codename1.gpu.VertexBuffer typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("clearDirty".equals(name)) {
             if (safeArgs.length == 0) {
                 typedTarget.clearDirty(); return null;
@@ -2971,7 +3113,7 @@ public final class GeneratedAccess_com_codename1_gpu {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke13(com.codename1.gpu.VertexFormat typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke14(com.codename1.gpu.VertexFormat typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("findByUsage".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.gpu.VertexAttribute.Usage.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.gpu.VertexAttribute.Usage.class}, false);
@@ -3008,7 +3150,7 @@ public final class GeneratedAccess_com_codename1_gpu {
         throw unsupportedInstance(typedTarget, name, safeArgs);
     }
 
-    private static Object invoke14(com.codename1.gpu.Renderer typedTarget, String name, Object[] safeArgs) throws Exception {
+    private static Object invoke15(com.codename1.gpu.Renderer typedTarget, String name, Object[] safeArgs) throws Exception {
         if ("onDispose".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.gpu.GraphicsDevice.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.gpu.GraphicsDevice.class}, false);

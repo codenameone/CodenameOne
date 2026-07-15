@@ -1823,14 +1823,19 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag_java_lan
 // navigator.clipboard is Window-only), so route the write to the main thread
 // host bridge, which performs it within the forwarded click's user activation.
 bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyToClipboard_java_lang_String_R_boolean",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyToClipboard___java_lang_String_R_boolean"
-], function*(text) {
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyToClipboard_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyToClipboard___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_boolean"
+], function*(text, html, rtf, markdown, asciidoc) {
   if (typeof jvm.invokeHostNative !== "function") {
     return 0;
   }
   const value = text == null ? "" : jvm.toNativeString(text);
-  const result = yield jvm.invokeHostNative("__cn1_copy_to_clipboard__", [{ text: value }]);
+  const request = { text: value };
+  if (html != null) request.html = jvm.toNativeString(html);
+  if (rtf != null) request.rtf = jvm.toNativeString(rtf);
+  if (markdown != null) request.markdown = jvm.toNativeString(markdown);
+  if (asciidoc != null) request.asciidoc = jvm.toNativeString(asciidoc);
+  const result = yield jvm.invokeHostNative("__cn1_copy_to_clipboard__", [request]);
   return result ? 1 : 0;
 });
 

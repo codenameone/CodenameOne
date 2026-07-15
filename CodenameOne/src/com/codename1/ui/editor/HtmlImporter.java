@@ -220,7 +220,7 @@ public final class HtmlImporter {
     private static boolean isInlineTag(String tag) {
         return "b".equals(tag) || "strong".equals(tag) || "i".equals(tag) || "em".equals(tag)
                 || "u".equals(tag) || "s".equals(tag) || "strike".equals(tag) || "del".equals(tag)
-                || "a".equals(tag) || "span".equals(tag) || "font".equals(tag);
+                || "a".equals(tag) || "span".equals(tag) || "font".equals(tag) || "code".equals(tag);
     }
 
     private RichBlocks.BlockAttr currentBlockCtx() {
@@ -286,6 +286,9 @@ public final class HtmlImporter {
         }
         if ("s".equals(tag) || "strike".equals(tag) || "del".equals(tag)) {
             return style.withStrike(true);
+        }
+        if ("code".equals(tag)) {
+            return style.withMonospace(true);
         }
         if ("a".equals(tag)) {
             return style.withUnderline(true).withForeColor(0x1a73e8);

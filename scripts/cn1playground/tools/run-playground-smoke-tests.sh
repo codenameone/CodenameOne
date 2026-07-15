@@ -72,19 +72,22 @@ for cls in com.codename1.ui.Accessor com.codename1.io.IOAccessor; do
   fi
 done
 
-mvn -pl common -am -DskipTests install
-mvn -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
+# These checks intentionally exercise the locally-installed framework SNAPSHOT.
+# Do not let Maven replace it with the latest remote SNAPSHOT between compilation
+# and the harness runs.
+mvn -nsu -pl common -am -DskipTests install
+mvn -nsu -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
   -Dexec.classpathScope=test \
   -Dexec.mainClass=com.codenameone.playground.PlaygroundSmokeHarness
-mvn -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
+mvn -nsu -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
   -Dexec.classpathScope=test \
   -Dexec.mainClass=com.codenameone.playground.PlaygroundSyntaxMatrixHarness
-mvn -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
+mvn -nsu -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
   -Dexec.classpathScope=test \
   -Dexec.mainClass=com.codenameone.playground.PlaygroundLayoutHarness
-mvn -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
+mvn -nsu -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
   -Dexec.classpathScope=test \
   -Dexec.mainClass=com.codenameone.playground.PlaygroundPreviewResolutionHarness
-mvn -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
+mvn -nsu -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
   -Dexec.classpathScope=test \
   -Dexec.mainClass=com.codenameone.playground.PlaygroundSamplesHarness

@@ -41,6 +41,7 @@ public class CodeView extends EditorView {
     private String languageId = "text";
     private LanguageDef def = LanguageDef.forName("text");
     private SyntaxHighlighter tokenizer = new Tokenizer(def);
+    private boolean plainHighlighter = true;
     private ThemePalette palette = ThemePalette.LIGHT;
     private boolean showLineNumbers = true;
     private int tabSize = 4;
@@ -73,6 +74,7 @@ public class CodeView extends EditorView {
         this.def = LanguageDef.forName(this.languageId);
         SyntaxHighlighter registered = CodeEditor.getRegisteredSyntaxHighlighter(this.languageId);
         this.tokenizer = registered == null ? new Tokenizer(def) : registered;
+        this.plainHighlighter = registered == null && def.isPlain();
         validUpTo = 0;
         repaint();
     }
@@ -194,22 +196,24 @@ public class CodeView extends EditorView {
             super.paintLine(g, line, text, x, y, lineHeight, f);
             return;
         }
-        if (def.isPlain()) {
+        if (plainHighlighter) {
             g.setColor(getTextColor());
             g.drawString(text, x, y);
             return;
         }
         ensureStates(line + 1);
         int startState = line == 0 ? 0 : endStates[line - 1];
-        Tokenizer.TokenLine tl = tokenizer.tokenize(text, startState);
+        SyntaxHighlightResult tl = tokenizer.tokenize(text, startState);
         int pos = 0;
         int defColor = getTextColor();
         for (int i = 0; i < tl.tokens.size(); i++) {
-            Tokenizer.Token t = tl.tokens.get(i);
+            SyntaxToken t = tl.tokens.get(i);
             if (t.start > pos) {
                 drawSegment(g, f, text, pos, t.start, x, y, defColor);
             }
-            drawSegment(g, f, text, t.start, t.start + t.length, x, y, palette.colorForKind(t.kind));
+            int color = palette == ThemePalette.DARK ? t.darkColor : t.lightColor;
+            drawSegment(g, f, text, t.start, t.start + t.length, x, y,
+                    color < 0 ? palette.colorForKind(t.kind) : color);
             pos = t.start + t.length;
         }
         if (pos < text.length()) {

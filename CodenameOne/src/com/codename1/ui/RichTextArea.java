@@ -60,6 +60,7 @@ import com.codename1.util.SuccessCallback;
 ///
 /// @author Shai Almog
 public class RichTextArea extends AbstractEditorComponent {
+    private RichTextFormat sourceFormat = RichTextFormat.HTML;
     private String placeholderText = "";
 
     /// Creates an empty rich text editor.
@@ -93,12 +94,20 @@ public class RichTextArea extends AbstractEditorComponent {
     ///
     /// - `html`: the HTML to display and edit
     public void setHtml(String html) {
+        sourceFormat = RichTextFormat.HTML;
         command("setHtml", html == null ? "" : html);
     }
 
     /// Replaces the editor content from any supported rich-text interchange format.
     public void setContent(String content, RichTextFormat format) {
-        setHtml(RichTextImporter.toHtml(content, format));
+        final String value = content == null ? "" : content;
+        final RichTextFormat actual = format == null ? RichTextFormat.PLAIN_TEXT : format;
+        if (actual == RichTextFormat.HTML) {
+            setHtml(value);
+            return;
+        }
+        sourceFormat = actual;
+        command(setCommand(actual), value);
     }
 
     /// Replaces the editor content with RTF.
@@ -122,7 +131,21 @@ public class RichTextArea extends AbstractEditorComponent {
     ///
     /// - `callback`: receives the HTML content
     public void getHtml(SuccessCallback<String> callback) {
-        query("getHtml", null, callback);
+        final SuccessCallback<String> result = callback;
+        onReady(new Runnable() {
+            public void run() {
+                if (getInternalBrowser() != null && sourceFormat != RichTextFormat.HTML) {
+                    getText(new SuccessCallback<String>() {
+                        public void onSucess(String source) {
+                            result.onSucess(RichTextImporter.convert(source, sourceFormat,
+                                    RichTextFormat.HTML));
+                        }
+                    });
+                } else {
+                    query("getHtml", null, result);
+                }
+            }
+        });
     }
 
     /// Retrieves the current editor content as plain text (markup stripped). The callback is invoked on
@@ -133,6 +156,44 @@ public class RichTextArea extends AbstractEditorComponent {
     /// - `callback`: receives the plain text content
     public void getText(SuccessCallback<String> callback) {
         query("getText", null, callback);
+    }
+
+    /// Retrieves the current content as Markdown.
+    public void getMarkdown(SuccessCallback<String> callback) {
+        queryContent("getMarkdown", RichTextFormat.MARKDOWN, callback);
+    }
+
+    /// Retrieves the current content as AsciiDoc.
+    public void getAsciiDoc(SuccessCallback<String> callback) {
+        queryContent("getAsciiDoc", RichTextFormat.ASCIIDOC, callback);
+    }
+
+    /// Retrieves the current content as RTF.
+    public void getRtf(SuccessCallback<String> callback) {
+        queryContent("getRtf", RichTextFormat.RTF, callback);
+    }
+
+    private void queryContent(final String queryName, final RichTextFormat format,
+            final SuccessCallback<String> callback) {
+        onReady(new Runnable() {
+            public void run() {
+                if (getInternalBrowser() == null || sourceFormat == format) {
+                    query(queryName, null, callback);
+                } else if (sourceFormat == RichTextFormat.HTML) {
+                    getHtml(new SuccessCallback<String>() {
+                        public void onSucess(String html) {
+                            callback.onSucess(RichTextImporter.fromHtml(html, format));
+                        }
+                    });
+                } else {
+                    getText(new SuccessCallback<String>() {
+                        public void onSucess(String source) {
+                            callback.onSucess(RichTextImporter.convert(source, sourceFormat, format));
+                        }
+                    });
+                }
+            }
+        });
     }
 
     /// Inserts the supplied HTML fragment at the current cursor position.
@@ -146,7 +207,46 @@ public class RichTextArea extends AbstractEditorComponent {
 
     /// Inserts content in any supported rich-text interchange format at the current selection.
     public void insertContent(String content, RichTextFormat format) {
-        insertHtml(RichTextImporter.toHtml(content, format));
+        final String value = content == null ? "" : content;
+        final RichTextFormat actual = format == null ? RichTextFormat.PLAIN_TEXT : format;
+        if (actual == RichTextFormat.HTML) {
+            onReady(new Runnable() {
+                public void run() {
+                    if (getInternalBrowser() != null && sourceFormat != RichTextFormat.HTML) {
+                        command(insertCommand(sourceFormat), RichTextImporter.fromHtml(value, sourceFormat));
+                    } else {
+                        insertHtml(value);
+                    }
+                }
+            });
+            return;
+        }
+        onReady(new Runnable() {
+            public void run() {
+                if (getInternalBrowser() == null || sourceFormat == actual) {
+                    command(insertCommand(actual), value);
+                } else if (sourceFormat == RichTextFormat.HTML) {
+                    insertHtml(RichTextImporter.convert(value, actual, RichTextFormat.HTML));
+                } else {
+                    command(insertCommand(sourceFormat),
+                            RichTextImporter.convert(value, actual, sourceFormat));
+                }
+            }
+        });
+    }
+
+    private static String setCommand(RichTextFormat format) {
+        if (format == RichTextFormat.MARKDOWN) return "setMarkdown";
+        if (format == RichTextFormat.ASCIIDOC) return "setAsciiDoc";
+        if (format == RichTextFormat.RTF) return "setRtf";
+        return "setPlainText";
+    }
+
+    private static String insertCommand(RichTextFormat format) {
+        if (format == RichTextFormat.MARKDOWN) return "insertMarkdown";
+        if (format == RichTextFormat.ASCIIDOC) return "insertAsciiDoc";
+        if (format == RichTextFormat.RTF) return "insertRtf";
+        return "insertPlainText";
     }
 
     /// Inserts RTF at the current selection.
@@ -357,7 +457,7 @@ public class RichTextArea extends AbstractEditorComponent {
             + "#ed:empty:before{content:attr(data-ph);color:#9aa0a6;pointer-events:none;}"
             + "#ed img{max-width:100%;height:auto;}#ed[contenteditable=false]{opacity:.7;}"
             + "</style></head><body><div id=\"ed\" contenteditable=\"true\" data-ph=\"\"></div><script>"
-            + "var ed=document.getElementById('ed');"
+            + "var ed=document.getElementById('ed'),sourceFormat='html';"
             + "function cn1post(m){try{if(window.cn1PostMessage){window.cn1PostMessage(m);}"
             + "else if(window.parent&&window.parent!==window){window.parent.postMessage(m,'*');}}catch(e){}}"
             + "function fire(t,v){cn1post('cn1ed:'+t+(v==null?'':(':'+v)));}"
@@ -365,17 +465,25 @@ public class RichTextArea extends AbstractEditorComponent {
             + "document.addEventListener('selectionchange',function(){fire('selection',null);});"
             + "function exec(c,a){try{document.execCommand(c,false,a);}catch(e){}ed.focus();}"
             + "window.cn1editor={cmd:function(name,arg){switch(name){"
-            + "case 'setHtml':ed.innerHTML=arg||'';fire('change',null);break;"
-            + "case 'insertHtml':exec('insertHTML',arg);break;case 'insertImage':exec('insertImage',arg);break;"
+            + "case 'setHtml':sourceFormat='html';ed.innerHTML=arg||'';fire('change',null);break;"
+            + "case 'setMarkdown':sourceFormat='markdown';ed.textContent=arg||'';fire('change',null);break;"
+            + "case 'setAsciiDoc':sourceFormat='asciidoc';ed.textContent=arg||'';fire('change',null);break;"
+            + "case 'setRtf':sourceFormat='rtf';ed.textContent=arg||'';fire('change',null);break;"
+            + "case 'setPlainText':sourceFormat='plain';ed.textContent=arg||'';fire('change',null);break;"
+            + "case 'insertMarkdown':case 'insertAsciiDoc':case 'insertRtf':case 'insertPlainText':exec('insertText',arg||'');break;"
+            + "case 'insertHtml':if(sourceFormat=='html'){exec('insertHTML',arg);}else{exec('insertText',arg||'');}break;case 'insertImage':if(sourceFormat=='html'){exec('insertImage',arg);}break;"
             + "case 'setPlaceholder':ed.setAttribute('data-ph',arg||'');break;"
             + "case 'setEditable':ed.setAttribute('contenteditable',arg=='1'?'true':'false');break;"
             + "case 'focus':ed.focus();break;case 'blur':ed.blur();break;"
-            + "case 'createLink':exec('createLink',arg);break;case 'foreColor':exec('foreColor',arg);break;"
-            + "case 'hiliteColor':if(!document.execCommand('hiliteColor',false,arg)){exec('backColor',arg);}break;"
-            + "case 'formatBlock':exec('formatBlock',arg);break;case 'fontSize':exec('fontSize',arg);break;"
-            + "default:exec(name,arg);break;}},query:function(name,arg){switch(name){"
+            + "case 'createLink':if(sourceFormat=='html'){exec('createLink',arg);}break;case 'foreColor':if(sourceFormat=='html'){exec('foreColor',arg);}break;"
+            + "case 'hiliteColor':if(sourceFormat=='html'&&!document.execCommand('hiliteColor',false,arg)){exec('backColor',arg);}break;"
+            + "case 'formatBlock':if(sourceFormat=='html'){exec('formatBlock',arg);}break;case 'fontSize':if(sourceFormat=='html'){exec('fontSize',arg);}break;"
+            + "default:if(sourceFormat=='html'){exec(name,arg);}break;}},query:function(name,arg){switch(name){"
             + "case 'getHtml':return ed.innerHTML;case 'getText':return ed.innerText||ed.textContent||'';"
-            + "case 'state':try{return document.queryCommandState(arg)?'1':'0';}catch(e){return '0';}"
+            + "case 'getMarkdown':return sourceFormat=='markdown'?(ed.textContent||''):'';"
+            + "case 'getAsciiDoc':return sourceFormat=='asciidoc'?(ed.textContent||''):'';"
+            + "case 'getRtf':return sourceFormat=='rtf'?(ed.textContent||''):'';"
+            + "case 'state':if(sourceFormat!='html'){return '0';}try{return document.queryCommandState(arg)?'1':'0';}catch(e){return '0';}"
             + "default:return '';}}};fire('ready',null);</script></body></html>";
     }
 }

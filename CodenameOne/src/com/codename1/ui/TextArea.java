@@ -778,6 +778,11 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         return lightweightEditingEnabled;
     }
 
+    private boolean shouldUseLightweightEditing() {
+        return lightweightEditingEnabled && isEditable() && (constraint & PASSWORD) == 0
+                && Display.impl.isTextInputSupported();
+    }
+
     @Override
     public int getPreferredTabIndex() {
         if (isEditable()) {
@@ -876,8 +881,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                 return;
             }
             if (action == 0 && isTypedKey(keyCode)) {
-                if (lightweightEditingEnabled && Display.impl.isTextInputSupported()
-                        && startLightweightEditing() && lightweightEditor != null) {
+                if (startLightweightEditing() && lightweightEditor != null) {
                     lightweightEditor.insertText(String.valueOf((char) keyCode));
                     return;
                 }
@@ -978,8 +982,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     }
 
     private boolean startLightweightEditing() {
-        if (!lightweightEditingEnabled || lightweightEditor != null || !isEditable()
-                || (constraint & PASSWORD) != 0 || !Display.impl.isTextInputSupported()) {
+        if (!shouldUseLightweightEditing() || lightweightEditor != null) {
             return lightweightEditor != null;
         }
         final Form form = getComponentForm();
@@ -2323,8 +2326,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// Launches the text field editing in a callserially call
     @Override
     public void startEditingAsync() {
-        if (lightweightEditingEnabled && Display.impl.isTextInputSupported()
-                && (constraint & PASSWORD) == 0 && getComponentForm() != null) {
+        if (shouldUseLightweightEditing() && getComponentForm() != null) {
             Display.getInstance().callSerially(new Runnable() {
                 @Override
                 public void run() {

@@ -27,12 +27,18 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.editor.SyntaxHighlightResult;
+import com.codename1.ui.editor.SyntaxToken;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.script.Compilable;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -47,6 +53,22 @@ class CodeEditorTest extends UITestBase {
     @Test
     void browserFallbackToleratesMissingSelectionDuringStartup() {
         assertTrue(CodeEditorHtml.PAGE.contains("var sel=window.getSelection();if(!sel){return;}"));
+    }
+
+    @Test
+    void browserFallbackDecoratesOnlyDiagnosticRangesAndKeepsArrowFocus() {
+        assertTrue(CodeEditorHtml.PAGE.contains("function decorateDiagnostics()"));
+        assertFalse(CodeEditorHtml.PAGE.contains("function applyDiagLines"));
+        assertTrue(CodeEditorHtml.PAGE.contains("keydown',function(e){e.stopPropagation();"));
+    }
+
+    @Test
+    void browserFallbackJavaScriptParses() throws Exception {
+        int start = CodeEditorHtml.PAGE.indexOf("<script>") + "<script>".length();
+        int end = CodeEditorHtml.PAGE.lastIndexOf("</script>");
+        ScriptEngine engine = new ScriptEngineManager().getEngineByName("nashorn");
+        assertTrue(engine instanceof Compilable, "Java 8 test runtime must provide Nashorn");
+        ((Compilable)engine).compile(CodeEditorHtml.PAGE.substring(start, end));
     }
 
     private void pump() {
@@ -93,6 +115,26 @@ class CodeEditorTest extends UITestBase {
         assertTrue(c.contains("setTheme:dark"));
         assertTrue(c.contains("setLineNumbers:0"));
         assertTrue(c.contains("setTabSize:2"));
+    }
+
+    @FormTest
+    void testThirdPartyHighlighterServesBrowserRanges() {
+        CodeEditor.registerSyntaxHighlighter("properties", (line, state) ->
+                new SyntaxHighlightResult(Arrays.asList(
+                        new SyntaxToken(0, Math.max(0, line.indexOf('=')), SyntaxToken.PROPERTY,
+                                0x112233, 0x445566)), 0));
+        try {
+            CodeEditor editor = showNativeEditor();
+            editor.setLanguage("properties");
+            assertTrue(cmds().contains("setCustomHighlighter:1"));
+            editor.fireEditorEvent("highlight", "7:accent=#0a66c2");
+            String command = implementation.getLastEditorCommand();
+            assertTrue(command.startsWith("applyCustomHighlight:7:"));
+            assertTrue(command.contains("--cl:#112233;--cd:#445566"));
+            assertTrue(command.contains("accent"));
+        } finally {
+            CodeEditor.registerSyntaxHighlighter("properties", null);
+        }
     }
 
     @FormTest

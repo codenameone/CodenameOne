@@ -28,5 +28,5 @@ package com.codename1.ui.editor;
 /// be stateless and thread-safe because one registered instance may serve multiple editors.
 public interface SyntaxHighlighter {
     /// Highlights a line, using `startState` from the preceding line.
-    Tokenizer.TokenLine tokenize(String line, int startState);
+    SyntaxHighlightResult tokenize(String line, int startState);
 }

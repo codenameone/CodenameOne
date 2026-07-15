@@ -68,6 +68,9 @@ public final class GeneratedAccess_com_codename1_annotations {
         if ("ExistIn".equals(simpleName)) {
             return com.codename1.annotations.ExistIn.class;
         }
+        if ("Fused".equals(simpleName)) {
+            return com.codename1.annotations.Fused.class;
+        }
         if ("Id".equals(simpleName)) {
             return com.codename1.annotations.Id.class;
         }

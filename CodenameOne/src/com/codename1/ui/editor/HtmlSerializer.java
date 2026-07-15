@@ -132,7 +132,13 @@ public final class HtmlSerializer {
         if (st.isStrike()) {
             sb.append("<s>");
         }
+        if (st.isMonospace()) {
+            sb.append("<code>");
+        }
         sb.append(escape(text));
+        if (st.isMonospace()) {
+            sb.append("</code>");
+        }
         if (st.isStrike()) {
             sb.append("</s>");
         }

@@ -1731,6 +1731,16 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
                 return typedTarget.getStrokeColor();
             }
         }
+        if ("getStrokeColor2".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getStrokeColor2();
+            }
+        }
+        if ("getStrokeGradientAngle".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getStrokeGradientAngle();
+            }
+        }
         if ("getStrokeOpacity".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getStrokeOpacity();
@@ -1794,6 +1804,11 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
         if ("isShadowMM".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.isShadowMM();
+            }
+        }
+        if ("isStrokeGradient".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.isStrokeGradient();
             }
         }
         if ("isStrokeMM".equals(name)) {
@@ -1945,6 +1960,24 @@ public final class GeneratedAccess_com_codename1_ui_plaf {
             if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
                 return typedTarget.strokeColor(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("strokeColor2".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                return typedTarget.strokeColor2(toIntValue(adaptedArgs[0]));
+            }
+        }
+        if ("strokeGradient".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return typedTarget.strokeGradient(((Boolean) adaptedArgs[0]).booleanValue());
+            }
+        }
+        if ("strokeGradientAngle".equals(name)) {
+            if (matches(safeArgs, new Class<?>[]{java.lang.Float.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Float.class}, false);
+                return typedTarget.strokeGradientAngle(((Number) adaptedArgs[0]).floatValue());
             }
         }
         if ("strokeOpacity".equals(name)) {

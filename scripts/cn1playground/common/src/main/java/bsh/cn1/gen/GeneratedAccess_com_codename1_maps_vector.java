@@ -667,6 +667,11 @@ public final class GeneratedAccess_com_codename1_maps_vector {
                 return typedTarget.hasPendingTiles();
             }
         }
+        if ("hasRenderedVisibleTiles".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.hasRenderedVisibleTiles();
+            }
+        }
         if ("latLngToScreen".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.maps.LatLng.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.maps.LatLng.class}, false);
