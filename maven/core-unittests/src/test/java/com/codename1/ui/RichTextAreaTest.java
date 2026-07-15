@@ -1,26 +1,3 @@
-/*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- * This code is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Codename One designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
- *
- * This code is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * version 2 for more details (a copy is included in the LICENSE file that
- * accompanied this code).
- *
- * You should have received a copy of the GNU General Public License version
- * 2 along with this work; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Please contact Codename One through http://www.codenameone.com/ if you
- * need additional information or have any questions.
- */
-
 package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
@@ -38,8 +15,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * Deep coverage for {@link RichTextArea}. The component routes every operation through the semantic
  * command/query channel of {@link AbstractEditorComponent}; these tests drive it against the
  * deterministic native editor backend provided by the test implementation so the full command, query,
- * event and ready-queue machinery is exercised. A couple of tests additionally verify the pure
- * Codename One text engine that is selected when no native peer is available.
+ * event and ready-queue machinery is exercised without a real web view. A couple of tests additionally
+ * verify the cross-platform {@code BrowserComponent} fallback selection.
  */
 class RichTextAreaTest extends UITestBase {
 
@@ -266,45 +243,41 @@ class RichTextAreaTest extends UITestBase {
         assertEquals(1, count.get());
     }
 
-    // --- pure Codename One text engine (default when no native peer) ---
+    // --- cross platform BrowserComponent fallback ---
 
     @FormTest
-    void testPureBackendSelectedWhenNoNativePeer() {
-        // State this explicitly so the test remains deterministic if form tests run concurrently.
-        implementation.setEditorNativePeerSupported(false);
-        implementation.setTextInputSupported(true);
+    void testBrowserFallbackSelectedWhenNoNativePeer() {
+        // editorNativePeerSupported defaults to false -> no native peer -> browser fallback
         RichTextArea editor = new RichTextArea();
         Form f = new Form("rt", new BorderLayout());
         f.add(BorderLayout.CENTER, editor);
         f.show();
         pump();
         assertFalse(editor.isNativeEditor());
-        assertTrue(editor.isEditorReady());
-        assertNull(editor.getInternalBrowser());
+        assertNotNull(editor.getInternalBrowser());
     }
 
     @FormTest
-    void testPureBackendRoundTripsContent() {
-        implementation.setEditorNativePeerSupported(false);
-        implementation.setTextInputSupported(true);
+    void testBrowserFallbackBecomesReadyOnLoadAndRoutesCommands() {
         RichTextArea editor = new RichTextArea();
         Form f = new Form("rt", new BorderLayout());
         f.add(BorderLayout.CENTER, editor);
         f.show();
         pump();
+        assertFalse(editor.isEditorReady());
+        // simulate the web view finishing load -> editor becomes ready
+        editor.getInternalBrowser().fireWebEvent(BrowserComponent.onLoad, new com.codename1.ui.events.ActionEvent(editor));
+        pump();
         assertTrue(editor.isEditorReady());
-        editor.setHtml("<p>hello <b>world</b></p>");
+        editor.bold();
         pump();
-        final java.util.concurrent.atomic.AtomicReference<String> text =
-                new java.util.concurrent.atomic.AtomicReference<String>();
-        editor.getText(new com.codename1.util.SuccessCallback<String>() {
-            public void onSucess(String v) {
-                text.set(v);
+        boolean routed = false;
+        for (String s : implementation.getBrowserExecuted()) {
+            if (s.contains("cn1editor.cmd") && s.contains("bold")) {
+                routed = true;
+                break;
             }
-        });
-        pump();
-        assertNotNull(text.get());
-        assertTrue(text.get().contains("hello"));
-        assertTrue(text.get().contains("world"));
+        }
+        assertTrue(routed, "bold() should be routed to the browser backend as a cn1editor.cmd call");
     }
 }

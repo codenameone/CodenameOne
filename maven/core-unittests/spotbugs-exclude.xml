@@ -370,17 +370,4 @@
     <Match>
         <Class name="~com\.codename1\.gaming\.physics\.box2d\..*" />
     </Match>
-
-    <!--
-    The pure text editor (com.codename1.ui.editor) implements the small
-    functional interfaces StyleTransform / StylePredicate / BlockOp with
-    anonymous classes that capture only local variables and call static
-    helpers, so SpotBugs suggests they could be static. That refactor would
-    replace concise inline transforms with many named classes for no real
-    benefit; suppress this style-only suggestion for the package.
-    -->
-    <Match>
-        <Class name="~com\.codename1\.ui\.editor\..*" />
-        <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON" />
-    </Match>
 </FindBugsFilter>

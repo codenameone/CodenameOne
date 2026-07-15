@@ -1,26 +1,25 @@
 /*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *
+ *  
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- *
+ * 
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Please contact Codename One through http://www.codenameone.com/ if you
+ * 
+ * Please contact Codename One through http://www.codenameone.com/ if you 
  * need additional information or have any questions.
  */
-
 package com.codename1.impl.android;
 
 import android.Manifest;
@@ -77,7 +76,6 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Font;
 import com.codename1.ui.Image;
 import com.codename1.ui.PeerComponent;
-import com.codename1.ui.RichTextClipboardData;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.VirtualKeyboardInterface;
@@ -293,137 +291,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public static CodenameOneActivity getActivity() {
         return activity;
     }
-
-    // ---- low level text input source (pure Codename One editors) ----
-
-    private static volatile com.codename1.ui.TextInputClient activeInputClient;
-    private static volatile com.codename1.ui.TextInputState activeInputState;
-    private static volatile com.codename1.ui.TextInputConfig activeInputConfig;
-
-    /// Returns the last editing state pushed down for the active text input client, read synchronously by
-    /// `CN1TextInputConnection` on the IME thread.
-    static com.codename1.ui.TextInputState currentInputState() {
-        return activeInputState;
-    }
-
-    static com.codename1.ui.TextInputConfig currentInputConfig() {
-        return activeInputConfig;
-    }
-
-    /// Called by the rendering view's `onCreateInputConnection` to supply the custom input connection
-    /// when a pure editor is bound. Returns null when no client is active so the view keeps its default
-    /// behavior.
-    static android.view.inputmethod.InputConnection createEditorInputConnection(android.view.View view, android.view.inputmethod.EditorInfo editorInfo) {
-        com.codename1.ui.TextInputClient client = activeInputClient;
-        if (client == null) {
-            return null;
-        }
-        configureEditorInfo(editorInfo, activeInputConfig);
-        return new CN1TextInputConnection(view, client);
-    }
-
-    /// True when a pure editor text input client is currently bound.
-    static boolean hasActiveInputClient() {
-        return activeInputClient != null;
-    }
-
-    private static void configureEditorInfo(android.view.inputmethod.EditorInfo editorInfo, com.codename1.ui.TextInputConfig cfg) {
-        int inputType = android.text.InputType.TYPE_CLASS_TEXT;
-        boolean multiline = cfg == null || cfg.isMultiline();
-        if (multiline) {
-            inputType |= android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE;
-        }
-        if (cfg != null && !cfg.isAutoCorrect()) {
-            inputType |= android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
-        }
-        if (cfg != null && cfg.isAutoCapitalize()) {
-            inputType |= android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES;
-        }
-        editorInfo.inputType = inputType;
-        editorInfo.imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI;
-        if (multiline) {
-            editorInfo.imeOptions |= android.view.inputmethod.EditorInfo.IME_ACTION_NONE;
-        }
-        editorInfo.initialSelStart = activeInputState != null ? activeInputState.getSelectionStart() : 0;
-        editorInfo.initialSelEnd = activeInputState != null ? activeInputState.getSelectionEnd() : 0;
-    }
-
-    @Override
-    public boolean isTextInputSupported() {
-        return true;
-    }
-
-    @Override
-    public Object startTextInput(com.codename1.ui.TextInputClient client, com.codename1.ui.TextInputConfig config) {
-        activeInputClient = client;
-        activeInputConfig = config;
-        activeInputState = client.getEditingState();
-        final CodenameOneActivity a = getActivity();
-        final CodenameOneSurface view = myView;
-        if (a == null || view == null) {
-            return client;
-        }
-        a.runOnUiThread(new Runnable() {
-            public void run() {
-                android.view.View v = view.getAndroidView();
-                v.setFocusable(true);
-                v.setFocusableInTouchMode(true);
-                v.requestFocus();
-                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
-                        a.getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
-                if (imm != null) {
-                    imm.restartInput(v);
-                    imm.showSoftInput(v, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
-                }
-            }
-        });
-        return client;
-    }
-
-    @Override
-    public void updateTextInputState(Object handle, com.codename1.ui.TextInputState state) {
-        activeInputState = state;
-        final CodenameOneActivity a = getActivity();
-        final CodenameOneSurface view = myView;
-        if (a == null || view == null) {
-            return;
-        }
-        a.runOnUiThread(new Runnable() {
-            public void run() {
-                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
-                        a.getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
-                if (imm != null && activeInputClient != null) {
-                    com.codename1.ui.TextInputState s = activeInputState;
-                    imm.updateSelection(view.getAndroidView(), s.getSelectionStart(), s.getSelectionEnd(),
-                            s.getComposingStart(), s.getComposingEnd());
-                }
-            }
-        });
-    }
-
-    @Override
-    public void stopTextInput(Object handle) {
-        activeInputClient = null;
-        activeInputState = null;
-        activeInputConfig = null;
-        final CodenameOneActivity a = getActivity();
-        final CodenameOneSurface view = myView;
-        if (a == null || view == null) {
-            return;
-        }
-        a.runOnUiThread(new Runnable() {
-            public void run() {
-                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
-                        a.getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
-                if (imm != null) {
-                    imm.hideSoftInputFromWindow(view.getAndroidView().getWindowToken(), 0);
-                    imm.restartInput(view.getAndroidView());
-                }
-            }
-        });
-    }
-
-
+    
     @Override
     public void setDisableScreenshots(final boolean disable) {
         final CodenameOneActivity a = getActivity();
@@ -8698,7 +8566,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public void copyToClipboard(final Object obj) {
-        super.copyToClipboard(obj);
         if (getActivity() == null) {
             return;
         }
@@ -8711,14 +8578,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     clipboard.setText(obj.toString());
                 } else {
                     android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
-                    android.content.ClipData clip;
-                    if (sdk >= 16 && obj instanceof RichTextClipboardData
-                            && ((RichTextClipboardData) obj).getHtml() != null) {
-                        RichTextClipboardData rich = (RichTextClipboardData) obj;
-                        clip = ClipData.newHtmlText("Codename One", rich.getPlainText(), rich.getHtml());
-                    } else {
-                        clip = ClipData.newPlainText("Codename One", obj.toString());
-                    }
+                    android.content.ClipData clip = ClipData.newPlainText("Codename One", obj.toString());
                     clipboard.setPrimaryClip(clip);
                 }
             }
@@ -8742,19 +8602,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     response[0] = clipboard.getText().toString();
                 } else {
                     android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
-                    ClipData clip = clipboard.getPrimaryClip();
-                    if (clip == null || clip.getItemCount() == 0) {
-                        return;
-                    }
-                    ClipData.Item item = clip.getItemAt(0);
-                    String html = sdk >= 16 ? item.getHtmlText() : null;
-                    CharSequence plain = item.coerceToText(getContext());
-                    if (html != null && html.length() > 0) {
-                        response[0] = new RichTextClipboardData(
-                                plain == null ? "" : plain.toString()).setHtml(html);
-                    } else {
-                        response[0] = plain == null ? null : plain.toString();
-                    }
+                    ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
+                    response[0] = item.getText();
                 }
             }
         });

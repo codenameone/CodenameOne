@@ -513,19 +513,12 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
         if (!Display.isInitialized() || Display.getInstance().getCurrent() == null) {
             return super.onCreateInputConnection(editorInfo);
         }
-        InputConnection editorConn = AndroidImplementation.createEditorInputConnection(this, editorInfo);
-        if (editorConn != null) {
-            return editorConn;
-        }
         cn1View.setInputType(editorInfo);
         return super.onCreateInputConnection(editorInfo);
     }
 
     @Override
     public boolean onCheckIsTextEditor() {
-        if (AndroidImplementation.hasActiveInputClient()) {
-            return true;
-        }
         if (!Display.isInitialized() || Display.getInstance().getCurrent() == null) {
             return false;
         }

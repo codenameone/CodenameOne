@@ -36,33 +36,20 @@ import java.io.Reader;
 ///
 /// @author Ofir Leitner
 public class HTMLParser extends XMLParser {
-    private final boolean preserveUnsupportedAttributes;
-
-    /// Creates the legacy validating HTML parser.
-    public HTMLParser() {
-        this(false);
-    }
-
-    /// Creates an HTML parser, optionally retaining attributes that are not in the legacy
-    /// `HTMLElement` schema. This is useful for modern HTML fragments containing `data-*` or ARIA
-    /// metadata while preserving the historic validation behavior by default.
-    ///
-    /// #### Parameters
-    ///
-    /// - `preserveUnsupportedAttributes`: true to keep unknown attributes in the parsed DOM
-    public HTMLParser(boolean preserveUnsupportedAttributes) {
-        this.preserveUnsupportedAttributes = preserveUnsupportedAttributes;
-        // Add common char entities that are above the HTML 2.0 char entities range
-        addCharEntity("bull", 8226);
-        addCharEntity("euro", 8364);
-        setIncludeWhitespacesBetweenTags(true);
-    }
 
     /// The list of empty tags (tags that naturally don't have any children).
     /// This is used to enable empty tags to be closed also in a non-strict way (i.e. <br> instead of <br/>)
     /// some of these tags are not a part of the XHTML-MP 1.0 standard, but including them here allows a more smooth parsing if the document is not strictly XHTML-MP 1.0
     private static final String[] EMPTY_TAGS = {"br", "link", "meta", "base", "area", "basefont", "col", "frame", "hr", "img", "input", "isindex", "param"};
     HTMLComponent htmlC; // The HTMLComponent that uses this Parser
+
+    /// Constructs a new instance of HTMLParser
+    public HTMLParser() {
+        // Add common char entities that are above the HTML 2.0 char entities range
+        addCharEntity("bull", 8226);
+        addCharEntity("euro", 8364);
+        setIncludeWhitespacesBetweenTags(true);
+    }
 
     /// Pair this HTMLParser with the HTMLComponent that uses it.
     /// This pairing is necessary to allow access to the htmlC in parseTagContent upon finding a CSS embedded segment
@@ -90,7 +77,7 @@ public class HTMLParser extends XMLParser {
     /// - `IOException`: if an I/O error in the stream is encountered
     @Override
     protected void parseTagContent(Element element, Reader is) throws IOException {
-        if ((HTMLComponent.SUPPORT_CSS) && (htmlC != null) && (htmlC.loadCSS) && (((HTMLElement) element).getTagId() == HTMLElement.TAG_STYLE)) { // We aren't strict and don't require text/css in a style tag // && "text/css".equals(element.getAttributeById(Element.ATTR_TYPE)))) {
+        if ((HTMLComponent.SUPPORT_CSS) && (htmlC.loadCSS) && (((HTMLElement) element).getTagId() == HTMLElement.TAG_STYLE)) { // We aren't strict and don't require text/css in a style tag // && "text/css".equals(element.getAttributeById(Element.ATTR_TYPE)))) {
             CSSElement addTo = CSSParser.getInstance().parseCSSSegment(is, null, htmlC, null);
             htmlC.addToEmebeddedCSS(addTo);
             return;
@@ -110,32 +97,7 @@ public class HTMLParser extends XMLParser {
     /// a new instance of the names HTMLElement
     @Override
     protected Element createNewElement(String name) {
-        return preserveUnsupportedAttributes ? new FragmentHTMLElement(name) : new HTMLElement(name);
-    }
-
-    private static final class FragmentHTMLElement extends HTMLElement {
-        FragmentHTMLElement(String name) {
-            super(name);
-        }
-
-        @Override
-        public int setAttribute(String attribute, String value) {
-            int result = super.setAttribute(attribute, value);
-            if (result != -1) {
-                setAttribute((Object) attribute.toLowerCase(), value);
-                return -1;
-            }
-            return result;
-        }
-
-        @Override
-        public String getAttribute(String name) {
-            String result = super.getAttribute(name);
-            if (result == null && getAttributes() != null) {
-                result = (String) getAttributes().get(name.toLowerCase());
-            }
-            return result;
-        }
+        return new HTMLElement(name);
     }
 
     /// Overrides XMLParser.createNewTextElement to return an HTMLElement instance

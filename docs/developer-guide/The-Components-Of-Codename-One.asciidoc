@@ -1953,12 +1953,58 @@ The effort to integrate Cordova/PhoneGap support into Codename One is handled wi
 
 This is discussed further in the https://www.codenameone.com/blog/phonegap-cordova-compatibility-for-codename-one.html[original announcement].
 
-=== Text editors
+=== RichTextArea
 
-`RichTextArea` and `CodeEditor` are introduced here as components, but editing is broad enough to have
-its own chapter. See <<text-editing>> for rich HTML, syntax highlighting, completion, diagnostics,
-touch and desktop selection, scrolling, bidirectional text, input methods, backend selection, and the
-port-level `TextInputClient` contract.
+The https://www.codenameone.com/javadoc/com/codename1/ui/RichTextArea.html[RichTextArea] is a visual editor for formatted text (a WYSIWYG / HTML editor). It lets the user select text and apply styling - bold, italic, underline, lists, links, colors, headings - and exchanges the result with your application as HTML. It works on phones and tablets with the on-screen virtual keyboard, and on desktops with a physical keyboard.
+
+`RichTextArea` derives from `AbstractEditorComponent`. By default the editing surface is a `contenteditable` document hosted inside the platform's native web widget (the same one used by `BrowserComponent`), which makes it fully cross-platform and gives correct keyboard, selection and IME behavior on every device. A platform port may transparently replace this with a fully native editing widget without any change to your code.
+
+NOTE: Because the editor is created asynchronously you should treat it like `BrowserComponent`: setters such as `setHtml(String)` are safe to call immediately (they're queued until the editor is ready) while reads such as `getHtml(SuccessCallback)` are asynchronous and deliver their result through a callback.
+
+The following sample places a `RichTextArea` in a form and wires a couple of formatting commands into the `Toolbar`:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava115Snippet.java[tag=the-components-of-codename-one-java-115,indent=0]
+----
+
+.RichTextArea with a formatting toolbar editing styled content
+image::img/components-richtextarea.png[RichTextArea with a formatting toolbar editing styled content,scaledwidth=35%]
+
+The formatting commands map to the operations you would expect from a word processor and all act on the current selection: `bold()`, `italic()`, `underline()`, `strikeThrough()`, `insertOrderedList()`, `insertUnorderedList()`, `indent()`/`outdent()`, `justifyLeft()`/`justifyCenter()`/`justifyRight()`, `createLink(url)`/`removeLink()`, `setForegroundColor(rgb)`/`setHighlightColor(rgb)`, `setBlockFormat("h1")`, `setFontSize(1..7)`, `removeFormat()`, `undo()` and `redo()`. You can also insert content at the cursor with `insertHtml(String)` and `insertImage(String)`.
+
+TIP: To keep a formatting toolbar in sync with the selection (for example, to highlight the bold button when the caret is inside bold text) register a change listener with `addChangeListener(ActionListener)` and query the active state with `queryCommandState("bold", active -> ...)`.
+
+Reading the edited content is asynchronous:
+
+
+=== CodeEditor
+
+The https://www.codenameone.com/javadoc/com/codename1/ui/CodeEditor.html[CodeEditor] is an IDE-style source editor with syntax highlighting, a line-number gutter, light/dark themes and asynchronous code completion. Like `RichTextArea` it's designed for both touch devices (with the virtual keyboard) and desktops (with a physical keyboard), and uses the same cross-platform editing backend with an optional native upgrade per platform.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/TheComponentsOfCodenameOneJava117Snippet.java[tag=the-components-of-codename-one-java-117,indent=0]
+----
+
+The highlighting language is selected with `setLanguage(String)` and understands common languages such as `java`, `kotlin`, `javascript`, `python`, `css`, `xml`, `json` and `c`. The content is exchanged with `setText(String)` and the asynchronous `getText(SuccessCallback)`, and `setReadOnly(boolean)` turns the editor into a syntax-highlighted code viewer.
+
+.CodeEditor showing Java with the completion popup (light theme)
+image::img/components-codeeditor.png[CodeEditor showing Java with the completion popup,scaledwidth=35%]
+
+==== Code completion
+
+Code completion is driven by a https://www.codenameone.com/javadoc/com/codename1/ui/CodeCompletionProvider.html[CodeCompletionProvider]. The editor calls the provider as the user types (or when completion is explicitly triggered), passing the full text and the caret offset; the provider returns its proposals asynchronously, which makes it suitable both for fast in-memory completion and for completion backed by a remote language server.
+
+
+Each https://www.codenameone.com/javadoc/com/codename1/ui/CodeCompletion.html[CodeCompletion] carries the text shown in the popup, the text inserted when it's chosen (which may differ), an optional category used to badge the entry (`"method"`, `"keyword"`, `"class"`, ...) and an optional detail string such as a signature.
+
+The editor honors light and dark themes through `setTheme(String)`:
+
+.CodeEditor in the dark theme
+image::img/components-codeeditor-dark.png[CodeEditor in the dark theme,scaledwidth=35%]
+
+TIP: The built-in editing surface is fully self contained and works offline with no external dependencies. When an app actually references `CodeEditor` the build server can additionally bundle a richer code editor library; apps that don't use `CodeEditor` never pay that cost.
 
 === AutoCompleteTextField
 

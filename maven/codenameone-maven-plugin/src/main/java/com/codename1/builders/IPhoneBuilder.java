@@ -108,6 +108,7 @@ public class IPhoneBuilder extends Executor {
     private boolean usesLocalNotifications;
     private boolean usesPurchaseAPI;
     private boolean usesAppReview;
+    private boolean usesCodeEditor;
     private boolean usesWalletApi;
     private boolean usesCryptoAPI;
     private boolean usesCryptoGcm;
@@ -808,6 +809,12 @@ public class IPhoneBuilder extends Executor {
                     // bridge are only linked when the app references the API.
                     if (!usesAppReview && cls.indexOf("com/codename1/appreview") == 0) {
                         usesAppReview = true;
+                    }
+                    // CodeEditor optionally upgrades its built-in highlighter to the
+                    // bundled CodeMirror web assets. Gated on actual usage (CN1_USE_CODEMIRROR)
+                    // so apps that never embed a code editor pay nothing.
+                    if (!usesCodeEditor && cls.indexOf("com/codename1/ui/CodeEditor") == 0) {
+                        usesCodeEditor = true;
                     }
                     // Wallet issuer-provisioning natives are only compiled in when
                     // the app actually references the API (or enables the extension
@@ -2111,6 +2118,11 @@ public class IPhoneBuilder extends Executor {
             if (usesAppReview) {
                 File CodenameOne_GLViewController_h = new File(buildinRes, "CodenameOne_GLViewController.h");
                 replaceInFile(CodenameOne_GLViewController_h, "//#define CN1_USE_APPREVIEW", "#define CN1_USE_APPREVIEW");
+
+            }
+            if (usesCodeEditor) {
+                File CodenameOne_GLViewController_h = new File(buildinRes, "CodenameOne_GLViewController.h");
+                replaceInFile(CodenameOne_GLViewController_h, "//#define CN1_USE_CODEMIRROR", "#define CN1_USE_CODEMIRROR");
 
             }
         } catch (Exception ex) {

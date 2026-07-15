@@ -20,16 +20,16 @@ Both editors extend `AbstractEditorComponent`. That base class does not draw any
 
 There are two backends behind that channel, and they are interchangeable.
 
-The first is a pure Codename One engine. It paints text, selection, carets, diagnostics, images, and formatting with lightweight components, while the port's low-level text-input bridge supplies virtual-keyboard and IME events. That keeps the document and interaction model consistent across canvas-based ports without embedding a web editor.
+The first is a cross-platform engine built on `BrowserComponent`. The editor's HTML and JavaScript ship inside the core jar, so there is nothing to download at runtime. It renders through whatever web view the platform already provides: `WKWebView` on iOS, `WebView` on Android, CEF on the desktop simulator, and an iframe on the web target. Going through a real web view means the editor gets correct virtual-keyboard behavior and physical-keyboard handling for free, instead of us re-implementing text input per platform.
 
-The second backend is optional and supplied by a port. A platform implementation can return a native editor peer through `CodenameOneImplementation#createNativeEditorPeer`, then handle `editorPeerCommand` and `editorPeerQuery`. The same semantic channel drives it, so the component code does not change. Applications can also point `CodeEditor#setEngineURL(...)` at a compatible custom engine when they need a specialized integration.
+The second backend is optional and supplied by a port. A platform implementation can return a native editor peer through `CodenameOneImplementation#createNativeEditorPeer`, then handle `editorPeerCommand` and `editorPeerQuery`. The same semantic channel drives it, so the component code does not change. `CodeEditor#setEngineURL(...)` is the application-level version of the same idea: point the editor at a richer engine, such as a full Monaco or CodeMirror build you host yourself.
 
 {{< mermaid >}}
 flowchart TD
   A["RichTextArea / CodeEditor"] --> B["AbstractEditorComponent<br/>(command / query / event channel)"]
-  B --> C["Pure Codename One engine<br/>lightweight rendering + text input bridge"]
+  B --> C["Cross-platform engine<br/>BrowserComponent + bundled HTML/JS"]
   B --> D["Optional native peer<br/>createNativeEditorPeer /<br/>editorPeerCommand / editorPeerQuery"]
-  C --> E["Canvas rendering<br/>keyboard + IME input from the port"]
+  C --> E["WKWebView (iOS)<br/>WebView (Android)<br/>CEF (desktop)<br/>iframe (web)"]
 {{< /mermaid >}}
 
 ## CodeEditor
@@ -103,7 +103,7 @@ The toolbar drives the same command channel described earlier; pressing the bold
 
 `CodeEditor` can be backed by a heavier engine, and CodeMirror assets are not free weight to carry around. So the Android and iOS builders scan your app for use of `com.codename1.ui.CodeEditor`. The optional CodeMirror assets are bundled only when that API actually appears, gated by `CN1_USE_CODEMIRROR`. An app that never touches `CodeEditor` ships nothing extra.
 
-The Playground opts its multiline `TextArea` source panes into `setLightweightEditingEnabled(true)`, so the same caret, selection, scrolling, clipboard, keyboard, and IME machinery is dogfooded in a real application. There are 33 deterministic unit tests across `RichTextAreaTest` and `CodeEditorTest`, backed by an editor SPI in the test implementation, plus a dedicated developer-guide chapter with screenshots.
+The Playground already uses `CodeEditor` for its editor pane, so it is dogfooded rather than demo-ware. There are 33 deterministic unit tests across `RichTextAreaTest` and `CodeEditorTest`, backed by an editor SPI in the test implementation so they run without a real web view, plus new developer-guide sections with screenshots.
 
 ## The tradeoff
 

@@ -1,4 +1,5 @@
-# Pure Codename One text editor render; absorb minor glyph anti-aliasing
-# variance between CI runs / GPU backends.
+# The editor renders inside the platform native web widget; absorb minor
+# web-render anti-aliasing variance between CI runs (blank/black peer captures
+# are well within this).
 maxChannelDelta=16
 maxMismatchPercent=2.0

@@ -362,7 +362,9 @@ A bit later I attended a great session "The Chuck Norris Experiment: Running Jav
 Jaroslav Tulach  
 ](https://twitter.com/JaroslavTulach)  
 (co-founder of NetBeans or Xelfi for us old timers) and  
+[  
 Anton Epple  
+](https://twitter.com/monacotoni)  
 . The session presented the  
 [  
 Bck2Brwsr  
