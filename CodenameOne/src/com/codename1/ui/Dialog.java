@@ -1031,8 +1031,9 @@ public class Dialog extends Form implements AbstractDialog {
                 centeredTitleBody = new Container(new BorderLayout());
                 centeredTitleBody.setUIID("Container");
                 centeredTitleArea = new Container(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE));
-                centeredTitleArea.setUIID("Container");
             }
+            centeredTitleArea.setUIID(getUIManager().getThemeConstant(
+                    "dlgCenteredTitleUIID", "Container"));
             centeredTitleArea.removeAll();
             centeredTitleBody.removeAll();
             centeredTitleArea.addComponent(BorderLayout.CENTER, dialogTitle);
@@ -1401,7 +1402,10 @@ public class Dialog extends Form implements AbstractDialog {
         String uiid = getUIManager().getThemeConstant("dlgButtonCommandUIID", null);
         addButtonBar(buttonArea);
         if (cmds.length > 0) {
-            String lineColor = getUIManager().getThemeConstant("dlgInvisibleButtons", null);
+            String lineColor = getUIManager().getThemeConstant(
+                    Boolean.TRUE.equals(Display.getInstance().isDarkMode())
+                            ? "dlgInvisibleButtonsDark" : "dlgInvisibleButtons",
+                    getUIManager().getThemeConstant("dlgInvisibleButtons", null));
             if (cmds.length > 3) {
                 lineColor = null;
             }

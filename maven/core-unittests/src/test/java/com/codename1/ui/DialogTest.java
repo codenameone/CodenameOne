@@ -20,6 +20,7 @@ class DialogTest extends UITestBase {
     void centeredTitleSupportsThemeDefaultAndRuntimeToggle() {
         Hashtable<String, Object> theme = new Hashtable<String, Object>();
         theme.put("@dialogTitleCenterBool", "true");
+        theme.put("@dlgCenteredTitleUIID", "DialogCenteredTitle");
         theme.put("@dlgCommandGridBool", "true");
         theme.put("Dialog.padding", "5,5,5,5");
         theme.put("Dialog.padUnit", new byte[]{
@@ -47,6 +48,7 @@ class DialogTest extends UITestBase {
         BorderLayout titleBodyLayout = (BorderLayout) titleBody.getLayout();
 
         assertEquals(BorderLayout.CENTER, rootLayout.getComponentConstraint(titleBody));
+        assertEquals("DialogCenteredTitle", titleArea.getUIID());
         assertEquals(BorderLayout.CENTER, titleBodyLayout.getComponentConstraint(titleArea));
         assertEquals(BorderLayout.SOUTH, titleBodyLayout.getComponentConstraint(dialog.getContentPane()));
         assertEquals(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE, titleAreaLayout.getCenterBehavior());

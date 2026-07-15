@@ -305,10 +305,13 @@ public class InteractionDialog extends Container implements AbstractDialog {
         dialogBody.removeAll();
         BorderLayout titleLayout = (BorderLayout) titleArea.getLayout();
         if (titleCentered) {
+            titleArea.setUIID(getUIManager().getThemeConstant(
+                    "dlgCenteredTitleUIID", "Container"));
             titleLayout.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);
             dialogBody.addComponent(BorderLayout.CENTER, titleArea);
             dialogBody.addComponent(BorderLayout.SOUTH, contentPane);
         } else {
+            titleArea.setUIID("Container");
             titleLayout.setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
             dialogBody.addComponent(BorderLayout.NORTH, titleArea);
             dialogBody.addComponent(BorderLayout.CENTER, contentPane);
@@ -1376,7 +1379,10 @@ public class InteractionDialog extends Container implements AbstractDialog {
             commandAreaStyle.setPadding(BOTTOM, 0);
         }
         String uiid = manager.getThemeConstant("dlgButtonCommandUIID", null);
-        String lineColor = manager.getThemeConstant("dlgInvisibleButtons", null);
+        String lineColor = manager.getThemeConstant(
+                Boolean.TRUE.equals(Display.getInstance().isDarkMode())
+                        ? "dlgInvisibleButtonsDark" : "dlgInvisibleButtons",
+                manager.getThemeConstant("dlgInvisibleButtons", null));
         if (cmds.length > 3) {
             lineColor = null;
         }

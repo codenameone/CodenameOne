@@ -41,6 +41,7 @@ class InteractionDialogTest extends UITestBase {
     void centeredTitleSupportsThemeDefaultAndRuntimeToggle() {
         Hashtable<String, Object> theme = new Hashtable<String, Object>();
         theme.put("@dialogTitleCenterBool", "true");
+        theme.put("@dlgCenteredTitleUIID", "DialogCenteredTitle");
         UIManager.getInstance().setThemeProps(theme);
 
         InteractionDialog dialog = new InteractionDialog("Centered", new BorderLayout());
@@ -50,6 +51,7 @@ class InteractionDialogTest extends UITestBase {
         BorderLayout bodyLayout = (BorderLayout) dialogBody.getLayout();
 
         assertTrue(dialog.isTitleCentered());
+        assertEquals("DialogCenteredTitle", titleArea.getUIID());
         assertSame(dialog, dialogBody.getParent());
         assertSame(dialogBody, dialog.getContentPane().getParent());
         assertEquals(BorderLayout.CENTER, bodyLayout.getComponentConstraint(titleArea));
@@ -59,6 +61,7 @@ class InteractionDialogTest extends UITestBase {
         dialog.setTitleCentered(false);
 
         assertFalse(dialog.isTitleCentered());
+        assertEquals("Container", titleArea.getUIID());
         assertSame(dialog, dialogBody.getParent());
         assertSame(dialogBody, dialog.getContentPane().getParent());
         assertEquals(BorderLayout.NORTH, bodyLayout.getComponentConstraint(titleArea));

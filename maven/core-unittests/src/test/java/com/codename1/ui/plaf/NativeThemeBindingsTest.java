@@ -62,7 +62,9 @@ public class NativeThemeBindingsTest extends UITestBase {
         // theme constant so a user app can override it via the same syntax.
         assertEquals("007AFF", theme.get("@accent-color"));
         assertEquals("DialogButton", theme.get("@dlgButtonCommandUIID"));
+        assertEquals("DialogCenteredTitle", theme.get("@dlgCenteredTitleUIID"));
         assertEquals("c6c6c8", theme.get("@dlgInvisibleButtons"));
+        assertEquals("38383a", theme.get("@dlgInvisibleButtonsDark"));
 
         UIManager.getInstance().setThemeProps(theme);
 
