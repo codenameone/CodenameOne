@@ -90,7 +90,7 @@ That work also finished wiring `@media` for the existing watch port, which never
 
 ![The CodeEditor with Java syntax highlighting, a gutter, and an async code-completion popup, and the RichTextArea WYSIWYG editor with a formatting toolbar](/blog/rich-text-and-code-editing/components-codeeditor.png)
 
-Both sit on a single `AbstractEditorComponent` with two interchangeable backends: a fully cross-platform engine made of self-contained HTML and JS inside the core jar, and an optional richer native backend a port can supply. The `CodeEditor` is not a toy demo: the Playground already uses it. The deep dive is in {{< post-link path="/blog/rich-text-and-code-editing" text="Sunday's post" >}}.
+Both sit on a single `AbstractEditorComponent` with two interchangeable backends: a pure Codename One engine that renders on the canvas and receives keyboard and IME input through the port, and an optional native backend a port can supply. The Playground dogfoods the same lightweight editing machinery by enabling it on its multiline `TextArea` source panes. The deep dive is in {{< post-link path="/blog/rich-text-and-code-editing" text="Sunday's post" >}}.
 
 ## Device integrity and app review
 

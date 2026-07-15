@@ -40,7 +40,7 @@ public final class JavaScriptBrowserLifecycleCoordinator {
 
     public interface PasteHooks {
         void copyPlainText(String text);
-        void copyHtmlText(String html);
+        void copyRichText(String plainText, String html);
         void copyFiles(String[] paths);
         void firePasteEvent();
     }
@@ -70,13 +70,13 @@ public final class JavaScriptBrowserLifecycleCoordinator {
     }
 
     public static boolean handlePaste(PasteHooks hooks, String plainText, String htmlText, String[] filePaths) {
-        if (plainText != null && plainText.length() > 0) {
-            hooks.copyPlainText(plainText);
+        if (htmlText != null && htmlText.length() > 0) {
+            hooks.copyRichText(plainText == null ? "" : plainText, htmlText);
             hooks.firePasteEvent();
             return true;
         }
-        if (htmlText != null && htmlText.length() > 0) {
-            hooks.copyHtmlText(htmlText);
+        if (plainText != null && plainText.length() > 0) {
+            hooks.copyPlainText(plainText);
             hooks.firePasteEvent();
             return true;
         }

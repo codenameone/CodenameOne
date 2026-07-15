@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 /** Define Theme Constants here */
 #Constants {
     defaultSourceDPIInt: "0";
@@ -618,14 +641,29 @@ PlaygroundPanelDark {
     border: none;
 }
 
-/* The default "BrowserComponent" UIID ships a border that shows as a 1px
- * outline around the Monaco editor / preview. Clear it so the editor sits
- * flush against its panel. */
+/* The preview still uses BrowserComponent. Clear its default border so it
+ * sits flush against the surrounding panel. */
 BrowserComponent {
     border: none;
     padding: 0;
     margin: 0;
     background: transparent;
+}
+
+PlaygroundSourceEditor {
+    background: #FFFFFF;
+    color: #0F172A;
+    border: none;
+    margin: 0;
+    padding: 1.5mm;
+}
+
+PlaygroundSourceEditorDark {
+    background: #0F172A;
+    color: #E2E8F0;
+    border: none;
+    margin: 0;
+    padding: 1.5mm;
 }
 
 /* ----- Split pane divider ----- */

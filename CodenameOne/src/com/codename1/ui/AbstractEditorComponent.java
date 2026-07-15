@@ -23,6 +23,8 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.editor.EditorHost;
+import com.codename1.ui.editor.PureEditor;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
@@ -40,27 +42,34 @@ import java.util.List;
 /// and the inbound `#onEditorEvent(String, String)` dispatch. Two interchangeable backends honor
 /// that channel:
 ///
-/// 1. A 100% cross platform fallback backed by `BrowserComponent` (a `contenteditable` surface for
-///    rich text, a syntax highlighting surface for code). This works on every platform that supports
-///    the native web widget and gets virtual keyboard handling on phones/tablets and physical keyboard
-///    handling on desktop for free.
-/// 2. An optional native backend supplied by the platform port (see
+/// 1. The pure Codename One text engine (`com.codename1.ui.editor`) which renders the document itself
+///    with `Graphics`/`Font` and binds to the platform text input source (soft keyboard, hardware
+///    keyboard and IME). This is the default where the port exposes low-level text input.
+/// 2. A `BrowserComponent` fallback on ports that don't expose low-level text input. Its
+///    `contenteditable` surface remains editable through the platform web view.
+/// 3. An optional native backend supplied by the platform port (see
 ///    `com.codename1.impl.CodenameOneImplementation#createNativeEditorPeer(AbstractEditorComponent, String)`).
 ///    When a port returns a non-null native peer the editor drives it through
-///    `editorPeerCommand` / `editorPeerQuery` instead of the browser, allowing a platform to provide a
-///    genuinely native experience that can exceed an HTML based app.
+///    `editorPeerCommand` / `editorPeerQuery` instead of the pure engine, allowing a platform to provide a
+///    genuinely native experience.
 ///
-/// Both backends are addressed with the same vocabulary so concrete editors never need to know which
+/// All backends are addressed with the same vocabulary so concrete editors never need to know which
 /// one is active.
 ///
 /// @author Shai Almog
-public abstract class AbstractEditorComponent extends Container {
-    /// Prefix used for all messages that travel from the web editor back to Codename One over the
-    /// `BrowserComponent` message bridge.
+public abstract class AbstractEditorComponent extends Container implements EditorHost {
+    /// Prefix used for messages sent from the browser fallback to Codename One.
     static final String MESSAGE_PREFIX = "cn1ed:";
+
+    /// Backend identifier: the pure Codename One text engine.
+    public static final int BACKEND_PURE = 0;
+
+    /// Backend identifier for the `BrowserComponent` compatibility fallback.
+    public static final int BACKEND_BROWSER = 1;
 
     private BrowserComponent browser;
     private PeerComponent nativePeer;
+    private PureEditor pureEditor;
     private boolean nativeMode;
     private boolean ready;
     private boolean editable = true;
@@ -101,8 +110,19 @@ public abstract class AbstractEditorComponent extends Container {
             return;
         }
         nativeMode = false;
+        if (isTextInputSupported()) {
+            pureEditor = createPureEditor();
+            removeComponent(placeholder);
+            addComponent(BorderLayout.CENTER, pureEditor.getView());
+            markReady();
+            revalidateLater();
+            return;
+        }
+        initBrowserBackend();
+    }
+
+    private void initBrowserBackend() {
         browser = new BrowserComponent();
-        // keep the editor chrome supplied by the surrounding form, the editing surface is transparent
         browser.setProperty("BackgroundColor", 0xffffff);
         browser.addWebEventListener(BrowserComponent.onMessage, new ActionListener() {
             @Override
@@ -113,7 +133,6 @@ public abstract class AbstractEditorComponent extends Container {
         browser.addWebEventListener(BrowserComponent.onLoad, new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent evt) {
-                // the page defines window.cn1editor synchronously so it is ready once the page loaded
                 markReady();
             }
         });
@@ -138,16 +157,8 @@ public abstract class AbstractEditorComponent extends Container {
         }
         String body = msg.substring(MESSAGE_PREFIX.length());
         int colon = body.indexOf(':');
-        String type;
-        String value;
-        if (colon < 0) {
-            type = body;
-            value = null;
-        } else {
-            type = body.substring(0, colon);
-            value = body.substring(colon + 1);
-        }
-        onEditorEvent(type, value);
+        onEditorEvent(colon < 0 ? body : body.substring(0, colon),
+                colon < 0 ? null : body.substring(colon + 1));
     }
 
     private void markReady() {
@@ -164,25 +175,41 @@ public abstract class AbstractEditorComponent extends Container {
         readyListeners.fireActionEvent(new ActionEvent(this));
     }
 
+    /// Deprecated compatibility hook. Backend selection is automatic: the pure engine is used when
+    /// low-level text input is available and the browser fallback is used otherwise.
+    ///
+    /// #### Parameters
+    ///
+    /// - `backend`: ignored
+    @Deprecated
+    public static void setDefaultBackend(int backend) {
+    }
+
+    /// Returns the preferred pure backend. Actual selection may fall back to the browser at runtime.
+    @Deprecated
+    public static int getDefaultBackend() {
+        return BACKEND_PURE;
+    }
+
+    /// Creates the pure Codename One backend for this editor. Subclasses override to supply a code or
+    /// rich text feature layer.
+    PureEditor createPureEditor() {
+        return new PureEditor(this, getEditorType());
+    }
+
     /// Returns the editor type identifier passed to the native peer factory, e.g.
     /// `"richtext"` or `"code"`.
     abstract String getEditorType();
 
-    /// Returns the bootstrap HTML page used by the `BrowserComponent` fallback backend. The page must
-    /// define a global `window.cn1editor` object exposing `cmd(name, arg)` and `query(name, arg)`
-    /// functions and post change/ready events back through `window.cn1PostMessage`.
+    /// Returns the self-contained page used by the browser fallback.
     abstract String createEditorHtml();
 
-    /// Base URL used when loading the editor page, allowing relative resources (such as a bundled code
-    /// editor library) to resolve. The default returns a synthetic origin.
+    /// Base URL for relative resources in the browser fallback page.
     String getEditorBaseURL() {
         return "https://cn1editor.codenameone.com/";
     }
 
-    /// When non-null the browser fallback loads this app-hierarchy URL (via
-    /// `BrowserComponent#setURLHierarchy(String)`) as a custom editor engine instead of the built-in
-    /// `#createEditorHtml()` page. Subclasses override to allow an application to supply a richer editor
-    /// backend that speaks the same `window.cn1editor` bridge.
+    /// Optional app-hierarchy URL for a custom browser editor engine.
     String getEngineURL() {
         return null;
     }
@@ -215,6 +242,7 @@ public abstract class AbstractEditorComponent extends Container {
     /// - `type`: the event type
     ///
     /// - `value`: optional payload, may be null
+    @Override
     public void fireEditorEvent(final String type, final String value) {
         if (CN.isEdt()) {
             onEditorEvent(type, value);
@@ -248,6 +276,8 @@ public abstract class AbstractEditorComponent extends Container {
         }
         if (nativeMode) {
             Display.impl.editorPeerCommand(nativePeer, name, arg);
+        } else if (pureEditor != null) {
+            pureEditor.cmd(name, arg);
         } else {
             browser.execute("window.cn1editor.cmd(${0}, ${1})", new Object[]{name, arg == null ? "" : arg});
         }
@@ -277,9 +307,12 @@ public abstract class AbstractEditorComponent extends Container {
             callback.onSucess(Display.impl.editorPeerQuery(nativePeer, name, arg));
             return;
         }
+        if (pureEditor != null) {
+            callback.onSucess(pureEditor.query(name, arg));
+            return;
+        }
         browser.execute("callback.onSuccess(window.cn1editor.query(${0}, ${1}))",
-                new Object[]{name, arg == null ? "" : arg},
-                new JSRefStringCallback(callback));
+                new Object[]{name, arg == null ? "" : arg}, new JSRefStringCallback(callback));
     }
 
     private static final class JSRefStringCallback implements SuccessCallback<BrowserComponent.JSRef> {
@@ -314,14 +347,13 @@ public abstract class AbstractEditorComponent extends Container {
         return ready;
     }
 
-    /// True when a platform supplied native editor backend is in use, false when the cross platform
-    /// `BrowserComponent` fallback is active.
+    /// True when a platform supplied native editor backend is in use, false for the pure and browser
+    /// backends.
     public boolean isNativeEditor() {
         return nativeMode;
     }
 
-    /// Returns the underlying `BrowserComponent` used by the fallback backend, or null when a native
-    /// backend is active. Exposed for advanced customization; most apps never need this.
+    /// Returns the browser fallback, or null when the pure or native backend is active.
     public BrowserComponent getInternalBrowser() {
         return browser;
     }
@@ -396,5 +428,37 @@ public abstract class AbstractEditorComponent extends Container {
     /// Removes keyboard focus from the editing surface, hiding the virtual keyboard on touch devices.
     public void blurEditor() {
         command("blur", null);
+    }
+
+    // ---- EditorHost (pure backend bridge to the platform text input source) ----
+
+    /// {@inheritDoc}
+    @Override
+    public boolean isTextInputSupported() {
+        return Display.impl.isTextInputSupported();
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Object startTextInput(TextInputClient client, TextInputConfig config) {
+        return Display.impl.startTextInput(client, config);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void updateTextInputState(Object handle, TextInputState state) {
+        Display.impl.updateTextInputState(handle, state);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void stopTextInput(Object handle) {
+        Display.impl.stopTextInput(handle);
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void editorChanged() {
+        onEditorEvent("change", null);
     }
 }

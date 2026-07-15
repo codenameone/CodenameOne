@@ -633,7 +633,7 @@ When a `Dialog` is shown, the parent `Form` is deinitialized. This causes any `B
 
 This affects:
 
-* **Editors** (Monaco, CodeMirror) - content and cursor position lost
+* **Stateful embedded editors** - content and cursor position lost
 * **WebRTC** connections - broken when removed from DOM
 * **Interactive visualizations** - charts, maps, diagrams with JavaScript state
 * **Any JavaScript state** - event listeners, variables, etc.
@@ -670,5 +670,4 @@ With `removeOnDeinitialize=false`:
 . Dialog is dismissed
 . Parent `Form`'s `initComponent()` is called
 . `BrowserComponent` reconnects to the existing iframe - JavaScript state preserved
-
 

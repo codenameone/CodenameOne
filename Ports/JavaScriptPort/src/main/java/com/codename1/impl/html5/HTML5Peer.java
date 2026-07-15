@@ -331,8 +331,8 @@ public class HTML5Peer extends PeerComponent {
     // ``doc.documentElement.contains(el)`` compares the worker's doc proxy against
     // the el proxy and ALWAYS returns false. initComponent() then re-appends the
     // peer on every call -- and appendChild() of an element that is already a child
-    // MOVES it, which RELOADS an iframe peer. For the Playground's Monaco editor that
-    // reload re-bootstraps the editor and wipes the user's edits on every interaction
+    // MOVES it, which RELOADS an iframe peer. For an embedded editor that reload
+    // re-bootstraps the document and wipes the user's edits on every interaction
     // (the editor only started receiving events once the pointer-events toggle
     // landed, which is why this surfaced as "typed character erased immediately").
     // Probe through the JSO bridge instead: getParentNode() runs on the MAIN thread
