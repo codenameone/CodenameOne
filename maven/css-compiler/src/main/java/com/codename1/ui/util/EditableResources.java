@@ -95,7 +95,7 @@ import javax.swing.tree.TreePath;
  * @author Shai Almog
  */
 public class EditableResources extends Resources implements TreeModel {
-    private static final short MINOR_VERSION = 14;
+    private static final short MINOR_VERSION = 15;
     private static final short MAJOR_VERSION = 1;
 
     private static final boolean IS_MAC;
@@ -2308,6 +2308,10 @@ public class EditableResources extends Resources implements TreeModel {
             output.writeBoolean(rb.isShadowMM());
             output.writeFloat(rb.getShadowX());
             output.writeFloat(rb.getShadowY());
+            // Gradient-stroke fields, added in resource format 1.15
+            output.writeBoolean(rb.isStrokeGradient());
+            output.writeInt(rb.getStrokeColor2());
+            output.writeFloat(rb.getStrokeGradientAngle());
             return;
         }
         if (border instanceof CSSBorder) {

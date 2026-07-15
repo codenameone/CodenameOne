@@ -5798,6 +5798,19 @@ public class CSSTheme {
                 out.strokeOpacity(0);
             }
 
+            // Liquid Glass gradient rim: when a cn1-stroke-gradient end colour is
+            // supplied the stroke is painted as a two-colour gradient from the
+            // border-color to this colour, along cn1-stroke-gradient-angle
+            // (degrees, 0 = top-to-bottom).
+            LexicalUnit strokeGradientColor = styles.get("cn1-stroke-gradient");
+            if (strokeGradientColor != null) {
+                out.strokeColor2(getColorInt(strokeGradientColor));
+                ScaledUnit strokeGradientAngle = (ScaledUnit) styles.get("cn1-stroke-gradient-angle");
+                if (strokeGradientAngle != null) {
+                    out.strokeGradientAngle((float) strokeGradientAngle.getNumericValue());
+                }
+            }
+
             /*
 
             apply(style, "cn1-box-shadow-inset", value);
@@ -6801,7 +6814,20 @@ public class CSSTheme {
                 style.put("cn1-background-type", value);
                 break;
             }
-            
+
+            // Liquid Glass gradient stroke: the border thickness + start colour
+            // come from the standard `border` shorthand; these give the end
+            // colour (turning the rim into a two-colour gradient) and an optional
+            // direction. Consumed by createRoundBorder().
+            case "cn1-stroke-gradient" : {
+                style.put("cn1-stroke-gradient", value);
+                break;
+            }
+            case "cn1-stroke-gradient-angle" : {
+                style.put("cn1-stroke-gradient-angle", value);
+                break;
+            }
+
             case "background" : {
                 
                 

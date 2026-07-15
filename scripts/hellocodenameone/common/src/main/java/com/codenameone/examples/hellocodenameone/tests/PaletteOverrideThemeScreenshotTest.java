@@ -31,19 +31,17 @@ import java.util.Hashtable;
  * mechanism is what ships for dynamic theming use cases (in-app
  * accent toggles, A/B tests, branded flavours).
  *
- * This test installs a magenta override on the primary accent and a
- * vivid teal on the disabled accent. The teal is the load-bearing
- * choice for cross-platform coverage: on iOS Modern the only visible
- * widgets that rebind when accent-color changes are RaisedButton +
- * Button (which the magenta already exercises), but the disabled
- * RaisedButton stays at the default light-blue accent-disabled tone
- * unless `@accent-disabled-color` is also retuned. Adding the teal
- * therefore produces a visible iOS pixel diff against a baseline that
- * predates the binding mechanism, confirming the binding fires on iOS
- * and isn't merely a no-op coincidence with the magenta. Android
- * Material 3 doesn't bind its disabled state to accent-disabled (its
- * disabled colours are hard-coded in CSS), so the teal is iOS-only;
- * Android's diff is driven by the magenta `@accent-container-color`
+ * This test installs a magenta override on the primary accent (plus a
+ * teal on the disabled slot and Material's tonal container tokens).
+ * Under the iOS 26 theme the one accent-bound surface is the
+ * RaisedButton FILL, so the magenta override retunes it and the
+ * assertion below pins that binding. The regular Button label (fixed
+ * neutral) and the disabled RaisedButton (fixed desaturated taupe) are
+ * deliberately NOT accent-bound, so they ignore the override -- their
+ * appearance is covered by the goldens rather than asserted. The extra
+ * disabled/container override keys are left in place (harmless where
+ * unbound) so the same override map keeps exercising Android Material 3,
+ * whose diff is driven by the magenta `@accent-container-color`
  * retuning RaisedButton's tonal fill.
  *
  * The light capture exercises the light base styles; the dark capture
@@ -185,26 +183,22 @@ public class PaletteOverrideThemeScreenshotTest extends DualAppearanceBaseTest {
 
     private void assertPaletteApplied(Button primary, Button text, Button disabled, String suffix) {
         int primaryBg = primary.getUnselectedStyle().getBgColor();
-        int textFg = text.getUnselectedStyle().getFgColor();
-        int textBg = text.getUnselectedStyle().getBgColor();
-        int disabledBg = disabled.getDisabledStyle().getBgColor();
         boolean iosTheme = "ios".equals(Display.getInstance().getPlatformName())
                 || suffix.startsWith("ios_");
-        // iOS Button is a text-accent glass pill. Material Button is the
-        // filled primary action, so its background (not foreground) carries
-        // the accent while the label remains on-primary white.
-        // Fail fast only for the iOS theme whose serialized pill-border
-        // bindings this regression test protects. Material ports don't expose
-        // one uniform Style fg/bg representation for their painted buttons;
-        // their rendered palette behavior remains covered by the goldens.
-        boolean textAccentApplied = textFg == 0xff2d95;
-        if (iosTheme && (primaryBg != 0xff2d95 || !textAccentApplied
-                || disabledBg != 0x00b894)) {
-            throw new AssertionError("Palette override missing in " + suffix
+        // iOS 26 contract: the RaisedButton FILL is the one accent-bound surface,
+        // so it must track the @accent-color override (magenta). The regular Button
+        // LABEL is a fixed neutral (black on the light glass, white in dark) and the
+        // disabled RaisedButton is a fixed desaturated taupe -- both intentionally
+        // NOT accent-bound, so they do not follow the override; their appearance is
+        // covered by the goldens. Fail fast only for the iOS theme whose serialized
+        // pill-border binding this regression test protects. Material ports don't
+        // expose one uniform Style fg/bg for their painted buttons; their palette
+        // behaviour stays covered by the goldens.
+        if (iosTheme && primaryBg != 0xff2d95) {
+            throw new AssertionError("RaisedButton accent binding missing in " + suffix
                     + ": Raised.bg=" + Integer.toHexString(primaryBg)
-                    + " Button.fg=" + Integer.toHexString(textFg)
-                    + " Button.bg=" + Integer.toHexString(textBg)
-                    + " Raised.disabled.bg=" + Integer.toHexString(disabledBg));
+                    + " Button.fg=" + Integer.toHexString(text.getUnselectedStyle().getFgColor())
+                    + " Raised.disabled.bg=" + Integer.toHexString(disabled.getDisabledStyle().getBgColor()));
         }
     }
 }
