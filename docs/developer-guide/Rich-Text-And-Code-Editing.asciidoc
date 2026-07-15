@@ -173,7 +173,7 @@ mapped directly to the rich model and serialized directly back with `getMarkdown
 underline, strike-through, and skips metadata destinations such as font and color tables.
 
 On a browser fallback, Markdown, AsciiDoc, and RTF remain in source mode: editing and reading the same
-format returns source text instead of silently replacing it with generated HTML. Requesting a
+format returns source text without replacing it with generated HTML. Requesting a
 different output format performs an explicit model conversion and returns canonical output, just as
 `getHtml(...)` canonicalizes a visual rich-text document.
 
@@ -236,10 +236,10 @@ underlines it draws are diagnostics supplied through `setDiagnostics(...)`.
 
 ==== Custom syntax highlighters
 
-Built-in languages use grammar-specific incremental lexers. JSON doesn't accept single-quoted
+Built-in languages use grammar-specific incremental lexical analyzers. JSON doesn't accept single-quoted
 strings, CSS doesn't interpret `//` as a comment, XML tracks tags and attributes, Python carries
 triple-quoted strings across lines, and C-family numeric prefixes are validated by radix. These rules
-are deliberately lexical; a compiler or language server remains the authority for diagnostics.
+are lexical by design; a compiler or language server remains the authority for diagnostics.
 
 Third-party libraries can register a `SyntaxHighlighter` under any language ID. The highlighter
 receives one line and the state returned for the preceding line, then returns ordered token spans and
