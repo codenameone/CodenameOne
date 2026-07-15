@@ -61,10 +61,6 @@ public class ToolingHelpClient {
     /**
      * Self-serve help articles keyed by {@code step}. These are the synchronous
      * fallback shown when there is no email (Path B) or support is unreachable.
-     *
-     * <p>NOTE: confirm the canonical help.codenameone.com article slugs with the team;
-     * these point at stable guides that already exist and are safe defaults. Update in
-     * one place here when the dedicated articles land.</p>
      */
     private static final Map<String, String> HELP_ARTICLES = new HashMap<String, String>();
     private static final String DEFAULT_HELP_ARTICLE = "https://www.codenameone.com/getting-started.html";
@@ -72,9 +68,10 @@ public class ToolingHelpClient {
         HELP_ARTICLES.put("install", "https://www.codenameone.com/getting-started.html");
         HELP_ARTICLES.put("create_project", "https://www.codenameone.com/getting-started.html");
         HELP_ARTICLES.put("configure",
-                "https://www.codenameone.com/blog/automatically-generate-provisioning-profiles-certificates-signing-your-app.html");
+                "https://help.codenameone.com/en-us/article/build-an-ios-app-from-windows-or-linux-setting-up-signing-t25fmz/?bust=1784015085238");
         HELP_ARTICLES.put("local_run", "https://www.codenameone.com/manual/getting-started.html");
-        HELP_ARTICLES.put("build_submit", "https://www.codenameone.com/manual/appendix-build-server.html");
+        HELP_ARTICLES.put("build_submit",
+                "https://help.codenameone.com/en-us/article/create-your-first-codename-one-project-and-get-a-green-build-15s7a9u/?bust=1784015443556");
         HELP_ARTICLES.put("other", DEFAULT_HELP_ARTICLE);
     }
 

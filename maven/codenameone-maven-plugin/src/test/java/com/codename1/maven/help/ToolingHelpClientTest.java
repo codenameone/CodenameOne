@@ -149,7 +149,14 @@ public class ToolingHelpClientTest {
 
     @Test
     public void helpArticleUrl_mapsKnownStepsAndFallsBack() {
-        assertTrue(ToolingHelpClient.helpArticleUrl("configure").contains("codenameone.com"));
+        assertEquals("https://help.codenameone.com/en-us/article/"
+                        + "build-an-ios-app-from-windows-or-linux-setting-up-signing-t25fmz/"
+                        + "?bust=1784015085238",
+                ToolingHelpClient.helpArticleUrl("configure"));
+        assertEquals("https://help.codenameone.com/en-us/article/"
+                        + "create-your-first-codename-one-project-and-get-a-green-build-15s7a9u/"
+                        + "?bust=1784015443556",
+                ToolingHelpClient.helpArticleUrl("build_submit"));
         assertEquals(ToolingHelpClient.helpArticleUrl("other"),
                 ToolingHelpClient.helpArticleUrl("does-not-exist"));
         assertNotNull(ToolingHelpClient.helpArticleUrl(null));
