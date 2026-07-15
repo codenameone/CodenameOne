@@ -796,7 +796,16 @@ extern BOOL isRetinaBug();
 
 -(void)invalidateRetainedFramebuffer {
     retainedFramebufferInvalid = YES;
-    clearRetainedFramebufferOnNextFrame = NO;
+    // issue #5349: after a suspend/resume iOS may have discarded the contents
+    // of the private-storage screenTexture, so loading it (MTLLoadActionLoad)
+    // paints garbage/violet in any region the diff-painter does not repaint
+    // this frame (the Toolbar/title bar, unselected Tabs, a FAB shadow, ...).
+    // Previously the clear only happened once a repaint covered the whole
+    // screen -- but a partial animation repaint routinely lands first, loads
+    // the stale texture and pins the garbage until a touch dirties the region.
+    // Force the very next frame to clear unconditionally so no discarded pixels
+    // can survive; the full repaint triggered on foreground then fills content.
+    clearRetainedFramebufferOnNextFrame = YES;
     // A preserved resize frame is also stale after a suspend/resume cycle.
     needsResizePresent = NO;
 }

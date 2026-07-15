@@ -1,0 +1,20 @@
+# Exact third-party source files excluded from the Codename One/Oracle header
+# check.  Wildcards and directories are deliberately rejected by the validator.
+# Format: repository-relative path | provenance/license rationale
+
+Ports/JavaScriptPort/src/main/webapp/css/bootstrap-theme.min.css | Bootstrap 3.3.4, Copyright Twitter, MIT license
+Ports/JavaScriptPort/src/main/webapp/css/bootstrap.min.css | Bootstrap 3.3.4 and normalize.css 3.0.2, MIT licenses
+Ports/JavaScriptPort/src/main/webapp/js/bootstrap.min.js | Bootstrap 3.3.4, Copyright Twitter, MIT license
+Ports/JavaScriptPort/src/main/webapp/js/fontmetrics.js | Bundles Web Font Loader and other Apache-2.0/MIT third-party font utilities
+Ports/JavaScriptPort/src/main/webapp/js/jquery.min.js | jQuery 2.1.3, Copyright jQuery Foundation, MIT license
+Ports/JavaScriptPort/src/main/webapp/js/manup.js | ManUp.js web-app-manifest polyfill, Apache-2.0 license
+Ports/JavaScriptPort/src/main/webapp/js/push.js | Contains js-base64 2.1.9 third-party code alongside the port push adapter
+Ports/JavaScriptPort/src/main/webapp/js/samplerate.min.js | Emscripten-generated third-party sample-rate conversion library
+Ports/JavaScriptPort/src/main/webapp/js/upup.min.js | UpUp 1.0.0, Copyright Tal Ater, MIT license
+Ports/JavaScriptPort/src/main/webapp/js/videojs/RecordRTC.min.js | RecordRTC 5.5.3 and bundled dependencies, MIT and other upstream licenses
+Ports/JavaScriptPort/src/main/webapp/js/videojs/adapter.js | WebRTC adapter.js, BSD-style license
+Ports/JavaScriptPort/src/main/webapp/js/videojs/video-js.min.css | Minified Video.js third-party stylesheet
+Ports/JavaScriptPort/src/main/webapp/js/videojs/video.min.js | Video.js 7.4.1 and vtt.js, Apache-2.0 licenses
+Ports/JavaScriptPort/src/main/webapp/js/videojs/videojs.record.min.css | videojs-record 3.5.0 third-party stylesheet
+Ports/JavaScriptPort/src/main/webapp/js/videojs/videojs.record.min.js | videojs-record 3.5.0 third-party bundle
+Ports/JavaScriptPort/src/main/webapp/sw.js | Codename One service-worker adapter containing the UpUp 1.0.0 MIT-licensed service worker

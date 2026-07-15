@@ -9,6 +9,16 @@ import java.io.File;
 @Mojo(name="install-codenameone")
 public class InstallCodenameOneMojo extends AbstractCN1Mojo {
     @Override
+    protected String helpStep() {
+        return "install";
+    }
+
+    @Override
+    protected String helpAction() {
+        return "mvn cn1:install-codenameone";
+    }
+
+    @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         File cn1Dir = new File(System.getProperty("user.home"), ".codenameone");
         if (!cn1Dir.exists()) {

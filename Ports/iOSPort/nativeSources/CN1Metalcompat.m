@@ -1933,6 +1933,30 @@ void CN1MetalUnregisterMutableImage(GLUIImage *image) {
     }
 }
 
+// --------------- Texture-discard recovery (issue #5349) ---------------
+//
+// iOS discards the contents of MTLStorageModePrivate textures while the app is
+// suspended (and can reclaim them under memory pressure). CN1 caches such
+// textures for every image, so after a resume it would sample the discarded
+// garbage and paint a violet/magenta fill on any surface the diff-painter does
+// not fully repaint (Toolbar, unselected Tabs, a FAB shadow, a Switch thumb).
+//
+// A monotonically increasing generation, bumped on foreground and on memory
+// warning. GLUIImage.getMTLTexture re-decodes its read-only texture from the
+// retained UIImage the first time it is sampled in a newer generation. This is
+// the only safe recovery signal: probing the OS purgeable state per-draw
+// (setPurgeableState) trips Metal's commit-time lockPurgeableObjects validation
+// on textures already referenced by an in-flight command buffer.
+static volatile int gTextureValidateGeneration = 0;
+
+int CN1MetalTextureValidateGeneration(void) {
+    return gTextureValidateGeneration;
+}
+
+void CN1MetalBumpTextureValidateGeneration(void) {
+    gTextureValidateGeneration++;
+}
+
 void CN1MetalBackupMutableImagesForSuspend(void) {
     if (gMutableImageRegistry == nil) return;
     NSArray *snapshot;
@@ -1945,6 +1969,13 @@ void CN1MetalBackupMutableImagesForSuspend(void) {
     }
     for (GLUIImage *image in snapshot) {
         if ([image mtlMutableTexture] == nil) {
+            // Layer B (issue #5349): a plain read-only image whose texture was
+            // uploaded from a UIImage. Drop it now so it re-decodes from that
+            // retained UIImage after resume instead of sampling the contents
+            // iOS discards during suspend. (Also frees GPU memory before we go
+            // to the background.) getMTLTexture's generation check is the
+            // primary guard; this just reclaims eagerly.
+            [image dropReadOnlyCachedTexture];
             continue;
         }
         // Read the current GPU pixels back into a UIImage *before* dropping
@@ -1962,6 +1993,10 @@ void CN1MetalBackupMutableImagesForSuspend(void) {
         // invalidates the read-only mtlTexture cache.
         [image setImage:backup];
     }
+    // Glyph atlases are private-storage textures too; drop them so text
+    // re-rasterises after resume rather than sampling discarded contents.
+    extern void CN1MetalGlyphAtlasReleaseAll(void);
+    CN1MetalGlyphAtlasReleaseAll();
 }
 
 // --------------- Memory-pressure cache release ---------------
@@ -1983,6 +2018,11 @@ void CN1MetalReleaseCaches(void) {
     // linear-gradient / radial-gradient), no offscreen bitmap to cache.
     // Only the glyph atlases need releasing under memory pressure.
     CN1MetalGlyphAtlasReleaseAll();
+    // issue #5349: a memory warning means the OS is (or is about to start)
+    // reclaiming resources -- bump the generation so cached read-only image
+    // textures re-decode from their UIImage on next use rather than risk
+    // sampling contents the OS discarded.
+    CN1MetalBumpTextureValidateGeneration();
 }
 
 #endif /* CN1_USE_METAL */

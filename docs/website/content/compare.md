@@ -89,3 +89,5 @@ MAF historically combined enterprise complexity with hybrid-web tradeoffs and a 
 ## Bottom Line
 
 If you want a Java/Kotlin-based, high-portability cross-platform workflow with strong native output and reduced platform build friction, Codename One is built for exactly that.
+
+{{< crisp-event function="pricingEvaluator" >}}

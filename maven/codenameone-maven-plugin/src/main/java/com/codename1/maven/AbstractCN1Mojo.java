@@ -192,9 +192,49 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         
         
         setupAnt();
-        executeImpl();
+        try {
+            executeImpl();
+        } catch (MojoExecutionException | MojoFailureException e) {
+            offerHelp(e);
+            throw e;
+        } catch (RuntimeException e) {
+            offerHelp(e);
+            throw e;
+        }
     }
-    
+
+    /**
+     * On any local failure, record the context and print the "Get help" affordance
+     * (see {@link com.codename1.maven.help.ToolingHelp}). This never sends anything and
+     * never masks the original failure &mdash; it just tells the user how to reach support.
+     */
+    private void offerHelp(Throwable failure) {
+        com.codename1.maven.help.ToolingHelp.offerAfterFailure(
+                getLog(),
+                com.codename1.maven.help.ToolingHelp.COMPONENT_MAVEN_PLUGIN,
+                helpStep(),
+                helpAction(),
+                com.codename1.maven.help.ToolingHelp.pluginVersion(),
+                failure);
+    }
+
+    /**
+     * The wire-contract {@code step} this goal maps to (install | create_project |
+     * configure | local_run | build_submit | other). Subclasses override to classify
+     * their failures; defaults to {@code other}.
+     */
+    protected String helpStep() {
+        return "other";
+    }
+
+    /**
+     * The exact command/action that failed, folded into the reproduction so support can
+     * re-run it (e.g. {@code mvn cn1:build -Dcodename1.platform=ios}). Null when unknown.
+     */
+    protected String helpAction() {
+        return null;
+    }
+
     protected abstract void executeImpl()  throws MojoExecutionException, MojoFailureException;
 
 
