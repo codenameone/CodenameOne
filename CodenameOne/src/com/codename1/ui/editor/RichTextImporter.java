@@ -292,7 +292,7 @@ public final class RichTextImporter {
                     }
                     continue;
                 }
-                if (!Character.isLetter(next)) {
+                if (!isAsciiLetter(next)) {
                     i++;
                     if (next == '*') {
                         state.skip = true;
@@ -303,7 +303,7 @@ public final class RichTextImporter {
                     continue;
                 }
                 int wordStart = i;
-                while (i < source.length() && Character.isLetter(source.charAt(i))) {
+                while (i < source.length() && isAsciiLetter(source.charAt(i))) {
                     i++;
                 }
                 String word = source.substring(wordStart, i);
@@ -511,6 +511,10 @@ public final class RichTextImporter {
         int h = Character.digit(high, 16);
         int l = Character.digit(low, 16);
         return h < 0 || l < 0 ? -1 : (h << 4) | l;
+    }
+
+    private static boolean isAsciiLetter(char value) {
+        return value >= 'A' && value <= 'Z' || value >= 'a' && value <= 'z';
     }
 
     private static String escape(String value) {
