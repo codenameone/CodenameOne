@@ -1683,7 +1683,7 @@ public class BrowserComponent extends Container {
     ///   When a Dialog is shown, the parent Form is deinitialized, which normally causes
     ///   BrowserComponent's iframe to be removed from the DOM. When the Dialog is dismissed,
     ///   the Form is re-shown but the iframe must be recreated from scratch, losing all
-    ///   JavaScript state (editor content, event listeners, etc.).
+    ///   JavaScript state (Monaco editor content, event listeners, etc.).
     ///   
     ///   Setting this to `Boolean.FALSE` preserves the iframe in the DOM across
     ///   deinitialization cycles, which is essential for:

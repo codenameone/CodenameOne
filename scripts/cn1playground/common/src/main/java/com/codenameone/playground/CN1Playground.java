@@ -1,26 +1,3 @@
-/*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
- * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
- * This code is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Codename One designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
- *
- * This code is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * version 2 for more details (a copy is included in the LICENSE file that
- * accompanied this code).
- *
- * You should have received a copy of the GNU General Public License version
- * 2 along with this work; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Please contact Codename One through http://www.codenameone.com/ if you
- * need additional information or have any questions.
- */
-
 package com.codenameone.playground;
 
 import com.codename1.components.SplitPane;
@@ -74,8 +51,8 @@ public class CN1Playground extends Lifecycle {
     private final PlaygroundProjectExporter projectExporter = new PlaygroundProjectExporter();
 
     private Form appForm;
-    private PlaygroundLightweightEditor editor;
-    private PlaygroundLightweightEditor cssEditor;
+    private PlaygroundBrowserEditor editor;
+    private PlaygroundBrowserEditor cssEditor;
     private PlaygroundInspector inspector;
     private PlaygroundTopBar topBar;
     private PlaygroundActivityBar activityBar;
@@ -171,8 +148,8 @@ public class CN1Playground extends Lifecycle {
             toolbar.hideToolbar();
         }
 
-        editor = new PlaygroundLightweightEditor(PlaygroundLightweightEditor.Mode.JAVA, currentScript, websiteDarkMode, this::handleSourceChanged);
-        cssEditor = new PlaygroundLightweightEditor(PlaygroundLightweightEditor.Mode.CSS, currentCss, websiteDarkMode, this::handleCssChanged);
+        editor = new PlaygroundBrowserEditor(PlaygroundBrowserEditor.Mode.JAVA, currentScript, websiteDarkMode, this::handleSourceChanged);
+        cssEditor = new PlaygroundBrowserEditor(PlaygroundBrowserEditor.Mode.CSS, currentCss, websiteDarkMode, this::handleCssChanged);
         inspector = new PlaygroundInspector(websiteDarkMode, (component, property, value) -> handlePropertyChanged(component));
 
         topBar = new PlaygroundTopBar(currentMode, websiteDarkMode, new PlaygroundTopBar.Actions() {
@@ -535,8 +512,8 @@ public class CN1Playground extends Lifecycle {
         // Put bottomNav at the FORM's SOUTH slot (not inside bodyContainer) so
         // the Form-level BorderLayout carves out its height BEFORE allocating
         // bodyContainer to the editor + tab stack. Keeps the nav height out
-        // of the tab content region so the source editor can't shrink or
-        // reflow it when it reports its own preferred size.
+        // of the tab content region, so the Monaco iframe peers can't shrink
+        // or reflow it when the editor reports its own preferred size.
         detach(bottomNav);
         appForm.add(BorderLayout.SOUTH, bottomNav);
 
@@ -789,6 +766,7 @@ public class CN1Playground extends Lifecycle {
 
             editor.setMarkers(diagnostics);
             editor.setInlineMessages(currentMessages);
+            editor.setUiidCompletions(PlaygroundCssSupport.collectVisibleUiids(previewColumn.getContentHost()));
             applyCurrentCss();
             persistCurrentState();
         });
@@ -1062,6 +1040,7 @@ public class CN1Playground extends Lifecycle {
         currentCssMessages = messages;
         cssEditor.setMarkers(diagnostics);
         cssEditor.setInlineMessages(messages);
+        cssEditor.setUiidCompletions(PlaygroundCssSupport.collectVisibleUiids(previewColumn.getContentHost()));
         // Refresh only the user's preview content. Walking the bezel/screen/mask would
         // wipe programmatic borders that have no theme.css counterpart.
         if (previewColumn != null) {

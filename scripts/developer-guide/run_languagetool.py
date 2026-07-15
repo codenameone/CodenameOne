@@ -254,12 +254,6 @@ DISABLED_RULES = (
     # "Word repeated at sentence start" — fires every time we have a
     # parallel-structured list of "The X does ... The Y does ..." entries.
     "ENGLISH_WORD_REPEAT_BEGINNING_RULE",
-    # "Sentence does not start with an uppercase letter" — fires on
-    # asciidoc ordered-list continuation items that are deliberately
-    # lowercase verb phrases (". gets X, . verifies Y, . builds Z") joined
-    # to a lead-in like "a method that:". Capitalizing one item mid-list
-    # would read worse than leaving the parallel structure intact.
-    "UPPERCASE_SENTENCE_START",
     # NUMBERS_IN_WORDS flags cn1lib/cn1libs/cn1-binaries-style identifiers
     # that the accept list already declares acceptable.
     "NUMBERS_IN_WORDS",

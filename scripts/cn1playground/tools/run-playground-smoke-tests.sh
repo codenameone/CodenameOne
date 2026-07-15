@@ -18,34 +18,12 @@ if ! grep -q 'index.put("com.codename1.ui.Component"' "$ROOT/common/src/main/jav
 fi
 
 echo "Verifying key com.codename1.ui classes are present in generated registry..."
-for cls in Button Container Dialog Display Form Label List TextField BrowserComponent CodeEditor RichTextArea; do
+for cls in Button Container Dialog Display Form Label List TextField BrowserComponent; do
   if ! grep -q "index.put(\"com.codename1.ui.${cls}\"" "$ROOT/common/src/main/java/bsh/cn1/GeneratedCN1Access.java"; then
     echo "GeneratedCN1Access is missing com.codename1.ui.${cls}" >&2
     exit 1
   fi
 done
-
-echo "Verifying new editor APIs are available to playground scripts..."
-for member in 'setLightweightEditingEnabled(boolean)' 'setContent(String, RichTextFormat)' \
-              'setMarkdown(String)' 'setAsciiDoc(String)' 'setRtf(String)'; do
-  if ! grep -q "$member" "$ROOT/common/src/main/java/bsh/cn1/GeneratedCN1Access.java"; then
-    echo "GeneratedCN1Access is missing editor API ${member}" >&2
-    exit 1
-  fi
-done
-
-echo "Verifying the playground opts into lightweight TextArea editing..."
-if ! grep -q 'setLightweightEditingEnabled(true)' \
-        "$ROOT/common/src/main/java/com/codenameone/playground/PlaygroundLightweightEditor.java"; then
-  echo "Playground source editor does not enable lightweight editing" >&2
-  exit 1
-fi
-
-forbidden_editor='mona''co'
-if git -C "$ROOT/../.." grep -in "$forbidden_editor"; then
-  echo "Removed browser-editor dependency is still referenced by tracked files" >&2
-  exit 1
-fi
 
 echo "Verifying package-private/internal sentinel classes are NOT generated..."
 for cls in com.codename1.ui.Accessor com.codename1.io.IOAccessor; do

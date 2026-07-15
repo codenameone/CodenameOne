@@ -33,9 +33,6 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.events.DataChangedListener;
-import com.codename1.ui.editor.EditorDocument;
-import com.codename1.ui.editor.EditorHost;
-import com.codename1.ui.editor.EditorView;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.LookAndFeel;
@@ -213,8 +210,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         public void actionPerformed(ActionEvent evt) {
             Form f = getComponentForm();
             if (f != null) {
-                if (isEditing() && f.getComponentAt(evt.getX(), evt.getY()) != TextArea.this //NOPMD CompareObjectsWithEquals
-                        && !isLightweightEditorAt(evt.getX(), evt.getY())) {
+                if (isEditing() && f.getComponentAt(evt.getX(), evt.getY()) != TextArea.this) { //NOPMD CompareObjectsWithEquals
                     fireActionEvent();
                     setSuppressActionEvent(true);
                 }
@@ -224,10 +220,6 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     private boolean textSelectionEnabled;
     private TextSelection.Spans span;
     private TextSelection.TextSelectionSupport textSelectionSupport;
-    private boolean lightweightEditingEnabled;
-    private LightweightTextAreaEditor lightweightEditor;
-    private Container lightweightEditorLayer;
-    private boolean stoppingLightweightEditor;
 
     /// Creates an area with the given rows and columns
     ///
@@ -574,25 +566,6 @@ public class TextArea extends Component implements ActionSource, TextHolder {
             }
         }
         super.setWidth(width);
-        syncLightweightEditorBounds();
-    }
-
-    @Override
-    public void setX(int x) {
-        super.setX(x);
-        syncLightweightEditorBounds();
-    }
-
-    @Override
-    public void setY(int y) {
-        super.setY(y);
-        syncLightweightEditorBounds();
-    }
-
-    @Override
-    public void setHeight(int height) {
-        super.setHeight(height);
-        syncLightweightEditorBounds();
     }
 
     /// Returns the text in the text area
@@ -751,37 +724,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// - `b`: true is text are is editable; otherwise false
     public void setEditable(boolean b) {
         editable = b;
-        if (!b && lightweightEditor != null) {
-            stopLightweightEditing(null, true);
-        }
         updateCursor();
-    }
-
-    /// Enables the pure Codename One editing surface for this text component. This mode uses the
-    /// framework's `TextInputClient` bridge for virtual-keyboard and IME input while keeping selection,
-    /// caret movement, scrolling, clipboard operations, and painting in lightweight code. It is disabled
-    /// by default so existing applications retain their native editor behavior.
-    ///
-    /// Password fields and ports without the low-level text-input bridge continue to use the native
-    /// editor, even when this option is enabled.
-    ///
-    /// #### Parameters
-    ///
-    /// - `enabled`: true to prefer lightweight editing for this component
-    public void setLightweightEditingEnabled(boolean enabled) {
-        if (lightweightEditingEnabled == enabled) {
-            return;
-        }
-        lightweightEditingEnabled = enabled;
-        if (!enabled && lightweightEditor != null) {
-            stopLightweightEditing(null, true);
-        }
-    }
-
-    /// Returns whether this component prefers the pure Codename One editor instead of a native editor.
-    /// The default is false.
-    public boolean isLightweightEditingEnabled() {
-        return lightweightEditingEnabled;
     }
 
     @Override
@@ -882,11 +825,6 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                 return;
             }
             if (action == 0 && isTypedKey(keyCode)) {
-                if (lightweightEditingEnabled && Display.impl.isTextInputSupported()
-                        && startLightweightEditing() && lightweightEditor != null) {
-                    lightweightEditor.insertText(String.valueOf((char) keyCode));
-                    return;
-                }
                 //registerAsInputDevice();
                 Display.getInstance().editString(this, getMaxSize(), getConstraint(), getText(), keyCode);
             }
@@ -902,11 +840,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     @Override
     void deinitializeImpl() {
         super.deinitializeImpl();
-        if (lightweightEditor != null) {
-            stopLightweightEditing(null, false);
-        } else {
-            Display.getInstance().stopEditing(this);
-        }
+        Display.getInstance().stopEditing(this);
     }
 
     void onClick() {
@@ -916,9 +850,6 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     }
 
     void editString() {
-        if (startLightweightEditing()) {
-            return;
-        }
         if (autoDegradeMaxSize && (!hadSuccessfulEdit) && (maxSize > 1024)) {
             try {
                 //registerAsInputDevice();
@@ -981,177 +912,6 @@ public class TextArea extends Component implements ActionSource, TextHolder {
             }
         }
 
-    }
-
-    private boolean startLightweightEditing() {
-        if (!lightweightEditingEnabled || lightweightEditor != null || !isEditable()
-                || (constraint & PASSWORD) != 0 || !Display.impl.isTextInputSupported()) {
-            return lightweightEditor != null;
-        }
-        final Form form = getComponentForm();
-        if (form == null) {
-            return false;
-        }
-        if (Display.getInstance().isTextEditing(this)) {
-            Display.getInstance().stopEditing(this);
-        }
-        final EditorHost host = new EditorHost() {
-            @Override
-            public boolean isTextInputSupported() {
-                return Display.impl.isTextInputSupported();
-            }
-
-            @Override
-            public Object startTextInput(TextInputClient client, TextInputConfig config) {
-                return Display.impl.startTextInput(client, config);
-            }
-
-            @Override
-            public void updateTextInputState(Object handle, TextInputState state) {
-                Display.impl.updateTextInputState(handle, state);
-            }
-
-            @Override
-            public void stopTextInput(Object handle) {
-                Display.impl.stopTextInput(handle);
-            }
-
-            @Override
-            public void editorChanged() {
-                if (lightweightEditor != null) {
-                    TextArea.this.setText(lightweightEditor.getText());
-                }
-            }
-
-            @Override
-            public void fireEditorEvent(String type, String value) {
-            }
-        };
-        LightweightTextAreaEditor editor = new LightweightTextAreaEditor(host);
-        lightweightEditor = editor;
-        editor.setText(text);
-        editor.setSelectionRange(text.length(), text.length());
-        editor.setUIID(getUIID());
-        Style style = getSelectedStyle();
-        editor.setBackgroundColor(style.getBgColor());
-        editor.setTextColor(style.getFgColor());
-        editor.setSelectionColor(0xb3d4fc);
-        lightweightEditorLayer = form.getFormLayeredPane(LightweightTextAreaEditor.class, true);
-        lightweightEditorLayer.add(editor);
-        syncLightweightEditorBounds();
-        setSuppressActionEvent(false);
-        editor.requestFocus();
-        repaint();
-        return true;
-    }
-
-    private void syncLightweightEditorBounds() {
-        if (lightweightEditor == null || lightweightEditorLayer == null || getParent() == null) {
-            return;
-        }
-        lightweightEditor.setX(getAbsoluteX() - lightweightEditorLayer.getAbsoluteX());
-        lightweightEditor.setY(getAbsoluteY() - lightweightEditorLayer.getAbsoluteY());
-        lightweightEditor.setWidth(getWidth());
-        lightweightEditor.setHeight(getHeight());
-    }
-
-    private boolean isLightweightEditorAt(int x, int y) {
-        return lightweightEditor != null && lightweightEditor.contains(x, y);
-    }
-
-    private void stopLightweightEditing(final Runnable onFinish, boolean fireEvent) {
-        if (lightweightEditor == null || stoppingLightweightEditor) {
-            if (onFinish != null) {
-                onFinish.run();
-            }
-            return;
-        }
-        stoppingLightweightEditor = true;
-        LightweightTextAreaEditor editor = lightweightEditor;
-        setText(editor.getText());
-        lightweightEditor = null;
-        lightweightEditorLayer = null;
-        editor.remove();
-        stoppingLightweightEditor = false;
-        if (fireEvent) {
-            fireActionEvent();
-        }
-        repaint();
-        if (onFinish != null) {
-            onFinish.run();
-        }
-    }
-
-    private final class LightweightTextAreaEditor extends EditorView {
-        LightweightTextAreaEditor(EditorHost host) {
-            super(host, false);
-        }
-
-        @Override
-        protected void replaceRange(int start, int end, String value, boolean record) {
-            String filtered = EditorDocument.normalizeText(value == null ? "" : value);
-            if (isSingleLineTextArea()) {
-                filtered = filtered.replace('\n', ' ');
-            }
-            int lower = Math.max(0, Math.min(getTextLength(), Math.min(start, end)));
-            int upper = Math.max(0, Math.min(getTextLength(), Math.max(start, end)));
-            int selected = upper - lower;
-            int room = Math.max(0, getMaxSize() - (getTextLength() - selected));
-            if (filtered.length() > room) {
-                filtered = filtered.substring(0, room);
-                if (filtered.length() > 0 && Character.isHighSurrogate(filtered.charAt(filtered.length() - 1))) {
-                    filtered = filtered.substring(0, filtered.length() - 1);
-                }
-            }
-            if ((getConstraint() & UPPERCASE) != 0) {
-                filtered = filtered.toUpperCase();
-            }
-            super.replaceRange(start, end, filtered, record);
-        }
-
-        @Override
-        public TextInputConfig getConfig() {
-            TextInputConfig config = super.getConfig();
-            config.setConstraint(getConstraint());
-            config.setMultiline(!isSingleLineTextArea());
-            config.setAutoCorrect((getConstraint() & (NON_PREDICTIVE | SENSITIVE)) == 0);
-            config.setAutoCapitalize((getConstraint() & (INITIAL_CAPS_SENTENCE | INITIAL_CAPS_WORD)) != 0);
-            if (isSingleLineTextArea()) {
-                config.setActionType(TextInputConfig.ACTION_DONE);
-            }
-            return config;
-        }
-
-        @Override
-        public void onEditorAction(int action) {
-            if (isSingleLineTextArea()) {
-                stopLightweightEditing(null, true);
-            } else {
-                super.onEditorAction(action);
-            }
-        }
-
-        @Override
-        protected void focusLost() {
-            super.focusLost();
-            if (!stoppingLightweightEditor && lightweightEditor == this) { //NOPMD CompareObjectsWithEquals
-                Display.getInstance().callSerially(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (lightweightEditor == LightweightTextAreaEditor.this //NOPMD CompareObjectsWithEquals
-                                && !LightweightTextAreaEditor.this.hasFocus()) {
-                            stopLightweightEditing(null, true);
-                        }
-                    }
-                });
-            }
-        }
-
-        @Override
-        public boolean animate() {
-            syncLightweightEditorBounds();
-            return super.animate();
-        }
     }
 
     /// {@inheritDoc}
@@ -2317,9 +2077,6 @@ public class TextArea extends Component implements ActionSource, TextHolder {
 
     /// Launches the text field editing, notice that calling this in a callSerially is generally considered good practice
     public void startEditing() {
-        if (startLightweightEditing()) {
-            return;
-        }
         if (!Display.getInstance().isTextEditing(this)) {
             //registerAsInputDevice();
             Display.getInstance().editString(this, maxSize, constraint, text);
@@ -2329,16 +2086,6 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// Launches the text field editing in a callserially call
     @Override
     public void startEditingAsync() {
-        if (lightweightEditingEnabled && Display.impl.isTextInputSupported()
-                && (constraint & PASSWORD) == 0 && getComponentForm() != null) {
-            Display.getInstance().callSerially(new Runnable() {
-                @Override
-                public void run() {
-                    startLightweightEditing();
-                }
-            });
-            return;
-        }
         if (!Display.getInstance().isTextEditing(this)) {
             if (Display.impl.usesInvokeAndBlockForEditString()) {
                 // Implementations that use invokeAndBlock for edit string
@@ -2380,14 +2127,12 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// true if Display.getInstance().isTextEditing(this)
     @Override
     public boolean isEditing() {
-        return lightweightEditor != null || Display.getInstance().isTextEditing(this);
+        return Display.getInstance().isTextEditing(this);
     }
 
     /// Stops text editing of this field if it is being edited
     public void stopEditing() {
-        if (lightweightEditor != null) {
-            stopLightweightEditing(null, true);
-        } else if (isEditing()) {
+        if (isEditing()) {
             Display.getInstance().stopEditing(this);
         }
     }
@@ -2399,9 +2144,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /// - `onFinish`: invoked when editing stopped
     @Override
     public void stopEditing(Runnable onFinish) {
-        if (lightweightEditor != null) {
-            stopLightweightEditing(onFinish, true);
-        } else if (isEditing()) {
+        if (isEditing()) {
             Display.getInstance().stopEditing(this, onFinish);
         } else {
             if (onFinish != null) {
