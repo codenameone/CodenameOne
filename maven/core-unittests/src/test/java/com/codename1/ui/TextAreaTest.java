@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
@@ -124,6 +147,61 @@ class TextAreaTest extends UITestBase {
 
         textArea.setEditable(true);
         assertTrue(textArea.isEditable());
+    }
+
+    @FormTest
+    void testLightweightEditingIsOptInAndUsesTextInputClient() {
+        TextArea.setLightweightEditingEnabled(false);
+        TextField field = new TextField("ab");
+        field.setMaxSize(5);
+        try {
+            assertFalse(TextArea.isLightweightEditingEnabled());
+            TextArea.setLightweightEditingEnabled(true);
+            assertTrue(TextArea.isLightweightEditingEnabled());
+
+            Form form = new Form(BoxLayout.y());
+            form.add(field);
+            form.show();
+            flushSerialCalls();
+            field.startEditing();
+            flushSerialCalls();
+
+            assertTrue(field.isEditing());
+            assertTrue(form.getFocused() instanceof TextInputClient);
+            TextInputClient input = (TextInputClient) form.getFocused();
+            assertFalse(input.getConfig().isMultiline());
+            input.commitText("\ncdXYZ");
+            assertEquals("ab cd", field.getText(), "single-line and max-size filtering should happen in the editor engine");
+
+            field.stopEditing();
+            assertFalse(field.isEditing());
+            assertEquals("ab cd", field.getText());
+        } finally {
+            TextArea.setLightweightEditingEnabled(false);
+        }
+    }
+
+    @FormTest
+    void testLightweightTextAreaAcceptsMultilineImeInput() {
+        TextArea area = new TextArea("one", 3, 20);
+        area.setMaxSize(20);
+        TextArea.setLightweightEditingEnabled(true);
+        try {
+            Form form = new Form(BoxLayout.y());
+            form.add(area);
+            form.show();
+            flushSerialCalls();
+
+            area.startEditing();
+            flushSerialCalls();
+            TextInputClient input = (TextInputClient) form.getFocused();
+            assertTrue(input.getConfig().isMultiline());
+            input.commitText("\ntwo");
+            assertEquals("one\ntwo", area.getText());
+            area.stopEditing();
+        } finally {
+            TextArea.setLightweightEditingEnabled(false);
+        }
     }
 
     @FormTest

@@ -1995,8 +1995,10 @@ public class LinuxImplementation extends CodenameOneImplementation {
      */
     @Override
     public void copyToClipboard(Object obj) {
-        if (obj instanceof String) {
-            LinuxNative.clipboardSetText((String) obj);
+        if (obj instanceof String || obj instanceof com.codename1.ui.ClipboardContent) {
+            LinuxNative.clipboardSetText(obj instanceof com.codename1.ui.ClipboardContent
+                    ? ((com.codename1.ui.ClipboardContent) obj)
+                            .getText(com.codename1.ui.ClipboardContent.MIME_TEXT) : (String) obj);
         }
         super.copyToClipboard(obj);
     }
@@ -2005,6 +2007,12 @@ public class LinuxImplementation extends CodenameOneImplementation {
     public Object getPasteDataFromClipboard() {
         String text = LinuxNative.clipboardGetText();
         if (text != null) {
+            Object lightweight = super.getPasteDataFromClipboard();
+            if (lightweight instanceof com.codename1.ui.ClipboardContent
+                    && text.equals(((com.codename1.ui.ClipboardContent) lightweight)
+                            .getText(com.codename1.ui.ClipboardContent.MIME_TEXT))) {
+                return lightweight;
+            }
             return text;
         }
         return super.getPasteDataFromClipboard();

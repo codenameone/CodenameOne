@@ -91,6 +91,7 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
+import com.codename1.ui.ClipboardContent;
 import com.codename1.ui.Sheet;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.TextArea;
@@ -1491,8 +1492,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     }
 
                     @Override
-                    public void copyHtmlText(String html) {
-                        HTML5Implementation.super.copyToClipboard(html);
+                    public void copyRichText(String plainText, String html) {
+                        HTML5Implementation.super.copyToClipboard(new ClipboardContent()
+                                .setData(ClipboardContent.MIME_TEXT, plainText)
+                                .setData(ClipboardContent.MIME_HTML, html));
                     }
 
                     @Override
@@ -10586,6 +10589,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
         final ClipboardCopyRequest request = (obj instanceof ClipboardCopyRequest) ? (ClipboardCopyRequest)obj : new ClipboardCopyRequest(obj);
         obj = request.content;
         super.copyToClipboard(obj);
+        if (obj instanceof ClipboardContent) {
+            obj = ((ClipboardContent)obj).getText(ClipboardContent.MIME_TEXT);
+        }
         if (!(obj instanceof String)) {
             return;
         }

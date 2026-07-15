@@ -23,8 +23,12 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.editor.CodePureEditor;
+import com.codename1.ui.editor.PureEditor;
+import com.codename1.ui.editor.SyntaxHighlighter;
 import com.codename1.util.SuccessCallback;
 
+import java.util.Hashtable;
 import java.util.List;
 
 /// An IDE style source code editor with syntax highlighting, a line-number gutter and asynchronous
@@ -34,12 +38,10 @@ import java.util.List;
 /// desktops (with a physical keyboard). Code completion is driven by a `CodeCompletionProvider`, which
 /// can resolve proposals locally or from a remote language server.
 ///
-/// Like `RichTextArea`, the editor uses a 100% cross platform `BrowserComponent` backend by default and
-/// can be transparently upgraded to a native code editor by a platform port. The built-in editing
-/// surface is fully self contained and offline. When the optional bundled CodeMirror library is present
-/// (the Codename One build server adds it automatically when, and only when, an app actually uses
-/// `CodeEditor`) the editor upgrades to CodeMirror for richer language support; otherwise it uses a
-/// lightweight built-in highlighter.
+/// Like `RichTextArea`, ports with low-level text input use the pure Codename One text engine
+/// (`com.codename1.ui.editor`) with a built-in incremental syntax highlighter. Ports without that input
+/// contract use an editable `BrowserComponent` fallback, and a port can transparently supply a native
+/// code editor instead.
 ///
 /// #### Example
 ///
@@ -57,6 +59,8 @@ import java.util.List;
 ///
 /// @author Shai Almog
 public class CodeEditor extends AbstractEditorComponent {
+    private static final Hashtable<String, SyntaxHighlighter> syntaxHighlighters =
+            new Hashtable<String, SyntaxHighlighter>();
     private String language = "text";
     private String theme = "light";
     private boolean showLineNumbers = true;
@@ -86,6 +90,11 @@ public class CodeEditor extends AbstractEditorComponent {
     @Override
     String getEditorType() {
         return "code";
+    }
+
+    @Override
+    PureEditor createPureEditor() {
+        return new CodePureEditor(this, getEditorType());
     }
 
     /// Replaces the entire editor content.
@@ -120,6 +129,26 @@ public class CodeEditor extends AbstractEditorComponent {
     /// Returns the current highlighting language id.
     public String getLanguage() {
         return language;
+    }
+
+    /// Registers a syntax highlighter for a language id. Registration is global and affects existing
+    /// editors the next time their language is set. Passing null removes a previous registration.
+    public static void registerSyntaxHighlighter(String language, SyntaxHighlighter highlighter) {
+        String id = normalizeLanguage(language);
+        if (highlighter == null) {
+            syntaxHighlighters.remove(id);
+        } else {
+            syntaxHighlighters.put(id, highlighter);
+        }
+    }
+
+    /// Returns the third-party syntax highlighter registered for a language, or null.
+    public static SyntaxHighlighter getRegisteredSyntaxHighlighter(String language) {
+        return syntaxHighlighters.get(normalizeLanguage(language));
+    }
+
+    private static String normalizeLanguage(String language) {
+        return language == null ? "text" : language.trim().toLowerCase();
     }
 
     /// Sets the color theme. Currently `"light"` and `"dark"` are supported.
@@ -254,28 +283,20 @@ public class CodeEditor extends AbstractEditorComponent {
         return sb.toString();
     }
 
-    /// Points the editor at a custom engine page bundled in the app's HTML hierarchy (loaded with
-    /// `BrowserComponent#setURLHierarchy(String)`) instead of the self contained built-in engine. The
-    /// custom page must implement the same `window.cn1editor` command/query bridge and post the same
-    /// `cn1ed:` events, which lets an application back `CodeEditor` with a richer editor (e.g. CodeMirror
-    /// or Monaco) when maximum polish is required while keeping the exact same Java API. Must be set
-    /// before the editor is shown.
+    /// Points the browser fallback at a custom editor page in the app hierarchy. Ports with low-level
+    /// text input continue to use the pure editor; this URL is used only where the browser fallback is
+    /// required.
     ///
     /// #### Parameters
     ///
-    /// - `url`: an app-hierarchy URL such as `"/my-editor/index.html"`, or null to use the built-in engine
+    /// - `url`: an app-hierarchy URL, or null for the built-in page
     public void setEngineURL(String url) {
         this.engineUrl = url;
     }
 
-    /// Returns the custom engine URL set with `#setEngineURL(String)`, or null when the built-in engine
-    /// is used.
+    /// Returns the custom browser-engine URL, or null for the built-in page.
     @Override
     public String getEngineURL() {
-        return engineUrl;
-    }
-
-    String getEngineURLInternal() {
         return engineUrl;
     }
 
@@ -400,4 +421,5 @@ public class CodeEditor extends AbstractEditorComponent {
     String createEditorHtml() {
         return CodeEditorHtml.PAGE;
     }
+
 }

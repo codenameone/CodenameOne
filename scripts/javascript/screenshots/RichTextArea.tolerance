@@ -1,4 +1,4 @@
-# Editor inside the platform web widget; JS port captures CN1 canvas (no DOM
-# iframe peer) so this is a deterministic blank. Small tolerance for safety.
+# Pure Codename One text editor render; absorb minor glyph anti-aliasing
+# variance between CI runs / GPU backends.
 maxChannelDelta=16
 maxMismatchPercent=2.0

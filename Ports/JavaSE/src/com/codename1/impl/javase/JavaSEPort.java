@@ -139,6 +139,7 @@ import com.codename1.ui.Sheet;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextSelection;
 import com.codename1.ui.Transform;
+import com.codename1.ui.ClipboardContent;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.UITimer;
 import com.codename1.util.AsyncResource;
@@ -148,6 +149,8 @@ import com.jhlabs.image.GaussianFilter;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
+import java.awt.datatransfer.Transferable;
+import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.font.TextAttribute;
 import java.awt.font.TextLayout;
 import java.awt.geom.GeneralPath;
@@ -1630,14 +1633,16 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     @Override
     public void copyToClipboard(Object obj) {
-        if (obj instanceof String) {
-            final String text = (String)obj;
+        if (obj instanceof String || obj instanceof ClipboardContent) {
+            final String text = obj instanceof ClipboardContent
+                    ? ((ClipboardContent) obj).getText(ClipboardContent.MIME_TEXT) : (String)obj;
+            final ClipboardContent rich = obj instanceof ClipboardContent
+                    ? (ClipboardContent)obj : null;
             EventQueue.invokeLater(new Runnable() {
                 public void run() {
                     Toolkit toolkit = Toolkit.getDefaultToolkit();
                     Clipboard clipboard = toolkit.getSystemClipboard();
-                    StringSelection strSel = new StringSelection(text.trim());
-                    clipboard.setContents(strSel, null);
+                    clipboard.setContents(rich == null ? new StringSelection(text) : new RichTransferable(rich), null);
                 }
             });
         } else {
@@ -1654,42 +1659,121 @@ public class JavaSEPort extends CodenameOneImplementation {
         super.copyToClipboard(obj); //To change body of generated methods, choose Tools | Templates.
     }
 
+    private static final class RichTransferable implements Transferable {
+        private final ClipboardContent data;
+        private final DataFlavor[] flavors;
+
+        RichTransferable(ClipboardContent data) {
+            this.data = data;
+            ArrayList<DataFlavor> available = new ArrayList<DataFlavor>();
+            if (data.getText(ClipboardContent.MIME_TEXT) != null) {
+                available.add(DataFlavor.stringFlavor);
+            }
+            String[] mimeTypes = data.getMimeTypes();
+            for (int i = 0; i < mimeTypes.length; i++) {
+                if (!ClipboardContent.MIME_TEXT.equals(mimeTypes[i]) && data.getText(mimeTypes[i]) != null) {
+                    available.add(new DataFlavor(mimeTypes[i] + ";class=java.lang.String", mimeTypes[i]));
+                }
+            }
+            flavors = available.toArray(new DataFlavor[available.size()]);
+        }
+
+        public DataFlavor[] getTransferDataFlavors() {
+            return flavors.clone();
+        }
+
+        public boolean isDataFlavorSupported(DataFlavor flavor) {
+            for (int i = 0; i < flavors.length; i++) {
+                if (flavors[i].equals(flavor)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public Object getTransferData(DataFlavor flavor) throws UnsupportedFlavorException {
+            if (DataFlavor.stringFlavor.equals(flavor)) {
+                return data.getText(ClipboardContent.MIME_TEXT);
+            }
+            String value = data.getText(flavor.getPrimaryType() + "/" + flavor.getSubType());
+            if (value != null) {
+                return value;
+            }
+            throw new UnsupportedFlavorException(flavor);
+        }
+    }
+
     @Override
     public Object getPasteDataFromClipboard() {
         Toolkit toolkit = Toolkit.getDefaultToolkit();
         Clipboard clipboard = toolkit.getSystemClipboard();
-
+        String plain = null;
+        ClipboardContent content = new ClipboardContent();
         for (DataFlavor flavor : clipboard.getAvailableDataFlavors()) {
             try {
-
                 Object out = clipboard.getData(flavor);
-                String str = null;
-                if (out != null) {
-                    str = out.toString();
+                String str = clipboardText(out);
+                if (str == null) {
+                    continue;
                 }
-                if (str != null && str.startsWith("cn1lightweightclipboard://")) {
+                if (str.startsWith("cn1lightweightclipboard://")) {
                     return super.getPasteDataFromClipboard();
                 }
-            } catch (Exception ex) {
-
-            }
-
-        }
-
-        for (DataFlavor flavor : clipboard.getAvailableDataFlavors()) {
-            try {
-                Object out = clipboard.getData(flavor);
-                if (out != null) {
-                    String str = out.toString();
-                    if (str != null) return str;
+                if (plain == null && (DataFlavor.stringFlavor.equals(flavor)
+                        || flavor.isMimeTypeEqual("text/plain"))) {
+                    plain = str;
+                    content.setData(ClipboardContent.MIME_TEXT, str);
+                } else if (flavor.getPrimaryType().equalsIgnoreCase("text")) {
+                    content.setData(flavor.getPrimaryType() + "/" + flavor.getSubType(), str);
+                } else if (flavor.isMimeTypeEqual("application/rtf")) {
+                    content.setData(ClipboardContent.MIME_RTF, str);
                 }
             } catch (Exception ex) {
-
+                // Try the next representation offered by the native clipboard.
             }
-
         }
-
+        if (content.getMimeTypes().length > (plain == null ? 0 : 1)) {
+            if (plain == null) {
+                content.setData(ClipboardContent.MIME_TEXT, "");
+            }
+            return content;
+        }
+        if (plain != null) {
+            Object lightweight = super.getPasteDataFromClipboard();
+            if (lightweight instanceof ClipboardContent
+                    && plain.equals(((ClipboardContent) lightweight).getText(ClipboardContent.MIME_TEXT))) {
+                return lightweight;
+            }
+            return plain;
+        }
         return super.getPasteDataFromClipboard();
+    }
+
+    private static String clipboardText(Object value) throws IOException {
+        if (value instanceof String) {
+            return (String)value;
+        }
+        if (value instanceof Reader) {
+            Reader reader = (Reader)value;
+            StringBuilder out = new StringBuilder();
+            char[] buffer = new char[2048];
+            int read;
+            while ((read = reader.read(buffer)) >= 0) {
+                out.append(buffer, 0, read);
+            }
+            return out.toString();
+        }
+        if (value instanceof InputStream) {
+            InputStream input = (InputStream)value;
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buffer = new byte[2048];
+            int read;
+            while ((read = input.read(buffer)) >= 0) {
+                out.write(buffer, 0, read);
+            }
+            return new String(out.toByteArray(), "UTF-8");
+        }
+        return value == null ? null : value.toString();
     }
 
     public void setCurrentForm(Form f) {
@@ -3151,11 +3235,43 @@ public class JavaSEPort extends CodenameOneImplementation {
         // are taking action when the key is released... so we need to track whether the
         // control key was down while a key was pressed.
         private HashSet<Integer> ignorePressedKeys = new HashSet<Integer>();
+        private boolean isPureEditorFocused() {
+            com.codename1.ui.Form f = com.codename1.ui.CN.getCurrentForm();
+            return f != null && (f.getFocused() instanceof com.codename1.ui.editor.EditorView);
+        }
+
+        // True only for keys a pure editor actually consumes: real characters, navigation, and editing
+        // keys. This prevents modifier / function / home-end keys (whose key codes overlap printable
+        // ASCII) from being delivered and inserted as garbage "tofu" characters.
+        private boolean editorHandlesKey(KeyEvent e) {
+            int vk = e.getKeyCode();
+            switch (vk) {
+                case KeyEvent.VK_UP:
+                case KeyEvent.VK_DOWN:
+                case KeyEvent.VK_LEFT:
+                case KeyEvent.VK_RIGHT:
+                case KeyEvent.VK_ENTER:
+                case KeyEvent.VK_SPACE:
+                case KeyEvent.VK_BACK_SPACE:
+                case KeyEvent.VK_DELETE:
+                case KeyEvent.VK_TAB:
+                    return true;
+                default:
+                    break;
+            }
+            if ((vk >= KeyEvent.VK_A && vk <= KeyEvent.VK_Z) || (vk >= KeyEvent.VK_0 && vk <= KeyEvent.VK_9)) {
+                return true;
+            }
+            char kc = e.getKeyChar();
+            return kc != KeyEvent.CHAR_UNDEFINED && kc >= 32 && kc != 127;
+        }
+
         public void keyPressed(KeyEvent e) {
             if (!isEnabled()) {
                 return;
             }
-            if (e.isMetaDown() && e.getKeyChar() == 'c') {
+            boolean editorFocused = isPureEditorFocused();
+            if (!editorFocused && e.isMetaDown() && e.getKeyChar() == 'c') {
                 Form f = CN.getCurrentForm();
                 if (f != null) {
                     final TextSelection ts = f.getTextSelection();
@@ -3181,7 +3297,7 @@ public class JavaSEPort extends CodenameOneImplementation {
                 
             }
             
-            if (e.isMetaDown() && e.getKeyChar() == 'a') {
+            if (!editorFocused && e.isMetaDown() && e.getKeyChar() == 'a') {
                 Form f = CN.getCurrentForm();
                 if (f != null) {
                     final TextSelection ts = f.getTextSelection();
@@ -3193,15 +3309,28 @@ public class JavaSEPort extends CodenameOneImplementation {
                         });
                     }
                 }
-                
+
             }
             lastInputEvent = e;
-            // block key combos that might generate unreadable events
-            if (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
+            // block key combos that might generate unreadable events, unless a pure editor is focused and
+            // wants the modifier combos (word / line navigation, clipboard shortcuts)
+            if (!editorFocused && (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown())) {
                 ignorePressedKeys.add(e.getKeyCode());
                 return;
             }
+            if (editorFocused && !editorHandlesKey(e)) {
+                return;
+            }
             int code = getCode(e);
+            // a pure editor needs the real Enter / Space characters; getCode() otherwise collapses both
+            // to the FIRE game key which the editor cannot distinguish
+            if (editorFocused) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    code = '\n';
+                } else if (e.getKeyCode() == KeyEvent.VK_SPACE) {
+                    code = ' ';
+                }
+            }
             if (testRecorder != null) {
                 testRecorder.eventKeyPressed(code);
             }
@@ -3214,12 +3343,26 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (!isEnabled()) {
                 return;
             }
+            boolean editorFocused = isPureEditorFocused();
             lastInputEvent = e;
-            // block key combos that might generate unreadable events
-            if (ignore || e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown()) {
+            if (ignore) {
+                return;
+            }
+            // block key combos that might generate unreadable events, unless a pure editor is focused
+            if (!editorFocused && (e.isAltDown() || e.isControlDown() || e.isMetaDown() || e.isAltGraphDown())) {
+                return;
+            }
+            if (editorFocused && !editorHandlesKey(e)) {
                 return;
             }
             int code = getCode(e);
+            if (editorFocused) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    code = '\n';
+                } else if (e.getKeyCode() == KeyEvent.VK_SPACE) {
+                    code = ' ';
+                }
+            }
             if (testRecorder != null) {
                 testRecorder.eventKeyReleased(code);
             }

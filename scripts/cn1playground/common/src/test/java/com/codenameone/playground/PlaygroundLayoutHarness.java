@@ -1,6 +1,30 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package com.codenameone.playground;
 
 import com.codename1.ui.CN;
+import com.codename1.ui.CodeEditor;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
@@ -18,9 +42,8 @@ import com.codename1.ui.Form;
 /// split pane vs. top bar + tab strip + tab content + bottom nav). Exits
 /// with non-zero status on any failure so CI can fail the job.
 ///
-/// Caveat: the JavaSE simulator cannot exercise the HTML5 Monaco editor
-/// (it relies on BrowserComponent which renders as an empty placeholder),
-/// so checks are scoped to the native-CN1 chrome.
+/// Both scenarios verify that the source pane uses the framework CodeEditor
+/// API rather than silently regressing to a generic multiline TextArea.
 public final class PlaygroundLayoutHarness {
     private PlaygroundLayoutHarness() {
     }
@@ -83,6 +106,22 @@ public final class PlaygroundLayoutHarness {
         }
 
         int failures = 0;
+        Component sourceEditor = findByUiid(form, "PlaygroundSourceEditor", "PlaygroundSourceEditorDark");
+        if (!(sourceEditor instanceof CodeEditor)) {
+            System.err.println("[" + label + "] CodeEditor source editor NOT FOUND in form tree");
+            failures++;
+        } else {
+            CodeEditor codeEditor = (CodeEditor) sourceEditor;
+            if (!codeEditor.isShowLineNumbers()) {
+                System.err.println("[" + label + "] CodeEditor line-number gutter is disabled");
+                failures++;
+            } else if (!("java".equals(codeEditor.getLanguage()) || "css".equals(codeEditor.getLanguage()))) {
+                System.err.println("[" + label + "] CodeEditor has unexpected language: " + codeEditor.getLanguage());
+                failures++;
+            } else {
+                System.out.println("[" + label + "] CodeEditor source editor present");
+            }
+        }
         failures += expectPresent(label, form, "PlaygroundTopBar", "PlaygroundTopBarDark");
         failures += expectPresent(label, form, "PlaygroundAppIcon", "PlaygroundAppIconDark");
         if (mobile) {
@@ -232,4 +271,5 @@ public final class PlaygroundLayoutHarness {
         }
         return null;
     }
+
 }
