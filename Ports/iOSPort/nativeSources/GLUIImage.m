@@ -184,10 +184,40 @@ extern int nextPowerOf2(int val);
     // pixel source. Screen-side DrawImage samples this; the cached UIImage-
     // derived mtlTexture is only relevant for never-drawn-into images.
     if (mtlMutableTexture != nil) return mtlMutableTexture;
-    if (mtlTexture != nil) return mtlTexture;
+    if (mtlTexture != nil) {
+        // issue #5349: the first time this cached read-only texture is sampled
+        // after a foreground/resume (or a memory warning), re-decode it from the
+        // retained UIImage. iOS can discard a private-storage texture's contents
+        // while the app is suspended, and the leftover bytes render as a
+        // violet/magenta fill; re-decoding from the CPU-side UIImage is cheap and
+        // always correct. A plain generation compare is used (no OS purgeable
+        // probe) -- setPurgeableState on a texture already referenced by an
+        // in-flight command buffer trips Metal's commit-time validation.
+        int gen = CN1MetalTextureValidateGeneration();
+        if (mtlTextureGeneration != gen) {
+            mtlTextureGeneration = gen;
+            [mtlTexture release];
+            mtlTexture = nil;
+        } else {
+            return mtlTexture;
+        }
+    }
     if (img == nil) return nil;
     mtlTexture = CN1MetalTextureFromUIImage(img);
+    mtlTextureGeneration = CN1MetalTextureValidateGeneration();
+    // Track every GPU-backed image (not just mutable render targets) so the
+    // suspend backup can drop/rebuild its texture too (issue #5349). The weak
+    // registry drops the entry automatically on dealloc.
+    CN1MetalRegisterMutableImage(self);
     return mtlTexture;
+}
+
+-(void)dropReadOnlyCachedTexture {
+    // issue #5349: release the cached read-only texture; getMTLTexture rebuilds
+    // it from the retained UIImage on next use. Bumping the generation match is
+    // unnecessary -- a nil texture is unconditionally rebuilt.
+    [mtlTexture release];
+    mtlTexture = nil;
 }
 
 -(id<MTLTexture>)mtlMutableTexture { return mtlMutableTexture; }

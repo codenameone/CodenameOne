@@ -382,5 +382,11 @@ void CN1MetalUnregisterMutableImage(GLUIImage *image);
 // re-seed from getImage. Must be called on the main thread.
 void CN1MetalBackupMutableImagesForSuspend(void);
 
+// Texture-discard recovery (issue #5349). The generation is bumped on foreground
+// and memory warning; GLUIImage.getMTLTexture re-decodes its read-only texture
+// from the retained UIImage when its cached generation lags.
+int  CN1MetalTextureValidateGeneration(void);
+void CN1MetalBumpTextureValidateGeneration(void);
+
 #endif /* CN1_USE_METAL */
 #endif /* CN1Metalcompat_h */

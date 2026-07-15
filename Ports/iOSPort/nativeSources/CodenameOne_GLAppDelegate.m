@@ -301,6 +301,14 @@ static void installSignalHandlers() {
         if ([renderingView respondsToSelector:@selector(invalidateRetainedFramebuffer)]) {
             [renderingView invalidateRetainedFramebuffer];
         }
+        // issue #5349: iOS may have discarded the contents of our private-storage
+        // image/glyph textures while suspended. Bump the texture-validate
+        // generation so every cached read-only image texture re-decodes from its
+        // retained UIImage on next sample instead of rendering the discarded
+        // garbage (a violet/magenta fill) on surfaces the diff-painter does not
+        // fully repaint this frame. Pairs with the screenTexture clear above.
+        extern void CN1MetalBumpTextureValidateGeneration(void);
+        CN1MetalBumpTextureValidateGeneration();
 #endif
         // Defer to the next runloop so UIKit can settle the view bounds
         // after the snapshot rotation. updateCanvas itself also

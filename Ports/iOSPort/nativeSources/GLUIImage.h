@@ -41,6 +41,13 @@
     int textureHeight;
 #ifdef CN1_USE_METAL
     id<MTLTexture> mtlTexture;
+    // issue #5349: the texture-validate generation this cached read-only
+    // mtlTexture was last confirmed against. When it lags the global counter
+    // (bumped on foreground / memory warning), getMTLTexture re-decodes from
+    // the retained UIImage -- iOS may have discarded the private-storage
+    // texture's contents while the app was suspended, and we must not sample
+    // the leftover garbage (which renders as a violet/magenta fill).
+    int mtlTextureGeneration;
     // Phase 3 v2: mutable-image render target. Allocated lazily by
     // CN1MetalEnsureMutableTexture sized to the mutable image's logical
     // dimensions. drawFrame opens an MTLRenderCommandEncoder against this
@@ -81,6 +88,12 @@
 // (Phase 3 mutable-image render target), that is returned instead -- it
 // is the freshest pixel source.
 -(id<MTLTexture>)getMTLTexture;
+
+// issue #5349: drop the cached read-only mtlTexture so the next getMTLTexture
+// re-decodes it from the retained UIImage. Called from the suspend backup for
+// every registered image that is NOT a mutable render target (those go through
+// the readback path instead). Safe no-op when no read-only texture is cached.
+-(void)dropReadOnlyCachedTexture;
 
 // Phase 3 v2 mutable-image accessors. CN1Metalcompat owns the lifecycle;
 // these are the storage hooks. Accessors only -- consumers outside this
