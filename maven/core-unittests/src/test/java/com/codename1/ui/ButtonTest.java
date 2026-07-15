@@ -4,14 +4,43 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.plaf.UIManager;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
+import java.util.Hashtable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class ButtonTest extends UITestBase {
+
+    @Test
+    void toolbarCommandCanHideTextWhenItHasAnIcon() {
+        Hashtable props = new Hashtable();
+        props.put("@hideToolbarCommandTextWithIconBool", "true");
+        UIManager.getInstance().addThemeProps(props);
+        try {
+            Command iconCommand = new Command("Settings", Image.createImage(1, 1));
+            iconCommand.putClientProperty("TitleCommand", Boolean.TRUE);
+            Button iconButton = new Button(iconCommand);
+            assertEquals("", iconButton.getText());
+            assertEquals("Settings", iconButton.getAccessibilityText());
+
+            Command textCommand = new Command("Done");
+            textCommand.putClientProperty("TitleCommand", Boolean.TRUE);
+            assertEquals("Done", new Button(textCommand).getText(),
+                    "text-only toolbar commands must retain their label");
+
+            Command ordinaryCommand = new Command("Open", Image.createImage(1, 1));
+            assertEquals("Open", new Button(ordinaryCommand).getText(),
+                    "the toolbar setting must not hide side-menu or ordinary command text");
+        } finally {
+            Hashtable reset = new Hashtable();
+            reset.put("@hideToolbarCommandTextWithIconBool", "false");
+            UIManager.getInstance().addThemeProps(reset);
+        }
+    }
 
     @FormTest
     void testSetCommandBindsCommandAndFiresAction() throws Exception {

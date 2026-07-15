@@ -216,7 +216,9 @@ public class FidelityDeviceRunner {
                                 comp.setPreferredH(disp.convertToPixels(5.5f));
                             } else if ("ProgressBar".equals(c.getId())) {
                                 comp.setPreferredW(w);
-                                comp.setPreferredH(Math.max(8, disp.convertToPixels(0.8f))); // ~2x thicker bar
+                                // The painter centres the native 0.5mm capsule in this
+                                // small layout box; don't inflate it to the old 8px bar.
+                                comp.setPreferredH(Math.max(4, disp.convertToPixels(0.5f)));
                             }
                             st.setMargin(0, 0, 0, 0);
                         }

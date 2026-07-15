@@ -322,6 +322,22 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
         if (cmd.getIconGapMM() > -1) {
             setGap(Display.INSTANCE.convertToPixels(cmd.getIconGapMM()));
         }
+        // Compact circular toolbar commands cannot accommodate an icon and a
+        // useful text label at the same time.  Themes may opt title-bar commands
+        // into icon-only rendering while retaining the command name as the
+        // accessibility label.  Side-menu, dialog and ordinary command-backed
+        // buttons are deliberately unaffected.
+        if (cmd.getClientProperty("TitleCommand") != null
+                && getUIManager().isThemeConstant("hideToolbarCommandTextWithIconBool", false)
+                && (cmd.getIcon() != null || cmd.getMaterialIcon() != 0)) {
+            String commandName = cmd.getCommandName();
+            String accessibilityText = getAccessibilityText();
+            if ((accessibilityText == null || accessibilityText.equals(getText()))
+                    && commandName != null && commandName.length() > 0) {
+                setAccessibilityText(commandName);
+            }
+            setText("");
+        }
     }
 
     private ActionListener<? extends ActionEvent> bindListener() {

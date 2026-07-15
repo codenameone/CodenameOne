@@ -17,9 +17,8 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
  * Round-trips a gradient-stroke {@link RoundBorder} through the resource writer
  * ({@link EditableResources#save}) and reader ({@link Resources}) to guard the
  * three fields added in resource format 1.15 (strokeGradient / strokeColor2 /
- * strokeGradientAngle). The shipped native themes don't currently use the
- * gradient stroke, so this is the only thing exercising that serialization path
- * -- without it a broken read/write pairing would ship silently.
+ * strokeGradientAngle). The iOS Liquid Glass theme uses this path for button
+ * rims, so a broken read/write pairing would corrupt a shipped native theme.
  */
 public class RoundBorderGradientStrokeResourceTest extends UITestBase {
 
