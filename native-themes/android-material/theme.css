@@ -1,4 +1,26 @@
 /*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+/*
  * Android Material 3 native theme.
  *
  * CEF-free subset of the Codename One CSS compiler: solid fills, native
@@ -125,6 +147,9 @@
        without it Form.showDialog's hard-coded 20%/10%/20% screen
        margins make even an empty dialog ~60%x70% of the screen. */
     dialogPosition: Center;
+    /* Keep Material's traditional top-title layout explicit so switching from
+       the iOS theme at runtime resets the shared dialog default. */
+    dialogTitleCenterBool: false;
     /* Cap the alert width so a long body wraps into a Material card instead of
        stretching full-width on wide screens (tablet / landscape / desktop).
        Material dialog ~88% width; density-robust cap, card on wide screens. */
@@ -133,6 +158,9 @@
     shrinkPopupTitleBool: true;
     dialogButtonCommandsBool: true;
     dlgCommandGridBool: true;
+    /* Dialog commands use the flush text-button UIID rather than filled Button. */
+    dlgButtonCommandUIID: "DialogButton";
+    dlgInvisibleButtons: "cac4d0";
 }
 
 Component {
@@ -611,11 +639,11 @@ DialogBody {
 DialogButton {
     color: var(--accent-color, #6750a4);
     background-color: transparent;
-    /* M3 dialog text button: 14sp label (2.25mm at the 160dpi contract) with
-       12dp horizontal padding; 2.5mm/2.5mm rendered the command row ~20px
-       wider than the native alert's. */
-    padding: 1mm 1.9mm 1mm 1.9mm;
-    margin: 0 0.5mm 0 0.5mm;
+    /* Fold the old 0.5mm left/right margin into the 1.9mm padding. This keeps
+       the native packed width while letting the separators reach the card
+       edges; external margins make the cells read as standalone buttons. */
+    padding: 1mm 2.4mm 1mm 2.4mm;
+    margin: 0;
     font-family: "native:MainRegular";
     font-size: 2.25mm;
     text-align: center;
@@ -817,7 +845,7 @@ PopupContent {
     Dialog { background-color: #2b2930; color: #e6e0e9; border: none; border-radius: 4.4mm; }
     DialogBody { background-color: transparent; color: #cac4d0; }
     DialogTitle { color: #e6e0e9; background-color: transparent; }
-    DialogButton { color: var(--accent-color-dark, #d0bcff); background-color: transparent; padding: 1mm 1.9mm 1mm 1.9mm; margin: 0 0.5mm 0 0.5mm; font-family: "native:MainRegular"; font-size: 2.25mm; }
+    DialogButton { color: var(--accent-color-dark, #d0bcff); background-color: transparent; padding: 1mm 2.4mm 1mm 2.4mm; margin: 0; font-family: "native:MainRegular"; font-size: 2.25mm; }
     DialogContentPane { background-color: transparent; }
     DialogCommandArea { background-color: transparent; }
     PopupContent { background-color: #211f26; color: #e6e0e9; }

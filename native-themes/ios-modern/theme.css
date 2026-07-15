@@ -1,4 +1,26 @@
 /*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+/*
  * iOS modern (liquid-glass) native theme.
  *
  * CEF-free subset of the Codename One CSS compiler: solid fills, native
@@ -266,6 +288,11 @@
     shrinkPopupTitleBool: true;
     dialogButtonCommandsBool: true;
     dlgCommandGridBool: true;
+    /* Alert actions are part of the card, not regular glass Button pills. */
+    dlgButtonCommandUIID: "DialogButton";
+    dlgCenteredTitleUIID: "DialogCenteredTitle";
+    dlgInvisibleButtons: "c6c6c8";
+    dlgInvisibleButtonsDark: "38383a";
 }
 
 Component {
@@ -922,6 +949,9 @@ DialogTitle {
     font-size: 2.9mm;
     text-align: center;
 }
+/* A packed iOS alert still reserves the native title field, so centering the
+   title does not collapse it back into an ordinary top heading. */
+DialogCenteredTitle { cn1-derive: Container; background-color: transparent; padding: 8mm 0; margin: 0; }
 DialogContentPane { background-color: transparent; padding: 2mm; margin: 0; }
 /* Action row: a hairline separator above the buttons, like the native alert. */
 DialogCommandArea { background-color: transparent; padding: 0; border-top: 0.2mm solid #c6c6c8; }
@@ -929,6 +959,10 @@ DialogCommandArea { background-color: transparent; padding: 0; border-top: 0.2mm
 /* Defined standalone (NOT cn1-derive: Button) so the Button pill background /
    cn1-pill-border can never leak in and turn the flush alert actions into pills. */
 DialogButton { cn1-background-type: cn1-none; color: var(--accent-color, #007aff); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.9mm; padding: 2mm; margin: 0; border-radius: 0; text-align: center; }
+/* Keep this standalone too.  A derived Button UIID may retain the platform
+   Button background/border in a generated native theme, which turns the
+   default action into an opaque half-card instead of alert chrome. */
+DialogButtonDefault { cn1-background-type: cn1-none; color: var(--accent-color, #007aff); background-color: transparent; font-family: "native:MainBold"; font-size: 2.9mm; padding: 2mm; margin: 0; border-radius: 0; text-align: center; }
 DialogButton.pressed { background-color: #e1e1e6; color: var(--accent-color, #007aff); }
 
 FloatingActionButton {
@@ -1179,6 +1213,7 @@ PopupContent {
     DialogContentPane { background-color: transparent; }
     DialogCommandArea { background-color: transparent; border-top: 0.2mm solid #38383a; }
     DialogButton { cn1-background-type: cn1-none; color: var(--accent-color-dark, #0a84ff); background-color: transparent; }
+    DialogButtonDefault { cn1-background-type: cn1-none; color: var(--accent-color-dark, #0a84ff); background-color: transparent; font-family: "native:MainBold"; font-size: 2.9mm; padding: 2mm; margin: 0; border-radius: 0; text-align: center; }
     DialogButton.pressed { background-color: #2c2c2e; color: var(--accent-color-dark, #0a84ff); }
     PopupContent { background-color: rgba(44,44,46,0.95); color: #ffffff; }
 

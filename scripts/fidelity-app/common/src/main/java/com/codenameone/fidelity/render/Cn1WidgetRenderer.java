@@ -20,6 +20,28 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.fidelity.render;
 
 import com.codename1.components.FloatingActionButton;
@@ -36,10 +58,13 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.Slider;
 import com.codename1.ui.Tabs;
 import com.codename1.ui.TextField;
 import com.codename1.ui.Toolbar;
+import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.UIManager;
 import com.codenameone.fidelity.spec.ComponentSpec;
 
 /**
@@ -363,32 +388,71 @@ public final class Cn1WidgetRenderer {
             // hairline divider; Android Material dialogs left-align the title/body
             // and right-align a flow of text actions. Pick per platform.
             boolean iosDlg = "ios".equals(com.codename1.ui.Display.getInstance().getPlatformName());
-            int dlgAlign = iosDlg ? Component.CENTER : Component.LEFT;
-            Container dialog = new Container(new BorderLayout());
-            dialog.setUIID("Dialog");
-            Label title = new Label("Title");
-            title.setUIID("DialogTitle");
-            title.getAllStyles().setAlignment(dlgAlign);
-            Label body = new Label(text);
-            body.setUIID("DialogBody");
-            body.getAllStyles().setAlignment(dlgAlign);
-            Container content = new Container(BoxLayout.y());
-            content.getAllStyles().setBgTransparency(0);
-            content.add(title);
-            content.add(body);
-            Button cancel = new Button("Cancel");
-            cancel.setUIID("DialogButton");
-            Button ok = new Button("OK");
-            ok.setUIID("DialogButton");
-            Container btns = iosDlg
-                    ? new Container(new GridLayout(1, 2))
-                    : new Container(new com.codename1.ui.layouts.FlowLayout(Component.RIGHT));
-            btns.setUIID("DialogCommandArea");
-            btns.add(cancel);
-            btns.add(ok);
-            dialog.add(BorderLayout.CENTER, content);
-            dialog.add(BorderLayout.SOUTH, btns);
-            c = dialog;
+            if (iosDlg) {
+                Container dialog = new Container(new BorderLayout());
+                dialog.setUIID("Dialog");
+                Label title = new Label("Title");
+                title.setUIID("DialogTitle");
+                title.getAllStyles().setAlignment(Component.CENTER);
+                Label body = new Label(text);
+                body.setUIID("DialogBody");
+                body.getAllStyles().setAlignment(Component.CENTER);
+                LayeredLayout contentLayout = new LayeredLayout();
+                Container content = new Container(contentLayout);
+                content.getAllStyles().setBgTransparency(0);
+                content.add(title);
+                content.add(body);
+                // Match UIAlertController's vertical fields inside its alert
+                // surface.  Insets are percentages so this remains stable at
+                // every fidelity scale while preserving the reference ratios.
+                contentLayout.setInsets(title, "37.75% 0 auto 0");
+                contentLayout.setInsets(body, "81.75% 0 auto 0");
+
+                Button cancel = new Button("Cancel");
+                cancel.setUIID("DialogButton");
+                Button ok = new Button("OK");
+                ok.setUIID("DialogButtonDefault");
+                Container btns = new Container(new GridLayout(1, 2));
+                btns.setUIID("DialogCommandArea");
+                String separator = UIManager.getInstance().getThemeConstant(
+                        "dark".equals(appearance)
+                                ? "dlgInvisibleButtonsDark" : "dlgInvisibleButtons",
+                        "dark".equals(appearance) ? "38383a" : "c6c6c8");
+                Border divider = Border.createCompoundBorder(null, null, null,
+                        Border.createLineBorder(1, Integer.parseInt(separator, 16)));
+                cancel.getUnselectedStyle().setBorder(divider);
+                cancel.getSelectedStyle().setBorder(divider);
+                cancel.getPressedStyle().setBorder(divider);
+                btns.add(cancel);
+                btns.add(ok);
+                dialog.add(BorderLayout.CENTER, content);
+                dialog.add(BorderLayout.SOUTH, btns);
+                c = dialog;
+            } else {
+                Container dialog = new Container(new BorderLayout());
+                dialog.setUIID("Dialog");
+                Label title = new Label("Title");
+                title.setUIID("DialogTitle");
+                title.getAllStyles().setAlignment(Component.LEFT);
+                Label body = new Label(text);
+                body.setUIID("DialogBody");
+                body.getAllStyles().setAlignment(Component.LEFT);
+                Container content = new Container(BoxLayout.y());
+                content.getAllStyles().setBgTransparency(0);
+                content.add(title);
+                content.add(body);
+                Button cancel = new Button("Cancel");
+                cancel.setUIID("DialogButton");
+                Button ok = new Button("OK");
+                ok.setUIID("DialogButton");
+                Container btns = new Container(new FlowLayout(Component.RIGHT));
+                btns.setUIID("DialogCommandArea");
+                btns.add(cancel);
+                btns.add(ok);
+                dialog.add(BorderLayout.CENTER, content);
+                dialog.add(BorderLayout.SOUTH, btns);
+                c = dialog;
+            }
         } else if ("Spinner".equals(id)) {
             // iOS picker wheel: a single-column spinner showing several rows with the
             // middle one selected, the curved perspective fade and the glass selection
