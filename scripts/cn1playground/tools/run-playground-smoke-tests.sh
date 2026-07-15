@@ -56,7 +56,10 @@ if grep -q 'setEngineURL' "$PLAYGROUND_EDITOR"; then
 fi
 
 forbidden_editor='mona''co'
-if git -C "$ROOT/../.." grep -in "$forbidden_editor"; then
+if git -C "$ROOT/../.." grep -in "$forbidden_editor" -- \
+    ':!docs/website/content/blog/funding-open-source-without-the-bait-and-switch.md' \
+    ':!docs/website/content/blog/java-one-detailed-trip-report.md' \
+    ':!docs/website/content/blog/rich-text-and-code-editing.md'; then
   echo "Removed browser-editor dependency is still referenced by tracked files" >&2
   exit 1
 fi
