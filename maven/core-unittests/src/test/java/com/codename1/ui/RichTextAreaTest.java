@@ -270,7 +270,9 @@ class RichTextAreaTest extends UITestBase {
 
     @FormTest
     void testPureBackendSelectedWhenNoNativePeer() {
-        // editorNativePeerSupported defaults to false -> no native peer -> pure engine
+        // State this explicitly so the test remains deterministic if form tests run concurrently.
+        implementation.setEditorNativePeerSupported(false);
+        implementation.setTextInputSupported(true);
         RichTextArea editor = new RichTextArea();
         Form f = new Form("rt", new BorderLayout());
         f.add(BorderLayout.CENTER, editor);
@@ -283,6 +285,8 @@ class RichTextAreaTest extends UITestBase {
 
     @FormTest
     void testPureBackendRoundTripsContent() {
+        implementation.setEditorNativePeerSupported(false);
+        implementation.setTextInputSupported(true);
         RichTextArea editor = new RichTextArea();
         Form f = new Form("rt", new BorderLayout());
         f.add(BorderLayout.CENTER, editor);

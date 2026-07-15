@@ -1134,11 +1134,11 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         @Override
         protected void focusLost() {
             super.focusLost();
-            if (!stoppingLightweightEditor && lightweightEditor == this) {
+            if (!stoppingLightweightEditor && lightweightEditor == this) { //NOPMD CompareObjectsWithEquals
                 Display.getInstance().callSerially(new Runnable() {
                     @Override
                     public void run() {
-                        if (lightweightEditor == LightweightTextAreaEditor.this
+                        if (lightweightEditor == LightweightTextAreaEditor.this //NOPMD CompareObjectsWithEquals
                                 && !LightweightTextAreaEditor.this.hasFocus()) {
                             stopLightweightEditing(null, true);
                         }

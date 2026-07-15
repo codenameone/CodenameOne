@@ -59,8 +59,7 @@ public final class RichTextImporter {
         String list = null;
         boolean fenced = false;
         StringBuilder code = new StringBuilder();
-        for (int i = 0; i < lines.size(); i++) {
-            String line = lines.get(i);
+        for (String line : lines) {
             if (line.startsWith("```")) {
                 if (fenced) {
                     out.append("<pre>").append(escape(code.toString())).append("</pre>");
@@ -115,8 +114,7 @@ public final class RichTextImporter {
         String list = null;
         boolean literal = false;
         StringBuilder code = new StringBuilder();
-        for (int i = 0; i < lines.size(); i++) {
-            String line = lines.get(i);
+        for (String line : lines) {
             if ("----".equals(line.trim()) || "....".equals(line.trim())) {
                 if (literal) {
                     out.append("<pre>").append(escape(code.toString())).append("</pre>");
@@ -274,9 +272,12 @@ public final class RichTextImporter {
                 char next = source.charAt(i);
                 if (next == '\\' || next == '{' || next == '}') {
                     i++;
-                    if (!state.skip && skipFallback-- <= 0) {
-                        syncRtfStyle(out, rendered, state);
-                        appendEscaped(out, next);
+                    if (!state.skip) {
+                        if (skipFallback <= 0) {
+                            syncRtfStyle(out, rendered, state);
+                            appendEscaped(out, next);
+                        }
+                        skipFallback--;
                     }
                     continue;
                 }
@@ -285,9 +286,12 @@ public final class RichTextImporter {
                     if (i + 1 < source.length()) {
                         int value = hex(source.charAt(i), source.charAt(i + 1));
                         i += 2;
-                        if (!state.skip && value >= 0 && skipFallback-- <= 0) {
-                            syncRtfStyle(out, rendered, state);
-                            appendEscaped(out, (char) value);
+                        if (!state.skip && value >= 0) {
+                            if (skipFallback <= 0) {
+                                syncRtfStyle(out, rendered, state);
+                                appendEscaped(out, (char) value);
+                            }
+                            skipFallback--;
                         }
                     }
                     continue;

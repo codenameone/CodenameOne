@@ -18,9 +18,18 @@ if ! grep -q 'index.put("com.codename1.ui.Component"' "$ROOT/common/src/main/jav
 fi
 
 echo "Verifying key com.codename1.ui classes are present in generated registry..."
-for cls in Button Container Dialog Display Form Label List TextField BrowserComponent; do
+for cls in Button Container Dialog Display Form Label List TextField BrowserComponent CodeEditor RichTextArea; do
   if ! grep -q "index.put(\"com.codename1.ui.${cls}\"" "$ROOT/common/src/main/java/bsh/cn1/GeneratedCN1Access.java"; then
     echo "GeneratedCN1Access is missing com.codename1.ui.${cls}" >&2
+    exit 1
+  fi
+done
+
+echo "Verifying new editor APIs are available to playground scripts..."
+for member in 'setLightweightEditingEnabled(boolean)' 'setContent(String, RichTextFormat)' \
+              'setMarkdown(String)' 'setAsciiDoc(String)' 'setRtf(String)'; do
+  if ! grep -q "$member" "$ROOT/common/src/main/java/bsh/cn1/GeneratedCN1Access.java"; then
+    echo "GeneratedCN1Access is missing editor API ${member}" >&2
     exit 1
   fi
 done

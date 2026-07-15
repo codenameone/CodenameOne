@@ -150,10 +150,10 @@ public final class HtmlImporter {
     private static Map<String, String> attributes(Element element) {
         Map<String, String> attrs = new HashMap<String, String>();
         String[] names = {"style", "align", "href", "src", "color", "size", "data-indent"};
-        for (int i = 0; i < names.length; i++) {
-            String value = element.getAttribute(names[i]);
+        for (String name : names) {
+            String value = element.getAttribute(name);
             if (value != null) {
-                attrs.put(names[i], value);
+                attrs.put(name, value);
             }
         }
         return attrs;

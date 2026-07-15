@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 (function() {
   var state = {
     metadata: null,
@@ -30,6 +53,17 @@
 
   function post(payload) {
     var message = JSON.stringify(payload);
+    if (window.cn1PostMessage) {
+      window.cn1PostMessage(message);
+      return;
+    }
+    if (window.parent && window.parent !== window && window.parent.postMessage) {
+      window.parent.postMessage(message, '*');
+    }
+  }
+
+  function postEditorEvent(type, value) {
+    var message = "cn1ed:" + type + (value == null ? "" : ":" + value);
     if (window.cn1PostMessage) {
       window.cn1PostMessage(message);
       return;
@@ -610,6 +644,7 @@
         // language and let the host route this change to the right editor.
         language: state.language
       });
+      postEditorEvent("change", state.language);
     }, 350);
   }
 
@@ -892,6 +927,130 @@
         return monaco.MarkerSeverity.Error;
     }
   }
+
+  // CodeEditor semantic command bridge. The framework now owns this editing
+  // surface and selects its pure, browser, or native backend. Monaco remains a
+  // custom browser engine for the playground so it can augment CodeEditor with
+  // generated API metadata, UIID completions, and inline run messages.
+  var semanticSource = "";
+  var semanticMarkers = [];
+  var semanticMessages = [];
+  var semanticUiids = [];
+
+  function parseCommandJson(value, fallback) {
+    try {
+      return JSON.parse(value || "");
+    } catch (e) {
+      return fallback;
+    }
+  }
+
+  function semanticCommand(name, value) {
+    value = value == null ? "" : String(value);
+    switch (name) {
+      case "setText":
+        semanticSource = value;
+        if (state.model) {
+          setSource(value);
+        }
+        return;
+      case "setLanguage":
+        state.language = value || "text";
+        if (state.model) {
+          monaco.editor.setModelLanguage(state.model, state.language);
+        }
+        return;
+      case "setTheme":
+        applyTheme(value === "dark");
+        return;
+      case "setLineNumbers":
+        if (state.editor) {
+          state.editor.updateOptions({ lineNumbers: value === "1" ? "on" : "off" });
+        }
+        return;
+      case "setTabSize":
+        if (state.model) {
+          state.model.updateOptions({ tabSize: Math.max(1, parseInt(value, 10) || 4) });
+        }
+        return;
+      case "setEditable":
+        if (state.editor) {
+          state.editor.updateOptions({ readOnly: value !== "1" });
+        }
+        return;
+      case "setDiagnostics":
+        semanticMarkers = parseCommandJson(value, []).map(function(item) {
+          return {
+            line: item.l,
+            column: item.c,
+            endLine: item.el,
+            endColumn: item.ec,
+            severity: item.s,
+            message: item.m
+          };
+        });
+        setMarkers(semanticMarkers);
+        return;
+      case "setInlineMessages":
+        semanticMessages = parseCommandJson(value, []);
+        setInlineMessages(semanticMessages);
+        return;
+      case "setUiids":
+        semanticUiids = parseCommandJson(value, []);
+        setUiids(semanticUiids);
+        return;
+      case "playgroundMetadata":
+        bootstrap(value || "{}", semanticSource, state.language, state.dark,
+          semanticMarkers, semanticMessages, semanticUiids);
+        return;
+      case "insertText":
+        if (state.editor) {
+          var selection = state.editor.getSelection();
+          state.editor.executeEdits("cn1", [{ range: selection, text: value, forceMoveMarkers: true }]);
+        }
+        return;
+      case "setCursor":
+        if (state.editor && state.model) {
+          state.editor.setPosition(state.model.getPositionAt(Math.max(0, parseInt(value, 10) || 0)));
+        }
+        return;
+      case "focus":
+        if (state.editor) {
+          state.editor.focus();
+        }
+        return;
+      case "blur":
+        if (state.editor && state.editor.getDomNode()) {
+          state.editor.getDomNode().blur();
+        }
+        return;
+      case "undo":
+      case "redo":
+        if (state.editor) {
+          state.editor.trigger("cn1", name, null);
+        }
+        return;
+      default:
+        return;
+    }
+  }
+
+  function semanticQuery(name) {
+    if (name === "getText" || name === "getHtml") {
+      return state.model ? state.model.getValue() : semanticSource;
+    }
+    if (name === "getCursor") {
+      return state.editor && state.model
+        ? String(state.model.getOffsetAt(state.editor.getPosition()))
+        : "0";
+    }
+    return "";
+  }
+
+  window.cn1editor = {
+    cmd: semanticCommand,
+    query: semanticQuery
+  };
 
   window.PlaygroundEditor = {
     bootstrap: bootstrap,
