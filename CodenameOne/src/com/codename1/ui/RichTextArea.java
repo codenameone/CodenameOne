@@ -133,9 +133,11 @@ public class RichTextArea extends AbstractEditorComponent {
     public void getHtml(SuccessCallback<String> callback) {
         final SuccessCallback<String> result = callback;
         onReady(new Runnable() {
+            @Override
             public void run() {
                 if (getInternalBrowser() != null && sourceFormat != RichTextFormat.HTML) {
                     getText(new SuccessCallback<String>() {
+                        @Override
                         public void onSucess(String source) {
                             result.onSucess(RichTextImporter.convert(source, sourceFormat,
                                     RichTextFormat.HTML));
@@ -176,17 +178,20 @@ public class RichTextArea extends AbstractEditorComponent {
     private void queryContent(final String queryName, final RichTextFormat format,
             final SuccessCallback<String> callback) {
         onReady(new Runnable() {
+            @Override
             public void run() {
                 if (getInternalBrowser() == null || sourceFormat == format) {
                     query(queryName, null, callback);
                 } else if (sourceFormat == RichTextFormat.HTML) {
                     getHtml(new SuccessCallback<String>() {
+                        @Override
                         public void onSucess(String html) {
                             callback.onSucess(RichTextImporter.fromHtml(html, format));
                         }
                     });
                 } else {
                     getText(new SuccessCallback<String>() {
+                        @Override
                         public void onSucess(String source) {
                             callback.onSucess(RichTextImporter.convert(source, sourceFormat, format));
                         }
@@ -211,6 +216,7 @@ public class RichTextArea extends AbstractEditorComponent {
         final RichTextFormat actual = format == null ? RichTextFormat.PLAIN_TEXT : format;
         if (actual == RichTextFormat.HTML) {
             onReady(new Runnable() {
+                @Override
                 public void run() {
                     if (getInternalBrowser() != null && sourceFormat != RichTextFormat.HTML) {
                         command(insertCommand(sourceFormat), RichTextImporter.fromHtml(value, sourceFormat));
@@ -222,6 +228,7 @@ public class RichTextArea extends AbstractEditorComponent {
             return;
         }
         onReady(new Runnable() {
+            @Override
             public void run() {
                 if (getInternalBrowser() == null || sourceFormat == actual) {
                     command(insertCommand(actual), value);
@@ -236,16 +243,28 @@ public class RichTextArea extends AbstractEditorComponent {
     }
 
     private static String setCommand(RichTextFormat format) {
-        if (format == RichTextFormat.MARKDOWN) return "setMarkdown";
-        if (format == RichTextFormat.ASCIIDOC) return "setAsciiDoc";
-        if (format == RichTextFormat.RTF) return "setRtf";
+        if (format == RichTextFormat.MARKDOWN) {
+            return "setMarkdown";
+        }
+        if (format == RichTextFormat.ASCIIDOC) {
+            return "setAsciiDoc";
+        }
+        if (format == RichTextFormat.RTF) {
+            return "setRtf";
+        }
         return "setPlainText";
     }
 
     private static String insertCommand(RichTextFormat format) {
-        if (format == RichTextFormat.MARKDOWN) return "insertMarkdown";
-        if (format == RichTextFormat.ASCIIDOC) return "insertAsciiDoc";
-        if (format == RichTextFormat.RTF) return "insertRtf";
+        if (format == RichTextFormat.MARKDOWN) {
+            return "insertMarkdown";
+        }
+        if (format == RichTextFormat.ASCIIDOC) {
+            return "insertAsciiDoc";
+        }
+        if (format == RichTextFormat.RTF) {
+            return "insertRtf";
+        }
         return "insertPlainText";
     }
 

@@ -333,9 +333,13 @@ public class CodeEditor extends AbstractEditorComponent {
 
     private void handleHighlightRequest(String value) {
         SyntaxHighlighter highlighter = getRegisteredSyntaxHighlighter(language);
-        if (highlighter == null || value == null) return;
+        if (highlighter == null || value == null) {
+            return;
+        }
         int colon = value.indexOf(':');
-        if (colon < 0) return;
+        if (colon < 0) {
+            return;
+        }
         String request = value.substring(0, colon);
         String source = value.substring(colon + 1);
         StringBuilder html = new StringBuilder();
@@ -344,14 +348,20 @@ public class CodeEditor extends AbstractEditorComponent {
         while (lineStart <= source.length()) {
             int lineEnd = source.indexOf('\n', lineStart);
             boolean lastLine = lineEnd < 0;
-            if (lastLine) lineEnd = source.length();
-            if (lineStart > 0) html.append('\n');
+            if (lastLine) {
+                lineEnd = source.length();
+            }
+            if (lineStart > 0) {
+                html.append('\n');
+            }
             String line = source.substring(lineStart, lineEnd);
             SyntaxHighlightResult result = highlighter.tokenize(line, state);
             if (result == null) {
                 appendHtml(html, line, 0, line.length());
                 state = 0;
-                if (lastLine) break;
+                if (lastLine) {
+                    break;
+                }
                 lineStart = lineEnd + 1;
                 continue;
             }
@@ -359,7 +369,9 @@ public class CodeEditor extends AbstractEditorComponent {
             int position = 0;
             for (int i = 0; i < result.tokens.size(); i++) {
                 SyntaxToken token = result.tokens.get(i);
-                if (token == null) continue;
+                if (token == null) {
+                    continue;
+                }
                 int start = Math.max(position, Math.min(line.length(), token.start));
                 int end = Math.max(start, Math.min(line.length(), token.start + token.length));
                 appendHtml(html, line, position, start);
@@ -371,7 +383,9 @@ public class CodeEditor extends AbstractEditorComponent {
                 position = end;
             }
             appendHtml(html, line, position, line.length());
-            if (lastLine) break;
+            if (lastLine) {
+                break;
+            }
             lineStart = lineEnd + 1;
         }
         command("applyCustomHighlight", request + ":" + html.toString());
@@ -390,23 +404,32 @@ public class CodeEditor extends AbstractEditorComponent {
                 : (token.kind == SyntaxToken.COMMENT ? "cm"
                 : (token.kind == SyntaxToken.NUMBER ? "nu" : "")));
         out.append("<span");
-        if (css.length() > 0) out.append(" class=\"").append(css).append('"');
+        if (css.length() > 0) {
+            out.append(" class=\"").append(css).append('"');
+        }
         out.append('>');
     }
 
     private static String rgb(int color) {
         String value = Integer.toHexString(color & 0xffffff);
-        while (value.length() < 6) value = "0" + value;
+        while (value.length() < 6) {
+            value = "0" + value;
+        }
         return value;
     }
 
     private static void appendHtml(StringBuilder out, String value, int start, int end) {
         for (int i = start; i < end; i++) {
             char c = value.charAt(i);
-            if (c == '&') out.append("&amp;");
-            else if (c == '<') out.append("&lt;");
-            else if (c == '>') out.append("&gt;");
-            else out.append(c);
+            if (c == '&') {
+                out.append("&amp;");
+            } else if (c == '<') {
+                out.append("&lt;");
+            } else if (c == '>') {
+                out.append("&gt;");
+            } else {
+                out.append(c);
+            }
         }
     }
 

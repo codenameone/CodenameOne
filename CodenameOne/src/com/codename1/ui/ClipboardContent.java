@@ -92,8 +92,8 @@ public class ClipboardContent {
         if (preferredMimeTypes == null) {
             return null;
         }
-        for (int i = 0; i < preferredMimeTypes.length; i++) {
-            String mimeType = normalizeMimeType(preferredMimeTypes[i]);
+        for (String preferredMimeType : preferredMimeTypes) {
+            String mimeType = normalizeMimeType(preferredMimeType);
             if (mimeTypes.contains(mimeType)) {
                 return mimeType;
             }

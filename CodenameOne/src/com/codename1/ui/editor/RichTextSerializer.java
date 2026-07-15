@@ -215,7 +215,9 @@ public final class RichTextSerializer {
         StringBuilder out = new StringBuilder(value.length());
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
-            if (c == delimiter || c == '\\') out.append('\\');
+            if (c == delimiter || c == '\\') {
+                out.append('\\');
+            }
             out.append(c);
         }
         return out.toString();

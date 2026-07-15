@@ -94,6 +94,7 @@ public class Tokenizer implements SyntaxHighlighter {
     /// #### Returns
     ///
     /// the colored spans and exit state
+    @Override
     public SyntaxHighlightResult tokenize(String line, int startState) {
         List<SyntaxToken> tokens = new ArrayList<SyntaxToken>();
         if (def.isPlain()) {
@@ -261,18 +262,26 @@ public class Tokenizer implements SyntaxHighlighter {
                 int end = scanString(line, i + 1, '"');
                 int stop = end < 0 ? line.length() : end + 1;
                 int j = stop;
-                while (j < line.length() && Character.isWhitespace(line.charAt(j))) j++;
+                while (j < line.length() && Character.isWhitespace(line.charAt(j))) {
+                    j++;
+                }
                 tokens.add(new SyntaxToken(i, stop - i, j < line.length() && line.charAt(j) == ':' ? PROPERTY : STRING));
                 i = stop;
             } else if (c == '-' || isDigit(c)) {
                 int start = i++;
-                if (c == '-' && (i >= line.length() || !isDigit(line.charAt(i)))) continue;
+                if (c == '-' && (i >= line.length() || !isDigit(line.charAt(i)))) {
+                    continue;
+                }
                 i = scanJsonNumber(line, start);
                 tokens.add(new SyntaxToken(start, i - start, NUMBER));
             } else if (isIdentStart(c)) {
                 int start = i++;
-                while (i < line.length() && isIdentPart(line.charAt(i))) i++;
-                if (def.isKeyword(line.substring(start, i))) tokens.add(new SyntaxToken(start, i - start, KEYWORD));
+                while (i < line.length() && isIdentPart(line.charAt(i))) {
+                    i++;
+                }
+                if (def.isKeyword(line.substring(start, i))) {
+                    tokens.add(new SyntaxToken(start, i - start, KEYWORD));
+                }
             } else {
                 i++;
             }
@@ -282,18 +291,30 @@ public class Tokenizer implements SyntaxHighlighter {
 
     private static int scanJsonNumber(String line, int start) {
         int i = start;
-        if (i < line.length() && line.charAt(i) == '-') i++;
-        while (i < line.length() && isDigit(line.charAt(i))) i++;
+        if (i < line.length() && line.charAt(i) == '-') {
+            i++;
+        }
+        while (i < line.length() && isDigit(line.charAt(i))) {
+            i++;
+        }
         if (i < line.length() && line.charAt(i) == '.') {
             i++;
-            while (i < line.length() && isDigit(line.charAt(i))) i++;
+            while (i < line.length() && isDigit(line.charAt(i))) {
+                i++;
+            }
         }
         if (i < line.length() && (line.charAt(i) == 'e' || line.charAt(i) == 'E')) {
             int exponent = i++;
-            if (i < line.length() && (line.charAt(i) == '+' || line.charAt(i) == '-')) i++;
+            if (i < line.length() && (line.charAt(i) == '+' || line.charAt(i) == '-')) {
+                i++;
+            }
             int digits = i;
-            while (i < line.length() && isDigit(line.charAt(i))) i++;
-            if (digits == i) i = exponent;
+            while (i < line.length() && isDigit(line.charAt(i))) {
+                i++;
+            }
+            if (digits == i) {
+                i = exponent;
+            }
         }
         return i;
     }
@@ -304,7 +325,9 @@ public class Tokenizer implements SyntaxHighlighter {
         if (startState == STATE_XML_COMMENT) {
             int end = line.indexOf("-->");
             if (end < 0) {
-                if (line.length() > 0) tokens.add(new SyntaxToken(0, line.length(), COMMENT));
+                if (line.length() > 0) {
+                    tokens.add(new SyntaxToken(0, line.length(), COMMENT));
+                }
                 return new SyntaxHighlightResult(tokens, STATE_XML_COMMENT);
             }
             tokens.add(new SyntaxToken(0, end + 3, COMMENT));
@@ -312,7 +335,9 @@ public class Tokenizer implements SyntaxHighlighter {
         }
         while (i < line.length()) {
             int open = line.indexOf('<', i);
-            if (open < 0) break;
+            if (open < 0) {
+                break;
+            }
             if (line.startsWith("<!--", open)) {
                 int end = line.indexOf("-->", open + 4);
                 if (end < 0) {
@@ -324,10 +349,16 @@ public class Tokenizer implements SyntaxHighlighter {
                 continue;
             }
             int p = open + 1;
-            if (p < line.length() && (line.charAt(p) == '/' || line.charAt(p) == '?' || line.charAt(p) == '!')) p++;
+            if (p < line.length() && (line.charAt(p) == '/' || line.charAt(p) == '?' || line.charAt(p) == '!')) {
+                p++;
+            }
             int name = p;
-            while (p < line.length() && isXmlName(line.charAt(p))) p++;
-            if (p > name) tokens.add(new SyntaxToken(name, p - name, TYPE));
+            while (p < line.length() && isXmlName(line.charAt(p))) {
+                p++;
+            }
+            if (p > name) {
+                tokens.add(new SyntaxToken(name, p - name, TYPE));
+            }
             while (p < line.length() && line.charAt(p) != '>') {
                 if (line.charAt(p) == '"' || line.charAt(p) == '\'') {
                     char quote = line.charAt(p);
@@ -337,9 +368,13 @@ public class Tokenizer implements SyntaxHighlighter {
                     p = stop;
                 } else if (isXmlName(line.charAt(p))) {
                     int attr = p++;
-                    while (p < line.length() && isXmlName(line.charAt(p))) p++;
+                    while (p < line.length() && isXmlName(line.charAt(p))) {
+                        p++;
+                    }
                     tokens.add(new SyntaxToken(attr, p - attr, PROPERTY));
-                } else p++;
+                } else {
+                    p++;
+                }
             }
             i = p < line.length() ? p + 1 : p;
         }
@@ -356,7 +391,9 @@ public class Tokenizer implements SyntaxHighlighter {
         if (startState == STATE_BLOCK_COMMENT || startState == STATE_CSS_COMMENT_DECLARATION) {
             int end = line.indexOf("*/");
             if (end < 0) {
-                if (line.length() > 0) tokens.add(new SyntaxToken(0, line.length(), COMMENT));
+                if (line.length() > 0) {
+                    tokens.add(new SyntaxToken(0, line.length(), COMMENT));
+                }
                 return new SyntaxHighlightResult(tokens, startState);
             }
             tokens.add(new SyntaxToken(0, end + 2, COMMENT));
@@ -391,16 +428,22 @@ public class Tokenizer implements SyntaxHighlighter {
                 i = end;
             } else if (isIdentStart(c) || c == '-' || c == '@') {
                 int start = i++;
-                while (i < line.length() && (isIdentPart(line.charAt(i)) || line.charAt(i) == '-')) i++;
+                while (i < line.length() && (isIdentPart(line.charAt(i)) || line.charAt(i) == '-')) {
+                    i++;
+                }
                 int p = i;
-                while (p < line.length() && Character.isWhitespace(line.charAt(p))) p++;
+                while (p < line.length() && Character.isWhitespace(line.charAt(p))) {
+                    p++;
+                }
                 if (c != '@' && p < line.length() && line.charAt(p) == ':'
                         && (declaration || line.indexOf('{', p) < 0)) {
                     tokens.add(new SyntaxToken(start, i - start, PROPERTY));
                 } else if (!declaration || c == '@') {
                     tokens.add(new SyntaxToken(start, i - start, TYPE));
                 }
-            } else i++;
+            } else {
+                i++;
+            }
         }
         return new SyntaxHighlightResult(tokens, declaration ? STATE_CSS_DECLARATION : STATE_NORMAL);
     }
@@ -412,7 +455,9 @@ public class Tokenizer implements SyntaxHighlighter {
             String quote = startState == STATE_TRIPLE_SINGLE ? "'''" : "\"\"\"";
             int end = line.indexOf(quote);
             if (end < 0) {
-                if (line.length() > 0) tokens.add(new SyntaxToken(0, line.length(), STRING));
+                if (line.length() > 0) {
+                    tokens.add(new SyntaxToken(0, line.length(), STRING));
+                }
                 return new SyntaxHighlightResult(tokens, startState);
             }
             tokens.add(new SyntaxToken(0, end + 3, STRING));
@@ -444,9 +489,15 @@ public class Tokenizer implements SyntaxHighlighter {
                 i = end;
             } else if (isIdentStart(c)) {
                 int start = i++;
-                while (i < line.length() && isIdentPart(line.charAt(i))) i++;
-                if (def.isKeyword(line.substring(start, i))) tokens.add(new SyntaxToken(start, i - start, KEYWORD));
-            } else i++;
+                while (i < line.length() && isIdentPart(line.charAt(i))) {
+                    i++;
+                }
+                if (def.isKeyword(line.substring(start, i))) {
+                    tokens.add(new SyntaxToken(start, i - start, KEYWORD));
+                }
+            } else {
+                i++;
+            }
         }
         return new SyntaxHighlightResult(tokens, STATE_NORMAL);
     }

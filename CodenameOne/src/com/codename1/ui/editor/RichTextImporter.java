@@ -53,9 +53,9 @@ public final class RichTextImporter {
         }
         ModelBuilder builder = new ModelBuilder();
         List<String> plainLines = lines(value);
-        for (int i = 0; i < plainLines.size(); i++) {
+        for (String plainLine : plainLines) {
             builder.startBlock(RichBlocks.PARAGRAPH, RichBlocks.LIST_NONE);
-            builder.append(plainLines.get(i), TextStyle.DEFAULT, null);
+            builder.append(plainLine, TextStyle.DEFAULT, null);
         }
         return builder.result(false);
     }
@@ -87,7 +87,9 @@ public final class RichTextImporter {
     public static String convert(String content, RichTextFormat sourceFormat, RichTextFormat targetFormat) {
         RichTextFormat source = sourceFormat == null ? RichTextFormat.PLAIN_TEXT : sourceFormat;
         RichTextFormat target = targetFormat == null ? RichTextFormat.PLAIN_TEXT : targetFormat;
-        if (source == target) return content == null ? "" : content;
+        if (source == target) {
+            return content == null ? "" : content;
+        }
         HtmlImporter.Result result = parse(content, source);
         EditorDocument doc = new EditorDocument(result.getText());
         InlineStyles inline = new InlineStyles(doc.length());
@@ -184,8 +186,7 @@ public final class RichTextImporter {
         ModelBuilder out = new ModelBuilder();
         List<String> sourceLines = lines(source);
         boolean literal = false;
-        for (int lineIndex = 0; lineIndex < sourceLines.size(); lineIndex++) {
-            String line = sourceLines.get(lineIndex);
+        for (String line : sourceLines) {
             String trimmed = line.trim();
             boolean fence = asciidoc ? "----".equals(trimmed) || "....".equals(trimmed)
                     : line.startsWith("```");
@@ -397,14 +398,18 @@ public final class RichTextImporter {
                 i++;
             } else if (c == '[') {
                 depth++;
-            } else if (c == ']' && --depth == 0) {
-                return i;
+            } else if (c == ']') {
+                depth--;
+                if (depth == 0) {
+                    return i;
+                }
             }
         }
         return -1;
     }
 
     private static final class ModelBuilder {
+        @SuppressWarnings("PMD.AvoidStringBufferField")
         private final StringBuilder text = new StringBuilder();
         private final List<TextStyle> styles = new ArrayList<TextStyle>();
         private final List<RichBlocks.BlockAttr> blocks = new ArrayList<RichBlocks.BlockAttr>();
@@ -722,16 +727,24 @@ public final class RichTextImporter {
                 continue;
             }
             if (c == '}') {
-                if (!stack.isEmpty()) state = stack.remove(stack.size() - 1);
+                if (!stack.isEmpty()) {
+                    state = stack.remove(stack.size() - 1);
+                }
                 continue;
             }
             if (c == '\\') {
-                if (i >= source.length()) break;
+                if (i >= source.length()) {
+                    break;
+                }
                 char next = source.charAt(i);
                 if (next == '\\' || next == '{' || next == '}') {
                     i++;
-                    if (!state.skip && skipFallback-- <= 0) {
-                        out.append(String.valueOf(next), rtfStyle(state), null);
+                    if (!state.skip) {
+                        boolean appendCharacter = skipFallback <= 0;
+                        skipFallback--;
+                        if (appendCharacter) {
+                            out.append(String.valueOf(next), rtfStyle(state), null);
+                        }
                     }
                     continue;
                 }
@@ -740,8 +753,12 @@ public final class RichTextImporter {
                     if (i + 1 < source.length()) {
                         int value = hex(source.charAt(i), source.charAt(i + 1));
                         i += 2;
-                        if (!state.skip && value >= 0 && skipFallback-- <= 0) {
-                            out.append(String.valueOf((char) value), rtfStyle(state), null);
+                        if (!state.skip && value >= 0) {
+                            boolean appendCharacter = skipFallback <= 0;
+                            skipFallback--;
+                            if (appendCharacter) {
+                                out.append(String.valueOf((char) value), rtfStyle(state), null);
+                            }
                         }
                     }
                     continue;

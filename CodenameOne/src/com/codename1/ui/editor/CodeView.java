@@ -211,7 +211,7 @@ public class CodeView extends EditorView {
             if (t.start > pos) {
                 drawSegment(g, f, text, pos, t.start, x, y, defColor);
             }
-            int color = palette == ThemePalette.DARK ? t.darkColor : t.lightColor;
+            int color = ThemePalette.DARK.equals(palette) ? t.darkColor : t.lightColor;
             drawSegment(g, f, text, t.start, t.start + t.length, x, y,
                     color < 0 ? palette.colorForKind(t.kind) : color);
             pos = t.start + t.length;
