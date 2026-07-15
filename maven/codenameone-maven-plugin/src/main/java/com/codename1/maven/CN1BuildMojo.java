@@ -88,7 +88,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
     @Override
     protected String helpAction() {
-        StringBuilder sb = new StringBuilder("mvn cn1:build");
+        StringBuilder sb = new StringBuilder("mvn package");
         if (platform != null && platform.trim().length() > 0) {
             sb.append(" -Dcodename1.platform=").append(platform.trim());
         }

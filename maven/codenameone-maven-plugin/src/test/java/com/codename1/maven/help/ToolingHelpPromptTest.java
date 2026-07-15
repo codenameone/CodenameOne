@@ -23,7 +23,9 @@ public class ToolingHelpPromptTest {
                 .component("maven-plugin")
                 .step("create_project")
                 .toolingVersion("7.0.153")
-                .errorSummary("archetype:generate failed");
+                .errorSummary("archetype:generate failed")
+                .errorDetail("Command: mvn package\nJAVA_HOME: /opt/jdk8\nProxy: https=proxy.example:443\n"
+                        + "java.lang.IllegalStateException: failed at /Users/alice/private-project");
     }
 
     @Test
@@ -42,6 +44,41 @@ public class ToolingHelpPromptTest {
         assertTrue(out.toString().contains("reply to you at dev@example.com"));
         // Email path must NOT auto-open a browser.
         assertNull(browser.openedUrl);
+    }
+
+    @Test
+    public void showsCompleteDiagnosticPayloadBeforeConfirmation() throws Exception {
+        RecordingClient client = RecordingClient.emailing(8, "t");
+        RecordingBrowser browser = new RecordingBrowser(true);
+        StringWriter out = new StringWriter();
+
+        rawRun(client, browser, out, "\n\nn\n", "dev@example.com");
+
+        assertEquals(0, client.submitCount);
+        String text = out.toString();
+        assertTrue(text.contains("Complete report to be sent"));
+        assertTrue(text.contains("stack traces, local file paths, JAVA_HOME, and proxy settings"));
+        assertTrue(text.contains("JAVA_HOME: /opt/jdk8"));
+        assertTrue(text.contains("Proxy: https=proxy.example:443"));
+        assertTrue(text.contains("/Users/alice/private-project"));
+    }
+
+    @Test
+    public void keepsConfiguredMessageWhenInteractiveInputIsBlank() throws Exception {
+        RecordingClient client = RecordingClient.emailing(9, "t");
+        RecordingBrowser browser = new RecordingBrowser(true);
+        StringWriter out = new StringWriter();
+        BufferedReader reader = new BufferedReader(new StringReader("\n\ny\n"));
+        PrintWriter writer = new PrintWriter(out);
+        ToolingHelpPrompt prompt = new ToolingHelpPrompt(reader, writer, client, browser);
+
+        prompt.run(base(), "dev@example.com", "Configured Maven note");
+        writer.flush();
+
+        assertEquals(1, client.submitCount);
+        assertEquals("Configured Maven note", client.lastReport.getMessage());
+        assertTrue(out.toString().contains("[Configured Maven note]"));
+        assertTrue(out.toString().contains("Your note: Configured Maven note"));
     }
 
     @Test

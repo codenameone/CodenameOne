@@ -44,97 +44,97 @@
   };
 
   // --- Crisp trigger events -------------------------------------------------
-  // Fire named Crisp `session:event`s so the matching automated campaigns launch
-  // for the visitor. Each fires at most once per page view and once per session.
-  // These only run once Crisp is active (consent accepted), because `$crisp` is
-  // only defined then — a declined visitor never fires an event.
+  // Pages and product surfaces explicitly call the matching function below. This
+  // shared script handles consent, timing, and deduplication; it never guesses user
+  // intent from the current URL.
   const firedThisView = {};
+  const pendingEvents = {};
 
   const fireCrispEvent = (name, data) => {
-    if (firedThisView[name]) {
-      return;
+    // Consent can change after a page schedules a dwell event. Check it at the
+    // moment the event fires, before touching either deduplication guard.
+    if (getConsent() !== "accepted" || !window.$crisp || firedThisView[name]) {
+      return false;
     }
-    firedThisView[name] = true;
     try {
       const sessionKey = `cn1-crisp-ev-${name}`;
       if (sessionStorage.getItem(sessionKey)) {
-        return; // already fired earlier this session
+        return false; // already fired earlier this session
       }
-      sessionStorage.setItem(sessionKey, "1");
     } catch (e) {
-      // sessionStorage unavailable (private mode) — fall back to per-view guard only
-    }
-    if (!window.$crisp) {
-      return;
+      // sessionStorage unavailable (private mode) — use the per-view guard only
     }
     try {
       const event = data ? [name, data, "blue"] : [name];
       window.$crisp.push(["set", "session:event", [[event]]]);
+      firedThisView[name] = true;
+      try {
+        sessionStorage.setItem(`cn1-crisp-ev-${name}`, "1");
+      } catch (e) {
+        // sessionStorage unavailable — the per-view guard still applies
+      }
+      return true;
     } catch (e) {
-      // no-op
+      return false;
     }
   };
 
-  let triggersRegistered = false;
-
-  const registerCrispTriggerEvents = () => {
-    if (triggersRegistered) {
-      return;
+  const requestCrispEvent = (name, data) => {
+    const consent = getConsent();
+    if (consent === null) {
+      // The page requested the event before the visitor answered the consent
+      // banner. Remember the request, but don't mark it as fired.
+      pendingEvents[name] = data || null;
+      return false;
     }
-    triggersRegistered = true;
-    const path = (window.location.pathname || "").toLowerCase();
-    const meta = { page: path };
-
-    // 1. ConsoleDwell60 -> "T1 — First-build nudge (console)".
-    //    The build console lives on cloud.codenameone.com/console (a separate app);
-    //    this matcher fires there if this script is ever bundled into it. On the
-    //    marketing site the path never contains /console, so it stays dormant here.
-    if (path.includes("/console")) {
-      setTimeout(() => fireCrispEvent("ConsoleDwell60", meta), 60000);
-    }
-
-    // 2. SigningScreenView -> "T2 — iOS signing help".
-    //    The real signing/certificate screen is in the console app; the site's proxy
-    //    is a view of the /signing/ doc page. `onSigningScreenOpen` is also exposed
-    //    globally so the console app can call it directly when that screen opens.
-    if (/\/signing/.test(path)) {
-      fireCrispEvent("SigningScreenView", meta);
-    }
-
-    // 3. BuildError -> "T3 — Build-error rescue".
-    //    Fired on build failure by the console app (not this repo). Exposed here as a
-    //    helper so whatever surfaces a build error can call it; not auto-fired on the site.
-
-    // 4. GettingStartedDwell -> "T4 — Getting-started nudge".
-    //    Spec paths /getting-started and /docs; on this site "docs" maps to
-    //    /developing-in-codename-one and /developer-guide.
-    if (/\/(getting-started|docs|developing-in-codename-one|developer-guide)/.test(path)) {
-      setTimeout(() => fireCrispEvent("GettingStartedDwell", meta), 20000);
-    }
-
-    // 5. PricingEvaluator -> "T5 — Evaluator (pricing/vs pages)".
-    //    30s on pricing/compare pages OR upward exit-intent, whichever comes first.
-    if (/\/(pricing|compare|comparison-chart)/.test(path) || /vs/i.test(path)) {
-      const firePricing = () => fireCrispEvent("PricingEvaluator", meta);
-      setTimeout(firePricing, 30000);
-      document.addEventListener("mouseout", (e) => {
-        if (!e.relatedTarget && e.clientY <= 0) {
-          firePricing();
-        }
-      });
-    }
+    return consent === "accepted" && fireCrispEvent(name, data);
   };
 
-  // Public hooks for surfaces that know exactly when the moment happened (e.g. the
-  // external console): call these to fire the event on demand.
-  window.cn1CrispEvents = window.cn1CrispEvents || {
-    signingScreenOpen: () => fireCrispEvent("SigningScreenView", { page: "console" }),
-    buildError: (data) => fireCrispEvent("BuildError", data),
+  const flushPendingEvents = () => {
+    Object.keys(pendingEvents).forEach((name) => {
+      const data = pendingEvents[name];
+      delete pendingEvents[name];
+      fireCrispEvent(name, data);
+    });
   };
+
+  const clearPendingEvents = () => {
+    Object.keys(pendingEvents).forEach((name) => delete pendingEvents[name]);
+  };
+
+  const scheduleCrispEvent = (name, delay, data) => {
+    window.setTimeout(() => requestCrispEvent(name, data), delay);
+  };
+
+  // Explicit hooks for the pages and product surfaces that own each event.
+  const crispEvents = window.cn1CrispEvents || {};
+  crispEvents.consoleDwell60 = (data) => scheduleCrispEvent(
+    "ConsoleDwell60", 60000, data || { page: "console" }
+  );
+  crispEvents.signingScreenView = (data) => requestCrispEvent(
+    "SigningScreenView", data || { page: "signing" }
+  );
+  // Keep the original console-facing name as an alias.
+  crispEvents.signingScreenOpen = (data) => requestCrispEvent(
+    "SigningScreenView", data || { page: "console" }
+  );
+  crispEvents.buildError = (data) => requestCrispEvent("BuildError", data);
+  crispEvents.gettingStartedDwell = (data) => scheduleCrispEvent(
+    "GettingStartedDwell", 20000, data
+  );
+  crispEvents.pricingEvaluator = (data) => {
+    const firePricing = () => requestCrispEvent("PricingEvaluator", data);
+    window.setTimeout(firePricing, 30000);
+    document.addEventListener("mouseout", (event) => {
+      if (!event.relatedTarget && event.clientY <= 0) {
+        firePricing();
+      }
+    });
+  };
+  window.cn1CrispEvents = crispEvents;
 
   const loadCrisp = () => {
     if (window.CRISP_WEBSITE_ID || document.getElementById("cn1-crisp-loader")) {
-      registerCrispTriggerEvents();
       return;
     }
     window.$crisp = window.$crisp || [];
@@ -145,11 +145,12 @@
     s.src = "https://client.crisp.chat/l.js";
     s.async = true;
     d.head.appendChild(s);
-    registerCrispTriggerEvents();
   };
 
   const hideCrisp = () => {
-    window.$crisp = window.$crisp || [];
+    if (!window.$crisp) {
+      return;
+    }
     try {
       window.$crisp.push(["do", "chat:hide"]);
     } catch (e) {
@@ -183,10 +184,12 @@
     setConsent("accepted");
     closeBanner();
     loadCrisp();
+    flushPendingEvents();
   };
 
   const declineConsent = () => {
     setConsent("declined");
+    clearPendingEvents();
     closeBanner();
     hideCrisp();
   };

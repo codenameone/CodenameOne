@@ -1,0 +1,138 @@
+{{- define "main" -}}
+<article class="post-single cn1-signing-page">
+  <header class="cn1-signing-hero">
+    <div class="cn1-signing-hero__copy">
+      {{ partial "breadcrumbs.html" . }}
+      <p class="cn1-signing-eyebrow">Certificate Wizard</p>
+      <h1>Code signing without the portal maze</h1>
+      <p class="cn1-signing-lead">
+        The standalone Certificate Wizard creates and installs the signing assets your Codename One project needs.
+        Start it from Maven, use the recommended Auto Setup flow, and keep the generated credentials backed up.
+      </p>
+      <div class="cn1-signing-actions">
+        <a class="cn1-signing-button cn1-signing-button--primary" href="#quick-start">Launch the wizard</a>
+        <a class="cn1-signing-button" href="/developer-guide/#certificate-wizard">Read the full guide</a>
+      </div>
+    </div>
+    <div class="cn1-signing-hero__visual" aria-hidden="true">
+      <div class="cn1-signing-orbit cn1-signing-orbit--one"></div>
+      <div class="cn1-signing-orbit cn1-signing-orbit--two"></div>
+      <div class="cn1-signing-shield"><i class="fas fa-shield-alt"></i><span>Signed</span></div>
+      <span class="cn1-signing-platform cn1-signing-platform--apple"><i class="fab fa-apple"></i></span>
+      <span class="cn1-signing-platform cn1-signing-platform--android"><i class="fab fa-android"></i></span>
+      <span class="cn1-signing-platform cn1-signing-platform--windows"><i class="fab fa-windows"></i></span>
+    </div>
+  </header>
+
+  <section class="cn1-signing-quick" id="quick-start">
+    <div>
+      <p class="cn1-signing-kicker">Quick start</p>
+      <h2>Run it from your project</h2>
+      <p>The wizard is a standalone desktop app bound to the current Codename One Maven project.</p>
+    </div>
+    <div class="cn1-signing-terminal" aria-label="Certificate Wizard Maven command">
+      <span class="cn1-signing-terminal__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      <code><span>$</span> mvn cn1:certificatewizard</code>
+    </div>
+  </section>
+
+  <section class="cn1-signing-section">
+    <div class="cn1-signing-section__heading">
+      <p class="cn1-signing-kicker">Current workflows</p>
+      <h2>One tool, the signing paths we support today</h2>
+      <p>Use these maintained paths for mobile and desktop distribution.</p>
+    </div>
+    <div class="cn1-signing-grid cn1-signing-grid--three">
+      <article class="cn1-signing-card">
+        <span class="cn1-signing-card__icon"><i class="fab fa-apple"></i></span>
+        <h3>Apple platforms</h3>
+        <p>Create or reuse iOS development and distribution certificates, provisioning profiles, bundle IDs, devices, push capability, and Mac signing assets.</p>
+        <a href="#apple-setup">Apple setup <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+      </article>
+      <article class="cn1-signing-card">
+        <span class="cn1-signing-card__icon cn1-signing-card__icon--android"><i class="fab fa-android"></i></span>
+        <h3>Android</h3>
+        <p>Generate a self-signed keystore locally with the JDK's <code>keytool</code> and install its path, alias, and password into the project.</p>
+        <a href="#android-setup">Android setup <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+      </article>
+      <article class="cn1-signing-card">
+        <span class="cn1-signing-card__icon cn1-signing-card__icon--windows"><i class="fab fa-windows"></i></span>
+        <h3>Windows</h3>
+        <p>Configure an Authenticode certificate issued by a certificate authority or managed signing provider. The wizard explains the required project settings.</p>
+        <a href="#desktop-signing">Desktop signing <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+      </article>
+    </div>
+  </section>
+
+  <section class="cn1-signing-section cn1-signing-section--panel" id="apple-setup">
+    <div class="cn1-signing-section__heading">
+      <p class="cn1-signing-kicker">Apple setup</p>
+      <h2>Use an App Store Connect API key, not your Apple ID password</h2>
+      <p>The new wizard uses Apple's documented machine-to-machine API and avoids the fragile login and two-factor-authentication flow used by the old wizard.</p>
+    </div>
+    <ol class="cn1-signing-steps">
+      <li>
+        <span>1</span>
+        <div><h3>Join the Apple Developer Program</h3><p>An active team membership is required for device testing and App Store distribution.</p></div>
+      </li>
+      <li>
+        <span>2</span>
+        <div><h3>Create a Team API key</h3><p>In App Store Connect, open <strong>Users and Access → Integrations → App Store Connect API</strong>. Generate a Team Key with <strong>Admin</strong> access.</p></div>
+      </li>
+      <li>
+        <span>3</span>
+        <div><h3>Import the three key values</h3><p>Copy the Key ID and Issuer ID, then import the downloaded <code>.p8</code> private key. Apple lets you download that file only once, so store a secure backup.</p></div>
+      </li>
+      <li>
+        <span>4</span>
+        <div><h3>Choose Auto Setup</h3><p>The wizard reads your package name, creates or reuses the bundle ID, certificates, and profiles, then writes the debug and release signing settings into the current project.</p></div>
+      </li>
+    </ol>
+    <aside class="cn1-signing-note">
+      <i class="fas fa-user-shield" aria-hidden="true"></i>
+      <div>
+        <h3>Know where the key goes</h3>
+        <p>The <code>.p8</code> key is sent to the Codename One cloud signing service so it can perform Apple API operations on your behalf. Revoke it in App Store Connect at any time and generate a replacement if needed.</p>
+      </div>
+    </aside>
+  </section>
+
+  <section class="cn1-signing-section">
+    <div class="cn1-signing-grid cn1-signing-grid--two">
+      <article class="cn1-signing-detail" id="android-setup">
+        <p class="cn1-signing-kicker">Android</p>
+        <h2>Generate locally, then back it up</h2>
+        <p>The Android page runs the JDK's <code>keytool</code> on your computer. By default the keystore is stored under <code>androidCerts/KeyChain.ks</code>, and the wizard writes the corresponding project properties.</p>
+        <div class="cn1-signing-warning"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i><p><strong>Do not lose this keystore or its password.</strong> A published Android app must continue to use the same signing identity for updates.</p></div>
+      </article>
+      <article class="cn1-signing-detail" id="desktop-signing">
+        <p class="cn1-signing-kicker">Desktop</p>
+        <h2>Mac and Windows use different trust models</h2>
+        <p><strong>macOS:</strong> use the same App Store Connect key to create Mac App Store profiles or Developer ID certificates for direct distribution and notarization.</p>
+        <p><strong>Windows:</strong> obtain an Authenticode <code>.pfx</code> or <code>.p12</code> from a recognized code-signing provider, then configure the certificate, password, and timestamp service shown by the wizard.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="cn1-signing-section cn1-signing-help">
+    <div class="cn1-signing-help__copy">
+      <p class="cn1-signing-kicker">Need a hand?</p>
+      <h2>Bring the error to the community</h2>
+      <p>Include the target platform, the wizard step that failed, the exact error text, and whether you were creating new assets or reusing existing ones. Never post private keys, certificate passwords, or tokens.</p>
+    </div>
+    <div class="cn1-signing-help__links">
+      <a href="#" data-cn1-enable-chat><i class="fas fa-comment-dots" aria-hidden="true"></i><span><strong>Open site chat</strong><small>Talk to the Codename One team</small></span></a>
+      <a href="https://github.com/codenameone/CodenameOne/discussions" target="_blank" rel="noopener"><i class="fab fa-github" aria-hidden="true"></i><span><strong>GitHub Discussions</strong><small>Ask the community</small></span></a>
+      <a href="https://github.com/codenameone/CodenameOne/issues" target="_blank" rel="noopener"><i class="fas fa-bug" aria-hidden="true"></i><span><strong>GitHub Issues</strong><small>Report a reproducible tool bug</small></span></a>
+      <a href="/discussion-forum/"><i class="fas fa-users" aria-hidden="true"></i><span><strong>Community support</strong><small>More support channels</small></span></a>
+    </div>
+  </section>
+
+  <section class="cn1-signing-more">
+    <h2>Go deeper</h2>
+    <a href="/developer-guide/#certificate-wizard"><strong>Certificate Wizard guide</strong><span>Fields, Auto Setup, manual asset management, devices, and edge cases <i class="fas fa-arrow-right" aria-hidden="true"></i></span></a>
+    <a href="/blog/standalone-certificate-wizard/"><strong>Why the wizard changed</strong><span>The standalone app and App Store Connect API-key model <i class="fas fa-arrow-right" aria-hidden="true"></i></span></a>
+  </section>
+</article>
+{{ partial "crisp-event.html" (dict "function" "signingScreenView" "page" .RelPermalink) }}
+{{- end -}}

@@ -50,7 +50,20 @@ public class ToolingHelpPrompt {
      *         before an explicit Send (nothing was transmitted in that case)
      */
     public ToolingHelpResponse run(ToolingHelpReport.Builder base, String prefilledEmail) throws IOException {
-        // 1. Show the failure context the user is about to send.
+        return run(base, prefilledEmail, null);
+    }
+
+    /**
+     * Runs the dialog with optional pre-filled contact details and user note.
+     *
+     * @param base             the captured failure context
+     * @param prefilledEmail   the signed-in account email, or null if unknown
+     * @param prefilledMessage the configured note, or null if none was supplied
+     * @return the submission result, or {@code null} if the user cancelled
+     */
+    public ToolingHelpResponse run(ToolingHelpReport.Builder base, String prefilledEmail,
+                                   String prefilledMessage) throws IOException {
+        // 1. Show a short failure context before gathering the editable fields.
         ToolingHelpReport preview = base.build();
         out.println();
         out.println("Get help from Codename One support");
@@ -71,17 +84,20 @@ public class ToolingHelpPrompt {
             return cancelled();
         }
 
-        // 3. Optional free-text box.
-        out.println();
-        out.print("What were you trying to do? (optional, press Enter to skip): ");
-        out.flush();
-        String message = readLine();
+        // 3. Optional free-text box (pre-filled when -Dmessage was supplied).
+        String message = promptMessage(prefilledMessage);
         if (message == null) {
             return cancelled();
         }
-        message = message.trim();
 
-        // 4. Privacy note.
+        ToolingHelpReport report = base
+                .email(email.length() == 0 ? null : email)
+                .message(message.length() == 0 ? null : message)
+                .build();
+
+        // 4. Show every field that will be transmitted, including the full diagnostic
+        // detail, before asking for consent.
+        printReportPreview(report);
         out.println();
         out.println(ToolingHelpMessages.PRIVACY_NOTE);
 
@@ -93,11 +109,6 @@ public class ToolingHelpPrompt {
             return cancelled();
         }
 
-        ToolingHelpReport report = base
-                .email(email.length() == 0 ? null : email)
-                .message(message.length() == 0 ? null : message)
-                .build();
-
         out.println();
         out.println("Sending…");
         ToolingHelpResponse response = client.submit(report);
@@ -108,6 +119,53 @@ public class ToolingHelpPrompt {
         }
         printResult(response, browserOpened);
         return response;
+    }
+
+    private String promptMessage(String prefilledMessage) throws IOException {
+        String prefill = prefilledMessage == null ? "" : prefilledMessage.trim();
+        out.println();
+        if (prefill.length() > 0) {
+            out.print("What were you trying to do? [" + prefill
+                    + "] (Enter to keep, or type a new note, or 'none'): ");
+        } else {
+            out.print("What were you trying to do? (optional, press Enter to skip): ");
+        }
+        out.flush();
+        String typed = readLine();
+        if (typed == null) {
+            return null;
+        }
+        typed = typed.trim();
+        if (typed.length() == 0) {
+            return prefill;
+        }
+        if ("none".equalsIgnoreCase(typed) || "-".equals(typed)) {
+            return "";
+        }
+        return typed;
+    }
+
+    private void printReportPreview(ToolingHelpReport report) {
+        out.println();
+        out.println("Complete report to be sent");
+        out.println("──────────────────────────");
+        out.println("Diagnostics can contain stack traces, local file paths, JAVA_HOME, and proxy settings.");
+        printField("Component", report.getComponent());
+        printField("Tooling version", report.getToolingVersion());
+        printField("Step", report.getStep());
+        printField("OS", report.getOs());
+        printField("OS version", report.getOsVersion());
+        printField("Java version", report.getJavaVersion());
+        printField("Error summary", report.getErrorSummary());
+        printField("Reply email", report.getEmail());
+        printField("Your note", report.getMessage());
+        out.println("Error detail:");
+        out.println(orDash(report.getErrorDetail()));
+        out.flush();
+    }
+
+    private void printField(String label, String value) {
+        out.println(label + ": " + orDash(value));
     }
 
     private String promptEmail(String prefilledEmail) throws IOException {

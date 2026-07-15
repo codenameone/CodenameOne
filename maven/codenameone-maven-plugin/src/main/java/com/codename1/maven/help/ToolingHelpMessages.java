@@ -16,7 +16,7 @@ public final class ToolingHelpMessages {
 
     /** The one-line privacy note shown before Send. */
     public static final String PRIVACY_NOTE =
-            "This sends the error above to Codename One support so we can help. "
+            "This sends the complete report shown above to Codename One support so we can help. "
             + "Nothing is sent unless you click Send.";
 
     private ToolingHelpMessages() {
@@ -33,7 +33,7 @@ public final class ToolingHelpMessages {
         lines.add("── Get help ──");
         lines.add("This step failed. To send it to Codename One support and get help, run:");
         lines.add("    mvn cn1:get-help");
-        lines.add("We only send the error above when you confirm — nothing is sent automatically.");
+        lines.add("The complete report is shown for review before you confirm — nothing is sent automatically.");
         lines.add("");
         return lines;
     }

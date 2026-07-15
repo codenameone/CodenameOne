@@ -138,7 +138,7 @@ public class GetHelpMojo extends AbstractMojo {
         PrintWriter writer = new PrintWriter(new java.io.OutputStreamWriter(System.out, charset), true);
         ToolingHelpPrompt prompt = new ToolingHelpPrompt(reader, writer, client);
         try {
-            ToolingHelpResponse response = prompt.run(base, resolvedEmail);
+            ToolingHelpResponse response = prompt.run(base, resolvedEmail, message);
             clearOnDelivery(response);
         } catch (IOException ex) {
             throw new MojoExecutionException("Failed to read console input for get-help", ex);

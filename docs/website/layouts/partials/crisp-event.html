@@ -1,0 +1,11 @@
+{{- $function := .function -}}
+{{- $page := .page -}}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var events = window.cn1CrispEvents;
+    var handler = events && events[{{ $function | jsonify | safeJS }}];
+    if (typeof handler === "function") {
+      handler({ page: {{ $page | jsonify | safeJS }} });
+    }
+  });
+</script>

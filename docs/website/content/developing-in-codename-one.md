@@ -38,3 +38,5 @@ hero_image: "/uploads/Group-2270.svg"
 
 - **[Tutorial Tag In the Blog](/blog/)**  
   The Codename One blog publishes tutorials regularly and you can follow all of them in this tag.
+
+{{< crisp-event function="gettingStartedDwell" >}}
