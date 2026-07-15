@@ -66,6 +66,16 @@ public class OpenCertificateWizardMojo extends AbstractCN1Mojo {
     private boolean spawn;
 
     @Override
+    protected String helpStep() {
+        return "configure";
+    }
+
+    @Override
+    protected String helpAction() {
+        return "mvn cn1:certificatewizard";
+    }
+
+    @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         if (Boolean.getBoolean(LAUNCHED_PROPERTY)) {
             getLog().debug("Skipping certificatewizard: already launched in this Maven invocation");

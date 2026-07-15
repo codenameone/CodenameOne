@@ -13,6 +13,16 @@ import java.util.Properties;
 public class CN1DebugMojo extends AbstractCN1Mojo {
 
     @Override
+    protected String helpStep() {
+        return "local_run";
+    }
+
+    @Override
+    protected String helpAction() {
+        return "mvn cn1:debug";
+    }
+
+    @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         File commonDir = getCN1ProjectDir();
         if (commonDir == null) {

@@ -147,3 +147,5 @@ Support is provided for the process of administering and installing the corporat
 The corporate solution requires that your company perform the setup and installation of at least 4 separate servers with a complex configuration process. This requires a trained system administrator to perform the setup based on instructions from Codename One.
 
 If you think the corporate server is right for you please fill out the form here.
+
+{{< crisp-event function="pricingEvaluator" >}}

@@ -82,6 +82,23 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
 
 
     @Override
+    protected String helpStep() {
+        return "build_submit";
+    }
+
+    @Override
+    protected String helpAction() {
+        StringBuilder sb = new StringBuilder("mvn package");
+        if (platform != null && platform.trim().length() > 0) {
+            sb.append(" -Dcodename1.platform=").append(platform.trim());
+        }
+        if (buildTarget != null && buildTarget.trim().length() > 0) {
+            sb.append(" -Dcodename1.buildTarget=").append(buildTarget.trim());
+        }
+        return sb.toString();
+    }
+
+    @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         if ("none".equalsIgnoreCase(buildTarget)) {
             getLog().info("BuildTarget is None.  Skipping cn1build goal");

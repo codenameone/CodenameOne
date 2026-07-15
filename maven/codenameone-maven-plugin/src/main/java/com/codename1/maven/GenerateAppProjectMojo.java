@@ -865,6 +865,24 @@ public class GenerateAppProjectMojo extends AbstractMojo {
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         try {
+            doExecute();
+        } catch (MojoExecutionException | MojoFailureException e) {
+            com.codename1.maven.help.ToolingHelp.offerAfterFailure(getLog(),
+                    com.codename1.maven.help.ToolingHelp.COMPONENT_MAVEN_PLUGIN,
+                    "create_project", "mvn cn1:generate-app-project",
+                    com.codename1.maven.help.ToolingHelp.pluginVersion(), e);
+            throw e;
+        } catch (RuntimeException e) {
+            com.codename1.maven.help.ToolingHelp.offerAfterFailure(getLog(),
+                    com.codename1.maven.help.ToolingHelp.COMPONENT_MAVEN_PLUGIN,
+                    "create_project", "mvn cn1:generate-app-project",
+                    com.codename1.maven.help.ToolingHelp.pluginVersion(), e);
+            throw e;
+        }
+    }
+
+    private void doExecute() throws MojoExecutionException, MojoFailureException {
+        try {
 
             Properties props;
             try {
