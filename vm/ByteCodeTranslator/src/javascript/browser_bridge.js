@@ -979,6 +979,184 @@
     return s;
   }
 
+  // iOS-26 tab selection lens. Keep these values and the math in lock-step
+  // with JavaSEPort.applyLensBuffer(): the Simulator is the browser renderer's
+  // pixel reference for the glass-tab animation.
+  var LENS_MAG_FLAT = 0.75;
+  var LENS_TINT_HI = 150;
+  var LENS_TINT_LO = 55;
+  var LENS_LIFT_COEF = 0.40;
+  var LENS_GLARE = 0.09;
+  var LENS_RIM = 0.06;
+  var LENS_RIM_W = 0.06;
+  var LENS_REFRACT = 0.16;
+  var LENS_EDGE_SHADOW = 0.12;
+  var LENS_RIM_SCALE = 0.84;
+  var LENS_GLASS_TINT = 0xbcd8ff;
+  var LENS_GLASS_TINT_STR = 0.10;
+  var LENS_SAT_BOOST = 1.32;
+
+  function lensSmoothstep(a, b, x) {
+    var t = (x - a) / (b - a);
+    t = t < 0 ? 0 : (t > 1 ? 1 : t);
+    return t * t * (3 - 2 * t);
+  }
+
+  function lensBilinear(a, b, c, d, tx, ty) {
+    var top = a + (b - a) * tx;
+    var bottom = c + (d - c) * tx;
+    return (top + (bottom - top) * ty) | 0;
+  }
+
+  function lensSample(data, width, height, fx, fy, channel) {
+    if (fx < 0) { fx = 0; } else if (fx > width - 1) { fx = width - 1; }
+    if (fy < 0) { fy = 0; } else if (fy > height - 1) { fy = height - 1; }
+    var x0 = fx | 0, y0 = fy | 0;
+    var x1 = Math.min(x0 + 1, width - 1), y1 = Math.min(y0 + 1, height - 1);
+    var tx = fx - x0, ty = fy - y0;
+    var row0 = y0 * width, row1 = y1 * width;
+    return lensBilinear(
+      data[(row0 + x0) * 4 + channel], data[(row0 + x1) * 4 + channel],
+      data[(row1 + x0) * 4 + channel], data[(row1 + x1) * 4 + channel],
+      tx, ty
+    );
+  }
+
+  function lensDeviceRect(ctx, x, y, width, height) {
+    var tr = ctx.getTransform ? ctx.getTransform() : null;
+    if (!tr) {
+      return { x: Math.round(x), y: Math.round(y), w: Math.round(width), h: Math.round(height), scale: 1 };
+    }
+    // Tabs paint under translation/uniform scaling only. A pixel read ignores
+    // Canvas transforms, so resolve that axis-aligned transform explicitly.
+    // A rotated/sheared lens is outside the v1 contract and safely no-ops.
+    if (Math.abs(tr.b) > 1e-9 || Math.abs(tr.c) > 1e-9) {
+      return null;
+    }
+    var x0 = tr.a * x + tr.e, x1 = tr.a * (x + width) + tr.e;
+    var y0 = tr.d * y + tr.f, y1 = tr.d * (y + height) + tr.f;
+    return {
+      x: Math.round(Math.min(x0, x1)),
+      y: Math.round(Math.min(y0, y1)),
+      w: Math.round(Math.abs(x1 - x0)),
+      h: Math.round(Math.abs(y1 - y0)),
+      scale: Math.min(Math.abs(tr.a), Math.abs(tr.d))
+    };
+  }
+
+  function applyLensSelfRegion(ctx, x, y, width, height, cornerRadius,
+                               magnify, aberration, tintColor, tintStrength) {
+    if (!ctx.canvas || width <= 0 || height <= 0) {
+      return;
+    }
+    var rect = lensDeviceRect(ctx, x, y, width, height);
+    if (!rect || rect.w <= 0 || rect.h <= 0) {
+      return;
+    }
+    var rx = rect.x, ry = rect.y, rw = rect.w, rh = rect.h;
+    var canvasWidth = ctx.canvas.width | 0, canvasHeight = ctx.canvas.height | 0;
+    if (rx < 0) { rw += rx; rx = 0; }
+    if (ry < 0) { rh += ry; ry = 0; }
+    if (rx + rw > canvasWidth) { rw = canvasWidth - rx; }
+    if (ry + rh > canvasHeight) { rh = canvasHeight - ry; }
+    if (rw <= 0 || rh <= 0) {
+      return;
+    }
+
+    var source = ctx.getImageData(rx, ry, rw, rh);
+    var src = source.data;
+    var result = ctx.createImageData(rw, rh);
+    var out = result.data;
+    var hw = rw / 2.0, hh = rh / 2.0;
+    var scaledCorner = cornerRadius * rect.scale;
+    var radius = scaledCorner < 0 ? Math.min(hw, hh)
+                                  : Math.min(scaledCorner, Math.min(hw, hh));
+    if (radius < 0) { radius = 0; }
+    var tr = (tintColor >> 16) & 0xff;
+    var tg = (tintColor >> 8) & 0xff;
+    var tb = tintColor & 0xff;
+    var liftMax = LENS_LIFT_COEF * (magnify - 1.0) * hh;
+    var glassAmount = lensSmoothstep(1.085, 1.25, magnify);
+
+    for (var yy = 0; yy < rh; yy++) {
+      var py = yy + 0.5 - hh;
+      for (var xx = 0; xx < rw; xx++) {
+        var px = xx + 0.5 - hw;
+        var index = (yy * rw + xx) * 4;
+        var dxe = Math.abs(px) - (hw - radius);
+        var dye = Math.abs(py) - (hh - radius);
+        var axx = Math.max(dxe, 0), ayy = Math.max(dye, 0);
+        var outside = Math.sqrt(axx * axx + ayy * ayy);
+        var inside = Math.min(Math.max(dxe, dye), 0);
+        var depth = -(outside + inside - radius);
+        if (depth <= 0) {
+          out[index] = src[index];
+          out[index + 1] = src[index + 1];
+          out[index + 2] = src[index + 2];
+          out[index + 3] = src[index + 3];
+          continue;
+        }
+
+        var alpha = Math.min(depth, 1.0);
+        var rd = Math.min(1.0, Math.sqrt((px * px) / (hw * hw) + (py * py) / (hh * hh)));
+        var edge = lensSmoothstep(LENS_MAG_FLAT, 1.0, rd);
+        var rimScale = 1.0 + (LENS_RIM_SCALE - 1.0) * glassAmount;
+        var mag = magnify + (rimScale - magnify) * edge;
+        if (mag < 0.2) { mag = 0.2; }
+        var abr = aberration * edge;
+        var magR = mag * (1 - abr), magB = mag * (1 + abr);
+        if (magR < 0.05) { magR = 0.05; }
+        if (magB < 0.05) { magB = 0.05; }
+        var lift = liftMax * (1 - rd * rd);
+        var refract = 1.0 + LENS_REFRACT * glassAmount * lensSmoothstep(0.70, 1.0, rd);
+        var sampleYR = hh + (py / magR) * refract + lift;
+        var sampleYG = hh + (py / mag) * refract + lift;
+        var sampleYB = hh + (py / magB) * refract + lift;
+        var sr = lensSample(src, rw, rh, hw + (px / magR) * refract, sampleYR, 0);
+        var sg = lensSample(src, rw, rh, hw + (px / mag) * refract, sampleYG, 1);
+        var sb = lensSample(src, rw, rh, hw + (px / magB) * refract, sampleYB, 2);
+        var lum = 0.2126 * sr + 0.7152 * sg + 0.0722 * sb;
+        var tint = tintStrength * lensSmoothstep(LENS_TINT_HI, LENS_TINT_LO, lum);
+        var fr = sr + (tr - sr) * tint;
+        var fg = sg + (tg - sg) * tint;
+        var fb = sb + (tb - sb) * tint;
+        var glassTint = LENS_GLASS_TINT_STR * glassAmount;
+        fr += (((LENS_GLASS_TINT >> 16) & 0xff) - fr) * glassTint;
+        fg += (((LENS_GLASS_TINT >> 8) & 0xff) - fg) * glassTint;
+        fb += ((LENS_GLASS_TINT & 0xff) - fb) * glassTint;
+        var saturationLum = 0.2126 * fr + 0.7152 * fg + 0.0722 * fb;
+        fr = saturationLum + (fr - saturationLum) * LENS_SAT_BOOST;
+        fg = saturationLum + (fg - saturationLum) * LENS_SAT_BOOST;
+        fb = saturationLum + (fb - saturationLum) * LENS_SAT_BOOST;
+        var gx = px / hw, gy = (py + 0.42 * hh) / hh;
+        var glare = LENS_GLARE * glassAmount * Math.exp(-(gx * gx * 1.15 + gy * gy * 2.6) * 2.1);
+        var rimWidth = Math.max(2.0, LENS_RIM_W * hh);
+        var rim = depth < rimWidth ? (1.0 - depth / rimWidth) * LENS_RIM : 0;
+        var bright = glare + rim;
+        if (bright > 0) {
+          fr += bright * (255 - fr);
+          fg += bright * (255 - fg);
+          fb += bright * (255 - fb);
+        }
+        var edgeShadowWidth = Math.max(2.0, 0.13 * Math.min(hw, hh));
+        if (depth < edgeShadowWidth) {
+          var edgeShadow = (1.0 - depth / edgeShadowWidth) * LENS_EDGE_SHADOW * glassAmount;
+          fr *= 1 - edgeShadow;
+          fg *= 1 - edgeShadow;
+          fb *= 1 - edgeShadow;
+        }
+        fr = fr < 0 ? 0 : (fr > 255 ? 255 : fr | 0);
+        fg = fg < 0 ? 0 : (fg > 255 ? 255 : fg | 0);
+        fb = fb < 0 ? 0 : (fb > 255 ? 255 : fb | 0);
+        out[index] = (src[index] + (fr - src[index]) * alpha) | 0;
+        out[index + 1] = (src[index + 1] + (fg - src[index + 1]) * alpha) | 0;
+        out[index + 2] = (src[index + 2] + (fb - src[index + 2]) * alpha) | 0;
+        out[index + 3] = src[index + 3];
+      }
+    }
+    ctx.putImageData(result, rx, ry);
+  }
+
   // Replay one command stream (opcodes + nums + objs) onto ``ctx``.
   function replaySurfaceCommands(ctx, ops, opCount, nums, objs) {
     var ni = 0; // num cursor
@@ -1122,44 +1300,17 @@
           break;
         }
         case SURF.LENS_SELF_REGION: {
-          // iOS-26 selection DROP: magnify this surface's own pixels in the
-          // region (content bulge), then optionally wash them toward an accent
-          // tint. drawImage(self) snapshots the source bitmap per the HTML
-          // spec. cornerRadius: 0 = rect, -1 = capsule, >0 = rounded px.
+          // iOS-26 selection DROP: run the Simulator-equivalent per-pixel lens
+          // over this surface's own pixels. cornerRadius: 0 = rect, -1 =
+          // capsule, >0 = rounded px.
           var _lx = nums[ni++], _ly = nums[ni++], _lw = nums[ni++], _lh = nums[ni++];
           var _lcr = nums[ni++], _lmag = nums[ni++];
-          var _ltint = objs[oi++];
+          var _lab = nums[ni++], _ltint = nums[ni++] | 0, _ltintStrength = nums[ni++];
           if (_lw > 0 && _lh > 0 && ctx.canvas) {
             try {
-              ctx.save();
-              ctx.beginPath();
-              if (_lcr) {
-                var _lrr = _lcr < 0 ? Math.min(_lw, _lh) / 2
-                                    : Math.min(_lcr, Math.min(_lw, _lh) / 2);
-                ctx.moveTo(_lx + _lrr, _ly);
-                ctx.arcTo(_lx + _lw, _ly, _lx + _lw, _ly + _lh, _lrr);
-                ctx.arcTo(_lx + _lw, _ly + _lh, _lx, _ly + _lh, _lrr);
-                ctx.arcTo(_lx, _ly + _lh, _lx, _ly, _lrr);
-                ctx.arcTo(_lx, _ly, _lx + _lw, _ly, _lrr);
-                ctx.closePath();
-              } else {
-                ctx.rect(_lx, _ly, _lw, _lh);
-              }
-              ctx.clip();
-              // Magnify: draw the region's own pixels scaled about its centre.
-              // Source rect = region shrunk by 1/mag around centre; dest = the
-              // full region -> the content bulges outward like the native lens.
-              var _lm = _lmag > 1 ? _lmag : 1;
-              var _lsw = _lw / _lm, _lsh = _lh / _lm;
-              var _lsx = _lx + (_lw - _lsw) / 2, _lsy = _ly + (_lh - _lsh) / 2;
-              ctx.drawImage(ctx.canvas, _lsx, _lsy, _lsw, _lsh, _lx, _ly, _lw, _lh);
-              if (_ltint) {
-                ctx.fillStyle = _ltint;
-                ctx.fillRect(_lx, _ly, _lw, _lh);
-              }
+              applyLensSelfRegion(ctx, _lx, _ly, _lw, _lh, _lcr,
+                                  _lmag, _lab, _ltint, _ltintStrength);
             } catch (_elr) {
-            } finally {
-              try { ctx.restore(); } catch (_elr2) {}
             }
           }
           break;

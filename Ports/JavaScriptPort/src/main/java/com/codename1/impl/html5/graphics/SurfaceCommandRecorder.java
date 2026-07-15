@@ -135,12 +135,10 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
     // side-channel host call would race the flush.
     public static final int OP_BLUR_SELF_REGION = 80;  // 6 nums (x, y, w, h, sigmaPx, cornerRadius)
 
-    // In-place iOS 26 selection-DROP lens: MAGNIFY the surface's own pixels in
-    // the region (content bulge) then optionally wash them toward an accent
-    // tint. The full chromatic aberration of the native Metal shader is
-    // dropped on the web; magnify + tint carries the recognisable "drop".
-    // 6 nums (x, y, w, h, cornerRadius, magnify) + 1 obj (tint css color or
-    // null when tintStrength<=0).
+    // In-place iOS 26 selection-DROP lens. The host mirrors JavaSE's per-pixel
+    // lens, including aberration and luminance-keyed tint.
+    // 9 nums: x, y, w, h, cornerRadius, magnify, aberration, tintColor,
+    // tintStrength.
     public static final int OP_LENS_SELF_REGION = 81;
 
     private int[] ops = new int[64];
@@ -296,9 +294,12 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
         op(OP_BLUR_SELF_REGION); num(x); num(y); num(w); num(h); num(sigmaPx); num(cornerRadius);
     }
 
-    /** Records an in-place selection-drop lens; see OP_LENS_SELF_REGION. tintCss null = no tint. */
-    public void lensSelfRegion(double x, double y, double w, double h, double cornerRadius, double magnify, String tintCss) {
-        op(OP_LENS_SELF_REGION); num(x); num(y); num(w); num(h); num(cornerRadius); num(magnify); obj(tintCss);
+    /** Records an in-place selection-drop lens; see OP_LENS_SELF_REGION. */
+    public void lensSelfRegion(double x, double y, double w, double h, double cornerRadius,
+            double magnify, double aberration, int tintColor, double tintStrength) {
+        op(OP_LENS_SELF_REGION);
+        num(x); num(y); num(w); num(h); num(cornerRadius); num(magnify);
+        num(aberration); num(tintColor); num(tintStrength);
     }
     @Override public String getFilter() { return "none"; }
     @Override public void clearRect(double x, double y, double width, double height) {

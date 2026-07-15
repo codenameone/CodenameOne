@@ -183,9 +183,9 @@ public class BufferedGraphics extends HTML5Graphics {
 
     @Override
     public void lensRegion(int x, int y, int width, int height, float cornerRadius, float magnify,
-            int tintColor, float tintStrength) {
+            float aberration, int tintColor, float tintStrength) {
         addOp(new com.codename1.impl.html5.graphics.LensRegion(x, y, width, height, cornerRadius,
-                magnify, tintColor, tintStrength));
+                magnify, aberration, tintColor, tintStrength));
     }
 
     @Override

@@ -6425,10 +6425,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public boolean lensRegion(Object graphics, int x, int y, int width, int height, float cornerRadius,
             float magnify, float aberration, int tintColor, float tintStrength) {
-        // The iOS-26 tab selection drop: magnify the content bulge + accent
-        // tint. Chromatic aberration (the iOS Metal shader's extra) is dropped
-        // on the web; magnify + tint carries the recognisable effect.
-        g(graphics).lensRegion(x, y, width, height, cornerRadius, magnify, tintColor, tintStrength);
+        // The host-side canvas bridge runs the same per-pixel lens as JavaSE:
+        // centre magnification, rim refraction, chromatic aberration, luminance-
+        // keyed accent tint and the subtle glass highlights/shadows. Keeping the
+        // complete parameter set here is important -- the old browser fallback
+        // reduced this to a uniform zoom plus a blue rectangle, which made every
+        // in-flight frame visibly harsher than the Simulator.
+        g(graphics).lensRegion(x, y, width, height, cornerRadius, magnify,
+                aberration, tintColor, tintStrength);
         return true;
     }
 

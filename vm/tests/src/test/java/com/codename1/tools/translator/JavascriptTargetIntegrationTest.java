@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JavascriptTargetIntegrationTest {
@@ -90,6 +91,14 @@ class JavascriptTargetIntegrationTest {
                 "Generated host page should use the JavaScript port browser shell assets");
         assertTrue(browserBridge.contains("cn1HostBridge") && browserBridge.contains("host-callback") && browserBridge.contains("host-call"),
                 "Browser bridge should expose host-call plumbing for the JavaScript port shell");
+        assertTrue(browserBridge.contains("function applyLensSelfRegion")
+                        && browserBridge.contains("ctx.getImageData(rx, ry, rw, rh)")
+                        && browserBridge.contains("LENS_GLASS_TINT_STR")
+                        && browserBridge.contains("_lab = nums[ni++]")
+                        && browserBridge.contains("_ltintStrength = nums[ni++]"),
+                "Browser bridge should ship the Simulator-equivalent per-pixel glass-tab lens");
+        assertFalse(browserBridge.contains("var _lsw = _lw / _lm"),
+                "Glass-tab lens must not regress to the coarse uniform-zoom fallback");
         assertTrue(protocolDoc.contains("Version: 1")
                         && protocolDoc.contains("host-call")
                         && protocolDoc.contains("host-callback")
