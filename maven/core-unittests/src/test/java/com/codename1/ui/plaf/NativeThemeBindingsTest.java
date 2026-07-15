@@ -87,6 +87,8 @@ public class NativeThemeBindingsTest extends UITestBase {
         assertEquals("DialogCenteredTitle", theme.get("@dlgCenteredTitleUIID"));
         assertEquals("c6c6c8", theme.get("@dlgInvisibleButtons"));
         assertEquals("38383a", theme.get("@dlgInvisibleButtonsDark"));
+        assertFalse(theme.containsKey("@dialogTitleCenterBool"),
+                "The native iOS theme must not opt existing dialogs into the centered layout");
 
         UIManager.getInstance().setThemeProps(theme);
 
