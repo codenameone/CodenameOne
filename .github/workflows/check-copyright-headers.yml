@@ -1,0 +1,40 @@
+name: Check copyright headers
+
+# New source files must use Codename One's complete GPLv2 + Classpath
+# Exception header. Existing older source may retain Oracle's complete form.
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+jobs:
+  check-copyright-headers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate added and modified source headers
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base_sha="$PR_BASE_SHA"
+          elif [[ -n "$PUSH_BASE_SHA" && "$PUSH_BASE_SHA" != "0000000000000000000000000000000000000000" ]]; then
+            base_sha="$PUSH_BASE_SHA"
+          else
+            base_sha="$(git rev-parse HEAD^)"
+          fi
+          scripts/check-copyright-headers.sh --base "$base_sha" --head "$GITHUB_SHA"

@@ -1,5 +1,9 @@
-<!-- Licensed under the PolyForm Noncommercial License 1.0.0 -->
+JavaScriptPort is licensed with the rest of Codename One under GPLv2 with the
+Classpath Exception. It is not a separate proprietary or noncommercial license
+boundary.
 
-This subtree is intentionally licensed separately from the parent Codename One repository.
-
-Files in `Ports/JavaScriptPort/**` are licensed under PolyForm Noncommercial 1.0.0 and must not inherit the parent repository's standard source-file license headers.
+The web runtime includes narrowly identified third-party assets. Their
+copyright and license notices remain in those files, and the source files that
+must retain upstream headers are listed individually in
+`scripts/copyright-header-exclusions.txt`. The list intentionally contains no
+directory or wildcard exclusions.
