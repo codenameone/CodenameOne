@@ -23,17 +23,20 @@
  */
 package com.codename1.ui.editor;
 
+import com.codename1.ui.html.HTMLParser;
+import com.codename1.xml.Element;
+
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /// Parses an HTML string into the pure rich text editor model (plain text plus per character
-/// `TextStyle` and per paragraph `RichBlocks.BlockAttr`). It uses a small, tolerant streaming HTML
-/// tokenizer (rather than the framework's `HTMLParser`, which is coupled to an `HTMLComponent`) and maps
-/// the common inline and block tags onto the editor model. It handles the HTML that `HtmlSerializer`
-/// emits plus common external markup (headings, paragraphs, lists, bold / italic / underline / strike,
-/// colored spans and links).
+/// `TextStyle` and per paragraph `RichBlocks.BlockAttr`). Parsing and entity decoding are delegated to
+/// the framework's tolerant `HTMLParser`/`XMLParser` implementation; this class only maps the resulting
+/// DOM onto the editor model. It handles the HTML that `HtmlSerializer` emits plus common external
+/// markup (headings, paragraphs, lists, bold / italic / underline / strike, colored spans and links).
 public final class HtmlImporter {
     /// The imported content.
     public static final class Result {
@@ -107,7 +110,7 @@ public final class HtmlImporter {
     /// Parses HTML into an editor model result.
     public static Result parse(String html) {
         HtmlImporter imp = new HtmlImporter();
-        imp.tokenize(html == null ? "" : html);
+        imp.parseFragment(html == null ? "" : html);
         if (imp.paras.isEmpty()) {
             imp.paras.add(new RichBlocks.BlockAttr());
         }
@@ -115,108 +118,43 @@ public final class HtmlImporter {
                 imp.blockContent);
     }
 
-    // ---- streaming tokenizer ----
+    // ---- framework HTML parser bridge ----
 
-    private void tokenize(String html) {
-        int i = 0;
-        int n = html.length();
-        while (i < n) {
-            char c = html.charAt(i);
-            if (c == '<') {
-                if (html.regionMatches(i, "<!--", 0, 4)) {
-                    int end = html.indexOf("-->", i + 4);
-                    i = end < 0 ? n : end + 3;
-                    continue;
-                }
-                int gt = html.indexOf('>', i);
-                if (gt < 0) {
-                    appendText(html.substring(i));
-                    break;
-                }
-                String tagBody = html.substring(i + 1, gt);
-                i = gt + 1;
-                if (tagBody.length() == 0) {
-                    continue;
-                }
-                if (tagBody.charAt(0) == '/') {
-                    endTag(tagBody.substring(1).trim().toLowerCase());
-                } else {
-                    boolean selfClose = tagBody.endsWith("/");
-                    if (selfClose) {
-                        tagBody = tagBody.substring(0, tagBody.length() - 1);
-                    }
-                    parseStartTag(tagBody);
-                }
-            } else {
-                int lt = html.indexOf('<', i);
-                if (lt < 0) {
-                    lt = n;
-                }
-                appendText(decodeEntities(html.substring(i, lt)));
-                i = lt;
-            }
+    private void parseFragment(String html) {
+        HTMLParser parser = new HTMLParser(true);
+        Element root = parser.parse(new StringReader("<div>" + html + "</div>"));
+        if (root == null) {
+            return;
+        }
+        for (int i = 0; i < root.getNumChildren(); i++) {
+            walk(root.getChildAt(i));
         }
     }
 
-    private void parseStartTag(String tagBody) {
-        int sp = 0;
-        while (sp < tagBody.length() && !isSpace(tagBody.charAt(sp))) {
-            sp++;
+    private void walk(Element element) {
+        if (element.isTextElement()) {
+            appendText(element.getText());
+            return;
         }
-        String name = tagBody.substring(0, sp).toLowerCase();
-        Map<String, String> attrs = parseAttrs(tagBody.substring(sp));
-        startTag(name, attrs);
+        String name = element.getTagName().toLowerCase();
+        if ("head".equals(name) || "style".equals(name) || "script".equals(name)) {
+            return;
+        }
+        startTag(name, attributes(element));
+        for (int i = 0; i < element.getNumChildren(); i++) {
+            walk(element.getChildAt(i));
+        }
+        endTag(name);
     }
 
-    private static boolean isSpace(char c) {
-        return c == ' ' || c == '\t' || c == '\n' || c == '\r';
-    }
-
-    private Map<String, String> parseAttrs(String s) {
+    private static Map<String, String> attributes(Element element) {
         Map<String, String> attrs = new HashMap<String, String>();
-        int i = 0;
-        int n = s.length();
-        while (i < n) {
-            while (i < n && isSpace(s.charAt(i))) {
-                i++;
+        String[] names = {"style", "align", "href", "src", "color", "size", "data-indent"};
+        for (int i = 0; i < names.length; i++) {
+            String value = element.getAttribute(names[i]);
+            if (value != null) {
+                attrs.put(names[i], value);
             }
-            int start = i;
-            while (i < n && s.charAt(i) != '=' && !isSpace(s.charAt(i))) {
-                i++;
-            }
-            if (i == start) {
-                break;
-            }
-            String key = s.substring(start, i).toLowerCase();
-            while (i < n && isSpace(s.charAt(i))) {
-                i++;
-            }
-            String value = "";
-            if (i < n && s.charAt(i) == '=') {
-                i++;
-                while (i < n && isSpace(s.charAt(i))) {
-                    i++;
-                }
-                if (i < n && (s.charAt(i) == '"' || s.charAt(i) == '\'')) {
-                    char q = s.charAt(i);
-                    i++;
-                    int vs = i;
-                    while (i < n && s.charAt(i) != q) {
-                        i++;
-                    }
-                    value = s.substring(vs, i);
-                    if (i < n) {
-                        i++;
-                    }
-                } else {
-                    int vs = i;
-                    while (i < n && !isSpace(s.charAt(i))) {
-                        i++;
-                    }
-                    value = s.substring(vs, i);
-                }
-            }
-            attrs.put(key, decodeEntities(value));
         }
         return attrs;
     }
@@ -463,87 +401,6 @@ public final class HtmlImporter {
         imageSources.add(source == null ? "" : source);
         lastWasSpace = false;
         freshParagraph = false;
-    }
-
-    // ---- entities ----
-
-    private static String decodeEntities(String s) {
-        if (s.indexOf('&') < 0) {
-            return s;
-        }
-        StringBuilder sb = new StringBuilder(s.length());
-        int i = 0;
-        int n = s.length();
-        while (i < n) {
-            char c = s.charAt(i);
-            if (c == '&') {
-                int semi = s.indexOf(';', i);
-                if (semi > i && semi - i <= 10) {
-                    String ent = s.substring(i + 1, semi);
-                    String rep = entity(ent);
-                    if (rep != null) {
-                        sb.append(rep);
-                        i = semi + 1;
-                        continue;
-                    }
-                }
-            }
-            sb.append(c);
-            i++;
-        }
-        return sb.toString();
-    }
-
-    // Common named HTML entities (typography and symbols) as name/replacement pairs. Values use unicode
-    // escapes to keep the source ASCII only.
-    private static final String[] NAMED_ENTITIES = {
-        "mdash", "\u2014", "ndash", "\u2013", "hellip", "\u2026",
-        "lsquo", "\u2018", "rsquo", "\u2019", "ldquo", "\u201C", "rdquo", "\u201D",
-        "laquo", "\u00AB", "raquo", "\u00BB", "bull", "\u2022", "middot", "\u00B7",
-        "copy", "\u00A9", "reg", "\u00AE", "trade", "\u2122",
-        "deg", "\u00B0", "plusmn", "\u00B1", "times", "\u00D7", "divide", "\u00F7",
-        "euro", "\u20AC", "pound", "\u00A3", "cent", "\u00A2", "yen", "\u00A5",
-        "sect", "\u00A7", "para", "\u00B6"
-    };
-
-    private static String entity(String ent) {
-        if ("amp".equals(ent)) {
-            return "&";
-        }
-        if ("lt".equals(ent)) {
-            return "<";
-        }
-        if ("gt".equals(ent)) {
-            return ">";
-        }
-        if ("quot".equals(ent)) {
-            return "\"";
-        }
-        if ("apos".equals(ent)) {
-            return "'";
-        }
-        if ("nbsp".equals(ent)) {
-            return " ";
-        }
-        for (int k = 0; k < NAMED_ENTITIES.length; k += 2) {
-            if (NAMED_ENTITIES[k].equals(ent)) {
-                return NAMED_ENTITIES[k + 1];
-            }
-        }
-        if (ent.length() > 1 && ent.charAt(0) == '#') {
-            try {
-                int code;
-                if (ent.charAt(1) == 'x' || ent.charAt(1) == 'X') {
-                    code = Integer.parseInt(ent.substring(2), 16);
-                } else {
-                    code = Integer.parseInt(ent.substring(1));
-                }
-                return String.valueOf((char) code);
-            } catch (NumberFormatException err) {
-                return null;
-            }
-        }
-        return null;
     }
 
     // ---- css helpers ----

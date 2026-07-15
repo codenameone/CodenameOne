@@ -25,6 +25,7 @@ package com.codename1.ui;
 
 import com.codename1.ui.editor.PureEditor;
 import com.codename1.ui.editor.RichPureEditor;
+import com.codename1.ui.editor.RichTextImporter;
 import com.codename1.util.SuccessCallback;
 
 /// A native visual editor for rich text / HTML content (a WYSIWYG editor).
@@ -95,6 +96,26 @@ public class RichTextArea extends AbstractEditorComponent {
         command("setHtml", html == null ? "" : html);
     }
 
+    /// Replaces the editor content from any supported rich-text interchange format.
+    public void setContent(String content, RichTextFormat format) {
+        setHtml(RichTextImporter.toHtml(content, format));
+    }
+
+    /// Replaces the editor content with RTF.
+    public void setRtf(String rtf) {
+        setContent(rtf, RichTextFormat.RTF);
+    }
+
+    /// Replaces the editor content with Markdown.
+    public void setMarkdown(String markdown) {
+        setContent(markdown, RichTextFormat.MARKDOWN);
+    }
+
+    /// Replaces the editor content with AsciiDoc.
+    public void setAsciiDoc(String asciidoc) {
+        setContent(asciidoc, RichTextFormat.ASCIIDOC);
+    }
+
     /// Retrieves the current editor content as an HTML string. The callback is invoked on the EDT.
     ///
     /// #### Parameters
@@ -121,6 +142,26 @@ public class RichTextArea extends AbstractEditorComponent {
     /// - `html`: the HTML fragment to insert
     public void insertHtml(String html) {
         command("insertHtml", html);
+    }
+
+    /// Inserts content in any supported rich-text interchange format at the current selection.
+    public void insertContent(String content, RichTextFormat format) {
+        insertHtml(RichTextImporter.toHtml(content, format));
+    }
+
+    /// Inserts RTF at the current selection.
+    public void insertRtf(String rtf) {
+        insertContent(rtf, RichTextFormat.RTF);
+    }
+
+    /// Inserts Markdown at the current selection.
+    public void insertMarkdown(String markdown) {
+        insertContent(markdown, RichTextFormat.MARKDOWN);
+    }
+
+    /// Inserts AsciiDoc at the current selection.
+    public void insertAsciiDoc(String asciidoc) {
+        insertContent(asciidoc, RichTextFormat.ASCIIDOC);
     }
 
     /// Inserts an image at the current cursor position.

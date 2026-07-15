@@ -7853,6 +7853,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     public Object getPasteDataFromClipboard() {
         String s = nativeInstance.getClipboardString();
         if(s != null) {
+            Object lightweight = super.getPasteDataFromClipboard();
+            if(lightweight instanceof com.codename1.ui.RichTextClipboardData
+                    && s.equals(((com.codename1.ui.RichTextClipboardData)lightweight).getPlainText())) {
+                return lightweight;
+            }
             return s;
         }
         return super.getPasteDataFromClipboard();
@@ -7860,6 +7865,11 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void copyToClipboard(Object obj) {
+        if(obj instanceof com.codename1.ui.RichTextClipboardData) {
+            nativeInstance.setClipboardString(((com.codename1.ui.RichTextClipboardData)obj).getPlainText());
+            super.copyToClipboard(obj);
+            return;
+        }
         if(obj instanceof String) {
             nativeInstance.setClipboardString((String)obj);
             super.copyToClipboard(obj);

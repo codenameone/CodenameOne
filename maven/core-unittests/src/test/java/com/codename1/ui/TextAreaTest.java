@@ -127,6 +127,52 @@ class TextAreaTest extends UITestBase {
     }
 
     @FormTest
+    void testLightweightEditingIsOptInAndUsesTextInputClient() {
+        TextField field = new TextField("ab");
+        field.setMaxSize(5);
+        assertFalse(field.isLightweightEditingEnabled());
+        field.setLightweightEditingEnabled(true);
+        assertTrue(field.isLightweightEditingEnabled());
+
+        Form form = new Form(BoxLayout.y());
+        form.add(field);
+        form.show();
+        flushSerialCalls();
+        field.startEditing();
+        flushSerialCalls();
+
+        assertTrue(field.isEditing());
+        assertTrue(form.getFocused() instanceof TextInputClient);
+        TextInputClient input = (TextInputClient) form.getFocused();
+        assertFalse(input.getConfig().isMultiline());
+        input.commitText("\ncdXYZ");
+        assertEquals("ab cd", field.getText(), "single-line and max-size filtering should happen in the editor engine");
+
+        field.stopEditing();
+        assertFalse(field.isEditing());
+        assertEquals("ab cd", field.getText());
+    }
+
+    @FormTest
+    void testLightweightTextAreaAcceptsMultilineImeInput() {
+        TextArea area = new TextArea("one", 3, 20);
+        area.setMaxSize(20);
+        area.setLightweightEditingEnabled(true);
+        Form form = new Form(BoxLayout.y());
+        form.add(area);
+        form.show();
+        flushSerialCalls();
+
+        area.startEditing();
+        flushSerialCalls();
+        TextInputClient input = (TextInputClient) form.getFocused();
+        assertTrue(input.getConfig().isMultiline());
+        input.commitText("\ntwo");
+        assertEquals("one\ntwo", area.getText());
+        area.stopEditing();
+    }
+
+    @FormTest
     void testGrowByContent() {
         TextArea textArea = new TextArea();
 

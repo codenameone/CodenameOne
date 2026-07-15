@@ -65,4 +65,10 @@ class HtmlImporterTest {
         // an unknown entity is passed through verbatim rather than dropped
         assertTrue(text("<p>a &bogus; b</p>").contains("&bogus;"));
     }
+
+    @Test
+    void retainsModernDataAttributesInFragmentMode() {
+        HtmlImporter.Result result = HtmlImporter.parse("<p data-indent=\"3\">indented</p>");
+        assertEquals(3, result.getBlocks().get(0).indent);
+    }
 }

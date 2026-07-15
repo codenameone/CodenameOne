@@ -30,6 +30,7 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.TextInputClient;
 import com.codename1.ui.TextInputConfig;
 import com.codename1.ui.TextInputState;
+import com.codename1.ui.RichTextClipboardData;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.WheelEvent;
@@ -998,7 +999,7 @@ public class EditorView extends Component implements TextInputClient {
 
     // ---- clipboard ----
 
-    private void copySelection() {
+    protected void copySelection() {
         if (hasSelection()) {
             Display.getInstance().copyToClipboard(doc.substring(getSelectionStart(), getSelectionEnd()));
         }
@@ -1016,6 +1017,15 @@ public class EditorView extends Component implements TextInputClient {
             return;
         }
         Object data = Display.getInstance().getPasteDataFromClipboard();
+        pasteClipboardData(data);
+    }
+
+    /// Inserts clipboard data. Rich editor subclasses may override this to preserve formatting.
+    protected void pasteClipboardData(Object data) {
+        if (data instanceof RichTextClipboardData) {
+            insertText(((RichTextClipboardData) data).getPlainText());
+            return;
+        }
         if (data instanceof String) {
             insertText((String) data);
         }

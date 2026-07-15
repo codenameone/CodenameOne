@@ -75,6 +75,7 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
+import com.codename1.ui.RichTextClipboardData;
 import com.codename1.ui.Sheet;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.TextArea;
@@ -1475,8 +1476,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     }
 
                     @Override
-                    public void copyHtmlText(String html) {
-                        HTML5Implementation.super.copyToClipboard(html);
+                    public void copyRichText(String plainText, String html) {
+                        HTML5Implementation.super.copyToClipboard(
+                                new RichTextClipboardData(plainText).setHtml(html));
                     }
 
                     @Override

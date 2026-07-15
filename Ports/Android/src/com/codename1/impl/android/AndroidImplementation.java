@@ -76,6 +76,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Font;
 import com.codename1.ui.Image;
 import com.codename1.ui.PeerComponent;
+import com.codename1.ui.RichTextClipboardData;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.VirtualKeyboardInterface;
@@ -8696,6 +8697,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public void copyToClipboard(final Object obj) {
+        super.copyToClipboard(obj);
         if (getActivity() == null) {
             return;
         }
@@ -8708,7 +8710,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     clipboard.setText(obj.toString());
                 } else {
                     android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
-                    android.content.ClipData clip = ClipData.newPlainText("Codename One", obj.toString());
+                    android.content.ClipData clip;
+                    if (sdk >= 16 && obj instanceof RichTextClipboardData
+                            && ((RichTextClipboardData) obj).getHtml() != null) {
+                        RichTextClipboardData rich = (RichTextClipboardData) obj;
+                        clip = ClipData.newHtmlText("Codename One", rich.getPlainText(), rich.getHtml());
+                    } else {
+                        clip = ClipData.newPlainText("Codename One", obj.toString());
+                    }
                     clipboard.setPrimaryClip(clip);
                 }
             }
@@ -8732,8 +8741,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     response[0] = clipboard.getText().toString();
                 } else {
                     android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
-                    ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
-                    response[0] = item.getText();
+                    ClipData clip = clipboard.getPrimaryClip();
+                    if (clip == null || clip.getItemCount() == 0) {
+                        return;
+                    }
+                    ClipData.Item item = clip.getItemAt(0);
+                    String html = sdk >= 16 ? item.getHtmlText() : null;
+                    CharSequence plain = item.coerceToText(getContext());
+                    if (html != null && html.length() > 0) {
+                        response[0] = new RichTextClipboardData(
+                                plain == null ? "" : plain.toString()).setHtml(html);
+                    } else {
+                        response[0] = plain == null ? null : plain.toString();
+                    }
                 }
             }
         });

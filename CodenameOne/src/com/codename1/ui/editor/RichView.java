@@ -26,6 +26,9 @@ package com.codename1.ui.editor;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.ui.Display;
+import com.codename1.ui.RichTextClipboardData;
+import com.codename1.ui.RichTextFormat;
 import com.codename1.ui.plaf.Style;
 
 import java.util.ArrayList;
@@ -156,6 +159,60 @@ public class RichView extends EditorView {
         getUndoManager().breakRun();
         invalidateLayout();
         repaint();
+    }
+
+    @Override
+    protected void pasteClipboardData(Object data) {
+        RichTextFormat format = null;
+        String content = null;
+        if (data instanceof RichTextClipboardData) {
+            RichTextClipboardData richData = (RichTextClipboardData) data;
+            format = richData.getPreferredFormat();
+            content = richData.getContent(format);
+        } else if (data instanceof String && ((String) data).trim().startsWith("{\\rtf")) {
+            format = RichTextFormat.RTF;
+            content = (String) data;
+        }
+        if (format == null || format == RichTextFormat.PLAIN_TEXT) {
+            super.pasteClipboardData(data);
+            return;
+        }
+        HtmlImporter.Result imported = HtmlImporter.parse(RichTextImporter.toHtml(content, format));
+        insertContent(imported.getText(), imported.getStyles(), imported.getBlocks(), imported.getLinks(),
+                RichPureEditor.loadImages(imported.getImageSources()), imported.getImageSources(),
+                imported.hasBlockContent());
+    }
+
+    @Override
+    protected void copySelection() {
+        if (!hasSelection()) {
+            return;
+        }
+        int start = getSelectionStart();
+        int end = getSelectionEnd();
+        String plain = getDocument().substring(start, end);
+        EditorDocument fragment = new EditorDocument();
+        fragment.setText(plain);
+        InlineStyles fragmentStyles = new InlineStyles(fragment.length());
+        List<String> fragmentLinks = new ArrayList<String>(fragment.length());
+        List<String> fragmentSources = new ArrayList<String>(fragment.length());
+        for (int i = 0; i < fragment.length(); i++) {
+            fragmentStyles.setAt(i, inline.styleAt(start + i));
+            fragmentLinks.add(valueAt(linkRuns, start + i));
+            fragmentSources.add(valueAt(imageSources, start + i));
+        }
+        RichBlocks fragmentBlocks = new RichBlocks(fragment.getLineCount());
+        int firstLine = getDocument().lineOfOffset(start);
+        for (int i = 0; i < fragmentBlocks.count(); i++) {
+            copyBlock(fragmentBlocks.get(i), blocks.get(firstLine + i));
+        }
+        String html = HtmlSerializer.serialize(fragment, fragmentStyles, fragmentBlocks,
+                fragmentLinks, fragmentSources);
+        Display.getInstance().copyToClipboard(new RichTextClipboardData(plain).setHtml(html));
+    }
+
+    private static String valueAt(List<String> values, int index) {
+        return index >= 0 && index < values.size() ? values.get(index) : null;
     }
 
     private static void copyBlock(RichBlocks.BlockAttr destination, RichBlocks.BlockAttr source) {

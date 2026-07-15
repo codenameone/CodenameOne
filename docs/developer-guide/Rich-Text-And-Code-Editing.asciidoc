@@ -37,6 +37,26 @@ after construction are queued. Use `onReady(Runnable)` or a ready listener when 
 the backend exists. Reads use callbacks (`getHtml(...)`, `getText(...)`, and
 `getCursorPosition(...)`) so the same application code works with every backend.
 
+==== The editor package
+
+The `com.codename1.ui.editor` package separates editing mechanics from feature-specific rendering.
+`EditorDocument` owns normalized UTF-16 text and line offsets. `EditorView` owns the caret, selection,
+composition range, scrolling, hit testing, clipboard commands, and undo transactions. `CodeView` and
+`RichView` extend that surface instead of creating independent input implementations.
+
+The code layer adds incremental tokenization, palettes, completion, diagnostics, indentation, and the
+line-number gutter. The rich layer keeps `InlineStyles`, `RichBlocks`, hyperlink targets, and image
+runs parallel to the text. Every mutation, including undo and redo, updates those parallel models in
+the same transaction. `HtmlImporter` and `HtmlSerializer` are model adapters; they don't implement a
+second HTML tokenizer. Fragment parsing and entity decoding go through the framework's tolerant
+`HTMLParser`, which extends `XMLParser`. The parser's fragment mode retains modern attributes such as
+`data-*` while the legacy `HTMLComponent` path keeps its existing validation behavior.
+
+`EditorHost` is the narrow bridge between a view and its owner. It starts and stops platform text
+input, pushes updated editing state to the port, and reports semantic editor events. This split lets
+the same document and interaction engine run inside the full editors and the optional lightweight
+mode of standard text components.
+
 === Focus, change events, and editability
 
 `focusEditor()` moves focus into the editing surface and opens the virtual keyboard when appropriate.
@@ -80,6 +100,29 @@ NOTE: `TextInputClient`, `TextInputConfig`, and `TextInputState` are general por
 lightweight editing components can implement the same protocol, but ordinary applications normally use
 `RichTextArea` or `CodeEditor` and don't bind an input client directly.
 
+=== Optional lightweight TextArea and TextField editing
+
+`TextArea` and `TextField` normally keep their established native editing behavior. Applications that
+want Codename One to retain control of painting, selection, scrolling, focus, and clipboard handling
+can opt individual components into the shared lightweight engine. The option is off by default and is
+inherited by `TextField` from `TextArea`.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/RichTextAndCodeEditingJavaSnippet.java[tag=rich-text-and-code-editing-java-lightweight-fields,indent=0]
+----
+
+While editing, the framework places an `EditorView` over the text component in the form's layered
+pane. Changes still flow through the original component's text, data-change listeners, max-size rule,
+constraint, capitalization settings, multiline setting, and action events. The overlay is removed
+when editing ends, so the `TextArea` or `TextField` remains the application-facing component.
+
+The mode requires a port implementation of the low-level text-input contract. A port that doesn't
+provide it falls back to the existing native editor rather than presenting a read-only canvas.
+Password fields also retain native editing so the platform can provide its protected text-entry
+behavior. This makes the feature safe to enable selectively while ports and applications migrate away
+from heavyweight native text overlays.
+
 === Selection, bidirectional text, and scrolling
 
 On touch devices, a tap places the caret, a long press selects a word, and draggable handles adjust the
@@ -118,6 +161,30 @@ Fragment insertion retains its formatting and block structure. `createLink(url)`
 the model, and `removeLink()` removes it. `insertImage(url)` accepts normal URLs, data URIs, and supported
 application resources; the source is retained so `getHtml(...)` can emit an `img` element when the
 document is saved and reloaded.
+
+==== HTML, RTF, Markdown, and AsciiDoc
+
+`setContent(...)` and `insertContent(...)` accept a `RichTextFormat`. HTML is parsed directly;
+Markdown and AsciiDoc headings, emphasis, links, images, lists, quotes, and literal blocks are mapped
+to the same rich model. The RTF importer handles paragraph breaks, Unicode escapes, bold, italic,
+underline, strike-through, and skips metadata destinations such as font and color tables.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/RichTextAndCodeEditingJavaSnippet.java[tag=rich-text-and-code-editing-java-formats,indent=0]
+----
+
+Rich paste uses `RichTextClipboardData`, which always carries a plain-text fallback and can also carry
+HTML, RTF, Markdown, or AsciiDoc. `RichTextArea` chooses the richest available representation; plain
+`EditorView` consumers use the fallback. Copying a rich selection publishes both canonical HTML and
+plain text. Android, Java SE, and the JavaScript port read the rich MIME types exposed by their native
+clipboards, while ports with text-only clipboard APIs preserve rich data for in-application
+round-trips and publish the plain representation to other applications.
+
+RTF is also recognized when a clipboard provider returns it as a string beginning with an RTF header.
+Format import is intentionally a practical interchange subset, not a layout-compatible word
+processor: unsupported RTF destinations and advanced Markdown or AsciiDoc extensions degrade to the
+supported text and structure rather than controlling document layout.
 
 TIP: Treat imported HTML as document data, not as a browser page. The pure importer doesn't execute
 scripts. Keep image URLs and link destinations subject to the same trust and validation rules used by

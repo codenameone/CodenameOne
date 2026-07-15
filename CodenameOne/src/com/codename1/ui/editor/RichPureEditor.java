@@ -179,7 +179,7 @@ public class RichPureEditor extends PureEditor {
         }
     }
 
-    private static com.codename1.ui.Image loadImage(String url) {
+    static com.codename1.ui.Image loadImage(String url) {
         if (url == null || url.length() == 0) {
             return null;
         }
@@ -211,7 +211,7 @@ public class RichPureEditor extends PureEditor {
         }
     }
 
-    private static List<com.codename1.ui.Image> loadImages(List<String> sources) {
+    static List<com.codename1.ui.Image> loadImages(List<String> sources) {
         List<com.codename1.ui.Image> out = new ArrayList<com.codename1.ui.Image>(sources.size());
         for (String source : sources) {
             out.add(source == null || source.length() == 0 ? null : loadImage(source));

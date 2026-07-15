@@ -847,6 +847,14 @@ class JavaScriptRuntimeFacadeTest {
         assertTrue(calls.contains("firePasteEvent"));
 
         calls.clear();
+        handled = coordinatorClass.getMethod("handlePaste", pasteHooksClass, String.class, String.class, String[].class)
+                .invoke(null, pasteHooks, "plain", "<b>rich</b>", null);
+        assertEquals(Boolean.TRUE, handled);
+        assertTrue(calls.contains("copyRichText"));
+        assertFalse(calls.contains("copyPlainText"));
+        assertTrue(calls.contains("firePasteEvent"));
+
+        calls.clear();
         Object backside = java.lang.reflect.Proxy.newProxyInstance(loader, new Class[]{backsideHooksClass}, (proxy, method, args) -> {
             calls.add(method.getName());
             return null;
