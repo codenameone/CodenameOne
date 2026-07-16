@@ -1,6 +1,7 @@
 name: Nightly platform and browser evidence
 
 on:
+  workflow_call:
   schedule:
     - cron: '35 2 * * *'
   workflow_dispatch:

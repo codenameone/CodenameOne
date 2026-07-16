@@ -5,6 +5,12 @@ on:
   # diff limit, so pull_request triggers stopped firing -- dispatch with
   #   gh workflow run <file> --ref <branch>
   workflow_dispatch:
+    inputs:
+      port_status_browser_evidence:
+        description: Run only the Port Status browser evidence matrix
+        required: false
+        default: false
+        type: boolean
   schedule:
     - cron: '35 1 * * *'
   pull_request:
@@ -61,6 +67,7 @@ concurrency:
 
 jobs:
   javascript-screenshots:
+    if: ${{ !inputs.port_status_browser_evidence }}
     permissions:
       contents: read
       pull-requests: write
@@ -237,3 +244,10 @@ jobs:
           path: artifacts/javascript-ui-tests
           if-no-files-found: warn
           retention-days: 14
+
+  port-status-browser-evidence:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.port_status_browser_evidence }}
+    permissions:
+      actions: write
+      contents: write
+    uses: ./.github/workflows/port-status-nightly.yml
