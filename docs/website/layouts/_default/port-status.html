@@ -1,6 +1,7 @@
 {{- define "main" -}}
 {{- $contract := site.Data.port_status -}}
 {{- $reports := site.Data.port_status_reports -}}
+{{- $supplement := site.Data.port_status_supplement -}}
 {{- $snapshotTime := now.UTC -}}
 <article class="post-single cn1-port-status" data-port-status>
   <header class="post-header cn1-port-status__header">
@@ -8,7 +9,7 @@
     <p class="cn1-port-status__eyebrow">Automated compliance report</p>
     <h1 class="post-title entry-hint-parent">{{ .Title }}</h1>
     <p class="cn1-port-status__intro">
-      Every row is backed by one or more tests in the Codename One compliance test suite.
+      Every row in the automated matrix is backed by one or more tests in the Codename One compliance test suite.
       A check means every mapped test is successful in the latest available master report for that port.
     </p>
     <div class="cn1-port-status__facts" aria-label="Compliance contract size">
@@ -17,6 +18,7 @@
       {{- range $contract.features -}}{{- $testCount = add $testCount (len .tests) -}}{{- end -}}
       <span><strong>{{ $testCount }}</strong> tests</span>
       <span><strong>{{ len $contract.ports }}</strong> port targets</span>
+      <span><strong>{{ len $supplement.features }}</strong> environment-dependent feature families</span>
     </div>
   </header>
 
@@ -92,6 +94,89 @@
     </table>
   </section>
 
+  <section class="cn1-port-status__errata" data-skip-errata aria-labelledby="skip-errata-title">
+    <h2 id="skip-errata-title">Skipped-test errata</h2>
+    <p>
+      A skip describes a limitation of the unattended test environment, not an unsupported Codename One port.
+      Every skipped result in the table is accounted for below.
+    </p>
+    <div class="cn1-port-status__errata-list">
+      {{- range $supplement.skip_reasons }}
+      {{- $erratum := . -}}
+      {{- $skippedPortNames := slice -}}
+      {{- range $contract.ports -}}
+        {{- $port := . -}}
+        {{- $report := index $reports .id -}}
+        {{- with $report -}}
+          {{- $result := index .tests $erratum.test -}}
+          {{- with $result -}}
+            {{- if eq .status "skip" -}}{{- $skippedPortNames = $skippedPortNames | append $port.name -}}{{- end -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+      {{- if gt (len $skippedPortNames) 0 }}
+      <article data-skip-erratum="{{ .test }}">
+        <h3><code>{{ .test }}</code></h3>
+        <p><strong>Skipped on:</strong> {{ delimit $skippedPortNames ", " }}.</p>
+        <p><strong>Why:</strong> {{ .reason }}</p>
+        <p><strong>Port support:</strong> {{ .platform_support }}</p>
+        <p><strong>How it is tested:</strong> {{ .verification }}</p>
+      </article>
+      {{- end }}
+      {{- end }}
+    </div>
+  </section>
+
+  <section class="cn1-port-status__manual" data-manual-coverage aria-labelledby="manual-coverage-title">
+    <header>
+      <p class="cn1-port-status__eyebrow">Environment-dependent coverage</p>
+      <h2 id="manual-coverage-title">Features verified outside the deterministic suite</h2>
+      <p>
+        These are the remaining platform-integration feature families whose decisive behavior depends on hardware,
+        permission UI, signing, store or provider accounts, external services, or an operating-system process.
+        Each row states how support is delivered, how it is verified, and why it cannot honestly be counted as a
+        deterministic result in the automated table above. An unavailable cell applies only to that integration;
+        it does not mean the Codename One port itself is unsupported.
+      </p>
+    </header>
+    <div class="cn1-port-status__legend" aria-label="Environment-dependent support legend">
+      <span><i class="cn1-port-status__mark is-supported" aria-hidden="true">✓</i> Supported backend</span>
+      <span><i class="cn1-port-status__mark is-conditional" aria-hidden="true">◐</i> Hardware, account, or configuration dependent</span>
+      <span><i class="cn1-port-status__mark is-fallback" aria-hidden="true">↪</i> Portable fallback</span>
+      <span><i class="cn1-port-status__mark is-unavailable" aria-hidden="true">—</i> No declared backend</span>
+    </div>
+    <div class="cn1-port-status__matrix cn1-port-status__matrix--manual" aria-label="Environment-dependent feature support matrix">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Feature and testing logic</th>
+            {{- range $contract.ports }}<th scope="col"><span>{{ .name }}</span></th>{{- end }}
+          </tr>
+        </thead>
+        <tbody>
+          {{- range $supplement.features }}
+          {{- $feature := . -}}
+          <tr data-manual-feature-row data-manual-feature-id="{{ .id }}">
+            <th scope="row">
+              <span class="cn1-port-status__category">{{ .category }}</span>
+              <strong>{{ .name }}</strong>
+              <p>{{ .description }}</p>
+              <details>
+                <summary>Testing logic and exclusion</summary>
+                <p><b>Verification:</b> {{ .testing }}</p>
+                <p><b>Why it is outside the suite:</b> {{ .why_not_automated }}</p>
+              </details>
+            </th>
+            {{- range $contract.ports -}}
+              {{- partial "port-status-manual-status.html" (dict "feature" $feature "port" .) -}}
+            {{- end -}}
+          </tr>
+          {{- end }}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <footer class="cn1-port-status__method">
     <h2>How to read this page</h2>
     <p>
@@ -99,6 +184,9 @@
     </p>
     <p>
       The browser makes no runtime report request. A website build uses the last stored result for ports that did not run, and the timestamp above identifies when this static table was assembled. A platform-specific skip is not a pass. An incomplete report is not a pass. Reports older than {{ $contract.stale_after_days }} days are marked stale.
+    </p>
+    <p>
+      The second matrix is a support inventory, not a synthetic pass/fail score. It records native backends, conditional integrations, portable fallbacks, and unavailable backends together with the verification method that is appropriate for each feature.
     </p>
     <p>
       <a href="https://github.com/codenameone/CodenameOne/blob/master/docs/website/data/port_status.json" target="_blank" rel="noopener">Compliance feature contract</a>

@@ -9,6 +9,7 @@ on:
       - Test JavaScript screenshot scripts
       - Linux native build + run (GTK3, x64 + arm64)
       - Windows cross-build + run (Linux build -> Windows run)
+      - ParparVM Java Tests (Windows)
     types: [completed]
 
 permissions:

@@ -57,6 +57,7 @@
     {{- $label = printf "Stale report. %s" $label -}}
   {{- end -}}
 {{- end -}}
+{{- $label = printf "%s: %s" $port.name $label -}}
 <td data-feature-cell data-port="{{ $port.id }}" data-feature="{{ $feature.id }}" class="is-{{ $state }}" title="{{ $label }}">
   <span class="cn1-port-status__mark is-{{ $state }}" aria-hidden="true">{{ $mark }}</span>
   <span class="screen-reader-text">{{ $label }}</span>

@@ -116,6 +116,10 @@
 .cn1-port-status__mark.is-partial,
 .cn1-port-status__mark.is-stale { color: #c38a20; }
 .cn1-port-status__mark.is-unknown { color: #7d8791; }
+.cn1-port-status__mark.is-supported { color: #27955b; }
+.cn1-port-status__mark.is-conditional { color: #c38a20; }
+.cn1-port-status__mark.is-fallback { color: #3976c5; }
+.cn1-port-status__mark.is-unavailable { color: #7d8791; }
 
 .cn1-port-status__ports {
     display: grid;
@@ -268,6 +272,78 @@
 .cn1-port-status__matrix td.is-fail { background: color-mix(in srgb, #d24c4c 9%, transparent); }
 .cn1-port-status__matrix td.is-partial,
 .cn1-port-status__matrix td.is-stale { background: color-mix(in srgb, #c38a20 9%, transparent); }
+
+.cn1-port-status__errata,
+.cn1-port-status__manual {
+    margin-top: 2.25rem;
+}
+
+.cn1-port-status__errata > p,
+.cn1-port-status__manual > header {
+    color: var(--secondary);
+    line-height: 1.65;
+    max-width: 900px;
+}
+
+.cn1-port-status__errata-list {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    margin-top: 1rem;
+}
+
+.cn1-port-status__errata-list article {
+    background: var(--entry);
+    border: 1px solid var(--cn1-status-border);
+    border-left: 4px solid #c38a20;
+    border-radius: 12px;
+    padding: 1.1rem;
+}
+
+.cn1-port-status__errata-list h3 {
+    font-size: 1rem;
+    margin: 0 0 .65rem;
+}
+
+.cn1-port-status__errata-list p {
+    color: var(--secondary);
+    font-size: .84rem;
+    line-height: 1.55;
+    margin: .45rem 0;
+}
+
+.cn1-port-status__manual > header h2 {
+    color: var(--primary);
+    margin-bottom: .6rem;
+}
+
+.cn1-port-status__matrix--manual table {
+    min-width: 1320px;
+}
+
+.cn1-port-status__matrix--manual td small {
+    color: var(--secondary);
+    display: block;
+    font-size: .64rem;
+    line-height: 1.25;
+    margin-top: .35rem;
+}
+
+.cn1-port-status__matrix--manual td.is-supported {
+    background: color-mix(in srgb, #27955b 8%, transparent);
+}
+
+.cn1-port-status__matrix--manual td.is-conditional {
+    background: color-mix(in srgb, #c38a20 9%, transparent);
+}
+
+.cn1-port-status__matrix--manual td.is-fallback {
+    background: color-mix(in srgb, #3976c5 9%, transparent);
+}
+
+.cn1-port-status__matrix--manual td.is-unavailable {
+    background: color-mix(in srgb, #7d8791 7%, transparent);
+}
 
 .cn1-port-status__method {
     background: var(--entry);

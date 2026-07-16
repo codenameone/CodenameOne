@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/port-status-contract.yml'
       - 'docs/website/data/port_status.json'
+      - 'docs/website/data/port_status_supplement.json'
       - 'docs/website/data/port_status_reports/**'
       - 'scripts/hellocodenameone/common/src/main/**'
       - 'scripts/hellocodenameone/conformance/**'
@@ -23,6 +24,7 @@ on:
     paths:
       - '.github/workflows/port-status-contract.yml'
       - 'docs/website/data/port_status.json'
+      - 'docs/website/data/port_status_supplement.json'
       - 'docs/website/data/port_status_reports/**'
       - 'scripts/hellocodenameone/common/src/main/**'
       - 'scripts/hellocodenameone/conformance/**'

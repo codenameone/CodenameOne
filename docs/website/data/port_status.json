@@ -23,6 +23,7 @@
     {"id": "linux-x64", "name": "Linux x64", "detail": "Native GTK3/Cairo build", "workflow": "linux-build-run.yml"},
     {"id": "linux-arm64", "name": "Linux ARM64", "detail": "Native GTK3/Cairo build", "workflow": "linux-build-run.yml"},
     {"id": "windows-x64", "name": "Windows x64", "detail": "Native cross-compiled binary on Windows", "workflow": "windows-cross-build-run.yml"},
+    {"id": "windows-arm64", "name": "Windows ARM64", "detail": "Native ARM64 binary on Windows 11", "workflow": "parparvm-tests-windows.yml"},
     {"id": "watchos", "name": "watchOS", "detail": "Apple Watch Simulator", "workflow": "scripts-ios.yml"},
     {"id": "tvos", "name": "tvOS", "detail": "Apple TV Simulator", "workflow": "scripts-ios.yml"}
   ],

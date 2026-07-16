@@ -43,12 +43,21 @@ function countMatches(value, pattern) {
     return Array.from(value.matchAll(pattern)).length;
 }
 
+function attribute(tag, name) {
+    const match = tag.match(new RegExp(`\\b${name}=(?:["']([^"']*)["']|([^\\s>]+))`, "i"));
+    return match ? (match[1] || match[2]) : "";
+}
+
 function validate() {
     const home = read("index.html");
     const page = read(path.join("port-status", "index.html"));
 
-    if (!/<a\b[^>]*href=(?:["']?\/port-status\/["']?)[^>]*>[\s\S]*?PORT STATUS[\s\S]*?<\/a>/i.test(home)) {
-        fail("the main site navigation does not link to /port-status/");
+    const resourcesMenu = home.match(
+        /<button\b[^>]*>[\s\S]*?<span>RESOURCES<\/span>[\s\S]*?<\/button><ul\b[^>]*class=(?:["']?sub-menu["']?)[^>]*>([\s\S]*?)<\/ul>/i
+    );
+    if (!resourcesMenu || !/<a\b[^>]*href=(?:["']?\/port-status\/["']?)[^>]*>[\s\S]*?Port Status[\s\S]*?<\/a>/i.test(resourcesMenu[1]) ||
+        countMatches(home, /href=(?:["']?\/port-status\/["']?)/gi) !== 1) {
+        fail("the Resources menu must contain the only /port-status/ navigation item");
     }
 
     const pageText = page.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
@@ -73,8 +82,8 @@ function validate() {
     const featureRows = countMatches(page, /\bdata-feature-row(?:=|\s|>)/g);
     const featureCells = countMatches(page, /\bdata-feature-cell(?:=|\s|>)/g);
     const mappedTests = countMatches(page, /<li><code>[^<]+<\/code><\/li>/g);
-    if (portCards !== 10) {
-        fail(`generated ${portCards} port cards instead of 10`);
+    if (portCards !== 11 || !/data-port-card=(?:["']?windows-arm64["']?)(?:\s|>)/i.test(page)) {
+        fail(`generated ${portCards} port cards or omitted Windows ARM64; expected 11 targets`);
     }
     if (featureRows < 51) {
         fail(`the generated table has only ${featureRows} feature rows`);
@@ -97,6 +106,53 @@ function validate() {
     );
     if (renderedCells !== featureCells) {
         fail("not every compliance cell has a build-time status");
+    }
+    const platformNames = {
+        "android": "Android",
+        "ios-gl": "iOS (OpenGL)",
+        "ios-metal": "iOS (Metal)",
+        "mac-native": "macOS native",
+        "javascript": "Web",
+        "linux-x64": "Linux x64",
+        "linux-arm64": "Linux ARM64",
+        "windows-x64": "Windows x64",
+        "windows-arm64": "Windows ARM64",
+        "watchos": "watchOS",
+        "tvos": "tvOS"
+    };
+    const primaryCellTags = Array.from(page.matchAll(/<td\b(?=[^>]*\bdata-feature-cell\b)[^>]*>/gi), match => match[0]);
+    for (const cell of primaryCellTags) {
+        const port = attribute(cell, "data-port");
+        if (!platformNames[port] || !attribute(cell, "title").startsWith(`${platformNames[port]}:`)) {
+            fail(`compliance cell for ${port || "an unknown port"} has no platform-named tooltip`);
+        }
+    }
+
+    const errata = Array.from(page.matchAll(/\bdata-skip-erratum=(?:["']([^"']+)["']|([^\s>]+))/gi),
+        match => match[1] || match[2]);
+    if (errata.length < 2 || !errata.includes("CameraApiTest") || !errata.includes("VideoIORoundTripTest") ||
+        !/Every skipped result in the table is accounted for/i.test(pageText) ||
+        countMatches(page, /<strong>Port support:<\/strong>/gi) !== errata.length) {
+        fail("the generated page does not contain exhaustive skipped-test errata");
+    }
+
+    const manualRows = countMatches(page, /\bdata-manual-feature-row(?:=|\s|>)/g);
+    const manualCells = countMatches(page, /\bdata-manual-feature-cell(?:=|\s|>)/g);
+    if (manualRows < 20 || manualCells !== manualRows * portCards) {
+        fail("the environment-dependent feature matrix is incomplete");
+    }
+    const manualCellTags = Array.from(page.matchAll(/<td\b(?=[^>]*\bdata-manual-feature-cell\b)[^>]*>/gi), match => match[0]);
+    for (const cell of manualCellTags) {
+        const port = attribute(cell, "data-port");
+        const state = attribute(cell, "class");
+        if (!platformNames[port] || !attribute(cell, "title").startsWith(`${platformNames[port]}:`) ||
+            !/^is-(?:supported|conditional|fallback|unavailable)$/.test(state)) {
+            fail(`environment-dependent cell for ${port || "an unknown port"} is incomplete`);
+        }
+    }
+    if (countMatches(page, /<b>Verification:<\/b>/gi) !== manualRows ||
+        countMatches(page, /<b>Why it is outside the suite:<\/b>/gi) !== manualRows) {
+        fail("each environment-dependent feature must explain its test logic and suite exclusion");
     }
     if (/Waiting for report|Loading the latest compliance reports/i.test(page)) {
         fail("the generated page still waits for client-side report rendering");
@@ -142,13 +198,16 @@ function validate() {
     const stylesheet = read(stylesheetPath);
     const matrixRule = stylesheet.match(/\.cn1-port-status__matrix\{([^}]*)\}/);
     if (!matrixRule || /max-height|overflow:(?:auto|scroll)/.test(matrixRule[1]) ||
-        !/\.cn1-port-status__matrix thead th\{[^}]*position:sticky[^}]*top:0/.test(stylesheet)) {
+        !/\.cn1-port-status__matrix thead th\{[^}]*position:sticky[^}]*top:0/.test(stylesheet) ||
+        !stylesheet.includes(".cn1-port-status__errata-list{") ||
+        !stylesheet.includes(".cn1-port-status__matrix--manual")) {
         fail("the table header must stick during normal page scrolling without a nested table scroller");
     }
 
     console.log(
         `Port Status page valid: ${portCards} ports, ` +
-        `${featureRows} features, ${mappedTests} mapped tests, static snapshot.`
+        `${featureRows} automated features, ${manualRows} environment-dependent features, ` +
+        `${mappedTests} mapped tests, static snapshot.`
     );
 }
 

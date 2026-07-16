@@ -63,7 +63,9 @@ The browser never fetches report data, and the page displays when the static
 snapshot was generated. The bootstrap reports use the successful master
 workflow conclusion because the older artifacts did not consistently retain
 per-test completion logs. New reports use the normalized suite and screenshot
-results directly.
+results directly. Windows x64 and Windows ARM64 are separate targets: the ARM64
+report comes from the native `windows-11-arm` suite rather than being inferred
+from the x64 result.
 
 The feature contract lives in
 `docs/website/data/port_status.json`. Every test registered in
@@ -75,6 +77,13 @@ to its producing test. Validate both rules from the repository root:
 ----
 python3 scripts/hellocodenameone/conformance/port_status.py validate
 ----
+
+`docs/website/data/port_status_supplement.json` owns the skipped-test errata and
+the environment-dependent support matrix. The validator requires an erratum
+for every skipped test in the stored reports and requires every manual feature
+to declare exactly one support state for every portability target, together
+with its verification logic and the reason it cannot join the deterministic
+suite.
 
 When adding a conformance test:
 

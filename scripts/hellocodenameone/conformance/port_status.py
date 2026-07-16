@@ -16,6 +16,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_MANIFEST = REPO_ROOT / "docs/website/data/port_status.json"
+SUPPLEMENT = REPO_ROOT / "docs/website/data/port_status_supplement.json"
 RUNNER = REPO_ROOT / (
     "scripts/hellocodenameone/common/src/main/java/com/codenameone/"
     "examples/hellocodenameone/tests/Cn1ssDeviceRunner.java"
@@ -154,6 +155,7 @@ def validate(manifest: dict) -> dict:
         if owner is None:
             problems.append(f"Golden screenshot {name} is not mapped to a test")
 
+    skipped_tests: set[str] = set()
     report_directory = manifest.get("report_directory")
     if report_directory:
         report_root = REPO_ROOT / report_directory
@@ -184,6 +186,89 @@ def validate(manifest: dict) -> dict:
                     f"Stored report {report_path} is missing tests: "
                     + ", ".join(missing_tests)
                 )
+            for test, result in report_tests.items():
+                if not isinstance(result, dict) or result.get("status") not in {
+                    "pass", "fail", "skip", "not-run"
+                }:
+                    problems.append(f"Stored report {report_path} has an invalid result for {test}")
+                elif result.get("status") == "skip":
+                    skipped_tests.add(test)
+
+    manual_feature_count = 0
+    try:
+        supplement = read_json(SUPPLEMENT)
+    except ContractError as exc:
+        problems.append(str(exc))
+        supplement = {}
+
+    skip_reason_tests = [
+        item.get("test") for item in supplement.get("skip_reasons", [])
+    ]
+    duplicate_skip_reasons = sorted(
+        test for test, count in Counter(skip_reason_tests).items() if count > 1
+    )
+    if duplicate_skip_reasons:
+        problems.append("Duplicate skip errata: " + ", ".join(duplicate_skip_reasons))
+    unknown_skip_reasons = sorted(set(skip_reason_tests) - set(mapped))
+    if unknown_skip_reasons:
+        problems.append(
+            "Skip errata references unknown tests: "
+            + ", ".join(unknown_skip_reasons)
+        )
+    missing_skip_reasons = sorted(skipped_tests - set(skip_reason_tests))
+    if missing_skip_reasons:
+        problems.append("Skipped tests without errata: " + ", ".join(missing_skip_reasons))
+    for item in supplement.get("skip_reasons", []):
+        required = ("test", "reason", "platform_support", "verification")
+        if not all(item.get(field) for field in required):
+            problems.append(
+                "Every skip erratum needs test, reason, platform_support, and verification"
+            )
+
+    manual_features = supplement.get("features", [])
+    manual_feature_count = len(manual_features)
+    manual_ids = [item.get("id") for item in manual_features]
+    duplicate_manual_ids = sorted(
+        feature for feature, count in Counter(manual_ids).items() if count > 1
+    )
+    if duplicate_manual_ids:
+        problems.append("Duplicate manual feature IDs: " + ", ".join(duplicate_manual_ids))
+    for feature in manual_features:
+        feature_id = feature.get("id") or "<unknown>"
+        if not all(feature.get(field) for field in (
+            "id", "category", "name", "description", "testing", "why_not_automated"
+        )):
+            problems.append(f"Manual feature {feature_id} is missing its description or test rationale")
+        covered_ports: list[str] = []
+        for coverage in feature.get("coverage", []):
+            state = coverage.get("state")
+            if state not in {"supported", "conditional", "fallback", "unavailable"}:
+                problems.append(f"Manual feature {feature_id} has invalid state {state}")
+            if not coverage.get("label") or not coverage.get("detail"):
+                problems.append(
+                    f"Manual feature {feature_id} has coverage without a label or detail"
+                )
+            covered_ports.extend(coverage.get("ports", []))
+        duplicate_coverage = sorted(
+            port for port, count in Counter(covered_ports).items() if count > 1
+        )
+        if duplicate_coverage:
+            problems.append(
+                f"Manual feature {feature_id} covers ports more than once: "
+                + ", ".join(duplicate_coverage)
+            )
+        unknown_coverage = sorted(set(covered_ports) - set(port_ids))
+        missing_coverage = sorted(set(port_ids) - set(covered_ports))
+        if unknown_coverage:
+            problems.append(
+                f"Manual feature {feature_id} references unknown ports: "
+                + ", ".join(unknown_coverage)
+            )
+        if missing_coverage:
+            problems.append(
+                f"Manual feature {feature_id} has no status for: "
+                + ", ".join(missing_coverage)
+            )
 
     if problems:
         raise ContractError("\n".join(problems))
@@ -192,6 +277,7 @@ def validate(manifest: dict) -> dict:
         "features": len(features),
         "tests": len(registered),
         "goldens": len(golden_names),
+        "manual_features": manual_feature_count,
     }
 
 
