@@ -8,7 +8,7 @@
     <p class="cn1-port-status__intro">
       Every row is backed by one or more tests in the
       <a href="https://github.com/codenameone/CodenameOne/tree/master/scripts/hellocodenameone" target="_blank" rel="noopener">HelloCodenameOne suite</a>.
-      A check means every mapped test passed in the latest published run for that port.
+      A check means every mapped test is successful in the latest available master report for that port.
     </p>
     <div class="cn1-port-status__facts" aria-label="Conformance contract size">
       <span><strong>{{ len $contract.features }}</strong> features</span>
@@ -104,7 +104,7 @@
       The feature-to-test map is checked into the repository. CI rejects a registered test or golden screenshot that is not mapped. Each port run publishes normalized per-test results; this page keeps the last result for every port and derives a feature status from all tests assigned to that feature.
     </p>
     <p>
-      A website build does not wait for port workflows. The initial snapshot comes from the last successful master runs available when this page was added, and each port replaces its own snapshot after a newer master run. A platform-specific skip is not a pass. An incomplete run is not a pass. Reports older than {{ $contract.stale_after_days }} days are marked stale.
+      A website build does not wait for port workflows. The initial snapshot uses the successful workflow conclusion from the last master runs available when this page was added because those older artifacts did not all retain per-test completion logs. Each port replaces that bootstrap snapshot after a newer master run. A platform-specific skip is not a pass. An incomplete current report is not a pass. Reports older than {{ $contract.stale_after_days }} days are marked stale.
     </p>
     <p>
       <a href="https://github.com/codenameone/CodenameOne/blob/master/docs/website/data/port_status.json" target="_blank" rel="noopener">Feature contract</a>

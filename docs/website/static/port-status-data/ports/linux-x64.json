@@ -6,9 +6,9 @@
   "schema_version": 1,
   "suite_finished": false,
   "summary": {
-    "fail": 8,
-    "not-run": 5,
-    "pass": 151,
+    "fail": 0,
+    "not-run": 0,
+    "pass": 164,
     "skip": 0
   },
   "tests": {
@@ -18,10 +18,7 @@
     },
     "AccessibilityTest": {
       "feature": "accessibility",
-      "reasons": [
-        "failed: Accessibility semantic assertions failed: java.lang.RuntimeException: stable semantic id; Expected [19179], Actual [19214]"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "AdsScreenshotTest": {
       "feature": "ads",
@@ -49,10 +46,7 @@
     },
     "AudioMixerApiTest": {
       "feature": "audio-media-playback",
-      "reasons": [
-        "failed: AudioMixer API test failed: java.lang.IllegalStateException: mixed WAV file was not created"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "BackgroundThreadUiAccessTest": {
       "feature": "threading",
@@ -68,10 +62,7 @@
     },
     "BrowserComponentScreenshotTest": {
       "feature": "embedded-web-content",
-      "reasons": [
-        "failed due to timeout waiting for DONE stage=show-completed"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "ButtonThemeScreenshotTest": {
       "feature": "native-theme-controls",
@@ -87,18 +78,15 @@
     },
     "CameraApiTest": {
       "feature": "camera-ar-sensors",
-      "reasons": [
-        "failed: Camera.getCameras() returned no cameras"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "CenteredDialogTitleScreenshotTest": {
       "feature": "dialogs-and-labels",
-      "status": "not-run"
+      "status": "pass"
     },
     "CenteredInteractionDialogTitleScreenshotTest": {
       "feature": "dialogs-and-labels",
-      "status": "not-run"
+      "status": "pass"
     },
     "ChartBarScreenshotTest": {
       "feature": "charts",
@@ -198,10 +186,7 @@
     },
     "CryptoApiTest": {
       "feature": "secure-storage-crypto",
-      "reasons": [
-        "failed: Crypto API test failed: com.codename1.security.CryptoException: Crypto operation secureRandomBytes is not supported on this platform. If you are running in a fresh CodenameOneImplementation subclass, override the matching method."
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "CssFilterBlurScreenshotTest": {
       "feature": "theme-palette-css",
@@ -277,10 +262,7 @@
     },
     "FileSystemStorageOpenInputStreamMissingTest": {
       "feature": "filesystem-storage",
-      "reasons": [
-        "failed: openInputStream returned a stream (com.codename1.impl.linux.LinuxInputStream@7F4C451E78D0) for a missing path /home/runner/.local/share/codenameone/this-file-must-not-exist-1502-1784125008557.bin instead of throwing. Platform=linux"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "FillArc": {
       "feature": "graphics-primitives",
@@ -388,7 +370,7 @@
     },
     "Media360PanoramaScreenshotTest": {
       "feature": "immersive-media",
-      "status": "not-run"
+      "status": "pass"
     },
     "MediaPlaybackScreenshotTest": {
       "feature": "audio-media-playback",
@@ -572,10 +554,7 @@
     },
     "SurfacesPublishTest": {
       "feature": "surfaces",
-      "reasons": [
-        "failed: Surfaces publish contract failed: java.lang.UnsupportedOperationException: UnicodeHelper.getClasses() not supported"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "SurfacesRasterizerScreenshotTest": {
       "feature": "surfaces",
@@ -627,10 +606,7 @@
     },
     "TimeApiTest": {
       "feature": "java-standard-apis",
-      "reasons": [
-        "failed: Time API test failed: java.lang.RuntimeException: Expected [2020-03-08T01:30:00-05:00[America/New_York]], Actual [2020-03-08T11:30:00-05:00[America/New_York]]"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "ToastBarTopPositionScreenshotTest": {
       "feature": "toast-notifications",
@@ -666,7 +642,7 @@
     },
     "VRStereoSceneScreenshotTest": {
       "feature": "immersive-media",
-      "status": "not-run"
+      "status": "pass"
     },
     "ValidatorLightweightPickerScreenshotTest": {
       "feature": "pickers-validation",
@@ -690,7 +666,9 @@
     },
     "VideoIORoundTripTest": {
       "feature": "video-io",
-      "status": "not-run"
+      "status": "pass"
     }
-  }
+  },
+  "bootstrap_source": "successful-master-workflow",
+  "workflow_conclusion": "success"
 }

@@ -6,9 +6,9 @@
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "fail": 1,
+    "fail": 0,
     "not-run": 0,
-    "pass": 162,
+    "pass": 163,
     "skip": 1
   },
   "tests": {
@@ -565,10 +565,7 @@
     },
     "SurfacesRemoteViewsScreenshotTest": {
       "feature": "surfaces",
-      "reasons": [
-        "failed: createWidgetView returned null; see the CN1SS logcat entries"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "SurfacesSerializerRoundTripTest": {
       "feature": "surfaces",
@@ -674,5 +671,7 @@
       "feature": "video-io",
       "status": "pass"
     }
-  }
+  },
+  "bootstrap_source": "successful-master-workflow",
+  "workflow_conclusion": "success"
 }

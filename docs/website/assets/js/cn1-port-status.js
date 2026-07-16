@@ -54,6 +54,15 @@
         return (Date.now() - timestamp) / 86400000;
     }
 
+    function isSuccessfulBootstrap(report) {
+        return report.bootstrap_source === "successful-master-workflow" &&
+            report.workflow_conclusion === "success";
+    }
+
+    function reportCompleted(report) {
+        return report.suite_finished || isSuccessfulBootstrap(report);
+    }
+
     function featureStatus(feature, report) {
         if (!report) {
             return {state: "unknown", label: "No current report", tests: []};
@@ -73,7 +82,7 @@
         if (failed.length) {
             state = "fail";
             label = failed.length + " failed: " + failed.map(function (item) { return item.name; }).join(", ");
-        } else if (!report.suite_finished) {
+        } else if (!reportCompleted(report)) {
             state = "partial";
             label = "Suite did not finish";
         } else if (passed.length === results.length) {
@@ -130,9 +139,12 @@
         var summary = report.summary || {};
         var stale = daysOld(report.generated_at) > contract.stale_after_days;
         var failed = summary.fail || 0;
-        var unfinished = !report.suite_finished;
+        var unfinished = !reportCompleted(report);
         card.classList.add(failed ? "is-fail" : (stale || unfinished ? "is-partial" : "is-pass"));
-        state.textContent = failed ? failed + " failing tests" : (unfinished ? "Run incomplete" : (stale ? "Report is stale" : "Suite completed"));
+        state.textContent = failed ? failed + " failing tests" :
+            (unfinished ? "Run incomplete" :
+                (stale ? "Report is stale" :
+                    (isSuccessfulBootstrap(report) ? "Workflow completed" : "Suite completed")));
         var detail = (summary.pass || 0) + " passed · " + (summary.skip || 0) + " skipped · " + (summary["not-run"] || 0) + " not run";
         meta.replaceChildren(document.createTextNode(formatDate(report.generated_at)), document.createElement("br"), document.createTextNode(detail));
         if (report.run_url) {

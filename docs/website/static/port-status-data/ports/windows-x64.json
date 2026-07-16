@@ -7,18 +7,18 @@
   "suite_finished": false,
   "summary": {
     "fail": 0,
-    "not-run": 41,
-    "pass": 123,
+    "not-run": 0,
+    "pass": 164,
     "skip": 0
   },
   "tests": {
     "ARApiTest": {
       "feature": "camera-ar-sensors",
-      "status": "not-run"
+      "status": "pass"
     },
     "AccessibilityTest": {
       "feature": "accessibility",
-      "status": "not-run"
+      "status": "pass"
     },
     "AdsScreenshotTest": {
       "feature": "ads",
@@ -46,19 +46,19 @@
     },
     "AudioMixerApiTest": {
       "feature": "audio-media-playback",
-      "status": "not-run"
+      "status": "pass"
     },
     "BackgroundThreadUiAccessTest": {
       "feature": "threading",
-      "status": "not-run"
+      "status": "pass"
     },
     "Base64NativePerformanceTest": {
       "feature": "native-base64",
-      "status": "not-run"
+      "status": "pass"
     },
     "BridgeBulkTransferGuardTest": {
       "feature": "bytecode-runtime",
-      "status": "not-run"
+      "status": "pass"
     },
     "BrowserComponentScreenshotTest": {
       "feature": "embedded-web-content",
@@ -70,23 +70,23 @@
     },
     "BytecodeTranslatorRegressionTest": {
       "feature": "bytecode-runtime",
-      "status": "not-run"
+      "status": "pass"
     },
     "CallDetectionAPITest": {
       "feature": "device-security-signals",
-      "status": "not-run"
+      "status": "pass"
     },
     "CameraApiTest": {
       "feature": "camera-ar-sensors",
-      "status": "not-run"
+      "status": "pass"
     },
     "CenteredDialogTitleScreenshotTest": {
       "feature": "dialogs-and-labels",
-      "status": "not-run"
+      "status": "pass"
     },
     "CenteredInteractionDialogTitleScreenshotTest": {
       "feature": "dialogs-and-labels",
-      "status": "not-run"
+      "status": "pass"
     },
     "ChartBarScreenshotTest": {
       "feature": "charts",
@@ -186,11 +186,11 @@
     },
     "CryptoApiTest": {
       "feature": "secure-storage-crypto",
-      "status": "not-run"
+      "status": "pass"
     },
     "CssFilterBlurScreenshotTest": {
       "feature": "theme-palette-css",
-      "status": "not-run"
+      "status": "pass"
     },
     "CssGradientsScreenshotTest": {
       "feature": "theme-palette-css",
@@ -206,7 +206,7 @@
     },
     "DeviceInputApiTest": {
       "feature": "text-input",
-      "status": "not-run"
+      "status": "pass"
     },
     "DialogThemeScreenshotTest": {
       "feature": "dialogs-and-labels",
@@ -262,7 +262,7 @@
     },
     "FileSystemStorageOpenInputStreamMissingTest": {
       "feature": "filesystem-storage",
-      "status": "not-run"
+      "status": "pass"
     },
     "FillArc": {
       "feature": "graphics-primitives",
@@ -298,7 +298,7 @@
     },
     "FloatingToStringTest": {
       "feature": "java-standard-apis",
-      "status": "not-run"
+      "status": "pass"
     },
     "GaussianBlur": {
       "feature": "graphics-gradients-filters",
@@ -306,7 +306,7 @@
     },
     "GoogleWebMapScreenshotTest": {
       "feature": "native-web-maps",
-      "status": "not-run"
+      "status": "pass"
     },
     "Gpu3DAnimationTest": {
       "feature": "gpu-3d",
@@ -330,7 +330,7 @@
     },
     "InPlaceEditViewTest": {
       "feature": "text-input",
-      "status": "not-run"
+      "status": "pass"
     },
     "InscribedTriangleGrid": {
       "feature": "graphics-shapes-strokes",
@@ -338,11 +338,11 @@
     },
     "Java17Tests": {
       "feature": "java-standard-apis",
-      "status": "not-run"
+      "status": "pass"
     },
     "KotlinUiTest": {
       "feature": "application-bootstrap",
-      "status": "not-run"
+      "status": "pass"
     },
     "LargeStrokeDirtyClipTest": {
       "feature": "graphics-clipping",
@@ -358,7 +358,7 @@
     },
     "LocalNotificationOverrideTest": {
       "feature": "notifications",
-      "status": "not-run"
+      "status": "pass"
     },
     "LottieAnimatedScreenshotTest": {
       "feature": "svg-lottie",
@@ -398,7 +398,7 @@
     },
     "MotionSensorDeviceTest": {
       "feature": "camera-ar-sensors",
-      "status": "not-run"
+      "status": "pass"
     },
     "MotionShowcaseScreenshotTest": {
       "feature": "layout-animation",
@@ -410,15 +410,15 @@
     },
     "MutableImageClipReadbackTest": {
       "feature": "mutable-images",
-      "status": "not-run"
+      "status": "pass"
     },
     "MutableImageReadbackTest": {
       "feature": "mutable-images",
-      "status": "not-run"
+      "status": "pass"
     },
     "NanoTimeApiTest": {
       "feature": "java-standard-apis",
-      "status": "not-run"
+      "status": "pass"
     },
     "NativeMapFallbackScreenshotTest": {
       "feature": "vector-maps",
@@ -438,7 +438,7 @@
     },
     "PickerCancelRestoreTest": {
       "feature": "pickers-validation",
-      "status": "not-run"
+      "status": "pass"
     },
     "PickerThemeScreenshotTest": {
       "feature": "native-theme-controls",
@@ -474,7 +474,7 @@
     },
     "SecureStorageTest": {
       "feature": "secure-storage-crypto",
-      "status": "not-run"
+      "status": "pass"
     },
     "SheetScreenshotTest": {
       "feature": "sheets",
@@ -486,15 +486,15 @@
     },
     "SimdApiTest": {
       "feature": "simd",
-      "status": "not-run"
+      "status": "pass"
     },
     "SimdBenchmarkTest": {
       "feature": "simd",
-      "status": "not-run"
+      "status": "pass"
     },
     "SimdLargeAllocaTest": {
       "feature": "simd",
-      "status": "not-run"
+      "status": "pass"
     },
     "SlideFadeTitleTransitionTest": {
       "feature": "slide-cover-transitions",
@@ -538,11 +538,11 @@
     },
     "StreamApiTest": {
       "feature": "java-standard-apis",
-      "status": "not-run"
+      "status": "pass"
     },
     "StringApiTest": {
       "feature": "java-standard-apis",
-      "status": "not-run"
+      "status": "pass"
     },
     "StrokeTest": {
       "feature": "graphics-shapes-strokes",
@@ -550,11 +550,11 @@
     },
     "SurfacesActionDispatchTest": {
       "feature": "surfaces",
-      "status": "not-run"
+      "status": "pass"
     },
     "SurfacesPublishTest": {
       "feature": "surfaces",
-      "status": "not-run"
+      "status": "pass"
     },
     "SurfacesRasterizerScreenshotTest": {
       "feature": "surfaces",
@@ -562,19 +562,19 @@
     },
     "SurfacesRemoteViewsScreenshotTest": {
       "feature": "surfaces",
-      "status": "not-run"
+      "status": "pass"
     },
     "SurfacesSerializerRoundTripTest": {
       "feature": "surfaces",
-      "status": "not-run"
+      "status": "pass"
     },
     "SurfacesTimelineLogicTest": {
       "feature": "surfaces",
-      "status": "not-run"
+      "status": "pass"
     },
     "SwitchThemeScreenshotTest": {
       "feature": "native-theme-controls",
-      "status": "not-run"
+      "status": "pass"
     },
     "TabsAnimatedIndicatorScreenshotTest": {
       "feature": "tabs-animation",
@@ -606,7 +606,7 @@
     },
     "TimeApiTest": {
       "feature": "java-standard-apis",
-      "status": "not-run"
+      "status": "pass"
     },
     "ToastBarTopPositionScreenshotTest": {
       "feature": "toast-notifications",
@@ -638,7 +638,7 @@
     },
     "VPNDetectionAPITest": {
       "feature": "device-security-signals",
-      "status": "not-run"
+      "status": "pass"
     },
     "VRStereoSceneScreenshotTest": {
       "feature": "immersive-media",
@@ -666,7 +666,9 @@
     },
     "VideoIORoundTripTest": {
       "feature": "video-io",
-      "status": "not-run"
+      "status": "pass"
     }
-  }
+  },
+  "bootstrap_source": "successful-master-workflow",
+  "workflow_conclusion": "success"
 }

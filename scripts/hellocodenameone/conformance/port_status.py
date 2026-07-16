@@ -168,6 +168,10 @@ def validate(manifest: dict) -> dict:
                 problems.append(f"Seed report {seed_path} has the wrong schema version")
             if seed.get("port") != port_id:
                 problems.append(f"Seed report {seed_path} identifies port {seed.get('port')}")
+            if seed.get("bootstrap_source") != "successful-master-workflow":
+                problems.append(f"Seed report {seed_path} has no successful-workflow provenance")
+            if seed.get("workflow_conclusion") != "success":
+                problems.append(f"Seed report {seed_path} did not come from a successful workflow")
             seed_tests = seed.get("tests")
             if not isinstance(seed_tests, dict):
                 problems.append(f"Seed report {seed_path} has no test result map")
@@ -183,6 +187,15 @@ def validate(manifest: dict) -> dict:
                 problems.append(
                     f"Seed report {seed_path} is missing tests: "
                     + ", ".join(missing_tests)
+                )
+            failing_tests = sorted(
+                test for test, result in seed_tests.items()
+                if result.get("status") == "fail"
+            )
+            if failing_tests:
+                problems.append(
+                    f"Successful-workflow seed report {seed_path} contains failures: "
+                    + ", ".join(failing_tests)
                 )
 
     if problems:

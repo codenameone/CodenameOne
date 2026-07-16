@@ -674,5 +674,7 @@
       ],
       "status": "skip"
     }
-  }
+  },
+  "bootstrap_source": "successful-master-workflow",
+  "workflow_conclusion": "success"
 }
