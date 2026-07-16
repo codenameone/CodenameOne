@@ -64,6 +64,37 @@ public abstract class BaseTest extends AbstractTest {
         UITimer.timer(1500, false, parent, run);
     }
 
+    /// Wraps a component so a callback can run after its subtree has actually PAINTED, a
+    /// deterministic "content is on screen" signal. Event-driven components (the pure editors
+    /// report ready as soon as their backend initializes, typically before the first paint
+    /// flushes on the slower ports) capture too early with a plain ready callback and too
+    /// flakily with fixed settle timers; gating on the first real paint is exact on every port.
+    protected static final class FirstPaintGate extends com.codename1.ui.Container {
+        private Runnable pending;
+
+        public FirstPaintGate(com.codename1.ui.Component content) {
+            super(new com.codename1.ui.layouts.BorderLayout());
+            add(com.codename1.ui.layouts.BorderLayout.CENTER, content);
+        }
+
+        /// Schedules {@code r} (serially on the EDT) after the next completed paint of this
+        /// container's subtree.
+        public void runAfterNextPaint(Runnable r) {
+            pending = r;
+            repaint();
+        }
+
+        @Override
+        public void paint(com.codename1.ui.Graphics g) {
+            super.paint(g);
+            if (pending != null) {
+                Runnable r = pending;
+                pending = null;
+                com.codename1.ui.CN.callSerially(r);
+            }
+        }
+    }
+
     /// After the initial 1500ms settle, poll the form's AnimationManager until
     /// it reports no in-flight animations, then take the screenshot. Guarded
     /// by a max-wait so a runaway animation can't deadlock the suite.

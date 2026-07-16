@@ -1476,6 +1476,10 @@ public class IOSImplementation extends CodenameOneImplementation {
     // their real bodies. tiKeepAlive is never set true.
     private static boolean tiKeepAlive = false;
 
+    /// Consumes the keep-alive results below; several ti* queries are now pure snapshot reads,
+    /// and an ignored pure return would trip the static analysis gate.
+    private static int tiKeepAliveSink;
+
     private static void tiKeepNativeCallbacksAlive() {
         if (tiKeepAlive) {
             tiCommit("", 0);
@@ -1486,13 +1490,14 @@ public class IOSImplementation extends CodenameOneImplementation {
             tiEditorAction(0);
             tiReplaceRange(0, 0, "", 0);
             tiSetSelection(0, 0, 0);
-            tiTextLength();
-            tiTextRange(0, 0);
-            tiSelectionStart();
-            tiSelectionEnd();
-            tiRectForOffset(0);
-            tiOffsetAtPoint(0, 0);
-            tiSelectionRects(0, 0);
+            tiKeepAliveSink = tiTextLength()
+                    + tiTextRange(0, 0).length()
+                    + tiSelectionStart()
+                    + tiSelectionEnd()
+                    + tiRectForOffset(0).length
+                    + tiOffsetAtPoint(0, 0)
+                    + tiSelectionRects(0, 0).length
+                    + tiKeepAliveSink;
         }
     }
 

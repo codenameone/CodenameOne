@@ -37,6 +37,7 @@ import com.codename1.ui.layouts.BorderLayout;
  */
 public class CodeEditorScreenshotTest extends BaseTest {
     private CodeEditor editor;
+    private FirstPaintGate gate;
 
     @Override
     public boolean runTest() throws Exception {
@@ -54,14 +55,20 @@ public class CodeEditorScreenshotTest extends BaseTest {
                 + "        }\n"
                 + "    }\n"
                 + "}\n");
-        form.add(BorderLayout.CENTER, editor);
+        gate = new FirstPaintGate(editor);
+        form.add(BorderLayout.CENTER, gate);
         form.show();
         return true;
     }
 
     @Override
     protected void registerReadyCallback(Form parent, final Runnable run) {
-        // fires immediately when the backend already finished initializing
-        editor.onReady(run);
+        // capture after the backend reports ready AND the editor's content actually painted;
+        // ready alone races the first paint flush on the slower ports
+        editor.onReady(new Runnable() {
+            public void run() {
+                gate.runAfterNextPaint(run);
+            }
+        });
     }
 }
