@@ -1,11 +1,11 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-// Pixel-parity guard for the iOS-26 glass-tab selection lens. This evaluates
+// Pixel-parity guard for the complete iOS-26 glass-tab effect. This evaluates
 // the implementation that browser_bridge.js actually ships (not a copied test
 // implementation) against checksums produced by JavaSEPort.applyLensBuffer()
-// for the same deterministic source image at every frozen animation-timing
-// checkpoint. A one-channel/one-pixel drift changes the checksum.
+// and IOSImplementation's material/optics routines. A one-channel/one-pixel
+// drift changes the checksum.
 const bridgePath = new URL('../vm/ByteCodeTranslator/src/javascript/browser_bridge.js', import.meta.url);
 const bridge = fs.readFileSync(bridgePath, 'utf8');
 const start = bridge.indexOf('  var LENS_MAG_FLAT =');
@@ -14,7 +14,10 @@ if (start < 0 || end < 0) {
   throw new Error('Unable to locate the lens implementation in browser_bridge.js');
 }
 const sandbox = { Math, Uint8ClampedArray };
-vm.runInNewContext(bridge.substring(start, end) + '\nthis.applyLens = applyLensSelfRegion;', sandbox);
+vm.runInNewContext(bridge.substring(start, end)
+    + '\nthis.applyLens = applyLensSelfRegion;'
+    + '\nthis.applyMaterial = glassMaterialInPlace;'
+    + '\nthis.applyOptics = applyGlassOptics;', sandbox);
 
 function crc32(bytes) {
   let crc = 0xffffffff;
@@ -25,6 +28,31 @@ function crc32(bytes) {
     }
   }
   return (crc ^ 0xffffffff) >>> 0;
+}
+
+function rgbaToArgb(rgba) {
+  const argb = new Uint8Array(rgba.length);
+  for (let i = 0; i < rgba.length / 4; i++) {
+    argb[i * 4] = rgba[i * 4 + 3];
+    argb[i * 4 + 1] = rgba[i * 4];
+    argb[i * 4 + 2] = rgba[i * 4 + 1];
+    argb[i * 4 + 3] = rgba[i * 4 + 2];
+  }
+  return argb;
+}
+
+function glassPattern(width, height) {
+  const source = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const offset = (y * width + x) * 4;
+      source[offset] = (x * 17 + y * 3) & 0xff;
+      source[offset + 1] = (x * 5 + y * 19) & 0xff;
+      source[offset + 2] = (x * 11 + y * 7) & 0xff;
+      source[offset + 3] = (x * 7 + y * 13 + 31) & 0xff;
+    }
+  }
+  return source;
 }
 
 const frames = [
@@ -61,17 +89,32 @@ for (const frame of frames) {
       frame.magnify, frame.aberration, 0x0a84ff, 1);
 
   // JavaSE's reference buffer is packed ARGB; Canvas ImageData is RGBA.
-  const argb = new Uint8Array(width * height * 4);
-  for (let i = 0; i < width * height; i++) {
-    argb[i * 4] = output[i * 4 + 3];
-    argb[i * 4 + 1] = output[i * 4];
-    argb[i * 4 + 2] = output[i * 4 + 1];
-    argb[i * 4 + 3] = output[i * 4 + 2];
-  }
-  const actual = crc32(argb);
+  const actual = crc32(rgbaToArgb(output));
   if (actual !== frame.expected) {
     throw new Error(`Lens parity failed at ${frame.progress}%: `
         + `expected ${frame.expected.toString(16)}, got ${actual.toString(16)}`);
   }
   console.log(`lens parity PASS t=${frame.progress}% size=${width}x${height} crc=${actual.toString(16)}`);
 }
+
+for (const recipe of [
+  { name: 'pill-light', saturation: 1.8, scale: 1, offset: 108, expected: 0x5d960bce },
+  { name: 'pill-dark', saturation: 2.5, scale: 0.3, offset: 13, expected: 0x836a16cf }
+]) {
+  const material = glassPattern(64, 40);
+  sandbox.applyMaterial(material, recipe.saturation, recipe.scale, recipe.offset);
+  const actual = crc32(rgbaToArgb(material));
+  if (actual !== recipe.expected) {
+    throw new Error(`Glass material parity failed for ${recipe.name}: `
+        + `expected ${recipe.expected.toString(16)}, got ${actual.toString(16)}`);
+  }
+  console.log(`glass material parity PASS recipe=${recipe.name} crc=${actual.toString(16)}`);
+}
+
+const optics = sandbox.applyOptics(glassPattern(52, 32), 52, 32, 6,
+    40, 20, -1, 0.4, 0.5);
+const opticsCrc = crc32(rgbaToArgb(optics));
+if (opticsCrc !== 0x8057dd7a) {
+  throw new Error(`Glass optics parity failed: expected 8057dd7a, got ${opticsCrc.toString(16)}`);
+}
+console.log(`glass optics parity PASS crc=${opticsCrc.toString(16)}`);

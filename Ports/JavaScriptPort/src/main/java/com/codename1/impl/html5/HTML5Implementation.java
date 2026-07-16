@@ -6414,11 +6414,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
     @Override
     public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius,
             float cornerRadius, float sat, float scale, float offset, float refract, float specular) {
-        // Plain backdrop blur clipped to the glass shape. The full Liquid Glass
-        // colour transform (saturation/scale/offset/refraction/specular) is the
-        // iOS Metal port's material; the browser gets the honest frost, which
-        // is what backdrop-filter delivers on the web anyway.
-        g(graphics).blurRegion(x, y, width, height, radius, cornerRadius);
+        // Preserve the complete named GlassRecipe. The host bridge applies the
+        // same affine colour material and rounded-shape optics as iOS around
+        // the browser's native Gaussian blur. Dropping these parameters made
+        // the tab-bar pill far more transparent than native.
+        g(graphics).glassRegion(x, y, width, height, radius, cornerRadius,
+                sat, scale, offset, refract, specular);
         return true;
     }
 

@@ -141,6 +141,11 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
     // tintStrength.
     public static final int OP_LENS_SELF_REGION = 81;
 
+    // Complete named Liquid Glass material: affine colour transform + blur +
+    // rounded shape optics. 11 nums: x, y, w, h, blurRadius, cornerRadius,
+    // saturation, scale, offset, refraction, specular.
+    public static final int OP_GLASS_SELF_REGION = 82;
+
     private int[] ops = new int[64];
     private int opCount;
     private double[] nums = new double[256];
@@ -300,6 +305,15 @@ public final class SurfaceCommandRecorder implements CanvasRenderingContext2D {
         op(OP_LENS_SELF_REGION);
         num(x); num(y); num(w); num(h); num(cornerRadius); num(magnify);
         num(aberration); num(tintColor); num(tintStrength);
+    }
+
+    /** Records a complete in-place Liquid Glass material; see OP_GLASS_SELF_REGION. */
+    public void glassSelfRegion(double x, double y, double w, double h, double blurRadius,
+            double cornerRadius, double saturation, double scale, double offset,
+            double refraction, double specular) {
+        op(OP_GLASS_SELF_REGION);
+        num(x); num(y); num(w); num(h); num(blurRadius); num(cornerRadius);
+        num(saturation); num(scale); num(offset); num(refraction); num(specular);
     }
     @Override public String getFilter() { return "none"; }
     @Override public void clearRect(double x, double y, double width, double height) {

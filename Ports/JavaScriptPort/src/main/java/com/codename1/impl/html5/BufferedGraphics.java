@@ -182,6 +182,13 @@ public class BufferedGraphics extends HTML5Graphics {
     }
 
     @Override
+    public void glassRegion(int x, int y, int width, int height, float radius, float cornerRadius,
+            float saturation, float scale, float offset, float refraction, float specular) {
+        addOp(new com.codename1.impl.html5.graphics.GlassRegion(x, y, width, height,
+                radius, cornerRadius, saturation, scale, offset, refraction, specular));
+    }
+
+    @Override
     public void lensRegion(int x, int y, int width, int height, float cornerRadius, float magnify,
             float aberration, int tintColor, float tintStrength) {
         addOp(new com.codename1.impl.html5.graphics.LensRegion(x, y, width, height, cornerRadius,
