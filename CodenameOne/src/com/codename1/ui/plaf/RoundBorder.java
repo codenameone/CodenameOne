@@ -33,7 +33,6 @@ import com.codename1.ui.MultipleGradientPaint;
 import com.codename1.ui.Paint;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.geom.GeneralPath;
-import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.geom.Rectangle;
 
 /// A border that can either be a circle or a circular rectangle which is a rectangle whose sides are circles.
@@ -808,10 +807,12 @@ public final class RoundBorder extends Border {
             this.solidColor = solidColor;
         }
 
+        @Override
         public void paint(Graphics g, com.codename1.ui.geom.Rectangle2D bounds) {
             paint(g, bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
         }
 
+        @Override
         public void paint(Graphics g, double x, double y, double w, double h) {
             g.setColor(solidColor);
             g.fillRect((int) x, (int) y, (int) Math.ceil(w), (int) Math.ceil(h));
