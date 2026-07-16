@@ -16,14 +16,20 @@ if [ "${PORT_STATUS_PUBLISH:-}" != "1" ] && { [ "${GITHUB_ACTIONS:-}" != "true" 
   exit 0
 fi
 
+branch="port-status-data"
+port="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["port"])' "$report")"
+performance_status="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("performance", {}).get("status", "missing"))' "$report")"
+if [ "$performance_status" != "complete" ]; then
+  echo "Not publishing incomplete ${port} performance data (${performance_status}); preserving the last complete report."
+  exit 0
+fi
+
 if ! command -v gh >/dev/null 2>&1; then
   echo "GitHub CLI is required to publish port status." >&2
   exit 2
 fi
 
 repo="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}"
-branch="port-status-data"
-port="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["port"])' "$report")"
 target="ports/${port}.json"
 
 if ! gh api "repos/${repo}/git/ref/heads/${branch}" >/dev/null 2>&1; then

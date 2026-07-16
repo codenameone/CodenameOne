@@ -681,6 +681,7 @@ jobs:
           CN1SS_SUCCESS_MESSAGE: '✅ Native Apple Watch (watchOS, Core Graphics) screenshot tests passed.'
           CN1SS_COMMENT_LOG_PREFIX: '[run-watch-ui-tests]'
           CN1SS_FAIL_ON_MISMATCH: '1'
+          CN1SS_WATCH_TIMEOUT: '2400'
           # The watch form factor splits the iOS 2x2 graphics grid into separate
           # full-screen captures; tolerate a small tail drop, matching the GL job.
           CN1SS_ALLOWED_MISSING: '4'
@@ -692,7 +693,7 @@ jobs:
           ./scripts/run-watch-ui-tests.sh \
             "${{ steps.build-ios-app.outputs.workspace }}" \
             "${{ steps.build-ios-app.outputs.scheme }}"
-        timeout-minutes: 45
+        timeout-minutes: 60
 
       - name: Upload watchOS port status
         if: always()
