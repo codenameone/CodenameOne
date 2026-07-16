@@ -6,6 +6,14 @@ import vm from 'node:vm';
 // implementation) against checksums produced by JavaSEPort.applyLensBuffer()
 // and IOSImplementation's material/optics routines. A one-channel/one-pixel
 // drift changes the checksum.
+//
+// The glass material/optics pins below are shared by THREE CPU
+// implementations: IOSImplementation.{glassMaterialInPlace,applyGlassOptics},
+// JavaSEPort.{glassMaterialInPlace,applyGlassOptics} (the simulator's
+// backdrop-filter glass) and the browser bridge functions checked here. When
+// one of them changes, regenerate with a reflection probe over the SAME
+// glassPattern inputs (see the GlassParityDump/LensParityDump probes in the
+// PR description) and update all backends together.
 const bridgePath = new URL('../vm/ByteCodeTranslator/src/javascript/browser_bridge.js', import.meta.url);
 const bridge = fs.readFileSync(bridgePath, 'utf8');
 const javaSource = fs.readFileSync(new URL(
