@@ -38,6 +38,20 @@ public class JsPrimitiveArraySemanticsApp {
             score |= 128;
         }
 
+        int[] shiftRight = new int[] {1, 2, 3, 4, 5};
+        System.arraycopy(shiftRight, 1, shiftRight, 2, 3);
+        if (shiftRight[0] == 1 && shiftRight[1] == 2 && shiftRight[2] == 2
+                && shiftRight[3] == 3 && shiftRight[4] == 4) {
+            score |= 256;
+        }
+
+        int[] shiftLeft = new int[] {1, 2, 3, 4, 5};
+        System.arraycopy(shiftLeft, 1, shiftLeft, 0, 4);
+        if (shiftLeft[0] == 2 && shiftLeft[1] == 3 && shiftLeft[2] == 4
+                && shiftLeft[3] == 5 && shiftLeft[4] == 5) {
+            score |= 512;
+        }
+
         result = score;
         System.exit(score);
     }

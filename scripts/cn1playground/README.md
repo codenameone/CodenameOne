@@ -484,3 +484,16 @@ Use this process when adding or fixing Java syntax support in Playground:
 ## Contributing
 
 See the main Codename One repository for contribution guidelines.
+
+## JavaScript Browser Input Check
+
+To verify the JavaScript playground's lightweight editor in a real browser, serve a built
+`CN1Playground-js` directory and run:
+
+```bash
+node tools/verify-lightweight-editor-input.mjs http://127.0.0.1:8767/
+```
+
+The Playwright check types spaces without a delay, moves the caret with arrow keys, replaces the
+document with a rapid marker, negotiates a multi-flavor clipboard paste, and verifies that the editor
+canvas visibly repaints.

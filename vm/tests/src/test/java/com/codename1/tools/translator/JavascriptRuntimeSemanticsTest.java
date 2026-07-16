@@ -287,8 +287,8 @@ class JavascriptRuntimeSemanticsTest {
     void preservesPrimitiveArrayLiteralAndCopySemanticsInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
         WorkerRunResult result = translateAndRunFixture(config, "JsPrimitiveArraySemanticsApp.java", "JsPrimitiveArraySemanticsApp");
 
-        assertEquals(255, result.result,
-                "Translated runtime should preserve primitive byte[]/float[] literals and System.arraycopy semantics. raw="
+        assertEquals(1023, result.result,
+                "Translated runtime should preserve primitive array literals and overlapping System.arraycopy semantics. raw="
                         + result.rawMessage + " err=" + result.errorMessage);
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
     }

@@ -5194,7 +5194,15 @@ bindNative(["cn1_java_lang_System_nanoTime_R_long", "cn1_java_lang_System_nanoTi
 });
 bindNative(["cn1_java_lang_System_identityHashCode_java_lang_Object_R_int", "cn1_java_lang_System_identityHashCode___java_lang_Object_R_int"], function(obj) { return identityHash(obj); });
 bindNative(["cn1_java_lang_System_arraycopy_java_lang_Object_int_java_lang_Object_int_int", "cn1_java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int"], function(src, srcOffset, dst, dstOffset, length) {
-  for (let i = 0; i < length; i++) dst[dstOffset + i] = src[srcOffset + i];
+  // System.arraycopy has memmove semantics when source and destination ranges
+  // overlap.  Copying forward unconditionally corrupts right-shifts such as
+  // StringBuilder.insert(), repeating the character at the insertion point
+  // through the rest of the buffer.
+  if (src === dst && dstOffset > srcOffset && dstOffset < srcOffset + length) {
+    for (let i = length - 1; i >= 0; i--) dst[dstOffset + i] = src[srcOffset + i];
+  } else {
+    for (let i = 0; i < length; i++) dst[dstOffset + i] = src[srcOffset + i];
+  }
   return null;
 });
 bindNative(["cn1_java_lang_System_gcLight", "cn1_java_lang_System_gcLight__"], function() { return null; });

@@ -566,6 +566,25 @@
     if ('altKey'   in evt) out.altKey   = !!evt.altKey;
     if ('metaKey'  in evt) out.metaKey  = !!evt.metaKey;
     if ('repeat'   in evt) out.repeat   = !!evt.repeat;
+    if ('inputType' in evt) out.inputType = evt.inputType == null ? '' : String(evt.inputType);
+    if ('isComposing' in evt) out.isComposing = !!evt.isComposing;
+    if (evt.clipboardData) {
+      var clipboardTypes = ['text/plain', 'text/html', 'text/rtf', 'text/markdown', 'text/asciidoc'];
+      var clipboardDataByType = {};
+      for (var clipboardIndex = 0; clipboardIndex < clipboardTypes.length; clipboardIndex++) {
+        var clipboardType = clipboardTypes[clipboardIndex];
+        try {
+          clipboardDataByType[clipboardType] = evt.clipboardData.getData(clipboardType) || '';
+        } catch (clipboardErr) {
+          clipboardDataByType[clipboardType] = '';
+        }
+      }
+      out.clipboardDataByType = clipboardDataByType;
+      if (evt.clipboardData.files && evt.clipboardData.files.length > 0
+              && typeof storeHostRef === 'function') {
+        out.clipboardFiles = storeHostRef(evt.clipboardData.files);
+      }
+    }
     // MessageEvent fields (window.postMessage / BrowserComponent.onMessage).
     // Without these the worker-side MessageEvent.getDataAsString() returns null
     // and the source-identity check (getEventSource(e) == iframe.contentWindow)
@@ -630,6 +649,43 @@
         payload = null;
       }
       try {
+        // A worker callback cannot call preventDefault() inside the browser's
+        // dispatch window.  Lightweight text input marks its hidden textarea
+        // so the small set of events consumed by Java are cancelled here,
+        // before they can also mutate the native textarea and race the editor
+        // state sent back by the worker.
+        var eventTarget = event && event.target;
+        var eventCurrentTarget = event && event.currentTarget;
+        var workerTextInput = !!((eventTarget && eventTarget.getAttribute
+                && eventTarget.getAttribute('data-cn1-worker-text-input') === 'true')
+                || (eventCurrentTarget && eventCurrentTarget.getAttribute
+                && eventCurrentTarget.getAttribute('data-cn1-worker-text-input') === 'true'));
+        var cancelWorkerTextInputEvent = false;
+        if (workerTextInput && event) {
+          if (event.type === 'beforeinput') {
+            var inputType = event.inputType || '';
+            cancelWorkerTextInputEvent = inputType === 'insertText'
+                    || inputType === 'insertReplacementText'
+                    || inputType === 'insertLineBreak'
+                    || inputType === 'insertParagraph'
+                    || inputType === 'deleteContentBackward'
+                    || inputType === 'deleteContentForward'
+                    || inputType === 'historyUndo'
+                    || inputType === 'historyRedo';
+          } else if (event.type === 'keydown') {
+            var keyCode = event.keyCode | 0;
+            var commandModifier = !!(event.ctrlKey || event.metaKey);
+            cancelWorkerTextInputEvent = (commandModifier && (keyCode === 65 || keyCode === 89 || keyCode === 90))
+                    || keyCode === 8 || keyCode === 9 || keyCode === 27
+                    || (keyCode >= 33 && keyCode <= 40) || keyCode === 46;
+          } else if (event.type === 'copy' || event.type === 'cut' || event.type === 'paste') {
+            cancelWorkerTextInputEvent = true;
+          }
+        }
+        if (cancelWorkerTextInputEvent) {
+          if (typeof event.preventDefault === 'function') event.preventDefault();
+          if (typeof event.stopPropagation === 'function') event.stopPropagation();
+        }
         target.postMessage({
           type: 'worker-callback',
           callbackId: callbackId,

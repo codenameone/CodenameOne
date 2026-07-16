@@ -36,6 +36,7 @@ import com.codename1.impl.html5.JSOImplementations.CompositionEvent;
 import com.codename1.impl.html5.JSOImplementations.HTMLIFrameElement;
 import com.codename1.impl.html5.JSOImplementations.HTMLMediaElement;
 import com.codename1.impl.html5.JSOImplementations.ImageExt;
+import com.codename1.impl.html5.JSOImplementations.InputEvent;
 import com.codename1.impl.html5.JSOImplementations.KeyEvent;
 import com.codename1.impl.html5.JSOImplementations.Navigator;
 import com.codename1.impl.html5.JSOImplementations.TextElement;
@@ -247,6 +248,8 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private TextInputState lightweightTextInputState;
     private HTMLTextAreaElement lightweightTextInputElement;
     private boolean lightweightTextInputComposing;
+    private final List<Runnable> lightweightTextInputQueue = new ArrayList<Runnable>();
+    private boolean lightweightTextInputDrainScheduled;
     private boolean editingStartingUp;
     private static double devicePixelRatio=-1;
     private EasyThread nativeEdt;
@@ -1250,20 +1253,25 @@ public class HTML5Implementation extends CodenameOneImplementation {
         Window.current().dispatchEvent(evt);
     }
     
-    @JSBody(params={"evt", "mimeType"}, script="try {return evt.clipboardData.getData(mimeType)}catch(e){return ''}")
-    private native static String getPasteEventData(Event evt, String mimeType);
+    @JSBody(params={"evt", "mimeType"}, script="try {var types=['text/plain','text/html','text/rtf','text/markdown','text/asciidoc']; var type=types[mimeType]; if (evt.clipboardDataByType) return evt.clipboardDataByType[type] || ''; return evt.clipboardData.getData(type)}catch(e){return ''}")
+    private native static String getPasteEventData(Event evt, int mimeType);
     
-    @JSBody(params={"evt"}, script="try {return evt.clipboardData.files;} catch(e){return null}")
+    @JSBody(params={"evt"}, script="try {if (evt.clipboardFiles) return evt.clipboardFiles; return evt.clipboardData.files;} catch(e){return null}")
     private native static FileList getPasteEventFileList(Event evt);
     
     private void firePasteEvent() {
+        final TextInputClient client = lightweightTextInputClient;
+        if (client != null) {
+            enqueueLightweightTextInput(client, new Runnable() {
+                @Override
+                public void run() {
+                    client.onKeyCommand(TextInputClient.KEY_PASTE, 0);
+                }
+            });
+            return;
+        }
         callSerially(new Runnable() {
             public void run() {
-                TextInputClient client = lightweightTextInputClient;
-                if (client != null) {
-                    client.onKeyCommand(TextInputClient.KEY_PASTE, 0);
-                    return;
-                }
                 Form f = CN.getCurrentForm();
                 if (f == null) {
                     return;
@@ -1493,11 +1501,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     // second time and discard HTML/RTF/Markdown/AsciiDoc flavors.
                     evt.preventDefault();
                 }
-                String plainText = getPasteEventData(evt, "text/plain");
-                String htmlText = getPasteEventData(evt, "text/html");
-                String rtfText = getPasteEventData(evt, "text/rtf");
-                String markdownText = getPasteEventData(evt, "text/markdown");
-                String asciidocText = getPasteEventData(evt, "text/asciidoc");
+                String plainText = getPasteEventData(evt, 0);
+                String htmlText = getPasteEventData(evt, 1);
+                String rtfText = getPasteEventData(evt, 2);
+                String markdownText = getPasteEventData(evt, 3);
+                String asciidocText = getPasteEventData(evt, 4);
                 FileList files = getPasteEventFileList(evt);
                 String[] filePaths = null;
                 if (files != null) {
@@ -1517,19 +1525,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
                             .setData(ClipboardContent.MIME_RTF, emptyToNull(rtfText))
                             .setData(ClipboardContent.MIME_MARKDOWN, emptyToNull(markdownText))
                             .setData(ClipboardContent.MIME_ASCIIDOC, emptyToNull(asciidocText));
-                    HTML5Implementation.super.copyToClipboard(content);
+                    setPasteDataFromClipboard(content);
                     firePasteEvent();
                     return;
                 }
                 JavaScriptBrowserLifecycleCoordinator.handlePaste(new JavaScriptBrowserLifecycleCoordinator.PasteHooks() {
                     @Override
                     public void copyPlainText(String text) {
-                        HTML5Implementation.super.copyToClipboard(text);
+                        setPasteDataFromClipboard(text);
                     }
 
                     @Override
                     public void copyRichText(String plainText, String html) {
-                        HTML5Implementation.super.copyToClipboard(new ClipboardContent()
+                        setPasteDataFromClipboard(new ClipboardContent()
                                 .setData(ClipboardContent.MIME_TEXT, plainText)
                                 .setData(ClipboardContent.MIME_HTML, html));
                     }
@@ -1540,7 +1548,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         for (int i = 0; i < paths.length; i++) {
                             cn1Files[i] = new com.codename1.io.File(paths[i]);
                         }
-                        HTML5Implementation.super.copyToClipboard(cn1Files);
+                        setPasteDataFromClipboard(cn1Files);
                     }
 
                     @Override
@@ -2521,6 +2529,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         lightweightTextInputConfig = config == null ? client.getConfig() : config;
         lightweightTextInputState = client.getEditingState();
         lightweightTextInputComposing = false;
+        clearLightweightTextInputQueue();
         configureLightweightTextInputElement();
         syncLightweightTextInputElement(lightweightTextInputState);
         lightweightTextInputElement.getStyle().setProperty("display", "block");
@@ -2550,6 +2559,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         lightweightTextInputConfig = null;
         lightweightTextInputState = null;
         lightweightTextInputComposing = false;
+        clearLightweightTextInputQueue();
         if (lightweightTextInputElement != null) {
             lightweightTextInputElement.blur();
             lightweightTextInputElement.getStyle().setProperty("display", "none");
@@ -2564,6 +2574,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         final HTMLTextAreaElement element = (HTMLTextAreaElement) doc().createElement("textarea");
         lightweightTextInputElement = element;
         element.setAttribute("class", "cn1-lightweight-text-input");
+        element.setAttribute("data-cn1-worker-text-input", "true");
         element.setAttribute("aria-hidden", "true");
         element.setTabIndex(-1);
         CSSStyleDeclaration style = element.getStyle();
@@ -2584,6 +2595,35 @@ public class HTML5Implementation extends CodenameOneImplementation {
         style.setProperty("resize", "none");
         style.setProperty("overflow", "hidden");
 
+        element.addEventListener("beforeinput", new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                final InputEvent input = (InputEvent) evt;
+                final TextInputClient client = lightweightTextInputClient;
+                if (client == null || input.isComposing()) {
+                    return;
+                }
+                final String inputType = input.getInputType();
+                final String data = input.getData();
+                if (!isHandledLightweightBeforeInput(inputType)) {
+                    return;
+                }
+                // Keep the hidden textarea from mutating independently of the Java document. Full
+                // textarea value snapshots race the worker/EDT round-trip and can overwrite a later
+                // keystroke. Queue the browser's explicit edit operation instead, preserving order.
+                evt.preventDefault();
+                evt.stopPropagation();
+                enqueueLightweightTextInput(client, new Runnable() {
+                    @Override
+                    public void run() {
+                        if (client == lightweightTextInputClient) {
+                            applyLightweightBeforeInput(client, inputType, data);
+                        }
+                    }
+                });
+            }
+        }, true);
+
         element.addEventListener("input", new EventListener() {
             @Override
             public void handleEvent(Event evt) {
@@ -2595,7 +2635,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 if (client == null) {
                     return;
                 }
-                callSerially(new Runnable() {
+                enqueueLightweightTextInput(client, new Runnable() {
                     @Override
                     public void run() {
                         if (client == lightweightTextInputClient) {
@@ -2606,27 +2646,32 @@ public class HTML5Implementation extends CodenameOneImplementation {
             }
         }, true);
 
-        EventListener selectionListener = new EventListener() {
+        element.addEventListener("paste", new EventListener() {
             @Override
             public void handleEvent(Event evt) {
                 final TextInputClient client = lightweightTextInputClient;
-                final int start = element.getSelectionStart();
-                final int end = element.getSelectionEnd();
-                if (client == null || lightweightTextInputComposing) {
+                if (client == null) {
                     return;
                 }
-                callSerially(new Runnable() {
+                evt.preventDefault();
+                evt.stopPropagation();
+                final ClipboardContent content = new ClipboardContent()
+                        .setData(ClipboardContent.MIME_TEXT, getPasteEventData(evt, 0))
+                        .setData(ClipboardContent.MIME_HTML, emptyToNull(getPasteEventData(evt, 1)))
+                        .setData(ClipboardContent.MIME_RTF, emptyToNull(getPasteEventData(evt, 2)))
+                        .setData(ClipboardContent.MIME_MARKDOWN, emptyToNull(getPasteEventData(evt, 3)))
+                        .setData(ClipboardContent.MIME_ASCIIDOC, emptyToNull(getPasteEventData(evt, 4)));
+                enqueueLightweightTextInput(client, new Runnable() {
                     @Override
                     public void run() {
                         if (client == lightweightTextInputClient) {
-                            client.setSelectionRange(start, end);
+                            setPasteDataFromClipboard(content);
+                            client.onKeyCommand(TextInputClient.KEY_PASTE, 0);
                         }
                     }
                 });
             }
-        };
-        element.addEventListener("select", selectionListener, true);
-        element.addEventListener("keyup", selectionListener, true);
+        }, true);
 
         element.addEventListener("keydown", new EventListener() {
             @Override
@@ -2641,7 +2686,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 if (command != 0) {
                     evt.preventDefault();
                     evt.stopPropagation();
-                    callSerially(new Runnable() {
+                    enqueueLightweightTextInput(client, new Runnable() {
                         @Override
                         public void run() {
                             if (client == lightweightTextInputClient) {
@@ -2652,7 +2697,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 } else if (key.getKeyCode() == 9) {
                     evt.preventDefault();
                     evt.stopPropagation();
-                    callSerially(new Runnable() {
+                    enqueueLightweightTextInput(client, new Runnable() {
                         @Override
                         public void run() {
                             if (client == lightweightTextInputClient) {
@@ -2666,7 +2711,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                     evt.preventDefault();
                     evt.stopPropagation();
                     final int action = lightweightTextInputConfig.getActionType();
-                    callSerially(new Runnable() {
+                    enqueueLightweightTextInput(client, new Runnable() {
                         @Override
                         public void run() {
                             if (client == lightweightTextInputClient) {
@@ -2692,7 +2737,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 if (client == null) {
                     return;
                 }
-                callSerially(new Runnable() {
+                enqueueLightweightTextInput(client, new Runnable() {
                     @Override
                     public void run() {
                         if (client == lightweightTextInputClient) {
@@ -2712,7 +2757,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 if (client == null) {
                     return;
                 }
-                callSerially(new Runnable() {
+                enqueueLightweightTextInput(client, new Runnable() {
                     @Override
                     public void run() {
                         if (client == lightweightTextInputClient) {
@@ -2750,6 +2795,38 @@ public class HTML5Implementation extends CodenameOneImplementation {
             modifiers |= TextInputClient.MOD_ALT;
         }
         return modifiers;
+    }
+
+    private static boolean isHandledLightweightBeforeInput(String inputType) {
+        return "insertText".equals(inputType)
+                || "insertReplacementText".equals(inputType)
+                || "insertLineBreak".equals(inputType)
+                || "insertParagraph".equals(inputType)
+                || "deleteContentBackward".equals(inputType)
+                || "deleteContentForward".equals(inputType)
+                || "historyUndo".equals(inputType)
+                || "historyRedo".equals(inputType);
+    }
+
+    private void applyLightweightBeforeInput(TextInputClient client, String inputType, String data) {
+        if ("insertText".equals(inputType) || "insertReplacementText".equals(inputType)) {
+            client.commitText(data == null ? "" : data);
+        } else if ("insertLineBreak".equals(inputType) || "insertParagraph".equals(inputType)) {
+            TextInputConfig config = lightweightTextInputConfig;
+            if (config == null || config.isMultiline()) {
+                client.commitText("\n");
+            } else {
+                client.onEditorAction(config.getActionType());
+            }
+        } else if ("deleteContentBackward".equals(inputType)) {
+            client.onKeyCommand(TextInputClient.KEY_BACKSPACE, 0);
+        } else if ("deleteContentForward".equals(inputType)) {
+            client.onKeyCommand(TextInputClient.KEY_DELETE, 0);
+        } else if ("historyUndo".equals(inputType)) {
+            client.onKeyCommand(TextInputClient.KEY_UNDO, 0);
+        } else if ("historyRedo".equals(inputType)) {
+            client.onKeyCommand(TextInputClient.KEY_REDO, 0);
+        }
     }
 
     private static int lightweightKeyCommand(KeyEvent key, int modifiers) {
@@ -2804,7 +2881,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         evt.preventDefault();
         evt.stopPropagation();
-        callSerially(new Runnable() {
+        enqueueLightweightTextInput(client, new Runnable() {
             @Override
             public void run() {
                 if (client == lightweightTextInputClient) {
@@ -2812,6 +2889,50 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 }
             }
         });
+    }
+
+    private void enqueueLightweightTextInput(final TextInputClient client, Runnable operation) {
+        boolean scheduleDrain = false;
+        synchronized (lightweightTextInputQueue) {
+            if (client != lightweightTextInputClient) {
+                return;
+            }
+            lightweightTextInputQueue.add(operation);
+            if (!lightweightTextInputDrainScheduled) {
+                lightweightTextInputDrainScheduled = true;
+                scheduleDrain = true;
+            }
+        }
+        if (scheduleDrain) {
+            callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    drainLightweightTextInput(client);
+                }
+            });
+        }
+    }
+
+    private void drainLightweightTextInput(TextInputClient client) {
+        while (true) {
+            Runnable operation;
+            synchronized (lightweightTextInputQueue) {
+                if (client != lightweightTextInputClient || lightweightTextInputQueue.isEmpty()) {
+                    lightweightTextInputQueue.clear();
+                    lightweightTextInputDrainScheduled = false;
+                    return;
+                }
+                operation = lightweightTextInputQueue.remove(0);
+            }
+            operation.run();
+        }
+    }
+
+    private void clearLightweightTextInputQueue() {
+        synchronized (lightweightTextInputQueue) {
+            lightweightTextInputQueue.clear();
+            lightweightTextInputDrainScheduled = false;
+        }
     }
 
     private void configureLightweightTextInputElement() {

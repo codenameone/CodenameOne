@@ -5216,6 +5216,17 @@ public abstract class CodenameOneImplementation {
         return lightweightClipboard;
     }
 
+    /// Stores clipboard data received from a native paste event without publishing it back to the
+    /// system clipboard. Ports that negotiate multiple native clipboard representations should call
+    /// this before dispatching the framework paste event.
+    ///
+    /// #### Parameters
+    ///
+    /// - `data`: the clipboard payload exposed to `getPasteDataFromClipboard()`
+    protected final void setPasteDataFromClipboard(Object data) {
+        lightweightClipboard = data;
+    }
+
     /// Returns the clipboard representations available to framework code. The default adapter keeps
     /// old ports source-compatible while exposing plain text and content written through the new API.
     public ClipboardContent getClipboardContent() {
