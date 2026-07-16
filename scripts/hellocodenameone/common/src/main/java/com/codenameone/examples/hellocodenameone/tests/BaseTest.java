@@ -93,24 +93,32 @@ public abstract class BaseTest extends AbstractTest {
     /// flushes on the slower ports) capture too early with a plain ready callback and too
     /// flakily with fixed settle timers; gating on the first real paint is exact on every port.
     protected static final class FirstPaintGate extends com.codename1.ui.Container {
+        private final com.codename1.ui.Component content;
         private Runnable pending;
 
         public FirstPaintGate(com.codename1.ui.Component content) {
             super(new com.codename1.ui.layouts.BorderLayout());
+            this.content = content;
             add(com.codename1.ui.layouts.BorderLayout.CENTER, content);
         }
 
         /// Schedules {@code r} (serially on the EDT) after the next completed paint of this
-        /// container's subtree.
+        /// container's subtree in which the content has real bounds. A paint that happens
+        /// before layout assigned the content its size draws nothing yet, so firing there
+        /// would capture an empty frame; instead ask for another cycle and fire on it.
         public void runAfterNextPaint(Runnable r) {
             pending = r;
-            repaint();
+            revalidateLater();
         }
 
         @Override
         public void paint(com.codename1.ui.Graphics g) {
             super.paint(g);
             if (pending != null) {
+                if (content.getWidth() <= 0 || content.getHeight() <= 0) {
+                    revalidateLater();
+                    return;
+                }
                 Runnable r = pending;
                 pending = null;
                 com.codename1.ui.CN.callSerially(r);
