@@ -23,7 +23,7 @@
 
 package com.codenameone.examples.hellocodenameone.tests;
 
-import com.bench.Bench;
+import com.bench.CommonWorkloads;
 
 /** Runs the canonical ParparVM common workloads inside every port app. */
 public class CommonWorkloadBenchmarkTest extends BaseTest {
@@ -46,34 +46,34 @@ public class CommonWorkloadBenchmarkTest extends BaseTest {
             System.gc();
             recordMemory();
             run("intArithmetic", new Workload() {
-                public long run() { return Bench.intArithmetic(); }
+                public long run() { return CommonWorkloads.intArithmetic(); }
             });
             run("longArithmetic", new Workload() {
-                public long run() { return Bench.longArithmetic(); }
+                public long run() { return CommonWorkloads.longArithmetic(); }
             });
             run("mathTranscendental", new Workload() {
-                public long run() { return Bench.mathTranscendental(); }
+                public long run() { return CommonWorkloads.mathTranscendental(); }
             });
             run("arraySequential", new Workload() {
-                public long run() { return Bench.arraySequential(); }
+                public long run() { return CommonWorkloads.arraySequential(); }
             });
             run("arrayRandom", new Workload() {
-                public long run() { return Bench.arrayRandom(); }
+                public long run() { return CommonWorkloads.arrayRandom(); }
             });
             run("objectAllocation", new Workload() {
-                public long run() { return Bench.objectAllocation(); }
+                public long run() { return CommonWorkloads.objectAllocation(); }
             });
             run("hashMapChurn", new Workload() {
-                public long run() { return Bench.hashMapChurn(); }
+                public long run() { return CommonWorkloads.hashMapChurn(); }
             });
             run("stringBuilding", new Workload() {
-                public long run() { return Bench.stringBuilding(); }
+                public long run() { return CommonWorkloads.stringBuilding(); }
             });
             run("recursion", new Workload() {
-                public long run() { return Bench.recursion(); }
+                public long run() { return CommonWorkloads.recursion(); }
             });
             run("quicksort", new Workload() {
-                public long run() { return Bench.quicksortBench(); }
+                public long run() { return CommonWorkloads.quicksortBench(); }
             });
             emit("memory kind=managed-heap minimum_bytes=" + minimumUsedMemory
                     + " peak_bytes=" + peakUsedMemory);

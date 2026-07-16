@@ -24,7 +24,8 @@ mkdir -p target
 # host-JVM reference classes
 J8="${JDK_8_HOME:?set JDK_8_HOME}"
 mkdir -p target/host-classes
-"$J8/bin/javac" -nowarn -encoding UTF-8 -d target/host-classes common/src/main/java/com/bench/Bench.java
+"$J8/bin/javac" -nowarn -encoding UTF-8 -d target/host-classes \
+    src/com/bench/Bench.java common/src/main/java/com/bench/CommonWorkloads.java
 
 python3 - "$OUT" "$REF_JAVA" "$ROUNDS" <<'EOF'
 import subprocess, re, math, sys

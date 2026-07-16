@@ -31,21 +31,16 @@ import java.util.HashMap;
  * java.util collections, so the identical source compiles & runs on both Java SE
  * and ParparVM (translated to C).
  *
- * Anti-JIT design: every benchmark folds its work into a long checksum that is
- * printed at the end (defeats dead-code elimination), and every hot loop carries
+ * Anti-JIT design: every benchmark folds its work into a long checksum returned
+ * to its caller (defeats dead-code elimination), and every hot loop carries
  * a cross-iteration data dependency (defeats constant folding / hoisting /
  * auto-vectorizing the whole loop away). Fixed seeds keep results deterministic
  * so the checksum can be cross-checked between the two runtimes.
- *
- * Output is line-oriented and machine-parseable:
- *   BENCH <name> rep <i> ns=<elapsed> checksum=<c>
- *   DONE
  */
-public class Bench {
+public final class CommonWorkloads {
 
-    // warmup runs (discarded) and measured runs (reported) per benchmark
-    static final int WARMUP = 3;
-    static final int MEASURE = 5;
+    private CommonWorkloads() {
+    }
 
     // ---- 1. integer arithmetic: dependent ALU chain ----
     public static long intArithmetic() {
@@ -225,29 +220,4 @@ public class Bench {
         return checksum;
     }
 
-    interface BenchFn { long run(); }
-
-    static void runBench(String name, BenchFn fn) {
-        for (int w = 0; w < WARMUP; w++) fn.run();
-        for (int r = 0; r < MEASURE; r++) {
-            long t0 = System.nanoTime();
-            long checksum = fn.run();
-            long ns = System.nanoTime() - t0;
-            System.out.println("BENCH " + name + " rep " + r + " ns=" + ns + " checksum=" + checksum);
-        }
-    }
-
-    public static void main(String[] args) {
-        runBench("intArithmetic",     new BenchFn() { public long run() { return intArithmetic(); } });
-        runBench("longArithmetic",    new BenchFn() { public long run() { return longArithmetic(); } });
-        runBench("mathTranscendental",new BenchFn() { public long run() { return mathTranscendental(); } });
-        runBench("arraySequential",   new BenchFn() { public long run() { return arraySequential(); } });
-        runBench("arrayRandom",       new BenchFn() { public long run() { return arrayRandom(); } });
-        runBench("objectAllocation",  new BenchFn() { public long run() { return objectAllocation(); } });
-        runBench("hashMapChurn",      new BenchFn() { public long run() { return hashMapChurn(); } });
-        runBench("stringBuilding",    new BenchFn() { public long run() { return stringBuilding(); } });
-        runBench("recursion",         new BenchFn() { public long run() { return recursion(); } });
-        runBench("quicksort",         new BenchFn() { public long run() { return quicksortBench(); } });
-        System.out.println("DONE");
-    }
 }

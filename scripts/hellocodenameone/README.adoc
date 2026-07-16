@@ -102,7 +102,7 @@ or a temporary data-branch failure; there is no client-side fetch.
 
 The performance section is generated from the same port reports. Every target
 runs the canonical ten workloads from
-`vm/benchmarks/common/src/main/java/com/bench/Bench.java`
+`vm/benchmarks/common/src/main/java/com/bench/CommonWorkloads.java`
 inside its generated application. `CommonWorkloadBenchmarkTest` records the
 minimum of five measurements after three in-process warm-ups, plus the minimum
 and peak managed-heap use observed during the run. The host-side runner records

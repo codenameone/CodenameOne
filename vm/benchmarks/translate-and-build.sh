@@ -50,10 +50,12 @@ fi
 # 4. compile the benchmark class against JavaAPI only. Bench is shared with
 # the generated port application; torture programs remain in src/com/bench.
 mkdir -p "$WORK/classes"
-SOURCE="src/com/bench/$MAIN.java"
-[ "$MAIN" = "Bench" ] && SOURCE="common/src/main/java/com/bench/Bench.java"
+SOURCES=("src/com/bench/$MAIN.java")
+if [ "$MAIN" = "Bench" ]; then
+    SOURCES+=("common/src/main/java/com/bench/CommonWorkloads.java")
+fi
 "$J8/bin/javac" -nowarn -encoding UTF-8 -bootclasspath "$JAVAAPI" -source 1.8 -target 1.8 \
-    -d "$WORK/classes" "$SOURCE"
+    -d "$WORK/classes" "${SOURCES[@]}"
 
 # 5. translate to C
 mkdir -p "$WORK/out"
