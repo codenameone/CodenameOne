@@ -184,6 +184,91 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         task.execute();
     }
 
+    /**
+     * Fails the build when the staged jar-with-dependencies contains an
+     * application class that references another application class which is not
+     * in the jar. Stale build output causes exactly this -- e.g. an IDE deletes
+     * the class files of removed/renamed sources while a dependent class
+     * compiled against them survives in target/classes, and an incremental
+     * Maven compile then ships it. The server-side VM translators only warn
+     * about the dangling reference and the build later fails with an obscure
+     * native compiler error (a missing generated header on iOS), so catch it
+     * here with an actionable message before uploading anything.
+     */
+    private void verifyApplicationClassClosure(File jarWithDependencies, List<String> cpElements) throws MojoFailureException {
+        if ("true".equals(System.getProperty("codename1.skipClassClosureCheck", "false"))
+                || "true".equals(project.getProperties().getProperty("codename1.skipClassClosureCheck", "false"))) {
+            getLog().info("Skipping application class closure check because codename1.skipClassClosureCheck=true");
+            return;
+        }
+        // The project package space: compiled output directories plus module
+        // jars owned by this build (the app's common jar reaches the platform
+        // modules as a jar dependency, identified by the shared groupId).
+        List<File> projectClassRoots = new ArrayList<File>();
+        for (String element : cpElements) {
+            File dir = new File(element);
+            if (dir.isDirectory()) {
+                projectClassRoots.add(dir);
+            }
+        }
+        for (Artifact artifact : project.getArtifacts()) {
+            if (project.getGroupId().equals(artifact.getGroupId())) {
+                File jar = getJar(artifact);
+                if (jar != null && jar.isFile()) {
+                    projectClassRoots.add(jar);
+                }
+            }
+        }
+        // Classes stripped from the upload that the build server re-supplies:
+        // references into them are not missing.
+        List<File> providedJars = new ArrayList<File>();
+        for (Artifact artifact : project.getArtifacts()) {
+            boolean providedByServer = GROUP_ID.equals(artifact.getGroupId())
+                    && contains(artifact.getArtifactId(), BUNDLE_ARTIFACT_ID_BLACKLIST);
+            providedByServer = providedByServer || ("org.jetbrains.kotlin".equals(artifact.getGroupId())
+                    && "kotlin-stdlib".equals(artifact.getArtifactId()));
+            if (providedByServer) {
+                File jar = getJar(artifact);
+                if (jar != null && jar.isFile()) {
+                    providedJars.add(jar);
+                }
+            }
+        }
+        Map<String, Set<String>> missing;
+        try {
+            missing = ClassClosureVerifier.findMissingProjectReferences(jarWithDependencies, projectClassRoots, providedJars);
+        } catch (IOException ex) {
+            getLog().warn("Could not verify the consistency of the application classes: " + ex.getMessage());
+            return;
+        }
+        if (missing.isEmpty()) {
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("The compiled application classes are inconsistent. The following class");
+        sb.append(missing.size() == 1 ? " is" : "es are");
+        sb.append(" referenced by your code but missing from the build:\n");
+        for (Map.Entry<String, Set<String>> e : missing.entrySet()) {
+            sb.append(" - ").append(e.getKey().replace('/', '.'))
+                    .append(" (referenced from ");
+            boolean first = true;
+            for (String referencing : e.getValue()) {
+                if (!first) {
+                    sb.append(", ");
+                }
+                first = false;
+                sb.append(referencing.replace('/', '.'));
+            }
+            sb.append(")\n");
+        }
+        sb.append("This usually means the build output contains stale classes from a previous build,\n");
+        sb.append("e.g. after renaming, moving or deleting a class, or switching branches, without a\n");
+        sb.append("clean rebuild. Run 'mvn clean' and rebuild. If a listed class was removed\n");
+        sb.append("intentionally, also remove or update the code that still references it.\n");
+        sb.append("To bypass this check build with -Dcodename1.skipClassClosureCheck=true");
+        throw new MojoFailureException(sb.toString());
+    }
+
 
     /**
      * Localized launcher icons (cn1_icon_&lt;lang&gt;[_&lt;country&gt;].png) are scaled up to the
@@ -594,6 +679,8 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
             mergeJars(jarWithDependencies, jarsToMerge.toArray(new File[jarsToMerge.size()]));
 
         }
+
+        verifyApplicationClassClosure(jarWithDependencies, cpElements);
 
         try {
             updateCodenameOne(false);
