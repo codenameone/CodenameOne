@@ -21,12 +21,26 @@ if (!url) {
 }
 
 const browser = await chromium.launch({headless: true});
+let page;
+let completed = false;
 try {
-  const page = await browser.newPage({viewport: {width: 1440, height: 900}});
+  page = await browser.newPage({viewport: {width: 1440, height: 900}});
   page.on('console', message => {
-    if (message.type() === 'error') {
+    if (message.type() === 'error'
+        && message.text() !== 'Failed to load resource: net::ERR_FAILED'
+        && !message.text().includes('cloudflareinsights.com/cdn-cgi/rum')) {
       console.error(`Browser console: ${message.text()}`);
     }
+  });
+  page.on('pageerror', error => {
+    console.error(`Browser page error: ${error.stack || error.message || String(error)}`);
+  });
+  page.on('requestfailed', request => {
+    if (request.url().includes('cloudflareinsights.com/cdn-cgi/rum')) {
+      return;
+    }
+    const failure = request.failure();
+    console.error(`Browser request failed: ${request.url()} (${failure ? failure.errorText : 'unknown error'})`);
   });
   await page.goto(url, {waitUntil: 'domcontentloaded', timeout: 30000});
   const wrapperFrame = await page.waitForFunction(() => {
@@ -35,16 +49,37 @@ try {
   }, null, {timeout: 30000});
   await wrapperFrame.dispose();
 
-  const appFrame = page.frames().find(frame => frame.url().includes('/playground-app/')) || page.mainFrame();
-  await appFrame.waitForFunction(() => window.cn1Started === true, null, {timeout: 30000});
+  let appFrame = page.frames().find(frame => frame.url().includes('/playground-app/'));
+  for (let i = 0; !appFrame && i < 150; i++) {
+    await page.waitForTimeout(200);
+    appFrame = page.frames().find(frame => frame.url().includes('/playground-app/'));
+  }
+  assert.ok(appFrame, 'Playground app iframe did not finish navigating');
+  await appFrame.waitForFunction(() => window.cn1Started === true, null, {timeout: 90000});
 
   const frameElement = appFrame === page.mainFrame() ? null : await appFrame.frameElement();
   const frameBox = frameElement ? await frameElement.boundingBox() : {x: 0, y: 0};
+  const messageCountBeforeClick = await appFrame.evaluate(() => (window.__parparMessages || []).length);
   await page.mouse.click(frameBox.x + 300, frameBox.y + 190);
-  await appFrame.waitForFunction(() => {
-    const input = document.querySelector('textarea.cn1-lightweight-text-input');
-    return input && document.activeElement === input;
-  }, null, {timeout: 5000});
+  try {
+    await appFrame.waitForFunction(() => {
+      const input = document.querySelector('textarea.cn1-lightweight-text-input');
+      return input && document.activeElement === input;
+    }, null, {timeout: 5000});
+  } catch (error) {
+    console.error('Editor focus diagnostics:', JSON.stringify(await appFrame.evaluate(beforeCount => ({
+      activeElement: document.activeElement && document.activeElement.outerHTML,
+      textareas: Array.from(document.querySelectorAll('textarea')).map(input => input.outerHTML),
+      canvases: Array.from(document.querySelectorAll('canvas')).map(canvas => ({
+        className: canvas.className,
+        rect: canvas.getBoundingClientRect().toJSON()
+      })),
+      cn1Started: window.cn1Started,
+      parparError: window.__parparError,
+      messageTypesAfterClick: (window.__parparMessages || []).slice(beforeCount).map(message => message && message.type)
+    }), messageCountBeforeClick)).substring(0, 16000));
+    throw error;
+  }
 
   const initial = await appFrame.evaluate(() => {
     const input = document.querySelector('textarea.cn1-lightweight-text-input');
@@ -129,6 +164,12 @@ try {
     await page.screenshot({path: `${artifactDir}/playground-lightweight-input.png`, fullPage: true});
   }
   console.log('PASS: lightweight playground input accepted spaces, arrows, rapid text, negotiated paste, and visibly repainted.');
+  completed = true;
 } finally {
+  const artifactDir = process.env.PLAYGROUND_INPUT_ARTIFACT_DIR;
+  if (page && artifactDir && !completed) {
+    await page.screenshot({path: `${artifactDir}/playground-lightweight-input-final.png`, fullPage: true}).catch(() => {});
+    console.error('Browser frames:', page.frames().map(frame => frame.url()));
+  }
   await browser.close();
 }
