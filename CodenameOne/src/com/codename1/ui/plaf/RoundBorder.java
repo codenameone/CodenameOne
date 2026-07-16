@@ -689,26 +689,30 @@ public final class RoundBorder extends Border {
                 return;
             }
             if (stroke && this.stroke != null && strokeGradient && strokeAngle == 360 && g.isShapeClipSupported()) {
-                // Gradient-stroked circle: fill the background to the full edge,
-                // then paint a translucent `sw`-wide gradient RING over the rim.
-                // The ring is one two-contour shape (inner contour reversed, so
-                // the default non-zero winding leaves the ring) -- the previous
-                // outer-gradient-fill-then-inner-background-fill construction
-                // rasterized the two edges independently, and at hairline widths
-                // their sub-pixel misregistration read as a broken, muddy stroke
-                // that mixed with the backdrop instead of glinting over the fill.
+                // Gradient-stroked circle, in three passes that hold on every
+                // port: (1) the background fills the FULL circle, (2) the
+                // translucent gradient paints over it clipped to the same
+                // circle, (3) the interior is restored clipped to the inset
+                // circle. Passes 2 and 3 go through the same clip+paint
+                // rasterizer, so the leftover `sw`-wide gradient ring has
+                // registration-stable edges even at hairline widths (the old
+                // gradient-fill-then-plain-inner-fill pair mixed two different
+                // rasterizers and read as a broken, muddy stroke), and because
+                // the background lies beneath it the ring glints over the fill
+                // instead of the backdrop. A multi-contour winding ring is NOT
+                // portable: the iOS/Metal clip unions subpaths.
                 int sw = Math.max(1, (int) Math.ceil(this.stroke.getLineWidth()));
                 GeneralPath outer = new GeneralPath();
                 outer.arc(x, y, size, size, 0, 2 * Math.PI);
                 g.fillShape(outer);
-                GeneralPath ring = new GeneralPath();
-                ring.arc(x, y, size, size, 0, 2 * Math.PI);
-                GeneralPath innerCircle = new GeneralPath();
-                innerCircle.arc(x + sw, y + sw, size - sw * 2, size - sw * 2, 0, 2 * Math.PI);
-                ring.append(reversePath(innerCircle), false);
                 g.setColor(makeStrokePaint(width, height));
                 g.setAlpha(strokeOpacity);
-                g.fillShape(ring);
+                g.fillShape(outer);
+                GeneralPath innerBg = new GeneralPath();
+                innerBg.arc(x + sw, y + sw, size - sw * 2, size - sw * 2, 0, 2 * Math.PI);
+                g.setColor(new SolidPaint(color));
+                g.setAlpha(opacity);
+                g.fillShape(innerBg);
             } else if (stroke && this.stroke != null) {
                 int sw = (int) Math.ceil(this.stroke.getLineWidth());
                 GeneralPath arc = new GeneralPath();
@@ -727,21 +731,19 @@ public final class RoundBorder extends Border {
         } else {
             float sw = (stroke && this.stroke != null) ? this.stroke.getLineWidth() : 0;
             if (stroke && this.stroke != null && strokeGradient && g.isShapeClipSupported()) {
-                // Gradient-stroked pill: fill the background to the full edge,
-                // then paint a translucent `sw`-wide gradient RING over the rim.
-                // The ring is one two-contour shape (inner contour reversed, so
-                // the default non-zero winding leaves the ring) -- the previous
-                // outer-gradient-fill-then-inner-background-fill construction
-                // rasterized the two edges independently, and at hairline widths
-                // their sub-pixel misregistration read as a broken, muddy stroke
-                // that mixed with the backdrop instead of glinting over the fill.
+                // Gradient-stroked pill; see the circle branch above for why
+                // this is three passes (background, gradient over it, interior
+                // restored) with the last two on the same clip+paint rasterizer
+                // rather than a multi-contour winding ring.
                 GeneralPath outer = createPillPath(width, height, 0);
                 g.fillShape(outer);
-                GeneralPath ring = createPillPath(width, height, 0);
-                ring.append(reversePath(createPillPath(width, height, Math.max(1f, sw))), false);
                 g.setColor(makeStrokePaint(width, height));
                 g.setAlpha(strokeOpacity);
-                g.fillShape(ring);
+                g.fillShape(outer);
+                GeneralPath innerBg = createPillPath(width, height, Math.max(1f, sw));
+                g.setColor(new SolidPaint(color));
+                g.setAlpha(opacity);
+                g.fillShape(innerBg);
                 return;
             }
             GeneralPath gp = createPillPath(width, height, sw);
@@ -752,75 +754,6 @@ public final class RoundBorder extends Border {
                 g.drawShape(gp, this.stroke);
             }
         }
-    }
-
-    /// Returns `src` traced in the OPPOSITE direction by walking its segments
-    /// backwards (cubic control points swapped). Appended after a forward outer
-    /// contour the reversed contour forms a RING under the default non-zero
-    /// winding rule, which every port's rasterizer honours (unlike even-odd,
-    /// which the JavaScript port's canvas fill does not plumb through).
-    private static GeneralPath reversePath(GeneralPath src) {
-        java.util.ArrayList<float[]> segs = new java.util.ArrayList<float[]>();
-        PathIterator it = src.getPathIterator();
-        float[] buf = new float[6];
-        while (!it.isDone()) {
-            int type = it.currentSegment(buf);
-            float[] seg;
-            if (type == PathIterator.SEG_CUBICTO) {
-                seg = new float[]{type, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]};
-            } else if (type == PathIterator.SEG_QUADTO) {
-                seg = new float[]{type, buf[0], buf[1], buf[2], buf[3]};
-            } else if (type == PathIterator.SEG_CLOSE) {
-                seg = new float[]{type};
-            } else {
-                seg = new float[]{type, buf[0], buf[1]};
-            }
-            segs.add(seg);
-            it.next();
-        }
-        GeneralPath out = new GeneralPath();
-        // endpoint of segment i (the pill contour is a single closed subpath)
-        int n = segs.size();
-        float startX = 0;
-        float startY = 0;
-        float[] endX = new float[n];
-        float[] endY = new float[n];
-        float curX = 0;
-        float curY = 0;
-        for (int i = 0; i < n; i++) {
-            float[] s = segs.get(i);
-            int type = (int) s[0];
-            if (type == PathIterator.SEG_MOVETO) {
-                startX = s[1];
-                startY = s[2];
-                curX = startX;
-                curY = startY;
-            } else if (type == PathIterator.SEG_CLOSE) {
-                curX = startX;
-                curY = startY;
-            } else {
-                curX = s[s.length - 2];
-                curY = s[s.length - 1];
-            }
-            endX[i] = curX;
-            endY[i] = curY;
-        }
-        out.moveTo(endX[n - 1], endY[n - 1]);
-        for (int i = n - 1; i >= 1; i--) {
-            float[] s = segs.get(i);
-            int type = (int) s[0];
-            float px = endX[i - 1];
-            float py = endY[i - 1];
-            if (type == PathIterator.SEG_CUBICTO) {
-                out.curveTo(s[3], s[4], s[1], s[2], px, py);
-            } else if (type == PathIterator.SEG_QUADTO) {
-                out.quadTo(s[1], s[2], px, py);
-            } else if (type == PathIterator.SEG_LINETO || type == PathIterator.SEG_CLOSE) {
-                out.lineTo(px, py);
-            }
-        }
-        out.closePath();
-        return out;
     }
 
     /// Builds the capsule (pill) outline inset from the edges by `sw` on every side.
@@ -862,6 +795,27 @@ public final class RoundBorder extends Border {
                 new float[]{0f, 1f}, new int[]{strokeColor, strokeColor2},
                 MultipleGradientPaint.CycleMethod.NO_CYCLE,
                 MultipleGradientPaint.ColorSpaceType.SRGB, null);
+    }
+
+    /// A solid-colour Paint. Filling through the clip+paint mechanism (rather
+    /// than a plain path fill) keeps the gradient stroke's inner edge on the
+    /// SAME rasterizer as the gradient pass, so the hairline ring between them
+    /// stays registration-stable on every port.
+    private static final class SolidPaint implements Paint {
+        private final int solidColor;
+
+        SolidPaint(int solidColor) {
+            this.solidColor = solidColor;
+        }
+
+        public void paint(Graphics g, com.codename1.ui.geom.Rectangle2D bounds) {
+            paint(g, bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
+        }
+
+        public void paint(Graphics g, double x, double y, double w, double h) {
+            g.setColor(solidColor);
+            g.fillRect((int) x, (int) y, (int) Math.ceil(w), (int) Math.ceil(h));
+        }
     }
 
     @Override
