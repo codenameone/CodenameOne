@@ -781,10 +781,12 @@ public final class RoundBorder extends Border {
         GeneralPath out = new GeneralPath();
         // endpoint of segment i (the pill contour is a single closed subpath)
         int n = segs.size();
-        float startX = 0, startY = 0;
+        float startX = 0;
+        float startY = 0;
         float[] endX = new float[n];
         float[] endY = new float[n];
-        float curX = 0, curY = 0;
+        float curX = 0;
+        float curY = 0;
         for (int i = 0; i < n; i++) {
             float[] s = segs.get(i);
             int type = (int) s[0];
@@ -807,7 +809,8 @@ public final class RoundBorder extends Border {
         for (int i = n - 1; i >= 1; i--) {
             float[] s = segs.get(i);
             int type = (int) s[0];
-            float px = endX[i - 1], py = endY[i - 1];
+            float px = endX[i - 1];
+            float py = endY[i - 1];
             if (type == PathIterator.SEG_CUBICTO) {
                 out.curveTo(s[3], s[4], s[1], s[2], px, py);
             } else if (type == PathIterator.SEG_QUADTO) {
