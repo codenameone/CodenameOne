@@ -218,6 +218,15 @@ jobs:
           mkdir -p "${ARTIFACTS_DIR}"
           ./scripts/run-javascript-browser-tests.sh "${{ steps.locate_bundle.outputs.bundle }}" "${GITHUB_WORKSPACE}/scripts/javascript/screenshots"
 
+      - name: Upload JavaScript port status
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: port-status-javascript
+          path: artifacts/javascript-ui-tests/port-status-javascript.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload JavaScript screenshot artifacts
         if: always()
         uses: actions/upload-artifact@v7

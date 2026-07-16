@@ -209,6 +209,8 @@ done < <(/usr/bin/find "$WS_RAW_DIR" -name '*.png' | sort)
 cp -f "$WS_RAW_DIR"/*.png "$ARTIFACTS_DIR/" 2>/dev/null || true
 
 COMPARE_JSON="$SS_TMP/compare.json"; SUMMARY_OUT="$SS_TMP/summary.txt"; COMMENT_OUT="$SS_TMP/comment.md"
+export CN1SS_PORT_ID="${CN1SS_PORT_ID:-watchos}"
+export CN1SS_SUITE_LOG="$WATCH_APP_LOG"
 
 # --- Gate (mirrors the iOS jobs, enforced centrally in scripts/lib/cn1ss.sh) -
 # The watch form factor is intentionally very different from the phone and some

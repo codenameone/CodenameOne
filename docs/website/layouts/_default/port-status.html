@@ -1,0 +1,118 @@
+{{- define "main" -}}
+{{- $contract := site.Data.port_status -}}
+<article class="post-single cn1-port-status" data-port-status>
+  <header class="post-header cn1-port-status__header">
+    {{ partial "breadcrumbs.html" . }}
+    <p class="cn1-port-status__eyebrow">Generated conformance report</p>
+    <h1 class="post-title entry-hint-parent">{{ .Title }}</h1>
+    <p class="cn1-port-status__intro">
+      Every row is backed by one or more tests in the
+      <a href="https://github.com/codenameone/CodenameOne/tree/master/scripts/hellocodenameone" target="_blank" rel="noopener">HelloCodenameOne suite</a>.
+      A check means every mapped test passed in the latest published run for that port.
+    </p>
+    <div class="cn1-port-status__facts" aria-label="Conformance contract size">
+      <span><strong>{{ len $contract.features }}</strong> features</span>
+      {{- $testCount := 0 -}}
+      {{- range $contract.features -}}{{- $testCount = add $testCount (len .tests) -}}{{- end -}}
+      <span><strong>{{ $testCount }}</strong> tests</span>
+      <span><strong>{{ len $contract.ports }}</strong> port targets</span>
+    </div>
+  </header>
+
+  <section class="cn1-port-status__notice" data-port-status-notice role="status">
+    Loading the latest conformance reports from GitHub…
+  </section>
+
+  <section class="cn1-port-status__legend" aria-label="Status legend">
+    <span><i class="cn1-port-status__mark is-pass" aria-hidden="true">✓</i> Passed</span>
+    <span><i class="cn1-port-status__mark is-partial" aria-hidden="true">−</i> Partial or skipped</span>
+    <span><i class="cn1-port-status__mark is-fail" aria-hidden="true">×</i> Failed</span>
+    <span><i class="cn1-port-status__mark is-unknown" aria-hidden="true">?</i> No current report</span>
+  </section>
+
+  <section class="cn1-port-status__ports" aria-label="Latest port runs">
+    {{- range $contract.ports }}
+    <article class="cn1-port-card" data-port-card="{{ .id }}">
+      <div>
+        <h2>{{ .name }}</h2>
+        <p>{{ .detail }}</p>
+      </div>
+      <p class="cn1-port-card__state" data-port-state>Waiting for report</p>
+      <p class="cn1-port-card__meta" data-port-meta></p>
+    </article>
+    {{- end }}
+  </section>
+
+  <div class="cn1-port-status__toolbar">
+    <label>
+      <span>Feature category</span>
+      <select data-category-filter>
+        <option value="">All categories</option>
+        {{- $categories := slice -}}
+        {{- range $contract.features -}}{{- $categories = $categories | append .category -}}{{- end -}}
+        {{- range (sort (uniq $categories)) }}
+        <option value="{{ . }}">{{ . }}</option>
+        {{- end }}
+      </select>
+    </label>
+    <label class="cn1-port-status__search">
+      <span>Find a feature or test</span>
+      <input type="search" data-feature-search placeholder="Graphics, maps, accessibility…">
+    </label>
+  </div>
+
+  <section class="cn1-port-status__matrix" aria-label="Port feature conformance matrix">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Feature</th>
+          {{- range $contract.ports }}
+          <th scope="col"><span>{{ .name }}</span></th>
+          {{- end }}
+        </tr>
+      </thead>
+      <tbody>
+        {{- range $contract.features }}
+        {{- $feature := . }}
+        <tr data-feature-row data-feature-id="{{ .id }}" data-category="{{ .category }}" data-search="{{ lower (printf "%s %s %s %s" .category .name .description (delimit .tests " ")) }}">
+          <th scope="row">
+            <span class="cn1-port-status__category">{{ .category }}</span>
+            <strong>{{ .name }}</strong>
+            <p>{{ .description }}</p>
+            <details>
+              <summary>{{ len .tests }} mapped {{ cond (eq (len .tests) 1) "test" "tests" }}</summary>
+              <ul>
+                {{- range (sort .tests) }}<li><code>{{ . }}</code></li>{{- end }}
+              </ul>
+            </details>
+          </th>
+          {{- range $contract.ports }}
+          <td data-feature-cell data-port="{{ .id }}" data-feature="{{ $feature.id }}" class="is-unknown">
+            <span class="cn1-port-status__mark is-unknown" aria-hidden="true">?</span>
+            <span class="screen-reader-text" data-status-label>No current report</span>
+          </td>
+          {{- end }}
+        </tr>
+        {{- end }}
+      </tbody>
+    </table>
+  </section>
+
+  <footer class="cn1-port-status__method">
+    <h2>How to read this page</h2>
+    <p>
+      The feature-to-test map is checked into the repository. CI rejects a registered test or golden screenshot that is not mapped. Each port run publishes normalized per-test results; this page derives a feature status from all tests assigned to that feature.
+    </p>
+    <p>
+      A platform-specific skip is not a pass. An incomplete run is not a pass. Reports older than {{ $contract.stale_after_days }} days are marked stale. You can inspect the exact tests under every feature and open the linked workflow run for its logs and artifacts.
+    </p>
+    <p>
+      <a href="https://github.com/codenameone/CodenameOne/blob/master/docs/website/data/port_status.json" target="_blank" rel="noopener">Feature contract</a>
+      <span aria-hidden="true">·</span>
+      <a href="https://github.com/codenameone/CodenameOne/blob/master/scripts/hellocodenameone/conformance/port_status.py" target="_blank" rel="noopener">Validator and result normalizer</a>
+    </p>
+  </footer>
+
+  <script type="application/json" data-port-status-contract>{{ $contract | jsonify | safeHTML }}</script>
+</article>
+{{- end -}}

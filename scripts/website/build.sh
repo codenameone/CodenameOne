@@ -35,6 +35,8 @@ WEBSITE_CN1_VERSION="${WEBSITE_CN1_VERSION:-auto}"
 CN1_USER="${CN1_USER:-}"
 CN1_TOKEN="${CN1_TOKEN:-}"
 
+"${PYTHON_BIN}" "${REPO_ROOT}/scripts/hellocodenameone/conformance/port_status.py" validate
+
 if [ "${WEBSITE_INCLUDE_INITIALIZR}" = "auto" ]; then
   if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
     WEBSITE_INCLUDE_INITIALIZR="true"

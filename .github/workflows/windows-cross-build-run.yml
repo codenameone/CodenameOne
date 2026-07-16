@@ -261,7 +261,7 @@ jobs:
   compare-comment:
     name: cross-compiled screenshot-comment
     needs: run-on-windows
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -326,6 +326,9 @@ jobs:
           # through green CI.
           export CN1SS_FAIL_ON_MISMATCH=1
           export CN1SS_ALLOWED_MISSING=0
+          export CN1SS_PORT_ID=windows-x64
+          export CN1SS_SUITE_LOG="$ART/raw-x64/app-output.log"
+          if [ "${{ github.event_name }}" != "pull_request" ]; then export CN1SS_SKIP_COMMENT=1; fi
           set +e
           cn1ss_process_and_report \
             "Native Windows port (cross-compiled)" \
@@ -343,3 +346,12 @@ jobs:
             echo "[windows-cross] FATAL: $me screenshot(s) streamed with no stored golden (missing_expected) -- add them to $REF_DIR."; fail=1
           fi
           if [ "$fail" -ne 0 ]; then echo "Windows cross screenshot gate failed."; exit 1; fi
+
+      - name: Upload Windows port status
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: port-status-windows-x64
+          path: artifacts/windows-port/port-status-windows-x64.json
+          if-no-files-found: warn
+          retention-days: 14

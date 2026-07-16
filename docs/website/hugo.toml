@@ -130,15 +130,21 @@ weight = 24
 
 [[menu.main]]
 parent = "resources"
+name = "Port Status"
+url = "/port-status/"
+weight = 25
+
+[[menu.main]]
+parent = "resources"
 name = "FAQ"
 url = "/faq/"
-weight = 25
+weight = 26
 
 [[menu.main]]
 parent = "resources"
 name = "Blog"
 url = "/blog/"
-weight = 26
+weight = 27
 
 [[menu.main]]
 identifier = "search"

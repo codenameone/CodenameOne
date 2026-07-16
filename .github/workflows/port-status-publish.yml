@@ -1,0 +1,50 @@
+name: Publish port status reports
+
+on:
+  workflow_run:
+    workflows:
+      - Test Android build scripts
+      - Test iOS UI build scripts
+      - Test Mac native UI build scripts
+      - Test JavaScript screenshot scripts
+      - Linux native build + run (GTK3, x64 + arm64)
+      - Windows cross-build + run (Linux build -> Windows run)
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    if: github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: master
+
+      - name: Download normalized reports
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+          pattern: port-status-*
+          path: reports
+          merge-multiple: true
+
+      - name: Publish reports to the data branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PORT_STATUS_PUBLISH: '1'
+        run: |
+          set -euo pipefail
+          found=0
+          while IFS= read -r report; do
+            found=1
+            ./scripts/hellocodenameone/conformance/publish_port_status.sh "$report"
+          done < <(find reports -type f -name 'port-status-*.json' | sort)
+          if [ "$found" -eq 0 ]; then
+            echo "No normalized port reports were found in workflow artifacts." >&2
+            exit 1
+          fi

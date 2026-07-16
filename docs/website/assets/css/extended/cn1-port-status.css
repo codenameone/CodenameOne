@@ -1,0 +1,278 @@
+.cn1-port-status {
+    --cn1-status-border: color-mix(in srgb, var(--primary) 16%, transparent);
+    max-width: 1500px;
+}
+
+.cn1-port-status .screen-reader-text {
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+}
+
+.cn1-port-status__header {
+    max-width: 900px;
+}
+
+.cn1-port-status__eyebrow,
+.cn1-port-status__category {
+    color: #e7652a;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.cn1-port-status__intro {
+    color: var(--secondary);
+    font-size: 1.08rem;
+    line-height: 1.7;
+    margin-top: 1rem;
+    max-width: 800px;
+}
+
+.cn1-port-status__facts,
+.cn1-port-status__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem 1.25rem;
+    margin-top: 1.25rem;
+}
+
+.cn1-port-status__facts span {
+    background: var(--entry);
+    border: 1px solid var(--cn1-status-border);
+    border-radius: 999px;
+    padding: .45rem .8rem;
+}
+
+.cn1-port-status__notice {
+    background: color-mix(in srgb, #27955b 12%, var(--entry));
+    border: 1px solid color-mix(in srgb, #27955b 45%, transparent);
+    border-radius: 12px;
+    margin: 1.5rem 0 0;
+    padding: .8rem 1rem;
+}
+
+.cn1-port-status__notice.is-error {
+    background: color-mix(in srgb, #c38a20 12%, var(--entry));
+    border-color: color-mix(in srgb, #c38a20 45%, transparent);
+}
+
+.cn1-port-status__legend {
+    color: var(--secondary);
+    font-size: .86rem;
+    margin-bottom: 1.25rem;
+}
+
+.cn1-port-status__legend span {
+    align-items: center;
+    display: inline-flex;
+    gap: .4rem;
+}
+
+.cn1-port-status__mark {
+    align-items: center;
+    border: 2px solid currentColor;
+    border-radius: 5px;
+    display: inline-flex;
+    font-size: .83rem;
+    font-style: normal;
+    font-weight: 800;
+    height: 1.35rem;
+    justify-content: center;
+    line-height: 1;
+    width: 1.35rem;
+}
+
+.cn1-port-status__mark.is-pass { color: #27955b; }
+.cn1-port-status__mark.is-fail { color: #d24c4c; }
+.cn1-port-status__mark.is-partial,
+.cn1-port-status__mark.is-stale { color: #c38a20; }
+.cn1-port-status__mark.is-unknown { color: #7d8791; }
+
+.cn1-port-status__ports {
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    margin: 1.25rem 0 1.75rem;
+}
+
+.cn1-port-card {
+    background: var(--entry);
+    border: 1px solid var(--cn1-status-border);
+    border-left: 4px solid #7d8791;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    min-height: 150px;
+    padding: 1rem;
+}
+
+.cn1-port-card.is-pass { border-left-color: #27955b; }
+.cn1-port-card.is-fail { border-left-color: #d24c4c; }
+.cn1-port-card.is-partial { border-left-color: #c38a20; }
+
+.cn1-port-card h2 {
+    font-size: 1rem;
+    margin: 0;
+}
+
+.cn1-port-card p {
+    color: var(--secondary);
+    font-size: .78rem;
+    line-height: 1.45;
+    margin: .25rem 0 0;
+}
+
+.cn1-port-card .cn1-port-card__state {
+    color: var(--primary);
+    font-size: .86rem;
+    font-weight: 700;
+    margin-top: auto;
+    padding-top: .8rem;
+}
+
+.cn1-port-status__toolbar {
+    align-items: end;
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: minmax(180px, .45fr) minmax(240px, 1fr);
+    margin-bottom: 1rem;
+}
+
+.cn1-port-status__toolbar label span {
+    display: block;
+    font-size: .78rem;
+    font-weight: 700;
+    margin-bottom: .3rem;
+}
+
+.cn1-port-status__toolbar input,
+.cn1-port-status__toolbar select {
+    background: var(--entry);
+    border: 1px solid var(--cn1-status-border);
+    border-radius: 9px;
+    color: var(--primary);
+    font: inherit;
+    padding: .65rem .75rem;
+    width: 100%;
+}
+
+.cn1-port-status__matrix {
+    border: 1px solid var(--cn1-status-border);
+    border-radius: 12px;
+    overflow: auto;
+}
+
+.cn1-port-status__matrix table {
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: .85rem;
+    margin: 0;
+    min-width: 1220px;
+    width: 100%;
+}
+
+.cn1-port-status__matrix th,
+.cn1-port-status__matrix td {
+    border-bottom: 1px solid var(--cn1-status-border);
+    border-right: 1px solid var(--cn1-status-border);
+    padding: .7rem;
+}
+
+.cn1-port-status__matrix thead th {
+    background: var(--entry);
+    font-size: .72rem;
+    position: sticky;
+    text-align: center;
+    top: 0;
+    z-index: 2;
+}
+
+.cn1-port-status__matrix thead th:first-child,
+.cn1-port-status__matrix tbody th {
+    left: 0;
+    position: sticky;
+    text-align: left;
+    width: 330px;
+    z-index: 1;
+}
+
+.cn1-port-status__matrix thead th:first-child {
+    z-index: 3;
+}
+
+.cn1-port-status__matrix tbody th {
+    background: var(--theme);
+    font-weight: 400;
+}
+
+.cn1-port-status__matrix tbody th strong {
+    display: block;
+    font-size: .9rem;
+    margin-top: .15rem;
+}
+
+.cn1-port-status__matrix tbody th p {
+    color: var(--secondary);
+    font-size: .76rem;
+    line-height: 1.45;
+    margin: .25rem 0;
+}
+
+.cn1-port-status__matrix details {
+    color: var(--secondary);
+    font-size: .72rem;
+}
+
+.cn1-port-status__matrix details ul {
+    margin: .4rem 0 0;
+    max-height: 180px;
+    overflow: auto;
+    padding-left: 1.1rem;
+}
+
+.cn1-port-status__matrix td {
+    min-width: 82px;
+    text-align: center;
+}
+
+.cn1-port-status__matrix td.is-pass { background: color-mix(in srgb, #27955b 8%, transparent); }
+.cn1-port-status__matrix td.is-fail { background: color-mix(in srgb, #d24c4c 9%, transparent); }
+.cn1-port-status__matrix td.is-partial,
+.cn1-port-status__matrix td.is-stale { background: color-mix(in srgb, #c38a20 9%, transparent); }
+
+.cn1-port-status__method {
+    background: var(--entry);
+    border: 1px solid var(--cn1-status-border);
+    border-radius: 12px;
+    margin-top: 1.5rem;
+    padding: 1.25rem;
+}
+
+.cn1-port-status__method h2 {
+    font-size: 1.1rem;
+    margin: 0 0 .6rem;
+}
+
+.cn1-port-status__method p {
+    color: var(--secondary);
+    font-size: .86rem;
+    line-height: 1.65;
+    margin: .5rem 0;
+}
+
+@media (max-width: 720px) {
+    .cn1-port-status__toolbar {
+        grid-template-columns: 1fr;
+    }
+
+    .cn1-port-status__matrix thead th:first-child,
+    .cn1-port-status__matrix tbody th {
+        width: 260px;
+    }
+}

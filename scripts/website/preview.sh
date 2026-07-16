@@ -5,6 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 WEBSITE_DIR="${REPO_ROOT}/docs/website"
 
+python3 "${REPO_ROOT}/scripts/hellocodenameone/conformance/port_status.py" validate
+
 if [ ! -d "${WEBSITE_DIR}" ]; then
   echo "Website directory not found: ${WEBSITE_DIR}" >&2
   exit 1

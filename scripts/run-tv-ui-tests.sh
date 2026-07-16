@@ -219,6 +219,8 @@ done < <(/usr/bin/find "$WS_RAW_DIR" -name '*.png' | sort)
 cp -f "$WS_RAW_DIR"/*.png "$ARTIFACTS_DIR/" 2>/dev/null || true
 
 COMPARE_JSON="$SS_TMP/compare.json"; SUMMARY_OUT="$SS_TMP/summary.txt"; COMMENT_OUT="$SS_TMP/comment.md"
+export CN1SS_PORT_ID="${CN1SS_PORT_ID:-tvos}"
+export CN1SS_SUITE_LOG="$APP_CONSOLE"
 
 export CN1SS_FAIL_ON_MISMATCH="${CN1SS_FAIL_ON_MISMATCH:-1}"
 export CN1SS_ALLOWED_MISSING="${CN1SS_ALLOWED_MISSING:-0}"

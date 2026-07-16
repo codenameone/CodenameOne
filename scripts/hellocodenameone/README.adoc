@@ -45,3 +45,37 @@ The project should work in IntelliJ out of the box.  No need to copy any files.
 == Help and Support
 
 See the https://www.codenameone.com[Codename One Web Site].
+
+== Port conformance suite
+
+This project is also the executable cross-port contract used by Codename One CI.
+`Cn1ssDeviceRunner` runs the same assertion and screenshot tests on the supported
+native, desktop, and web targets. The public
+https://www.codenameone.com/port-status/[Port Status] page groups those tests by
+Codename One feature and publishes the latest normalized result for each port.
+
+The feature contract lives in
+`docs/website/data/port_status.json`. Every test registered in
+`Cn1ssDeviceRunner`, including tests installed through `addTest()`, must appear
+under exactly one feature. Every committed CN1SS golden filename must map back
+to its producing test. Validate both rules from the repository root:
+
+[source,shell]
+----
+python3 scripts/hellocodenameone/conformance/port_status.py validate
+----
+
+When adding a conformance test:
+
+. Register the test in `Cn1ssDeviceRunner` or through its `addTest()` hook.
+. Add the test class to the appropriate feature in `port_status.json`. Create a
+  narrowly named feature when no existing row describes the behavior.
+. If the test emits screenshots, add patterns mapping every new golden name to
+  that test.
+. Run the validator before pushing. The `Validate port status contract` workflow
+  enforces the same rules in CI.
+
+CN1SS normalizes each run to `pass`, `fail`, `skip`, or `not-run` per test. A
+public feature checkbox is checked only when every mapped test passes. Skips,
+incomplete runs, stale reports, and failures remain distinct states; none is
+presented as a pass.
