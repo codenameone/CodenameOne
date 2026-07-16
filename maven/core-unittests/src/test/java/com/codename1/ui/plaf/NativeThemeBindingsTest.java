@@ -91,7 +91,7 @@ public class NativeThemeBindingsTest extends UITestBase {
         assertEquals("38383a", theme.get("@dlgInvisibleButtonsDark"));
         assertEquals("true", theme.get("@hideToolbarCommandTextWithIconBool"));
         assertEquals("60", theme.get("@spinnerPerspectiveDarkFadePctInt"));
-        assertEquals("0.5", theme.get("@progressTrackThicknessMM"));
+        assertEquals("0.6", theme.get("@progressTrackThicknessMM"));
         RoundBorder raisedBorder = assertInstanceOf(RoundBorder.class,
                 theme.get("RaisedButton.border"));
         assertTrue(raisedBorder.isStrokeGradient(),
@@ -100,6 +100,14 @@ public class NativeThemeBindingsTest extends UITestBase {
                 theme.get("FlatButton.border"));
         assertTrue(flatBorder.isStrokeGradient(),
                 "FlatButton must retain its Liquid Glass gradient rim");
+        RoundBorder darkRaisedBorder = assertInstanceOf(RoundBorder.class,
+                theme.get("$DarkRaisedButton.border"));
+        assertTrue(darkRaisedBorder.isStrokeGradient(),
+                "dark RaisedButton must retain its Liquid Glass gradient rim");
+        RoundBorder darkFlatBorder = assertInstanceOf(RoundBorder.class,
+                theme.get("$DarkFlatButton.border"));
+        assertTrue(darkFlatBorder.isStrokeGradient(),
+                "dark FlatButton must retain its Liquid Glass gradient rim");
         assertFalse(theme.containsKey("@dialogTitleCenterBool"),
                 "The native iOS theme must not opt existing dialogs into the centered layout");
 

@@ -269,7 +269,7 @@
     sliderThumbShadowSizeMM: "0.4";
     /* UIProgressView is a very thin capsule inside its (potentially taller)
        layout box. Slider's non-editable native-progress painter reads this. */
-    progressTrackThicknessMM: "0.5";
+    progressTrackThicknessMM: "0.6";
     /* iOS picker wheel: the 3D perspective fade (rows shrink/dim toward the edges)
        and ~7 visible rows, matching a native UIPickerView. */
     ios7SpinnerBool: true;
@@ -374,9 +374,10 @@ RaisedButton {
     color: #ffffff;
     background-color: var(--accent-color, #007aff);
     cn1-background-type: cn1-pill-border;
-    border: 0.25mm solid rgba(136,254,255,0.88);
+    border: 0.1mm solid rgba(136,254,255,0.58);
     cn1-stroke-gradient: #ffffff;
     cn1-stroke-gradient-angle: 135deg;
+    padding: 1.1mm 2.2mm 1.1mm 2.2mm;
     text-align: center;
 }
 RaisedButton.pressed { color: #ffffff; background-color: var(--accent-pressed-color, #0064d1); cn1-background-type: cn1-pill-border; }
@@ -386,8 +387,8 @@ RaisedButton.disabled { color: #ffffff; background-color: #b3a8a0; cn1-backgroun
 /* Gray button (.gray / .bordered): dark label on a DARKER (greyer) semi-opaque pill
    distinct from the lighter regular Button fill above. Semi-opaque, no blur -- see
    the Button note on why the buttons avoid backdrop-filter. */
-FlatButton { cn1-derive: Button; color: #1c1c1e; background-color: rgba(199,197,198,0.80); cn1-background-type: cn1-pill-border; border: 0.25mm solid rgba(255,255,255,0.88); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2.8mm 1.1mm 2.8mm; }
-FlatButton.pressed { color: #1c1c1e; background-color: rgba(186,184,185,0.85); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.8mm 1.1mm 2.8mm; }
+FlatButton { cn1-derive: Button; color: #1c1c1e; background-color: rgba(199,197,198,0.80); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
+FlatButton.pressed { color: #1c1c1e; background-color: rgba(186,184,185,0.85); cn1-background-type: cn1-pill-border; padding: 1.1mm 2mm 1.1mm 2mm; }
 
 TextField {
     color: #000000;
@@ -1071,14 +1072,14 @@ PopupContent {
     /* Item 3: disabled regular button is a faded grey label on the dark glass. */
     Button.disabled { color: #636366; background-color: rgba(30,30,32,0.74); cn1-background-type: cn1-pill-border; }
     /* Gray button (.gray): white label on a slightly lighter dark glass pill. */
-    FlatButton { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.8mm 1.1mm 2.8mm; }
-    FlatButton.pressed { color: #ffffff; background-color: rgba(150,143,138,0.78); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.8mm 1.1mm 2.8mm; }
+    FlatButton { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
+    FlatButton.pressed { color: #ffffff; background-color: rgba(150,143,138,0.78); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
 
     /* Prominent filled button: white label on the OPAQUE dark accent pill. */
-    RaisedButton { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
-    RaisedButton.pressed { color: #ffffff; background-color: var(--accent-pressed-color-dark, #64b1ff); cn1-background-type: cn1-pill-border; }
+    RaisedButton { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(136,254,255,0.58); cn1-stroke-gradient: #ffffff; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2.2mm 1.1mm 2.2mm; }
+    RaisedButton.pressed { color: #ffffff; background-color: var(--accent-pressed-color-dark, #64b1ff); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(136,254,255,0.58); cn1-stroke-gradient: #ffffff; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2.2mm 1.1mm 2.2mm; }
     /* Item 3: disabled prominent button is a desaturated dark-taupe pill. */
-    RaisedButton.disabled { color: #8e8e93; background-color: #48423e; cn1-background-type: cn1-pill-border; }
+    RaisedButton.disabled { color: #8e8e93; background-color: #48423e; cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(136,254,255,0.58); cn1-stroke-gradient: #ffffff; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2.2mm 1.1mm 2.2mm; }
 
     /* Dark grouped cell: #2c2c2e contrasts with the #1c1c1e form (was #1c1c1e ==
        form -> invisible field). Hairline + blur for the glass character. */

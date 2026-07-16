@@ -1,11 +1,11 @@
 /*
  * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
- *
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation. Codename One designates this
+ * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
- * by Codename One in the LICENSE file that accompanied this code.
+ * by Oracle in the LICENSE file that accompanied this code.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -216,9 +216,9 @@ public class FidelityDeviceRunner {
                                 comp.setPreferredH(disp.convertToPixels(5.5f));
                             } else if ("ProgressBar".equals(c.getId())) {
                                 comp.setPreferredW(w);
-                                // The painter centres the native 0.5mm capsule in this
+                                // The painter centres the native 0.6mm capsule in this
                                 // small layout box; don't inflate it to the old 8px bar.
-                                comp.setPreferredH(Math.max(4, disp.convertToPixels(0.5f)));
+                                comp.setPreferredH(Math.max(4, disp.convertToPixels(0.6f)));
                             }
                             st.setMargin(0, 0, 0, 0);
                         }
