@@ -69,8 +69,6 @@ on:
       - 'tests/**'
       - 'maven/**'
       - '!maven/core-unittests/**'
-  workflow_dispatch:
-
 jobs:
   build-port:
     # Shared with scripts-ios.yml / scripts-ios-native.yml / ios-packaging.yml
