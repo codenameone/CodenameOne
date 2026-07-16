@@ -101,10 +101,10 @@
   <footer class="cn1-port-status__method">
     <h2>How to read this page</h2>
     <p>
-      The feature-to-test map is checked into the repository. CI rejects a registered test or golden screenshot that is not mapped. Each port run publishes normalized per-test results; this page derives a feature status from all tests assigned to that feature.
+      The feature-to-test map is checked into the repository. CI rejects a registered test or golden screenshot that is not mapped. Each port run publishes normalized per-test results; this page keeps the last result for every port and derives a feature status from all tests assigned to that feature.
     </p>
     <p>
-      A platform-specific skip is not a pass. An incomplete run is not a pass. Reports older than {{ $contract.stale_after_days }} days are marked stale. You can inspect the exact tests under every feature and open the linked workflow run for its logs and artifacts.
+      A website build does not wait for port workflows. The initial snapshot comes from the last successful master runs available when this page was added, and each port replaces its own snapshot after a newer master run. A platform-specific skip is not a pass. An incomplete run is not a pass. Reports older than {{ $contract.stale_after_days }} days are marked stale.
     </p>
     <p>
       <a href="https://github.com/codenameone/CodenameOne/blob/master/docs/website/data/port_status.json" target="_blank" rel="noopener">Feature contract</a>
@@ -113,6 +113,6 @@
     </p>
   </footer>
 
-  <script type="application/json" data-port-status-contract>{{ $contract | jsonify | safeHTML }}</script>
+  <script type="application/json" data-port-status-contract>{{ jsonify $contract | safeJS }}</script>
 </article>
 {{- end -}}

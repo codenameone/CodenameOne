@@ -1,6 +1,8 @@
 {
   "schema_version": 1,
   "report_branch": "port-status-data",
+  "seed_report_base": "/port-status-data/ports/",
+  "seed_report_directory": "docs/website/static/port-status-data/ports",
   "stale_after_days": 14,
   "golden_directories": [
     "scripts/android/screenshots",

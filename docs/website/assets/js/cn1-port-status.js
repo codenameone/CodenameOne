@@ -41,8 +41,10 @@
     }
 
     var reports = {};
+    var reportSources = {};
     var reportBase = "https://raw.githubusercontent.com/codenameone/CodenameOne/" +
         contract.report_branch + "/ports/";
+    var seedReportBase = contract.seed_report_base || "";
 
     function daysOld(value) {
         var timestamp = Date.parse(value || "");
@@ -156,11 +158,8 @@
         });
     }
 
-    function loadPort(port) {
-        if (port.report_pending) {
-            return Promise.resolve();
-        }
-        return fetch(reportBase + encodeURIComponent(port.id) + ".json", {cache: "no-store"})
+    function fetchReport(url) {
+        return fetch(url, {cache: "no-store"})
             .then(function (response) {
                 if (!response.ok) {
                     throw new Error("HTTP " + response.status);
@@ -168,10 +167,31 @@
                 return response.json();
             })
             .then(function (report) {
-                if (report.port !== port.id || report.schema_version !== contract.schema_version) {
-                    throw new Error("Report contract mismatch");
+                return report;
+            });
+    }
+
+    function acceptReport(port, report, source) {
+        if (report.port !== port.id || report.schema_version !== contract.schema_version) {
+            throw new Error("Report contract mismatch");
+        }
+        reports[port.id] = report;
+        reportSources[port.id] = source;
+    }
+
+    function loadPort(port) {
+        var fileName = encodeURIComponent(port.id) + ".json";
+        return fetchReport(reportBase + fileName)
+            .then(function (report) {
+                acceptReport(port, report, "published");
+            })
+            .catch(function () {
+                if (!seedReportBase) {
+                    throw new Error("No seed report base configured");
                 }
-                reports[port.id] = report;
+                return fetchReport(seedReportBase + fileName).then(function (report) {
+                    acceptReport(port, report, "seed");
+                });
             })
             .catch(function () {
                 reports[port.id] = null;
@@ -198,9 +218,14 @@
     Promise.all(contract.ports.map(loadPort)).then(function () {
         render();
         var loaded = Object.keys(reports).filter(function (id) { return reports[id]; }).length;
-        notice.textContent = loaded
-            ? "Showing the latest published reports for " + loaded + " port target" + (loaded === 1 ? "" : "s") + "."
-            : "No detailed port reports have been published yet. The contract is ready; CI will populate this page after the next master runs.";
+        var seeded = Object.keys(reportSources).filter(function (id) { return reportSources[id] === "seed"; }).length;
+        if (loaded) {
+            notice.textContent = "Showing the latest available master results for " + loaded +
+                " port target" + (loaded === 1 ? "" : "s") + "." +
+                (seeded ? " " + seeded + " use the initial master snapshot until that port publishes a newer run." : "");
+        } else {
+            notice.textContent = "No master port reports are available.";
+        }
         notice.classList.toggle("is-error", loaded === 0);
     });
 }());

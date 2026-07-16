@@ -25,7 +25,7 @@ COMMON_SOURCES = REPO_ROOT / "scripts/hellocodenameone/common/src/main"
 START_RE = re.compile(r"suite starting test=([A-Za-z0-9_]+)")
 FINISH_RE = re.compile(r"suite finished test=([A-Za-z0-9_]+)")
 SKIP_RE = re.compile(r"test=([A-Za-z0-9_]+) status=SKIPPED(?: reason=([^\s]+))?")
-ERROR_RE = re.compile(r"CN1SS:ERR:suite test=([A-Za-z0-9_]+)(?:\s+|$)(.*)")
+ERROR_RE = re.compile(r"CN1SS:ERR:suite test=([A-Za-z0-9_]+)(?:\s+(.*))?$")
 
 
 class ContractError(RuntimeError):
@@ -154,6 +154,37 @@ def validate(manifest: dict) -> dict:
         if owner is None:
             problems.append(f"Golden screenshot {name} is not mapped to a test")
 
+    seed_directory = manifest.get("seed_report_directory")
+    if seed_directory:
+        seed_root = REPO_ROOT / seed_directory
+        for port_id in port_ids:
+            seed_path = seed_root / f"{port_id}.json"
+            try:
+                seed = read_json(seed_path)
+            except ContractError as exc:
+                problems.append(str(exc))
+                continue
+            if seed.get("schema_version") != manifest.get("schema_version"):
+                problems.append(f"Seed report {seed_path} has the wrong schema version")
+            if seed.get("port") != port_id:
+                problems.append(f"Seed report {seed_path} identifies port {seed.get('port')}")
+            seed_tests = seed.get("tests")
+            if not isinstance(seed_tests, dict):
+                problems.append(f"Seed report {seed_path} has no test result map")
+                continue
+            unknown_tests = sorted(set(seed_tests) - set(mapped))
+            if unknown_tests:
+                problems.append(
+                    f"Seed report {seed_path} contains unknown tests: "
+                    + ", ".join(unknown_tests)
+                )
+            missing_tests = sorted(set(mapped) - set(seed_tests))
+            if missing_tests:
+                problems.append(
+                    f"Seed report {seed_path} is missing tests: "
+                    + ", ".join(missing_tests)
+                )
+
     if problems:
         raise ContractError("\n".join(problems))
     return {
@@ -193,7 +224,7 @@ def parse_logs(paths: list[Path], states: dict[str, dict]) -> bool:
             if match and match.group(1) in states:
                 entry = states[match.group(1)]
                 entry["failed"] = True
-                add_reason(entry, match.group(2).strip() or "suite-error")
+                add_reason(entry, (match.group(2) or "").strip() or "suite-error")
     return suite_finished
 
 

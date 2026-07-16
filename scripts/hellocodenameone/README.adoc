@@ -52,7 +52,12 @@ This project is also the executable cross-port contract used by Codename One CI.
 `Cn1ssDeviceRunner` runs the same assertion and screenshot tests on the supported
 native, desktop, and web targets. The public
 https://www.codenameone.com/port-status/[Port Status] page groups those tests by
-Codename One feature and publishes the latest normalized result for each port.
+Codename One feature and publishes the latest normalized result from `master`
+for each port. Port workflows update their reports independently on the
+`port-status-data` branch, so a website-only build neither waits for nor clears
+ports that did not run. The checked-in reports under
+`docs/website/static/port-status-data/ports` are the initial snapshot only;
+the page uses one of them only until that port has its first published report.
 
 The feature contract lives in
 `docs/website/data/port_status.json`. Every test registered in
