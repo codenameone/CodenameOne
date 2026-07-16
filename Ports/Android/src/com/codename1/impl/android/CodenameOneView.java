@@ -461,6 +461,14 @@ public class CodenameOneView {
             return true;
         }
 
+        // Hardware (Bluetooth / Chromebook) keys bypass the IME and would otherwise be
+        // dropped while a pure-editor input session is bound (the editor's raw key path is
+        // disabled when the platform session is active). Route them through the same
+        // translation the IME-synthesized keys use.
+        if (AndroidImplementation.routeHardwareKeyToActiveClient(down, event)) {
+            return true;
+        }
+
         // ENTER is gated for back-compat: on touch keyboards Enter is the IME
         // "done" action, so apps historically had to opt in via sendEnterKey.
         // Default it on when a hardware (alpha) keyboard generated the event
@@ -557,6 +565,11 @@ public class CodenameOneView {
              * deadlock!
              */
             return true;
+        }
+        if (event.getAction() == MotionEvent.ACTION_UP) {
+            // EditText re-summons a dismissed keyboard on every tap; give the pure
+            // editors the same behavior while their input session is bound
+            AndroidImplementation.showSoftInputForActiveClient();
         }
         
         

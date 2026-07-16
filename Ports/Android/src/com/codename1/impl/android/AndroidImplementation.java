@@ -331,6 +331,48 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         pendingAppliedSeq = seq;
     }
 
+    /// Routes a hardware (Bluetooth / Chromebook) key event to the bound text input client.
+    /// Hardware keys bypass the IME entirely, and the pure editor's raw key path is disabled
+    /// while a platform session is active, so without this they would be silently dropped.
+    /// Returns true when the event was consumed for the client (including the matching key-up
+    /// of a consumed key-down); false leaves the event to the regular Codename One pipeline
+    /// (BACK, D-pad game keys on non-editor forms, ...).
+    static boolean routeHardwareKeyToActiveClient(boolean down, android.view.KeyEvent event) {
+        com.codename1.ui.TextInputClient client = activeInputClient;
+        if (client == null || event == null) {
+            return false;
+        }
+        return CN1TextInputConnection.deliverHardwareKey(client, event, down);
+    }
+
+    /// Re-requests the soft keyboard for the bound text input client. Called on every tap so a
+    /// keyboard the user dismissed (back gesture) returns when the editor is tapped again, the
+    /// same behavior a native EditText has. No-op when no client is bound.
+    static void showSoftInputForActiveClient() {
+        if (activeInputClient == null) {
+            return;
+        }
+        final CodenameOneActivity a = getActivity();
+        final CodenameOneSurface view = instance != null ? instance.myView : null;
+        if (a == null || view == null) {
+            return;
+        }
+        a.runOnUiThread(new Runnable() {
+            public void run() {
+                if (activeInputClient == null) {
+                    return;
+                }
+                android.view.View v = view.getAndroidView();
+                v.requestFocus();
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
+                        a.getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.showSoftInput(v, 0);
+                }
+            }
+        });
+    }
+
     static com.codename1.ui.TextInputConfig currentInputConfig() {
         return activeInputConfig;
     }

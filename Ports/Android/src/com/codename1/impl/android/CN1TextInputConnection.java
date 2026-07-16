@@ -157,6 +157,14 @@ class CN1TextInputConnection extends BaseInputConnection {
         if (event.getAction() != KeyEvent.ACTION_DOWN) {
             return true;
         }
+        deliverHardwareKey(client, event, true);
+        return true;
+    }
+
+    /// Shared key translation for IME-synthesized key events (`#sendKeyEvent`) and hardware
+    /// keys routed from the view while a session is bound. Returns true when the key belongs
+    /// to the client; a key-up of a handled key is consumed without delivering anything.
+    static boolean deliverHardwareKey(final TextInputClient client, KeyEvent event, boolean down) {
         int mods = 0;
         if (event.isShiftPressed()) {
             mods |= TextInputClient.MOD_SHIFT;
@@ -174,38 +182,48 @@ class CN1TextInputConnection extends BaseInputConnection {
             command = mapControlKey(keyCode, mods);
         }
         if (command > 0) {
-            final int cmd = command;
-            post(new Runnable() {
-                public void run() {
-                    client.onKeyCommand(cmd, fmods);
-                }
-            });
+            if (down) {
+                final int cmd = command;
+                postToEdt(new Runnable() {
+                    public void run() {
+                        client.onKeyCommand(cmd, fmods);
+                    }
+                });
+            }
             return true;
         }
         if (keyCode == KeyEvent.KEYCODE_ENTER) {
-            TextInputConfig cfg = AndroidImplementation.currentInputConfig();
-            // multiline clients treat ACTION_DEFAULT as a newline; single-line clients get
-            // the action the field was configured with (Done / Next / Search / Send)
-            final int action = cfg != null && !cfg.isMultiline()
-                    ? cfg.getActionType() : TextInputConfig.ACTION_DEFAULT;
-            post(new Runnable() {
-                public void run() {
-                    client.onEditorAction(action);
-                }
-            });
+            if (down) {
+                TextInputConfig cfg = AndroidImplementation.currentInputConfig();
+                // multiline clients treat ACTION_DEFAULT as a newline; single-line clients get
+                // the action the field was configured with (Done / Next / Search / Send)
+                final int action = cfg != null && !cfg.isMultiline()
+                        ? cfg.getActionType() : TextInputConfig.ACTION_DEFAULT;
+                postToEdt(new Runnable() {
+                    public void run() {
+                        client.onEditorAction(action);
+                    }
+                });
+            }
             return true;
         }
         final int unicode = event.getUnicodeChar();
         if (unicode > 0) {
-            final String s = String.valueOf((char) unicode);
-            post(new Runnable() {
-                public void run() {
-                    client.commitText(s);
-                }
-            });
+            if (down) {
+                final String s = String.valueOf((char) unicode);
+                postToEdt(new Runnable() {
+                    public void run() {
+                        client.commitText(s);
+                    }
+                });
+            }
             return true;
         }
-        return true;
+        return false;
+    }
+
+    private static void postToEdt(Runnable r) {
+        Display.getInstance().callSerially(r);
     }
 
     private static int mapKey(int keyCode) {
