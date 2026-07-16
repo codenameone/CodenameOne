@@ -55,12 +55,14 @@ if grep -q 'setEngineURL' "$PLAYGROUND_EDITOR"; then
   exit 1
 fi
 
+# Scope the tripwire to the subsystems the old browser editor lived in; a repo-wide
+# grep would fail this job for unrelated legitimate uses (e.g. the macOS "Monaco"
+# monospace font in a doc, skin or font list).
 forbidden_editor='mona''co'
 if git -C "$ROOT/../.." grep -in "$forbidden_editor" -- \
-    ':!docs/website/content/blog/funding-open-source-without-the-bait-and-switch.md' \
-    ':!docs/website/content/blog/java-one-detailed-trip-report.md' \
-    ':!docs/website/content/blog/rich-text-and-code-editing.md'; then
-  echo "Removed browser-editor dependency is still referenced by tracked files" >&2
+    'scripts/cn1playground' \
+    'CodenameOne/src'; then
+  echo "Removed browser-editor dependency is still referenced by playground/core files" >&2
   exit 1
 fi
 

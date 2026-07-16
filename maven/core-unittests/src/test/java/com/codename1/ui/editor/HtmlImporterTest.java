@@ -71,4 +71,16 @@ class HtmlImporterTest {
         HtmlImporter.Result result = HtmlImporter.parse("<p data-indent=\"3\">indented</p>");
         assertEquals(3, result.getBlocks().get(0).indent);
     }
+
+    @Test
+    void preservesWhitespaceInsidePre() {
+        HtmlImporter.Result result = HtmlImporter.parse("<pre>if (x) {\n    go();\n}</pre>");
+        assertEquals("if (x) {\n    go();\n}", result.getText());
+        // every line of the preformatted body keeps the PRE block type
+        for (int i = 0; i < result.getBlocks().size(); i++) {
+            assertEquals(RichBlocks.PRE, result.getBlocks().get(i).type);
+        }
+        // outside pre the normal collapsing still applies
+        assertEquals("a b", text("<p>a\n     b</p>"));
+    }
 }

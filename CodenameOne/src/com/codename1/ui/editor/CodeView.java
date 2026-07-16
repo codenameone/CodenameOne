@@ -204,6 +204,13 @@ public class CodeView extends EditorView {
         ensureStates(line + 1);
         int startState = line == 0 ? 0 : endStates[line - 1];
         SyntaxHighlightResult tl = tokenizer.tokenize(text, startState);
+        if (tl == null || tl.tokens == null) {
+            // the SyntaxHighlighter contract allows a null result (no highlighting for
+            // this line); paint plain instead of crashing the render loop
+            g.setColor(getTextColor());
+            g.drawString(text, x, y);
+            return;
+        }
         int pos = 0;
         int defColor = getTextColor();
         for (int i = 0; i < tl.tokens.size(); i++) {
@@ -247,7 +254,8 @@ public class CodeView extends EditorView {
         }
         for (int i = validUpTo; i < upto; i++) {
             int st = i == 0 ? 0 : endStates[i - 1];
-            endStates[i] = tokenizer.tokenize(getDocument().getLineText(i), st).endState;
+            SyntaxHighlightResult r = tokenizer.tokenize(getDocument().getLineText(i), st);
+            endStates[i] = r == null ? st : r.endState;
         }
         if (upto > validUpTo) {
             validUpTo = upto;

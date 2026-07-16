@@ -1432,12 +1432,18 @@ public class IOSImplementation extends CodenameOneImplementation {
         boolean autoCap = config == null || config.isAutoCapitalize();
         boolean multiline = config == null || config.isMultiline();
         nativeInstance.startTextInput(constraint, autoCorrect, autoCap, multiline,
-                st.getText(), st.getSelectionStart(), st.getSelectionEnd());
+                st.getText(), st.getSelectionStart(), st.getSelectionEnd(),
+                config != null ? config.getActionType() : com.codename1.ui.TextInputConfig.ACTION_DEFAULT);
         return client;
     }
 
     @Override
     public void updateTextInputState(Object handle, com.codename1.ui.TextInputState state) {
+        if (handle == null || handle != tiClient || state == null) {
+            // a stale handle (an unbalanced session that was already replaced) must not
+            // disturb the currently bound client
+            return;
+        }
         com.codename1.ui.TextInputClient c = tiClient;
         int[] r = c != null ? c.getCaretRect() : new int[]{0, 0, 0, 0};
         nativeInstance.updateTextInputState(state.getText(), state.getSelectionStart(), state.getSelectionEnd(),
@@ -1481,6 +1487,9 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     @Override
     public void stopTextInput(Object handle) {
+        if (handle == null || handle != tiClient) {
+            return;
+        }
         tiClient = null;
         nativeInstance.stopTextInput();
     }

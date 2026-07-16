@@ -631,13 +631,20 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         if (growByContent
                 && !Objects.equals(text, old)
                 && getParent() != null
-                && Display.getInstance().isTextEditing(this)
+                && (lightweightEditor != null || Display.getInstance().isTextEditing(this))
                 && textMightGrowByContent(old, text)) {
             getParent().revalidateLater();
         }
         if (!Objects.equals(text, old)) {
             fireDataChanged(DataChangedListener.CHANGED, -1);
             accessibilityChanged(AccessibilityManager.CHANGE_VALUE | AccessibilityManager.CHANGE_CONTENT);
+        }
+        // a programmatic value change must reach the live lightweight overlay too, or
+        // stopLightweightEditing would write the overlay's stale text back over this value
+        if (lightweightEditor != null && !Objects.equals(text, old)
+                && !text.equals(lightweightEditor.getText())) {
+            lightweightEditor.setText(text);
+            lightweightEditor.setSelectionRange(text.length(), text.length());
         }
         // while native editing we don't need the cursor animations
         if (Display.getInstance().isNativeInputSupported() && Display.getInstance().isTextEditing(this)) {

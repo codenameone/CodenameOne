@@ -38,12 +38,20 @@
 @property (nonatomic) UIKeyboardType keyboardType;
 @property (nonatomic) UIReturnKeyType returnKeyType;
 @property (nonatomic) UITextSpellCheckingType spellCheckingType;
+@property (nonatomic, getter=isSecureTextEntry) BOOL secureTextEntry;
 @property (nonatomic) BOOL multiline;
+/// The TextInputConfig.ACTION_* code delivered through tiEditorAction when Return is pressed on a
+/// single line field.
+@property (nonatomic) int actionType;
 
 /// Replaces the shadow mirror with the authoritative Java state (text + selection + caret rect in
 /// screen pixels) without echoing the change back to Java.
 - (void)cn1SyncText:(NSString *)text selStart:(NSInteger)selStart selEnd:(NSInteger)selEnd
           caretRect:(CGRect)caretPixels;
+
+/// Clears any leftover IME composition state; called when a session starts or stops so a stale marked
+/// range from a previous session can never block Java-state syncing.
+- (void)cn1ResetComposition;
 
 @end
 

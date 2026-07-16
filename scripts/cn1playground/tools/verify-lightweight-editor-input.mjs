@@ -123,6 +123,40 @@ try {
   const afterMarker = await displayCanvas.screenshot();
   assert.notDeepEqual(afterMarker, beforeMarker, 'Editor canvas did not visibly repaint after keyboard input');
 
+  // Click INSIDE the already-focused editor (a caret reposition). The browser's default
+  // mousedown action moves DOM focus off the hidden textarea; the bridge must cancel that
+  // synchronously (and the state push must re-assert focus) or every subsequent key goes
+  // dead until the editing session is restarted -- the "type, click, typing stops" bug.
+  await page.mouse.click(frameBox.x + 320, frameBox.y + 190);
+  await appFrame.waitForFunction(() => {
+    const input = document.querySelector('textarea.cn1-lightweight-text-input');
+    return input && document.activeElement === input;
+  }, null, {timeout: 5000}).catch(async error => {
+    const active = await appFrame.evaluate(() => document.activeElement && document.activeElement.outerHTML);
+    console.error(`Caret-reposition click moved DOM focus off the editor input. activeElement: ${active}`);
+    throw error;
+  });
+  const beforeRepositionType = await appFrame.evaluate(() => {
+    const input = document.querySelector('textarea.cn1-lightweight-text-input');
+    return input.value;
+  });
+  await page.keyboard.type('Q');
+  await appFrame.waitForFunction(previous => {
+    const input = document.querySelector('textarea.cn1-lightweight-text-input');
+    return input && input.value !== previous && input.value.indexOf('Q') >= 0;
+  }, beforeRepositionType, {timeout: 5000}).catch(async error => {
+    const value = await appFrame.locator('textarea.cn1-lightweight-text-input').inputValue();
+    console.error(`Typing after a caret-reposition click was not delivered. Editor text: ${JSON.stringify(value)}`);
+    throw error;
+  });
+  // Restore the marker document so the paste assertions below see the expected base text.
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+  await page.keyboard.type(marker);
+  await appFrame.waitForFunction(value => {
+    const input = document.querySelector('textarea.cn1-lightweight-text-input');
+    return input && input.value === value;
+  }, marker, {timeout: 5000});
+
   const pasteDispatch = await appFrame.evaluate(() => {
     const input = document.querySelector('textarea.cn1-lightweight-text-input');
     const transfer = new DataTransfer();

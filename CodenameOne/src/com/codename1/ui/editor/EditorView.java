@@ -55,6 +55,9 @@ public class EditorView extends Component implements TextInputClient {
     private int anchor = -1;
     private int composingStart = -1;
     private int composingEnd = -1;
+    // pre-composition snapshot so the finalized composition forms a single undo unit
+    private String composingBaseRemoved;
+    private Object composingBeforeState;
     private boolean editable = true;
 
     private int scrollY;
@@ -162,7 +165,17 @@ public class EditorView extends Component implements TextInputClient {
 
     /// Enables or disables editing.
     public void setEditableState(boolean editable) {
+        if (this.editable == editable) {
+            return;
+        }
         this.editable = editable;
+        // keep the platform session in step: a read-only editor must not hold the soft
+        // keyboard open, and re-enabling while focused should bring it back
+        if (!editable) {
+            stopInput();
+        } else if (hasFocus()) {
+            startInput();
+        }
     }
 
     /// True when editing is enabled.
@@ -1042,6 +1055,8 @@ public class EditorView extends Component implements TextInputClient {
     private void onDocumentChanged() {
         composingStart = -1;
         composingEnd = -1;
+        composingBaseRemoved = null;
+        composingBeforeState = null;
         touchSelection = false;
         invalidateLayout();
         resetBlink();
@@ -1333,8 +1348,26 @@ public class EditorView extends Component implements TextInputClient {
         repaint();
     }
 
+    @Override
+    protected void deinitialize() {
+        super.deinitialize();
+        // Removing a focused component clears the form's focus without firing focusLost
+        // (Container.removeComponentImpl uses setFocusedInternal), so release the platform
+        // input session here or the stale handle would block startInput on the next focus
+        // gain, leaving the editor deaf until an explicit focus round-trip. The form also
+        // drops animation registrations on deinit, so reset the flag to re-register the
+        // caret blink when focus returns.
+        stopInput();
+        animRegistered = false;
+    }
+
     private void startInput() {
-        if (host != null && inputHandle == null && host.isTextInputSupported()) {
+        if (host != null && editable && host.isTextInputSupported()) {
+            // a leftover handle means an unbalanced lifecycle (e.g. the view was re-added while
+            // a session was bound); release it so the session is rebound to the current state
+            if (inputHandle != null) {
+                host.stopTextInput(inputHandle);
+            }
             inputHandle = host.startTextInput(this, getConfig());
             inputActive = inputHandle != null;
         }
@@ -1707,7 +1740,22 @@ public class EditorView extends Component implements TextInputClient {
             return;
         }
         if (composingStart >= 0) {
-            replaceRange(composingStart, composingEnd, text, true);
+            // Finalize the composition as ONE undo unit spanning from the pre-composition
+            // document (including any selection the first compose replaced) to the committed
+            // text. The intermediate compose updates were never recorded, so recording the
+            // plain range replacement here would put stale offsets on the undo stack.
+            int base = composingStart;
+            String removed = composingBaseRemoved == null ? "" : composingBaseRemoved;
+            Object before = composingBeforeState;
+            replaceRange(composingStart, composingEnd, text, false);
+            composingBaseRemoved = null;
+            composingBeforeState = null;
+            String inserted = doc.substring(base, caret);
+            if (removed.length() > 0 || inserted.length() > 0) {
+                undo.breakRun();
+                undo.record(base, removed, inserted, before, captureDocumentState());
+                undo.breakRun();
+            }
             return;
         }
         if (handleTypedText(text)) {
@@ -1733,6 +1781,13 @@ public class EditorView extends Component implements TextInputClient {
         }
         start = doc.clamp(start);
         end = doc.clamp(end);
+        if (composingStart < 0) {
+            // snapshot the pre-composition document so the whole composition (including the
+            // selection this first compose replaces) finalizes as a single undo unit in
+            // commitText / finishComposing; intermediate compose updates are never recorded
+            composingBaseRemoved = doc.substring(start, end);
+            composingBeforeState = captureDocumentState();
+        }
         String removed = doc.substring(start, end);
         doc.delete(start, end);
         doc.insert(start, value);
@@ -1745,6 +1800,7 @@ public class EditorView extends Component implements TextInputClient {
         documentEdited(start);
         documentReplaced(start, removed, value);
         if (removed.length() > 0 || value.length() > 0) {
+            invalidateLayout();
             resetBlink();
             scrollCaretVisible();
             if (host != null) {
@@ -1757,8 +1813,21 @@ public class EditorView extends Component implements TextInputClient {
 
     @Override
     public void finishComposing() {
+        if (composingStart >= 0) {
+            // the composed text stays; record the whole composition as one undo unit against
+            // the pre-composition snapshot
+            String inserted = doc.substring(composingStart, composingEnd);
+            String removed = composingBaseRemoved == null ? "" : composingBaseRemoved;
+            if (removed.length() > 0 || inserted.length() > 0) {
+                undo.breakRun();
+                undo.record(composingStart, removed, inserted, composingBeforeState, captureDocumentState());
+                undo.breakRun();
+            }
+        }
         composingStart = -1;
         composingEnd = -1;
+        composingBaseRemoved = null;
+        composingBeforeState = null;
     }
 
     @Override

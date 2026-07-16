@@ -179,7 +179,14 @@ public final class RichTextSerializer {
             if (c == '\\' || c == '{' || c == '}') {
                 out.append('\\').append(c);
             } else if (c > 127) {
-                out.append("\\u").append((int) c).append('?');
+                // The RTF unicode keyword (backslash-u) takes a SIGNED 16-bit value; values
+                // above 32767 (surrogate halves, high BMP chars) must be emitted as N-65536
+                // or Word-family consumers reject the document
+                int code = c;
+                if (code > 32767) {
+                    code -= 65536;
+                }
+                out.append("\\u").append(code).append('?');
             } else {
                 out.append(c);
             }

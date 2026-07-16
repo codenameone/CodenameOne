@@ -23,6 +23,7 @@
 
 package com.codenameone.playground;
 
+import com.codename1.ui.CodeCompletion;
 import com.codename1.ui.CodeDiagnostic;
 import com.codename1.ui.CodeEditor;
 import com.codename1.ui.Component;
@@ -57,6 +58,8 @@ final class PlaygroundCodeEditor {
     private final Container component;
     private final Listener listener;
     private List<PlaygroundRunner.InlineMessage> inlineMessages = new ArrayList<PlaygroundRunner.InlineMessage>();
+    private final List<String> uiidCompletions = new ArrayList<String>();
+    private boolean completionProviderInstalled;
     private String source;
     private int version;
     private int pendingTextQuery;
@@ -76,7 +79,9 @@ final class PlaygroundCodeEditor {
         messages.setSingleLineTextArea(false);
         messages.setGrowByContent(true);
         messages.setUIID("Label");
-        messages.setVisible(false);
+        // setHidden collapses the preferred size; setVisible(false) would keep reserving the
+        // empty strip's rows under the editor
+        messages.setHidden(true);
 
         component = new Container(new BorderLayout());
         component.add(BorderLayout.CENTER, editor);
@@ -117,6 +122,27 @@ final class PlaygroundCodeEditor {
             }
         }
         editor.setDiagnostics(converted);
+    }
+
+    void setUiidCompletions(List<String> uiids) {
+        uiidCompletions.clear();
+        if (uiids != null) {
+            for (String uiid : uiids) {
+                if (uiid != null && uiid.trim().length() > 0) {
+                    uiidCompletions.add(uiid.trim());
+                }
+            }
+        }
+        if (!completionProviderInstalled) {
+            completionProviderInstalled = true;
+            editor.setCompletionProvider((ed, code, cursor, results) -> {
+                List<CodeCompletion> out = new ArrayList<CodeCompletion>(uiidCompletions.size());
+                for (String uiid : uiidCompletions) {
+                    out.add(new CodeCompletion(uiid).setType("uiid"));
+                }
+                results.onSucess(out);
+            });
+        }
     }
 
     void setInlineMessages(List<PlaygroundRunner.InlineMessage> inlineMessages) {
@@ -171,7 +197,7 @@ final class PlaygroundCodeEditor {
             out.append(message.text == null ? "" : message.text);
         }
         messages.setText(out.toString());
-        messages.setVisible(out.length() > 0);
+        messages.setHidden(out.length() == 0);
         if (component.getComponentForm() != null) {
             component.revalidate();
         }

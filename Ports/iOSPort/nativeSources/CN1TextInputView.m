@@ -151,7 +151,9 @@ static CN1TextInputView* cn1TextInputView = nil;
         self.spellCheckingType = UITextSpellCheckingTypeDefault;
         self.keyboardType = UIKeyboardTypeDefault;
         self.returnKeyType = UIReturnKeyDefault;
+        self.secureTextEntry = NO;
         self.multiline = YES;
+        self.actionType = 0;
         _shadow = [[NSMutableString alloc] init];
         _selectedRange = NSMakeRange(0, 0);
         _markedRange = NSMakeRange(NSNotFound, 0);
@@ -320,7 +322,7 @@ static CN1TextInputView* cn1TextInputView = nil;
             UIKeyCommand* kc = [UIKeyCommand keyCommandWithInput:inp
                                                    modifierFlags:(UIKeyModifierFlags)[m integerValue]
                                                           action:@selector(cn1Arrow:)];
-            if (@available(iOS 15.0, *)) {
+            if (@available(iOS 15.0, tvOS 15.0, *)) {
                 kc.wantsPriorityOverSystemBehavior = YES;
             }
             [cmds addObject:kc];
@@ -386,14 +388,27 @@ static CN1TextInputView* cn1TextInputView = nil;
     if (text == nil) {
         return;
     }
-    [self cn1EditRange:_selectedRange with:text notify:YES];
+    if (!self.multiline && [text isEqualToString:@"\n"]) {
+        // Return on a single line field is the configured editor action (Done / Next / Search /
+        // Send), never a literal newline; the client decides what the action does.
+        com_codename1_impl_ios_IOSImplementation_tiEditorAction___int(CN1_THREAD_GET_STATE_PASS_ARG
+                (JAVA_INT)self.actionType);
+        return;
+    }
+    // UIKit contract: insertText replaces the marked (composing) text when present, otherwise the
+    // selection. IMEs that finalize a composition through insertText rely on this.
+    NSRange target = (_markedRange.location != NSNotFound) ? _markedRange : _selectedRange;
+    [self cn1EditRange:target with:text notify:YES];
 }
 
 - (void)deleteBackward {
     if (_selectedRange.length > 0) {
         [self cn1EditRange:_selectedRange with:@"" notify:YES];
     } else if (_selectedRange.location > 0) {
-        [self cn1EditRange:NSMakeRange(_selectedRange.location - 1, 1) with:@"" notify:YES];
+        // delete the full composed character sequence so surrogate pairs / emoji clusters are
+        // never split into a lone surrogate
+        NSRange r = [_shadow rangeOfComposedCharacterSequenceAtIndex:(NSUInteger)(_selectedRange.location - 1)];
+        [self cn1EditRange:r with:@"" notify:YES];
     }
 }
 
@@ -638,11 +653,17 @@ static CN1TextInputView* cn1TextInputView = nil;
     _selectedRange = NSMakeRange(MIN(s, e), (NSUInteger)(s > e ? s - e : e - s));
 }
 
+- (void)cn1ResetComposition {
+    // a marked range left over from a previous session would make cn1SyncText refuse to load the
+    // new session's text forever (every subsequent range edit would target the old document)
+    _markedRange = NSMakeRange(NSNotFound, 0);
+}
+
 @end
 
 #pragma mark - native bridge (declared native in IOSNative.java)
 
-void com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boolean_java_lang_String_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT constraint, JAVA_BOOLEAN autoCorrect, JAVA_BOOLEAN autoCapitalize, JAVA_BOOLEAN multiline, JAVA_OBJECT initialText, JAVA_INT selStart, JAVA_INT selEnd) {
+void com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boolean_java_lang_String_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT constraint, JAVA_BOOLEAN autoCorrect, JAVA_BOOLEAN autoCapitalize, JAVA_BOOLEAN multiline, JAVA_OBJECT initialText, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT actionType) {
     NSString* startText = initialText != NULL ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG initialText) : @"";
     dispatch_async(dispatch_get_main_queue(), ^{
         @autoreleasepool {
@@ -653,6 +674,56 @@ void com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boole
             cn1TextInputView.autocapitalizationType = autoCapitalize ? UITextAutocapitalizationTypeSentences : UITextAutocapitalizationTypeNone;
             cn1TextInputView.spellCheckingType = autoCorrect ? UITextSpellCheckingTypeDefault : UITextSpellCheckingTypeNo;
             cn1TextInputView.multiline = multiline != 0;
+            cn1TextInputView.actionType = (int)actionType;
+            // keyboard style + secure entry follow the field's constraint; a password field with
+            // the default keyboard would otherwise feed autocorrect learning
+            BOOL secure = (constraint & 0x10000) != 0; // TextArea.PASSWORD
+            UIKeyboardType kt = UIKeyboardTypeDefault;
+            switch (constraint & 0xffff) {
+                case 1: // TextArea.EMAILADDR
+                    kt = UIKeyboardTypeEmailAddress;
+                    break;
+                case 2: // TextArea.NUMERIC
+                    kt = UIKeyboardTypeNumbersAndPunctuation;
+                    break;
+                case 3: // TextArea.PHONENUMBER
+                    kt = UIKeyboardTypePhonePad;
+                    break;
+                case 4: // TextArea.URL
+                    kt = UIKeyboardTypeURL;
+                    break;
+                case 5: // TextArea.DECIMAL
+                    kt = UIKeyboardTypeDecimalPad;
+                    break;
+                default:
+                    break;
+            }
+            cn1TextInputView.keyboardType = kt;
+            cn1TextInputView.secureTextEntry = secure;
+            if (secure) {
+                cn1TextInputView.autocorrectionType = UITextAutocorrectionTypeNo;
+                cn1TextInputView.spellCheckingType = UITextSpellCheckingTypeNo;
+                cn1TextInputView.autocapitalizationType = UITextAutocapitalizationTypeNone;
+            }
+            UIReturnKeyType rk = UIReturnKeyDefault;
+            switch (actionType) {
+                case 1: // TextInputConfig.ACTION_DONE
+                    rk = UIReturnKeyDone;
+                    break;
+                case 2: // TextInputConfig.ACTION_NEXT
+                    rk = UIReturnKeyNext;
+                    break;
+                case 3: // TextInputConfig.ACTION_SEARCH
+                    rk = UIReturnKeySearch;
+                    break;
+                case 4: // TextInputConfig.ACTION_SEND
+                    rk = UIReturnKeySend;
+                    break;
+                default:
+                    break;
+            }
+            cn1TextInputView.returnKeyType = rk;
+            [cn1TextInputView cn1ResetComposition];
             [cn1TextInputView cn1SyncText:(startText != nil ? startText : @"") selStart:selStart selEnd:selEnd caretRect:CGRectMake(0, 0, 2, 16)];
             UIViewController* vc = [CodenameOne_GLViewController instance];
             if (vc != nil) {
@@ -697,6 +768,7 @@ void com_codename1_impl_ios_IOSNative_stopTextInput__(CN1_THREAD_STATE_MULTI_ARG
     dispatch_async(dispatch_get_main_queue(), ^{
         @autoreleasepool {
             if (cn1TextInputView != nil) {
+                [cn1TextInputView cn1ResetComposition];
                 [cn1TextInputView resignFirstResponder];
                 [cn1TextInputView removeFromSuperview];
             }
@@ -707,7 +779,7 @@ void com_codename1_impl_ios_IOSNative_stopTextInput__(CN1_THREAD_STATE_MULTI_ARG
 #else
 
 // watchOS has no UIKeyInput / UITextInput keyboard support; provide stubs so the symbols still link.
-void com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boolean_java_lang_String_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT constraint, JAVA_BOOLEAN autoCorrect, JAVA_BOOLEAN autoCapitalize, JAVA_BOOLEAN multiline, JAVA_OBJECT initialText, JAVA_INT selStart, JAVA_INT selEnd) {
+void com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boolean_java_lang_String_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT constraint, JAVA_BOOLEAN autoCorrect, JAVA_BOOLEAN autoCapitalize, JAVA_BOOLEAN multiline, JAVA_OBJECT initialText, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT actionType) {
 }
 void com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_String_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT text, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT caretX, JAVA_INT caretY, JAVA_INT caretW, JAVA_INT caretH) {
 }

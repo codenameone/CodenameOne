@@ -625,7 +625,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardContent___java_lang_Str
     POOL_BEGIN();
     NSString* type = cn1PasteboardTypeForMime(toNSString(CN1_THREAD_STATE_PASS_ARG mimeType));
     NSData* data = [[UIPasteboard generalPasteboard] dataForPasteboardType:type];
-    NSString* value = data == nil ? nil : [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    NSString* value = data == nil ? nil : [[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] autorelease];
     JAVA_OBJECT result = fromNSString(CN1_THREAD_STATE_PASS_ARG value);
     POOL_END();
     return result;

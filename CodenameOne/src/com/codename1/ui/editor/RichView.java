@@ -790,46 +790,47 @@ public class RichView extends EditorView {
             g.drawString(prefix, textStart - prefixW, y + baseline(lineHeight, prefixFont));
         }
 
-        // styled runs
-        int col = 0;
-        int cx = textStart;
-        while (col < text.length()) {
-            Image img = text.charAt(col) == OBJ ? imageAt(lineStart + col) : null;
-            if (img != null) {
-                int iw = imageDisplayWidth(img);
-                int ih = imageDisplayHeight(img);
-                g.drawImage(img, cx, y + Math.max(0, lineHeight - ih), iw, ih);
-                cx += iw;
-                col++;
-                continue;
+        // styled runs. On lines with right-to-left content paint the bidi-reordered visual
+        // atoms (the same layout measureColumnX / columnAtX use) so glyphs, caret, selection
+        // and hit testing all agree; each atom is single-style and single-direction so the
+        // platform font engine shapes the glyphs within it.
+        if (!BidiUtil.isTrivialLtr(text, isRTL())) {
+            int[][] atoms = richVisualAtoms(line, text, lineStart);
+            for (int[] atom : atoms) {
+                int ax = textStart + atom[4];
+                if (atom[3] == 1) {
+                    Image img = imageAt(lineStart + atom[0]);
+                    if (img != null) {
+                        int iw = imageDisplayWidth(img);
+                        int ih = imageDisplayHeight(img);
+                        g.drawImage(img, ax, y + Math.max(0, lineHeight - ih), iw, ih);
+                    }
+                    continue;
+                }
+                paintStyledRun(g, b, text, lineStart, atom[0], atom[1], ax, y, lineHeight);
             }
-            TextStyle st = inline.styleAt(lineStart + col);
-            int runEnd = col + 1;
-            while (runEnd < text.length() && text.charAt(runEnd) != OBJ
-                    && inline.styleAt(lineStart + runEnd).equals(st)) {
-                runEnd++;
+        } else {
+            int col = 0;
+            int cx = textStart;
+            while (col < text.length()) {
+                Image img = text.charAt(col) == OBJ ? imageAt(lineStart + col) : null;
+                if (img != null) {
+                    int iw = imageDisplayWidth(img);
+                    int ih = imageDisplayHeight(img);
+                    g.drawImage(img, cx, y + Math.max(0, lineHeight - ih), iw, ih);
+                    cx += iw;
+                    col++;
+                    continue;
+                }
+                TextStyle st = inline.styleAt(lineStart + col);
+                int runEnd = col + 1;
+                while (runEnd < text.length() && text.charAt(runEnd) != OBJ
+                        && inline.styleAt(lineStart + runEnd).equals(st)) {
+                    runEnd++;
+                }
+                cx += paintStyledRun(g, b, text, lineStart, col, runEnd, cx, y, lineHeight);
+                col = runEnd;
             }
-            String run = text.substring(col, runEnd);
-            boolean bold = st.isBold() || isHeading(b.type);
-            Font rf = fontFor(bold, st.isItalic(), runPx(b.type, st.getFontSizeLevel()));
-            int w = rf.stringWidth(run);
-            int ry = y + baseline(lineHeight, rf);
-            if (st.getHighlight() >= 0) {
-                g.setColor(st.getHighlight());
-                g.fillRect(cx, y, w, lineHeight);
-            }
-            int decoration = 0;
-            if (st.isUnderline()) {
-                decoration |= Style.TEXT_DECORATION_UNDERLINE;
-            }
-            if (st.isStrike()) {
-                decoration |= Style.TEXT_DECORATION_STRIKETHRU;
-            }
-            g.setColor(st.getForeColor() >= 0 ? st.getForeColor() : getTextColor());
-            g.setFont(rf);
-            g.drawString(run, cx, ry, decoration);
-            cx += w;
-            col = runEnd;
         }
 
         // placeholder
@@ -838,6 +839,32 @@ public class RichView extends EditorView {
             g.setFont(fontFor(false, false, baseSize()));
             g.drawString(placeholder, x, y + baseline(lineHeight, fontFor(false, false, baseSize())));
         }
+    }
+
+    /// Paints one single-style text run at `cx` and returns its pixel width.
+    private int paintStyledRun(Graphics g, RichBlocks.BlockAttr b, String text, int lineStart,
+            int from, int to, int cx, int y, int lineHeight) {
+        TextStyle st = inline.styleAt(lineStart + from);
+        String run = text.substring(from, to);
+        boolean bold = st.isBold() || isHeading(b.type);
+        Font rf = fontFor(bold, st.isItalic(), runPx(b.type, st.getFontSizeLevel()));
+        int w = rf.stringWidth(run);
+        int ry = y + baseline(lineHeight, rf);
+        if (st.getHighlight() >= 0) {
+            g.setColor(st.getHighlight());
+            g.fillRect(cx, y, w, lineHeight);
+        }
+        int decoration = 0;
+        if (st.isUnderline()) {
+            decoration |= Style.TEXT_DECORATION_UNDERLINE;
+        }
+        if (st.isStrike()) {
+            decoration |= Style.TEXT_DECORATION_STRIKETHRU;
+        }
+        g.setColor(st.getForeColor() >= 0 ? st.getForeColor() : getTextColor());
+        g.setFont(rf);
+        g.drawString(run, cx, ry, decoration);
+        return w;
     }
 
     private int measureLine(int line, String text) {

@@ -101,6 +101,8 @@ public final class HtmlImporter {
     private final List<String> linkStack = new ArrayList<String>();
     private String currentHref;
     private boolean blockContent;
+    // nesting depth of <pre> elements; whitespace is preserved verbatim while > 0
+    private int preDepth;
     // list context stack: each entry is {listType, indent}
     private final List<int[]> listStack = new ArrayList<int[]>();
 
@@ -181,6 +183,9 @@ public final class HtmlImporter {
         }
         if (isBlockTag(name) || "li".equals(name)) {
             blockContent = true;
+            if ("pre".equals(name)) {
+                preDepth++;
+            }
             startBlock(blockAttrFor(name, attrs));
             return;
         }
@@ -196,6 +201,10 @@ public final class HtmlImporter {
     }
 
     private void endTag(String name) {
+        if ("pre".equals(name) && preDepth > 0) {
+            preDepth--;
+            return;
+        }
         if ("ol".equals(name) || "ul".equals(name)) {
             if (!listStack.isEmpty()) {
                 listStack.remove(listStack.size() - 1);
@@ -371,6 +380,10 @@ public final class HtmlImporter {
         if (paras.isEmpty()) {
             paras.add(new RichBlocks.BlockAttr());
         }
+        if (preDepth > 0) {
+            appendPreformattedText(t);
+            return;
+        }
         for (int i = 0; i < t.length(); i++) {
             char c = t.charAt(i);
             if (c == ' ' || c == '\n' || c == '\r' || c == '\t') {
@@ -391,6 +404,44 @@ public final class HtmlImporter {
                 lastWasSpace = false;
                 freshParagraph = false;
             }
+        }
+    }
+
+    /// Inside `pre` whitespace is content: spaces and tabs are preserved verbatim and newlines
+    /// start a fresh preformatted line, so indentation survives `setHtml` and getHtml round trips.
+    private void appendPreformattedText(String t) {
+        for (int i = 0; i < t.length(); i++) {
+            char c = t.charAt(i);
+            if (c == '\r') {
+                continue;
+            }
+            if (c == '\n') {
+                // the parser hands the pre body as text; a leading newline right after <pre>
+                // would otherwise open an empty first line
+                if (freshParagraph) {
+                    continue;
+                }
+                RichBlocks.BlockAttr attr = currentBlockCtx();
+                attr.type = RichBlocks.PRE;
+                attr.listType = RichBlocks.LIST_NONE;
+                newParagraph(attr);
+                continue;
+            }
+            text.append(c == '\t' ? ' ' : c);
+            if (c == '\t') {
+                // expand the tab to spaces; the renderer has no tab stops
+                for (int s = 0; s < 3; s++) {
+                    text.append(' ');
+                    styles.add(current);
+                    links.add(currentHref);
+                    imageSources.add(null);
+                }
+            }
+            styles.add(current);
+            links.add(currentHref);
+            imageSources.add(null);
+            lastWasSpace = false;
+            freshParagraph = false;
         }
     }
 

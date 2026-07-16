@@ -328,24 +328,94 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     private static void configureEditorInfo(android.view.inputmethod.EditorInfo editorInfo, com.codename1.ui.TextInputConfig cfg) {
-        int inputType = android.text.InputType.TYPE_CLASS_TEXT;
+        int constraint = cfg == null ? 0 : cfg.getConstraint();
+        int inputType;
+        switch (constraint & 0xffff) {
+            case com.codename1.ui.TextArea.NUMERIC:
+                inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                        | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED;
+                break;
+            case com.codename1.ui.TextArea.DECIMAL:
+                inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                        | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
+                        | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL;
+                break;
+            case com.codename1.ui.TextArea.PHONENUMBER:
+                inputType = android.text.InputType.TYPE_CLASS_PHONE;
+                break;
+            case com.codename1.ui.TextArea.EMAILADDR:
+                inputType = android.text.InputType.TYPE_CLASS_TEXT
+                        | android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS;
+                break;
+            case com.codename1.ui.TextArea.URL:
+                inputType = android.text.InputType.TYPE_CLASS_TEXT
+                        | android.text.InputType.TYPE_TEXT_VARIATION_URI;
+                break;
+            default:
+                inputType = android.text.InputType.TYPE_CLASS_TEXT;
+                break;
+        }
+        boolean text = (inputType & android.text.InputType.TYPE_MASK_CLASS) == android.text.InputType.TYPE_CLASS_TEXT;
+        boolean password = (constraint & com.codename1.ui.TextArea.PASSWORD) != 0;
+        if (password) {
+            inputType = text
+                    ? inputType | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+                    : android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD;
+            text = (inputType & android.text.InputType.TYPE_MASK_CLASS) == android.text.InputType.TYPE_CLASS_TEXT;
+        }
         boolean multiline = cfg == null || cfg.isMultiline();
-        if (multiline) {
-            inputType |= android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE;
-        }
-        if (cfg != null && !cfg.isAutoCorrect()) {
-            inputType |= android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
-        }
-        if (cfg != null && cfg.isAutoCapitalize()) {
-            inputType |= android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES;
+        if (text) {
+            if (multiline) {
+                inputType |= android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE;
+            }
+            if (password || (cfg != null && !cfg.isAutoCorrect())) {
+                inputType |= android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
+            }
+            if (!password && cfg != null && cfg.isAutoCapitalize()) {
+                inputType |= android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES;
+            }
         }
         editorInfo.inputType = inputType;
         editorInfo.imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI;
         if (multiline) {
             editorInfo.imeOptions |= android.view.inputmethod.EditorInfo.IME_ACTION_NONE;
+        } else {
+            editorInfo.imeOptions |= imeActionFor(cfg == null
+                    ? com.codename1.ui.TextInputConfig.ACTION_DEFAULT : cfg.getActionType());
         }
         editorInfo.initialSelStart = activeInputState != null ? activeInputState.getSelectionStart() : 0;
         editorInfo.initialSelEnd = activeInputState != null ? activeInputState.getSelectionEnd() : 0;
+    }
+
+    private static int imeActionFor(int actionType) {
+        switch (actionType) {
+            case com.codename1.ui.TextInputConfig.ACTION_NEXT:
+                return android.view.inputmethod.EditorInfo.IME_ACTION_NEXT;
+            case com.codename1.ui.TextInputConfig.ACTION_SEARCH:
+                return android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH;
+            case com.codename1.ui.TextInputConfig.ACTION_SEND:
+                return android.view.inputmethod.EditorInfo.IME_ACTION_SEND;
+            case com.codename1.ui.TextInputConfig.ACTION_DONE:
+            default:
+                return android.view.inputmethod.EditorInfo.IME_ACTION_DONE;
+        }
+    }
+
+    /// Maps an Android `EditorInfo.IME_ACTION_*` code back to the `TextInputConfig` action constant
+    /// delivered to `TextInputClient.onEditorAction`.
+    static int textInputActionFor(int imeActionCode) {
+        switch (imeActionCode) {
+            case android.view.inputmethod.EditorInfo.IME_ACTION_NEXT:
+                return com.codename1.ui.TextInputConfig.ACTION_NEXT;
+            case android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH:
+                return com.codename1.ui.TextInputConfig.ACTION_SEARCH;
+            case android.view.inputmethod.EditorInfo.IME_ACTION_SEND:
+                return com.codename1.ui.TextInputConfig.ACTION_SEND;
+            case android.view.inputmethod.EditorInfo.IME_ACTION_DONE:
+                return com.codename1.ui.TextInputConfig.ACTION_DONE;
+            default:
+                return com.codename1.ui.TextInputConfig.ACTION_DEFAULT;
+        }
     }
 
     @Override
@@ -382,6 +452,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void updateTextInputState(Object handle, com.codename1.ui.TextInputState state) {
+        if (handle == null || handle != activeInputClient || state == null) {
+            // a stale handle (an unbalanced session that was already replaced) must not
+            // disturb the currently bound client
+            return;
+        }
         activeInputState = state;
         final CodenameOneActivity a = getActivity();
         final CodenameOneSurface view = myView;
@@ -403,6 +478,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void stopTextInput(Object handle) {
+        if (handle == null || handle != activeInputClient) {
+            return;
+        }
         activeInputClient = null;
         activeInputState = null;
         activeInputConfig = null;

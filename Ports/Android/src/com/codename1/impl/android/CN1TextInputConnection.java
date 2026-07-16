@@ -116,6 +116,9 @@ class CN1TextInputConnection extends BaseInputConnection {
         final int fmods = mods;
         int keyCode = event.getKeyCode();
         int command = mapKey(keyCode);
+        if (command == 0 && (mods & TextInputClient.MOD_CTRL) != 0) {
+            command = mapControlKey(keyCode, mods);
+        }
         if (command > 0) {
             final int cmd = command;
             post(new Runnable() {
@@ -126,9 +129,14 @@ class CN1TextInputConnection extends BaseInputConnection {
             return true;
         }
         if (keyCode == KeyEvent.KEYCODE_ENTER) {
+            TextInputConfig cfg = AndroidImplementation.currentInputConfig();
+            // multiline clients treat ACTION_DEFAULT as a newline; single-line clients get
+            // the action the field was configured with (Done / Next / Search / Send)
+            final int action = cfg != null && !cfg.isMultiline()
+                    ? cfg.getActionType() : TextInputConfig.ACTION_DEFAULT;
             post(new Runnable() {
                 public void run() {
-                    client.onEditorAction(TextInputConfig.ACTION_DEFAULT);
+                    client.onEditorAction(action);
                 }
             });
             return true;
@@ -164,6 +172,10 @@ class CN1TextInputConnection extends BaseInputConnection {
                 return TextInputClient.KEY_HOME;
             case KeyEvent.KEYCODE_MOVE_END:
                 return TextInputClient.KEY_END;
+            case KeyEvent.KEYCODE_PAGE_UP:
+                return TextInputClient.KEY_PAGE_UP;
+            case KeyEvent.KEYCODE_PAGE_DOWN:
+                return TextInputClient.KEY_PAGE_DOWN;
             case KeyEvent.KEYCODE_ESCAPE:
                 return TextInputClient.KEY_ESCAPE;
             default:
@@ -171,11 +183,48 @@ class CN1TextInputConnection extends BaseInputConnection {
         }
     }
 
+    /// Hardware-keyboard shortcuts arrive as Ctrl-modified letter key events rather than through the
+    /// IME text pipeline; map the editing shortcuts every desktop-class keyboard user expects.
+    private static int mapControlKey(int keyCode, int mods) {
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_A:
+                return TextInputClient.KEY_SELECT_ALL;
+            case KeyEvent.KEYCODE_Z:
+                return (mods & TextInputClient.MOD_SHIFT) != 0
+                        ? TextInputClient.KEY_REDO : TextInputClient.KEY_UNDO;
+            case KeyEvent.KEYCODE_Y:
+                return TextInputClient.KEY_REDO;
+            case KeyEvent.KEYCODE_C:
+                return TextInputClient.KEY_COPY;
+            case KeyEvent.KEYCODE_X:
+                return TextInputClient.KEY_CUT;
+            case KeyEvent.KEYCODE_V:
+                return TextInputClient.KEY_PASTE;
+            default:
+                return 0;
+        }
+    }
+
     @Override
     public boolean performEditorAction(int actionCode) {
+        final int action = AndroidImplementation.textInputActionFor(actionCode);
         post(new Runnable() {
             public void run() {
-                client.onEditorAction(TextInputConfig.ACTION_DEFAULT);
+                client.onEditorAction(action);
+            }
+        });
+        return true;
+    }
+
+    @Override
+    public boolean setComposingRegion(final int start, final int end) {
+        // Gboard marks an existing word for recomposition (tap into a word, pick a
+        // suggestion) and expects the next setComposingText to replace that region.
+        // The client contract replaces the selection when no composition is active,
+        // so mirror the region as the selection.
+        post(new Runnable() {
+            public void run() {
+                client.setSelectionRange(Math.min(start, end), Math.max(start, end));
             }
         });
         return true;

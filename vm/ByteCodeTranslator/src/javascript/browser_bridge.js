@@ -661,6 +661,25 @@
                 || (eventCurrentTarget && eventCurrentTarget.getAttribute
                 && eventCurrentTarget.getAttribute('data-cn1-worker-text-input') === 'true'));
         var cancelWorkerTextInputEvent = false;
+        // While the lightweight text input session owns the keyboard, a press on
+        // the render canvas must not move DOM focus: the browser's default
+        // mousedown/touchstart action blurs the hidden textarea (focus falls to
+        // <body>), the window key pipeline defers to the active session, and
+        // every key goes dead until the session restarts. The worker's own
+        // preventDefault (the pointer-routing "consume" decision) arrives after
+        // the dispatch window, so cancel the focus change here, synchronously.
+        if (event && (event.type === 'mousedown' || event.type === 'touchstart')
+            && !workerTextInput
+            && ((eventTarget && eventTarget.tagName === 'CANVAS')
+                || (eventCurrentTarget && eventCurrentTarget.tagName === 'CANVAS'))) {
+          var bridgeDoc = global.document || (global.window && global.window.document);
+          var activeEl = bridgeDoc && bridgeDoc.activeElement;
+          if (activeEl && activeEl.getAttribute
+              && activeEl.getAttribute('data-cn1-worker-text-input') === 'true'
+              && typeof event.preventDefault === 'function') {
+            event.preventDefault();
+          }
+        }
         if (workerTextInput && event) {
           if (event.type === 'beforeinput') {
             var inputType = event.inputType || '';
@@ -672,7 +691,9 @@
                     || inputType === 'deleteContentForward'
                     || inputType === 'historyUndo'
                     || inputType === 'historyRedo';
-          } else if (event.type === 'keydown') {
+          } else if (event.type === 'keydown' && !event.isComposing) {
+            // isComposing keydowns navigate the IME candidate list; cancelling them
+            // would break composition on browsers that deliver real keyCodes mid-IME
             var keyCode = event.keyCode | 0;
             var commandModifier = !!(event.ctrlKey || event.metaKey);
             cancelWorkerTextInputEvent = (commandModifier && (keyCode === 65 || keyCode === 89 || keyCode === 90))

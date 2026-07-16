@@ -2546,6 +2546,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
         lightweightTextInputState = state;
         if (!lightweightTextInputComposing) {
             syncLightweightTextInputElement(state);
+            // Re-assert DOM focus on every state push. Anything that silently moves focus off the
+            // hidden textarea (a browser overlay, an extension, a focus change the bridge guard
+            // could not cancel) otherwise leaves the session bound but deaf -- the window key
+            // pipeline defers to the active session, so every key goes dead until the session is
+            // restarted. The editor pushes state on each pointer interaction, so clicking back
+            // into the editor heals the binding. focus() on an already-focused element is a no-op.
+            lightweightTextInputElement.focus();
         }
     }
 
@@ -2630,6 +2637,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
                 if (lightweightTextInputComposing) {
                     return;
                 }
+                // Safari fires the composition's final input event AFTER compositionend has
+                // already cleared the composing flag and committed the text; diffing the
+                // textarea value again would insert the composed string twice.
+                String inputType = ((InputEvent) evt).getInputType();
+                if ("insertCompositionText".equals(inputType) || "deleteCompositionText".equals(inputType)) {
+                    return;
+                }
                 final TextInputClient client = lightweightTextInputClient;
                 final String value = element.getValue();
                 if (client == null) {
@@ -2678,7 +2692,10 @@ public class HTML5Implementation extends CodenameOneImplementation {
             public void handleEvent(Event evt) {
                 final KeyEvent key = (KeyEvent) evt;
                 final TextInputClient client = lightweightTextInputClient;
-                if (client == null) {
+                if (client == null || lightweightTextInputComposing) {
+                    // while an IME composition is active the arrows / Escape / Enter navigate
+                    // the candidate list; routing them to the client would corrupt the
+                    // composition (the composition listeners own this phase)
                     return;
                 }
                 final int modifiers = lightweightModifiers(key);
@@ -2705,21 +2722,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
                             }
                         }
                     });
-                } else if (key.getKeyCode() == 13
-                        && lightweightTextInputConfig != null
-                        && !lightweightTextInputConfig.isMultiline()) {
-                    evt.preventDefault();
-                    evt.stopPropagation();
-                    final int action = lightweightTextInputConfig.getActionType();
-                    enqueueLightweightTextInput(client, new Runnable() {
-                        @Override
-                        public void run() {
-                            if (client == lightweightTextInputClient) {
-                                client.onEditorAction(action);
-                            }
-                        }
-                    });
                 }
+                // Enter is deliberately NOT handled here: on the worker runtime this
+                // preventDefault lands after the browser's dispatch window, so the keydown
+                // still produces a beforeinput insertLineBreak/insertParagraph -- handling
+                // both would fire onEditorAction twice on single-line fields. The
+                // applyLightweightBeforeInput path owns Enter for both runtimes.
             }
         }, true);
 
@@ -2842,8 +2850,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
                             ? TextInputClient.KEY_REDO : TextInputClient.KEY_UNDO;
                 default:
                     // Copy, cut, and paste remain native browser events so their ClipboardEvent
-                    // carries all negotiated MIME flavors and retains user activation.
-                    return 0;
+                    // carries all negotiated MIME flavors and retains user activation. Navigation
+                    // and deletion keys fall through so Ctrl+arrow word movement, Ctrl+Home/End
+                    // and Ctrl+Backspace/Delete reach the client with their modifiers -- the
+                    // bridge cancels their keydown unconditionally, so mapping them to nothing
+                    // here would make the modified keys dead.
+                    break;
             }
         }
         switch (keyCode) {
@@ -2917,8 +2929,14 @@ public class HTML5Implementation extends CodenameOneImplementation {
         while (true) {
             Runnable operation;
             synchronized (lightweightTextInputQueue) {
-                if (client != lightweightTextInputClient || lightweightTextInputQueue.isEmpty()) {
-                    lightweightTextInputQueue.clear();
+                if (client != lightweightTextInputClient) {
+                    // This drain was scheduled for a session that has since been replaced.
+                    // The queue now belongs to the successor (startTextInput cleared the old
+                    // entries and the successor scheduled its own drain), so leave both the
+                    // queue and the drain flag alone.
+                    return;
+                }
+                if (lightweightTextInputQueue.isEmpty()) {
                     lightweightTextInputDrainScheduled = false;
                     return;
                 }

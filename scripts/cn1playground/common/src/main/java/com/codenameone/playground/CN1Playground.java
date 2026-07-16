@@ -772,6 +772,9 @@ public class CN1Playground extends Lifecycle {
 
             editor.setMarkers(diagnostics);
             editor.setInlineMessages(currentMessages);
+            List<String> visibleUiids = PlaygroundCssSupport.collectVisibleUiids(previewColumn.getContentHost());
+            editor.setUiidCompletions(visibleUiids);
+            cssEditor.setUiidCompletions(visibleUiids);
             applyCurrentCss();
             persistCurrentState();
         });
