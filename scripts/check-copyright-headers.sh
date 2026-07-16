@@ -85,7 +85,9 @@ validate_exclusions() {
 header_kind() {
   local file="$1"
   local header_file="$2"
-  sed -n '1,40p' "$file" > "$header_file"
+  # normalize CRLF so historically Windows-ended sources (parts of the Android
+  # port) are judged on their header text, not their line endings
+  sed -n '1,40p' "$file" | tr -d '\r' > "$header_file"
 
   if [[ "$(awk 'NF { print; exit }' "$header_file")" != '/*' ]]; then
     return 1
