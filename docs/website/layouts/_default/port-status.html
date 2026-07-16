@@ -2,6 +2,8 @@
 {{- $contract := site.Data.port_status -}}
 {{- $reports := site.Data.port_status_reports -}}
 {{- $supplement := site.Data.port_status_supplement -}}
+{{- $support := site.Data.port_status_support -}}
+{{- $environment := site.Data.port_status_environment -}}
 {{- $snapshotTime := now.UTC -}}
 <article class="post-single cn1-port-status" data-port-status>
   <header class="post-header cn1-port-status__header">
@@ -17,7 +19,7 @@
       {{- $testCount := 0 -}}
       {{- range $contract.features -}}{{- $testCount = add $testCount (len .tests) -}}{{- end -}}
       <span><strong>{{ $testCount }}</strong> tests</span>
-      <span><strong>{{ len $contract.ports }}</strong> port targets</span>
+      <span><strong>{{ len $contract.ports }}</strong> CI targets</span>
       <span><strong>{{ len $supplement.features }}</strong> environment-dependent feature families</span>
     </div>
   </header>
@@ -25,6 +27,61 @@
   <section class="cn1-port-status__notice" role="status">
     Table snapshot generated
     <time data-port-status-truth datetime="{{ $snapshotTime.Format "2006-01-02T15:04:05Z07:00" }}">{{ $snapshotTime.Format "2006-01-02 15:04 UTC" }}</time>.
+  </section>
+
+  <section class="cn1-port-status__deployment" data-deployment-support aria-labelledby="deployment-support-title">
+    <header>
+      <p class="cn1-port-status__eyebrow">Deployment support contract</p>
+      <h2 id="deployment-support-title">Supported platforms, architectures, and tested environments</h2>
+      <p>
+        The compliance matrix uses {{ len $contract.ports }} CI targets, not {{ len $contract.ports }} distinct platforms:
+        renderer and CPU variants have separate columns so regressions cannot hide behind a combined result.
+        A deployment floor means the toolchain can target that release. Runtime CI evidence is stated separately,
+        because compiling for an older release is not proof that the application was launched there.
+      </p>
+    </header>
+    <div class="cn1-port-status__support-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Platform</th>
+            <th scope="col">Architectures</th>
+            <th scope="col">Declared range</th>
+            <th scope="col">Runtime CI evidence</th>
+            <th scope="col">Floor evidence and limits</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{- range $support.deployment_support }}
+          <tr data-deployment-row="{{ .id }}">
+            <th scope="row"><strong>{{ .platform }}</strong><small>{{ .support }}</small></th>
+            <td>{{ .architectures }}</td>
+            <td>{{ .declared_range }}</td>
+            <td>{{ .ci_evidence }}</td>
+            <td>{{ .floor_evidence }}</td>
+          </tr>
+          {{- end }}
+        </tbody>
+      </table>
+    </div>
+    <section class="cn1-port-status__browsers" data-browser-evidence aria-labelledby="browser-evidence-title">
+      <h3 id="browser-evidence-title">JavaScript browser engines</h3>
+      <p>
+        Chromium runs the full visual compliance suite. The smaller nightly lifecycle check boots the same
+        generated application in all three major browser engines and records the exact engine version here.
+        A browser family is not assigned an old minimum version until that version is actually exercised.
+      </p>
+      <div class="cn1-port-status__browser-grid">
+        {{- range $environment.browsers }}
+        <article class="is-{{ .status }}" data-browser-result="{{ .id }}">
+          <h4>{{ .name }}</h4>
+          <p><strong>{{ .engine_version }}</strong></p>
+          <p>{{ .coverage }}</p>
+          <span>{{ cond (eq .status "pass") "Passed" (cond (eq .status "fail") "Failed" "Awaiting nightly evidence") }}</span>
+        </article>
+        {{- end }}
+      </div>
+    </section>
   </section>
 
   <section class="cn1-port-status__legend" aria-label="Status legend">
@@ -175,6 +232,44 @@
         </tbody>
       </table>
     </div>
+  </section>
+
+  <section class="cn1-port-status__performance" data-performance-evidence aria-labelledby="performance-title">
+    <header>
+      <p class="cn1-port-status__eyebrow">Measured performance</p>
+      <h2 id="performance-title">{{ $support.benchmark.title }}</h2>
+      <p>
+        {{ $support.benchmark.machine }}; {{ $support.benchmark.configuration }}.
+        <strong>{{ $support.benchmark.result }}</strong>. {{ $support.benchmark.explanation }}
+      </p>
+    </header>
+    <div class="cn1-port-status__benchmark-grid">
+      {{- range $support.benchmark.rows }}
+      <article data-benchmark-result>
+        <strong>{{ .ratio }}</strong>
+        <span>{{ .name }}</span>
+      </article>
+      {{- end }}
+    </div>
+    <h3>Flutter comparison publication contract</h3>
+    <p>
+      Startup, size, memory, and Flutter/Dart results will appear only after the nightly job can produce a matched,
+      reproducible result. Until then this page makes no Flutter performance claim. That avoids comparing a complete
+      Flutter application with a runtime-only Codename One binary, or comparing measurements from different machines.
+    </p>
+    <div class="cn1-port-status__support-table cn1-port-status__support-table--metrics">
+      <table>
+        <thead><tr><th scope="col">Metric</th><th scope="col">Required testing logic</th></tr></thead>
+        <tbody>
+          {{- range $support.benchmark.comparative_metrics }}
+          <tr data-comparative-metric><th scope="row">{{ .metric }}</th><td>{{ .publication_rule }}</td></tr>
+          {{- end }}
+        </tbody>
+      </table>
+    </div>
+    <p class="cn1-port-status__source-note">
+      <a href="https://github.com/codenameone/CodenameOne/tree/master/vm/benchmarks" target="_blank" rel="noopener">Benchmark source and reproducibility notes</a>
+    </p>
   </section>
 
   <footer class="cn1-port-status__method">

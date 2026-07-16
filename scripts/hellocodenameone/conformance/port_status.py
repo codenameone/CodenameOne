@@ -17,6 +17,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_MANIFEST = REPO_ROOT / "docs/website/data/port_status.json"
 SUPPLEMENT = REPO_ROOT / "docs/website/data/port_status_supplement.json"
+SUPPORT = REPO_ROOT / "docs/website/data/port_status_support.json"
+ENVIRONMENT = REPO_ROOT / "docs/website/data/port_status_environment.json"
 RUNNER = REPO_ROOT / (
     "scripts/hellocodenameone/common/src/main/java/com/codenameone/"
     "examples/hellocodenameone/tests/Cn1ssDeviceRunner.java"
@@ -270,6 +272,51 @@ def validate(manifest: dict) -> dict:
                 + ", ".join(missing_coverage)
             )
 
+    try:
+        support = read_json(SUPPORT)
+        environment = read_json(ENVIRONMENT)
+    except ContractError as exc:
+        problems.append(str(exc))
+        support = {}
+        environment = {}
+
+    deployment_rows = support.get("deployment_support", [])
+    deployment_ids = [item.get("id") for item in deployment_rows]
+    expected_deployments = {
+        "android", "ios", "macos", "web", "linux", "windows", "watchos", "tvos"
+    }
+    if set(deployment_ids) != expected_deployments or len(deployment_ids) != len(expected_deployments):
+        problems.append("Deployment support must define Android, iOS, macOS, Web, Linux, Windows, watchOS, and tvOS exactly once")
+    for item in deployment_rows:
+        if not all(item.get(field) for field in (
+            "id", "platform", "architectures", "declared_range", "ci_evidence",
+            "floor_evidence", "support"
+        )):
+            problems.append(f"Deployment support row {item.get('id')} is incomplete")
+    deployment_by_id = {item.get("id"): item for item in deployment_rows}
+    if "Catalyst" not in json.dumps(deployment_by_id.get("macos", {})):
+        problems.append("macOS support must disclose its Mac Catalyst scope")
+    if "x64" not in json.dumps(deployment_by_id.get("linux", {})) or "ARM64" not in json.dumps(deployment_by_id.get("linux", {})):
+        problems.append("Linux support must declare both x64 and ARM64 evidence")
+
+    benchmark = support.get("benchmark", {})
+    if len(benchmark.get("rows", [])) != 10 or len(benchmark.get("comparative_metrics", [])) != 4:
+        problems.append("Performance evidence must retain ten common workloads and four comparative publication rules")
+    if "not presented as a Flutter comparison" not in benchmark.get("explanation", ""):
+        problems.append("The existing VM benchmark must not be represented as a Flutter comparison")
+
+    browsers = environment.get("browsers", [])
+    browser_ids = [item.get("id") for item in browsers]
+    if browser_ids != ["chromium", "firefox", "webkit"]:
+        problems.append("Browser evidence must contain Chromium, Firefox, and WebKit in that order")
+    for browser in browsers:
+        if browser.get("status") not in {"pending", "pass", "fail"} or not all(
+            browser.get(field) for field in ("id", "name", "engine_version", "coverage")
+        ):
+            problems.append(f"Browser evidence for {browser.get('id')} is incomplete")
+        if browser.get("status") != "pending" and browser.get("engine_version", "").startswith("Pending"):
+            problems.append(f"Measured browser evidence for {browser.get('id')} has no engine version")
+
     if problems:
         raise ContractError("\n".join(problems))
     return {
@@ -278,6 +325,8 @@ def validate(manifest: dict) -> dict:
         "tests": len(registered),
         "goldens": len(golden_names),
         "manual_features": manual_feature_count,
+        "deployment_platforms": len(deployment_rows),
+        "browser_engines": len(browsers),
     }
 
 

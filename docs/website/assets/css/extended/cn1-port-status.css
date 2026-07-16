@@ -85,6 +85,156 @@
     border-color: color-mix(in srgb, #c38a20 45%, transparent);
 }
 
+.cn1-port-status__deployment,
+.cn1-port-status__performance {
+    margin-top: 2.25rem;
+}
+
+.cn1-port-status__deployment > header,
+.cn1-port-status__performance > header {
+    max-width: 980px;
+}
+
+.cn1-port-status__deployment h2,
+.cn1-port-status__performance h2 {
+    margin-bottom: .6rem;
+}
+
+.cn1-port-status__deployment > header > p:last-child,
+.cn1-port-status__performance > header > p:last-child,
+.cn1-port-status__browsers > p,
+.cn1-port-status__performance > p {
+    color: var(--secondary);
+    line-height: 1.65;
+}
+
+.cn1-port-status__support-table {
+    border: 1px solid var(--cn1-status-border);
+    border-radius: 12px;
+    margin-top: 1rem;
+    overflow-x: auto;
+}
+
+.cn1-port-status__support-table table {
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: .82rem;
+    margin: 0;
+    min-width: 1050px;
+    width: 100%;
+}
+
+.cn1-port-status__support-table th,
+.cn1-port-status__support-table td {
+    border-bottom: 1px solid var(--cn1-status-border);
+    border-right: 1px solid var(--cn1-status-border);
+    line-height: 1.5;
+    padding: .75rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+.cn1-port-status__support-table thead th {
+    background: var(--entry);
+    font-size: .72rem;
+}
+
+.cn1-port-status__support-table tbody th {
+    min-width: 145px;
+}
+
+.cn1-port-status__support-table tbody th small {
+    color: var(--secondary);
+    display: block;
+    font-weight: 400;
+    margin-top: .2rem;
+}
+
+.cn1-port-status__support-table tr:last-child th,
+.cn1-port-status__support-table tr:last-child td {
+    border-bottom: 0;
+}
+
+.cn1-port-status__support-table th:last-child,
+.cn1-port-status__support-table td:last-child {
+    border-right: 0;
+}
+
+.cn1-port-status__browsers {
+    margin-top: 1.5rem;
+}
+
+.cn1-port-status__browsers h3,
+.cn1-port-status__performance h3 {
+    font-size: 1.05rem;
+    margin-bottom: .4rem;
+}
+
+.cn1-port-status__browser-grid,
+.cn1-port-status__benchmark-grid {
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    margin-top: 1rem;
+}
+
+.cn1-port-status__browser-grid article,
+.cn1-port-status__benchmark-grid article {
+    background: var(--entry);
+    border: 1px solid var(--cn1-status-border);
+    border-left: 4px solid #7d8791;
+    border-radius: 10px;
+    padding: .85rem;
+}
+
+.cn1-port-status__browser-grid article.is-pass { border-left-color: #27955b; }
+.cn1-port-status__browser-grid article.is-fail { border-left-color: #d24c4c; }
+.cn1-port-status__browser-grid article.is-pending { border-left-color: #c38a20; }
+
+.cn1-port-status__browser-grid h4 {
+    font-size: .95rem;
+    margin: 0;
+}
+
+.cn1-port-status__browser-grid p {
+    color: var(--secondary);
+    font-size: .75rem;
+    line-height: 1.4;
+    margin: .35rem 0;
+}
+
+.cn1-port-status__browser-grid article > span {
+    font-size: .72rem;
+    font-weight: 700;
+}
+
+.cn1-port-status__benchmark-grid {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    margin-bottom: 1.5rem;
+}
+
+.cn1-port-status__benchmark-grid article {
+    border-left-color: #3976c5;
+}
+
+.cn1-port-status__benchmark-grid strong {
+    display: block;
+    font-size: 1.15rem;
+}
+
+.cn1-port-status__benchmark-grid span {
+    color: var(--secondary);
+    font-size: .72rem;
+}
+
+.cn1-port-status__support-table--metrics table {
+    min-width: 680px;
+}
+
+.cn1-port-status__source-note {
+    font-size: .82rem;
+}
+
 .cn1-port-status__legend {
     color: var(--secondary);
     font-size: .86rem;

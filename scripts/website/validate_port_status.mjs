@@ -77,6 +77,28 @@ function validate() {
     if (/\bdata-port=(?:["']?javase["']?)(?:\s|>)/i.test(page)) {
         fail("JavaSE must not appear as a portability target");
     }
+    if (!/11 CI targets/i.test(pageText) || /11 port targets/i.test(pageText)) {
+        fail("the compliance columns must be described as CI targets, not distinct platforms");
+    }
+
+    const deploymentRows = countMatches(page, /\bdata-deployment-row(?:=|\s|>)/g);
+    const browserResults = countMatches(page, /\bdata-browser-result(?:=|\s|>)/g);
+    const benchmarkResults = countMatches(page, /\bdata-benchmark-result(?:=|\s|>)/g);
+    const comparativeMetrics = countMatches(page, /\bdata-comparative-metric(?:=|\s|>)/g);
+    if (deploymentRows !== 8 || browserResults !== 3 || benchmarkResults !== 10 || comparativeMetrics !== 4) {
+        fail("deployment, browser, or performance evidence is incomplete");
+    }
+    for (const required of [
+        "runtime CI evidence", "Mac Catalyst", "Chromium", "Firefox", "WebKit",
+        "Startup to first usable frame", "Installed binary size", "Peak resident memory"
+    ]) {
+        if (!pageText.toLowerCase().includes(required.toLowerCase())) {
+            fail(`deployment and performance evidence is missing ${required}`);
+        }
+    }
+    if (!/makes no Flutter performance claim/i.test(pageText)) {
+        fail("unmatched benchmark data must not be presented as a Flutter performance result");
+    }
 
     const portCards = countMatches(page, /\bdata-port-card(?:=|\s|>)/g);
     const featureRows = countMatches(page, /\bdata-feature-row(?:=|\s|>)/g);
@@ -205,7 +227,7 @@ function validate() {
     }
 
     console.log(
-        `Port Status page valid: ${portCards} ports, ` +
+        `Port Status page valid: ${portCards} CI targets, ${deploymentRows} deployment platforms, ` +
         `${featureRows} automated features, ${manualRows} environment-dependent features, ` +
         `${mappedTests} mapped tests, static snapshot.`
     );

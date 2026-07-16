@@ -19,6 +19,8 @@ class PortStatusTest(unittest.TestCase):
         self.assertGreaterEqual(counts["features"], 51)
         self.assertEqual(11, counts["ports"])
         self.assertEqual(20, counts["manual_features"])
+        self.assertEqual(8, counts["deployment_platforms"])
+        self.assertEqual(3, counts["browser_engines"])
         self.assertGreaterEqual(counts["goldens"], 100)
         features = {feature["id"]: feature["tests"] for feature in self.manifest["features"]}
         self.assertEqual(["ARApiTest", "MotionSensorDeviceTest"], features["ar-motion-sensors"])

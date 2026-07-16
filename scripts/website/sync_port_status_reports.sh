@@ -69,3 +69,18 @@ while IFS= read -r port; do
 done < <(jq -r '.ports[].id' "${MANIFEST}")
 
 echo "Resolved ${synced} Port Status reports from ${DATA_REF}; remaining ports use checked-in reports."
+
+environment_candidate="${tmp_dir}/environment.json"
+environment_target="${REPO_ROOT}/docs/website/data/port_status_environment.json"
+if git -C "${REPO_ROOT}" show "FETCH_HEAD:evidence/environment.json" > "${environment_candidate}" 2>/dev/null && \
+   jq -e '
+      .schema_version == 1 and
+      (.generated_at | type == "string") and
+      ([.browsers[].id] | sort) == ["chromium", "firefox", "webkit"] and
+      all(.browsers[]; (.engine_version | type == "string") and (.status == "pass" or .status == "fail"))
+   ' "${environment_candidate}" >/dev/null; then
+  cp "${environment_candidate}" "${environment_target}"
+  echo "Resolved nightly browser evidence from ${DATA_REF}."
+else
+  echo "No valid persisted browser evidence; using the checked-in first-run snapshot." >&2
+fi

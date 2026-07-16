@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "generated_at": null,
+  "commit": null,
+  "browsers": [
+    {
+      "id": "chromium",
+      "name": "Chromium",
+      "engine_version": "Pending first nightly run",
+      "status": "pending",
+      "coverage": "Full compliance suite plus nightly lifecycle validation"
+    },
+    {
+      "id": "firefox",
+      "name": "Firefox",
+      "engine_version": "Pending first nightly run",
+      "status": "pending",
+      "coverage": "Nightly lifecycle validation"
+    },
+    {
+      "id": "webkit",
+      "name": "WebKit",
+      "engine_version": "Pending first nightly run",
+      "status": "pending",
+      "coverage": "Nightly lifecycle validation"
+    }
+  ]
+}

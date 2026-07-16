@@ -2,7 +2,7 @@
 //
 // Playwright-driven smoke test for JavaScript-port bundles.
 //
-// Loads each requested bundle in headless Chromium, polls for the
+// Loads each requested bundle in a selected Playwright browser, polls for the
 // translator-emitted lifecycle milestones, and asserts that the app
 // reaches both ``window.cn1Initialized = true`` and
 // ``window.cn1Started = true`` within a per-bundle timeout. When a
@@ -36,6 +36,7 @@
 //   CN1_LIFECYCLE_TIMEOUT_SECONDS  per-bundle timeout (default 90s)
 //   CN1_LIFECYCLE_REPORT_DIR       artifacts directory; per-bundle
 //                                  browser logs and report.json land here
+//   CN1_PLAYWRIGHT_BROWSER         chromium, firefox, or webkit (default chromium)
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -46,17 +47,27 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let chromium;
+let firefox;
+let webkit;
 try {
-  ({ chromium } = await import('playwright'));
+  ({ chromium, firefox, webkit } = await import('playwright'));
 } catch (playwrightError) {
   try {
-    ({ chromium } = await import('@playwright/test'));
+    ({ chromium, firefox, webkit } = await import('@playwright/test'));
   } catch (playwrightTestError) {
     console.error('Unable to load Playwright. Install either "playwright" or "@playwright/test".');
     console.error('  Import from "playwright" failed:', String(playwrightError));
     console.error('  Import from "@playwright/test" failed:', String(playwrightTestError));
     process.exit(2);
   }
+}
+
+const BROWSER_NAME = String(process.env.CN1_PLAYWRIGHT_BROWSER || 'chromium').toLowerCase();
+const BROWSER_TYPES = { chromium, firefox, webkit };
+const BROWSER_TYPE = BROWSER_TYPES[BROWSER_NAME];
+if (!BROWSER_TYPE) {
+  console.error(`Unsupported CN1_PLAYWRIGHT_BROWSER=${BROWSER_NAME}; expected chromium, firefox, or webkit.`);
+  process.exit(2);
 }
 
 const TIMEOUT_SECONDS = Number(process.env.CN1_LIFECYCLE_TIMEOUT_SECONDS || '90');
@@ -224,7 +235,7 @@ async function runBundle({ name, bundle }) {
   materializeBundle(bundle, bundleDir);
   const indexRoot = locateIndexRoot(bundleDir);
   if (!indexRoot) {
-    return { name, bundle, ok: false, milestones: {}, reason: 'bundle has no index.html' };
+    return { name, bundle, browser: BROWSER_NAME, ok: false, milestones: {}, reason: 'bundle has no index.html' };
   }
   copyTree(indexRoot, serveDir);
   injectProbeScript(path.join(serveDir, 'index.html'));
@@ -234,7 +245,7 @@ async function runBundle({ name, bundle }) {
   try {
     harness = await startHarness(serveDir, logFile, urlFile);
   } catch (err) {
-    return { name, bundle, ok: false, milestones: {}, reason: `harness start failed: ${err.message}` };
+    return { name, bundle, browser: BROWSER_NAME, ok: false, milestones: {}, reason: `harness start failed: ${err.message}` };
   }
 
   const url = decorateUrl(harness.url);
@@ -246,14 +257,16 @@ async function runBundle({ name, bundle }) {
   let firstFailure = null;
   let pageError = null;
 
-  const browser = await chromium.launch({
-    headless: true,
-    args: [
+  const launchOptions = { headless: true };
+  if (BROWSER_NAME === 'chromium') {
+    launchOptions.args = [
       '--autoplay-policy=no-user-gesture-required',
       '--disable-web-security',
       '--allow-file-access-from-files'
-    ]
-  });
+    ];
+  }
+  const browser = await BROWSER_TYPE.launch(launchOptions);
+  const engineVersion = browser.version();
 
   let result;
   try {
@@ -287,6 +300,8 @@ async function runBundle({ name, bundle }) {
     result = {
       name,
       bundle,
+      browser: BROWSER_NAME,
+      engineVersion,
       ok: milestones.cn1Initialized && milestones.cn1Started && !pageError,
       milestones,
       lifecycle,
@@ -338,7 +353,7 @@ async function pollLifecycle(page, timeoutSeconds) {
 
 function summarise(results) {
   console.log('');
-  console.log('==== Lifecycle test results ====');
+  console.log(`==== Lifecycle test results (${BROWSER_NAME}) ====`);
   let failed = 0;
   for (const r of results) {
     const status = r.ok ? 'OK' : 'FAIL';
@@ -378,7 +393,7 @@ async function main() {
   const results = [];
   for (const b of bundles) {
     if (!fs.existsSync(b.bundle)) {
-      results.push({ name: b.name, bundle: b.bundle, ok: false, milestones: {}, reason: `bundle does not exist: ${b.bundle}` });
+      results.push({ name: b.name, bundle: b.bundle, browser: BROWSER_NAME, ok: false, milestones: {}, reason: `bundle does not exist: ${b.bundle}` });
       continue;
     }
     try {
@@ -387,6 +402,7 @@ async function main() {
       results.push({
         name: b.name,
         bundle: b.bundle,
+        browser: BROWSER_NAME,
         ok: false,
         milestones: {},
         reason: `infrastructure error: ${err && err.stack || err}`

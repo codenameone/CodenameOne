@@ -67,6 +67,10 @@ results directly. Windows x64 and Windows ARM64 are separate targets: the ARM64
 report comes from the native `windows-11-arm` suite rather than being inferred
 from the x64 result.
 
+The table columns are CI targets, not a count of distinct deployment platforms.
+Renderer variants and CPU architectures intentionally remain separate so a
+regression cannot be hidden by a combined platform result.
+
 The feature contract lives in
 `docs/website/data/port_status.json`. Every test registered in
 `Cn1ssDeviceRunner`, including tests installed through `addTest()`, must appear
@@ -84,6 +88,23 @@ for every skipped test in the stored reports and requires every manual feature
 to declare exactly one support state for every portability target, together
 with its verification logic and the reason it cannot join the deterministic
 suite.
+
+`docs/website/data/port_status_support.json` is the deployment-support and
+performance-evidence contract. It keeps declared release floors separate from
+the environments that CI actually launches, and it discloses the Mac Catalyst
+scope independently of the broader Linux desktop port. The
+`Nightly platform and browser evidence` workflow boots the generated JavaScript
+application in Playwright's Chromium, Firefox, and WebKit engines and publishes
+their exact versions to `evidence/environment.json` on the data branch. Website
+CI resolves that document into `port_status_environment.json` before Hugo writes
+the browser cards. The checked-in pending document exists only for the first run
+or a temporary data-branch failure; there is no client-side fetch.
+
+The performance section publishes the existing reproducible ParparVM benchmark
+as ParparVM-versus-JVM evidence. It explicitly does not convert that result into
+a Flutter claim. Startup, complete installed size, peak resident memory, and
+common Java-versus-Dart workloads have checked-in publication rules and remain
+unpublished until a matched same-host nightly harness supplies them.
 
 When adding a conformance test:
 
