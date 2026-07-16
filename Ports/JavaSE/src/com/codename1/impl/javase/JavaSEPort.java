@@ -9128,6 +9128,25 @@ public class JavaSEPort extends CodenameOneImplementation {
             Display.getInstance().setDefaultVirtualKeyboard(null);
         }
 
+        // Deterministic visual probes sometimes need to render at the physical
+        // density of a reference device while keeping the Simulator window small
+        // enough to fit the host display. A skin normally supplies this value via
+        // ppi/pixelRatio; this opt-in override decouples density from window chrome
+        // and is intentionally applied after skin/desktop-mode initialization.
+        String forcedPixelMilliRatio = System.getProperty("cn1.javase.pixelMilliRatio");
+        if (forcedPixelMilliRatio != null) {
+            try {
+                double ratio = Double.parseDouble(forcedPixelMilliRatio.trim());
+                if (ratio > 0) {
+                    pixelMilliRatio = Double.valueOf(ratio);
+                    setDefaultPixelMilliRatio(pixelMilliRatio);
+                }
+            } catch (NumberFormatException err) {
+                System.err.println("Ignoring invalid cn1.javase.pixelMilliRatio="
+                        + forcedPixelMilliRatio);
+            }
+        }
+
         float factor = ((float) getDisplayHeight()) / 480.0f;
         if (factor > 0 && autoAdjustFontSize && getSkin() != null) {
             // set a reasonable default font size
@@ -17208,29 +17227,33 @@ public class JavaSEPort extends CodenameOneImplementation {
     private static final double LENS_MAG_FLAT = 0.75;
     private static final double LENS_TINT_HI = 150;
     private static final double LENS_TINT_LO = 55;
+    private static final double LENS_LIGHT_KEY_LO = 150;
+    private static final double LENS_LIGHT_KEY_HI = 220;
     // The drop LIFTS the content under it upward (like a magnifying droplet pulling the
     // glyph up) -- this is the "tabs grow/rise" in the native morph, not just magnify.
     // Lift is proportional to (magnify-1) so it tracks the travel bump, peaks at centre.
-    private static final double LENS_LIFT_COEF = 0.40;
+    private static final double LENS_LIFT_COEF = 0.10;
     // The drop is a 3D GLASS droplet: a soft specular GLARE (light sheen) near the top,
     // and a bright EDGE RIM that defines the glass boundary. Without these it reads as a
     // flat tinted pill, not glass.
-    private static final double LENS_GLARE = 0.09;     // specular sheen strength
-    private static final double LENS_RIM = 0.06;       // edge-rim brightness
-    private static final double LENS_RIM_W = 0.06;     // rim band width (fraction of half-height)
-    private static final double LENS_REFRACT = 0.16;   // edge lensing: content bends at the rim
-    private static final double LENS_EDGE_SHADOW = 0.12; // soft dark band at the inner edge (glass depth)
-    // The periphery (bar / other tabs seen through the drop) is slightly SHRUNK while the
-    // central glyph stays enlarged -- mag falls from `magnify` at the centre to RIM_SCALE
-    // (<1) at the rim. And the glass carries a faint cool TINT inside it.
-    private static final double LENS_RIM_SCALE = 0.84;
-    private static final int LENS_GLASS_TINT = 0xbcd8ff;   // faint cool-blue glass cast
-    private static final double LENS_GLASS_TINT_STR = 0.10;
+    private static final double LENS_GLARE = 0.07;     // broad moving specular sheen
+    private static final double LENS_RIM = 0.11;       // directional top/left rim light
+    private static final double LENS_RIM_W = 0.10;     // rim band width (fraction of half-height)
+    private static final double LENS_REFRACT = 0.015;  // native barely displaces content at the rim
+    private static final double LENS_EDGE_SHADOW = 0.07; // directional bottom/right depth
+    // Magnification falls gently from `magnify` at the centre to 1 at the rim. The
+    // previous 0.84 rim scale visibly crushed neighbouring glyphs and read as a lens
+    // distortion rather than the native tab's shallow convex surface.
+    private static final double LENS_RIM_SCALE = 1.0;
+    private static final int LENS_GLASS_TINT = 0xbcd8ff;
+    private static final double LENS_GLASS_TINT_STR = 0.0; // native rim is neutral white, not a blue outline
     // The selected glyph seen through the drop reads MORE vivid/saturated than a flat
     // tint -- native's selected blue is punchy. Boost chroma around the pixel luminance:
     // coloured pixels (the blue glyph) push further from grey; neutral greys (the bar)
     // are barely touched, so only the glyph gets more saturated.
-    private static final double LENS_SAT_BOOST = 1.32;
+    private static final double LENS_SAT_BOOST = 1.12;
+    private static final double LENS_GLASS_START = 1.025;
+    private static final double LENS_GLASS_FULL = 1.075;
 
     @Override
     public boolean lensRegion(Object graphics, int x, int y, int width, int height,
@@ -17295,7 +17318,11 @@ public class JavaSEPort extends CodenameOneImplementation {
         // The 3D-glass cues (edge refraction / edge shadow / glare) belong to the MORPH
         // droplet, not the settled pill -- scale them by how magnified the drop is so a
         // resting selection stays a flat subtle pill.
-        double glassAmt = lensSmoothstep(1.085, 1.25, magnify);
+        // The bounded iOS-26 morph rests at 1.02x and peaks at 1.08x.  Keep the
+        // liquid foreground completely absent at rest, but let its rim/glare/
+        // refraction reach full strength during flight.  The previous 1.085x
+        // lower edge sat above the new peak, silently disabling the liquid layer.
+        double glassAmt = lensSmoothstep(LENS_GLASS_START, LENS_GLASS_FULL, magnify);
         for (int yy = 0; yy < rh; yy++) {
             double py = yy + 0.5 - hh;
             for (int xx = 0; xx < rw; xx++) {
@@ -17310,9 +17337,8 @@ public class JavaSEPort extends CodenameOneImplementation {
                 double alpha = Math.min(depth, 1.0);
                 double rd = Math.min(1.0, Math.sqrt((px * px) / (hw * hw) + (py * py) / (hh * hh)));
                 double edge = lensSmoothstep(LENS_MAG_FLAT, 1.0, rd);
-                // Centre ENLARGES (magnify); periphery SHRINKS (mag -> RIM_SCALE < 1) so the
-                // bar / other tabs seen through the drop read slightly minified, while the
-                // central glyph stays big. No shrink when settled (scaled by glassAmt).
+                // Centre enlarges gently; the rim returns to 1:1 instead of minifying
+                // neighbouring content. This keeps the native shallow-lens character.
                 double rimScale = 1.0 + (LENS_RIM_SCALE - 1.0) * glassAmt;
                 double mag = magnify + (rimScale - magnify) * edge;
                 if (mag < 0.2) mag = 0.2;
@@ -17330,7 +17356,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 int sg = (lensSample(src, rw, rh, hw + (px / mag) * refr, hh + (py / mag) * refr + lift) >> 8) & 0xff;
                 int sb = lensSample(src, rw, rh, hw + (px / magB) * refr, hh + (py / magB) * refr + lift) & 0xff;
                 double lum = 0.2126 * sr + 0.7152 * sg + 0.0722 * sb;
-                double t = tintStrength * lensSmoothstep(LENS_TINT_HI, LENS_TINT_LO, lum);
+                double t = tintStrength < 0
+                        ? -tintStrength * lensSmoothstep(LENS_LIGHT_KEY_LO, LENS_LIGHT_KEY_HI, lum)
+                        : tintStrength * lensSmoothstep(LENS_TINT_HI, LENS_TINT_LO, lum);
                 double fr = sr + (tr - sr) * t;
                 double fg = sg + (tg - sg) * t;
                 double fb = sb + (tb - sb) * t;
@@ -17347,15 +17375,17 @@ public class JavaSEPort extends CodenameOneImplementation {
                 fr = sl + (fr - sl) * LENS_SAT_BOOST;
                 fg = sl + (fg - sl) * LENS_SAT_BOOST;
                 fb = sl + (fb - sl) * LENS_SAT_BOOST;
-                // 3D GLASS: a soft specular GLARE near the top (an elliptical sheen) plus
-                // a bright EDGE RIM (small `depth` = near the boundary) so the drop reads
-                // as a raised glass droplet, not a flat tint. Both lift the colour toward
-                // white.
+                // 3D GLASS: native depth is a directional highlight/shadow surface, not
+                // large content displacement.  Light the top-left rim and shade the
+                // bottom-right rim so the travelling capsule reads as a convex volume.
                 double gx = px / hw, gy = (py + 0.42 * hh) / hh;
                 double glare = LENS_GLARE * glassAmt * Math.exp(-(gx * gx * 1.15 + gy * gy * 2.6) * 2.1);
                 double rimW = Math.max(2.0, LENS_RIM_W * hh);
-                double rim = depth < rimW ? (1.0 - depth / rimW) * LENS_RIM : 0;
-                double bright = glare + rim;
+                double rim = depth < rimW ? (1.0 - depth / rimW) * LENS_RIM
+                        * (0.35 + 0.65 * glassAmt) : 0;
+                double lightDir = Math.max(0.2, Math.min(1.0,
+                        0.68 - 0.28 * (py / hh) - 0.12 * (px / hw)));
+                double bright = glare + rim * lightDir;
                 if (bright > 0) {
                     fr += bright * (255 - fr);
                     fg += bright * (255 - fg);
@@ -17365,7 +17395,9 @@ public class JavaSEPort extends CodenameOneImplementation {
                 // shadow at its edge) -- gives the droplet depth instead of a flat cutout.
                 double esW = Math.max(2.0, 0.13 * Math.min(hw, hh));
                 if (depth < esW) {
-                    double es = (1.0 - depth / esW) * LENS_EDGE_SHADOW * glassAmt;
+                    double shadowDir = Math.max(0.1, Math.min(1.0,
+                            0.55 + 0.35 * (py / hh) + 0.10 * (px / hw)));
+                    double es = (1.0 - depth / esW) * LENS_EDGE_SHADOW * glassAmt * shadowDir;
                     fr *= (1 - es);
                     fg *= (1 - es);
                     fb *= (1 - es);

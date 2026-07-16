@@ -96,7 +96,7 @@
        controls:
          tabsMorphPreset            "ios26" (default) | "subtle"
          tabsMorphLensIntensityPct  scales the lens optics around 100
-         tabsMorphSpringPct         scales the settle overshoot around 100
+         tabsMorphSpringPct         scales the settle deformation around 100
          tabsAnimatedIndicatorDurationInt   the morph duration (ms), below */
     tabsMorphPreset: "ios26";
     /* Pressed = the SUSTAINED held-down look: iOS 26 dims a Liquid Glass button
@@ -161,11 +161,18 @@
        underline that tweens between tabs when the user changes
        selection. Off by default in the framework (so existing apps
        don't suddenly animate); on by default in the modern native
-       theme. Duration 200ms matches Material 3's reference. */
+       theme. */
     /* iOS 26 tab bars use a sliding CAPSULE selection indicator, not the Material 3
        underline -- so the underline is off and the capsule is on. */
     tabsAnimatedIndicatorBool: false;
-    tabsAnimatedIndicatorDurationInt: 480;
+    /* The native last-to-first travel reaches its final resting x at ~350ms.
+       200ms made JavaSE/JavaScript burn through the localized bubble motion so
+       quickly that it read as a jump. */
+    tabsAnimatedIndicatorDurationInt: 350;
+    /* Native flat-backdrop samples: outer bar #cd, settled selection #b4 over
+       a #808080 backdrop. 72 alpha with the system-fill selection colour lands
+       on that measured contrast instead of an almost invisible inner pill. */
+    tabSelPillAlphaInt: 72;
     tabsAnimatedIndicatorThicknessMm: 1;
     /* iOS 26 sliding selection capsule: a single Liquid Glass blob behind the
        selected tab that tweens between tabs on selection change. Replaces the
@@ -691,10 +698,10 @@ TabsContainer {
     /* Floating WHITE glass capsule (native iOS 26 bar): a translucent white fill over
        the blurred backdrop so it reads as a distinct white pill even over light-grey
        content, not a near-invisible frost. The blur still lets colour bleed through. */
-    /* Sampled against the golden over the shared backdrop: the native pill is
-       only ~22% white over a LIGHTLY blurred local backdrop (yellow stays
-       yellow); 0.60/blur40 washed and cross-mixed the colours. */
-    background-color: rgba(255,255,255,0.22);
+    /* Sampled against the animation's flat #808080 stage: the native pill is
+       #cd, which is a 60% white composite. Keep the blur local so textured
+       backdrops retain their colour instead of cross-mixing adjacent regions. */
+    background-color: rgba(255,255,255,0.60);
     color: #3c3c43;
     /* Tight local blur: 24px still dragged neighbouring backdrop colour across
        the pill (blue bleeding into the warm left gap); native frost stays local. */
@@ -1146,29 +1153,27 @@ PopupContent {
 
     Tabs { background-color: transparent; }
     TabbedPane { background-color: transparent; }
-    /* Dark glass tab pill: translucent so the backdrop reads through like the
-       native Liquid Glass bar (0.55 was too opaque -> flat grey vs native's tint;
-       fully transparent left NO visible pill on plain-blur ports and even on
-       Metal read lighter than the native bar's slight dark wash). */
-    TabsContainer { background-color: rgba(22,22,26,0.18); color: #ebebf5; cn1-background-type: cn1-pill-border; backdrop-filter: blur(40px); border: none; }
+    /* Dark flat-backdrop sample is #58 over #808080, matching a roughly 38%
+       composite of the #16161a bar colour. */
+    TabsContainer { background-color: rgba(22,22,26,0.38); color: #ebebf5; cn1-background-type: cn1-pill-border; backdrop-filter: blur(40px); border: none; }
     Tab { color: #ebebf5; background-color: transparent; }
     /* Dark bottom tab bar: the selected item sits on a lighter frosted sub-capsule
        over the dark pill (layered glass), matching the native UITabBar. */
     /* No per-tab background -- the sliding glass capsule is the only selection visual
        (a cn1-pill-border here double-painted a brighter inner pill / dark ring). */
-    Tab.selected { color: var(--accent-color-dark, #0a84ff); background-color: transparent; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
-    Tab.pressed { color: var(--accent-color-dark, #0a84ff); background-color: transparent; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
-    SelectedTab { color: var(--accent-color-dark, #0a84ff); background-color: transparent; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
+    Tab.selected { color: #ebebf5; background-color: transparent; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
+    Tab.pressed { color: #ebebf5; background-color: transparent; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
+    SelectedTab { color: #ebebf5; background-color: transparent; margin: 0.18mm 0.4mm 0.18mm 0.4mm; }
     UnselectedTab { color: #ebebf5; }
 
     /* Dark overrides for the icon-only UIID. Background stays transparent
        so the pill shows through; only the glyph (fgColor) is forced
        white. */
     TabIcon { color: #ffffff; background-color: transparent; }
-    /* With the dark lens tint disabled (it flooded the dark bar solid blue)
-       the selected glyph carries the accent itself, like the native dark bar. */
-    TabIcon.selected { color: #0a84ff; background-color: transparent; }
-    TabIcon.pressed { color: #0a84ff; background-color: transparent; }
+    /* The lens light-luminance key colours these white glyphs blue only while
+       the travelling drop covers them; the destination does not turn blue early. */
+    TabIcon.selected { color: #ffffff; background-color: transparent; }
+    TabIcon.pressed { color: #ffffff; background-color: transparent; }
 
     /* Dark glass panel: a translucent dark tint so the backdrop reads through as
        Liquid Glass (matches the dark UIVisualEffectView in the isolation tests). */
