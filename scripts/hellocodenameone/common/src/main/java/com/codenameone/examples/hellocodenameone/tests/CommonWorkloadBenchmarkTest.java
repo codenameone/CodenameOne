@@ -43,7 +43,9 @@ public class CommonWorkloadBenchmarkTest extends BaseTest {
             sink = 0;
             minimumUsedMemory = 0;
             peakUsedMemory = 0;
-            System.gc();
+            // Do not force a collection here. JavaScript has no collector
+            // monitor to notify, and a benchmark must observe the port's
+            // normal collection policy rather than perturb it explicitly.
             recordMemory();
             run("intArithmetic", new Workload() {
                 public long run() { return CommonWorkloads.intArithmetic(); }

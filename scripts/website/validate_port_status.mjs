@@ -146,7 +146,8 @@ function validate() {
     };
     const performanceTags = page.match(/<td\b[^>]*data-performance-cell[^>]*>/g) || [];
     for (const [port, name] of Object.entries(platformNames)) {
-        if (!performanceTags.some((tag) => tag.includes(`data-port="${port}"`) && tag.includes(`title="${name}:`))) {
+        if (!performanceTags.some((tag) => attribute(tag, "data-port") === port &&
+            attribute(tag, "title").startsWith(`${name}:`))) {
             fail(`performance cells for ${name} must identify the platform in their tooltip`);
         }
     }
