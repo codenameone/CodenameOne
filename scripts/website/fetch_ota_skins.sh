@@ -32,8 +32,13 @@ release_json="${tmp_dir}/release.json"
 archive_file="${tmp_dir}/ota.tar.gz"
 extract_dir="${tmp_dir}/extract"
 
+# --retry-all-errors makes curl retry HTTP 5xx responses too (with -f alone a
+# 503 fails immediately); api.github.com throws transient 5xx during incidents.
 curl_args=(
   -fsSL
+  --retry 5
+  --retry-delay 5
+  --retry-all-errors
   -H "Accept: application/vnd.github+json"
   -H "X-GitHub-Api-Version: 2022-11-28"
 )

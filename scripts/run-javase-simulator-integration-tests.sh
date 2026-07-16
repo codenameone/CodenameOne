@@ -95,21 +95,41 @@ if [ -z "$SIM_SKIN_PATH" ] || [ ! -f "$SIM_SKIN_PATH" ]; then
     SKIN_URL="$(GH_API_TOKEN="$SKIN_GH_TOKEN" python3 - <<'PY'
 import json
 import os
+import time
+import urllib.error
 import urllib.request
 
-request = urllib.request.Request(
-    'https://api.github.com/repos/codenameone/codenameone-skins/releases/latest',
-    headers={
-        'Accept': 'application/vnd.github+json',
-        'User-Agent': 'codenameone-javase-simulator-tests'
-    }
-)
-token = os.environ.get('GH_API_TOKEN', '')
-if token:
-    request.add_header('Authorization', 'Bearer ' + token)
+def fetch():
+    request = urllib.request.Request(
+        'https://api.github.com/repos/codenameone/codenameone-skins/releases/latest',
+        headers={
+            'Accept': 'application/vnd.github+json',
+            'User-Agent': 'codenameone-javase-simulator-tests'
+        }
+    )
+    token = os.environ.get('GH_API_TOKEN', '')
+    if token:
+        request.add_header('Authorization', 'Bearer ' + token)
+    with urllib.request.urlopen(request) as response:
+        return json.load(response)
 
-with urllib.request.urlopen(request) as response:
-    data = json.load(response)
+# api.github.com returns transient 5xx during incidents (observed: a 503 failing
+# this job twice in one evening) and 429 under load; retry those with backoff.
+# The curl download below already retries -- the lookup must too.
+data = None
+last_error = None
+for attempt in range(1, 6):
+    try:
+        data = fetch()
+        break
+    except (urllib.error.HTTPError, urllib.error.URLError) as err:
+        code = getattr(err, 'code', None)
+        if code is not None and code < 500 and code != 429:
+            raise
+        last_error = err
+        time.sleep(10 * attempt)
+if data is None:
+    raise SystemExit('release lookup failed after retries: %s' % last_error)
 
 assets = data.get('assets') or []
 if not assets:
@@ -122,7 +142,7 @@ PY
       js_log "Failed to resolve codenameone-skins release asset URL" >&2
       exit 2
     fi
-    curl -fL --retry 3 --retry-delay 2 -o "$SKIN_ARCHIVE" "$SKIN_URL"
+    curl -fL --retry 5 --retry-delay 5 --retry-all-errors -o "$SKIN_ARCHIVE" "$SKIN_URL"
   fi
   if [ ! -d "$SKIN_EXTRACT_DIR" ]; then
     mkdir -p "$SKIN_EXTRACT_DIR"
