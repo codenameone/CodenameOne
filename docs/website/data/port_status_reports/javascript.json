@@ -1,8 +1,8 @@
 {
-  "commit": "312de130d68a550f231f7a8822be5b4f719dc2cd",
-  "generated_at": "2026-07-15T14:58:11Z",
+  "commit": "4a3f5807e0850131483b20b45d3802c9c42f7fd7",
+  "generated_at": "2026-07-16T14:48:44Z",
   "port": "javascript",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29423193387",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29505603266",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
@@ -673,5 +673,60 @@
     }
   },
   "bootstrap_source": "successful-master-workflow",
-  "workflow_conclusion": "success"
+  "workflow_conclusion": "success",
+  "performance": {
+    "benchmark_version": 1,
+    "benchmarks": {
+      "arrayRandom": {
+        "checksum": "-2288487891715278",
+        "duration_ns": 1454299999
+      },
+      "arraySequential": {
+        "checksum": "0",
+        "duration_ns": 956000000
+      },
+      "hashMapChurn": {
+        "checksum": "49941",
+        "duration_ns": 15788000000
+      },
+      "intArithmetic": {
+        "checksum": "1313580095284",
+        "duration_ns": 721800001
+      },
+      "longArithmetic": {
+        "checksum": "6887886960473257608",
+        "duration_ns": 3997400000
+      },
+      "mathTranscendental": {
+        "checksum": "4729652805076374709",
+        "duration_ns": 300100000
+      },
+      "objectAllocation": {
+        "checksum": "2999790376128",
+        "duration_ns": 3617099999
+      },
+      "quicksort": {
+        "checksum": "786886890168670967",
+        "duration_ns": 577900001
+      },
+      "recursion": {
+        "checksum": "33385282",
+        "duration_ns": 1071299999
+      },
+      "stringBuilding": {
+        "checksum": "-609121604069",
+        "duration_ns": 1333500000
+      }
+    },
+    "binary_size_bytes": 8284531,
+    "memory": {
+      "kind": "managed-heap",
+      "minimum_bytes": 33554432,
+      "peak_bytes": 33554432
+    },
+    "method": "minimum of five measured runs after three in-process warm-ups",
+    "missing": [],
+    "status": "complete",
+    "suite_checksum": 0
+  }
 }

@@ -1,8 +1,8 @@
 {
-  "commit": "dec3d172f6fe327798cc083f2bab03a98cf9a8ac",
-  "generated_at": "2026-07-15T01:51:30Z",
+  "commit": "205dcc675896c1c094db47d9b0a2622adf7ec3bf",
+  "generated_at": "2026-07-16T13:06:47Z",
   "port": "ios-metal",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29380730117",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29496889339",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
@@ -676,5 +676,60 @@
     }
   },
   "bootstrap_source": "successful-master-workflow",
-  "workflow_conclusion": "success"
+  "workflow_conclusion": "success",
+  "performance": {
+    "benchmark_version": 1,
+    "benchmarks": {
+      "arrayRandom": {
+        "checksum": "-2288487891715278",
+        "duration_ns": 440011000
+      },
+      "arraySequential": {
+        "checksum": "0",
+        "duration_ns": 26479000
+      },
+      "hashMapChurn": {
+        "checksum": "49941",
+        "duration_ns": 47714000
+      },
+      "intArithmetic": {
+        "checksum": "1307491170054",
+        "duration_ns": 135175000
+      },
+      "longArithmetic": {
+        "checksum": "6887886960473257608",
+        "duration_ns": 76514000
+      },
+      "mathTranscendental": {
+        "checksum": "4729652805076374709",
+        "duration_ns": 410277000
+      },
+      "objectAllocation": {
+        "checksum": "2999790376128",
+        "duration_ns": 367596000
+      },
+      "quicksort": {
+        "checksum": "809667393311589960",
+        "duration_ns": 129907000
+      },
+      "recursion": {
+        "checksum": "33385282",
+        "duration_ns": 246493000
+      },
+      "stringBuilding": {
+        "checksum": "-609121604069",
+        "duration_ns": 86101000
+      }
+    },
+    "binary_size_bytes": 25240696,
+    "memory": {
+      "kind": "managed-heap",
+      "minimum_bytes": 598327296,
+      "peak_bytes": 2148155392
+    },
+    "method": "minimum of five measured runs after three in-process warm-ups",
+    "missing": [],
+    "status": "complete",
+    "suite_checksum": 0
+  }
 }
