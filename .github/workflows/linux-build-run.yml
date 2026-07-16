@@ -141,6 +141,7 @@ jobs:
           set -e
           bash scripts/ci/apt-get-update.sh
           sudo apt-get install -y --no-install-recommends \
+            -o Acquire::ForceIPv4=true -o Acquire::Retries=5 \
             cmake ninja-build pkg-config unzip xvfb fonts-dejavu-core \
             libgtk-3-dev libcairo2-dev libpango1.0-dev libgdk-pixbuf-2.0-dev libglib2.0-dev \
             libfontconfig1-dev libfreetype-dev \
