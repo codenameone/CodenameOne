@@ -3,14 +3,13 @@
 <article class="post-single cn1-port-status" data-port-status>
   <header class="post-header cn1-port-status__header">
     {{ partial "breadcrumbs.html" . }}
-    <p class="cn1-port-status__eyebrow">Generated conformance report</p>
+    <p class="cn1-port-status__eyebrow">Automated compliance report</p>
     <h1 class="post-title entry-hint-parent">{{ .Title }}</h1>
     <p class="cn1-port-status__intro">
-      Every row is backed by one or more tests in the
-      <a href="https://github.com/codenameone/CodenameOne/tree/master/scripts/hellocodenameone" target="_blank" rel="noopener">HelloCodenameOne suite</a>.
+      Every row is backed by one or more tests in the Codename One compliance test suite.
       A check means every mapped test is successful in the latest available master report for that port.
     </p>
-    <div class="cn1-port-status__facts" aria-label="Conformance contract size">
+    <div class="cn1-port-status__facts" aria-label="Compliance contract size">
       <span><strong>{{ len $contract.features }}</strong> features</span>
       {{- $testCount := 0 -}}
       {{- range $contract.features -}}{{- $testCount = add $testCount (len .tests) -}}{{- end -}}
@@ -20,7 +19,7 @@
   </header>
 
   <section class="cn1-port-status__notice" data-port-status-notice role="status">
-    Loading the latest conformance reports from GitHub…
+    Loading the latest compliance reports from GitHub…
   </section>
 
   <section class="cn1-port-status__legend" aria-label="Status legend">
@@ -61,7 +60,7 @@
     </label>
   </div>
 
-  <section class="cn1-port-status__matrix" aria-label="Port feature conformance matrix">
+  <section class="cn1-port-status__matrix" aria-label="Port feature compliance matrix">
     <table>
       <thead>
         <tr>
@@ -107,9 +106,7 @@
       A website build does not wait for port workflows. The initial snapshot uses the successful workflow conclusion from the last master runs available when this page was added because those older artifacts did not all retain per-test completion logs. Each port replaces that bootstrap snapshot after a newer master run. A platform-specific skip is not a pass. An incomplete current report is not a pass. Reports older than {{ $contract.stale_after_days }} days are marked stale.
     </p>
     <p>
-      <a href="https://github.com/codenameone/CodenameOne/blob/master/docs/website/data/port_status.json" target="_blank" rel="noopener">Feature contract</a>
-      <span aria-hidden="true">·</span>
-      <a href="https://github.com/codenameone/CodenameOne/blob/master/scripts/hellocodenameone/conformance/port_status.py" target="_blank" rel="noopener">Validator and result normalizer</a>
+      <a href="https://github.com/codenameone/CodenameOne/blob/master/docs/website/data/port_status.json" target="_blank" rel="noopener">Compliance feature contract</a>
     </p>
   </footer>
 

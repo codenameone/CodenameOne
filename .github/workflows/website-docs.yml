@@ -147,6 +147,11 @@ jobs:
           CN1_USER: ${{ secrets.CN1_USER }}
           CN1_TOKEN: ${{ secrets.CN1_TOKEN }}
 
+      - name: Validate Port Status page output
+        run: |
+          set -euo pipefail
+          node scripts/website/validate_port_status.mjs docs/website/public
+
       - name: Validate Initializr page output
         run: |
           set -euo pipefail
