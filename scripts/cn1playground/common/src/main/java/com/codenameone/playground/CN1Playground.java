@@ -266,11 +266,10 @@ public class CN1Playground extends Lifecycle {
         appForm.show();
         notifyWebsiteUiReady();
 
-        // CN1's first paint on the HTML5 port sometimes settles before the
-        // canvas has its final CSS size. Force one more layout pass shortly
-        // after show() so the mobile shell lands at the correct breakpoint.
+        // The browser can report its final CSS size shortly after show(). Recheck
+        // the breakpoint without invalidating lastLayout: rebuilding an unchanged
+        // shell detaches the live editors and can make an active input session vanish.
         UITimer.timer(150, false, appForm, () -> {
-            lastLayout = LAYOUT_NONE;
             applyLayoutForCurrentSize();
             appForm.revalidate();
         });
@@ -444,9 +443,6 @@ public class CN1Playground extends Lifecycle {
         previewColumn.setCompact(compact);
         previewColumn.setMobile(false);
 
-        // Mobile shell plants bottomNav at appForm.SOUTH. Clear it so the
-        // desktop shell doesn't end up with both an activity bar and a bottom
-        // nav stacked at the form's south edge.
         detach(bottomNav);
 
         detach(activityBar);
@@ -504,12 +500,6 @@ public class CN1Playground extends Lifecycle {
         detach(previewContainer);
         detach(previewColumn);
 
-        // Defensive: earlier flows may have called setHidden on bottomNav (the
-        // brief calls for hiding it when the keyboard is up). Ensure it is
-        // visible and has a real preferred height when mobile assembles so the
-        // Samples / Inspector / History row is never silently missing.
-        bottomNav.setHidden(false);
-        bottomNav.setVisible(true);
         bottomNav.setPreferredH(Display.getInstance().convertToPixels(12f));
 
         if (previewColumn.getParent() == null) {
@@ -529,16 +519,9 @@ public class CN1Playground extends Lifecycle {
         mobileLayout.getAllStyles().setBgTransparency(0);
         mobileLayout.add(BorderLayout.NORTH, stack);
         mobileLayout.add(BorderLayout.CENTER, tabContent);
+        mobileLayout.add(BorderLayout.SOUTH, bottomNav);
 
         bodyContainer.add(BorderLayout.CENTER, mobileLayout);
-
-        // Put bottomNav at the FORM's SOUTH slot (not inside bodyContainer) so
-        // the Form-level BorderLayout carves out its height BEFORE allocating
-        // bodyContainer to the editor + tab stack. Keeps the nav height out
-        // of the tab content region so the source editor can't shrink or
-        // reflow it when it reports its own preferred size.
-        detach(bottomNav);
-        appForm.add(BorderLayout.SOUTH, bottomNav);
 
         refreshMobileTabContent();
     }

@@ -32,6 +32,7 @@ import com.codename1.teavm.io.ArrayBufferInputStream;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.CodenameOneThread;
 import com.codename1.impl.html5.JSOImplementations.CN1Native;
+import com.codename1.impl.html5.JSOImplementations.CompositionEvent;
 import com.codename1.impl.html5.JSOImplementations.HTMLIFrameElement;
 import com.codename1.impl.html5.JSOImplementations.HTMLMediaElement;
 import com.codename1.impl.html5.JSOImplementations.ImageExt;
@@ -96,6 +97,9 @@ import com.codename1.ui.Sheet;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
+import com.codename1.ui.TextInputClient;
+import com.codename1.ui.TextInputConfig;
+import com.codename1.ui.TextInputState;
 import com.codename1.ui.TextSelection;
 import com.codename1.ui.Transform;
 import com.codename1.ui.events.ActionEvent;
@@ -238,6 +242,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private String pendingTextChanges;
     private TextArea currentEditingField;
     private HTMLInputElement currentInputField;
+    private TextInputClient lightweightTextInputClient;
+    private TextInputConfig lightweightTextInputConfig;
+    private TextInputState lightweightTextInputState;
+    private HTMLTextAreaElement lightweightTextInputElement;
+    private boolean lightweightTextInputComposing;
     private boolean editingStartingUp;
     private static double devicePixelRatio=-1;
     private EasyThread nativeEdt;
@@ -1250,6 +1259,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private void firePasteEvent() {
         callSerially(new Runnable() {
             public void run() {
+                TextInputClient client = lightweightTextInputClient;
+                if (client != null) {
+                    client.onKeyCommand(TextInputClient.KEY_PASTE, 0);
+                    return;
+                }
                 Form f = CN.getCurrentForm();
                 if (f == null) {
                     return;
@@ -1473,6 +1487,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
         onPaste = new EventListener() {
             @Override
             public void handleEvent(Event evt) {
+                if (lightweightTextInputClient != null) {
+                    // The editor consumes the negotiated ClipboardContent below. Do not also let the
+                    // hidden textarea perform a plain-text paste, which would insert the same payload a
+                    // second time and discard HTML/RTF/Markdown/AsciiDoc flavors.
+                    evt.preventDefault();
+                }
                 String plainText = getPasteEventData(evt, "text/plain");
                 String htmlText = getPasteEventData(evt, "text/html");
                 String rtfText = getPasteEventData(evt, "text/rtf");
@@ -2178,6 +2198,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
             @Override
             public void handleEvent(Event evt) {
+                if (lightweightTextInputClient != null) {
+                    // The hidden input owns this event. Dispatching it through the regular CN1
+                    // key pipeline as well lets Component focus traversal see navigation keys
+                    // and can move focus away from the editor.
+                    return;
+                }
                 final KeyEvent kevt = (KeyEvent) evt;
                 JavaScriptKeyboardInteractionAdapter.handleKeyDown(new JavaScriptKeyboardInteractionAdapter.EditingState() {
                     @Override
@@ -2257,6 +2283,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
             @Override
             public void handleEvent(Event evt) {
+                if (lightweightTextInputClient != null) {
+                    return;
+                }
                 final KeyEvent kevt = (KeyEvent) evt;
                 JavaScriptKeyboardInteractionAdapter.handleKeyUp(new JavaScriptKeyboardInteractionAdapter.BacksideHooks() {
                     @Override
@@ -2330,6 +2359,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
             @Override
             public void handleEvent(Event evt) {
+                if (lightweightTextInputClient != null) {
+                    return;
+                }
                 final KeyEvent kevt = (KeyEvent) evt;
                 JavaScriptKeyboardInteractionAdapter.handleKeyPress(new JavaScriptKeyboardInteractionAdapter.EditingState() {
                     @Override
@@ -2470,6 +2502,411 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     private static String emptyToNull(String value) {
         return value == null || value.length() == 0 ? null : value;
+    }
+
+    // ---- low-level text input source for canvas-rendered editors ----
+
+    @Override
+    public boolean isTextInputSupported() {
+        return true;
+    }
+
+    @Override
+    public Object startTextInput(TextInputClient client, TextInputConfig config) {
+        if (client == null) {
+            return null;
+        }
+        ensureLightweightTextInputElement();
+        lightweightTextInputClient = client;
+        lightweightTextInputConfig = config == null ? client.getConfig() : config;
+        lightweightTextInputState = client.getEditingState();
+        lightweightTextInputComposing = false;
+        configureLightweightTextInputElement();
+        syncLightweightTextInputElement(lightweightTextInputState);
+        lightweightTextInputElement.getStyle().setProperty("display", "block");
+        lightweightTextInputElement.focus();
+        client.inputFocusGained();
+        return client;
+    }
+
+    @Override
+    public void updateTextInputState(Object handle, TextInputState state) {
+        if (handle == null || handle != lightweightTextInputClient || state == null) {
+            return;
+        }
+        lightweightTextInputState = state;
+        if (!lightweightTextInputComposing) {
+            syncLightweightTextInputElement(state);
+        }
+    }
+
+    @Override
+    public void stopTextInput(Object handle) {
+        if (handle == null || handle != lightweightTextInputClient) {
+            return;
+        }
+        TextInputClient client = lightweightTextInputClient;
+        lightweightTextInputClient = null;
+        lightweightTextInputConfig = null;
+        lightweightTextInputState = null;
+        lightweightTextInputComposing = false;
+        if (lightweightTextInputElement != null) {
+            lightweightTextInputElement.blur();
+            lightweightTextInputElement.getStyle().setProperty("display", "none");
+        }
+        client.inputFocusLost();
+    }
+
+    private void ensureLightweightTextInputElement() {
+        if (lightweightTextInputElement != null) {
+            return;
+        }
+        final HTMLTextAreaElement element = (HTMLTextAreaElement) doc().createElement("textarea");
+        lightweightTextInputElement = element;
+        element.setAttribute("class", "cn1-lightweight-text-input");
+        element.setAttribute("aria-hidden", "true");
+        element.setTabIndex(-1);
+        CSSStyleDeclaration style = element.getStyle();
+        style.setProperty("position", "fixed");
+        style.setProperty("display", "none");
+        style.setProperty("width", "1px");
+        style.setProperty("height", "1px");
+        style.setProperty("padding", "0");
+        style.setProperty("margin", "0");
+        style.setProperty("border", "0");
+        style.setProperty("outline", "0");
+        style.setProperty("opacity", "0");
+        style.setProperty("color", "transparent");
+        style.setProperty("background", "transparent");
+        style.setProperty("caret-color", "transparent");
+        style.setProperty("pointer-events", "none");
+        style.setProperty("font-size", "16px");
+        style.setProperty("resize", "none");
+        style.setProperty("overflow", "hidden");
+
+        element.addEventListener("input", new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                if (lightweightTextInputComposing) {
+                    return;
+                }
+                final TextInputClient client = lightweightTextInputClient;
+                final String value = element.getValue();
+                if (client == null) {
+                    return;
+                }
+                callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (client == lightweightTextInputClient) {
+                            applyLightweightBrowserEdit(client, value);
+                        }
+                    }
+                });
+            }
+        }, true);
+
+        EventListener selectionListener = new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                final TextInputClient client = lightweightTextInputClient;
+                final int start = element.getSelectionStart();
+                final int end = element.getSelectionEnd();
+                if (client == null || lightweightTextInputComposing) {
+                    return;
+                }
+                callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (client == lightweightTextInputClient) {
+                            client.setSelectionRange(start, end);
+                        }
+                    }
+                });
+            }
+        };
+        element.addEventListener("select", selectionListener, true);
+        element.addEventListener("keyup", selectionListener, true);
+
+        element.addEventListener("keydown", new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                final KeyEvent key = (KeyEvent) evt;
+                final TextInputClient client = lightweightTextInputClient;
+                if (client == null) {
+                    return;
+                }
+                final int modifiers = lightweightModifiers(key);
+                final int command = lightweightKeyCommand(key, modifiers);
+                if (command != 0) {
+                    evt.preventDefault();
+                    evt.stopPropagation();
+                    callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (client == lightweightTextInputClient) {
+                                client.onKeyCommand(command, modifiers);
+                            }
+                        }
+                    });
+                } else if (key.getKeyCode() == 9) {
+                    evt.preventDefault();
+                    evt.stopPropagation();
+                    callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (client == lightweightTextInputClient) {
+                                client.commitText("\t");
+                            }
+                        }
+                    });
+                } else if (key.getKeyCode() == 13
+                        && lightweightTextInputConfig != null
+                        && !lightweightTextInputConfig.isMultiline()) {
+                    evt.preventDefault();
+                    evt.stopPropagation();
+                    final int action = lightweightTextInputConfig.getActionType();
+                    callSerially(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (client == lightweightTextInputClient) {
+                                client.onEditorAction(action);
+                            }
+                        }
+                    });
+                }
+            }
+        }, true);
+
+        element.addEventListener("compositionstart", new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                lightweightTextInputComposing = true;
+            }
+        }, true);
+        element.addEventListener("compositionupdate", new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                final TextInputClient client = lightweightTextInputClient;
+                final String data = ((CompositionEvent) evt).getData();
+                if (client == null) {
+                    return;
+                }
+                callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (client == lightweightTextInputClient) {
+                            client.setComposingText(data == null ? "" : data,
+                                    data == null ? 0 : data.length());
+                        }
+                    }
+                });
+            }
+        }, true);
+        element.addEventListener("compositionend", new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                final TextInputClient client = lightweightTextInputClient;
+                final String data = ((CompositionEvent) evt).getData();
+                lightweightTextInputComposing = false;
+                if (client == null) {
+                    return;
+                }
+                callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (client == lightweightTextInputClient) {
+                            client.commitText(data == null ? "" : data);
+                        }
+                    }
+                });
+            }
+        }, true);
+
+        element.addEventListener("copy", new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                routeLightweightClipboardCommand(evt, TextInputClient.KEY_COPY);
+            }
+        }, true);
+        element.addEventListener("cut", new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                routeLightweightClipboardCommand(evt, TextInputClient.KEY_CUT);
+            }
+        }, true);
+        doc().getBody().appendChild(element);
+    }
+
+    private static int lightweightModifiers(KeyEvent key) {
+        int modifiers = 0;
+        if (key.isShiftKey()) {
+            modifiers |= TextInputClient.MOD_SHIFT;
+        }
+        if (key.isCtrlKey() || key.isMetaKey()) {
+            modifiers |= TextInputClient.MOD_CTRL;
+        }
+        if (key.isAltKey()) {
+            modifiers |= TextInputClient.MOD_ALT;
+        }
+        return modifiers;
+    }
+
+    private static int lightweightKeyCommand(KeyEvent key, int modifiers) {
+        int keyCode = key.getKeyCode();
+        if ((modifiers & TextInputClient.MOD_CTRL) != 0) {
+            switch (keyCode) {
+                case 65:
+                    return TextInputClient.KEY_SELECT_ALL;
+                case 89:
+                    return TextInputClient.KEY_REDO;
+                case 90:
+                    return (modifiers & TextInputClient.MOD_SHIFT) != 0
+                            ? TextInputClient.KEY_REDO : TextInputClient.KEY_UNDO;
+                default:
+                    // Copy, cut, and paste remain native browser events so their ClipboardEvent
+                    // carries all negotiated MIME flavors and retains user activation.
+                    return 0;
+            }
+        }
+        switch (keyCode) {
+            case 8:
+                return TextInputClient.KEY_BACKSPACE;
+            case 27:
+                return TextInputClient.KEY_ESCAPE;
+            case 33:
+                return TextInputClient.KEY_PAGE_UP;
+            case 34:
+                return TextInputClient.KEY_PAGE_DOWN;
+            case 35:
+                return TextInputClient.KEY_END;
+            case 36:
+                return TextInputClient.KEY_HOME;
+            case 37:
+                return TextInputClient.KEY_LEFT;
+            case 38:
+                return TextInputClient.KEY_UP;
+            case 39:
+                return TextInputClient.KEY_RIGHT;
+            case 40:
+                return TextInputClient.KEY_DOWN;
+            case 46:
+                return TextInputClient.KEY_DELETE;
+            default:
+                return 0;
+        }
+    }
+
+    private void routeLightweightClipboardCommand(Event evt, final int command) {
+        final TextInputClient client = lightweightTextInputClient;
+        if (client == null) {
+            return;
+        }
+        evt.preventDefault();
+        evt.stopPropagation();
+        callSerially(new Runnable() {
+            @Override
+            public void run() {
+                if (client == lightweightTextInputClient) {
+                    client.onKeyCommand(command, TextInputClient.MOD_CTRL);
+                }
+            }
+        });
+    }
+
+    private void configureLightweightTextInputElement() {
+        TextInputConfig config = lightweightTextInputConfig;
+        if (config == null || lightweightTextInputElement == null) {
+            return;
+        }
+        lightweightTextInputElement.setAttribute("autocomplete", config.isAutoCorrect() ? "on" : "off");
+        lightweightTextInputElement.setAttribute("autocorrect", config.isAutoCorrect() ? "on" : "off");
+        lightweightTextInputElement.setAttribute("spellcheck", config.isAutoCorrect() ? "true" : "false");
+        lightweightTextInputElement.setAttribute("autocapitalize", config.isAutoCapitalize() ? "sentences" : "off");
+
+        String inputMode = "text";
+        switch (config.getConstraint() & 0xffff) {
+            case TextArea.EMAILADDR:
+                inputMode = "email";
+                break;
+            case TextArea.NUMERIC:
+                inputMode = "numeric";
+                break;
+            case TextArea.PHONENUMBER:
+                inputMode = "tel";
+                break;
+            case TextArea.URL:
+                inputMode = "url";
+                break;
+            default:
+                break;
+        }
+        lightweightTextInputElement.setAttribute("inputmode", inputMode);
+        switch (config.getActionType()) {
+            case TextInputConfig.ACTION_DONE:
+                lightweightTextInputElement.setAttribute("enterkeyhint", "done");
+                break;
+            case TextInputConfig.ACTION_NEXT:
+                lightweightTextInputElement.setAttribute("enterkeyhint", "next");
+                break;
+            case TextInputConfig.ACTION_SEARCH:
+                lightweightTextInputElement.setAttribute("enterkeyhint", "search");
+                break;
+            case TextInputConfig.ACTION_SEND:
+                lightweightTextInputElement.setAttribute("enterkeyhint", "send");
+                break;
+            default:
+                lightweightTextInputElement.setAttribute("enterkeyhint", "enter");
+                break;
+        }
+    }
+
+    private void syncLightweightTextInputElement(TextInputState state) {
+        if (lightweightTextInputElement == null || state == null) {
+            return;
+        }
+        String value = state.getText();
+        lightweightTextInputElement.setValue(value);
+        int start = clampTextInputOffset(state.getSelectionStart(), value.length());
+        int end = clampTextInputOffset(state.getSelectionEnd(), value.length());
+        lightweightTextInputElement.setSelectionStart(start);
+        lightweightTextInputElement.setSelectionEnd(end);
+
+        TextInputClient client = lightweightTextInputClient;
+        int[] caret = client == null ? null : client.getCaretRect();
+        if (caret != null && caret.length >= 4) {
+            lightweightTextInputElement.getStyle().setProperty("left", scaleCoord(caret[0]) + "px");
+            lightweightTextInputElement.getStyle().setProperty("top", scaleCoord(caret[1]) + "px");
+        }
+    }
+
+    private void applyLightweightBrowserEdit(TextInputClient client, String browserValue) {
+        TextInputState oldState = lightweightTextInputState;
+        String oldValue = oldState == null ? client.getEditingState().getText() : oldState.getText();
+        String newValue = browserValue == null ? "" : browserValue;
+        if (oldValue.equals(newValue)) {
+            return;
+        }
+
+        int prefix = 0;
+        int common = Math.min(oldValue.length(), newValue.length());
+        while (prefix < common && oldValue.charAt(prefix) == newValue.charAt(prefix)) {
+            prefix++;
+        }
+        int oldEnd = oldValue.length();
+        int newEnd = newValue.length();
+        while (oldEnd > prefix && newEnd > prefix
+                && oldValue.charAt(oldEnd - 1) == newValue.charAt(newEnd - 1)) {
+            oldEnd--;
+            newEnd--;
+        }
+
+        client.setSelectionRange(prefix, oldEnd);
+        client.commitText(newValue.substring(prefix, newEnd));
+    }
+
+    private static int clampTextInputOffset(int value, int length) {
+        return value < 0 ? 0 : value > length ? length : value;
     }
 
     @SuppressSyncErrors

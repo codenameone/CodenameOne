@@ -370,16 +370,9 @@ runtime wiring.
 
 ## JavaScript Port Considerations
 
-### `BrowserComponent` and Dialogs
+### Lightweight editor input
 
-When a `Dialog` is shown, the parent `Form` is deinitialized. This normally causes any `BrowserComponent` instances (including the code editor) to be removed from the DOM. When the `Dialog` is dismissed, the `Form` is re-shown but the browser state is lost.
-
-**The fix**: The playground editor sets the client property `"HTML5Peer.removeOnDeinitialize"` to `Boolean.FALSE`, which preserves the iframe in the DOM across deinitialization cycles. If you use `BrowserComponent` in your own playground scripts, consider applying the same fix:
-
-```java
-BrowserComponent browser = new BrowserComponent();
-browser.putClientProperty("HTML5Peer.removeOnDeinitialize", Boolean.FALSE);
-```
+The Java and CSS source panes are `CodeEditor` components rendered by Codename One. They don't use a `BrowserComponent`, an iframe, or a contenteditable element. The JavaScript port binds the focused editor to its low-level text-input source for keyboard, selection, IME, and negotiated clipboard events while the editor itself remains in the CN1 component hierarchy. Dialog and responsive-layout transitions therefore preserve the document and editor state without peer-lifecycle workarounds.
 
 ### Cross-Origin Restrictions
 

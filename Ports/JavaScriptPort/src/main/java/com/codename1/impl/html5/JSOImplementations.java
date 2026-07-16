@@ -662,6 +662,11 @@ public class JSOImplementations {
         @JSProperty
         public boolean isRepeat();
     }
+
+    public interface CompositionEvent extends Event {
+        @JSProperty
+        public String getData();
+    }
     
     
     
