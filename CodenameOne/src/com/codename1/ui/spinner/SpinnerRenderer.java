@@ -23,6 +23,7 @@
 package com.codename1.ui.spinner;
 
 import com.codename1.ui.Component;
+import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
@@ -155,10 +156,18 @@ class SpinnerRenderer<T> extends DefaultListCellRenderer<T> {
             Graphics ig = i.getGraphics();
             UIManager.getInstance().getLookAndFeel().setFG(ig, this);
             // The native picker dims every off-selection row to roughly the SAME
-            // tertiary grey (sampled ~0.32 of the label colour over the sheet,
-            // barely darker near the selection band) -- not a steep distance ramp.
+            // tertiary grey, not a steep distance ramp.  On a dark surface an
+            // alpha near 0.3 makes even a white source almost disappear, so a
+            // theme can provide a separate dark-mode ceiling.  Light mode keeps
+            // the historical values unless the theme explicitly opts in.
             int depth = Math.abs(perspective - FRONT_ANGLE);
-            float fade = Math.max(0.28f, 0.36f - 0.02f * depth);
+            int fadePct = 36;
+            if (Boolean.TRUE.equals(Display.getInstance().isDarkMode())) {
+                fadePct = UIManager.getInstance().getThemeConstant(
+                        "spinnerPerspectiveDarkFadePctInt", fadePct);
+            }
+            float fade = Math.max(Math.max(0.28f, (fadePct - 8) / 100f),
+                    fadePct / 100f - 0.02f * depth);
             int alpha = ig.concatenateAlpha((int) (getStyle().getFgAlpha() * fade));
             ig.drawString(text, 0, 0);
             ig.setAlpha(alpha);

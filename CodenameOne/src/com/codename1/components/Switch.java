@@ -335,7 +335,8 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         // Liquid-glass sheen: a soft specular highlight across the top of the knob so it
         // reads as glass rather than a flat disc. Subtle -- the primary glass cue is the
         // droplet stretch/squash during travel (see paint()).
-        if (UIManager.getInstance().isThemeConstant("switchLiquidGlassBool", false)) {
+        if (context.isEnabled()
+                && UIManager.getInstance().isThemeConstant("switchLiquidGlassBool", false)) {
             int tx = shadowSpread + thumbInset;
             int ty = shadowSpread + thumbInset;
             g.setColor(0xffffff);
@@ -596,7 +597,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
             // fill-less) - NOT the accent or a contrasting fill. The smooth ring is
             // the outer pill (foreground colour) minus the inner surface pill, so the
             // disabled style's bg must be the surface colour and its fg the outline.
-            trackDisabledImage = createPlatformTrackImage(this, (int) (getFontSize() * getTrackScaleX()), (int) (getFontSize() * getTrackScaleY()), getDisabledStyle().getBgColor(), 255, 2, getTrackDisabledOutlineColor(), Math.max(1, getTrackOffOutlineWidth()));
+            trackDisabledImage = createPlatformTrackImage(this, (int) (getFontSize() * getTrackScaleX()), (int) (getFontSize() * getTrackScaleY()), getDisabledStyle().getBgColor(), 255, 2, getTrackDisabledOutlineColor(), getTrackOffOutlineWidth());
         }
         return trackDisabledImage;
     }

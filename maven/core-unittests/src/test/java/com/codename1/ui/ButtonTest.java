@@ -1,17 +1,68 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.plaf.UIManager;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
+import java.util.Hashtable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class ButtonTest extends UITestBase {
+
+    @Test
+    void toolbarCommandCanHideTextWhenItHasAnIcon() {
+        Hashtable props = new Hashtable();
+        props.put("@hideToolbarCommandTextWithIconBool", "true");
+        UIManager.getInstance().addThemeProps(props);
+        try {
+            Command iconCommand = new Command("Settings", Image.createImage(1, 1));
+            iconCommand.putClientProperty("TitleCommand", Boolean.TRUE);
+            Button iconButton = new Button(iconCommand);
+            assertEquals("", iconButton.getText());
+            assertEquals("Settings", iconButton.getAccessibilityText());
+
+            Command textCommand = new Command("Done");
+            textCommand.putClientProperty("TitleCommand", Boolean.TRUE);
+            assertEquals("Done", new Button(textCommand).getText(),
+                    "text-only toolbar commands must retain their label");
+
+            Command ordinaryCommand = new Command("Open", Image.createImage(1, 1));
+            assertEquals("Open", new Button(ordinaryCommand).getText(),
+                    "the toolbar setting must not hide side-menu or ordinary command text");
+        } finally {
+            Hashtable reset = new Hashtable();
+            reset.put("@hideToolbarCommandTextWithIconBool", "false");
+            UIManager.getInstance().addThemeProps(reset);
+        }
+    }
 
     @FormTest
     void testSetCommandBindsCommandAndFiresAction() throws Exception {

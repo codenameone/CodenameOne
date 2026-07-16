@@ -1,26 +1,4 @@
 /*
- * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
- *
- * This code is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation. Codename One designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Codename One in the LICENSE file that accompanied this code.
- *
- * This code is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * version 2 for more details (a copy is included in the LICENSE file that
- * accompanied this code).
- *
- * You should have received a copy of the GNU General Public License version
- * 2 along with this work; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- *
- * Please contact Codename One through http://www.codenameone.com/ if you
- * need additional information or have any questions.
- */
-/*
  * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
@@ -87,7 +65,7 @@ public final class Cn1WidgetRenderer {
                 || "TabsGeom".equals(id)                       // geometry-isolation: Tabs over a flat backdrop
                 || "TabsMorph".equals(id)                      // animation-frame validation: same bar, frozen morph
                 || "SwitchMorph".equals(id)                    // animation-frame validation: frozen droplet slide
-                || "TabOne".equals(id)                         // minimal: one text-only tab, flat backdrop
+                || "TabOne".equals(id)                         // minimal: one tab with a transparent icon slot
                 || "GlassText".equals(id) || "GlassIcon".equals(id) // ladder rungs: glass + one element
                 || (id != null && id.startsWith("GlassPanel")); // glass-blend isolation panels
     }
@@ -258,13 +236,14 @@ public final class Cn1WidgetRenderer {
             panel.add(BorderLayout.CENTER, l);
             c = panel;
         } else if ("TabOne".equals(id)) {
-            // Minimal isolation case: a tab bar with ONE text-only tab (no icon,
-            // no second/unselected item). Strips away the SF-vs-Material icon
-            // mismatch and multi-tab spacing so only the glass pill geometry, the
-            // single centred text label and the (flat-backdrop) glass tint remain
-            // -- the smallest reproduction we can drive to ~100%.
+            // UIKit reserves its normal icon slot even when this UITabBarItem has
+            // no image.  Supply a transparent icon of the themed slot size so CN1
+            // keeps the same title position and overall bar height.
             Tabs tabs = new Tabs(Component.TOP);
-            tabs.addTab("Tab", new Container());
+            int blankWidth = com.codename1.ui.Display.getInstance().convertToPixels(6.75f);
+            int blankHeight = com.codename1.ui.Display.getInstance().convertToPixels(3.75f);
+            Image blankIcon = Image.createImage(blankWidth, blankHeight, 0);
+            tabs.addTab("Tab", blankIcon, new Container());
             c = tabs;
         } else if ("Tabs".equals(id) || "TabsGeom".equals(id) || "TabsMorph".equals(id)) {
             // iOS UITabBar: an icon-over-label bar at the TOP, three items
