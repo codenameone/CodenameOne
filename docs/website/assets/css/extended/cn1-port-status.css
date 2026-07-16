@@ -188,11 +188,6 @@
 .cn1-port-status__matrix {
     border: 1px solid var(--cn1-status-border);
     border-radius: 12px;
-    max-height: min(78vh, 920px);
-    overscroll-behavior: contain;
-    overflow: auto;
-    position: relative;
-    scrollbar-gutter: stable;
 }
 
 .cn1-port-status__matrix table {

@@ -140,10 +140,10 @@ function validate() {
     }
     const stylesheetPath = (stylesheetMatch[1] || stylesheetMatch[2]).replace(/^\//, "");
     const stylesheet = read(stylesheetPath);
-    if (!stylesheet.includes(".cn1-port-status__matrix{") ||
-        !stylesheet.includes("max-height:min(78vh,920px)") ||
+    const matrixRule = stylesheet.match(/\.cn1-port-status__matrix\{([^}]*)\}/);
+    if (!matrixRule || /max-height|overflow:(?:auto|scroll)/.test(matrixRule[1]) ||
         !/\.cn1-port-status__matrix thead th\{[^}]*position:sticky[^}]*top:0/.test(stylesheet)) {
-        fail("the generated table header is not frozen inside its scroll area");
+        fail("the table header must stick during normal page scrolling without a nested table scroller");
     }
 
     console.log(
