@@ -56,8 +56,9 @@ if grep -q 'setEngineURL' "$PLAYGROUND_EDITOR"; then
 fi
 
 # Scope the tripwire to the subsystems the old browser editor lived in; a repo-wide
-# grep would fail this job for unrelated legitimate uses (e.g. the macOS "Monaco"
-# monospace font in a doc, skin or font list).
+# grep would fail this job for unrelated legitimate uses (the forbidden name is also
+# a macOS monospace font that may appear in docs, skins or font lists). The name is
+# split below so this script never matches its own tripwire.
 forbidden_editor='mona''co'
 if git -C "$ROOT/../.." grep -in "$forbidden_editor" -- \
     'scripts/cn1playground' \
