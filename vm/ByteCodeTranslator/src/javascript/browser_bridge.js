@@ -1008,20 +1008,18 @@
   var LENS_MAG_FLAT = 0.75;
   var LENS_TINT_HI = 150;
   var LENS_TINT_LO = 55;
-  var LENS_LIGHT_KEY_LO = 150;
-  var LENS_LIGHT_KEY_HI = 220;
-  var LENS_LIFT_COEF = 0.10;
-  var LENS_GLARE = 0.07;
-  var LENS_RIM = 0.11;
-  var LENS_RIM_W = 0.10;
-  var LENS_REFRACT = 0.015;
-  var LENS_EDGE_SHADOW = 0.07;
-  var LENS_RIM_SCALE = 1.0;
+  var LENS_LIFT_COEF = 0.40;
+  var LENS_GLARE = 0.09;
+  var LENS_RIM = 0.06;
+  var LENS_RIM_W = 0.06;
+  var LENS_REFRACT = 0.16;
+  var LENS_EDGE_SHADOW = 0.12;
+  var LENS_RIM_SCALE = 0.84;
   var LENS_GLASS_TINT = 0xbcd8ff;
-  var LENS_GLASS_TINT_STR = 0.0;
-  var LENS_SAT_BOOST = 1.12;
-  var LENS_GLASS_START = 1.025;
-  var LENS_GLASS_FULL = 1.075;
+  var LENS_GLASS_TINT_STR = 0.10;
+  var LENS_SAT_BOOST = 1.32;
+  var LENS_GLASS_START = 1.085;
+  var LENS_GLASS_FULL = 1.25;
 
   function lensSmoothstep(a, b, x) {
     var t = (x - a) / (b - a);
@@ -1103,8 +1101,9 @@
     var tg = (tintColor >> 8) & 0xff;
     var tb = tintColor & 0xff;
     var liftMax = LENS_LIFT_COEF * (magnify - 1.0) * hh;
-    // The bounded tab morph rests at 1.02x and peaks at 1.08x.  Fade the
-    // foreground optics in above rest and reach full liquid character in flight.
+    // The 3D-glass cues (edge refraction / edge shadow / glare) belong to the
+    // MORPH droplet, not the settled pill (rest 1.08x, peak 1.18x): they fade
+    // in above rest so a resting selection stays a flat subtle pill.
     var glassAmount = lensSmoothstep(LENS_GLASS_START, LENS_GLASS_FULL, magnify);
 
     for (var yy = 0; yy < rh; yy++) {
@@ -1145,9 +1144,7 @@
         var sg = lensSample(src, rw, rh, hw + (px / mag) * refract, sampleYG, 1);
         var sb = lensSample(src, rw, rh, hw + (px / magB) * refract, sampleYB, 2);
         var lum = 0.2126 * sr + 0.7152 * sg + 0.0722 * sb;
-        var tint = tintStrength < 0
-            ? -tintStrength * lensSmoothstep(LENS_LIGHT_KEY_LO, LENS_LIGHT_KEY_HI, lum)
-            : tintStrength * lensSmoothstep(LENS_TINT_HI, LENS_TINT_LO, lum);
+        var tint = tintStrength * lensSmoothstep(LENS_TINT_HI, LENS_TINT_LO, lum);
         var fr = sr + (tr - sr) * tint;
         var fg = sg + (tg - sg) * tint;
         var fb = sb + (tb - sb) * tint;
@@ -1162,11 +1159,8 @@
         var gx = px / hw, gy = (py + 0.42 * hh) / hh;
         var glare = LENS_GLARE * glassAmount * Math.exp(-(gx * gx * 1.15 + gy * gy * 2.6) * 2.1);
         var rimWidth = Math.max(2.0, LENS_RIM_W * hh);
-        var rim = depth < rimWidth ? (1.0 - depth / rimWidth) * LENS_RIM
-            * (0.35 + 0.65 * glassAmount) : 0;
-        var lightDirection = Math.max(0.2, Math.min(1.0,
-            0.68 - 0.28 * (py / hh) - 0.12 * (px / hw)));
-        var bright = glare + rim * lightDirection;
+        var rim = depth < rimWidth ? (1.0 - depth / rimWidth) * LENS_RIM : 0;
+        var bright = glare + rim;
         if (bright > 0) {
           fr += bright * (255 - fr);
           fg += bright * (255 - fg);
@@ -1174,10 +1168,7 @@
         }
         var edgeShadowWidth = Math.max(2.0, 0.13 * Math.min(hw, hh));
         if (depth < edgeShadowWidth) {
-          var shadowDirection = Math.max(0.1, Math.min(1.0,
-              0.55 + 0.35 * (py / hh) + 0.10 * (px / hw)));
-          var edgeShadow = (1.0 - depth / edgeShadowWidth) * LENS_EDGE_SHADOW
-              * glassAmount * shadowDirection;
+          var edgeShadow = (1.0 - depth / edgeShadowWidth) * LENS_EDGE_SHADOW * glassAmount;
           fr *= 1 - edgeShadow;
           fg *= 1 - edgeShadow;
           fb *= 1 - edgeShadow;

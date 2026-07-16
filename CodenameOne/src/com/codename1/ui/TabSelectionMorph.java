@@ -36,19 +36,6 @@ package com.codename1.ui;
 /// the tokens + geometry from the theme/component and then paints from the returned model.
 final class TabSelectionMorph {
 
-    // At 60fps the 350ms native transition advances about 5% per frame. JavaSE can
-    // occasionally coalesce repaints and hand the next animation tick a completed
-    // wall-clock Motion; cap the visible jump so at least the characteristic liquid
-    // frames are painted instead of snapping directly from 0 to 100.
-    private static final int MAX_VISIBLE_FRAME_STEP = 14;
-
-    static int paceVisibleFrame(int previous, int wallClockValue) {
-        int prior = previous < 0 ? 0 : (previous > 100 ? 100 : previous);
-        int raw = wallClockValue < prior ? prior : (wallClockValue > 100 ? 100 : wallClockValue);
-        int capped = prior + MAX_VISIBLE_FRAME_STEP;
-        return raw > capped ? capped : raw;
-    }
-
     /// The morph's tuning tokens. Themes do not set these individually: a NAMED
     /// PRESET ({@link #preset}) supplies the full envelope set, and the theme
     /// exposes only high-level controls -- the preset name (tabsMorphPreset),
@@ -71,54 +58,45 @@ final class TabSelectionMorph {
         float peakAb;         // mid-flight chromatic aberration (fraction)
         float tintStrength;   // lens accent-tint strength 0..1
         int barGrowPct;       // whole-bar grow pulse percent (0 = off)
-        float spring = 1f;    // settle-deformation scale (0 = no stop squash/swell)
+        float spring = 1f;    // settle-overshoot scale (1 = preset amount, 0 = none)
 
         /// The named motion presets. "ios26" (the default, and any unknown name)
-        /// is bounded from the recorded iOS 26 UITabBar transition: the travelling
-        /// drop stays close to one cell, grows only a few percent vertically, and
-        /// uses barely-visible chromatic separation. "subtle" reduces those cues
-        /// further for applications that want an almost-flat selection change.
+        /// is the measured iOS 26 Liquid Glass morph; "subtle" halves the
+        /// deformation and optics for a calmer selection change.
         static Tokens preset(String name) {
             Tokens tk = new Tokens();
             if ("subtle".equals(name)) {
-                tk.stretch = 0f;
-                tk.squashW = 0.03f;
-                tk.grow = 0.005f;
-                tk.squashH = 0.025f;
-                tk.liftMm = 0.03f;
-                tk.bubbleWidthPct = 100;
-                tk.overflowPct = 0;
-                tk.downBiasMm = 0f;
-                tk.restMag = 1.01f;
-                tk.peakMag = 1.05f;
-                tk.peakAb = 0.00025f;
+                tk.stretch = 0.16f;
+                tk.squashW = 0.08f;
+                tk.grow = 0.07f;
+                tk.squashH = 0.09f;
+                tk.liftMm = 0.25f;
+                tk.bubbleWidthPct = 96;
+                tk.overflowPct = 12;
+                tk.downBiasMm = 0.15f;
+                tk.restMag = 1.04f;
+                tk.peakMag = 1.09f;
+                tk.peakAb = 0.01f;
                 tk.tintStrength = 1f;
                 tk.barGrowPct = 0;
-                tk.spring = 0.20f;
                 return tk;
             }
             // "ios26" -- the shipped iOS Modern tuning.
-            // The recorded native drop keeps essentially one cell's width while
-            // it travels.  Its liquid character comes from refraction across the
-            // moving edge, not from stretching across the neighbouring glyphs.
-            // A wider lens duplicated two tabs at once and looked like distortion
-            // instead of the compact UIKit bubble.
-            tk.stretch = 0f;
-            tk.squashW = 0.05f;
-            tk.grow = 0.01f;
-            tk.squashH = 0.04f;
-            tk.liftMm = 0.05f;
-            tk.bubbleWidthPct = 100;
-            tk.overflowPct = 0;
-            tk.downBiasMm = 0f;
-            tk.restMag = 1.02f;
-            tk.peakMag = 1.08f;
-            tk.peakAb = 0.0005f;
+            tk.stretch = 0.32f;
+            tk.squashW = 0.16f;
+            tk.grow = 0.14f;
+            tk.squashH = 0.18f;
+            tk.liftMm = 0.5f;
+            // Wider than the cell: the native iOS 26 selected pill overlaps its
+            // neighbour cells (276px over a 253px cell on the @3x reference bar).
+            tk.bubbleWidthPct = 109;
+            tk.overflowPct = 18;
+            tk.downBiasMm = 0.3f;
+            tk.restMag = 1.08f;
+            tk.peakMag = 1.18f;
+            tk.peakAb = 0.02f;
             tk.tintStrength = 1f;
             tk.barGrowPct = 0;
-            // Native keeps a restrained stop deformation without positional
-            // overshoot; scale the width/height settle envelope to 35%.
-            tk.spring = 0.35f;
             return tk;
         }
 
@@ -167,42 +145,24 @@ final class TabSelectionMorph {
         return t * t * (3 - 2 * t);
     }
 
-    // Measured centres of the travelling native selection drop, normalized from
-    // the first visible frame through its 350ms settle.  UIKit's curve accelerates
-    // more quickly than smoothstep, then spends the last third easing into place;
-    // approximating it with a short 200ms ease made the CN1 drop look like a jump.
-    private static final float[] NATIVE_POSITION_TIME = {
-        0f, 0.049f, 0.100f, 0.151f, 0.200f, 0.251f, 0.294f,
-        0.337f, 0.391f, 0.443f, 0.486f, 0.537f, 0.577f,
-        0.629f, 0.677f, 0.723f, 0.766f, 0.820f, 0.863f, 0.914f, 1f
-    };
-    private static final float[] NATIVE_POSITION_VALUE = {
-        0f, 0.032f, 0.099f, 0.219f, 0.288f, 0.394f, 0.492f,
-        0.582f, 0.678f, 0.728f, 0.770f, 0.804f, 0.876f,
-        0.907f, 0.932f, 0.951f, 0.966f, 0.981f, 0.996f, 1f, 1f
-    };
-
-    /// Position easing sampled from the recorded iOS 26 UITabBar transition.
-    /// The path is monotonic: the native drop deforms at the stop but does not
-    /// shoot past the end of the bar and snap back.
-    static float springEase(float t) {
+    /// Position easing: an even ease-in-out travel reaching the target ~t=0.78, then a
+    /// small damped overshoot that settles by t=1 (the "stop" bounce). The
+    /// springiness scales the overshoot amplitude: 1 = the preset 0.09, 0 = no
+    /// overshoot (a plain ease-in-out stop), 2 = double the bounce.
+    static float springEase(float t, float springiness) {
         if (t <= 0f) {
             return 0f;
         }
         if (t >= 1f) {
             return 1f;
         }
-        for (int i = 1; i < NATIVE_POSITION_TIME.length; i++) {
-            if (t <= NATIVE_POSITION_TIME[i]) {
-                float ta = NATIVE_POSITION_TIME[i - 1];
-                float tb = NATIVE_POSITION_TIME[i];
-                float u = (t - ta) / (tb - ta);
-                float va = NATIVE_POSITION_VALUE[i - 1];
-                float vb = NATIVE_POSITION_VALUE[i];
-                return va + (vb - va) * u;
-            }
+        float travelEnd = 0.78f;
+        if (t <= travelEnd) {
+            float u = t / travelEnd;
+            return u * u * (3 - 2 * u);
         }
-        return 1f;
+        float u = (t - travelEnd) / (1f - travelEnd);
+        return 1f + 0.09f * springiness * (float) (Math.sin(u * Math.PI) * (1f - u));
     }
 
     /// Computes one morph frame.
@@ -223,7 +183,7 @@ final class TabSelectionMorph {
         TabSelectionMorph m = new TabSelectionMorph();
         float tp = t < 0 ? 0 : (t > 1 ? 1 : t);
 
-        float pos = springEase(tp);
+        float pos = springEase(tp, tk.spring);
         int x = fromX + (int) ((toX - fromX) * pos);
         int w = fromW + (int) ((toW - fromW) * pos);
 
@@ -232,10 +192,6 @@ final class TabSelectionMorph {
         float moving = smooth(0f, 0.08f, tp) * (1f - smooth(0.88f, 1f, tp));
         float sd = (tp - 0.80f) / 0.14f;
         float squash = (sd > -1f && sd < 1f) ? (1f - sd * sd) * (1f - sd * sd) : 0f; // settle bump
-        // Springiness controls the stop DEFORMATION, not positional overshoot.
-        // The native centre path above is monotonic; the liquid cue is its brief
-        // width compression/height swell as it comes to rest.
-        squash *= tk.spring;
         float grow = smooth(0f, 0.10f, tp) * (1f - smooth(0.20f, 0.42f, tp));        // early whole-bar swell
 
         // horizontal elongation while moving, then width compression at the stop
@@ -250,8 +206,8 @@ final class TabSelectionMorph {
         capX += (w - bubbleW) / 2;
         w = bubbleW;
 
-        // The drop may be wider than its cell (bubbleWidthPct > 100), but it
-        // must never leave the bar:
+        // The drop may be wider than its cell (bubbleWidthPct > 100) and the
+        // spring overshoots the end cells -- but it must never leave the bar:
         // the native pill overlaps NEIGHBOUR cells, not the backdrop.
         if (capX < barLeftX) {
             w -= barLeftX - capX;

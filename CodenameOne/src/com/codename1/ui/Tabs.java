@@ -157,15 +157,12 @@ public class Tabs extends Container {
     private int animatedIndicatorDurationMs = 200;
     private int animatedIndicatorThicknessMm = 1; // 1mm-tall underline
     private Motion indicatorAnimMotion;
-    // Last progress actually presented. This is paced separately from the
-    // wall-clock Motion so a coalesced/slow repaint cannot skip the whole morph.
-    private int indicatorAnimValue;
     // The tab index the indicator morph is currently travelling TO. Lets a re-entrant
     // setSelectedIndex (e.g. the content-slide finishing) recognise that a morph to the
     // same tab is already in flight and NOT restart it mid-travel.
     private int indicatorTargetIndex = -1;
     // TEST-ONLY: when >=0, paintSelectionCapsule renders the morph at this fixed
-    // 0..100 progress instead of the live motion (for the JavaSE capture probe).
+    // 0..120 progress instead of the live motion (for the JavaSE capture probe).
     private int morphTestValue = -1;
     // Tab bounds at the start of the indicator animation.
     private int indicatorFromX;
@@ -401,10 +398,7 @@ public class Tabs extends Container {
         // slide motion control deregistration; the indicator motion is
         // cheap enough to run alongside without coordination.
         if (indicatorAnimMotion != null) {
-            int wallClockValue = indicatorAnimMotion.getValue();
-            indicatorAnimValue = TabSelectionMorph.paceVisibleFrame(
-                    indicatorAnimValue, wallClockValue);
-            if (indicatorAnimValue >= 100) {
+            if (indicatorAnimMotion.isFinished()) {
                 indicatorAnimMotion = null;
                 indicatorTargetIndex = -1;
                 // Paint ONE more frame now that the morph is over so the SETTLED capsule
@@ -475,7 +469,7 @@ public class Tabs extends Container {
         // indicator morph are done. Previously a finished 200ms slide deregistered the
         // animation while the 550ms morph was still in flight, freezing the drop mid-travel.
         if ((slideToDestMotion == null || slideToDestMotion.isFinished())
-                && indicatorAnimMotion == null) {
+                && (indicatorAnimMotion == null || indicatorAnimMotion.isFinished())) {
             Form f = getComponentForm();
             if (f != null) {
                 f.deregisterAnimatedInternal(this);
@@ -1480,7 +1474,7 @@ public class Tabs extends Container {
         // If a motion is already in flight, start from the *current*
         // interpolated position, not from the previous tab -- otherwise
         // rapid double-clicks jump back to a stale baseline.
-        if (indicatorAnimMotion != null && indicatorAnimValue < 100) {
+        if (indicatorAnimMotion != null && !indicatorAnimMotion.isFinished()) {
             if (toIndex == indicatorTargetIndex) {
                 // A morph to this SAME tab is already running. The content-slide finishing
                 // re-invokes setSelectedIndex(active) to finalise the selection; restarting
@@ -1488,7 +1482,7 @@ public class Tabs extends Container {
                 // Let the in-flight morph run to completion instead.
                 return;
             }
-            int v = indicatorAnimValue;
+            int v = indicatorAnimMotion.getValue();
             indicatorFromX = indicatorFromX + ((indicatorToX - indicatorFromX) * v / 100);
             indicatorFromW = indicatorFromW + ((indicatorToW - indicatorFromW) * v / 100);
         } else {
@@ -1499,12 +1493,11 @@ public class Tabs extends Container {
         indicatorToW = to[1];
         indicatorTargetIndex = toIndex;
         // LINEAR-TIME motion: the value is the morph timeline 0..100 and
-        // paintSelectionCapsule derives the recorded native position curve AND the
-        // height/squash envelopes from it -- so the bubble stays tall while travelling
-        // and compresses at the stop. (The non-glass
+        // paintSelectionCapsule derives the spring position (springEaseTabs, an
+        // ease-out-back overshoot) AND the height/squash envelopes from it -- so the
+        // bubble stays tall while travelling and compresses at the stop. (The non-glass
         // Material underline path reads the same value as a plain position fraction.)
         indicatorAnimMotion = Motion.createLinearMotion(0, 100, animatedIndicatorDurationMs);
-        indicatorAnimValue = 0;
         indicatorAnimMotion.start();
         Form f = getComponentForm();
         if (f != null) {
@@ -1545,7 +1538,7 @@ public class Tabs extends Container {
         g.setAlpha(oldAlpha);
     }
 
-    // Position easing + smoothstep now live in the pure
+    // Position easing (springEaseTabs) + smoothstep (lensSmooth) now live in the pure
     // TabSelectionMorph model (springEase / smooth) so the morph math is unit-testable.
 
     /// The thin frost rim left around the selection capsule (tabSelInsetMm, default a hair).
@@ -1597,7 +1590,7 @@ public class Tabs extends Container {
     }
 
     /// TEST-ONLY hook: render the selection morph frozen at a fixed progress
-    /// (`value` 0..100, where 100 is the settled target)
+    /// (`value` 0..120, where 100 is the target and &gt;100 is the settle overshoot)
     /// travelling from `fromIndex` to `toIndex`, so a JavaSE probe can capture exact
     /// frames of the animation without racing the real-time motion. Pass `value` &lt; 0
     /// to clear and resume normal behaviour.
@@ -1624,20 +1617,18 @@ public class Tabs extends Container {
     /// The iOS "selected cell" background: a subtle grey capsule kept at bar height
     /// (the lens drop, drawn over it, bulges taller). Travels + elongates with the
     /// drop. systemFill grey so it reads neutral, not blue. Alpha via tabSelPillAlphaInt.
-    private void drawSelectionPill(Graphics g, int capX, int capY, int w, int capH,
-            boolean dark) {
+    private void drawSelectionPill(Graphics g, int capX, int capY, int w, int capH, float bump) {
         int pillInset = capH * 7 / 100;                 // pill a hair shorter than the lens
         int py = capY + pillInset;
         int ph = capH - 2 * pillInset;
         if (ph <= 0) {
             return;
         }
-        // The native frame sequence keeps the system-fill body visible for the
-        // entire trip (#b4 light / #78 dark on the flat reference backdrop).
-        // Fading 85% of it away in flight left only a thin lens outline, which is
-        // why the foreground liquid bubble disappeared in JavaSE/JavaScript.
+        // FADE the grey pill out as the drop travels: the settled "selected cell"
+        // background is grey, but MID-FLIGHT the bubble is pure transparent glass
+        // (otherwise the grey shows through the gap between tabs as an empty blob).
         int baseAlpha = getUIManager().getThemeConstant("tabSelPillAlphaInt", 34);
-        int alpha = baseAlpha;
+        int alpha = (int) (baseAlpha * (1f - 0.85f * bump));
         if (alpha <= 0) {
             return;
         }
@@ -1645,9 +1636,7 @@ public class Tabs extends Container {
         int oldA = g.getAlpha();
         boolean aa = g.isAntiAliased();
         g.setAntiAliased(true);
-        g.setColor(getUIManager().getThemeConstant(dark
-                ? "tabSelPillDarkColorInt" : "tabSelPillColorInt",
-                dark ? 0xc9c9ce : 0x767680));
+        g.setColor(getUIManager().getThemeConstant("tabSelPillColorInt", 0x767680));
         g.setAlpha(alpha);
         g.fillRoundRect(capX, py, w, ph, ph, ph);
         g.setAntiAliased(aa);
@@ -1695,7 +1684,7 @@ public class Tabs extends Container {
         int toW;
         float t;
         if (morphTestValue >= 0 || indicatorAnimMotion != null) {
-            int v = morphTestValue >= 0 ? morphTestValue : indicatorAnimValue;
+            int v = morphTestValue >= 0 ? morphTestValue : indicatorAnimMotion.getValue();
             t = (v < 0 ? 0 : (v > 100 ? 100 : v)) / 100f;
             fromX = indicatorFromX;
             fromW = indicatorFromW;
@@ -1744,14 +1733,15 @@ public class Tabs extends Container {
                 g.lensRegion(m.barGrowX, m.barGrowY, m.barGrowW, m.barGrowH,
                         -1f, m.barGrowMag, 0f, 0x000000, 0f);
             }
-            drawSelectionPill(g, m.capX, m.capY, m.capW, m.capH, dark);
-            // The sign selects the luminance key: positive tints dark glyphs on the
-            // light bar, negative tints light glyphs on the dark bar. This keeps the
-            // accent attached to the travelling drop in both appearances instead of
-            // painting the destination tab blue before the bubble reaches it.
+            drawSelectionPill(g, m.capX, m.capY, m.capW, m.capH, m.flight);
+            // Accent supplied by the lens in LIGHT mode only: the keying tints DARK
+            // pixels toward the accent, which is right over a light frost (the
+            // deliberately-dark glyphs turn blue) but floods a dark bar solid blue,
+            // because everything under the drop is dark there. On dark bars the
+            // glyphs carry the accent directly (theme) and the lens keeps only its
+            // magnify/aberration optics.
             int tint = getUIManager().getThemeConstant("tabSelLensTintColorInt", 0x0a84ff);
-            g.lensRegion(m.lensX, m.lensY, m.lensW, m.lensH, -1f, m.magnify,
-                    m.aberration, tint, dark ? -m.tintStrength : m.tintStrength);
+            g.lensRegion(m.lensX, m.lensY, m.lensW, m.lensH, -1f, m.magnify, m.aberration, tint, dark ? 0f : m.tintStrength);
             return;
         }
         // Non-glass platforms: a translucent rounded capsule.
@@ -1771,8 +1761,8 @@ public class Tabs extends Container {
     /// only (review: fewer, coherent morph knobs): tabsMorphPreset picks a named
     /// envelope set inside the motion model ("ios26" default / "subtle"),
     /// tabsMorphLensIntensityPct scales the lens optics around the preset (100 =
-    /// as authored) and tabsMorphSpringPct scales the preset's settle deformation
-    /// (100 = preset deformation, 0 = plain stop). Duration remains
+    /// as authored) and tabsMorphSpringPct scales the settle overshoot (100 =
+    /// preset bounce, 0 = plain stop). Duration remains
     /// tabsAnimatedIndicatorDurationInt. The mm lengths carried by the preset
     /// are converted to px here so the model stays Display-free.
     private TabSelectionMorph.Tokens morphTokens() {
@@ -1780,7 +1770,7 @@ public class Tabs extends Container {
         TabSelectionMorph.Tokens tk = TabSelectionMorph.Tokens.preset(
                 uim.getThemeConstant("tabsMorphPreset", "ios26"));
         tk.scaleLensIntensity(uim.getThemeConstant("tabsMorphLensIntensityPct", 100) / 100f);
-        tk.spring *= uim.getThemeConstant("tabsMorphSpringPct", 100) / 100f;
+        tk.spring = uim.getThemeConstant("tabsMorphSpringPct", 100) / 100f;
         tk.liftPx = Display.getInstance().convertToPixels(tk.liftMm);
         tk.downBiasPx = Display.getInstance().convertToPixels(tk.downBiasMm);
         return tk;
@@ -1795,7 +1785,7 @@ public class Tabs extends Container {
         int x;
         int w;
         if (indicatorAnimMotion != null) {
-            int v = indicatorAnimValue;    // paced visible progress, 0..100
+            int v = indicatorAnimMotion.getValue();    // 0..100
             x = indicatorFromX + ((indicatorToX - indicatorFromX) * v / 100);
             w = indicatorFromW + ((indicatorToW - indicatorFromW) * v / 100);
         } else {

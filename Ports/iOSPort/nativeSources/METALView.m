@@ -214,20 +214,16 @@ static inline float glassSmoothstep(float a, float b, float x) {
 #define LENS_MAG_FLAT       0.75f   // uniform-magnify fraction of the (elliptical) radius
 #define LENS_TINT_HI        150.0f  // luminance >= HI: no tint
 #define LENS_TINT_LO        55.0f   // luminance <= LO: full dark->accent tint
-#define LENS_LIGHT_KEY_LO   150.0f  // dark bar/pill remain neutral
-#define LENS_LIGHT_KEY_HI   220.0f  // light glyph becomes full accent
-#define LENS_LIFT_COEF      0.10f   // restrained upward pull under the drop
-#define LENS_GLARE          0.07f   // broad moving specular sheen
-#define LENS_RIM            0.11f   // directional top/left rim light
-#define LENS_RIM_W          0.10f   // rim band width (fraction of half-height)
-#define LENS_REFRACT        0.015f  // native barely displaces content at the rim
-#define LENS_EDGE_SHADOW    0.07f   // directional bottom/right depth
-#define LENS_RIM_SCALE      1.0f    // no funhouse minification at the periphery
+#define LENS_LIFT_COEF      0.40f   // upward pull of the content under the drop
+#define LENS_GLARE          0.09f   // specular sheen strength
+#define LENS_RIM            0.06f   // edge-rim brightness
+#define LENS_RIM_W          0.06f   // rim band width (fraction of half-height)
+#define LENS_REFRACT        0.16f   // edge lensing: content bends at the rim
+#define LENS_EDGE_SHADOW    0.12f   // soft dark band just inside the rim
+#define LENS_RIM_SCALE      0.84f   // periphery shrinks (< 1) while the centre enlarges
 #define LENS_GLASS_TINT     0xbcd8ff /* faint cool-blue cast through the whole glass */
-#define LENS_GLASS_TINT_STR 0.0f
-#define LENS_SAT_BOOST      1.12f   // restrained blue saturation
-#define LENS_GLASS_START    1.025f
-#define LENS_GLASS_FULL     1.075f
+#define LENS_GLASS_TINT_STR 0.10f
+#define LENS_SAT_BOOST      1.32f   // push the tinted blue glyph more vivid
 
 __attribute__((unused))
 static void glassApplyLens(uint32_t *src, int rw, int rh, uint32_t *out,
@@ -244,9 +240,7 @@ static void glassApplyLens(uint32_t *src, int rw, int rh, uint32_t *out,
     float liftMax = LENS_LIFT_COEF * (magnify - 1.0f) * hh;
     // The 3D-glass cues belong to the morph droplet, not the settled pill -- fade them
     // out by how magnified the drop is, so a resting selection is a flat subtle pill.
-    // The bounded tab morph rests at 1.02x and peaks at 1.08x.  Fade the
-    // foreground optics in above rest and reach full liquid character in flight.
-    float glassAmt = glassSmoothstep(LENS_GLASS_START, LENS_GLASS_FULL, magnify);
+    float glassAmt = glassSmoothstep(1.085f, 1.25f, magnify);
     for (int y = 0; y < rh; y++) {
         float py = (y + 0.5f) - hh;
         for (int x = 0; x < rw; x++) {
@@ -262,8 +256,9 @@ static void glassApplyLens(uint32_t *src, int rw, int rh, uint32_t *out,
             float alpha = depth >= 1.0f ? 1.0f : depth;
             float rd = sqrtf((px * px) / (hw * hw) + (py * py) / (hh * hh));   // elliptical 0..1
             if (rd > 1.0f) rd = 1.0f;
-            // Centre enlarges gently; the rim returns to 1:1 instead of minifying
-            // neighbouring content. This keeps the native shallow-lens character.
+            // Centre ENLARGES (magnify); periphery SHRINKS toward RIM_SCALE (< 1) so the
+            // bar/other tabs seen through the drop read minified while the central glyph
+            // stays big. No shrink when settled (rimScale -> 1 as glassAmt -> 0).
             float edge = glassSmoothstep(LENS_MAG_FLAT, 1.0f, rd);
             float rimScale = 1.0f + (LENS_RIM_SCALE - 1.0f) * glassAmt;
             float mag = magnify + (rimScale - magnify) * edge;
@@ -278,9 +273,7 @@ static void glassApplyLens(uint32_t *src, int rw, int rh, uint32_t *out,
             int sg = (glassSampleBilinear(src, rw, rh, hw + (px / mag) * refr, hh + (py / mag) * refr + lift) >> 8) & 0xff;
             int sb = glassSampleBilinear(src, rw, rh, hw + (px / magB) * refr, hh + (py / magB) * refr + lift) & 0xff;
             float lum = 0.2126f * sr + 0.7152f * sg + 0.0722f * sb;
-            float t = tintStrength < 0.0f
-                    ? -tintStrength * glassSmoothstep(LENS_LIGHT_KEY_LO, LENS_LIGHT_KEY_HI, lum)
-                    : tintStrength * glassSmoothstep(LENS_TINT_HI, LENS_TINT_LO, lum);
+            float t = tintStrength * glassSmoothstep(LENS_TINT_HI, LENS_TINT_LO, lum);
             float fr = sr + (tr - sr) * t;
             float fg = sg + (tg - sg) * t;
             float fb = sb + (tb - sb) * t;
@@ -298,11 +291,8 @@ static void glassApplyLens(uint32_t *src, int rw, int rh, uint32_t *out,
             float gx = px / hw, gy = (py + 0.42f * hh) / hh;
             float glare = LENS_GLARE * glassAmt * expf(-(gx * gx * 1.15f + gy * gy * 2.6f) * 2.1f);
             float rimW = LENS_RIM_W * hh; if (rimW < 2.0f) rimW = 2.0f;
-            float rim = depth < rimW ? (1.0f - depth / rimW) * LENS_RIM
-                    * (0.35f + 0.65f * glassAmt) : 0.0f;
-            float lightDir = fmaxf(0.2f, fminf(1.0f,
-                    0.68f - 0.28f * (py / hh) - 0.12f * (px / hw)));
-            float bright = glare + rim * lightDir;
+            float rim = depth < rimW ? (1.0f - depth / rimW) * LENS_RIM : 0.0f;
+            float bright = glare + rim;
             if (bright > 0.0f) {
                 fr += bright * (255.0f - fr);
                 fg += bright * (255.0f - fg);
@@ -311,9 +301,7 @@ static void glassApplyLens(uint32_t *src, int rw, int rh, uint32_t *out,
             // soft dark band just inside the rim (glass depth), morph-only
             float esW = 0.13f * minhh; if (esW < 2.0f) esW = 2.0f;
             if (depth < esW) {
-                float shadowDir = fmaxf(0.1f, fminf(1.0f,
-                        0.55f + 0.35f * (py / hh) + 0.10f * (px / hw)));
-                float es = (1.0f - depth / esW) * LENS_EDGE_SHADOW * glassAmt * shadowDir;
+                float es = (1.0f - depth / esW) * LENS_EDGE_SHADOW * glassAmt;
                 fr *= (1.0f - es);
                 fg *= (1.0f - es);
                 fb *= (1.0f - es);

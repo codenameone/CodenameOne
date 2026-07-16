@@ -28,11 +28,10 @@ vm.runInNewContext(bridge.substring(start, end)
 // The same foreground lens is implemented four times because each backend has
 // a different pixel API. Fail before the CRC probe if a tuning constant drifts.
 const lensConstants = [
-  'LENS_MAG_FLAT', 'LENS_TINT_HI', 'LENS_TINT_LO',
-  'LENS_LIGHT_KEY_LO', 'LENS_LIGHT_KEY_HI', 'LENS_LIFT_COEF',
+  'LENS_MAG_FLAT', 'LENS_TINT_HI', 'LENS_TINT_LO', 'LENS_LIFT_COEF',
   'LENS_GLARE', 'LENS_RIM', 'LENS_RIM_W', 'LENS_REFRACT',
   'LENS_EDGE_SHADOW', 'LENS_RIM_SCALE', 'LENS_GLASS_TINT_STR',
-  'LENS_SAT_BOOST', 'LENS_GLASS_START', 'LENS_GLASS_FULL'
+  'LENS_SAT_BOOST'
 ];
 
 function constant(source, pattern, name, backend) {
@@ -57,7 +56,25 @@ for (const name of lensConstants) {
     throw new Error(`Lens constant drift for ${name}: ${JSON.stringify(values)}`);
   }
 }
-console.log(`lens constant parity PASS backends=4 constants=${lensConstants.length}`);
+
+// The liquid-layer gate (glassAmt = smoothstep(1.085, 1.25, magnify)) is a
+// named pair only in the JavaScript port; the other backends inline the
+// literals. Pin all four so the gate cannot drift silently either.
+const gateStart = constant(bridge, `var\\s+%s\\s*=\\s*([0-9.]+)\\s*;`, 'LENS_GLASS_START', 'JavaScript');
+const gateFull = constant(bridge, `var\\s+%s\\s*=\\s*([0-9.]+)\\s*;`, 'LENS_GLASS_FULL', 'JavaScript');
+if (gateStart !== 1.085 || gateFull !== 1.25) {
+  throw new Error(`JavaScript liquid gate drift: ${gateStart}..${gateFull}, expected 1.085..1.25`);
+}
+for (const [backend, source, pattern] of [
+  ['JavaSE', javaSource, /lensSmoothstep\(1\.085,\s*1\.25,\s*magnify\)/],
+  ['Metal CPU reference', metalReference, /glassSmoothstep\(1\.085f,\s*1\.25f,\s*magnify\)/],
+  ['Metal shader', metalShader, /cn1_lens_smoothstep\(1\.085,\s*1\.25,\s*magnify\)/]
+]) {
+  if (!pattern.test(source)) {
+    throw new Error(`Liquid gate smoothstep(1.085, 1.25) not found in ${backend}`);
+  }
+}
+console.log(`lens constant parity PASS backends=4 constants=${lensConstants.length + 2}`);
 
 function crc32(bytes) {
   let crc = 0xffffffff;
@@ -95,16 +112,18 @@ function glassPattern(width, height) {
   return source;
 }
 
+// magnify/aberration sampled from the shipped "ios26" preset (rest 1.08x,
+// peak 1.18x, peak aberration 0.02) at representative flight envelopes.
+// Expected CRCs are produced by JavaSEPort.applyLensBuffer over the same
+// synthetic source (see the LensParityDump probe in the PR description).
 const frames = [
-  { progress: 0, width: 100, height: 40, magnify: 1.02, aberration: 0, expected: 0x54b0a28a },
-  { progress: 10, width: 100, height: 40, magnify: 1.0755556, aberration: 0.000463, expected: 0x0cb3f189 },
-  { progress: 25, width: 100, height: 40, magnify: 1.08, aberration: 0.0005, expected: 0xbb9b8ae3 },
-  { progress: 50, width: 100, height: 40, magnify: 1.08, aberration: 0.0005, expected: 0xbb9b8ae3 },
-  { progress: 75, width: 98, height: 40, magnify: 1.05, aberration: 0.00025, expected: 0x3a6519ac },
-  { progress: 90, width: 99, height: 40, magnify: 1.02, aberration: 0, expected: 0x70153f60 },
-  { progress: 100, width: 100, height: 40, magnify: 1.02, aberration: 0, expected: 0x54b0a28a },
-  { progress: 'dark-25', width: 100, height: 40, magnify: 1.08,
-    aberration: 0.0005, tintStrength: -1, expected: 0x045fe638 }
+  { progress: 0, width: 100, height: 40, magnify: 1.08, aberration: 0, expected: 0xda50e7bd },
+  { progress: 10, width: 100, height: 40, magnify: 1.1726, aberration: 0.01852, expected: 0xfb9082d1 },
+  { progress: 25, width: 100, height: 40, magnify: 1.18, aberration: 0.02, expected: 0x766a3feb },
+  { progress: 50, width: 100, height: 40, magnify: 1.18, aberration: 0.02, expected: 0x766a3feb },
+  { progress: 75, width: 98, height: 40, magnify: 1.13, aberration: 0.01, expected: 0x4fe082c7 },
+  { progress: 90, width: 99, height: 40, magnify: 1.08, aberration: 0, expected: 0xd0b8b264 },
+  { progress: 100, width: 100, height: 40, magnify: 1.08, aberration: 0, expected: 0xda50e7bd }
 ];
 
 for (const frame of frames) {
@@ -128,8 +147,7 @@ for (const frame of frames) {
     putImageData(image) { output = image.data; }
   };
   sandbox.applyLens(context, 0, 0, width, height, -1,
-      frame.magnify, frame.aberration, 0x0a84ff,
-      frame.tintStrength === undefined ? 1 : frame.tintStrength);
+      frame.magnify, frame.aberration, 0x0a84ff, 1);
 
   // JavaSE's reference buffer is packed ARGB; Canvas ImageData is RGBA.
   const actual = crc32(rgbaToArgb(output));
