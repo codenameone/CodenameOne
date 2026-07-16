@@ -264,7 +264,7 @@ jobs:
   compare-comment:
     name: cross-compiled screenshot-comment
     needs: run-on-windows
-    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read

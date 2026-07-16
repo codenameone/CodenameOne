@@ -357,7 +357,7 @@ jobs:
   compare-comment:
     name: screenshot-comment
     needs: build-run
-    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -220,7 +220,7 @@ jobs:
   # Separate from the clean-target gate so a rendering hiccup never blocks merges.
   windows-port-screenshot:
     name: screenshot-capture (x64)
-    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     timeout-minutes: 90
     steps:
@@ -406,7 +406,7 @@ jobs:
   windows-port-screenshot-arm64:
     name: screenshot-capture (arm64)
     needs: windows-port-screenshot
-    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: windows-11-arm
     continue-on-error: true
     timeout-minutes: 60
@@ -607,7 +607,7 @@ jobs:
   windows-port-screenshot-comment-arm64:
     name: screenshot-comment (arm64)
     needs: windows-port-screenshot-arm64
-    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     continue-on-error: true
     runs-on: ubuntu-latest
     permissions:
