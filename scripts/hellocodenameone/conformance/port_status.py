@@ -154,48 +154,35 @@ def validate(manifest: dict) -> dict:
         if owner is None:
             problems.append(f"Golden screenshot {name} is not mapped to a test")
 
-    seed_directory = manifest.get("seed_report_directory")
-    if seed_directory:
-        seed_root = REPO_ROOT / seed_directory
+    report_directory = manifest.get("report_directory")
+    if report_directory:
+        report_root = REPO_ROOT / report_directory
         for port_id in port_ids:
-            seed_path = seed_root / f"{port_id}.json"
+            report_path = report_root / f"{port_id}.json"
             try:
-                seed = read_json(seed_path)
+                report = read_json(report_path)
             except ContractError as exc:
                 problems.append(str(exc))
                 continue
-            if seed.get("schema_version") != manifest.get("schema_version"):
-                problems.append(f"Seed report {seed_path} has the wrong schema version")
-            if seed.get("port") != port_id:
-                problems.append(f"Seed report {seed_path} identifies port {seed.get('port')}")
-            if seed.get("bootstrap_source") != "successful-master-workflow":
-                problems.append(f"Seed report {seed_path} has no successful-workflow provenance")
-            if seed.get("workflow_conclusion") != "success":
-                problems.append(f"Seed report {seed_path} did not come from a successful workflow")
-            seed_tests = seed.get("tests")
-            if not isinstance(seed_tests, dict):
-                problems.append(f"Seed report {seed_path} has no test result map")
+            if report.get("schema_version") != manifest.get("schema_version"):
+                problems.append(f"Stored report {report_path} has the wrong schema version")
+            if report.get("port") != port_id:
+                problems.append(f"Stored report {report_path} identifies port {report.get('port')}")
+            report_tests = report.get("tests")
+            if not isinstance(report_tests, dict):
+                problems.append(f"Stored report {report_path} has no test result map")
                 continue
-            unknown_tests = sorted(set(seed_tests) - set(mapped))
+            unknown_tests = sorted(set(report_tests) - set(mapped))
             if unknown_tests:
                 problems.append(
-                    f"Seed report {seed_path} contains unknown tests: "
+                    f"Stored report {report_path} contains unknown tests: "
                     + ", ".join(unknown_tests)
                 )
-            missing_tests = sorted(set(mapped) - set(seed_tests))
+            missing_tests = sorted(set(mapped) - set(report_tests))
             if missing_tests:
                 problems.append(
-                    f"Seed report {seed_path} is missing tests: "
+                    f"Stored report {report_path} is missing tests: "
                     + ", ".join(missing_tests)
-                )
-            failing_tests = sorted(
-                test for test, result in seed_tests.items()
-                if result.get("status") == "fail"
-            )
-            if failing_tests:
-                problems.append(
-                    f"Successful-workflow seed report {seed_path} contains failures: "
-                    + ", ".join(failing_tests)
                 )
 
     if problems:

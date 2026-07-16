@@ -1,8 +1,8 @@
 {
-  "commit": "c2d12f867bc2081a80a1745ecd0b0ffaad86921b",
-  "generated_at": "2026-07-15T15:03:08Z",
-  "port": "windows-x64",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29423004962",
+  "commit": "4d8237a779a9b1b8b6ba4c42fec4d2481779b335",
+  "generated_at": "2026-07-15T14:25:26Z",
+  "port": "linux-arm64",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29421206467",
   "schema_version": 1,
   "suite_finished": false,
   "summary": {
@@ -13,7 +13,7 @@
   },
   "tests": {
     "ARApiTest": {
-      "feature": "camera-ar-sensors",
+      "feature": "ar-motion-sensors",
       "status": "pass"
     },
     "AccessibilityTest": {
@@ -77,7 +77,7 @@
       "status": "pass"
     },
     "CameraApiTest": {
-      "feature": "camera-ar-sensors",
+      "feature": "camera-access",
       "status": "pass"
     },
     "CenteredDialogTitleScreenshotTest": {
@@ -397,7 +397,7 @@
       "status": "pass"
     },
     "MotionSensorDeviceTest": {
-      "feature": "camera-ar-sensors",
+      "feature": "ar-motion-sensors",
       "status": "pass"
     },
     "MotionShowcaseScreenshotTest": {
@@ -661,11 +661,11 @@
       "status": "pass"
     },
     "VideoIODecodedFramesScreenshotTest": {
-      "feature": "video-io",
+      "feature": "video-decoding",
       "status": "pass"
     },
     "VideoIORoundTripTest": {
-      "feature": "video-io",
+      "feature": "video-round-trip",
       "status": "pass"
     }
   },

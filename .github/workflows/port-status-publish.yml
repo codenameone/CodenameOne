@@ -12,7 +12,7 @@ on:
     types: [completed]
 
 permissions:
-  actions: read
+  actions: write
   contents: write
 
 jobs:
@@ -48,3 +48,8 @@ jobs:
             echo "No normalized port reports were found in workflow artifacts." >&2
             exit 1
           fi
+
+      - name: Rebuild the static Port Status snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run website-docs.yml --ref master

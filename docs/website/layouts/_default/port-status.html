@@ -1,5 +1,7 @@
 {{- define "main" -}}
 {{- $contract := site.Data.port_status -}}
+{{- $reports := site.Data.port_status_reports -}}
+{{- $snapshotTime := now.UTC -}}
 <article class="post-single cn1-port-status" data-port-status>
   <header class="post-header cn1-port-status__header">
     {{ partial "breadcrumbs.html" . }}
@@ -18,8 +20,9 @@
     </div>
   </header>
 
-  <section class="cn1-port-status__notice" data-port-status-notice role="status">
-    Loading the latest compliance reports from GitHub…
+  <section class="cn1-port-status__notice" role="status">
+    Table snapshot generated
+    <time data-port-status-truth datetime="{{ $snapshotTime.Format "2006-01-02T15:04:05Z07:00" }}">{{ $snapshotTime.Format "2006-01-02 15:04 UTC" }}</time>.
   </section>
 
   <section class="cn1-port-status__legend" aria-label="Status legend">
@@ -31,14 +34,8 @@
 
   <section class="cn1-port-status__ports" aria-label="Latest port runs">
     {{- range $contract.ports }}
-    <article class="cn1-port-card" data-port-card="{{ .id }}">
-      <div>
-        <h2>{{ .name }}</h2>
-        <p>{{ .detail }}</p>
-      </div>
-      <p class="cn1-port-card__state" data-port-state>Waiting for report</p>
-      <p class="cn1-port-card__meta" data-port-meta></p>
-    </article>
+    {{- $report := index $reports .id -}}
+    {{- partial "port-status-port-state.html" (dict "port" . "report" $report "contract" $contract "now" $snapshotTime) -}}
     {{- end }}
   </section>
 
@@ -86,10 +83,8 @@
             </details>
           </th>
           {{- range $contract.ports }}
-          <td data-feature-cell data-port="{{ .id }}" data-feature="{{ $feature.id }}" class="is-unknown">
-            <span class="cn1-port-status__mark is-unknown" aria-hidden="true">?</span>
-            <span class="screen-reader-text" data-status-label>No current report</span>
-          </td>
+          {{- $report := index $reports .id -}}
+          {{- partial "port-status-feature-status.html" (dict "feature" $feature "port" . "report" $report "contract" $contract "now" $snapshotTime) -}}
           {{- end }}
         </tr>
         {{- end }}
@@ -100,16 +95,14 @@
   <footer class="cn1-port-status__method">
     <h2>How to read this page</h2>
     <p>
-      The feature-to-test map is checked into the repository. CI rejects a registered test or golden screenshot that is not mapped. Each port run publishes normalized per-test results; this page keeps the last result for every port and derives a feature status from all tests assigned to that feature.
+      The feature-to-test map is checked into the repository. CI rejects a registered test or golden screenshot that is not mapped. Each port run stores normalized per-test results, and website CI writes the latest stored result directly into this table.
     </p>
     <p>
-      A website build does not wait for port workflows. The initial snapshot uses the successful workflow conclusion from the last master runs available when this page was added because those older artifacts did not all retain per-test completion logs. Each port replaces that bootstrap snapshot after a newer master run. A platform-specific skip is not a pass. An incomplete current report is not a pass. Reports older than {{ $contract.stale_after_days }} days are marked stale.
+      The browser makes no runtime report request. A website build uses the last stored result for ports that did not run, and the timestamp above identifies when this static table was assembled. A platform-specific skip is not a pass. An incomplete report is not a pass. Reports older than {{ $contract.stale_after_days }} days are marked stale.
     </p>
     <p>
       <a href="https://github.com/codenameone/CodenameOne/blob/master/docs/website/data/port_status.json" target="_blank" rel="noopener">Compliance feature contract</a>
     </p>
   </footer>
-
-  <script type="application/json" data-port-status-contract>{{ jsonify $contract | safeJS }}</script>
 </article>
 {{- end -}}

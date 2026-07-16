@@ -1,8 +1,6 @@
 {
   "schema_version": 1,
-  "report_branch": "port-status-data",
-  "seed_report_base": "/port-status-data/ports/",
-  "seed_report_directory": "docs/website/static/port-status-data/ports",
+  "report_directory": "docs/website/data/port_status_reports",
   "stale_after_days": 14,
   "golden_directories": [
     "scripts/android/screenshots",
@@ -338,11 +336,18 @@
       "tests": ["AccessibilityTest"]
     },
     {
-      "id": "camera-ar-sensors",
+      "id": "ar-motion-sensors",
       "category": "Device APIs",
-      "name": "Camera, AR, and motion sensors",
-      "description": "Checks camera, augmented-reality, and motion-sensor APIs when available.",
-      "tests": ["ARApiTest", "CameraApiTest", "MotionSensorDeviceTest"]
+      "name": "AR and motion sensors",
+      "description": "Checks augmented-reality and motion-sensor APIs.",
+      "tests": ["ARApiTest", "MotionSensorDeviceTest"]
+    },
+    {
+      "id": "camera-access",
+      "category": "Platform-dependent APIs",
+      "name": "Camera access",
+      "description": "Checks camera discovery and capture where hardware and runtime permissions are available.",
+      "tests": ["CameraApiTest"]
     },
     {
       "id": "mutable-images",
@@ -359,11 +364,18 @@
       "tests": ["DesktopModeScreenshotTest"]
     },
     {
-      "id": "video-io",
+      "id": "video-decoding",
       "category": "Media and graphics",
-      "name": "Video decoding and round trip",
-      "description": "Checks decoded frames and end-to-end video encode/decode behavior.",
-      "tests": ["VideoIODecodedFramesScreenshotTest", "VideoIORoundTripTest"]
+      "name": "Video frame decoding",
+      "description": "Checks decoded video frames.",
+      "tests": ["VideoIODecodedFramesScreenshotTest"]
+    },
+    {
+      "id": "video-round-trip",
+      "category": "Platform-dependent APIs",
+      "name": "Video encode/decode round trip",
+      "description": "Checks end-to-end video encoding and decoding where the platform provides an encoder.",
+      "tests": ["VideoIORoundTripTest"]
     },
     {
       "id": "immersive-media",

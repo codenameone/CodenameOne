@@ -13,7 +13,7 @@
   },
   "tests": {
     "ARApiTest": {
-      "feature": "camera-ar-sensors",
+      "feature": "ar-motion-sensors",
       "status": "pass"
     },
     "AccessibilityTest": {
@@ -77,7 +77,7 @@
       "status": "pass"
     },
     "CameraApiTest": {
-      "feature": "camera-ar-sensors",
+      "feature": "camera-access",
       "reasons": [
         "needs-runtime-permission-on-ios"
       ],
@@ -400,7 +400,7 @@
       "status": "pass"
     },
     "MotionSensorDeviceTest": {
-      "feature": "camera-ar-sensors",
+      "feature": "ar-motion-sensors",
       "status": "pass"
     },
     "MotionShowcaseScreenshotTest": {
@@ -664,11 +664,11 @@
       "status": "pass"
     },
     "VideoIODecodedFramesScreenshotTest": {
-      "feature": "video-io",
+      "feature": "video-decoding",
       "status": "pass"
     },
     "VideoIORoundTripTest": {
-      "feature": "video-io",
+      "feature": "video-round-trip",
       "reasons": [
         "encode-unavailable-on-ios:Failed"
       ],

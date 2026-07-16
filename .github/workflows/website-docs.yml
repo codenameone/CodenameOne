@@ -139,6 +139,10 @@ jobs:
           # than the pinned release. Bootstrap the local snapshot artifacts so
           # the initializr (and the other site apps) build against repo HEAD.
           WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS: "true"
+          # Resolve the latest persisted master result for each port before
+          # Hugo writes the static status table. Checked-in reports remain the
+          # fallback if the data branch is temporarily unavailable.
+          WEBSITE_REFRESH_PORT_STATUS: "true"
           # PR previews build with future-dated posts visible so reviewers
           # can read posts staged for later in the week. Production deploys
           # (push to master) keep the default so future posts only appear

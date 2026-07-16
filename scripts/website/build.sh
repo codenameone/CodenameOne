@@ -31,11 +31,10 @@ WEBSITE_INCLUDE_INITIALIZR="${WEBSITE_INCLUDE_INITIALIZR:-false}"
 WEBSITE_INCLUDE_PLAYGROUND="${WEBSITE_INCLUDE_PLAYGROUND:-false}"
 WEBSITE_INCLUDE_SKINDESIGNER="${WEBSITE_INCLUDE_SKINDESIGNER:-true}"
 WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS="${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS:-auto}"
+WEBSITE_REFRESH_PORT_STATUS="${WEBSITE_REFRESH_PORT_STATUS:-false}"
 WEBSITE_CN1_VERSION="${WEBSITE_CN1_VERSION:-auto}"
 CN1_USER="${CN1_USER:-}"
 CN1_TOKEN="${CN1_TOKEN:-}"
-
-"${PYTHON_BIN}" "${REPO_ROOT}/scripts/hellocodenameone/conformance/port_status.py" validate
 
 if [ "${WEBSITE_INCLUDE_INITIALIZR}" = "auto" ]; then
   if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
@@ -861,6 +860,11 @@ if ! command -v "${HUGO_BIN}" >/dev/null 2>&1; then
   echo "Hugo binary not found. Install Hugo (extended) and retry." >&2
   exit 1
 fi
+
+if [ "${WEBSITE_REFRESH_PORT_STATUS}" = "true" ]; then
+  "${REPO_ROOT}/scripts/website/sync_port_status_reports.sh"
+fi
+"${PYTHON_BIN}" "${REPO_ROOT}/scripts/hellocodenameone/conformance/port_status.py" validate
 
 build_javadocs_for_site
 build_developer_guide_for_site

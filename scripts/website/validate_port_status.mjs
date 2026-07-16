@@ -62,76 +62,54 @@ function validate() {
         fail("the public page links to the result-normalizer implementation");
     }
 
-    const contractMatch = page.match(
-        /<script\b(?=[^>]*\bdata-port-status-contract\b)[^>]*>([\s\S]*?)<\/script>/i
-    );
-    if (!contractMatch) {
-        fail("the generated page does not embed its compliance contract");
+    if (/data-port-status-contract|raw\.githubusercontent\.com|port-status-data\/ports/i.test(page)) {
+        fail("the generated page still depends on runtime report data");
     }
-
-    let contract;
-    try {
-        contract = JSON.parse(contractMatch[1]);
-    } catch (error) {
-        fail(`the embedded compliance contract is invalid JSON: ${error.message}`);
-    }
-    if (!contract || typeof contract !== "object" || Array.isArray(contract)) {
-        fail("the embedded compliance contract was serialized as a string");
-    }
-    if (!Array.isArray(contract.ports) || contract.ports.length !== 10) {
-        fail("the contract must contain the 10 portability targets");
-    }
-    if (contract.ports.some((port) => port.id === "javase")) {
+    if (/\bdata-port=(?:["']?javase["']?)(?:\s|>)/i.test(page)) {
         fail("JavaSE must not appear as a portability target");
-    }
-    if (!Array.isArray(contract.features) || contract.features.length < 49) {
-        fail("the compliance feature map lost required rows");
-    }
-
-    const mappedTests = new Set();
-    for (const feature of contract.features) {
-        if (!Array.isArray(feature.tests) || feature.tests.length === 0) {
-            fail(`feature ${feature.id || "<unknown>"} has no mapped tests`);
-        }
-        for (const test of feature.tests) {
-            if (mappedTests.has(test)) {
-                fail(`test ${test} is mapped more than once`);
-            }
-            mappedTests.add(test);
-        }
-    }
-    if (mappedTests.size < 164) {
-        fail("the compliance contract lost mapped tests");
     }
 
     const portCards = countMatches(page, /\bdata-port-card(?:=|\s|>)/g);
     const featureRows = countMatches(page, /\bdata-feature-row(?:=|\s|>)/g);
     const featureCells = countMatches(page, /\bdata-feature-cell(?:=|\s|>)/g);
-    if (portCards !== contract.ports.length) {
-        fail(`generated ${portCards} port cards for ${contract.ports.length} ports`);
+    const mappedTests = countMatches(page, /<li><code>[^<]+<\/code><\/li>/g);
+    if (portCards !== 10) {
+        fail(`generated ${portCards} port cards instead of 10`);
     }
-    if (featureRows !== contract.features.length) {
-        fail(`generated ${featureRows} feature rows for ${contract.features.length} features`);
+    if (featureRows < 51) {
+        fail(`the generated table has only ${featureRows} feature rows`);
     }
-    if (featureCells !== contract.ports.length * contract.features.length) {
+    if (featureCells !== portCards * featureRows) {
         fail("the generated compliance matrix is incomplete");
     }
-
-    if (contract.seed_report_base !== "/port-status-data/ports/") {
-        fail("the initial master-result fallback is not configured");
+    if (mappedTests < 164) {
+        fail(`the generated table exposes only ${mappedTests} mapped tests`);
     }
-    for (const port of contract.ports) {
-        const report = JSON.parse(read(path.join("port-status-data", "ports", `${port.id}.json`)));
-        if (report.port !== port.id || report.schema_version !== contract.schema_version) {
-            fail(`seed report ${port.id} does not match the compliance contract`);
+    for (const feature of ["ar-motion-sensors", "camera-access", "video-decoding", "video-round-trip"]) {
+        if (!new RegExp(`data-feature-id=["']?${feature}(?:["'\\s>])`).test(page)) {
+            fail(`the generated table is missing the split ${feature} feature row`);
         }
-        if (report.workflow_conclusion !== "success" || report.summary?.fail !== 0) {
-            fail(`seed report ${port.id} is not based on a successful master workflow`);
-        }
-        const reportTests = Object.keys(report.tests || {});
-        if (reportTests.length !== mappedTests.size || reportTests.some((test) => !mappedTests.has(test))) {
-            fail(`seed report ${port.id} does not cover every mapped test`);
-        }
+    }
+
+    const renderedCells = countMatches(
+        page,
+        /<td\b(?=[^>]*\bdata-feature-cell\b)(?=[^>]*\bclass=(?:["']?is-(?:pass|fail|partial|stale|unknown)))[^>]*>/g
+    );
+    if (renderedCells !== featureCells) {
+        fail("not every compliance cell has a build-time status");
+    }
+    if (/Waiting for report|Loading the latest compliance reports/i.test(page)) {
+        fail("the generated page still waits for client-side report rendering");
+    }
+    const truthTime = page.match(
+        /<time\b(?=[^>]*\bdata-port-status-truth\b)(?=[^>]*\bdatetime=(?:["']([^"']+)["']|([^\s>]+)))[^>]*>/i
+    );
+    if (!truthTime || Number.isNaN(Date.parse(truthTime[1] || truthTime[2])) ||
+        countMatches(page, /<time\b/gi) !== 1) {
+        fail("the static table must have exactly one valid time-of-truth timestamp");
+    }
+    if (fs.existsSync(path.join(publicDirectory, "port-status-data"))) {
+        fail("report JSON was copied into the public website output");
     }
 
     const assetMatch = page.match(
@@ -147,13 +125,30 @@ function validate() {
     } catch (error) {
         fail(`the generated Port Status JavaScript is invalid: ${error.message}`);
     }
-    if (!script.includes("seed_report_base") || !script.includes("successful-master-workflow")) {
-        fail("the generated JavaScript lost master-result fallback handling");
+    if (/\bfetch\s*\(/.test(script) || /raw\.githubusercontent\.com/.test(script)) {
+        fail("the generated JavaScript fetches report data at runtime");
+    }
+    if (!script.includes("data-category-filter") || !script.includes("data-feature-search")) {
+        fail("the generated JavaScript lost table filtering");
+    }
+
+    const stylesheetMatch = page.match(
+        /<link\b[^>]*href=(?:["']([^"']*stylesheet[^"']*\.css)["']|([^\s>]*stylesheet[^\s>]*\.css))[^>]*>/i
+    );
+    if (!stylesheetMatch) {
+        fail("the generated page has no website stylesheet");
+    }
+    const stylesheetPath = (stylesheetMatch[1] || stylesheetMatch[2]).replace(/^\//, "");
+    const stylesheet = read(stylesheetPath);
+    if (!stylesheet.includes(".cn1-port-status__matrix{") ||
+        !stylesheet.includes("max-height:min(78vh,920px)") ||
+        !/\.cn1-port-status__matrix thead th\{[^}]*position:sticky[^}]*top:0/.test(stylesheet)) {
+        fail("the generated table header is not frozen inside its scroll area");
     }
 
     console.log(
-        `Port Status page valid: ${contract.ports.length} ports, ` +
-        `${contract.features.length} features, ${mappedTests.size} mapped tests.`
+        `Port Status page valid: ${portCards} ports, ` +
+        `${featureRows} features, ${mappedTests} mapped tests, static snapshot.`
     );
 }
 

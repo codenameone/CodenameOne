@@ -1,19 +1,19 @@
 {
-  "commit": "dec3d172f6fe327798cc083f2bab03a98cf9a8ac",
-  "generated_at": "2026-07-15T01:51:30Z",
-  "port": "tvos",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29380730117",
+  "commit": "312de130d68a550f231f7a8822be5b4f719dc2cd",
+  "generated_at": "2026-07-15T14:58:11Z",
+  "port": "javascript",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29423193387",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 162,
-    "skip": 2
+    "pass": 163,
+    "skip": 1
   },
   "tests": {
     "ARApiTest": {
-      "feature": "camera-ar-sensors",
+      "feature": "ar-motion-sensors",
       "status": "pass"
     },
     "AccessibilityTest": {
@@ -77,9 +77,9 @@
       "status": "pass"
     },
     "CameraApiTest": {
-      "feature": "camera-ar-sensors",
+      "feature": "camera-access",
       "reasons": [
-        "needs-runtime-permission-on-ios"
+        "needs-runtime-permission-on-HTML5"
       ],
       "status": "skip"
     },
@@ -400,7 +400,7 @@
       "status": "pass"
     },
     "MotionSensorDeviceTest": {
-      "feature": "camera-ar-sensors",
+      "feature": "ar-motion-sensors",
       "status": "pass"
     },
     "MotionShowcaseScreenshotTest": {
@@ -664,15 +664,12 @@
       "status": "pass"
     },
     "VideoIODecodedFramesScreenshotTest": {
-      "feature": "video-io",
+      "feature": "video-decoding",
       "status": "pass"
     },
     "VideoIORoundTripTest": {
-      "feature": "video-io",
-      "reasons": [
-        "VideoIO-unsupported-on-ios"
-      ],
-      "status": "skip"
+      "feature": "video-round-trip",
+      "status": "pass"
     }
   },
   "bootstrap_source": "successful-master-workflow",

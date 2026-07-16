@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Publish one normalized report to the data-only branch consumed by the public
-# /port-status/ page. This is intentionally a per-port file update so unrelated
-# conformance workflows never need to merge a shared generated document.
+# Publish one normalized report to the data-only branch consumed by website CI.
+# This is intentionally a per-port file update so unrelated compliance
+# workflows never need to merge a shared generated document.
 
 report="${1:-}"
 if [ -z "$report" ] || [ ! -f "$report" ]; then
@@ -41,7 +41,7 @@ for attempt in 1 2 3; do
   args=(
     --method PUT
     "repos/${repo}/contents/${target}"
-    -f message="Update ${port} conformance status"
+    -f message="Update ${port} compliance status"
     -f content="$content"
     -f branch="$branch"
   )

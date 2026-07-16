@@ -1,0 +1,63 @@
+{{- $feature := .feature -}}
+{{- $port := .port -}}
+{{- $report := .report -}}
+{{- $contract := .contract -}}
+{{- $now := .now -}}
+{{- $state := "unknown" -}}
+{{- $mark := "?" -}}
+{{- $label := "No current report" -}}
+{{- if $report -}}
+  {{- $passed := 0 -}}
+  {{- $failed := 0 -}}
+  {{- $skipped := 0 -}}
+  {{- $notRun := 0 -}}
+  {{- $failedTests := slice -}}
+  {{- range $feature.tests -}}
+    {{- $result := index $report.tests . -}}
+    {{- $status := "not-run" -}}
+    {{- with $result -}}{{- $status = .status -}}{{- end -}}
+    {{- if eq $status "pass" -}}
+      {{- $passed = add $passed 1 -}}
+    {{- else if eq $status "fail" -}}
+      {{- $failed = add $failed 1 -}}
+      {{- $failedTests = $failedTests | append . -}}
+    {{- else if eq $status "skip" -}}
+      {{- $skipped = add $skipped 1 -}}
+    {{- else -}}
+      {{- $notRun = add $notRun 1 -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $bootstrapComplete := and (eq $report.bootstrap_source "successful-master-workflow") (eq $report.workflow_conclusion "success") -}}
+  {{- $complete := or $report.suite_finished $bootstrapComplete -}}
+  {{- $total := len $feature.tests -}}
+  {{- $state = "partial" -}}
+  {{- $mark = "−" -}}
+  {{- $label = printf "%d passed, %d skipped, %d not run" $passed $skipped $notRun -}}
+  {{- if gt $failed 0 -}}
+    {{- $state = "fail" -}}
+    {{- $mark = "×" -}}
+    {{- $label = printf "%d failed: %s" $failed (delimit $failedTests ", ") -}}
+  {{- else if not $complete -}}
+    {{- $label = "Suite did not finish" -}}
+  {{- else if eq $passed $total -}}
+    {{- $state = "pass" -}}
+    {{- $mark = "✓" -}}
+    {{- $label = printf "All %d mapped test%s passed" $total (cond (eq $total 1) "" "s") -}}
+  {{- else if eq $skipped $total -}}
+    {{- $label = "All mapped tests skipped" -}}
+  {{- end -}}
+  {{- $generated := time.AsTime $report.generated_at -}}
+  {{- $staleSeconds := mul (int $contract.stale_after_days) 86400 -}}
+  {{- $stale := gt (sub $now.Unix $generated.Unix) $staleSeconds -}}
+  {{- if $stale -}}
+    {{- if ne $state "fail" -}}
+      {{- $state = "stale" -}}
+      {{- $mark = "!" -}}
+    {{- end -}}
+    {{- $label = printf "Stale report. %s" $label -}}
+  {{- end -}}
+{{- end -}}
+<td data-feature-cell data-port="{{ $port.id }}" data-feature="{{ $feature.id }}" class="is-{{ $state }}" title="{{ $label }}">
+  <span class="cn1-port-status__mark is-{{ $state }}" aria-hidden="true">{{ $mark }}</span>
+  <span class="screen-reader-text">{{ $label }}</span>
+</td>

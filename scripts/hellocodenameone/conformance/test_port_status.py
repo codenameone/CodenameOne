@@ -16,8 +16,13 @@ class PortStatusTest(unittest.TestCase):
     def test_contract_covers_registered_tests_and_goldens(self):
         counts = port_status.validate(self.manifest)
         self.assertEqual(164, counts["tests"])
-        self.assertGreaterEqual(counts["features"], 40)
+        self.assertGreaterEqual(counts["features"], 51)
         self.assertGreaterEqual(counts["goldens"], 100)
+        features = {feature["id"]: feature["tests"] for feature in self.manifest["features"]}
+        self.assertEqual(["ARApiTest", "MotionSensorDeviceTest"], features["ar-motion-sensors"])
+        self.assertEqual(["CameraApiTest"], features["camera-access"])
+        self.assertEqual(["VideoIODecodedFramesScreenshotTest"], features["video-decoding"])
+        self.assertEqual(["VideoIORoundTripTest"], features["video-round-trip"])
 
     def test_normalize_preserves_pass_skip_and_screenshot_failure(self):
         log_text = "\n".join(

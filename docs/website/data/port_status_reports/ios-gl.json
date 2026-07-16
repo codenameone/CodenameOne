@@ -1,19 +1,19 @@
 {
-  "commit": "4d8237a779a9b1b8b6ba4c42fec4d2481779b335",
-  "generated_at": "2026-07-15T14:25:26Z",
-  "port": "linux-arm64",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29421206467",
+  "commit": "dec3d172f6fe327798cc083f2bab03a98cf9a8ac",
+  "generated_at": "2026-07-15T01:51:30Z",
+  "port": "ios-gl",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29380730117",
   "schema_version": 1,
-  "suite_finished": false,
+  "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 164,
-    "skip": 0
+    "pass": 162,
+    "skip": 2
   },
   "tests": {
     "ARApiTest": {
-      "feature": "camera-ar-sensors",
+      "feature": "ar-motion-sensors",
       "status": "pass"
     },
     "AccessibilityTest": {
@@ -77,8 +77,11 @@
       "status": "pass"
     },
     "CameraApiTest": {
-      "feature": "camera-ar-sensors",
-      "status": "pass"
+      "feature": "camera-access",
+      "reasons": [
+        "needs-runtime-permission-on-ios"
+      ],
+      "status": "skip"
     },
     "CenteredDialogTitleScreenshotTest": {
       "feature": "dialogs-and-labels",
@@ -397,7 +400,7 @@
       "status": "pass"
     },
     "MotionSensorDeviceTest": {
-      "feature": "camera-ar-sensors",
+      "feature": "ar-motion-sensors",
       "status": "pass"
     },
     "MotionShowcaseScreenshotTest": {
@@ -661,12 +664,15 @@
       "status": "pass"
     },
     "VideoIODecodedFramesScreenshotTest": {
-      "feature": "video-io",
+      "feature": "video-decoding",
       "status": "pass"
     },
     "VideoIORoundTripTest": {
-      "feature": "video-io",
-      "status": "pass"
+      "feature": "video-round-trip",
+      "reasons": [
+        "encode-unavailable-on-ios:Failed"
+      ],
+      "status": "skip"
     }
   },
   "bootstrap_source": "successful-master-workflow",
