@@ -442,25 +442,45 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
         // Default: the tab bar selection morph, first tab -> last tab and back,
         // mirroring the deterministic CN1 TabsMorph frames (travel 0 -> last).
-        let wPt = 60.0 * PT_PER_MM
-        let hPt = 16.0 * PT_PER_MM
-        let bar = UITabBar(frame: CGRect(x: 0, y: 0, width: wPt, height: hPt))
-        let a = UITabBarItem(title: "Featured", image: UIImage(systemName: "star.fill"), tag: 0)
-        let b = UITabBarItem(title: "Search", image: UIImage(systemName: "magnifyingglass"), tag: 1)
-        let c = UITabBarItem(title: "More", image: UIImage(systemName: "ellipsis"), tag: 2)
-        bar.items = [a, b, c]
-        bar.selectedItem = a
-        let ap = UITabBarAppearance()
-        ap.configureWithDefaultBackground()
-        bar.standardAppearance = ap
-        if #available(iOS 15.0, *) { bar.scrollEdgeAppearance = ap }
-        bar.center = CGPoint(x: host.bounds.midX, y: host.bounds.midY)
-        host.addSubview(bar)
+        //
+        // This MUST be a real UITabBarController, not a bare UITabBar with a
+        // custom UITabBarAppearance: the full iOS 26 Liquid Glass selection
+        // morph (the frosted refracting drop the Files app shows) is rendered
+        // only by the controller-managed bar with the DEFAULT appearance. The
+        // earlier bare-bar + configureWithDefaultBackground() version fell back
+        // to a flat compact platter, which mis-recorded the native reference
+        // and (in an earlier PR iteration) led the CN1 tuning astray.
+        guard let window = self.window else { return }
+        let grey = UIColor(white: 0.5, alpha: 1)
+        func page(_ title: String, _ systemImage: String, _ tag: Int) -> UIViewController {
+            let vc = UIViewController()
+            vc.view.backgroundColor = grey
+            vc.tabBarItem = UITabBarItem(title: title,
+                    image: UIImage(systemName: systemImage), tag: tag)
+            return vc
+        }
+        let tbc = UITabBarController()
+        tbc.viewControllers = [
+            page("Featured", "star.fill", 0),
+            page("Search", "magnifyingglass", 1),
+            page("More", "ellipsis", 2)
+        ]
+        tbc.overrideUserInterfaceStyle = appearance == "dark" ? .dark : .light
+        window.rootViewController = tbc
         print("NATIVEREF:ANIMATING tabs \(appearance)")
-        var toLast = true
-        Timer.scheduledTimer(withTimeInterval: 1.4, repeats: true) { _ in
-            bar.selectedItem = toLast ? c : a
-            toLast = !toLast
+        // UIKit plays the FULL Liquid Glass selection morph (the frosted
+        // refracting drop) only for genuine touch-driven selection -- the drop
+        // lifts under the finger. Programmatic selectedIndex changes play a
+        // flat, simplified platter slide, which mis-recorded the native
+        // reference. The recording harness drives REAL taps via an XCUITest
+        // runner (record-ios-native-anim.sh); NATIVEREF_TAPS=0 restores the
+        // legacy self-animating timer for manual eyeballing.
+        if ProcessInfo.processInfo.environment["NATIVEREF_TAPS"] == "0" {
+            var toLast = true
+            Timer.scheduledTimer(withTimeInterval: 1.4, repeats: true) { _ in
+                tbc.selectedIndex = toLast ? 2 : 0
+                toLast = !toLast
+            }
         }
     }
 

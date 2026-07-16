@@ -1,28 +1,28 @@
-# Animation references — which video is authoritative for what
+# Animation references — how they are captured and what they answer
 
-Two families of motion references live here, and they intentionally disagree
-about the tab morph's material:
+- **`native-tabs-*.mov`** — the REAL `UITabBar` Liquid Glass selection morph,
+  recorded from the NativeRef app on the iOS 26 simulator runtime named by
+  this golden set (`scripts/record-ios-native-anim.sh tabs <light|dark>`).
 
-- **`native-tabs-*.mov`** — the REAL `UITabBar` transition recorded from the
-  NativeRef app on the iOS 26 simulator runtime named by this golden set
-  (re-record with `scripts/record-ios-native-anim.sh tabs <light|dark>`). On
-  the original iOS 26 runtime the drop was a pronounced frosted, refracting
-  bubble (see the developer-guide fidelity image); Apple toned the effect down
-  in later 26.x updates, so a fresh recording shows a flat, compact drop.
-  These recordings answer "what does current UIKit do" — they are the honest
-  native baseline for TIMING and TRAVEL, **not** the material target.
+  **The recording MUST be tap-driven.** UIKit plays the full Liquid Glass
+  morph — the frosted refracting drop that bulges past the bar with chromatic
+  rims — only for genuine touch-driven selection on a `UITabBarController`;
+  programmatic `selectedIndex`/`selectedItem` changes play a flat simplified
+  platter slide, and a bare `UITabBar` never shows the full effect at all. An
+  earlier reference was mis-recorded through the programmatic path, and its
+  flat drop briefly led the CN1 tuning astray. The recording script now drives
+  real taps through the XCUITest bundle in
+  `../../ios-native-ref/tap-driver/` (requires `xcodegen`, like the
+  input-validation iOS driver).
 
 - **`cn1-tabs-*.mov`** — the Codename One morph in motion, rendered
   deterministically from the JavaSE simulator at the reference density
   (60 fps, the theme's 480 ms `tabsAnimatedIndicatorDurationInt` timeline,
-  1088x290 tile). This is the SHIPPED look — the frosted-bubble material
-  pinned by `../ios-26-metal-frames/TabsMorph_*` and the developer-guide
-  fidelity image — kept deliberately at the original iOS 26 design.
-  **Tune the morph model, lens constants, and theme against THIS and the
-  frame goldens, never against the flat `native-tabs-*.mov` material.**
+  1088x290 tile). The CN1 side of the same motion, at the same tile the
+  `../ios-26-metal-frames/TabsMorph_*` goldens use.
 
-- **`native-switch-*.mov`** — the real `UISwitch` toggle; unaffected by the
-  above (the switch motion did not change between 26.x updates).
+- **`native-switch-*.mov`** — the real `UISwitch` toggle; the switch morph is
+  not interaction-gated, so the self-animating recording path is fine there.
 
 The four lens/glass implementations (Metal shader, iOS CPU reference, JavaSE,
 JavaScript) are held together by `scripts/verify-javascript-lens-parity.mjs`.

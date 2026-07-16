@@ -214,18 +214,18 @@ final class PlaygroundExamples {
             Form form = new Form("Tabs", new BorderLayout());
             Tabs tabs = new Tabs();
             tabs.addTab("Home",
-                FontImage.createMaterial(FontImage.MATERIAL_HOME, "Tab", 4),
+                FontImage.MATERIAL_HOME, 4,
                 BoxLayout.encloseY(
                     new SpanLabel("Latest activity"),
                     new Label("3 new notifications"),
                     new Button("Open inbox")));
             tabs.addTab("Search",
-                FontImage.createMaterial(FontImage.MATERIAL_SEARCH, "Tab", 4),
+                FontImage.MATERIAL_SEARCH, 4,
                 BoxLayout.encloseY(
                     new TextField("", "Search anything"),
                     new SpanLabel("Results appear here")));
             tabs.addTab("Profile",
-                FontImage.createMaterial(FontImage.MATERIAL_PERSON, "Tab", 4),
+                FontImage.MATERIAL_PERSON, 4,
                 BoxLayout.encloseY(
                     new Label("Ada Lovelace"),
                     new Label("ada@analytical.engine"),
