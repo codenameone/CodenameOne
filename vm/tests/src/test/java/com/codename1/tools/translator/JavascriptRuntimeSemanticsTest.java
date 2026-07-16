@@ -41,7 +41,7 @@ class JavascriptRuntimeSemanticsTest {
     void executesArrayCovarianceInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
         WorkerRunResult result = translateAndRunFixture(config, "JsArrayCovarianceApp.java", "JsArrayCovarianceApp");
 
-        assertEquals(511, result.result, "Translated runtime should preserve CN1-relevant array covariance semantics");
+        assertEquals(4095, result.result, "Translated runtime should preserve CN1-relevant array covariance semantics");
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
     }
 

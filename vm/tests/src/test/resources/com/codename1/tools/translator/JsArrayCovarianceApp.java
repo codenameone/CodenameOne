@@ -40,6 +40,26 @@ public class JsArrayCovarianceApp {
         if (((Object[]) dogGrid).length == 1) {
             score |= 256;
         }
+
+        // Multi-dimensional PRIMITIVE arrays are object arrays too: int[][] is an
+        // Object[] whose components are int[]. List.toArray(new int[n][]) compiles
+        // to exactly this checkcast (the editor's bidiRuns relies on it), so a
+        // runtime that only tracks declared classes must resolve it structurally.
+        int[][] grid = new int[2][];
+        grid[0] = new int[]{7};
+        grid[1] = new int[]{8, 9};
+        if (grid instanceof Object[]) {
+            score |= 512;
+        }
+        if (((Object[]) grid).length == 2) {
+            score |= 1024;
+        }
+        java.util.List<int[]> rows = new java.util.ArrayList<int[]>();
+        rows.add(new int[]{7});
+        int[][] out = rows.toArray(new int[rows.size()][]);
+        if (out.length == 1 && out[0][0] == 7) {
+            score |= 2048;
+        }
         result = score;
     }
 }
