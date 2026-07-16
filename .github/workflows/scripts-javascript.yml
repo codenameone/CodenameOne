@@ -5,6 +5,8 @@ on:
   # diff limit, so pull_request triggers stopped firing -- dispatch with
   #   gh workflow run <file> --ref <branch>
   workflow_dispatch:
+  schedule:
+    - cron: '35 1 * * *'
   pull_request:
     paths:
       - '.github/workflows/scripts-javascript.yml'

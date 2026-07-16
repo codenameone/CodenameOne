@@ -100,6 +100,9 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     private static final int TEST_POLL_INTERVAL_MS = 50;
 
     private static int testTimeoutMs(BaseTest testClass) {
+        if (testClass instanceof CommonWorkloadBenchmarkTest) {
+            return "HTML5".equals(Display.getInstance().getPlatformName()) ? 1200000 : 600000;
+        }
         // DualAppearanceBaseTest needs more wall time on HTML5: it runs FOUR
         // serial capture phases there (Material light/dark plus the
         // ios_light/ios_dark Liquid Glass pair), each paying
@@ -351,6 +354,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new BytecodeTranslatorRegressionTest(),
             new SimdApiTest(),
             new SimdBenchmarkTest(),
+            new CommonWorkloadBenchmarkTest(),
             new SecureStorageTest(),
             // Exercises com.codename1.camera.* end-to-end against the
             // JavaSE simulator's synthetic camera backend (no permission

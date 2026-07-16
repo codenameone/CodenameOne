@@ -27,6 +27,8 @@ on:
   # diff limit, so pull_request triggers stopped firing -- dispatch with
   #   gh workflow run <file> --ref <branch>
   workflow_dispatch:
+  schedule:
+    - cron: '45 1 * * *'
   pull_request:
     paths:
       - '.github/workflows/linux-build-run.yml'
@@ -355,7 +357,7 @@ jobs:
   compare-comment:
     name: screenshot-comment
     needs: build-run
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -382,6 +384,18 @@ jobs:
         with:
           name: linux-screenshot-raw-arm64
           path: artifacts/linux-port/raw-arm64
+        continue-on-error: true
+      - name: Download x64 benchmark binary
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-demo-x64
+          path: artifacts/linux-port/demo-x64
+        continue-on-error: true
+      - name: Download arm64 benchmark binary
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-demo-arm64
+          path: artifacts/linux-port/demo-arm64
         continue-on-error: true
 
       - name: Post screenshots to PR
@@ -412,6 +426,7 @@ jobs:
             mkdir -p "$ART/previews-$arch"
             export CN1SS_PORT_ID="linux-$arch"
             export CN1SS_SUITE_LOG="$raw/app-output.log"
+            export CN1SS_BINARY_PATH="$ART/demo-$arch/codenameone-linux-demo-$arch"
             set +e
             CN1SS_COMMENT_MARKER="<!-- CN1SS_LINUX_${arch}_COMMENT -->" \
             CN1SS_COMMENT_LOG_PREFIX="[linux-gtk-$arch]" \

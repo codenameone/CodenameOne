@@ -396,7 +396,7 @@ cn1ss_generate_port_status() {
     return 0
   fi
 
-  local script_dir repo_root status_script python_bin output run_url
+  local script_dir repo_root status_script python_bin output run_url binary_size
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   repo_root="$(cd "$script_dir/../.." && pwd)"
   status_script="$repo_root/scripts/hellocodenameone/conformance/port_status.py"
@@ -431,6 +431,13 @@ cn1ss_generate_port_status() {
       args+=(--log "$log_path")
     fi
   done
+  binary_size="${CN1SS_BINARY_SIZE_BYTES:-}"
+  if [ -z "$binary_size" ] && [ -n "${CN1SS_BINARY_PATH:-}" ] && [ -e "$CN1SS_BINARY_PATH" ]; then
+    binary_size="$($python_bin -c 'from pathlib import Path; import sys; p=Path(sys.argv[1]); print(p.stat().st_size if p.is_file() else sum(f.stat().st_size for f in p.rglob("*") if f.is_file()))' "$CN1SS_BINARY_PATH")"
+  fi
+  if [ -n "$binary_size" ]; then
+    args+=(--binary-size "$binary_size")
+  fi
   if ! "$python_bin" "${args[@]}"; then
     cn1ss_log "FATAL: Failed to generate normalized port status for $CN1SS_PORT_ID"
     return 19

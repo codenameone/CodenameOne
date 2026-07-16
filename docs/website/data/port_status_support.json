@@ -41,9 +41,9 @@
       "id": "linux",
       "platform": "Linux",
       "architectures": "x64 and ARM64",
-      "declared_range": "glibc desktops with GTK3; Alpine through the opt-in musl target",
+      "declared_range": "glibc 2.28 or newer with GTK3; Alpine Linux through the opt-in musl target",
       "ci_evidence": "Full native compliance suite on Ubuntu x64 and Ubuntu ARM64, including GTK, media, browser, storage, notifications, location, and 3D dependencies",
-      "floor_evidence": "Release builds target an old glibc ABI; distro-floor runtime containers will be reported separately instead of inferring support from the build alone",
+      "floor_evidence": "The release toolchain targets the glibc 2.28 ABI. This covers Ubuntu 20.04+, Debian 10+, RHEL/Rocky/AlmaLinux 8+, Fedora 30+, and Linux Mint 20+. Alpine 3.20 is exercised separately with musl.",
       "support": "Supported, broad desktop scope"
     },
     {
@@ -75,40 +75,20 @@
     }
   ],
   "benchmark": {
-    "title": "ParparVM common-workload benchmark",
-    "machine": "Apple M2",
-    "configuration": "Best of five interleaved runs, ThinLTO, versus a warmed Azul JDK 25",
-    "result": "1.00x geometric mean",
-    "explanation": "Lower is faster. The same Java source and bit-identical checksums are used on both runtimes. This demonstrates native AOT performance against a mature optimizing JVM; it is not presented as a Flutter comparison.",
+    "title": "Port performance",
+    "configuration": "Every target runs the canonical ParparVM common workloads in its generated application. Each timing is the minimum of five measured runs after three in-process warm-ups. Values are absolute; lower timings and memory use are better.",
+    "memory_explanation": "Memory values are the lowest and highest managed-heap use observed by the application during the benchmark. They are not whole-process RSS. Binary size is the complete generated application package or bundle used by CI.",
     "rows": [
-      {"name": "String building", "ratio": "0.67x"},
-      {"name": "Sequential arrays", "ratio": "0.82x"},
-      {"name": "Quicksort", "ratio": "0.92x"},
-      {"name": "Hash map churn", "ratio": "0.95x"},
-      {"name": "Math transcendental", "ratio": "0.96x"},
-      {"name": "Random arrays", "ratio": "0.96x"},
-      {"name": "Integer arithmetic", "ratio": "1.07x"},
-      {"name": "Long arithmetic", "ratio": "1.12x"},
-      {"name": "Object allocation", "ratio": "1.19x"},
-      {"name": "Recursion", "ratio": "1.60x"}
-    ],
-    "comparative_metrics": [
-      {
-        "metric": "Startup to first usable frame",
-        "publication_rule": "Matched release applications, cold process start, multiple interleaved runs on the same host"
-      },
-      {
-        "metric": "Installed binary size",
-        "publication_rule": "Complete distributable application, including framework/runtime files required on a clean machine"
-      },
-      {
-        "metric": "Peak resident memory",
-        "publication_rule": "Same screen and idle interval, measured by the operating system after first frame"
-      },
-      {
-        "metric": "Common runtime workloads",
-        "publication_rule": "Equivalent Java and Dart AOT implementations with deterministic checksums and interleaved runs"
-      }
+      {"id": "intArithmetic", "name": "Integer arithmetic", "description": "40 million dependent 32-bit multiply, add, shift, and XOR operations."},
+      {"id": "longArithmetic", "name": "Long arithmetic", "description": "30 million dependent 64-bit arithmetic and bitwise operations."},
+      {"id": "mathTranscendental", "name": "Transcendental math", "description": "Eight million data-dependent sqrt, sin, cos, and remainder operations."},
+      {"id": "arraySequential", "name": "Sequential arrays", "description": "Fill eight million integers and perform four complete reduction passes."},
+      {"id": "arrayRandom", "name": "Random array access", "description": "20 million data-dependent reads from a four-million-element array."},
+      {"id": "objectAllocation", "name": "Object allocation", "description": "Allocate eight million short-lived linked nodes with periodic traversal."},
+      {"id": "hashMapChurn", "name": "Hash map churn", "description": "Three million boxed-key lookups and updates with repeated table clearing."},
+      {"id": "stringBuilding", "name": "String building", "description": "Build, retain, and hash 400,000 data-dependent strings."},
+      {"id": "recursion", "name": "Recursion", "description": "Three recursive Fibonacci calls using inputs 35 and 36."},
+      {"id": "quicksort", "name": "Quicksort", "description": "Generate and sort 1.5 million integers, then verify ordering and checksum."}
     ]
   }
 }

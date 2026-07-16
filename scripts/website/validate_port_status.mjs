@@ -53,7 +53,7 @@ function validate() {
     const page = read(path.join("port-status", "index.html"));
 
     const resourcesMenu = home.match(
-        /<button\b[^>]*>[\s\S]*?<span>RESOURCES<\/span>[\s\S]*?<\/button><ul\b[^>]*class=(?:["']?sub-menu["']?)[^>]*>([\s\S]*?)<\/ul>/i
+        /<button\b[^>]*>[\s\S]*?<span>RESOURCES<\/span>[\s\S]*?<\/button>\s*<ul\b[^>]*class=(?:["']?sub-menu["']?)[^>]*>([\s\S]*?)<\/ul>/i
     );
     if (!resourcesMenu || !/<a\b[^>]*href=(?:["']?\/port-status\/["']?)[^>]*>[\s\S]*?Port Status[\s\S]*?<\/a>/i.test(resourcesMenu[1]) ||
         countMatches(home, /href=(?:["']?\/port-status\/["']?)/gi) !== 1) {
@@ -83,21 +83,23 @@ function validate() {
 
     const deploymentRows = countMatches(page, /\bdata-deployment-row(?:=|\s|>)/g);
     const browserResults = countMatches(page, /\bdata-browser-result(?:=|\s|>)/g);
-    const benchmarkResults = countMatches(page, /\bdata-benchmark-result(?:=|\s|>)/g);
-    const comparativeMetrics = countMatches(page, /\bdata-comparative-metric(?:=|\s|>)/g);
-    if (deploymentRows !== 8 || browserResults !== 3 || benchmarkResults !== 10 || comparativeMetrics !== 4) {
+    const performanceRows = countMatches(page, /\bdata-performance-row(?:=|\s|>)/g);
+    const performanceCells = countMatches(page, /\bdata-performance-cell(?:=|\s|>)/g);
+    if (deploymentRows !== 8 || browserResults !== 3 || performanceRows !== 13 || performanceCells !== 13 * 11) {
         fail("deployment, browser, or performance evidence is incomplete");
     }
     for (const required of [
         "runtime CI evidence", "Mac Catalyst", "Chromium", "Firefox", "WebKit",
-        "Startup to first usable frame", "Installed binary size", "Peak resident memory"
+        "glibc 2.28", "Ubuntu 20.04", "Debian 10", "RHEL/Rocky/AlmaLinux 8",
+        "Binary size (complete application)", "Minimum managed memory", "Peak managed memory",
+        "Integer arithmetic", "Transcendental math", "Object allocation", "Quicksort"
     ]) {
         if (!pageText.toLowerCase().includes(required.toLowerCase())) {
             fail(`deployment and performance evidence is missing ${required}`);
         }
     }
-    if (!/makes no Flutter performance claim/i.test(pageText)) {
-        fail("unmatched benchmark data must not be presented as a Flutter performance result");
+    if (/flutter/i.test(pageText)) {
+        fail("the Port Status page must not contain unrelated framework-comparison language");
     }
 
     const portCards = countMatches(page, /\bdata-port-card(?:=|\s|>)/g);
@@ -142,6 +144,12 @@ function validate() {
         "watchos": "watchOS",
         "tvos": "tvOS"
     };
+    const performanceTags = page.match(/<td\b[^>]*data-performance-cell[^>]*>/g) || [];
+    for (const [port, name] of Object.entries(platformNames)) {
+        if (!performanceTags.some((tag) => tag.includes(`data-port="${port}"`) && tag.includes(`title="${name}:`))) {
+            fail(`performance cells for ${name} must identify the platform in their tooltip`);
+        }
+    }
     const primaryCellTags = Array.from(page.matchAll(/<td\b(?=[^>]*\bdata-feature-cell\b)[^>]*>/gi), match => match[0]);
     for (const cell of primaryCellTags) {
         const port = attribute(cell, "data-port");

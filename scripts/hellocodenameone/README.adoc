@@ -100,11 +100,16 @@ CI resolves that document into `port_status_environment.json` before Hugo writes
 the browser cards. The checked-in pending document exists only for the first run
 or a temporary data-branch failure; there is no client-side fetch.
 
-The performance section publishes the existing reproducible ParparVM benchmark
-as ParparVM-versus-JVM evidence. It explicitly does not convert that result into
-a Flutter claim. Startup, complete installed size, peak resident memory, and
-common Java-versus-Dart workloads have checked-in publication rules and remain
-unpublished until a matched same-host nightly harness supplies them.
+The performance section is generated from the same port reports. Every target
+runs the canonical ten workloads from
+`vm/benchmarks/common/src/main/java/com/bench/Bench.java`
+inside its generated application. `CommonWorkloadBenchmarkTest` records the
+minimum of five measurements after three in-process warm-ups, plus the minimum
+and peak managed-heap use observed during the run. The host-side runner records
+the exact size of the complete application package or bundle. These are
+absolute per-target values. The Android, Apple, JavaScript, Linux, and Windows
+port workflows run nightly so the static table is refreshed even when no source
+path for a particular port changed that day.
 
 When adding a conformance test:
 

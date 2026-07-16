@@ -1135,6 +1135,16 @@ class CleanTargetIntegrationTest {
         } else {
             exe = buildHelloCodenameOneExe();
         }
+        String performanceBinaryOut = System.getenv("CN1_PERFORMANCE_BINARY_OUT");
+        if (performanceBinaryOut != null && !performanceBinaryOut.trim().isEmpty()) {
+            Path performanceBinary = Paths.get(performanceBinaryOut.trim());
+            if (performanceBinary.getParent() != null) {
+                Files.createDirectories(performanceBinary.getParent());
+            }
+            Files.copy(exe, performanceBinary, StandardCopyOption.REPLACE_EXISTING);
+            System.out.println("Performance binary copied to " + performanceBinary.toAbsolutePath()
+                    + " (" + Files.size(performanceBinary) + " bytes)");
+        }
 
         // Compile the shared cn1ss screenshot server with an available JDK.
         java.util.List<CompilerHelper.CompilerConfig> configs = new java.util.ArrayList<>();

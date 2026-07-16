@@ -15,6 +15,9 @@ name: Test Mac native UI build scripts
 # Mac/iOS workflows on the same SHA stay fast.
 
 on:
+  workflow_dispatch:
+  schedule:
+    - cron: '25 1 * * *'
   pull_request:
     paths:
       - '.github/workflows/scripts-mac-native.yml'

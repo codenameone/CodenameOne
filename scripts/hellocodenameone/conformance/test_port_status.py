@@ -16,6 +16,7 @@ class PortStatusTest(unittest.TestCase):
     def test_contract_covers_registered_tests_and_goldens(self):
         counts = port_status.validate(self.manifest)
         self.assertEqual(164, counts["tests"])
+        self.assertEqual(1, counts["performance_tests"])
         self.assertGreaterEqual(counts["features"], 51)
         self.assertEqual(11, counts["ports"])
         self.assertEqual(20, counts["manual_features"])
@@ -36,6 +37,12 @@ class PortStatusTest(unittest.TestCase):
                 "CN1SS:INFO:suite starting test=CameraApiTest",
                 "CN1SS:INFO:test=CameraApiTest status=SKIPPED reason=no-camera",
                 "CN1SS:INFO:suite finished test=CameraApiTest",
+                *[
+                    f"CN1SS:PERF:benchmark id={benchmark} duration_ns=12000000 checksum=42"
+                    for benchmark in self.manifest["performance_benchmarks"]
+                ],
+                "CN1SS:PERF:memory kind=managed-heap minimum_bytes=1024 peak_bytes=4096",
+                "CN1SS:PERF:complete benchmark_version=1 checksum=42",
                 "CN1SS:SUITE:FINISHED",
             ]
         )
@@ -61,6 +68,7 @@ class PortStatusTest(unittest.TestCase):
                 run_url="https://example.invalid/run/1",
                 commit="abc123",
                 generated_at="2026-07-15T00:00:00Z",
+                binary_size=8192,
             )
 
         self.assertTrue(report["suite_finished"])
@@ -68,6 +76,10 @@ class PortStatusTest(unittest.TestCase):
         self.assertEqual("skip", report["tests"]["CameraApiTest"]["status"])
         self.assertIn("no-camera", report["tests"]["CameraApiTest"]["reasons"])
         self.assertEqual("not-run", report["tests"]["CryptoApiTest"]["status"])
+        self.assertEqual(8192, report["performance"]["binary_size_bytes"])
+        self.assertEqual("complete", report["performance"]["status"])
+        self.assertEqual(4096, report["performance"]["memory"]["peak_bytes"])
+        self.assertEqual(12000000, report["performance"]["benchmarks"]["intArithmetic"]["duration_ns"])
 
     def test_error_lines_allow_messages_or_no_message(self):
         log_text = "\n".join(

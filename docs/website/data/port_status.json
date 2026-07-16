@@ -2,6 +2,19 @@
   "schema_version": 1,
   "report_directory": "docs/website/data/port_status_reports",
   "stale_after_days": 14,
+  "performance_tests": ["CommonWorkloadBenchmarkTest"],
+  "performance_benchmarks": [
+    "intArithmetic",
+    "longArithmetic",
+    "mathTranscendental",
+    "arraySequential",
+    "arrayRandom",
+    "objectAllocation",
+    "hashMapChurn",
+    "stringBuilding",
+    "recursion",
+    "quicksort"
+  ],
   "golden_directories": [
     "scripts/android/screenshots",
     "scripts/ios/screenshots",

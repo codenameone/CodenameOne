@@ -471,6 +471,26 @@
     min-width: 1320px;
 }
 
+.cn1-port-status__matrix--performance {
+    margin-top: 1rem;
+}
+
+.cn1-port-status__matrix--performance table {
+    min-width: 1320px;
+}
+
+.cn1-port-status__matrix--performance tbody th small {
+    color: var(--secondary);
+    display: block;
+    font-size: .68rem;
+    margin-top: .35rem;
+}
+
+.cn1-port-status__matrix--performance td {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+}
+
 .cn1-port-status__matrix--manual td small {
     color: var(--secondary);
     display: block;

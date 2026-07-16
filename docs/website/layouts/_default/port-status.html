@@ -239,36 +239,70 @@
       <p class="cn1-port-status__eyebrow">Measured performance</p>
       <h2 id="performance-title">{{ $support.benchmark.title }}</h2>
       <p>
-        {{ $support.benchmark.machine }}; {{ $support.benchmark.configuration }}.
-        <strong>{{ $support.benchmark.result }}</strong>. {{ $support.benchmark.explanation }}
+        {{ $support.benchmark.configuration }} {{ $support.benchmark.memory_explanation }}
       </p>
     </header>
-    <div class="cn1-port-status__benchmark-grid">
-      {{- range $support.benchmark.rows }}
-      <article data-benchmark-result>
-        <strong>{{ .ratio }}</strong>
-        <span>{{ .name }}</span>
-      </article>
-      {{- end }}
-    </div>
-    <h3>Flutter comparison publication contract</h3>
-    <p>
-      Startup, size, memory, and Flutter/Dart results will appear only after the nightly job can produce a matched,
-      reproducible result. Until then this page makes no Flutter performance claim. That avoids comparing a complete
-      Flutter application with a runtime-only Codename One binary, or comparing measurements from different machines.
-    </p>
-    <div class="cn1-port-status__support-table cn1-port-status__support-table--metrics">
+    <div class="cn1-port-status__matrix cn1-port-status__matrix--performance" aria-label="Absolute port performance matrix">
       <table>
-        <thead><tr><th scope="col">Metric</th><th scope="col">Required testing logic</th></tr></thead>
+        <thead>
+          <tr>
+            <th scope="col">Metric and workload</th>
+            {{- range $contract.ports }}<th scope="col"><span>{{ .name }}</span></th>{{- end }}
+          </tr>
+        </thead>
         <tbody>
-          {{- range $support.benchmark.comparative_metrics }}
-          <tr data-comparative-metric><th scope="row">{{ .metric }}</th><td>{{ .publication_rule }}</td></tr>
+          <tr data-performance-row="binary-size">
+            <th scope="row"><strong>Binary size (complete application)</strong><p>All files in the generated package or application bundle used by CI.</p></th>
+            {{- range $contract.ports }}
+              {{- $port := . -}}{{- $report := index $reports .id -}}
+              <td data-performance-cell data-port="{{ .id }}" title="{{ .name }}: complete generated application size">
+                {{- with $report -}}{{- with .performance -}}{{- with .binary_size_bytes -}}
+                  {{- printf "%.2f MiB" (div (float .) 1048576.0) -}}
+                {{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}
+              </td>
+            {{- end }}
+          </tr>
+          <tr data-performance-row="minimum-memory">
+            <th scope="row"><strong>Minimum managed memory</strong><p>Lowest managed-heap use observed during the benchmark.</p></th>
+            {{- range $contract.ports }}
+              {{- $report := index $reports .id -}}
+              <td data-performance-cell data-port="{{ .id }}" title="{{ .name }}: minimum observed managed-heap use">
+                {{- with $report -}}{{- with .performance -}}{{- with .memory -}}{{- with .minimum_bytes -}}
+                  {{- printf "%.2f MiB" (div (float .) 1048576.0) -}}
+                {{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}
+              </td>
+            {{- end }}
+          </tr>
+          <tr data-performance-row="peak-memory">
+            <th scope="row"><strong>Peak managed memory</strong><p>Highest managed-heap use observed during the benchmark.</p></th>
+            {{- range $contract.ports }}
+              {{- $report := index $reports .id -}}
+              <td data-performance-cell data-port="{{ .id }}" title="{{ .name }}: peak observed managed-heap use">
+                {{- with $report -}}{{- with .performance -}}{{- with .memory -}}{{- with .peak_bytes -}}
+                  {{- printf "%.2f MiB" (div (float .) 1048576.0) -}}
+                {{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}
+              </td>
+            {{- end }}
+          </tr>
+          {{- range $support.benchmark.rows }}
+          {{- $benchmark := . -}}
+          <tr data-performance-row="{{ .id }}">
+            <th scope="row"><strong>{{ .name }}</strong><p>{{ .description }}</p><small>Best measured duration</small></th>
+            {{- range $contract.ports }}
+              {{- $report := index $reports .id -}}
+              <td data-performance-cell data-port="{{ .id }}" title="{{ .name }}: {{ $benchmark.name }} best measured duration">
+                {{- with $report -}}{{- with .performance -}}{{- with .benchmarks -}}{{- with (index . $benchmark.id) -}}
+                  {{- printf "%.2f ms" (div (float .duration_ns) 1000000.0) -}}
+                {{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}
+              </td>
+            {{- end }}
+          </tr>
           {{- end }}
         </tbody>
       </table>
     </div>
     <p class="cn1-port-status__source-note">
-      <a href="https://github.com/codenameone/CodenameOne/tree/master/vm/benchmarks" target="_blank" rel="noopener">Benchmark source and reproducibility notes</a>
+      <a href="https://github.com/codenameone/CodenameOne/blob/master/vm/benchmarks/common/src/main/java/com/bench/Bench.java" target="_blank" rel="noopener">ParparVM common-workload benchmark source</a>
     </p>
   </section>
 

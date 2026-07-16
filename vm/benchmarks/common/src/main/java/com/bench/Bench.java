@@ -3,7 +3,8 @@ package com.bench;
 import java.util.HashMap;
 
 /**
- * A self-contained micro-benchmark suite using only primitives and a couple of
+ * The canonical self-contained micro-benchmark suite used by ParparVM and the
+ * generated Codename One port applications. It uses only primitives and a couple of
  * java.util collections, so the identical source compiles & runs on both Java SE
  * and ParparVM (translated to C).
  *
@@ -24,7 +25,7 @@ public class Bench {
     static final int MEASURE = 5;
 
     // ---- 1. integer arithmetic: dependent ALU chain ----
-    static long intArithmetic() {
+    public static long intArithmetic() {
         int a = 0x12345678;
         int b = 0x9E3779B9;
         long checksum = 0;
@@ -37,7 +38,7 @@ public class Bench {
     }
 
     // ---- 2. long (64-bit) arithmetic: dependent chain ----
-    static long longArithmetic() {
+    public static long longArithmetic() {
         long a = 0x0123456789ABCDEFL;
         long b = -0x123456789L;
         long checksum = 0;
@@ -50,7 +51,7 @@ public class Bench {
     }
 
     // ---- 3. floating point + transcendental Math ----
-    static long mathTranscendental() {
+    public static long mathTranscendental() {
         double acc = 1.0;
         double x = 0.5;
         for (int i = 0; i < 8000000; i++) {
@@ -63,7 +64,7 @@ public class Bench {
 
     // ---- 4. sequential array fill + reduce (memory bandwidth, bounds checks) ----
     static int[] seqArr = new int[8000000];
-    static long arraySequential() {
+    public static long arraySequential() {
         int[] arr = seqArr;
         int n = arr.length;
         long checksum = 0;
@@ -84,7 +85,7 @@ public class Bench {
 
     // ---- 5. random-access gather (cache-miss bound, pointer-chase style) ----
     static int[] randArr = new int[4000000];
-    static long arrayRandom() {
+    public static long arrayRandom() {
         int[] arr = randArr;
         int n = arr.length;
         for (int i = 0; i < n; i++) arr[i] = (i * 2654435761L >>> 8) > 0 ? (int) (i * 2654435761L) : i;
@@ -105,7 +106,7 @@ public class Bench {
         Node next;
         Node(int v, Node next) { this.v = v; this.next = next; }
     }
-    static long objectAllocation() {
+    public static long objectAllocation() {
         long checksum = 0;
         Node head = null;
         for (int i = 0; i < 8000000; i++) {
@@ -121,7 +122,7 @@ public class Bench {
     }
 
     // ---- 7. HashMap put/get churn (implementation differs per platform) ----
-    static long hashMapChurn() {
+    public static long hashMapChurn() {
         HashMap<Integer, Integer> map = new HashMap<Integer, Integer>();
         long checksum = 0;
         int window = 50000;
@@ -144,7 +145,7 @@ public class Bench {
     // every String; the work per iteration is otherwise identical and every
     // string is still hashed exactly once.
     static String[] sbRing = new String[256];
-    static long stringBuilding() {
+    public static long stringBuilding() {
         long checksum = 0;
         for (int i = 0; i < 400000; i++) {
             StringBuilder sb = new StringBuilder();
@@ -166,7 +167,7 @@ public class Bench {
         if (n < 2) return n;
         return fib(n - 1) + fib(n - 2);
     }
-    static long recursion() {
+    public static long recursion() {
         long checksum = 0;
         for (int i = 0; i < 3; i++) checksum += fib(35 + (i & 1));
         return checksum;
@@ -188,7 +189,7 @@ public class Bench {
             else { quicksort(a, i, hi); hi = j; }
         }
     }
-    static long quicksortBench() {
+    public static long quicksortBench() {
         int[] a = sortArr;
         int n = a.length;
         int seed = 0xCAFEBABE;

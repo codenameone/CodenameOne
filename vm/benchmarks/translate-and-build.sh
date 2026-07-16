@@ -47,10 +47,13 @@ if [ ! -f "$JAVAAPI/java/lang/Object.class" ]; then
         $(find "$REPO/vm/JavaAPI/src" -name '*.java')
 fi
 
-# 4. compile the benchmark class against JavaAPI only
+# 4. compile the benchmark class against JavaAPI only. Bench is shared with
+# the generated port application; torture programs remain in src/com/bench.
 mkdir -p "$WORK/classes"
+SOURCE="src/com/bench/$MAIN.java"
+[ "$MAIN" = "Bench" ] && SOURCE="common/src/main/java/com/bench/Bench.java"
 "$J8/bin/javac" -nowarn -encoding UTF-8 -bootclasspath "$JAVAAPI" -source 1.8 -target 1.8 \
-    -d "$WORK/classes" "src/com/bench/$MAIN.java"
+    -d "$WORK/classes" "$SOURCE"
 
 # 5. translate to C
 mkdir -p "$WORK/out"

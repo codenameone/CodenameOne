@@ -21,6 +21,9 @@ name: ParparVM Java Tests (Windows)
 # is disabled so the x64 leg always runs to completion.
 
 on:
+  workflow_dispatch:
+  schedule:
+    - cron: '5 2 * * *'
   pull_request:
     paths:
       - '.github/workflows/parparvm-tests-windows.yml'
@@ -217,7 +220,7 @@ jobs:
   # Separate from the clean-target gate so a rendering hiccup never blocks merges.
   windows-port-screenshot:
     name: screenshot-capture (x64)
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule'
     runs-on: windows-latest
     timeout-minutes: 90
     steps:
@@ -365,6 +368,7 @@ jobs:
         env:
           JDK_8_HOME: ${{ env.JDK_8_HOME }}
           CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
+          CN1_PERFORMANCE_BINARY_OUT: ${{ github.workspace }}\artifacts\windows-port\raw\benchmark-app.exe
         run: |
           mvn -B clean package -pl JavaAPI -am -DskipTests
           mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesHelloSuiteOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false'
@@ -402,7 +406,7 @@ jobs:
   windows-port-screenshot-arm64:
     name: screenshot-capture (arm64)
     needs: windows-port-screenshot
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule'
     runs-on: windows-11-arm
     continue-on-error: true
     timeout-minutes: 60
@@ -489,6 +493,7 @@ jobs:
         shell: pwsh
         env:
           CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
+          CN1_PERFORMANCE_BINARY_OUT: ${{ github.workspace }}\artifacts\windows-port\raw\benchmark-app.exe
         run: |
           mvn -B clean package -pl JavaAPI -am -DskipTests
           mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesHelloSuiteOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false'
@@ -602,7 +607,7 @@ jobs:
   windows-port-screenshot-comment-arm64:
     name: screenshot-comment (arm64)
     needs: windows-port-screenshot-arm64
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule'
     continue-on-error: true
     runs-on: ubuntu-latest
     permissions:
@@ -655,6 +660,7 @@ jobs:
           export CN1SS_FAIL_ON_MISMATCH=1
           export CN1SS_ALLOWED_MISSING=0
           export CN1SS_PORT_ID=windows-arm64
+          export CN1SS_BINARY_PATH="$ART/raw/benchmark-app.exe"
           export CN1SS_SUITE_LOG="$ART/raw/app-output.log"
           if [ "${{ github.event_name }}" != "pull_request" ]; then export CN1SS_SKIP_COMMENT=1; fi
           set +e

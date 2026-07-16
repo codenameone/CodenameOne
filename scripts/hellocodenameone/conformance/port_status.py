@@ -29,6 +29,15 @@ START_RE = re.compile(r"suite starting test=([A-Za-z0-9_]+)")
 FINISH_RE = re.compile(r"suite finished test=([A-Za-z0-9_]+)")
 SKIP_RE = re.compile(r"test=([A-Za-z0-9_]+) status=SKIPPED(?: reason=([^\s]+))?")
 ERROR_RE = re.compile(r"CN1SS:ERR:suite test=([A-Za-z0-9_]+)(?:\s+(.*))?$")
+PERF_BENCH_RE = re.compile(
+    r"CN1SS:PERF:benchmark id=([A-Za-z0-9-]+) duration_ns=(\d+) checksum=(-?\d+)"
+)
+PERF_MEMORY_RE = re.compile(
+    r"CN1SS:PERF:memory kind=([a-z0-9-]+) minimum_bytes=(\d+) peak_bytes=(\d+)"
+)
+PERF_COMPLETE_RE = re.compile(
+    r"CN1SS:PERF:complete benchmark_version=(\d+) checksum=(-?\d+)"
+)
 
 
 class ContractError(RuntimeError):
@@ -122,12 +131,21 @@ def validate(manifest: dict) -> dict:
             "Tests registered more than once: " + ", ".join(duplicate_registrations)
         )
 
-    missing = sorted(set(registered) - set(mapped))
-    extra = sorted(set(mapped) - set(registered))
+    performance_tests = manifest.get("performance_tests", [])
+    duplicate_performance_tests = sorted(
+        name for name, count in Counter(performance_tests).items() if count > 1
+    )
+    if duplicate_performance_tests:
+        problems.append("Performance tests registered more than once: " + ", ".join(duplicate_performance_tests))
+    missing = sorted(set(registered) - set(mapped) - set(performance_tests))
+    extra = sorted((set(mapped) | set(performance_tests)) - set(registered))
     if missing:
         problems.append("Registered tests without a feature: " + ", ".join(missing))
     if extra:
         problems.append("Manifest tests not registered by the suite: " + ", ".join(extra))
+    performance_benchmarks = manifest.get("performance_benchmarks", [])
+    if len(performance_benchmarks) != 10 or len(set(performance_benchmarks)) != 10:
+        problems.append("The performance contract must define ten unique common workloads")
 
     for item in manifest.get("screenshot_mappings", []):
         if not item.get("pattern") or not item.get("test"):
@@ -298,12 +316,23 @@ def validate(manifest: dict) -> dict:
         problems.append("macOS support must disclose its Mac Catalyst scope")
     if "x64" not in json.dumps(deployment_by_id.get("linux", {})) or "ARM64" not in json.dumps(deployment_by_id.get("linux", {})):
         problems.append("Linux support must declare both x64 and ARM64 evidence")
+    linux_contract = json.dumps(deployment_by_id.get("linux", {}))
+    if "glibc 2.28" not in linux_contract or "Alpine 3.20" not in linux_contract:
+        problems.append("Linux support must declare the glibc 2.28 floor and Alpine 3.20 musl evidence")
+    if not all(name in linux_contract for name in (
+        "Ubuntu 20.04", "Debian 10", "RHEL/Rocky/AlmaLinux 8", "Fedora 30", "Linux Mint 20"
+    )):
+        problems.append("Linux support must map the glibc floor to named mainstream distributions")
 
     benchmark = support.get("benchmark", {})
-    if len(benchmark.get("rows", [])) != 10 or len(benchmark.get("comparative_metrics", [])) != 4:
-        problems.append("Performance evidence must retain ten common workloads and four comparative publication rules")
-    if "not presented as a Flutter comparison" not in benchmark.get("explanation", ""):
-        problems.append("The existing VM benchmark must not be represented as a Flutter comparison")
+    benchmark_rows = benchmark.get("rows", [])
+    benchmark_ids = [item.get("id") for item in benchmark_rows]
+    if benchmark_ids != performance_benchmarks or not all(
+        item.get("name") and item.get("description") for item in benchmark_rows
+    ):
+        problems.append("Performance evidence must describe every common workload in contract order")
+    if "absolute" not in benchmark.get("configuration", "").lower():
+        problems.append("The performance methodology must identify its results as absolute values")
 
     browsers = environment.get("browsers", [])
     browser_ids = [item.get("id") for item in browsers]
@@ -322,7 +351,8 @@ def validate(manifest: dict) -> dict:
     return {
         "ports": len(ports),
         "features": len(features),
-        "tests": len(registered),
+        "tests": len(mapped),
+        "performance_tests": len(performance_tests),
         "goldens": len(golden_names),
         "manual_features": manual_feature_count,
         "deployment_platforms": len(deployment_rows),
@@ -363,6 +393,60 @@ def parse_logs(paths: list[Path], states: dict[str, dict]) -> bool:
     return suite_finished
 
 
+def parse_performance(paths: list[Path], expected_benchmarks: list[str], binary_size: int | None) -> dict:
+    if binary_size is not None and binary_size <= 0:
+        raise ContractError("Performance binary size must be greater than zero")
+    benchmarks: dict[str, dict] = {}
+    memory: dict | None = None
+    benchmark_version: int | None = None
+    suite_checksum: int | None = None
+    for path in paths:
+        if not path.is_file():
+            continue
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            match = PERF_BENCH_RE.search(line)
+            if match:
+                benchmark_id = match.group(1)
+                if benchmark_id not in expected_benchmarks:
+                    raise ContractError(f"Unknown performance benchmark {benchmark_id} in {path}")
+                benchmarks[benchmark_id] = {
+                    "duration_ns": int(match.group(2)),
+                    "checksum": match.group(3),
+                }
+            match = PERF_MEMORY_RE.search(line)
+            if match:
+                if match.group(1) != "managed-heap":
+                    raise ContractError(f"Unknown performance memory kind {match.group(1)} in {path}")
+                minimum = int(match.group(2))
+                peak = int(match.group(3))
+                if peak < minimum:
+                    raise ContractError(f"Performance memory peak is below minimum in {path}")
+                memory = {
+                    "kind": match.group(1),
+                    "minimum_bytes": minimum,
+                    "peak_bytes": peak,
+                }
+            match = PERF_COMPLETE_RE.search(line)
+            if match:
+                benchmark_version = int(match.group(1))
+                suite_checksum = int(match.group(2))
+    missing = [item for item in expected_benchmarks if item not in benchmarks]
+    status = "complete" if (
+        not missing and memory is not None and binary_size is not None
+        and benchmark_version is not None and suite_checksum is not None
+    ) else "partial"
+    return {
+        "status": status,
+        "benchmark_version": benchmark_version,
+        "method": "minimum of five measured runs after three in-process warm-ups",
+        "binary_size_bytes": binary_size,
+        "memory": memory,
+        "benchmarks": {item: benchmarks[item] for item in expected_benchmarks if item in benchmarks},
+        "missing": missing,
+        "suite_checksum": suite_checksum,
+    }
+
+
 def parse_comparisons(paths: list[Path], manifest: dict, states: dict[str, dict]) -> None:
     for path in paths:
         if not path.is_file():
@@ -398,6 +482,7 @@ def normalize(
     run_url: str,
     commit: str,
     generated_at: str,
+    binary_size: int | None = None,
 ) -> dict:
     port_ids = {item.get("id") for item in manifest.get("ports", [])}
     if port_id not in port_ids:
@@ -416,6 +501,11 @@ def normalize(
         for test in mapped
     }
     suite_finished = parse_logs(logs, states)
+    performance = parse_performance(
+        logs,
+        manifest.get("performance_benchmarks", []),
+        binary_size,
+    )
     parse_comparisons(comparisons, manifest, states)
 
     tests: dict[str, dict] = {}
@@ -446,6 +536,7 @@ def normalize(
         "suite_finished": suite_finished,
         "summary": {key: counts.get(key, 0) for key in ("pass", "fail", "skip", "not-run")},
         "tests": tests,
+        "performance": performance,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -471,6 +562,7 @@ def build_parser() -> argparse.ArgumentParser:
     normalize_parser.add_argument("--run-url", default=os.environ.get("GITHUB_RUN_URL", ""))
     normalize_parser.add_argument("--commit", default=os.environ.get("GITHUB_SHA", ""))
     normalize_parser.add_argument("--generated-at", default=utc_now())
+    normalize_parser.add_argument("--binary-size", type=int)
     return parser
 
 
@@ -495,6 +587,7 @@ def main() -> int:
             run_url=args.run_url,
             commit=args.commit,
             generated_at=args.generated_at,
+            binary_size=args.binary_size,
         )
         print(
             f"Wrote {args.output}: "

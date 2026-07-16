@@ -59,7 +59,16 @@ while IFS= read -r port; do
   if ! jq -e --arg port "${port}" --slurpfile contract "${MANIFEST}" '
       .schema_version == $contract[0].schema_version and
       .port == $port and
-      ((.tests | keys | sort) == ([$contract[0].features[].tests[]] | sort))
+      ((.tests | keys | sort) == ([$contract[0].features[].tests[]] | sort)) and
+      .performance.status == "complete" and
+      (.performance.binary_size_bytes | type == "number" and . > 0) and
+      .performance.memory.kind == "managed-heap" and
+      (.performance.memory.minimum_bytes | type == "number") and
+      (.performance.memory.peak_bytes | type == "number") and
+      (.performance.memory.peak_bytes >= .performance.memory.minimum_bytes) and
+      ([.performance.benchmarks[].duration_ns | type] | all(. == "number")) and
+      ([.performance.benchmarks[].duration_ns] | all(. >= 0)) and
+      ((.performance.benchmarks | keys) == ($contract[0].performance_benchmarks | sort))
     ' "${candidate}" >/dev/null; then
     echo "Persisted ${port} report does not match the current contract; keeping the checked-in report." >&2
     continue

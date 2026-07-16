@@ -22,6 +22,8 @@ on:
   # diff limit, so pull_request triggers stopped firing -- dispatch with
   #   gh workflow run <file> --ref <branch>
   workflow_dispatch:
+  schedule:
+    - cron: '55 1 * * *'
   pull_request:
     paths:
       - '.github/workflows/windows-cross-build-run.yml'
@@ -241,6 +243,7 @@ jobs:
         shell: pwsh
         env:
           CN1_PREBUILT_EXE: ${{ github.workspace }}\artifacts\WinHelloMain.exe
+          CN1_PERFORMANCE_BINARY_OUT: ${{ github.workspace }}\artifacts\windows-port\raw\benchmark-app.exe
           CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
         run: |
           mvn -B clean package -pl JavaAPI -am -DskipTests
@@ -261,7 +264,7 @@ jobs:
   compare-comment:
     name: cross-compiled screenshot-comment
     needs: run-on-windows
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -328,6 +331,7 @@ jobs:
           export CN1SS_ALLOWED_MISSING=0
           export CN1SS_PORT_ID=windows-x64
           export CN1SS_SUITE_LOG="$ART/raw-x64/app-output.log"
+          export CN1SS_BINARY_PATH="$ART/raw-x64/benchmark-app.exe"
           if [ "${{ github.event_name }}" != "pull_request" ]; then export CN1SS_SKIP_COMMENT=1; fi
           set +e
           cn1ss_process_and_report \

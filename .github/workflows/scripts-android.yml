@@ -6,6 +6,8 @@ name: Test Android build scripts
   # diff limit, so pull_request triggers stopped firing -- dispatch with
   #   gh workflow run <file> --ref <branch>
   workflow_dispatch:
+  schedule:
+    - cron: '5 1 * * *'
   pull_request:
     paths:
       - '.github/workflows/scripts-android.yml'
