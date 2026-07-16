@@ -74,7 +74,7 @@ class AndroidScreenshotTask implements Runnable {
     /// requested right after a repaint could therefore read the previous frame --
     /// observed as the pure text editor screenshot tests uploading an empty
     /// content area from the CI emulator. Force a draw pass and only issue the
-    /// PixelCopy once that frame is committed to the render pipeline.
+    /// PixelCopy once that frame has been up for a vsync.
     private void captureAfterNextFrame(final int w, final int h) {
         final View v = (View) view;
         v.invalidate();

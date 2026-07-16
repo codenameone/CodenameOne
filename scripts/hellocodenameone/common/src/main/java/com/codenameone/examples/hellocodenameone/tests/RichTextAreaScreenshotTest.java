@@ -57,12 +57,18 @@ public class RichTextAreaScreenshotTest extends BaseTest {
     }
 
     @Override
-    protected void registerReadyCallback(Form parent, final Runnable run) {
+    protected void registerReadyCallback(final Form parent, final Runnable run) {
         // capture after the backend reports ready AND the editor's content actually painted;
-        // ready alone races the first paint flush on the slower ports
+        // ready alone races the first paint flush on the slower ports. Then wait out any
+        // animation still in flight (e.g. the form show transition on a slow CI emulator,
+        // which the capture would otherwise catch mid-fade).
         editor.onReady(new Runnable() {
             public void run() {
-                gate.runAfterNextPaint(run);
+                gate.runAfterNextPaint(new Runnable() {
+                    public void run() {
+                        parent.getAnimationManager().flushAnimation(run);
+                    }
+                });
             }
         });
     }
