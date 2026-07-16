@@ -32,9 +32,6 @@ ERROR_RE = re.compile(r"CN1SS:ERR:suite test=([A-Za-z0-9_]+)(?:\s+(.*))?$")
 PERF_BENCH_RE = re.compile(
     r"CN1SS:PERF:benchmark id=([A-Za-z0-9-]+) duration_ns=(\d+) checksum=(-?\d+)"
 )
-PERF_MEMORY_RE = re.compile(
-    r"CN1SS:PERF:memory kind=([a-z0-9-]+) minimum_bytes=(\d+) peak_bytes=(\d+)"
-)
 PERF_COMPLETE_RE = re.compile(
     r"CN1SS:PERF:complete benchmark_version=(\d+) checksum=(-?\d+)"
 )
@@ -394,10 +391,7 @@ def parse_logs(paths: list[Path], states: dict[str, dict]) -> bool:
 
 
 def parse_performance(paths: list[Path], expected_benchmarks: list[str], binary_size: int | None) -> dict:
-    if binary_size is not None and binary_size <= 0:
-        raise ContractError("Performance binary size must be greater than zero")
     benchmarks: dict[str, dict] = {}
-    memory: dict | None = None
     benchmark_version: int | None = None
     suite_checksum: int | None = None
     for path in paths:
@@ -413,34 +407,18 @@ def parse_performance(paths: list[Path], expected_benchmarks: list[str], binary_
                     "duration_ns": int(match.group(2)),
                     "checksum": match.group(3),
                 }
-            match = PERF_MEMORY_RE.search(line)
-            if match:
-                if match.group(1) != "managed-heap":
-                    raise ContractError(f"Unknown performance memory kind {match.group(1)} in {path}")
-                minimum = int(match.group(2))
-                peak = int(match.group(3))
-                if peak < minimum:
-                    raise ContractError(f"Performance memory peak is below minimum in {path}")
-                memory = {
-                    "kind": match.group(1),
-                    "minimum_bytes": minimum,
-                    "peak_bytes": peak,
-                }
             match = PERF_COMPLETE_RE.search(line)
             if match:
                 benchmark_version = int(match.group(1))
                 suite_checksum = int(match.group(2))
     missing = [item for item in expected_benchmarks if item not in benchmarks]
     status = "complete" if (
-        not missing and memory is not None and binary_size is not None
-        and benchmark_version is not None and suite_checksum is not None
+        not missing and benchmark_version is not None and suite_checksum is not None
     ) else "partial"
     return {
         "status": status,
         "benchmark_version": benchmark_version,
         "method": "minimum of five measured runs after three in-process warm-ups",
-        "binary_size_bytes": binary_size,
-        "memory": memory,
         "benchmarks": {item: benchmarks[item] for item in expected_benchmarks if item in benchmarks},
         "missing": missing,
         "suite_checksum": suite_checksum,

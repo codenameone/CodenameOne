@@ -210,7 +210,9 @@ cp -f "$WS_RAW_DIR"/*.png "$ARTIFACTS_DIR/" 2>/dev/null || true
 
 COMPARE_JSON="$SS_TMP/compare.json"; SUMMARY_OUT="$SS_TMP/summary.txt"; COMMENT_OUT="$SS_TMP/comment.md"
 export CN1SS_PORT_ID="${CN1SS_PORT_ID:-watchos}"
-export CN1SS_SUITE_LOG="$WATCH_APP_LOG"
+export CN1SS_SUITE_LOG="$ARTIFACTS_DIR/app-stderr.log"
+export CN1SS_SUITE_LOG_2="$ARTIFACTS_DIR/app-stdout.log"
+export CN1SS_SUITE_LOG_3="$WATCH_APP_LOG"
 export CN1SS_BINARY_PATH="$APP_PATH"
 
 # --- Gate (mirrors the iOS jobs, enforced centrally in scripts/lib/cn1ss.sh) -

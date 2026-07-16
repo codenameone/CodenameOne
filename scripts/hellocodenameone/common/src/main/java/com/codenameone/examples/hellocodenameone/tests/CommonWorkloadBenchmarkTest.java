@@ -30,8 +30,6 @@ public class CommonWorkloadBenchmarkTest extends BaseTest {
     private static final int WARMUP = 3;
     private static final int MEASUREMENTS = 5;
     private static long sink;
-    private static long minimumUsedMemory;
-    private static long peakUsedMemory;
 
     private interface Workload {
         long run();
@@ -41,12 +39,6 @@ public class CommonWorkloadBenchmarkTest extends BaseTest {
     public boolean runTest() {
         try {
             sink = 0;
-            minimumUsedMemory = 0;
-            peakUsedMemory = 0;
-            // Do not force a collection here. JavaScript has no collector
-            // monitor to notify, and a benchmark must observe the port's
-            // normal collection policy rather than perturb it explicitly.
-            recordMemory();
             run("intArithmetic", new Workload() {
                 public long run() { return CommonWorkloads.intArithmetic(); }
             });
@@ -77,8 +69,6 @@ public class CommonWorkloadBenchmarkTest extends BaseTest {
             run("quicksort", new Workload() {
                 public long run() { return CommonWorkloads.quicksortBench(); }
             });
-            emit("memory kind=managed-heap minimum_bytes=" + minimumUsedMemory
-                    + " peak_bytes=" + peakUsedMemory);
             emit("complete benchmark_version=1 checksum=" + sink);
             done();
             return true;
@@ -91,7 +81,6 @@ public class CommonWorkloadBenchmarkTest extends BaseTest {
     private static void run(String id, Workload workload) {
         for (int i = 0; i < WARMUP; i++) {
             sink ^= workload.run();
-            recordMemory();
         }
         long minimumNanos = Long.MAX_VALUE;
         long checksum = 0;
@@ -102,24 +91,9 @@ public class CommonWorkloadBenchmarkTest extends BaseTest {
             if (elapsed < minimumNanos) {
                 minimumNanos = elapsed;
             }
-            recordMemory();
         }
         sink ^= checksum;
         emit("benchmark id=" + id + " duration_ns=" + minimumNanos + " checksum=" + checksum);
-    }
-
-    private static void recordMemory() {
-        Runtime runtime = Runtime.getRuntime();
-        long used = runtime.totalMemory() - runtime.freeMemory();
-        if (used < 0) {
-            return;
-        }
-        if (minimumUsedMemory == 0 || used < minimumUsedMemory) {
-            minimumUsedMemory = used;
-        }
-        if (used > peakUsedMemory) {
-            peakUsedMemory = used;
-        }
     }
 
     private static void emit(String value) {

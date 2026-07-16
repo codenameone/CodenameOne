@@ -721,12 +721,6 @@
         "duration_ns": 154040000
       }
     },
-    "binary_size_bytes": 37929225,
-    "memory": {
-      "kind": "managed-heap",
-      "minimum_bytes": 761823232,
-      "peak_bytes": 2005319680
-    },
     "method": "minimum of five measured runs after three in-process warm-ups",
     "missing": [],
     "status": "complete",

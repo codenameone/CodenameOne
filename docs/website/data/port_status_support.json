@@ -76,8 +76,8 @@
   ],
   "benchmark": {
     "title": "Port performance",
-    "configuration": "Every target runs the canonical ParparVM common workloads in its generated application. Each timing is the minimum of five measured runs after three in-process warm-ups. Values are absolute; lower timings and memory use are better.",
-    "memory_explanation": "Memory values are the lowest and highest managed-heap use observed by the application during the benchmark. They are not whole-process RSS. Binary size is the complete generated application package or bundle used by CI.",
+    "configuration": "Every target runs the canonical ParparVM common workloads in its generated application. Each timing is the minimum of five measured runs after three in-process warm-ups. Values are absolute and lower timings are better.",
+    "excluded_metrics": "Binary size and memory are not reported yet. The compliance fixture is not a representative minimal application, its current artifacts mix compressed packages with unpacked bundles and executables, and the ports do not currently expose one comparable memory metric. These rows will return only after a dedicated release-mode benchmark app is stripped, packaged, and sampled consistently on every target.",
     "rows": [
       {"id": "intArithmetic", "name": "Integer arithmetic", "description": "40 million dependent 32-bit multiply, add, shift, and XOR operations."},
       {"id": "longArithmetic", "name": "Long arithmetic", "description": "30 million dependent 64-bit arithmetic and bitwise operations."},

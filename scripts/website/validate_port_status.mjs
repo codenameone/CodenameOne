@@ -85,13 +85,12 @@ function validate() {
     const browserResults = countMatches(page, /\bdata-browser-result(?:=|\s|>)/g);
     const performanceRows = countMatches(page, /\bdata-performance-row(?:=|\s|>)/g);
     const performanceCells = countMatches(page, /\bdata-performance-cell(?:=|\s|>)/g);
-    if (deploymentRows !== 8 || browserResults !== 3 || performanceRows !== 13 || performanceCells !== 13 * 11) {
+    if (deploymentRows !== 8 || browserResults !== 3 || performanceRows !== 10 || performanceCells !== 10 * 11) {
         fail("deployment, browser, or performance evidence is incomplete");
     }
     for (const required of [
         "runtime CI evidence", "Mac Catalyst", "Chromium", "Firefox", "WebKit",
         "glibc 2.28", "Ubuntu 20.04", "Debian 10", "RHEL/Rocky/AlmaLinux 8",
-        "Binary size (complete application)", "Minimum managed memory", "Peak managed memory",
         "Integer arithmetic", "Transcendental math", "Object allocation", "Quicksort"
     ]) {
         if (!pageText.toLowerCase().includes(required.toLowerCase())) {

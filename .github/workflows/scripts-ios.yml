@@ -5,6 +5,12 @@ on:
   # diff limit, so pull_request triggers stopped firing -- dispatch with
   #   gh workflow run <file> --ref <branch>
   workflow_dispatch:
+    inputs:
+      watch_only:
+        description: Run only the watchOS evidence job after the shared port build
+        required: false
+        default: false
+        type: boolean
   schedule:
     - cron: '15 1 * * *'
   pull_request:
@@ -84,6 +90,7 @@ jobs:
     uses: ./.github/workflows/_build-ios-port.yml
 
   build-ios:
+    if: ${{ !inputs.watch_only }}
     needs: build-port
     permissions:
       contents: read
@@ -278,6 +285,7 @@ jobs:
           retention-days: 14
 
   build-ios-metal:
+    if: ${{ !inputs.watch_only }}
     # Mirrors build-ios but enables the Metal rendering backend via the
     # codename1.arg.ios.metal=true build hint. Keeps the GL path untouched
     # so a regression on either path is isolated in its own job.
@@ -693,7 +701,7 @@ jobs:
           ./scripts/run-watch-ui-tests.sh \
             "${{ steps.build-ios-app.outputs.workspace }}" \
             "${{ steps.build-ios-app.outputs.scheme }}"
-        timeout-minutes: 60
+        timeout-minutes: 90
 
       - name: Upload watchOS port status
         if: always()
@@ -719,6 +727,7 @@ jobs:
           retention-days: 14
 
   build-ios-tv:
+    if: ${{ !inputs.watch_only }}
     # Native Apple TV (tvOS) screenshot pipeline. The tvOS slice auto-enables
     # from codename1.tvMain in the sample, so build-ios-app.sh generates the
     # <Main>TV target alongside the iOS app. tvOS reuses the iOS UIApplicationMain

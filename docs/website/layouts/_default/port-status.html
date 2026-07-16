@@ -239,7 +239,10 @@
       <p class="cn1-port-status__eyebrow">Measured performance</p>
       <h2 id="performance-title">{{ $support.benchmark.title }}</h2>
       <p>
-        {{ $support.benchmark.configuration }} {{ $support.benchmark.memory_explanation }}
+        {{ $support.benchmark.configuration }}
+      </p>
+      <p>
+        {{ $support.benchmark.excluded_metrics }}
       </p>
     </header>
     <div class="cn1-port-status__matrix cn1-port-status__matrix--performance" aria-label="Absolute port performance matrix">
@@ -251,39 +254,6 @@
           </tr>
         </thead>
         <tbody>
-          <tr data-performance-row="binary-size">
-            <th scope="row"><strong>Binary size (complete application)</strong><p>All files in the generated package or application bundle used by CI.</p></th>
-            {{- range $contract.ports }}
-              {{- $port := . -}}{{- $report := index $reports .id -}}
-              <td data-performance-cell data-port="{{ .id }}" title="{{ .name }}: complete generated application size">
-                {{- with $report -}}{{- with .performance -}}{{- with .binary_size_bytes -}}
-                  {{- printf "%.2f MiB" (div (float .) 1048576.0) -}}
-                {{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}
-              </td>
-            {{- end }}
-          </tr>
-          <tr data-performance-row="minimum-memory">
-            <th scope="row"><strong>Minimum managed memory</strong><p>Lowest managed-heap use observed during the benchmark.</p></th>
-            {{- range $contract.ports }}
-              {{- $report := index $reports .id -}}
-              <td data-performance-cell data-port="{{ .id }}" title="{{ .name }}: minimum observed managed-heap use">
-                {{- with $report -}}{{- with .performance -}}{{- with .memory -}}{{- with .minimum_bytes -}}
-                  {{- printf "%.2f MiB" (div (float .) 1048576.0) -}}
-                {{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}
-              </td>
-            {{- end }}
-          </tr>
-          <tr data-performance-row="peak-memory">
-            <th scope="row"><strong>Peak managed memory</strong><p>Highest managed-heap use observed during the benchmark.</p></th>
-            {{- range $contract.ports }}
-              {{- $report := index $reports .id -}}
-              <td data-performance-cell data-port="{{ .id }}" title="{{ .name }}: peak observed managed-heap use">
-                {{- with $report -}}{{- with .performance -}}{{- with .memory -}}{{- with .peak_bytes -}}
-                  {{- printf "%.2f MiB" (div (float .) 1048576.0) -}}
-                {{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}
-              </td>
-            {{- end }}
-          </tr>
           {{- range $support.benchmark.rows }}
           {{- $benchmark := . -}}
           <tr data-performance-row="{{ .id }}">

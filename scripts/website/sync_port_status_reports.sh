@@ -61,11 +61,6 @@ while IFS= read -r port; do
       .port == $port and
       ((.tests | keys | sort) == ([$contract[0].features[].tests[]] | sort)) and
       .performance.status == "complete" and
-      (.performance.binary_size_bytes | type == "number" and . > 0) and
-      .performance.memory.kind == "managed-heap" and
-      (.performance.memory.minimum_bytes | type == "number") and
-      (.performance.memory.peak_bytes | type == "number") and
-      (.performance.memory.peak_bytes >= .performance.memory.minimum_bytes) and
       ([.performance.benchmarks[].duration_ns | type] | all(. == "number")) and
       ([.performance.benchmarks[].duration_ns] | all(. >= 0)) and
       ((.performance.benchmarks | keys) == ($contract[0].performance_benchmarks | sort))
