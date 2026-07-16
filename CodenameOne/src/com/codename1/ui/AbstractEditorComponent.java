@@ -61,12 +61,6 @@ public abstract class AbstractEditorComponent extends Container implements Edito
     /// Prefix used for messages sent from the browser fallback to Codename One.
     static final String MESSAGE_PREFIX = "cn1ed:";
 
-    /// Backend identifier: the pure Codename One text engine.
-    public static final int BACKEND_PURE = 0;
-
-    /// Backend identifier for the `BrowserComponent` compatibility fallback.
-    public static final int BACKEND_BROWSER = 1;
-
     private BrowserComponent browser;
     private PeerComponent nativePeer;
     private PureEditor pureEditor;
@@ -173,22 +167,6 @@ public abstract class AbstractEditorComponent extends Container implements Edito
             r.run();
         }
         readyListeners.fireActionEvent(new ActionEvent(this));
-    }
-
-    /// Deprecated compatibility hook. Backend selection is automatic: the pure engine is used when
-    /// low-level text input is available and the browser fallback is used otherwise.
-    ///
-    /// #### Parameters
-    ///
-    /// - `backend`: ignored
-    @Deprecated
-    public static void setDefaultBackend(int backend) {
-    }
-
-    /// Returns the preferred pure backend. Actual selection may fall back to the browser at runtime.
-    @Deprecated
-    public static int getDefaultBackend() {
-        return BACKEND_PURE;
     }
 
     /// Creates the pure Codename One backend for this editor. Subclasses override to supply a code or

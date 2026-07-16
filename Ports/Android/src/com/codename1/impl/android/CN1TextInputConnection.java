@@ -41,6 +41,10 @@ import com.codename1.ui.TextInputState;
 /// last editing state snapshot pushed down through `AndroidImplementation`.
 class CN1TextInputConnection extends BaseInputConnection {
     private final TextInputClient client;
+    // connection-local composing range for the synchronous mirror (the authoritative composing
+    // state lives in the client on the EDT); -1 when no composition is being mirrored
+    private int mirrorComposeStart = -1;
+    private int mirrorComposeEnd = -1;
 
     CN1TextInputConnection(View targetView, TextInputClient client) {
         super(targetView, true);
@@ -56,11 +60,43 @@ class CN1TextInputConnection extends BaseInputConnection {
         Display.getInstance().callSerially(r);
     }
 
+    /// Applies an in-flight edit to the synchronous mirror so the IME's immediate
+    /// getTextBeforeCursor / getExtractedText reads see post-edit text instead of the state
+    /// from before the EDT round trip. The mirror is replaced wholesale by the authoritative
+    /// state when the EDT echoes it back.
+    private int mirrorReplace(int start, int end, String inserted, boolean composing) {
+        TextInputState cur = state();
+        String t = cur.getText();
+        int a = Math.max(0, Math.min(t.length(), Math.min(start, end)));
+        int b = Math.max(a, Math.min(t.length(), Math.max(start, end)));
+        String nt = t.substring(0, a) + inserted + t.substring(b);
+        int caret = a + inserted.length();
+        if (composing) {
+            mirrorComposeStart = a;
+            mirrorComposeEnd = caret;
+            return AndroidImplementation.setPendingInputState(new TextInputState(nt, caret, caret, a, caret));
+        }
+        mirrorComposeStart = -1;
+        mirrorComposeEnd = -1;
+        return AndroidImplementation.setPendingInputState(new TextInputState(nt, caret, caret));
+    }
+
+    private int mirrorReplaceStart(TextInputState cur) {
+        return mirrorComposeStart >= 0 ? mirrorComposeStart : cur.getSelectionStart();
+    }
+
+    private int mirrorReplaceEnd(TextInputState cur) {
+        return mirrorComposeStart >= 0 ? mirrorComposeEnd : cur.getSelectionEnd();
+    }
+
     @Override
     public boolean commitText(CharSequence text, int newCursorPosition) {
         final String s = text == null ? "" : text.toString();
+        TextInputState cur = state();
+        final int seq = mirrorReplace(mirrorReplaceStart(cur), mirrorReplaceEnd(cur), s, false);
         post(new Runnable() {
             public void run() {
+                AndroidImplementation.markPendingApplied(seq);
                 client.commitText(s);
             }
         });
@@ -70,8 +106,11 @@ class CN1TextInputConnection extends BaseInputConnection {
     @Override
     public boolean setComposingText(CharSequence text, final int newCursorPosition) {
         final String s = text == null ? "" : text.toString();
+        TextInputState cur = state();
+        final int seq = mirrorReplace(mirrorReplaceStart(cur), mirrorReplaceEnd(cur), s, true);
         post(new Runnable() {
             public void run() {
+                AndroidImplementation.markPendingApplied(seq);
                 client.setComposingText(s, newCursorPosition);
             }
         });
@@ -80,6 +119,8 @@ class CN1TextInputConnection extends BaseInputConnection {
 
     @Override
     public boolean finishComposingText() {
+        mirrorComposeStart = -1;
+        mirrorComposeEnd = -1;
         post(new Runnable() {
             public void run() {
                 client.finishComposing();
@@ -90,8 +131,21 @@ class CN1TextInputConnection extends BaseInputConnection {
 
     @Override
     public boolean deleteSurroundingText(final int beforeLength, final int afterLength) {
+        TextInputState cur = state();
+        String t = cur.getText();
+        int selStart = Math.max(0, Math.min(t.length(), cur.getSelectionStart()));
+        int selEnd = Math.max(selStart, Math.min(t.length(), cur.getSelectionEnd()));
+        int a = Math.max(0, selStart - Math.max(0, beforeLength));
+        int b = Math.min(t.length(), selEnd + Math.max(0, afterLength));
+        String nt = t.substring(0, a) + t.substring(selStart, selEnd) + t.substring(b);
+        int shift = selStart - a;
+        mirrorComposeStart = -1;
+        mirrorComposeEnd = -1;
+        final int seq = AndroidImplementation.setPendingInputState(
+                new TextInputState(nt, selStart - shift, selEnd - shift));
         post(new Runnable() {
             public void run() {
+                AndroidImplementation.markPendingApplied(seq);
                 client.deleteSurroundingText(beforeLength, afterLength);
             }
         });
@@ -222,6 +276,8 @@ class CN1TextInputConnection extends BaseInputConnection {
         // suggestion) and expects the next setComposingText to replace that region.
         // The client contract replaces the selection when no composition is active,
         // so mirror the region as the selection.
+        mirrorComposeStart = Math.min(start, end);
+        mirrorComposeEnd = Math.max(start, end);
         post(new Runnable() {
             public void run() {
                 client.setSelectionRange(Math.min(start, end), Math.max(start, end));

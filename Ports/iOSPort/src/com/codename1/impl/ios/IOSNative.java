@@ -64,7 +64,7 @@ public final class IOSNative {
             String hint, int hintColor, boolean showToolbar, boolean blockCopyPaste, int alignment, int verticalAlignment,
             boolean returnExitsEditing);
     native void startTextInput(int constraint, boolean autoCorrect, boolean autoCapitalize, boolean multiline, String initialText, int selStart, int selEnd, int actionType);
-    native void updateTextInputState(String text, int selStart, int selEnd, int caretX, int caretY, int caretW, int caretH);
+    native void updateTextInputState(String text, int selStart, int selEnd, int caretX, int caretY, int caretW, int caretH, int seq);
     native void setTextInputBounds(int x, int y, int w, int h);
     native void stopTextInput();
     native void resizeNativeTextView(int x, int y, int w, int h, int padTop, int padRight, int padBottom, int padLeft);

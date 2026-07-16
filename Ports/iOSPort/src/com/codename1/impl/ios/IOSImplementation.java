@@ -1417,6 +1417,14 @@ public class IOSImplementation extends CodenameOneImplementation {
     // ---- low level text input source (pure Codename One editors) ----
 
     private static com.codename1.ui.TextInputClient tiClient;
+    /// Immutable snapshot of the client's last pushed editing state; UIKit's synchronous
+    /// text/selection queries are answered from this on the iOS main thread (the EDT is a
+    /// separate ParparVM thread, so reading the live document there would race edits).
+    private static volatile com.codename1.ui.TextInputState tiSnapshot;
+    /// Generation of the last native-originated edit APPLIED to the Java document. Echoed back
+    /// with every state push so the native shadow can drop echoes that predate a newer local
+    /// edit (fast typing would otherwise regress the shadow text and caret).
+    private static volatile int tiNativeSeq;
 
     @Override
     public boolean isTextInputSupported() {
@@ -1427,6 +1435,8 @@ public class IOSImplementation extends CodenameOneImplementation {
     public Object startTextInput(com.codename1.ui.TextInputClient client, com.codename1.ui.TextInputConfig config) {
         tiClient = client;
         com.codename1.ui.TextInputState st = client.getEditingState();
+        tiSnapshot = st;
+        tiNativeSeq = 0;
         int constraint = config != null ? config.getConstraint() : 0;
         boolean autoCorrect = config == null || config.isAutoCorrect();
         boolean autoCap = config == null || config.isAutoCapitalize();
@@ -1446,8 +1456,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         com.codename1.ui.TextInputClient c = tiClient;
         int[] r = c != null ? c.getCaretRect() : new int[]{0, 0, 0, 0};
+        tiSnapshot = state;
         nativeInstance.updateTextInputState(state.getText(), state.getSelectionStart(), state.getSelectionEnd(),
-                r[0], r[1], r[2], r[3]);
+                r[0], r[1], r[2], r[3], tiNativeSeq);
         // Push the editor component's absolute bounds so the native input view can gate its touch region to
         // the editor (letting iOS draw its selection loupe/handles there) while passing other touches through.
         if (c instanceof com.codename1.ui.Component) {
@@ -1467,14 +1478,14 @@ public class IOSImplementation extends CodenameOneImplementation {
 
     private static void tiKeepNativeCallbacksAlive() {
         if (tiKeepAlive) {
-            tiCommit("");
-            tiSetComposing("", 0);
-            tiFinishComposing();
-            tiDeleteBackward();
+            tiCommit("", 0);
+            tiSetComposing("", 0, 0);
+            tiFinishComposing(0);
+            tiDeleteBackward(0);
             tiKeyCommand(0, 0);
             tiEditorAction(0);
-            tiReplaceRange(0, 0, "");
-            tiSetSelection(0, 0);
+            tiReplaceRange(0, 0, "", 0);
+            tiSetSelection(0, 0, 0);
             tiTextLength();
             tiTextRange(0, 0);
             tiSelectionStart();
@@ -1494,53 +1505,58 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.stopTextInput();
     }
 
-    /// Callback from native: committed text.
-    public static void tiCommit(final String text) {
+    /// Callback from native: committed text. `seq` is the native edit generation, recorded on the
+    /// EDT right before the edit applies so subsequent state pushes echo it back.
+    public static void tiCommit(final String text, final int seq) {
         final com.codename1.ui.TextInputClient c = tiClient;
         if (c == null) {
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
+                tiNativeSeq = seq;
                 c.commitText(text);
             }
         });
     }
 
     /// Callback from native: IME composing (marked) text.
-    public static void tiSetComposing(final String text, final int rel) {
+    public static void tiSetComposing(final String text, final int rel, final int seq) {
         final com.codename1.ui.TextInputClient c = tiClient;
         if (c == null) {
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
+                tiNativeSeq = seq;
                 c.setComposingText(text, rel);
             }
         });
     }
 
     /// Callback from native: composition finished.
-    public static void tiFinishComposing() {
+    public static void tiFinishComposing(final int seq) {
         final com.codename1.ui.TextInputClient c = tiClient;
         if (c == null) {
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
+                tiNativeSeq = seq;
                 c.finishComposing();
             }
         });
     }
 
     /// Callback from native: delete backward (one character before caret).
-    public static void tiDeleteBackward() {
+    public static void tiDeleteBackward(final int seq) {
         final com.codename1.ui.TextInputClient c = tiClient;
         if (c == null) {
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
+                tiNativeSeq = seq;
                 c.deleteSurroundingText(1, 0);
             }
         });
@@ -1572,72 +1588,120 @@ public class IOSImplementation extends CodenameOneImplementation {
         });
     }
 
-    // ---- UITextInput geometry + range edits (native calls these; geometry queries run synchronously on
-    // the iOS main thread, which is also the Codename One EDT on iOS) ----
+    // ---- UITextInput text/selection/geometry queries. These arrive synchronously on the iOS
+    // MAIN thread while the EDT (a separate ParparVM thread) may be mid-edit, so text and
+    // selection are answered from the volatile immutable snapshot pushed with each state
+    // update, and layout-dependent geometry marshals onto the EDT. ----
 
     /// Total document length in UTF-16 characters.
     public static int tiTextLength() {
-        com.codename1.ui.TextInputClient c = tiClient;
-        return c != null ? c.getTextLength() : 0;
+        com.codename1.ui.TextInputState s = tiSnapshot;
+        return s != null ? s.getText().length() : 0;
     }
 
     /// Text in the range `[start, end)`.
     public static String tiTextRange(int start, int end) {
-        com.codename1.ui.TextInputClient c = tiClient;
-        return c != null ? c.getTextRange(start, end) : "";
+        com.codename1.ui.TextInputState s = tiSnapshot;
+        if (s == null) {
+            return "";
+        }
+        String t = s.getText();
+        int a = Math.max(0, Math.min(t.length(), start));
+        int b = Math.max(a, Math.min(t.length(), end));
+        return t.substring(a, b);
     }
 
     /// Current selection start offset.
     public static int tiSelectionStart() {
-        com.codename1.ui.TextInputClient c = tiClient;
-        return c != null ? c.getEditingState().getSelectionStart() : 0;
+        com.codename1.ui.TextInputState s = tiSnapshot;
+        return s != null ? s.getSelectionStart() : 0;
     }
 
     /// Current selection end offset.
     public static int tiSelectionEnd() {
-        com.codename1.ui.TextInputClient c = tiClient;
-        return c != null ? c.getEditingState().getSelectionEnd() : 0;
+        com.codename1.ui.TextInputState s = tiSnapshot;
+        return s != null ? s.getSelectionEnd() : 0;
+    }
+
+    /// Runs a geometry query against the live editor on the EDT and returns its result. The main
+    /// thread never holds locks the EDT needs (all native UI work is dispatched asynchronously),
+    /// so the bounded wait cannot deadlock.
+    private static int[] tiGeometryQuery(final TiGeometryOp op) {
+        final com.codename1.ui.TextInputClient c = tiClient;
+        if (c == null) {
+            return new int[0];
+        }
+        Display d = Display.getInstance();
+        if (d.isEdt()) {
+            return op.run(c);
+        }
+        final int[][] out = new int[1][];
+        d.callSeriallyAndWait(new Runnable() {
+            public void run() {
+                if (c == tiClient) {
+                    out[0] = op.run(c);
+                }
+            }
+        });
+        return out[0] != null ? out[0] : new int[0];
+    }
+
+    private interface TiGeometryOp {
+        int[] run(com.codename1.ui.TextInputClient c);
     }
 
     /// Caret rectangle for an offset, absolute screen pixels `{x, y, w, h}`.
-    public static int[] tiRectForOffset(int offset) {
-        com.codename1.ui.TextInputClient c = tiClient;
-        return c != null ? c.rectForOffset(offset) : new int[]{0, 0, 0, 0};
+    public static int[] tiRectForOffset(final int offset) {
+        int[] r = tiGeometryQuery(new TiGeometryOp() {
+            public int[] run(com.codename1.ui.TextInputClient c) {
+                return c.rectForOffset(offset);
+            }
+        });
+        return r.length >= 4 ? r : new int[]{0, 0, 0, 0};
     }
 
     /// Document offset nearest an absolute screen point (pixels).
-    public static int tiOffsetAtPoint(int x, int y) {
-        com.codename1.ui.TextInputClient c = tiClient;
-        return c != null ? c.offsetAtPoint(x, y) : 0;
+    public static int tiOffsetAtPoint(final int x, final int y) {
+        int[] r = tiGeometryQuery(new TiGeometryOp() {
+            public int[] run(com.codename1.ui.TextInputClient c) {
+                return new int[]{c.offsetAtPoint(x, y)};
+            }
+        });
+        return r.length > 0 ? r[0] : 0;
     }
 
     /// Selection rectangles for `[start, end)`, flat array of absolute-pixel `{x, y, w, h, ...}`.
-    public static int[] tiSelectionRects(int start, int end) {
-        com.codename1.ui.TextInputClient c = tiClient;
-        return c != null ? c.selectionRects(start, end) : new int[0];
+    public static int[] tiSelectionRects(final int start, final int end) {
+        return tiGeometryQuery(new TiGeometryOp() {
+            public int[] run(com.codename1.ui.TextInputClient c) {
+                return c.selectionRects(start, end);
+            }
+        });
     }
 
     /// Callback from native: replace a range with text (range based edit).
-    public static void tiReplaceRange(final int start, final int end, final String text) {
+    public static void tiReplaceRange(final int start, final int end, final String text, final int seq) {
         final com.codename1.ui.TextInputClient c = tiClient;
         if (c == null) {
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
+                tiNativeSeq = seq;
                 c.replaceRange(start, end, text);
             }
         });
     }
 
     /// Callback from native: set the selection range.
-    public static void tiSetSelection(final int start, final int end) {
+    public static void tiSetSelection(final int start, final int end, final int seq) {
         final com.codename1.ui.TextInputClient c = tiClient;
         if (c == null) {
             return;
         }
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
+                tiNativeSeq = seq;
                 c.setSelectionRange(start, end);
             }
         });

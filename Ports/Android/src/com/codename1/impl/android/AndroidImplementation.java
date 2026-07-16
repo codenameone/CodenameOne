@@ -299,11 +299,36 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private static volatile com.codename1.ui.TextInputClient activeInputClient;
     private static volatile com.codename1.ui.TextInputState activeInputState;
     private static volatile com.codename1.ui.TextInputConfig activeInputConfig;
+    /// Synchronous mirror of edits the input connection has posted but the EDT has not yet
+    /// applied and echoed back. IMEs (notably Gboard) commit text and immediately re-read the
+    /// surrounding text; without this mirror they would see pre-commit text and desync their
+    /// suggestion model. Cleared when the authoritative state from the EDT has caught up with
+    /// every posted edit (the seq pair below).
+    private static volatile com.codename1.ui.TextInputState pendingInputState;
+    /// Generation of the last edit the input connection posted (written on the IME thread).
+    private static volatile int pendingPostedSeq;
+    /// Generation of the last posted edit the EDT applied (written on the EDT).
+    private static volatile int pendingAppliedSeq;
 
-    /// Returns the last editing state pushed down for the active text input client, read synchronously by
-    /// `CN1TextInputConnection` on the IME thread.
+    /// Returns the editing state as the IME must see it right now: the pending synchronous
+    /// mirror when an edit is in flight, otherwise the last state pushed from the EDT.
     static com.codename1.ui.TextInputState currentInputState() {
-        return activeInputState;
+        com.codename1.ui.TextInputState pending = pendingInputState;
+        return pending != null ? pending : activeInputState;
+    }
+
+    /// Records the input connection's synchronous mirror of an in-flight edit and returns the
+    /// edit's generation; the connection marks it applied from the EDT runnable that delivers
+    /// the edit to the client.
+    static int setPendingInputState(com.codename1.ui.TextInputState state) {
+        pendingInputState = state;
+        return ++pendingPostedSeq;
+    }
+
+    /// Marks a posted edit as applied on the EDT (called right before the client mutation whose
+    /// state push may then retire the mirror).
+    static void markPendingApplied(int seq) {
+        pendingAppliedSeq = seq;
     }
 
     static com.codename1.ui.TextInputConfig currentInputConfig() {
@@ -428,6 +453,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         activeInputClient = client;
         activeInputConfig = config;
         activeInputState = client.getEditingState();
+        pendingInputState = null;
         final CodenameOneActivity a = getActivity();
         final CodenameOneSurface view = myView;
         if (a == null || view == null) {
@@ -458,6 +484,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return;
         }
         activeInputState = state;
+        // retire the connection's synchronous mirror only when this push reflects every posted
+        // edit; clearing early would hide an in-flight edit from the IME's immediate re-reads
+        if (pendingAppliedSeq == pendingPostedSeq) {
+            pendingInputState = null;
+        }
         final CodenameOneActivity a = getActivity();
         final CodenameOneSurface view = myView;
         if (a == null || view == null) {
@@ -484,6 +515,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         activeInputClient = null;
         activeInputState = null;
         activeInputConfig = null;
+        pendingInputState = null;
         final CodenameOneActivity a = getActivity();
         final CodenameOneSurface view = myView;
         if (a == null || view == null) {

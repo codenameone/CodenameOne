@@ -853,6 +853,15 @@ public class RichView extends EditorView {
         if (st.getHighlight() >= 0) {
             g.setColor(st.getHighlight());
             g.fillRect(cx, y, w, lineHeight);
+        } else if (st.isMonospace()) {
+            // no monospace family ships with the framework fonts, so inline code runs get a
+            // subtle text-color tint instead; the style still round-trips through the
+            // serializers so consumers with a real code font keep the semantic
+            int alpha = g.getAlpha();
+            g.setColor(getTextColor());
+            g.setAlpha(24);
+            g.fillRect(cx, y, w, lineHeight);
+            g.setAlpha(alpha);
         }
         int decoration = 0;
         if (st.isUnderline()) {
@@ -906,12 +915,14 @@ public class RichView extends EditorView {
             pendingStyle = withFlag(base, w, value);
             return;
         }
+        Object before = beginFormatEdit();
         inline.transformRange(s, e, new InlineStyles.StyleTransform() {
             @Override
             public TextStyle apply(TextStyle st) {
                 return withFlag(st, w, value);
             }
         });
+        commitFormatEdit(s, before);
         afterStyleChange();
     }
 
@@ -1004,12 +1015,14 @@ public class RichView extends EditorView {
             pendingStyle = TextStyle.DEFAULT;
             return;
         }
+        Object before = beginFormatEdit();
         inline.transformRange(s, e, new InlineStyles.StyleTransform() {
             @Override
             public TextStyle apply(TextStyle st) {
                 return TextStyle.DEFAULT;
             }
         });
+        commitFormatEdit(s, before);
         afterStyleChange();
     }
 
@@ -1021,7 +1034,9 @@ public class RichView extends EditorView {
             pendingStyle = t.apply(base);
             return;
         }
+        Object before = beginFormatEdit();
         inline.transformRange(s, e, t);
+        commitFormatEdit(s, before);
         afterStyleChange();
     }
 
@@ -1033,6 +1048,33 @@ public class RichView extends EditorView {
         repaint();
     }
 
+    // ---- formatting undo: a formatting command replaces no text, so its undo unit carries only
+    // the before/after rich-model snapshots; undo/redo swap the styling in place. The depth guard
+    // keeps compound commands (applyLink mutates linkRuns then styles through applyStyle) as ONE
+    // undo unit. ----
+
+    private int formatEditDepth;
+
+    /// Starts a formatting undo unit; returns the pre-change snapshot, or null when nested inside
+    /// an outer formatting edit (which owns the unit).
+    private Object beginFormatEdit() {
+        formatEditDepth++;
+        return formatEditDepth > 1 ? null : captureDocumentState();
+    }
+
+    /// Closes a formatting undo unit opened by `#beginFormatEdit()`, recording it when this is the
+    /// outermost edit.
+    private void commitFormatEdit(int anchor, Object before) {
+        formatEditDepth--;
+        if (before == null) {
+            return;
+        }
+        UndoManager u = getUndoManager();
+        u.breakRun();
+        u.record(anchor, "", "", before, captureDocumentState());
+        u.breakRun();
+    }
+
     // ---- block formatting commands ----
 
     private void forEachSelectedBlock(BlockOp op) {
@@ -1040,9 +1082,11 @@ public class RichView extends EditorView {
         int e = getSelectionEnd();
         int firstLine = getDocument().lineOfOffset(s);
         int lastLine = getDocument().lineOfOffset(e);
+        Object before = beginFormatEdit();
         for (int ln = firstLine; ln <= lastLine; ln++) {
             op.apply(blocks.get(ln));
         }
+        commitFormatEdit(s, before);
         afterStyleChange();
     }
 
@@ -1133,7 +1177,11 @@ public class RichView extends EditorView {
         int end = getSelectionEnd();
         if (start == end) {
             pendingLink = url;
-        } else {
+        }
+        // one undo unit for the link target AND its appearance; the nested applyStyle
+        // sees formatEditDepth > 1 and leaves the recording to this outer edit
+        Object before = beginFormatEdit();
+        if (start != end) {
             for (int i = start; i < end && i < linkRuns.size(); i++) {
                 linkRuns.set(i, url);
             }
@@ -1144,6 +1192,7 @@ public class RichView extends EditorView {
                 return st.withUnderline(true).withForeColor(0x1a73e8);
             }
         });
+        commitFormatEdit(start, start == end ? null : before);
     }
 
     /// Removes the link appearance from the selection.
@@ -1152,7 +1201,9 @@ public class RichView extends EditorView {
         int end = getSelectionEnd();
         if (start == end) {
             pendingLink = null;
-        } else {
+        }
+        Object before = beginFormatEdit();
+        if (start != end) {
             for (int i = start; i < end && i < linkRuns.size(); i++) {
                 linkRuns.set(i, null);
             }
@@ -1163,6 +1214,7 @@ public class RichView extends EditorView {
                 return st.withUnderline(false).withForeColor(-1);
             }
         });
+        commitFormatEdit(start, start == end ? null : before);
     }
 
     /// Returns whether an inline command (`bold`, `italic`, `underline`, `strikeThrough`) is active for

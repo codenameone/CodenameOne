@@ -4480,12 +4480,6 @@ public final class GeneratedAccess_java_util {
                 return typedTarget.remove((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1]);
             }
         }
-        if ("replace".equals(name)) {
-            if (matches(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.lang.Object.class}, false)) {
-                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Object.class, java.lang.Object.class, java.lang.Object.class}, false);
-                return typedTarget.replace((java.lang.Object) adaptedArgs[0], (java.lang.Object) adaptedArgs[1], (java.lang.Object) adaptedArgs[2]);
-            }
-        }
         if ("replaceAll".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{java.util.function.BiFunction.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.util.function.BiFunction.class}, false);

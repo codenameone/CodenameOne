@@ -38,8 +38,11 @@ extern JAVA_OBJECT fromNSString(CN1_THREAD_STATE_MULTI_ARG NSString* str);
 extern NSString* toNSString(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o);
 
 // Java callbacks (generated for the static methods on IOSImplementation)
-extern void com_codename1_impl_ios_IOSImplementation_tiReplaceRange___int_int_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_INT start, JAVA_INT end, JAVA_OBJECT text);
-extern void com_codename1_impl_ios_IOSImplementation_tiSetSelection___int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_INT start, JAVA_INT end);
+extern void com_codename1_impl_ios_IOSImplementation_tiReplaceRange___int_int_java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_INT start, JAVA_INT end, JAVA_OBJECT text, JAVA_INT seq);
+extern void com_codename1_impl_ios_IOSImplementation_tiSetSelection___int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_INT start, JAVA_INT end, JAVA_INT seq);
+extern void com_codename1_impl_ios_IOSImplementation_tiCommit___java_lang_String_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT text, JAVA_INT seq);
+extern void com_codename1_impl_ios_IOSImplementation_tiSetComposing___java_lang_String_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT text, JAVA_INT rel, JAVA_INT seq);
+extern void com_codename1_impl_ios_IOSImplementation_tiFinishComposing___int(CN1_THREAD_STATE_MULTI_ARG JAVA_INT seq);
 extern void com_codename1_impl_ios_IOSImplementation_tiKeyCommand___int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_INT command, JAVA_INT modifiers);
 extern void com_codename1_impl_ios_IOSImplementation_tiEditorAction___int(CN1_THREAD_STATE_MULTI_ARG JAVA_INT action);
 extern JAVA_OBJECT com_codename1_impl_ios_IOSImplementation_tiSelectionRects___int_int_R_int_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_INT start, JAVA_INT end);
@@ -121,6 +124,7 @@ static CN1TextInputView* cn1TextInputView = nil;
     NSMutableString* _shadow;
     NSRange _selectedRange;
     NSRange _markedRange;        // location == NSNotFound when there is no marked (IME) text
+    int _editSeq;                // generation of the last local edit forwarded to Java
     CGRect _caretRectPoints;     // last caret rectangle from Java, converted to points
     CGRect _editorBoundsPoints;  // the editor component's bounds in points; the touch region we own
     id _textInteraction;         // UITextInteraction (iOS 13+) driving the system loupe/handles/menu
@@ -364,6 +368,13 @@ static CN1TextInputView* cn1TextInputView = nil;
     return NSMakeRange(loc, end - loc);
 }
 
+// Bumps and returns the local edit generation. Every edit that notifies Java carries a seq;
+// Java echoes the seq of the last edit it APPLIED with each state push, and cn1SyncText drops
+// echoes whose seq is stale so a slow round trip can never regress the shadow under fast typing.
+- (int)cn1NextSeq {
+    return ++_editSeq;
+}
+
 // Applies an edit to the shadow mirror and (optionally) forwards it to Java as a range replacement.
 - (void)cn1EditRange:(NSRange)range with:(NSString *)text notify:(BOOL)notify {
     if (text == nil) {
@@ -374,9 +385,9 @@ static CN1TextInputView* cn1TextInputView = nil;
     _selectedRange = NSMakeRange(range.location + text.length, 0);
     _markedRange = NSMakeRange(NSNotFound, 0);
     if (notify) {
-        com_codename1_impl_ios_IOSImplementation_tiReplaceRange___int_int_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG
+        com_codename1_impl_ios_IOSImplementation_tiReplaceRange___int_int_java_lang_String_int(CN1_THREAD_GET_STATE_PASS_ARG
                 (JAVA_INT)range.location, (JAVA_INT)(range.location + range.length),
-                fromNSString(CN1_THREAD_GET_STATE_PASS_ARG text));
+                fromNSString(CN1_THREAD_GET_STATE_PASS_ARG text), (JAVA_INT)[self cn1NextSeq]);
     }
 }
 
@@ -396,9 +407,15 @@ static CN1TextInputView* cn1TextInputView = nil;
         return;
     }
     // UIKit contract: insertText replaces the marked (composing) text when present, otherwise the
-    // selection. IMEs that finalize a composition through insertText rely on this.
+    // selection. Deliver it as a COMMIT (like the Android and JS ports) so the client finalizes an
+    // active composition correctly and typed-text hooks (auto indent, bracket pairing) run.
     NSRange target = (_markedRange.location != NSNotFound) ? _markedRange : _selectedRange;
-    [self cn1EditRange:target with:text notify:YES];
+    target = [self clampRange:target];
+    [_shadow replaceCharactersInRange:target withString:text];
+    _selectedRange = NSMakeRange(target.location + text.length, 0);
+    _markedRange = NSMakeRange(NSNotFound, 0);
+    com_codename1_impl_ios_IOSImplementation_tiCommit___java_lang_String_int(CN1_THREAD_GET_STATE_PASS_ARG
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG text), (JAVA_INT)[self cn1NextSeq]);
 }
 
 - (void)deleteBackward {
@@ -445,8 +462,9 @@ static CN1TextInputView* cn1TextInputView = nil;
         return;
     }
     _selectedRange = newRange;
-    com_codename1_impl_ios_IOSImplementation_tiSetSelection___int_int(CN1_THREAD_GET_STATE_PASS_ARG
-            (JAVA_INT)newRange.location, (JAVA_INT)(newRange.location + newRange.length));
+    com_codename1_impl_ios_IOSImplementation_tiSetSelection___int_int_int(CN1_THREAD_GET_STATE_PASS_ARG
+            (JAVA_INT)newRange.location, (JAVA_INT)(newRange.location + newRange.length),
+            (JAVA_INT)[self cn1NextSeq]);
 }
 
 #pragma mark UITextInput - marked text (IME composition)
@@ -474,15 +492,22 @@ static CN1TextInputView* cn1TextInputView = nil;
         sel = (NSInteger)markedText.length;
     }
     _selectedRange = NSMakeRange(rep.location + sel, 0);
-    // Mirror the composing text to Codename One as a plain range replacement so the document stays in
-    // sync; the marked range is tracked natively only so iOS can keep composing.
-    com_codename1_impl_ios_IOSImplementation_tiReplaceRange___int_int_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG
-            (JAVA_INT)rep.location, (JAVA_INT)(rep.location + rep.length),
-            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG markedText));
+    // Forward the composition through the client's composing contract (like Android's
+    // setComposingText and the JS port's composition events) so the editor tracks the marked
+    // range, defers undo recording until the composition finalizes, and reports the composing
+    // span back through its editing state.
+    com_codename1_impl_ios_IOSImplementation_tiSetComposing___java_lang_String_int_int(CN1_THREAD_GET_STATE_PASS_ARG
+            fromNSString(CN1_THREAD_GET_STATE_PASS_ARG markedText), (JAVA_INT)sel,
+            (JAVA_INT)[self cn1NextSeq]);
 }
 
 - (void)unmarkText {
-    _markedRange = NSMakeRange(NSNotFound, 0);
+    if (_markedRange.location != NSNotFound) {
+        _markedRange = NSMakeRange(NSNotFound, 0);
+        // the composed text stays; the client finalizes it as one undo unit
+        com_codename1_impl_ios_IOSImplementation_tiFinishComposing___int(CN1_THREAD_GET_STATE_PASS_ARG
+                (JAVA_INT)[self cn1NextSeq]);
+    }
 }
 
 #pragma mark UITextInput - positions and ranges
@@ -633,13 +658,18 @@ static CN1TextInputView* cn1TextInputView = nil;
 #pragma mark sync from Java
 
 - (void)cn1SyncText:(NSString *)text selStart:(NSInteger)selStart selEnd:(NSInteger)selEnd
-          caretRect:(CGRect)caretPixels {
+          caretRect:(CGRect)caretPixels seq:(NSInteger)seq {
     CGFloat scale = [UIScreen mainScreen].scale;
     if (scale <= 0) {
         scale = 1;
     }
     _caretRectPoints = CGRectMake(caretPixels.origin.x / scale, caretPixels.origin.y / scale,
             MAX((CGFloat)2, caretPixels.size.width / scale), caretPixels.size.height / scale);
+    // A stale echo (the state push for edit N arriving after the user already typed edit N+1)
+    // must not regress the shadow text or caret; only the caret geometry above is refreshed.
+    if (seq != (NSInteger)_editSeq) {
+        return;
+    }
     // Never disturb an active IME composition; only the caret geometry is refreshed above.
     if (_markedRange.location != NSNotFound) {
         return;
@@ -654,9 +684,10 @@ static CN1TextInputView* cn1TextInputView = nil;
 }
 
 - (void)cn1ResetComposition {
-    // a marked range left over from a previous session would make cn1SyncText refuse to load the
-    // new session's text forever (every subsequent range edit would target the old document)
+    // A marked range or edit generation left over from a previous session would make cn1SyncText
+    // refuse the new session's state forever; both reset when a session starts or stops.
     _markedRange = NSMakeRange(NSNotFound, 0);
+    _editSeq = 0;
 }
 
 @end
@@ -724,7 +755,7 @@ void com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boole
             }
             cn1TextInputView.returnKeyType = rk;
             [cn1TextInputView cn1ResetComposition];
-            [cn1TextInputView cn1SyncText:(startText != nil ? startText : @"") selStart:selStart selEnd:selEnd caretRect:CGRectMake(0, 0, 2, 16)];
+            [cn1TextInputView cn1SyncText:(startText != nil ? startText : @"") selStart:selStart selEnd:selEnd caretRect:CGRectMake(0, 0, 2, 16) seq:0];
             UIViewController* vc = [CodenameOne_GLViewController instance];
             if (vc != nil) {
                 cn1TextInputView.frame = vc.view.bounds;
@@ -752,13 +783,13 @@ void com_codename1_impl_ios_IOSNative_setTextInputBounds___int_int_int_int(CN1_T
     });
 }
 
-void com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_String_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT text, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT caretX, JAVA_INT caretY, JAVA_INT caretW, JAVA_INT caretH) {
+void com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_String_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT text, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT caretX, JAVA_INT caretY, JAVA_INT caretW, JAVA_INT caretH, JAVA_INT seq) {
     NSString* nsText = text != NULL ? toNSString(CN1_THREAD_GET_STATE_PASS_ARG text) : nil;
     CGRect caret = CGRectMake(caretX, caretY, caretW, caretH);
     dispatch_async(dispatch_get_main_queue(), ^{
         @autoreleasepool {
             if (cn1TextInputView != nil) {
-                [cn1TextInputView cn1SyncText:nsText selStart:selStart selEnd:selEnd caretRect:caret];
+                [cn1TextInputView cn1SyncText:nsText selStart:selStart selEnd:selEnd caretRect:caret seq:seq];
             }
         }
     });
@@ -781,7 +812,7 @@ void com_codename1_impl_ios_IOSNative_stopTextInput__(CN1_THREAD_STATE_MULTI_ARG
 // watchOS has no UIKeyInput / UITextInput keyboard support; provide stubs so the symbols still link.
 void com_codename1_impl_ios_IOSNative_startTextInput___int_boolean_boolean_boolean_java_lang_String_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT constraint, JAVA_BOOLEAN autoCorrect, JAVA_BOOLEAN autoCapitalize, JAVA_BOOLEAN multiline, JAVA_OBJECT initialText, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT actionType) {
 }
-void com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_String_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT text, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT caretX, JAVA_INT caretY, JAVA_INT caretW, JAVA_INT caretH) {
+void com_codename1_impl_ios_IOSNative_updateTextInputState___java_lang_String_int_int_int_int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT text, JAVA_INT selStart, JAVA_INT selEnd, JAVA_INT caretX, JAVA_INT caretY, JAVA_INT caretW, JAVA_INT caretH, JAVA_INT seq) {
 }
 void com_codename1_impl_ios_IOSNative_setTextInputBounds___int_int_int_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT x, JAVA_INT y, JAVA_INT w, JAVA_INT h) {
 }
