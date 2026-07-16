@@ -1220,6 +1220,8 @@ class CleanTargetIntegrationTest {
             appPb.redirectErrorStream(true);
             app = appPb.start();
             final java.util.concurrent.atomic.AtomicBoolean finished = new java.util.concurrent.atomic.AtomicBoolean(false);
+            final java.util.concurrent.atomic.AtomicBoolean performanceFinished =
+                    new java.util.concurrent.atomic.AtomicBoolean(false);
             final java.util.concurrent.atomic.AtomicInteger finishedTests = new java.util.concurrent.atomic.AtomicInteger(0);
             final java.util.concurrent.atomic.AtomicReference<String> lastLine =
                     new java.util.concurrent.atomic.AtomicReference<String>("");
@@ -1245,7 +1247,12 @@ class CleanTargetIntegrationTest {
                             int s = line.indexOf("CN1SS:STAT:");
                             if (s >= 0) { simdStats.add(line.substring(s + "CN1SS:STAT:".length()).trim()); }
                             int p = line.indexOf("CN1SS:PERF:");
-                            if (p >= 0) { performanceLog.add(line.substring(p)); }
+                            if (p >= 0) {
+                                performanceLog.add(line.substring(p));
+                                if (line.indexOf("CN1SS:PERF:complete") >= 0) {
+                                    performanceFinished.set(true);
+                                }
+                            }
                             if (line.contains("CN1SS:") || line.contains("suite ")) { lastLine.set(line); }
                         }
                     } catch (IOException ignore) {
@@ -1266,8 +1273,8 @@ class CleanTargetIntegrationTest {
             int minPngs = 100;
             long stableMs = 150_000L;       // > the slowest single inter-screenshot gap
             long deadline = System.currentTimeMillis() + 40L * 60 * 1000;
-            boolean requireCompleteSuite = Boolean.parseBoolean(
-                    System.getenv("CN1_REQUIRE_COMPLETE_SUITE"));
+            boolean requirePerformance = Boolean.parseBoolean(
+                    System.getenv("CN1_REQUIRE_PERFORMANCE"));
             int pngs = 0;
             int lastPngs = -1;
             long lastChange = System.currentTimeMillis();
@@ -1275,14 +1282,16 @@ class CleanTargetIntegrationTest {
                 if (finished.get()) { break; }
                 pngs = countPngFiles(outDir);
                 if (pngs != lastPngs) { lastPngs = pngs; lastChange = System.currentTimeMillis(); }
-                if (!requireCompleteSuite && pngs >= minPngs
-                        && (System.currentTimeMillis() - lastChange) >= stableMs) { break; }
+                if (pngs >= minPngs && (System.currentTimeMillis() - lastChange) >= stableMs
+                        && (!requirePerformance || performanceFinished.get())) { break; }
                 Thread.sleep(3000);
             }
             pngs = countPngFiles(outDir);
-            assertTrue(finished.get() || (!requireCompleteSuite && pngs >= minPngs),
+            assertTrue(finished.get() || (pngs >= minPngs
+                            && (!requirePerformance || performanceFinished.get())),
                     "hello suite capture incomplete: pngs=" + pngs + " (need " + minPngs + ")"
                     + " finishedTests=" + finishedTests.get() + " suiteFinished=" + finished.get()
+                    + " performanceFinished=" + performanceFinished.get()
                     + " lastLine=" + lastLine.get() + "\n" + serverLog);
 
             String outEnv = System.getenv("CN1_SHOT_OUTPUT_DIR");

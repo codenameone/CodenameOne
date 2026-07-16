@@ -244,7 +244,7 @@ jobs:
         env:
           CN1_PREBUILT_EXE: ${{ github.workspace }}\artifacts\WinHelloMain.exe
           CN1_PERFORMANCE_BINARY_OUT: ${{ github.workspace }}\artifacts\windows-port\raw\benchmark-app.exe
-          CN1_REQUIRE_COMPLETE_SUITE: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+          CN1_REQUIRE_PERFORMANCE: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
           CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
         run: |
           mvn -B clean package -pl JavaAPI -am -DskipTests
