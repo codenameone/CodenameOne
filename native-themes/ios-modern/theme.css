@@ -116,6 +116,9 @@
        other platforms (e.g. Material ripple) are unaffected. ~180ms matches the
        native settle without feeling laggy. */
     buttonReleaseFadeDurationInt: 180;
+    /* Circular Liquid Glass toolbar items render the command glyph only when one
+       is available. Button preserves the command title for accessibility. */
+    hideToolbarCommandTextWithIconBool: true;
 
     includeNativeBool: false;
     darkModeBool: true;
@@ -260,14 +263,20 @@
        ~5.9x4.3mm, wider than tall) with a soft drop shadow, sitting on one
        continuous track (no M3 gap / stop dot). sliderThumbHeightMM makes it a
        horizontal capsule; without it the thumb spans the component height. */
-    sliderThumbWidthMM: "5.0";
+    sliderThumbWidthMM: "6.5";
     sliderThumbHeightMM: "3.8";
     sliderContinuousTrackBool: true;
     sliderThumbShadowSizeMM: "0.4";
+    /* UIProgressView is a very thin capsule inside its (potentially taller)
+       layout box. Slider's non-editable native-progress painter reads this. */
+    progressTrackThicknessMM: "0.6";
     /* iOS picker wheel: the 3D perspective fade (rows shrink/dim toward the edges)
        and ~7 visible rows, matching a native UIPickerView. */
     ios7SpinnerBool: true;
     spinnerElementsInt: 7;
+    /* White off-centre values need substantially more opacity over the black
+       picker background than black values need over the light background. */
+    spinnerPerspectiveDarkFadePctInt: 60;
     /* No sliding underline under the selected tab -- the native UITabBar tints the
        selected item instead. */
     tabsAnimatedIndicatorThicknessMm: "0";
@@ -365,6 +374,10 @@ RaisedButton {
     color: #ffffff;
     background-color: var(--accent-color, #007aff);
     cn1-background-type: cn1-pill-border;
+    border: 0.1mm solid rgba(136,254,255,0.58);
+    cn1-stroke-gradient: #ffffff;
+    cn1-stroke-gradient-angle: 135deg;
+    padding: 1.1mm 2.2mm 1.1mm 2.2mm;
     text-align: center;
 }
 RaisedButton.pressed { color: #ffffff; background-color: var(--accent-pressed-color, #0064d1); cn1-background-type: cn1-pill-border; }
@@ -374,8 +387,8 @@ RaisedButton.disabled { color: #ffffff; background-color: #b3a8a0; cn1-backgroun
 /* Gray button (.gray / .bordered): dark label on a DARKER (greyer) semi-opaque pill
    distinct from the lighter regular Button fill above. Semi-opaque, no blur -- see
    the Button note on why the buttons avoid backdrop-filter. */
-FlatButton { cn1-derive: Button; color: #1c1c1e; background-color: rgba(199,197,198,0.80); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.8mm 1.1mm 2.8mm; }
-FlatButton.pressed { color: #1c1c1e; background-color: rgba(186,184,185,0.85); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.8mm 1.1mm 2.8mm; }
+FlatButton { cn1-derive: Button; color: #1c1c1e; background-color: rgba(199,197,198,0.80); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
+FlatButton.pressed { color: #1c1c1e; background-color: rgba(186,184,185,0.85); cn1-background-type: cn1-pill-border; padding: 1.1mm 2mm 1.1mm 2mm; }
 
 TextField {
     color: #000000;
@@ -524,13 +537,13 @@ SliderFull.disabled { background-color: #a6d0ff; }
 ProgressBar {
     background-color: #e5e5ea;
     color: var(--accent-color, #007aff);
-    border-radius: 1mm;
+    cn1-background-type: cn1-pill-border;
     padding: 0;
     margin: 0;
 }
 ProgressBarFull {
     background-color: var(--accent-color, #007aff);
-    border-radius: 1mm;
+    cn1-background-type: cn1-pill-border;
 }
 
 /* iOS picker wheel (UIPickerView). The rows are black centred labels on a clear
@@ -554,7 +567,8 @@ SpinnerRenderer {
 SpinnerRenderer.selected {
     color: #000000;
     background-color: rgba(120,120,128,0.10);
-    border-radius: 2.5mm;
+    cn1-background-type: cn1-pill-border;
+    margin: 0 2mm 0 2mm;
     text-align: center;
     padding: 0.4mm 2mm 0.4mm 2mm;
 }
@@ -564,7 +578,8 @@ SpinnerRenderer.selected {
 SpinnerRendererFocus {
     color: #000000;
     background-color: rgba(120,120,128,0.16);
-    border-radius: 2mm;
+    cn1-background-type: cn1-pill-border;
+    margin: 0 2mm 0 2mm;
     text-align: center;
     padding: 0.4mm 2mm 0.4mm 2mm;
 }
@@ -813,7 +828,7 @@ TabIcon.pressed { background-color: transparent; }
 GlassPanel {
     color: #3c3c43;
     background-color: transparent;
-    border-radius: 2.8mm;
+    border-radius: 1.4mm;
     backdrop-filter: blur(40px);
     padding: 0;
     margin: 1mm;
@@ -1057,14 +1072,14 @@ PopupContent {
     /* Item 3: disabled regular button is a faded grey label on the dark glass. */
     Button.disabled { color: #636366; background-color: rgba(30,30,32,0.74); cn1-background-type: cn1-pill-border; }
     /* Gray button (.gray): white label on a slightly lighter dark glass pill. */
-    FlatButton { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.8mm 1.1mm 2.8mm; }
-    FlatButton.pressed { color: #ffffff; background-color: rgba(150,143,138,0.78); cn1-background-type: cn1-pill-border; padding: 1.1mm 2.8mm 1.1mm 2.8mm; }
+    FlatButton { color: #ffffff; background-color: rgba(134,127,122,0.74); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
+    FlatButton.pressed { color: #ffffff; background-color: rgba(150,143,138,0.78); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(255,255,255,0.58); cn1-stroke-gradient: #8e8e93; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2mm 1.1mm 2mm; }
 
     /* Prominent filled button: white label on the OPAQUE dark accent pill. */
-    RaisedButton { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
-    RaisedButton.pressed { color: #ffffff; background-color: var(--accent-pressed-color-dark, #64b1ff); cn1-background-type: cn1-pill-border; }
+    RaisedButton { color: #ffffff; background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(136,254,255,0.58); cn1-stroke-gradient: #ffffff; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2.2mm 1.1mm 2.2mm; }
+    RaisedButton.pressed { color: #ffffff; background-color: var(--accent-pressed-color-dark, #64b1ff); cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(136,254,255,0.58); cn1-stroke-gradient: #ffffff; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2.2mm 1.1mm 2.2mm; }
     /* Item 3: disabled prominent button is a desaturated dark-taupe pill. */
-    RaisedButton.disabled { color: #8e8e93; background-color: #48423e; cn1-background-type: cn1-pill-border; }
+    RaisedButton.disabled { color: #8e8e93; background-color: #48423e; cn1-background-type: cn1-pill-border; border: 0.1mm solid rgba(136,254,255,0.58); cn1-stroke-gradient: #ffffff; cn1-stroke-gradient-angle: 135deg; padding: 1.1mm 2.2mm 1.1mm 2.2mm; }
 
     /* Dark grouped cell: #2c2c2e contrasts with the #1c1c1e form (was #1c1c1e ==
        form -> invisible field). Hairline + blur for the glass character. */
@@ -1107,8 +1122,8 @@ PopupContent {
     SliderFull.disabled { background-color: #2a4a73; }
     /* Dark progress bar: the empty track must be a DARK grey, not the light #e5e5ea
        carried over from the base rule (which read as a white bar on the dark tile). */
-    ProgressBar { background-color: #3a3a3c; color: var(--accent-color-dark, #0a84ff); }
-    ProgressBarFull { background-color: var(--accent-color-dark, #0a84ff); }
+    ProgressBar { background-color: #3a3a3c; color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
+    ProgressBarFull { background-color: var(--accent-color-dark, #0a84ff); cn1-background-type: cn1-pill-border; }
     /* Dark picker wheel: white labels, lighter translucent selection band. */
     /* Item 11: on the dark wheel the perspective-faded (background) rows were
        nearly invisible. The rows must start WHITE: the ios7Spinner perspective
@@ -1118,8 +1133,8 @@ PopupContent {
        A grey base (#a8a8ad) faded to near-black and made value 1/2/4/5 invisible,
        which also scored WORSE against the native reference. */
     SpinnerRenderer { color: #ffffff; background-color: transparent; }
-    SpinnerRenderer.selected { color: #ffffff; background-color: rgba(120,120,128,0.18); border-radius: 2.5mm; }
-    SpinnerRendererFocus { color: #ffffff; background-color: rgba(120,120,128,0.26); border-radius: 2mm; }
+    SpinnerRenderer.selected { color: #ffffff; background-color: rgba(120,120,128,0.18); cn1-background-type: cn1-pill-border; margin: 0 2mm 0 2mm; }
+    SpinnerRendererFocus { color: #ffffff; background-color: rgba(120,120,128,0.26); cn1-background-type: cn1-pill-border; margin: 0 2mm 0 2mm; }
     SpinnerOverlay { background-color: transparent; }
 
     OnOffSwitch { color: var(--accent-color-dark, #0a84ff); background-color: #2c2c2e; }
@@ -1172,7 +1187,7 @@ PopupContent {
 
     /* Dark glass panel: a translucent dark tint so the backdrop reads through as
        Liquid Glass (matches the dark UIVisualEffectView in the isolation tests). */
-    GlassPanel { color: #ebebf5; background-color: transparent; border-radius: 2.8mm; backdrop-filter: blur(40px); padding: 0; margin: 1mm; }
+    GlassPanel { color: #ebebf5; background-color: transparent; border-radius: 1.4mm; backdrop-filter: blur(40px); padding: 0; margin: 1mm; }
     GlassText { color: #ebebf5; background-color: transparent; cn1-background-type: cn1-pill-border; backdrop-filter: blur(40px); padding: 0; margin: 1mm; }
     GlassTextLabel { color: #ffffff; background-color: transparent; font-family: "native:MainRegular"; font-size: 1.8mm; text-align: center; padding: 0; margin: 0; }
 

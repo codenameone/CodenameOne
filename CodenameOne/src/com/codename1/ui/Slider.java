@@ -434,6 +434,15 @@ public class Slider extends Label implements ActionSource {
     /// Paint the progress indicator
     @Override
     public void paintComponentBackground(Graphics g) {
+        // Native progress indicators are thin capsules even when their component
+        // receives a taller touch/layout box.  Keep this opt-in so legacy themes
+        // and progress bars with image backgrounds retain their existing painter.
+        if (!infinite && !vertical && !isEditable()) {
+            String progressTrackMM = getUIManager().getThemeConstant("progressTrackThicknessMM", null);
+            if (progressTrackMM != null && paintNativeProgress(g, progressTrackMM)) {
+                return;
+            }
+        }
         // Opt-in native-slider look (Material 3): a thin rounded track with the
         // active portion in the accent colour and a vertical bar thumb, instead of
         // the legacy full-height fill. Gated on the sliderTrackThicknessMM theme
@@ -635,6 +644,44 @@ public class Slider extends Label implements ActionSource {
         // whether it is taller than wide (Material) or wider than tall (iOS).
         int thumbArc = Math.min(thumbW, thumbH);
         g.fillRoundRect(thumbX, thumbY, thumbW, thumbH, thumbArc, thumbArc);
+        if (aa) {
+            g.setAntiAliased(priorAa);
+        }
+        return true;
+    }
+
+    /// Paints a thin, continuous pill track for native progress indicators.
+    /// Empty/full colours come from the regular Slider UIID pair so light/dark
+    /// and runtime palette overrides continue to work normally.
+    private boolean paintNativeProgress(Graphics g, String trackMM) {
+        float tmm;
+        try {
+            tmm = Float.parseFloat(trackMM.trim());
+        } catch (NumberFormatException notANumber) {
+            return false;
+        }
+        if (tmm <= 0) {
+            return false;
+        }
+        int track = Math.max(2, Display.getInstance().convertToPixels(tmm));
+        int x = getX();
+        int y = getY() + (getHeight() - track) / 2;
+        int width = getWidth();
+        int range = maxValue - minValue;
+        int fullWidth = range <= 0 ? 0
+                : (int) (((float) (value - minValue) / (float) range) * width);
+
+        boolean aa = g.isAntiAliasingSupported();
+        boolean priorAa = g.isAntiAliased();
+        if (aa) {
+            g.setAntiAliased(true);
+        }
+        g.setColor(getSliderEmptyUnselectedStyle().getBgColor());
+        g.fillRoundRect(x, y, width, track, track, track);
+        if (fullWidth > 0) {
+            g.setColor(getSliderFullUnselectedStyle().getBgColor());
+            g.fillRoundRect(x, y, Math.min(width, fullWidth), track, track, track);
+        }
         if (aa) {
             g.setAntiAliased(priorAa);
         }

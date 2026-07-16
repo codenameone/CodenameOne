@@ -35,6 +35,8 @@ import java.util.Hashtable;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * End-to-end check: load the shipped iOS Modern native theme `.res`,
@@ -87,6 +89,25 @@ public class NativeThemeBindingsTest extends UITestBase {
         assertEquals("DialogCenteredTitle", theme.get("@dlgCenteredTitleUIID"));
         assertEquals("c6c6c8", theme.get("@dlgInvisibleButtons"));
         assertEquals("38383a", theme.get("@dlgInvisibleButtonsDark"));
+        assertEquals("true", theme.get("@hideToolbarCommandTextWithIconBool"));
+        assertEquals("60", theme.get("@spinnerPerspectiveDarkFadePctInt"));
+        assertEquals("0.6", theme.get("@progressTrackThicknessMM"));
+        RoundBorder raisedBorder = assertInstanceOf(RoundBorder.class,
+                theme.get("RaisedButton.border"));
+        assertTrue(raisedBorder.isStrokeGradient(),
+                "RaisedButton must retain its Liquid Glass gradient rim");
+        RoundBorder flatBorder = assertInstanceOf(RoundBorder.class,
+                theme.get("FlatButton.border"));
+        assertTrue(flatBorder.isStrokeGradient(),
+                "FlatButton must retain its Liquid Glass gradient rim");
+        RoundBorder darkRaisedBorder = assertInstanceOf(RoundBorder.class,
+                theme.get("$DarkRaisedButton.border"));
+        assertTrue(darkRaisedBorder.isStrokeGradient(),
+                "dark RaisedButton must retain its Liquid Glass gradient rim");
+        RoundBorder darkFlatBorder = assertInstanceOf(RoundBorder.class,
+                theme.get("$DarkFlatButton.border"));
+        assertTrue(darkFlatBorder.isStrokeGradient(),
+                "dark FlatButton must retain its Liquid Glass gradient rim");
         assertFalse(theme.containsKey("@dialogTitleCenterBool"),
                 "The native iOS theme must not opt existing dialogs into the centered layout");
 
