@@ -37,12 +37,38 @@ class AndroidScreenshotTask implements Runnable {
         }
 
         if (Build.VERSION.SDK_INT >= 26) {
-            tryPixelCopy(w, h);
+            captureAfterNextFrame(w, h);
             return;
         }
 
         // Pre-Oreo: fallback to drawing the view
         tryFallbackDraw(w, h);
+    }
+
+    /// PixelCopy reads the window's last PRESENTED frame, which has no ordering
+    /// guarantee against Codename One paints that were only just enqueued on the
+    /// EDT (the async view renders them on a later UI-thread frame). A capture
+    /// requested right after a repaint could therefore read the previous frame --
+    /// observed as the pure text editor screenshot tests uploading an empty
+    /// content area from the CI emulator. Force a draw pass and only issue the
+    /// PixelCopy once that frame is committed to the render pipeline.
+    private void captureAfterNextFrame(final int w, final int h) {
+        final View v = (View) view;
+        v.invalidate();
+        // Wait two vsyncs after the invalidate: the first frame draws and commits the
+        // invalidated content, the second fires once that frame is up, so the PixelCopy
+        // reads a surface that contains every paint enqueued before the capture request.
+        android.view.Choreographer.getInstance().postFrameCallback(new android.view.Choreographer.FrameCallback() {
+            @Override
+            public void doFrame(long frameTimeNanos) {
+                android.view.Choreographer.getInstance().postFrameCallback(new android.view.Choreographer.FrameCallback() {
+                    @Override
+                    public void doFrame(long frameTimeNanos2) {
+                        tryPixelCopy(w, h);
+                    }
+                });
+            }
+        });
     }
 
     private void tryPixelCopy(final int w, final int h) {
