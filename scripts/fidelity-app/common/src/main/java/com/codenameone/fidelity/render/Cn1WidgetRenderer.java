@@ -240,8 +240,9 @@ public final class Cn1WidgetRenderer {
             // no image.  Supply a transparent icon of the themed slot size so CN1
             // keeps the same title position and overall bar height.
             Tabs tabs = new Tabs(Component.TOP);
-            int blankSize = com.codename1.ui.Display.getInstance().convertToPixels(6.75f);
-            Image blankIcon = Image.createImage(blankSize, blankSize, 0);
+            int blankWidth = com.codename1.ui.Display.getInstance().convertToPixels(6.75f);
+            int blankHeight = com.codename1.ui.Display.getInstance().convertToPixels(3.75f);
+            Image blankIcon = Image.createImage(blankWidth, blankHeight, 0);
             tabs.addTab("Tab", blankIcon, new Container());
             c = tabs;
         } else if ("Tabs".equals(id) || "TabsGeom".equals(id) || "TabsMorph".equals(id)) {
