@@ -34,7 +34,7 @@ extract_dir="${tmp_dir}/extract"
 
 # --retry-all-errors makes curl retry HTTP 5xx responses too (with -f alone a
 # 503 fails immediately); api.github.com throws transient 5xx during incidents.
-curl_args=(
+base_args=(
   -fsSL
   --retry 5
   --retry-delay 5
@@ -42,12 +42,23 @@ curl_args=(
   -H "Accept: application/vnd.github+json"
   -H "X-GitHub-Api-Version: 2022-11-28"
 )
+curl_args=("${base_args[@]}")
 if [ -n "${GITHUB_TOKEN:-}" ]; then
   curl_args+=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
 fi
 
 echo "Fetching latest codenameone-skins release metadata..." >&2
-curl "${curl_args[@]}" -o "${release_json}" "${RELEASES_URL}"
+# The token only exists to raise the rate limit; during GitHub incidents the
+# authenticated pool can 503 while anonymous requests succeed (observed), so
+# fall back to an anonymous lookup before giving up.
+if ! curl "${curl_args[@]}" -o "${release_json}" "${RELEASES_URL}"; then
+  if [ -n "${GITHUB_TOKEN:-}" ]; then
+    echo "Authenticated release lookup failed; retrying anonymously..." >&2
+    curl "${base_args[@]}" -o "${release_json}" "${RELEASES_URL}"
+  else
+    exit 1
+  fi
+fi
 
 asset_url="$(
   python3 -c '

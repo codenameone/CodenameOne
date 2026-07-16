@@ -99,7 +99,7 @@ import time
 import urllib.error
 import urllib.request
 
-def fetch():
+def fetch(token):
     request = urllib.request.Request(
         'https://api.github.com/repos/codenameone/codenameone-skins/releases/latest',
         headers={
@@ -107,7 +107,6 @@ def fetch():
             'User-Agent': 'codenameone-javase-simulator-tests'
         }
     )
-    token = os.environ.get('GH_API_TOKEN', '')
     if token:
         request.add_header('Authorization', 'Bearer ' + token)
     with urllib.request.urlopen(request) as response:
@@ -115,12 +114,15 @@ def fetch():
 
 # api.github.com returns transient 5xx during incidents (observed: a 503 failing
 # this job twice in one evening) and 429 under load; retry those with backoff.
-# The curl download below already retries -- the lookup must too.
+# The curl download below already retries -- the lookup must too. The token only
+# exists to raise the rate limit, and during incidents the authenticated pool
+# can 503 while anonymous requests succeed, so the final attempts drop it.
+token = os.environ.get('GH_API_TOKEN', '')
 data = None
 last_error = None
-for attempt in range(1, 6):
+for attempt, use_token in enumerate([token, token, token, '', ''], start=1):
     try:
-        data = fetch()
+        data = fetch(use_token)
         break
     except (urllib.error.HTTPError, urllib.error.URLError) as err:
         code = getattr(err, 'code', None)
