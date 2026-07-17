@@ -1,6 +1,5 @@
 {{- $port := .port -}}
 {{- $report := .report -}}
-{{- $attempt := .attempt -}}
 {{- $contract := .contract -}}
 {{- $now := .now -}}
 {{- $state := "unknown" -}}
@@ -35,45 +34,5 @@
   <p class="cn1-port-card__meta">
     {{ $report.summary.pass }} passed · {{ $report.summary.skip }} skipped · {{ index $report.summary "not-run" }} not run
   </p>
-  {{- with $attempt }}
-    {{- $attemptGenerated := time.AsTime .generated_at -}}
-    {{- $reportGenerated := time.AsTime $report.generated_at -}}
-    {{- $attemptFailed := int (default 0 .summary.fail) -}}
-    {{- $attemptNotRun := int (default 0 (index .summary "not-run")) -}}
-    {{- $performanceIncomplete := ne .performance.status "complete" -}}
-    {{- $unhealthy := or (gt $attemptFailed 0) (gt $attemptNotRun 0) $performanceIncomplete -}}
-    {{- if and $unhealthy (gt $attemptGenerated.Unix $reportGenerated.Unix) }}
-      {{- $captureFailures := 0 -}}
-      {{- range .tests -}}
-        {{- if eq .status "fail" -}}
-          {{- $missingCapture := false -}}
-          {{- range .reasons -}}
-            {{- if strings.HasPrefix . "screenshot-missing_actual:" -}}{{- $missingCapture = true -}}{{- end -}}
-          {{- end -}}
-          {{- if $missingCapture -}}{{- $captureFailures = add $captureFailures 1 -}}{{- end -}}
-        {{- end -}}
-      {{- end -}}
-      {{- $environmental := or (gt $attemptNotRun 0) (and (gt $attemptFailed 0) (eq $captureFailures $attemptFailed)) $performanceIncomplete -}}
-      <aside class="cn1-port-card__attempt" data-port-attempt-note>
-        <strong>Latest CI attempt not promoted.</strong>
-        {{- if $environmental }} The CI environment produced incomplete evidence.
-        {{- else }} The run contains a deterministic failure that must be fixed or explicitly skipped.
-        {{- end }}
-        {{- if gt $attemptFailed 0 }} {{ $attemptFailed }} failed.
-        {{- end }}
-        {{- if gt $attemptNotRun 0 }} {{ $attemptNotRun }} not run.
-        {{- end }}
-        {{- if $performanceIncomplete }} Performance evidence incomplete.
-        {{- end }}
-        {{- with .run_url }} <a href="{{ . }}" target="_blank" rel="noopener">Latest attempt</a>.{{- end }}
-        {{ $bootstrapBaseline := eq $report.bootstrap_source "successful-master-workflow" -}}
-        Last good:
-        {{- if $bootstrapBaseline }} no normalized passing report is available. Previous published baseline:
-        {{- end }}
-        {{- with $report.run_url }} <a href="{{ . }}" target="_blank" rel="noopener">{{ $reportGenerated.Format "2006-01-02" }}</a>{{- else }} {{ $reportGenerated.Format "2006-01-02" }}{{- end }}
-        — {{ $report.summary.pass }} passed, {{ $report.summary.skip }} skipped, {{ index $report.summary "not-run" }} not run.
-      </aside>
-    {{- end }}
-  {{- end }}
   {{- end }}
 </article>

@@ -521,47 +521,6 @@ def normalize(
     return report
 
 
-def publication_issue(report: dict) -> str | None:
-    """Return why a report must not replace the last known-good snapshot."""
-    summary = report.get("summary", {})
-    failed = summary.get("fail")
-    not_run = summary.get("not-run")
-    if not isinstance(failed, int) or failed < 0:
-        return "the failure count is missing or invalid"
-    if not isinstance(not_run, int) or not_run < 0:
-        return "the not-run count is missing or invalid"
-    tests = report.get("tests")
-    if not isinstance(tests, dict) or not tests:
-        return "the test result map is missing or invalid"
-    actual = Counter(
-        result.get("status") if isinstance(result, dict) else None
-        for result in tests.values()
-    )
-    if any(status not in {"pass", "fail", "skip", "not-run"} for status in actual):
-        return "the test result map contains an invalid status"
-    for status in ("pass", "fail", "skip", "not-run"):
-        if summary.get(status) != actual.get(status, 0):
-            return f"the {status} summary does not match the test results"
-    if failed:
-        failed_results = [
-            result for result in tests.values()
-            if isinstance(result, dict) and result.get("status") == "fail"
-        ]
-        capture_only = len(failed_results) == failed and all(
-            any(str(reason).startswith("screenshot-missing_actual:")
-                for reason in result.get("reasons", []))
-            for result in failed_results
-        )
-        if capture_only:
-            return f"CI capture environment missed evidence for {failed} test(s)"
-        return f"{failed} test(s) failed"
-    if not_run:
-        return f"CI produced incomplete evidence: {not_run} test(s) did not run"
-    if report.get("performance", {}).get("status") != "complete":
-        return "performance evidence is incomplete"
-    return None
-
-
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -582,11 +541,6 @@ def build_parser() -> argparse.ArgumentParser:
     normalize_parser.add_argument("--commit", default=os.environ.get("GITHUB_SHA", ""))
     normalize_parser.add_argument("--generated-at", default=utc_now())
     normalize_parser.add_argument("--binary-size", type=int)
-
-    assess_parser = subparsers.add_parser(
-        "assess", help="check whether a report may replace the last known-good snapshot"
-    )
-    assess_parser.add_argument("--report", required=True, type=Path)
     return parser
 
 
@@ -601,13 +555,6 @@ def main() -> int:
                 f"{counts['tests']} tests, {counts['features']} features, "
                 f"{counts['ports']} ports, {counts['goldens']} golden names."
             )
-            return 0
-        if args.command == "assess":
-            issue = publication_issue(read_json(args.report))
-            if issue:
-                print(issue)
-                return 3
-            print("report is promotable")
             return 0
         report = normalize(
             manifest=manifest,

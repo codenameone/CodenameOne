@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import json
-import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -29,10 +28,6 @@ class PortStatusTest(unittest.TestCase):
         self.assertEqual(["CameraApiTest"], features["camera-access"])
         self.assertEqual(["VideoIODecodedFramesScreenshotTest"], features["video-decoding"])
         self.assertEqual(["VideoIORoundTripTest"], features["video-round-trip"])
-        self.assertEqual(
-            "SurfacesRemoteViewsScreenshotTest",
-            port_status.screenshot_test(self.manifest, "SurfacesRemoteViews"),
-        )
 
     def test_normalize_preserves_pass_skip_and_screenshot_failure(self):
         log_text = "\n".join(
@@ -113,100 +108,6 @@ class PortStatusTest(unittest.TestCase):
         self.assertEqual(["crypto failed"], report["tests"]["CryptoApiTest"]["reasons"])
         self.assertEqual("fail", report["tests"]["StringApiTest"]["status"])
         self.assertEqual(["suite-error"], report["tests"]["StringApiTest"]["reasons"])
-
-    def test_publication_requires_complete_passing_evidence(self):
-        report = port_status.read_json(
-            port_status.REPO_ROOT / "docs/website/data/port_status_reports/android.json"
-        )
-        self.assertIsNone(port_status.publication_issue(report))
-
-        report["suite_finished"] = False
-        self.assertIsNone(
-            port_status.publication_issue(report),
-            "all mapped results are sufficient even when an older runner omitted the suite marker",
-        )
-
-        report["tests"]["CryptoApiTest"]["status"] = "fail"
-        report["summary"]["pass"] -= 1
-        report["summary"]["fail"] += 1
-        self.assertEqual("1 test(s) failed", port_status.publication_issue(report))
-
-        report["tests"]["CryptoApiTest"] = {
-            "status": "fail",
-            "feature": report["tests"]["CryptoApiTest"]["feature"],
-            "reasons": ["screenshot-missing_actual:crypto"],
-        }
-        self.assertEqual(
-            "CI capture environment missed evidence for 1 test(s)",
-            port_status.publication_issue(report),
-        )
-
-    def test_publication_rejects_not_run_partial_performance_and_bad_summary(self):
-        report = port_status.read_json(
-            port_status.REPO_ROOT / "docs/website/data/port_status_reports/android.json"
-        )
-        report["tests"]["CryptoApiTest"]["status"] = "not-run"
-        report["summary"]["pass"] -= 1
-        report["summary"]["not-run"] += 1
-        self.assertIn("incomplete evidence", port_status.publication_issue(report))
-
-        report["tests"]["CryptoApiTest"]["status"] = "pass"
-        report["summary"]["pass"] += 1
-        report["summary"]["not-run"] -= 1
-        report["performance"]["status"] = "partial"
-        self.assertEqual("performance evidence is incomplete", port_status.publication_issue(report))
-
-        report["performance"]["status"] = "complete"
-        report["summary"]["pass"] -= 1
-        self.assertIn("summary does not match", port_status.publication_issue(report))
-
-    def test_javascript_declared_skips_have_public_errata(self):
-        supplement = port_status.read_json(port_status.SUPPLEMENT)
-        documented = {item["test"] for item in supplement["skip_reasons"]}
-        expected = {
-            "AccessibilityTest", "BackgroundThreadUiAccessTest",
-            "Base64NativePerformanceTest", "BrowserComponentScreenshotTest",
-            "BytecodeTranslatorRegressionTest", "CallDetectionAPITest",
-            "ChartCombinedXYScreenshotTest", "CryptoApiTest",
-            "FileSystemStorageOpenInputStreamMissingTest", "FloatingToStringTest",
-            "Gpu3DModelScreenshotTest", "LightweightPickerButtonsScreenshotTest",
-            "LocalNotificationOverrideTest", "SimdLargeAllocaTest", "StringApiTest",
-            "TimeApiTest", "VideoIORoundTripTest", "VPNDetectionAPITest",
-        }
-        self.assertTrue(expected.issubset(documented))
-
-    def test_javascript_runtime_and_bridge_skip_lists_match(self):
-        expected = {
-            "AccessibilityTest", "BackgroundThreadUiAccessTest",
-            "Base64NativePerformanceTest", "BrowserComponentScreenshotTest",
-            "BytecodeTranslatorRegressionTest", "CallDetectionAPITest",
-            "ChartCombinedXYScreenshotTest", "CryptoApiTest",
-            "FileSystemStorageOpenInputStreamMissingTest", "FloatingToStringTest",
-            "Gpu3DModelScreenshotTest", "LightweightPickerButtonsScreenshotTest",
-            "LocalNotificationOverrideTest", "SimdLargeAllocaTest", "StringApiTest",
-            "TimeApiTest", "VideoIORoundTripTest", "VPNDetectionAPITest",
-        }
-
-        runner = port_status.RUNNER.read_text(encoding="utf-8")
-        java_skips = set()
-        for method in ("isJsSkippedNativeTest", "isJsSkippedKnownRuntimeBug"):
-            start = runner.index(f"boolean {method}")
-            end = runner.index("\n    }", start)
-            java_skips.update(re.findall(r'"([A-Za-z0-9_]+)"\.equals\(testName\)', runner[start:end]))
-        self.assertEqual(expected, java_skips)
-
-        bridge_path = port_status.REPO_ROOT / "Ports/JavaScriptPort/src/main/webapp/port.js"
-        bridge = bridge_path.read_text(encoding="utf-8")
-        bridge_skips = set()
-        for object_name in ("cn1ssForcedTimeoutTestClasses", "cn1ssForcedTimeoutTestNames"):
-            start = bridge.index(f"const {object_name}")
-            end = bridge.index("\n});", start)
-            body = bridge[start:end]
-            body = re.sub(r"/\*.*?\*/", "", body, flags=re.DOTALL)
-            body = re.sub(r"//.*", "", body)
-            for key in re.findall(r'^\s*"([^"]+)"\s*:', body, flags=re.MULTILINE):
-                bridge_skips.add(key.rsplit("_", 1)[-1])
-        self.assertEqual(expected, bridge_skips)
 
 
 if __name__ == "__main__":

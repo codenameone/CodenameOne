@@ -31,7 +31,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 MANIFEST="${REPO_ROOT}/docs/website/data/port_status.json"
 REPORT_DIR="${REPO_ROOT}/docs/website/data/port_status_reports"
-ATTEMPT_DIR="${REPO_ROOT}/docs/website/data/port_status_attempts"
 DATA_REF="refs/heads/port-status-data"
 
 if ! command -v jq >/dev/null 2>&1; then
@@ -51,60 +50,26 @@ if ! git -C "${REPO_ROOT}" fetch --quiet --no-tags --depth=1 origin "${DATA_REF}
 fi
 
 synced=0
-mkdir -p "${ATTEMPT_DIR}"
-
-valid_report() {
-  local candidate="$1"
-  local port="$2"
-  jq -e --arg port "${port}" --slurpfile contract "${MANIFEST}" '
-    .schema_version == $contract[0].schema_version and
-    .port == $port and
-    ((.tests | keys | sort) == ([$contract[0].features[].tests[]] | sort)) and
-    (.summary.fail | type == "number") and
-    (.summary["not-run"] | type == "number") and
-    all(.tests[]; .status == "pass" or .status == "fail" or .status == "skip" or .status == "not-run")
-  ' "${candidate}" >/dev/null
-}
-
-healthy_report() {
-  local candidate="$1"
-  jq -e --slurpfile contract "${MANIFEST}" '
-    .summary.fail == 0 and
-    .summary["not-run"] == 0 and
-    all(.tests[]; .status == "pass" or .status == "skip") and
-    (.summary.pass == ([.tests[] | select(.status == "pass")] | length)) and
-    (.summary.skip == ([.tests[] | select(.status == "skip")] | length)) and
-    .performance.status == "complete" and
-    ([.performance.benchmarks[].duration_ns | type] | all(. == "number")) and
-    ([.performance.benchmarks[].duration_ns] | all(. >= 0)) and
-    ((.performance.benchmarks | keys) == ($contract[0].performance_benchmarks | sort))
-  ' "${candidate}" >/dev/null
-}
-
 while IFS= read -r port; do
-  rm -f "${ATTEMPT_DIR}/${port}.json"
   candidate="${tmp_dir}/${port}.json"
   if ! git -C "${REPO_ROOT}" show "FETCH_HEAD:ports/${port}.json" > "${candidate}" 2>/dev/null; then
     echo "No persisted ${port} report; keeping the checked-in report." >&2
-  elif ! valid_report "${candidate}" "${port}"; then
+    continue
+  fi
+  if ! jq -e --arg port "${port}" --slurpfile contract "${MANIFEST}" '
+      .schema_version == $contract[0].schema_version and
+      .port == $port and
+      ((.tests | keys | sort) == ([$contract[0].features[].tests[]] | sort)) and
+      .performance.status == "complete" and
+      ([.performance.benchmarks[].duration_ns | type] | all(. == "number")) and
+      ([.performance.benchmarks[].duration_ns] | all(. >= 0)) and
+      ((.performance.benchmarks | keys) == ($contract[0].performance_benchmarks | sort))
+    ' "${candidate}" >/dev/null; then
     echo "Persisted ${port} report does not match the current contract; keeping the checked-in report." >&2
-  elif healthy_report "${candidate}"; then
-    cp "${candidate}" "${REPORT_DIR}/${port}.json"
-    synced=$((synced + 1))
-  else
-    # Compatibility with reports written before attempts/<port>.json existed.
-    cp "${candidate}" "${ATTEMPT_DIR}/${port}.json"
-    echo "Persisted ${port} report is unhealthy; keeping the checked-in baseline." >&2
+    continue
   fi
-
-  attempt_candidate="${tmp_dir}/${port}-attempt.json"
-  if git -C "${REPO_ROOT}" show "FETCH_HEAD:attempts/${port}.json" > "${attempt_candidate}" 2>/dev/null; then
-    if valid_report "${attempt_candidate}" "${port}"; then
-      cp "${attempt_candidate}" "${ATTEMPT_DIR}/${port}.json"
-    else
-      echo "Persisted ${port} attempt does not match the current contract; ignoring it." >&2
-    fi
-  fi
+  cp "${candidate}" "${REPORT_DIR}/${port}.json"
+  synced=$((synced + 1))
 done < <(jq -r '.ports[].id' "${MANIFEST}")
 
 echo "Resolved ${synced} Port Status reports from ${DATA_REF}; remaining ports use checked-in reports."

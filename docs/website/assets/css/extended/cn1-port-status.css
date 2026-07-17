@@ -313,20 +313,6 @@
     padding-top: .8rem;
 }
 
-.cn1-port-card .cn1-port-card__attempt {
-    background: color-mix(in srgb, #c38a20 10%, transparent);
-    border-radius: 8px;
-    color: var(--primary);
-    font-size: .74rem;
-    line-height: 1.45;
-    margin-top: .65rem;
-    padding: .55rem .65rem;
-}
-
-.cn1-port-card__attempt strong {
-    display: block;
-}
-
 .cn1-port-status__toolbar {
     align-items: end;
     display: grid;

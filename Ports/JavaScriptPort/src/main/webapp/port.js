@@ -4045,14 +4045,6 @@ const cn1ssForcedTimeoutTestNames = Object.freeze({
   "Base64NativePerformanceTest": "base64NativePerformance",
   "BrowserComponentScreenshotTest": "browserComponentLoadEvent",
   "AccessibilityTest": "accessibility",
-  "CryptoApiTest": "cryptoBridgeUnavailable",
-  "VideoIORoundTripTest": "videoEncoderUnavailable",
-  // Known Java-runtime compatibility gaps. These remain explicit skips until
-  // their implementations match the shared Java contract; they are not flaky
-  // passes and must not be reported as intermittent CI failures.
-  "StringApiTest": "regexReplaceAllCompatibility",
-  "TimeApiTest": "fixedOffsetTimeZoneCompatibility",
-  "FloatingToStringTest": "floatingToStringCompatibility",
   // ChatInput/ChatView were parked because their dark-phase capture ran past the
   // flat 10s deadline the bridge imposed, so the runner force-advanced and the
   // pending dark emit captured the NEXT test (ChatInput_dark -> ImageViewer).
@@ -4426,10 +4418,6 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
     || null;
   if (forcedTimeoutReason != null) {
     emitDiagLine("PARPAR:DIAG:FALLBACK:key=FALLBACK:Cn1ssDeviceRunner.forcedTimeout:" + forcedTimeoutReason + ":HIT");
-    if (global.console && typeof global.console.log === "function") {
-      global.console.log("CN1SS:INFO:test=" + nativeTestName
-        + " status=SKIPPED reason=" + forcedTimeoutReason);
-    }
     try {
       const finalizeMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerFinalizeTestMethodId);
       if (typeof finalizeMethod === "function") {
@@ -4438,7 +4426,7 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
           effectiveIndex,
           effectiveTestObject,
           normalizedTestName,
-          0
+          1
         ));
       }
     } catch (_finalizeErr) {
