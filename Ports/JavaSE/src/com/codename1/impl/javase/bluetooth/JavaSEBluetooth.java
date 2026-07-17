@@ -54,7 +54,7 @@ public class JavaSEBluetooth extends Bluetooth {
     /** {@link #switchBackend(String)} name of the simulated stack. */
     public static final String BACKEND_SIMULATOR = SimulatorBleBackend.NAME;
 
-    /** {@link #switchBackend(String)} name of the future native backend. */
+    /** {@link #switchBackend(String)} name of the real-radio backend. */
     public static final String BACKEND_NATIVE = "native";
 
     private volatile BleBackend backend;
@@ -81,9 +81,10 @@ public class JavaSEBluetooth extends Bluetooth {
 
     /**
      * Switches the BLE engine. {@code "simulator"} activates the shared
-     * virtual stack; {@code "native"} is the reserved seam for a future
-     * backend against the host machine's real radio and currently throws
-     * {@code IllegalStateException("...not available...")}. Unknown names
+     * virtual stack; {@code "native"} activates the host machine's real
+     * radio through the bundled {@code cn1-ble-helper} process and throws
+     * {@code IllegalStateException} when no helper binary could be located
+     * (see {@link NativeBleBackend#HELPER_PATH_PROPERTY}). Unknown names
      * throw {@code IllegalArgumentException}.
      */
     public synchronized void switchBackend(String name) {
@@ -93,8 +94,15 @@ public class JavaSEBluetooth extends Bluetooth {
             return;
         }
         if (BACKEND_NATIVE.equals(name)) {
-            throw new IllegalStateException(
-                    "The native Bluetooth backend is not available yet");
+            NativeBleBackend nativeBackend = new NativeBleBackend();
+            if (!nativeBackend.isAvailable()) {
+                throw new IllegalStateException(
+                        "The native Bluetooth backend is not available: no "
+                                + "cn1-ble-helper binary was found. Tried: "
+                                + nativeBackend.describeResolution());
+            }
+            installBackend(nativeBackend);
+            return;
         }
         throw new IllegalArgumentException("Unknown Bluetooth backend: "
                 + name);

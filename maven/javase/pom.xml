@@ -78,6 +78,53 @@
                 </dependency>
             </dependencies>
         </profile>
+        <profile>
+            <!--
+              Maintainer opt-in: builds the Rust cn1-ble-helper (the real
+              Bluetooth backend's btleplug bridge) with the local cargo
+              toolchain and bundles the resulting binary for THIS host OS
+              into the jar. The default build never touches cargo; the
+              prebuilt binaries come from ${cn1.binaries}/ble instead (see
+              the resource mapping below).
+            -->
+            <id>build-ble-helper</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>build-ble-helper</id>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <configuration>
+                                    <target>
+                                        <property name="ble.helper.dir" location="${project.basedir}/../../Ports/JavaSE/native/cn1-ble-helper"/>
+                                        <exec executable="cargo" dir="${ble.helper.dir}" failonerror="true">
+                                            <arg value="build"/>
+                                            <arg value="--release"/>
+                                        </exec>
+                                        <condition property="ble.os" value="macos">
+                                            <os family="mac"/>
+                                        </condition>
+                                        <condition property="ble.os" value="windows">
+                                            <os family="windows"/>
+                                        </condition>
+                                        <property name="ble.os" value="linux"/>
+                                        <condition property="ble.exe" value="cn1-ble-helper.exe" else="cn1-ble-helper">
+                                            <os family="windows"/>
+                                        </condition>
+                                        <copy file="${ble.helper.dir}/target/release/${ble.exe}" tofile="${project.build.outputDirectory}/com/codename1/impl/javase/bluetooth/native/${ble.os}/${ble.exe}" overwrite="true"/>
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
     </profiles>
 
     <dependencies>
@@ -154,6 +201,21 @@
                 <excludes>
                     <exclude>**/*.java</exclude>
                 </excludes>
+            </resource>
+            <!--
+              Prebuilt cn1-ble-helper binaries (the real Bluetooth backend's
+              btleplug bridge) from the cn1-binaries repository, laid out as
+              ble/{macos,linux,windows}/cn1-ble-helper[.exe]. The directory
+              is optional: maven-resources-plugin skips a missing resource
+              directory with a warning, so builds without cn1-binaries (or
+              with an older checkout lacking ble/) still succeed; the
+              native backend then reports itself unavailable at runtime.
+              Maintainers can also bundle a locally-built helper for the
+              current host via -Pbuild-ble-helper.
+            -->
+            <resource>
+                <directory>${cn1.binaries}/ble</directory>
+                <targetPath>com/codename1/impl/javase/bluetooth/native</targetPath>
             </resource>
         </resources>
         <plugins>

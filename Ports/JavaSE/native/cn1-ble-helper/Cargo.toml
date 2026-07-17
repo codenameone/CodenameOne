@@ -1,0 +1,25 @@
+[package]
+name = "cn1-ble-helper"
+version = "1.0.0"
+edition = "2021"
+description = "Codename One JavaSE-port BLE helper: bridges the host radio (via btleplug) to the simulator over line-delimited JSON on stdin/stdout. See PROTOCOL.md."
+license = "GPL-2.0-only WITH Classpath-exception-2.0"
+
+[[bin]]
+name = "cn1-ble-helper"
+path = "src/main.rs"
+
+[dependencies]
+btleplug = "0.11"
+tokio = { version = "1", features = ["macros", "rt", "io-std", "io-util", "sync", "time"] }
+futures = "0.3"
+serde_json = "1"
+base64 = "0.22"
+uuid = "1"
+
+[profile.release]
+# Smaller helper = smaller javase jar shipped to apps.
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
