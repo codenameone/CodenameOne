@@ -29,6 +29,10 @@ class PortStatusTest(unittest.TestCase):
         self.assertEqual(["CameraApiTest"], features["camera-access"])
         self.assertEqual(["VideoIODecodedFramesScreenshotTest"], features["video-decoding"])
         self.assertEqual(["VideoIORoundTripTest"], features["video-round-trip"])
+        self.assertEqual(
+            "SurfacesRemoteViewsScreenshotTest",
+            port_status.screenshot_test(self.manifest, "SurfacesRemoteViews"),
+        )
 
     def test_normalize_preserves_pass_skip_and_screenshot_failure(self):
         log_text = "\n".join(
