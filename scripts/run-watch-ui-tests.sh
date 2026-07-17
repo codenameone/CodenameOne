@@ -155,20 +155,18 @@ xcrun simctl launch --stdout="$ARTIFACTS_DIR/app-stdout.log" --stderr="$ARTIFACT
   "$WATCH_UDID" "$BUNDLE_ID" >/dev/null 2>&1 || { rw_log "launch failed"; exit 6; }
 rw_log "Launched watch app; waiting for the suite to stream screenshots..."
 
-# Wait until every expected screenshot has streamed (preferred), or the streamed
-# count goes idle, capped by MAX_WAIT. The watch streams in bursts with multi-
-# second GC/render pauses between phases (the theme tests in particular arrive in
-# a late burst), so a short "count stable" window settles prematurely and the
-# comparison snapshots the partial set -- the late screenshots are received by
-# the WS sink (logged status=ok) but land on disk after we already compared,
-# showing up as false "missing". We therefore wait for the full golden count when
-# we can, and only fall back to an idle plateau (with a generous window) when
-# fewer screenshots are produced than the golden set.
+# Wait until every expected screenshot has streamed (preferred), or the suite
+# explicitly reports completion, capped by MAX_WAIT. Do not infer completion
+# from screenshot inactivity: assertion and benchmark tests near the end of the
+# suite can legitimately run for minutes without producing a PNG. An inactivity
+# heuristic used to compare the partial set while the app was still running,
+# producing false "missing" failures even though the final screenshot reached
+# the WebSocket sink seconds later.
 MAX_WAIT="${CN1SS_WATCH_TIMEOUT:-1200}"
 WATCH_REF_DIR="${SCREENSHOT_REF_DIR:-$SCRIPT_DIR/ios/screenshots-watch}"
 EXPECTED="$(/usr/bin/find "$WATCH_REF_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
 rw_log "Expecting $EXPECTED screenshots (golden set)"
-prev=-1; stable=0; waited=0
+stable=0; suite_finished_stable=0; waited=0
 while [ "$waited" -lt "$MAX_WAIT" ]; do
   sleep 8; waited=$((waited+8))
   cur="$(/usr/bin/find "$WS_RAW_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
@@ -178,12 +176,31 @@ while [ "$waited" -lt "$MAX_WAIT" ]; do
     stable=$((stable+1)); [ "$stable" -ge 2 ] && break
     continue
   fi
-  # Fallback: the streamed count has gone idle. Use a generous window (~80s) so a
-  # pause between bursts is not mistaken for completion.
-  if [ "$cur" = "$prev" ] && [ "$cur" -gt 0 ]; then
-    stable=$((stable+1)); [ "$stable" -ge 10 ] && break
-  else stable=0; fi
-  prev="$cur"
+  stable=0
+
+  # stdout/stderr are attached directly by simctl launch, so the DeviceRunner
+  # completion marker is available here without waiting for unified-log
+  # collection. Confirm it twice to give the ACK-paced WebSocket sink a final
+  # drain window before snapshotting the directory. A genuinely missing
+  # screenshot will then fail comparison; a slow screenshot cannot race it.
+  if grep -qa "CN1SS:SUITE:FINISHED" \
+      "$ARTIFACTS_DIR/app-stderr.log" "$ARTIFACTS_DIR/app-stdout.log" \
+      "$ARTIFACTS_DIR/app-console.log" 2>/dev/null; then
+    suite_finished_stable=$((suite_finished_stable+1))
+    if [ "$suite_finished_stable" -ge 2 ]; then
+      rw_log "Suite reported FINISHED; WebSocket drain confirmed after ${waited}s"
+      break
+    fi
+  else
+    suite_finished_stable=0
+  fi
+
+  if grep -qaE "Fatal|Terminating app due to uncaught exception|EXC_BAD|did crash|libsystem_kernel" \
+      "$ARTIFACTS_DIR/app-stderr.log" "$ARTIFACTS_DIR/app-stdout.log" \
+      "$ARTIFACTS_DIR/app-console.log" 2>/dev/null; then
+    rw_log "Detected app crash/fatal after ${waited}s"
+    break
+  fi
 done
 rw_log "Capture settled: $(/usr/bin/find "$WS_RAW_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ') of $EXPECTED screenshots after ${waited}s"
 
