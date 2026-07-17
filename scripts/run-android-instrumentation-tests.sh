@@ -295,6 +295,12 @@ export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 export CN1SS_COMMENT_MARKER="<!-- CN1SS_ANDROID_COMMENT -->"
 export CN1SS_COMMENT_LOG_PREFIX="[run-android-device-tests]"
 export CN1SS_PREVIEW_SUBDIR="android"
+export CN1SS_PORT_ID="${CN1SS_PORT_ID:-android}"
+export CN1SS_SUITE_LOG="$TEST_LOG"
+ANDROID_APP_APK="$(find "$GRADLE_PROJECT_DIR/app/build/outputs/apk" -type f -name '*.apk' ! -name '*androidTest*' -print -quit 2>/dev/null || true)"
+if [ -n "$ANDROID_APP_APK" ]; then
+  export CN1SS_BINARY_PATH="$ANDROID_APP_APK"
+fi
 export CN1SS_COVERAGE_SUMMARY="$COVERAGE_SUMMARY"
 if [ -n "${ANDROID_COVERAGE_HTML_URL:-}" ]; then
     export CN1SS_COVERAGE_HTML_URL="${ANDROID_COVERAGE_HTML_URL}"

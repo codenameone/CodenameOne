@@ -1,0 +1,31 @@
+# XCUITest tap driver for the native animation recordings.
+#
+# UIKit plays the FULL iOS 26 Liquid Glass tab-selection morph (the frosted
+# refracting drop) only for genuine touch-driven selection; programmatic
+# selectedIndex changes play a flat simplified platter slide. The recording
+# therefore drives REAL taps on the NativeRef app's UITabBarController via
+# this tiny UI-test bundle (record-ios-native-anim.sh generates the Xcode
+# project with xcodegen -- same dependency as the input-validation driver).
+name: NativeRefTapDriver
+options:
+  bundleIdPrefix: com.codenameone.fidelity.tapdriver
+targets:
+  HostStub:
+    type: application
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources: [HostStub]
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.codenameone.fidelity.tapdriver.hoststub
+      GENERATE_INFOPLIST_FILE: YES
+  NativeRefTapDriverUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources: [Tests]
+    dependencies:
+      - target: HostStub
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.codenameone.fidelity.tapdriver.uitests
+      GENERATE_INFOPLIST_FILE: YES
+      TEST_TARGET_NAME: HostStub

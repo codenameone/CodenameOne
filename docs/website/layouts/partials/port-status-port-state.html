@@ -1,0 +1,38 @@
+{{- $port := .port -}}
+{{- $report := .report -}}
+{{- $contract := .contract -}}
+{{- $now := .now -}}
+{{- $state := "unknown" -}}
+{{- $label := "No stored report" -}}
+{{- if $report -}}
+  {{- $failed := int (default 0 $report.summary.fail) -}}
+  {{- $bootstrapComplete := and (eq $report.bootstrap_source "successful-master-workflow") (eq $report.workflow_conclusion "success") -}}
+  {{- $complete := or $report.suite_finished $bootstrapComplete -}}
+  {{- $generated := time.AsTime $report.generated_at -}}
+  {{- $staleSeconds := mul (int $contract.stale_after_days) 86400 -}}
+  {{- $stale := gt (sub $now.Unix $generated.Unix) $staleSeconds -}}
+  {{- $state = "pass" -}}
+  {{- $label = cond $bootstrapComplete "Workflow completed" "Suite completed" -}}
+  {{- if gt $failed 0 -}}
+    {{- $state = "fail" -}}
+    {{- $label = printf "%d failing test%s" $failed (cond (eq $failed 1) "" "s") -}}
+  {{- else if not $complete -}}
+    {{- $state = "partial" -}}
+    {{- $label = "Run incomplete" -}}
+  {{- else if $stale -}}
+    {{- $state = "partial" -}}
+    {{- $label = "Report is stale" -}}
+  {{- end -}}
+{{- end -}}
+<article class="cn1-port-card is-{{ $state }}" data-port-card="{{ $port.id }}">
+  <div>
+    <h2>{{ $port.name }}</h2>
+    <p>{{ $port.detail }}</p>
+  </div>
+  <p class="cn1-port-card__state">{{ $label }}</p>
+  {{- if $report }}
+  <p class="cn1-port-card__meta">
+    {{ $report.summary.pass }} passed · {{ $report.summary.skip }} skipped · {{ index $report.summary "not-run" }} not run
+  </p>
+  {{- end }}
+</article>

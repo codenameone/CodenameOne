@@ -5,6 +5,14 @@ on:
   # diff limit, so pull_request triggers stopped firing -- dispatch with
   #   gh workflow run <file> --ref <branch>
   workflow_dispatch:
+    inputs:
+      watch_only:
+        description: Run only the watchOS evidence job after the shared port build
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    - cron: '15 1 * * *'
   pull_request:
     paths:
       - '.github/workflows/scripts-ios.yml'
@@ -82,6 +90,7 @@ jobs:
     uses: ./.github/workflows/_build-ios-port.yml
 
   build-ios:
+    if: ${{ !inputs.watch_only }}
     needs: build-port
     permissions:
       contents: read
@@ -234,6 +243,7 @@ jobs:
           # failures are scanned from CN1SS:ERR:suite lines by
           # run-ios-ui-tests.sh and are never allowed by this value.
           CN1SS_ALLOWED_MISSING: '2'
+          CN1SS_PORT_ID: ios-gl
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
@@ -251,6 +261,15 @@ jobs:
         # same envelope so it stays symmetric.
         timeout-minutes: 45
 
+      - name: Upload iOS OpenGL port status
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: port-status-ios-gl
+          path: artifacts/ios-ui-tests/port-status-ios-gl.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload iOS artifacts
         if: always()
         uses: actions/upload-artifact@v7
@@ -266,6 +285,7 @@ jobs:
           retention-days: 14
 
   build-ios-metal:
+    if: ${{ !inputs.watch_only }}
     # Mirrors build-ios but enables the Metal rendering backend via the
     # codename1.arg.ios.metal=true build hint. Keeps the GL path untouched
     # so a regression on either path is isolated in its own job.
@@ -466,6 +486,7 @@ jobs:
           # to the launched app via simctl --setenv.
           MTL_DEBUG_LAYER: '1'
           MTL_DEBUG_LAYER_ERROR_MODE: 'assert'
+          CN1SS_PORT_ID: ios-metal
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
@@ -482,6 +503,15 @@ jobs:
         # hit on master while the simulator was still draining the
         # screenshot suite.
         timeout-minutes: 45
+
+      - name: Upload iOS Metal port status
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: port-status-ios-metal
+          path: artifacts/ios-ui-tests-metal/port-status-ios-metal.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Publish Metal screenshot summary
         # Surfaces run-ios-ui-tests.sh's comparison result in the job's
@@ -659,6 +689,7 @@ jobs:
           CN1SS_SUCCESS_MESSAGE: '✅ Native Apple Watch (watchOS, Core Graphics) screenshot tests passed.'
           CN1SS_COMMENT_LOG_PREFIX: '[run-watch-ui-tests]'
           CN1SS_FAIL_ON_MISMATCH: '1'
+          CN1SS_WATCH_TIMEOUT: '2400'
           # The watch form factor splits the iOS 2x2 graphics grid into separate
           # full-screen captures; tolerate a small tail drop, matching the GL job.
           CN1SS_ALLOWED_MISSING: '4'
@@ -670,7 +701,16 @@ jobs:
           ./scripts/run-watch-ui-tests.sh \
             "${{ steps.build-ios-app.outputs.workspace }}" \
             "${{ steps.build-ios-app.outputs.scheme }}"
-        timeout-minutes: 45
+        timeout-minutes: 90
+
+      - name: Upload watchOS port status
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: port-status-watchos
+          path: artifacts/watch-ui-tests/port-status-watchos.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload watch artifacts
         if: always()
@@ -687,6 +727,7 @@ jobs:
           retention-days: 14
 
   build-ios-tv:
+    if: ${{ !inputs.watch_only }}
     # Native Apple TV (tvOS) screenshot pipeline. The tvOS slice auto-enables
     # from codename1.tvMain in the sample, so build-ios-app.sh generates the
     # <Main>TV target alongside the iOS app. tvOS reuses the iOS UIApplicationMain
@@ -824,6 +865,15 @@ jobs:
             "${{ steps.build-ios-app.outputs.workspace }}" \
             "${{ steps.build-ios-app.outputs.scheme }}"
         timeout-minutes: 45
+
+      - name: Upload tvOS port status
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: port-status-tvos
+          path: artifacts/tv-ui-tests/port-status-tvos.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload tv artifacts
         if: always()

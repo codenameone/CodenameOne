@@ -28,6 +28,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
+    - name: Free disk space for desktop runtime dependencies
+      run: |
+        # This Java-only job does not use the preinstalled Android, .NET, or
+        # Haskell toolchains. cn1-binaries-javase intentionally resolves large
+        # cross-platform JCEF and FFmpeg artifacts, then integration tests copy
+        # them into generated applications, so the stock runner otherwise runs
+        # out of disk while duplicating those artifacts.
+        sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+        df -h /
     - name: Set up JDK 8
       uses: actions/setup-java@v5
       with:

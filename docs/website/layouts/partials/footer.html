@@ -65,6 +65,7 @@
 {{- $cn1Pricing := resources.Get "js/cn1-pricing.js" | minify | fingerprint }}
 {{- $cn1Crisp := resources.Get "js/cn1-crisp.js" | minify | fingerprint }}
 {{- $cn1Javadoc := resources.Get "js/cn1-javadoc.js" | minify | fingerprint }}
+{{- $cn1PortStatus := resources.Get "js/cn1-port-status.js" | minify | fingerprint }}
 <script defer src="{{ $cn1Site.RelPermalink }}" integrity="{{ $cn1Site.Data.Integrity }}"></script>
 <script defer src="{{ $cn1Home.RelPermalink }}" integrity="{{ $cn1Home.Data.Integrity }}"></script>
 <script defer src="{{ $cn1Demo.RelPermalink }}" integrity="{{ $cn1Demo.Data.Integrity }}"></script>
@@ -72,6 +73,9 @@
 <script defer src="{{ $cn1Crisp.RelPermalink }}" integrity="{{ $cn1Crisp.Data.Integrity }}"></script>
 {{- if eq .Layout "api-javadoc" -}}
 <script defer src="{{ $cn1Javadoc.RelPermalink }}" integrity="{{ $cn1Javadoc.Data.Integrity }}"></script>
+{{- end -}}
+{{- if eq .Layout "port-status" -}}
+<script defer src="{{ $cn1PortStatus.RelPermalink }}" integrity="{{ $cn1PortStatus.Data.Integrity }}"></script>
 {{- end -}}
 
 <script>

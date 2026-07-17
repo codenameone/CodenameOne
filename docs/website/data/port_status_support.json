@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "deployment_support": [
+    {
+      "id": "android",
+      "platform": "Android",
+      "architectures": "ARM64, ARMv7, x86_64",
+      "declared_range": "API 19 and newer",
+      "ci_evidence": "Full compliance suite on an API 36 x86_64 emulator",
+      "floor_evidence": "Build floor enforced by android.min_sdk_version; runtime floor validation is being added to the nightly matrix",
+      "support": "Supported"
+    },
+    {
+      "id": "ios",
+      "platform": "iOS and iPadOS",
+      "architectures": "ARM64 devices; ARM64 simulator",
+      "declared_range": "iOS 14 and newer",
+      "ci_evidence": "Full compliance suite on the current Xcode 26 simulator with both Metal and legacy OpenGL renderers",
+      "floor_evidence": "The deployment target is compiled at 14.0; hosted CI does not currently run an iOS 14 simulator",
+      "support": "Supported"
+    },
+    {
+      "id": "macos",
+      "platform": "macOS",
+      "architectures": "Apple silicon and Intel through Mac Catalyst",
+      "declared_range": "macOS 10.15 and newer",
+      "ci_evidence": "Full native compliance suite on macOS 15 using the Mac Catalyst target",
+      "floor_evidence": "The macOS 10.15 and Catalyst 13.1 deployment floors are compiled; the oldest runtime is not available on hosted CI",
+      "support": "Supported, Catalyst scope"
+    },
+    {
+      "id": "web",
+      "platform": "Web",
+      "architectures": "Browser JavaScript runtime",
+      "declared_range": "Current Chromium, Firefox, and WebKit engines",
+      "ci_evidence": "Full compliance suite on Chromium; nightly lifecycle validation on Chromium, Firefox, and WebKit",
+      "floor_evidence": "Exact engine versions come from the latest nightly run below; older browser floors are not claimed until they are exercised",
+      "support": "Supported"
+    },
+    {
+      "id": "linux",
+      "platform": "Linux",
+      "architectures": "x64 and ARM64",
+      "declared_range": "glibc 2.28 or newer with GTK3; Alpine Linux through the opt-in musl target",
+      "ci_evidence": "Full native compliance suite on Ubuntu x64 and Ubuntu ARM64, including GTK, media, browser, storage, notifications, location, and 3D dependencies",
+      "floor_evidence": "The release toolchain targets the glibc 2.28 ABI. This covers Ubuntu 20.04+, Debian 10+, RHEL/Rocky/AlmaLinux 8+, Fedora 30+, and Linux Mint 20+. Alpine 3.20 is exercised separately with musl.",
+      "support": "Supported, broad desktop scope"
+    },
+    {
+      "id": "windows",
+      "platform": "Windows",
+      "architectures": "x64 and ARM64",
+      "declared_range": "Windows 10 and newer; Windows 11 for Widgets Board packages",
+      "ci_evidence": "Full native compliance suite on Windows 11 for x64 and ARM64",
+      "floor_evidence": "The plain Win32 executable keeps optional newer APIs dynamic; a Windows 10 runtime job is required before narrowing the supported release floor",
+      "support": "Supported"
+    },
+    {
+      "id": "watchos",
+      "platform": "watchOS",
+      "architectures": "ARM64_32 devices; simulator",
+      "declared_range": "watchOS 10 and newer",
+      "ci_evidence": "Full compliance suite on the current Xcode 26 Apple Watch simulator",
+      "floor_evidence": "The deployment target is compiled at 10.0; hosted CI does not currently run a watchOS 10 simulator",
+      "support": "Supported"
+    },
+    {
+      "id": "tvos",
+      "platform": "tvOS",
+      "architectures": "ARM64 devices; simulator",
+      "declared_range": "tvOS 13 and newer",
+      "ci_evidence": "Full compliance suite on the current Xcode 26 Apple TV simulator",
+      "floor_evidence": "The deployment target is compiled at 13.0; hosted CI does not currently run a tvOS 13 simulator",
+      "support": "Supported"
+    }
+  ],
+  "benchmark": {
+    "title": "Port performance",
+    "configuration": "Every target runs the canonical ParparVM common workloads in its generated application. Each timing is the minimum of five measured runs after three in-process warm-ups. Values are absolute and lower timings are better.",
+    "excluded_metrics": "Binary size and memory are not reported yet. The compliance fixture is not a representative minimal application, its current artifacts mix compressed packages with unpacked bundles and executables, and the ports do not currently expose one comparable memory metric. These rows will return only after a dedicated release-mode benchmark app is stripped, packaged, and sampled consistently on every target.",
+    "rows": [
+      {"id": "intArithmetic", "name": "Integer arithmetic", "description": "40 million dependent 32-bit multiply, add, shift, and XOR operations."},
+      {"id": "longArithmetic", "name": "Long arithmetic", "description": "30 million dependent 64-bit arithmetic and bitwise operations."},
+      {"id": "mathTranscendental", "name": "Transcendental math", "description": "Eight million data-dependent sqrt, sin, cos, and remainder operations."},
+      {"id": "arraySequential", "name": "Sequential arrays", "description": "Fill eight million integers and perform four complete reduction passes."},
+      {"id": "arrayRandom", "name": "Random array access", "description": "20 million data-dependent reads from a four-million-element array."},
+      {"id": "objectAllocation", "name": "Object allocation", "description": "Allocate eight million short-lived linked nodes with periodic traversal."},
+      {"id": "hashMapChurn", "name": "Hash map churn", "description": "Three million boxed-key lookups and updates with repeated table clearing."},
+      {"id": "stringBuilding", "name": "String building", "description": "Build, retain, and hash 400,000 data-dependent strings."},
+      {"id": "recursion", "name": "Recursion", "description": "Three recursive Fibonacci calls using inputs 35 and 36."},
+      {"id": "quicksort", "name": "Quicksort", "description": "Generate and sort 1.5 million integers, then verify ordering and checksum."}
+    ]
+  }
+}

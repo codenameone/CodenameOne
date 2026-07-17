@@ -42,6 +42,12 @@ on:
       - '.github/scripts/build_javadocs.sh'
       - '.github/workflows/website-docs.yml'
   workflow_dispatch:
+    inputs:
+      deploy_production:
+        description: 'Deploy this master build to production'
+        required: false
+        default: false
+        type: boolean
   # Daily production rebuild so future-dated blog posts (the daily release
   # follow-ups) publish on their own date with no manual push. Production
   # builds keep HUGO_BUILD_FUTURE=false, so a post only appears once its date
@@ -100,6 +106,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
+      - name: Test developer guide PDF redirect resolver
+        run: scripts/website/test_update_developer_guide_redirect.sh
+
       - name: Update developer guide PDF redirect
         run: |
           set -euo pipefail
@@ -139,6 +148,10 @@ jobs:
           # than the pinned release. Bootstrap the local snapshot artifacts so
           # the initializr (and the other site apps) build against repo HEAD.
           WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS: "true"
+          # Resolve the latest persisted master result for each port before
+          # Hugo writes the static status table. Checked-in reports remain the
+          # fallback if the data branch is temporarily unavailable.
+          WEBSITE_REFRESH_PORT_STATUS: "true"
           # PR previews build with future-dated posts visible so reviewers
           # can read posts staged for later in the week. Production deploys
           # (push to master) keep the default so future posts only appear
@@ -146,6 +159,11 @@ jobs:
           HUGO_BUILD_FUTURE: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
           CN1_USER: ${{ secrets.CN1_USER }}
           CN1_TOKEN: ${{ secrets.CN1_TOKEN }}
+
+      - name: Validate Port Status page output
+        run: |
+          set -euo pipefail
+          node scripts/website/validate_port_status.mjs docs/website/public
 
       - name: Validate Initializr page output
         run: |
@@ -437,12 +455,12 @@ jobs:
           done < /tmp/cf_deployments_to_delete.txt
 
       - name: Check Cloudflare deploy credentials
-        if: ${{ ((github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master')) || github.event_name == 'schedule') && env.CLOUDFLARE_TOKEN == '' }}
+        if: ${{ ((github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master')) || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.deploy_production && (github.ref_name == 'main' || github.ref_name == 'master'))) && env.CLOUDFLARE_TOKEN == '' }}
         run: |
           echo "::warning::Skipping Cloudflare Pages deploy because no API token secret is configured. Set CLOUDFLARE_TOKEN (preferred) or CF_API_TOKEN."
 
       - name: Deploy to Cloudflare Pages
-        if: ${{ ((github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master')) || github.event_name == 'schedule') && env.CLOUDFLARE_TOKEN != '' }}
+        if: ${{ ((github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master')) || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.deploy_production && (github.ref_name == 'main' || github.ref_name == 'master'))) && env.CLOUDFLARE_TOKEN != '' }}
         uses: cloudflare/wrangler-action@v3
         env:
           # Keep these env vars explicit so Wrangler can authenticate in non-interactive CI.

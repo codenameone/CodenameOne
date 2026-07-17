@@ -15,6 +15,9 @@ name: Test Mac native UI build scripts
 # Mac/iOS workflows on the same SHA stay fast.
 
 on:
+  workflow_dispatch:
+  schedule:
+    - cron: '25 1 * * *'
   pull_request:
     paths:
       - '.github/workflows/scripts-mac-native.yml'
@@ -66,8 +69,6 @@ on:
       - 'tests/**'
       - 'maven/**'
       - '!maven/core-unittests/**'
-  workflow_dispatch:
-
 jobs:
   build-port:
     # Shared with scripts-ios.yml / scripts-ios-native.yml / ios-packaging.yml
@@ -231,6 +232,15 @@ jobs:
         # gets SIGKILLed mid-compare -- a flaky timeout, not a real mismatch.
         # 45m lets the script's internal timeout govern gracefully instead.
         timeout-minutes: 45
+
+      - name: Upload Mac native port status
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: port-status-mac-native
+          path: artifacts/mac-native-ui-tests/port-status-mac-native.json
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Publish Mac native screenshot summary
         # Surfaces run-mac-native-ui-tests.sh's comparison result in the

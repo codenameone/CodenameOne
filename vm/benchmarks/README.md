@@ -33,8 +33,9 @@ periodically matters).
 
 ## What the benchmarks measure
 
-`Bench.java` — ten workload shapes, each with in-process warmup and repeated
-measurement (`BENCH <name> rep <n> ns=<t> checksum=<c>` lines):
+`CommonWorkloads.java` defines the ten workload shapes shared with the generated
+port applications. `Bench.java` is its standalone in-process warmup and repeated
+measurement runner (`BENCH <name> rep <n> ns=<t> checksum=<c>` lines):
 
 | bench | shape |
 |---|---|

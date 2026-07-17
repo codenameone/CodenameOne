@@ -21,11 +21,15 @@ name: ParparVM Java Tests (Windows)
 # is disabled so the x64 leg always runs to completion.
 
 on:
+  workflow_dispatch:
+  schedule:
+    - cron: '5 2 * * *'
   pull_request:
     paths:
       - '.github/workflows/parparvm-tests-windows.yml'
       - 'vm/**'
       - 'Ports/WindowsPort/**'
+      - 'scripts/hellocodenameone/**'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
@@ -35,6 +39,7 @@ on:
       - '.github/workflows/parparvm-tests-windows.yml'
       - 'vm/**'
       - 'Ports/WindowsPort/**'
+      - 'scripts/hellocodenameone/**'
       - '!vm/**/README.md'
       - '!vm/**/readme.md'
       - '!vm/**/docs/**'
@@ -209,12 +214,13 @@ jobs:
   # mode -- the app paints into an offscreen Direct2D/WIC bitmap (no window) and
   # writes a PNG. The PNG is uploaded as an artifact; the companion comment job
   # posts it to the PR. This x64 leg also publishes the compiled core + port
-  # bytecode for the native arm64 leg (windows-port-screenshot-arm64). PR events
-  # only (the comment job needs PR context). Separate from the clean-target gate
-  # so a rendering hiccup never blocks merges.
+  # bytecode for the native arm64 leg (windows-port-screenshot-arm64). Pull
+  # requests render review artifacts; master runs also produce the durable
+  # Windows ARM64 compliance report consumed by the static Port Status page.
+  # Separate from the clean-target gate so a rendering hiccup never blocks merges.
   windows-port-screenshot:
     name: screenshot-capture (x64)
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     timeout-minutes: 90
     steps:
@@ -362,6 +368,7 @@ jobs:
         env:
           JDK_8_HOME: ${{ env.JDK_8_HOME }}
           CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
+          CN1_PERFORMANCE_BINARY_OUT: ${{ github.workspace }}\artifacts\windows-port\raw\benchmark-app.exe
         run: |
           mvn -B clean package -pl JavaAPI -am -DskipTests
           mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesHelloSuiteOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false'
@@ -399,7 +406,7 @@ jobs:
   windows-port-screenshot-arm64:
     name: screenshot-capture (arm64)
     needs: windows-port-screenshot
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: windows-11-arm
     continue-on-error: true
     timeout-minutes: 60
@@ -486,6 +493,8 @@ jobs:
         shell: pwsh
         env:
           CN1_SHOT_OUTPUT_DIR: ${{ github.workspace }}\artifacts\windows-port\raw
+          CN1_PERFORMANCE_BINARY_OUT: ${{ github.workspace }}\artifacts\windows-port\raw\benchmark-app.exe
+          CN1_REQUIRE_PERFORMANCE: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
         run: |
           mvn -B clean package -pl JavaAPI -am -DskipTests
           mvn -B test -pl tests -am '-Dtest=CleanTargetIntegrationTest#capturesHelloSuiteOverWebSocket' '-Dsurefire.failIfNoSpecifiedTests=false'
@@ -599,7 +608,7 @@ jobs:
   windows-port-screenshot-comment-arm64:
     name: screenshot-comment (arm64)
     needs: windows-port-screenshot-arm64
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     continue-on-error: true
     runs-on: ubuntu-latest
     permissions:
@@ -651,6 +660,10 @@ jobs:
           # the PR -- but the mismatch is no longer silent.
           export CN1SS_FAIL_ON_MISMATCH=1
           export CN1SS_ALLOWED_MISSING=0
+          export CN1SS_PORT_ID=windows-arm64
+          export CN1SS_BINARY_PATH="$ART/raw/benchmark-app.exe"
+          export CN1SS_SUITE_LOG="$ART/raw/app-output.log"
+          if [ "${{ github.event_name }}" != "pull_request" ]; then export CN1SS_SKIP_COMMENT=1; fi
           set +e
           cn1ss_process_and_report \
             "Native Windows port (arm64)" \
@@ -668,6 +681,15 @@ jobs:
             echo "[windows-native-port arm64] FATAL: $me screenshot(s) streamed with no stored golden (missing_expected) -- add them to $REF_DIR."; fail=1
           fi
           if [ "$fail" -ne 0 ]; then echo "Windows arm64 screenshot gate failed."; exit 1; fi
+
+      - name: Upload Windows ARM64 port status
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: port-status-windows-arm64
+          path: artifacts/windows-port/port-status-windows-arm64.json
+          if-no-files-found: warn
+          retention-days: 14
 
   # Widgets Board provider compile check: compiles the one nativeSources TU no
   # other CI leg ever compiles -- cn1_windows_widgetboard.cpp, which is gated

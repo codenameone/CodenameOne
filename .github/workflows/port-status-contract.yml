@@ -1,0 +1,70 @@
+name: Validate port status contract
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/port-status-contract.yml'
+      - 'docs/website/data/port_status.json'
+      - 'docs/website/data/port_status_supplement.json'
+      - 'docs/website/data/port_status_support.json'
+      - 'docs/website/data/port_status_environment.json'
+      - 'docs/website/data/port_status_reports/**'
+      - 'scripts/hellocodenameone/common/src/main/**'
+      - 'scripts/hellocodenameone/conformance/**'
+      - 'scripts/run-javascript-lifecycle-tests.mjs'
+      - 'scripts/website/collect_browser_evidence.mjs'
+      - 'scripts/website/sync_port_status_reports.sh'
+      - '.github/workflows/port-status-nightly.yml'
+      - 'scripts/android/screenshots/**'
+      - 'scripts/ios/screenshots/**'
+      - 'scripts/ios/screenshots-metal/**'
+      - 'scripts/ios/screenshots-watch/**'
+      - 'scripts/ios/screenshots-tv/**'
+      - 'scripts/mac-native/screenshots/**'
+      - 'scripts/javascript/screenshots/**'
+      - 'scripts/linux/screenshots/**'
+      - 'scripts/linux/screenshots-arm/**'
+      - 'scripts/windows/screenshots/**'
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/port-status-contract.yml'
+      - 'docs/website/data/port_status.json'
+      - 'docs/website/data/port_status_supplement.json'
+      - 'docs/website/data/port_status_support.json'
+      - 'docs/website/data/port_status_environment.json'
+      - 'docs/website/data/port_status_reports/**'
+      - 'scripts/hellocodenameone/common/src/main/**'
+      - 'scripts/hellocodenameone/conformance/**'
+      - 'scripts/run-javascript-lifecycle-tests.mjs'
+      - 'scripts/website/collect_browser_evidence.mjs'
+      - 'scripts/website/sync_port_status_reports.sh'
+      - '.github/workflows/port-status-nightly.yml'
+      - 'scripts/android/screenshots/**'
+      - 'scripts/ios/screenshots/**'
+      - 'scripts/ios/screenshots-metal/**'
+      - 'scripts/ios/screenshots-watch/**'
+      - 'scripts/ios/screenshots-tv/**'
+      - 'scripts/mac-native/screenshots/**'
+      - 'scripts/javascript/screenshots/**'
+      - 'scripts/linux/screenshots/**'
+      - 'scripts/linux/screenshots-arm/**'
+      - 'scripts/windows/screenshots/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Validate every test and golden mapping
+        run: python3 scripts/hellocodenameone/conformance/port_status.py validate
+      - name: Run normalizer tests
+        working-directory: scripts/hellocodenameone/conformance
+        run: python3 -m unittest -v test_port_status.py

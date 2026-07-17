@@ -6,6 +6,8 @@ name: Test Android build scripts
   # diff limit, so pull_request triggers stopped firing -- dispatch with
   #   gh workflow run <file> --ref <branch>
   workflow_dispatch:
+  schedule:
+    - cron: '5 1 * * *'
   pull_request:
     paths:
       - '.github/workflows/scripts-android.yml'
@@ -196,6 +198,14 @@ jobs:
           target: google_apis
           disk-size: 2048M
           script: ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
+      - name: Upload Android port status
+        if: always() && matrix.id == 'default'
+        uses: actions/upload-artifact@v7
+        with:
+          name: port-status-android
+          path: artifacts/port-status-android.json
+          if-no-files-found: warn
+          retention-days: 14
       - name: Upload emulator screenshot
         if: always() && matrix.id == 'default'
         uses: actions/upload-artifact@v7
