@@ -210,6 +210,12 @@ final class PlaygroundCompletionModel {
         return KEYWORDS;
     }
 
+    /// True when a capitalized token names a type that is in scope (imported / default-imported /
+    /// bound) or known anywhere in the CN1 index.
+    boolean isKnownType(String token, Map<String, String> visible) {
+        return visible.containsKey(token) || simpleToQualified.containsKey(token);
+    }
+
     private void mergePackage(Map<String, String> target, String pkg) {
         List<String> names = packageToSimples.get(pkg);
         if (names == null) {

@@ -75,6 +75,8 @@ final class PlaygroundCodeEditor {
     private final Mode mode;
     private List<PlaygroundRunner.InlineMessage> inlineMessages = new ArrayList<PlaygroundRunner.InlineMessage>();
     private final List<String> uiidCompletions = new ArrayList<String>();
+    private List<CodeDiagnostic> runnerDiagnostics = new ArrayList<CodeDiagnostic>();
+    private List<CodeDiagnostic> heuristicDiagnostics = new ArrayList<CodeDiagnostic>();
     private boolean completionProviderInstalled;
     private String source;
     private int version;
@@ -138,7 +140,19 @@ final class PlaygroundCodeEditor {
                         .setSeverity(diagnostic.severity));
             }
         }
-        editor.setDiagnostics(converted);
+        runnerDiagnostics = converted;
+        refreshDiagnostics();
+    }
+
+    /// Combines the interpreter's run diagnostics with the on-the-fly heuristic markers (unbalanced
+    /// brackets, unknown types). The heuristics surface mistakes before a run completes and catch the
+    /// cases the interpreter recovers from silently.
+    private void refreshDiagnostics() {
+        List<CodeDiagnostic> all = new ArrayList<CodeDiagnostic>(runnerDiagnostics);
+        if (mode != Mode.CSS) {
+            all.addAll(heuristicDiagnostics);
+        }
+        editor.setDiagnostics(all);
     }
 
     void setUiidCompletions(List<String> uiids) {
@@ -339,6 +353,12 @@ final class PlaygroundCodeEditor {
                     return;
                 }
                 PlaygroundCodeEditor.this.source = updated;
+                if (mode != Mode.CSS) {
+                    // recompute the lightweight heuristic markers immediately so squiggles track typing
+                    // without waiting for the debounced run
+                    heuristicDiagnostics = PlaygroundHeuristicLint.compute(updated);
+                    refreshDiagnostics();
+                }
                 if (PlaygroundCodeEditor.this.listener != null) {
                     PlaygroundCodeEditor.this.listener.onSourceChanged(updated, ++version);
                 }
