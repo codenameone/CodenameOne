@@ -381,6 +381,15 @@ def render_syndicated_body(post: Post, posts: list[Post] | None = None, today: d
 USER_AGENT = "CodenameOneBlogSyndicator/1.0 (+https://github.com/codenameone/CodenameOne)"
 
 
+class HttpJsonError(RuntimeError):
+    """An HTTP error from a JSON endpoint, carrying the status code and body."""
+
+    def __init__(self, url: str, status: int, detail: str) -> None:
+        super().__init__(f"{url} returned HTTP {status}: {detail}")
+        self.status = status
+        self.detail = detail
+
+
 def http_post_json(url: str, headers: dict[str, str], payload: dict[str, Any]) -> dict[str, Any]:
     data = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(url, data=data, method="POST")
@@ -394,10 +403,58 @@ def http_post_json(url: str, headers: dict[str, str], payload: dict[str, Any]) -
             body = response.read().decode("utf-8")
     except urllib.error.HTTPError as err:
         detail = err.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"{url} returned HTTP {err.code}: {detail}") from err
+        raise HttpJsonError(url, err.code, detail) from err
     if not body:
         return {}
     return json.loads(body)
+
+
+def http_get_json(url: str, headers: dict[str, str]) -> Any:
+    request = urllib.request.Request(url, method="GET")
+    request.add_header("User-Agent", USER_AGENT)
+    request.add_header("Accept", "application/json")
+    for key, value in headers.items():
+        request.add_header(key, value)
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            body = response.read().decode("utf-8")
+    except urllib.error.HTTPError as err:
+        detail = err.read().decode("utf-8", errors="replace")
+        raise HttpJsonError(url, err.code, detail) from err
+    if not body:
+        return {}
+    return json.loads(body)
+
+
+def find_devto_article_by_canonical(canonical_url: str, api_key: str) -> dict[str, Any] | None:
+    """Return the caller's already-published dev.to article for ``canonical_url``.
+
+    Used to self-heal when a POST is rejected with "Canonical url has already
+    been taken" -- the post is live on dev.to but its URL was never recorded in
+    our state (e.g. a prior run published it but failed before committing state).
+    Looking the article up lets us record it and advance the rotation instead of
+    wedging on the same post forever.
+    """
+    target = canonical_url.rstrip("/")
+    page = 1
+    while page <= 20:  # Hard stop prevents an unexpected API response from paging forever.
+        articles = http_get_json(
+            f"https://dev.to/api/articles/me/all?per_page=100&page={page}",
+            headers={"api-key": api_key, "Accept": "application/vnd.forem.api-v1+json"},
+        )
+        if not isinstance(articles, list) or not articles:
+            break
+        for article in articles:
+            if str(article.get("canonical_url") or "").rstrip("/") == target:
+                return {
+                    "id": article.get("id"),
+                    "url": article.get("url") or article.get("canonical_url"),
+                    "syndicated_at": article.get("published_at")
+                    or dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+                    "recovered": True,
+                }
+        page += 1
+    return None
 
 
 def publish_to_devto(post: Post, body_markdown: str, api_key: str, draft: bool = False) -> dict[str, Any]:
@@ -416,11 +473,21 @@ def publish_to_devto(post: Post, body_markdown: str, api_key: str, draft: bool =
         payload["article"]["main_image"] = cover
     payload["article"] = {k: v for k, v in payload["article"].items() if v is not None}
 
-    response = http_post_json(
-        "https://dev.to/api/articles",
-        headers={"api-key": api_key, "Accept": "application/vnd.forem.api-v1+json"},
-        payload=payload,
-    )
+    try:
+        response = http_post_json(
+            "https://dev.to/api/articles",
+            headers={"api-key": api_key, "Accept": "application/vnd.forem.api-v1+json"},
+            payload=payload,
+        )
+    except HttpJsonError as err:
+        # A 422 "Canonical url has already been taken" means this post is already
+        # live on dev.to but we never recorded it. Recover its URL so the caller
+        # records it and the rotation advances, instead of failing every run.
+        if err.status == 422 and "canonical url has already been taken" in err.detail.lower():
+            existing = find_devto_article_by_canonical(post.canonical_url, api_key)
+            if existing:
+                return existing
+        raise
     article_id = response.get("id")
     # The URL field on dev.to returns the public canonical URL of the article,
     # but for unpublished drafts that URL 404s for anyone who is not the author.

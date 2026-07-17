@@ -27,11 +27,18 @@ jobs:
         with:
           # Token with write scope so the post-run commit can push the state file.
           token: ${{ secrets.GITHUB_TOKEN }}
+          # The state commit rebases onto the latest default-branch commit before
+          # pushing. A complete history is required when master advanced after
+          # this scheduled run was created.
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+
+      - name: Run syndication regression tests
+        run: python3 scripts/website/test_syndicate_blog_posts.py
 
       - name: Run API syndication script
         id: syndicate_api
@@ -96,15 +103,8 @@ jobs:
           retention-days: 14
 
       - name: Commit updated syndication state and queue
-        if: ${{ inputs.dry_run != true }}
-        run: |
-          set -euo pipefail
-          if git diff --quiet -- scripts/website/syndication-state.json scripts/website/syndication-queue.json; then
-            echo "No state or queue changes to commit."
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add scripts/website/syndication-state.json scripts/website/syndication-queue.json
-          git commit -m "ci: record blog syndication results"
-          git push
+        # always() so a successful publish is committed even when a later step
+        # (browser syndication, queueing) fails -- otherwise the recorded state is
+        # discarded and the same post is re-selected and rejected on the next run.
+        if: ${{ always() && inputs.dry_run != true }}
+        run: bash scripts/website/commit_syndication_state.sh
