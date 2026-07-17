@@ -94,9 +94,11 @@ public class HelperBleBackend implements BleBackend {
     /// ignores (e.g. scanStop while already tearing down). Static so it holds
     /// no reference to the enclosing backend.
     private static final PendingOp NO_OP = new PendingOp() {
+        @Override
         public void onEvent(String event, Map<String, Object> payload) {
         }
 
+        @Override
         public void onFailure(BluetoothException failure) {
             // nothing to report -- the caller does not observe this op
         }
@@ -192,7 +194,7 @@ public class HelperBleBackend implements BleBackend {
     /// Reader thread epilogue: distinguish clean shutdown from a crash.
     private void onHelperExited(HelperTransport t) {
         synchronized (processLock) {
-            if (transport != t) {
+            if (transport != t) { //NOPMD CompareObjectsWithEquals - identity check: is this still the live transport?
                 return; // superseded by a restart
             }
             transport = null;
@@ -606,30 +608,37 @@ public class HelperBleBackend implements BleBackend {
     // BleBackend
     // ------------------------------------------------------------------
 
+    @Override
     public String getName() {
         return NAME;
     }
 
+    @Override
     public boolean isLeSupported() {
         return true;
     }
 
+    @Override
     public boolean isPeripheralModeSupported() {
         return false; // btleplug is central-only
     }
 
+    @Override
     public boolean isClassicSupported() {
         return false;
     }
 
+    @Override
     public boolean isL2capSupported() {
         return false;
     }
 
+    @Override
     public AdapterState getAdapterState() {
         return adapterState.get();
     }
 
+    @Override
     public void setAdapterStateSink(AdapterStateSink sink) {
         stateSink.set(sink);
         if (sink != null) {
@@ -639,19 +648,22 @@ public class HelperBleBackend implements BleBackend {
         }
     }
 
+    @Override
     public void startScan(final ScanSink sink) {
         stopScan();
         scanSink.set(sink);
         long id = nextId();
         send(id, Wire.obj().put("cmd", "scanStart").put("id", id).line(),
                 new PendingOp() {
+                    @Override
                     public void onEvent(String event,
                             Map<String, Object> payload) {
                         // scanStarted -- sightings follow as scanResult
                     }
 
+                    @Override
                     public void onFailure(BluetoothException failure) {
-                        if (scanSink.get() == sink) {
+                        if (scanSink.get() == sink) { //NOPMD CompareObjectsWithEquals - identity check: is this still the registered sink?
                             scanSink.set(null);
                         }
                         sink.onFailed(failure);
@@ -659,6 +671,7 @@ public class HelperBleBackend implements BleBackend {
                 });
     }
 
+    @Override
     public void stopScan() {
         scanSink.set(null);
         synchronized (processLock) {
@@ -670,10 +683,12 @@ public class HelperBleBackend implements BleBackend {
         send(id, Wire.obj().put("cmd", "scanStop").put("id", id).line(), NO_OP);
     }
 
+    @Override
     public BlePeripheral getPeripheral(String address) {
         return cachedPeripheral(address);
     }
 
+    @Override
     public List<BlePeripheral> getConnectedPeripherals(
             BluetoothUuid serviceFilter) {
         ArrayList<BlePeripheral> out = new ArrayList<BlePeripheral>();
@@ -699,11 +714,13 @@ public class HelperBleBackend implements BleBackend {
         return out;
     }
 
+    @Override
     public List<BlePeripheral> getBondedPeripherals() {
         // btleplug exposes no bonded-device registry
         return new ArrayList<BlePeripheral>();
     }
 
+    @Override
     public AsyncResource<GattServer> openGattServer(
             GattServerListener listener) {
         AsyncResource<GattServer> out = new AsyncResource<GattServer>();
@@ -711,6 +728,7 @@ public class HelperBleBackend implements BleBackend {
         return out;
     }
 
+    @Override
     public AsyncResource<BleAdvertisement> startAdvertising(
             AdvertiseSettings settings, AdvertiseData data,
             AdvertiseData scanResponse) {
@@ -720,6 +738,7 @@ public class HelperBleBackend implements BleBackend {
         return out;
     }
 
+    @Override
     public AsyncResource<L2capServer> openL2capServer(boolean secure) {
         AsyncResource<L2capServer> out = new AsyncResource<L2capServer>();
         out.error(notSupported("L2CAP"));
@@ -732,6 +751,7 @@ public class HelperBleBackend implements BleBackend {
                 + " (btleplug is central-only)");
     }
 
+    @Override
     public void shutdown() {
         shutdownInternal();
     }

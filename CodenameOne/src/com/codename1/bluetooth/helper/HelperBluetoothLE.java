@@ -49,50 +49,61 @@ class HelperBluetoothLE extends BluetoothLE {
         this.backend = backend;
     }
 
+    @Override
     protected boolean isScanSupported() {
         return backend.isLeSupported();
     }
 
+    @Override
     protected void startPlatformScan() {
         backend.startScan(new BleBackend.ScanSink() {
+            @Override
             public void onResult(ScanResult result) {
                 fireScanResult(result);
             }
 
+            @Override
             public void onFailed(BluetoothException reason) {
                 fireScanFailed(reason);
             }
         });
     }
 
+    @Override
     protected void stopPlatformScan() {
         backend.stopScan();
     }
 
+    @Override
     public BlePeripheral getPeripheral(String address) {
         return backend.getPeripheral(address);
     }
 
+    @Override
     public List<BlePeripheral> getConnectedPeripherals(
             BluetoothUuid serviceFilter) {
         return backend.getConnectedPeripherals(serviceFilter);
     }
 
+    @Override
     public List<BlePeripheral> getBondedPeripherals() {
         return backend.getBondedPeripherals();
     }
 
+    @Override
     public AsyncResource<GattServer> openGattServer(
             GattServerListener listener) {
         return backend.openGattServer(listener);
     }
 
+    @Override
     public AsyncResource<BleAdvertisement> startAdvertising(
             AdvertiseSettings settings, AdvertiseData data,
             AdvertiseData scanResponse) {
         return backend.startAdvertising(settings, data, scanResponse);
     }
 
+    @Override
     public AsyncResource<L2capServer> openL2capServer(boolean secure) {
         return backend.openL2capServer(secure);
     }

@@ -75,18 +75,22 @@ public class HelperBlePeripheral extends BlePeripheral {
         this.address = address;
     }
 
+    @Override
     public String getAddress() {
         return address;
     }
 
+    @Override
     public String getName() {
         return name.get();
     }
 
+    @Override
     public DeviceType getType() {
         return DeviceType.LE;
     }
 
+    @Override
     public BondState getBondState() {
         // btleplug exposes no bond registry
         return BondState.NONE;
@@ -145,9 +149,11 @@ public class HelperBlePeripheral extends BlePeripheral {
     // BlePeripheral SPI
     // ------------------------------------------------------------------
 
+    @Override
     protected void doConnect(ConnectionOptions options,
             final AsyncResource<BlePeripheral> out) {
         backend.connectPeripheral(address, new PendingOp() {
+            @Override
             public void onEvent(String event, Map<String, Object> payload) {
                 String reportedName = Wire.str(payload, "name", null);
                 if (reportedName != null && reportedName.length() > 0) {
@@ -158,6 +164,7 @@ public class HelperBlePeripheral extends BlePeripheral {
                 }
             }
 
+            @Override
             public void onFailure(BluetoothException failure) {
                 if (!out.isDone()) {
                     out.error(failure);
@@ -166,13 +173,16 @@ public class HelperBlePeripheral extends BlePeripheral {
         });
     }
 
+    @Override
     protected void doDisconnect() {
         backend.disconnectPeripheral(address, new PendingOp() {
+            @Override
             public void onEvent(String event, Map<String, Object> payload) {
                 fireConnectionStateChanged(ConnectionState.DISCONNECTED,
                         null);
             }
 
+            @Override
             public void onFailure(BluetoothException failure) {
                 // the link is gone either way
                 fireConnectionStateChanged(ConnectionState.DISCONNECTED,
@@ -181,9 +191,11 @@ public class HelperBlePeripheral extends BlePeripheral {
         });
     }
 
+    @Override
     protected void doDiscoverServices(
             final AsyncResource<List<GattService>> out) {
         backend.discoverServices(address, new PendingOp() {
+            @Override
             public void onEvent(String event, Map<String, Object> payload) {
                 List<GattService> services = buildGattModel(payload);
                 if (!out.isDone()) {
@@ -191,6 +203,7 @@ public class HelperBlePeripheral extends BlePeripheral {
                 }
             }
 
+            @Override
             public void onFailure(BluetoothException failure) {
                 if (!out.isDone()) {
                     out.error(failure);
@@ -269,6 +282,7 @@ public class HelperBlePeripheral extends BlePeripheral {
         return mask;
     }
 
+    @Override
     protected void doReadCharacteristic(GattCharacteristic c,
             final AsyncResource<byte[]> out) {
         backend.readCharacteristic(address,
@@ -276,6 +290,7 @@ public class HelperBlePeripheral extends BlePeripheral {
                 bytesOp(out));
     }
 
+    @Override
     protected void doWriteCharacteristic(GattCharacteristic c, byte[] value,
             boolean withResponse, final AsyncResource<Boolean> out) {
         backend.writeCharacteristic(address,
@@ -284,6 +299,7 @@ public class HelperBlePeripheral extends BlePeripheral {
                 booleanOp(out));
     }
 
+    @Override
     protected void doReadDescriptor(GattDescriptor d,
             final AsyncResource<byte[]> out) {
         GattCharacteristic c = d.getCharacteristic();
@@ -292,6 +308,7 @@ public class HelperBlePeripheral extends BlePeripheral {
                 d.getUuid().toString(), bytesOp(out));
     }
 
+    @Override
     protected void doWriteDescriptor(GattDescriptor d, byte[] value,
             final AsyncResource<Boolean> out) {
         GattCharacteristic c = d.getCharacteristic();
@@ -301,6 +318,7 @@ public class HelperBlePeripheral extends BlePeripheral {
                 booleanOp(out));
     }
 
+    @Override
     protected void doSetNotifications(GattCharacteristic c, boolean enable,
             boolean indication, final AsyncResource<Boolean> out) {
         // btleplug picks notify vs indicate from the characteristic's own
@@ -310,8 +328,10 @@ public class HelperBlePeripheral extends BlePeripheral {
                 enable, booleanOp(out));
     }
 
+    @Override
     protected void doReadRssi(final AsyncResource<Integer> out) {
         backend.readRssi(address, new PendingOp() {
+            @Override
             public void onEvent(String event, Map<String, Object> payload) {
                 int rssi = Wire.intVal(payload, "rssi", -127);
                 lastRssi.set(rssi);
@@ -321,6 +341,7 @@ public class HelperBlePeripheral extends BlePeripheral {
                 }
             }
 
+            @Override
             public void onFailure(BluetoothException failure) {
                 if (out.isDone()) {
                     return;
@@ -337,6 +358,7 @@ public class HelperBlePeripheral extends BlePeripheral {
         });
     }
 
+    @Override
     protected void doRequestMtu(int mtu, AsyncResource<Integer> out) {
         // btleplug negotiates/does not expose MTU control -- resolve with
         // the current value, mirroring the iOS behavior of this API
@@ -345,6 +367,7 @@ public class HelperBlePeripheral extends BlePeripheral {
         }
     }
 
+    @Override
     protected void doRequestConnectionPriority(ConnectionPriority priority,
             AsyncResource<Boolean> out) {
         // interval preferences are platform-managed -- a successful no-op
@@ -353,6 +376,7 @@ public class HelperBlePeripheral extends BlePeripheral {
         }
     }
 
+    @Override
     protected void doCreateBond(AsyncResource<Boolean> out) {
         if (backend.helperSupports("bonding")) {
             // reserved: no current helper build advertises bonding
@@ -368,6 +392,7 @@ public class HelperBlePeripheral extends BlePeripheral {
         }
     }
 
+    @Override
     protected void doOpenL2cap(int psm, boolean secure,
             AsyncResource<L2capChannel> out) {
         if (!out.isDone()) {
@@ -379,12 +404,14 @@ public class HelperBlePeripheral extends BlePeripheral {
 
     private static PendingOp booleanOp(final AsyncResource<Boolean> out) {
         return new PendingOp() {
+            @Override
             public void onEvent(String event, Map<String, Object> payload) {
                 if (!out.isDone()) {
                     out.complete(Boolean.TRUE);
                 }
             }
 
+            @Override
             public void onFailure(BluetoothException failure) {
                 if (!out.isDone()) {
                     out.error(failure);
@@ -398,6 +425,7 @@ public class HelperBlePeripheral extends BlePeripheral {
     /// enclosing peripheral.
     private static PendingOp bytesOp(final AsyncResource<byte[]> out) {
         return new PendingOp() {
+            @Override
             public void onEvent(String event, Map<String, Object> payload) {
                 if (!out.isDone()) {
                     out.complete(Wire.decodeBase64(
@@ -405,6 +433,7 @@ public class HelperBlePeripheral extends BlePeripheral {
                 }
             }
 
+            @Override
             public void onFailure(BluetoothException failure) {
                 if (!out.isDone()) {
                     out.error(failure);

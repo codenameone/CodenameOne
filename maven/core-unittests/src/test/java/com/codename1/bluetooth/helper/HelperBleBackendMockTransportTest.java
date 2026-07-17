@@ -232,8 +232,11 @@ public class HelperBleBackendMockTransportTest {
                 + ",\"address\":\"aa:01\",\"name\":\"Heart Monitor\"}");
         await("connect completion", connect::isDone);
         Assertions.assertNull(errorOf(connect));
-        Assertions.assertEquals(ConnectionState.CONNECTED,
-                p.getConnectionState());
+        // getConnectionState() flips to CONNECTED on the EDT (via the
+        // connect future's completion callback), after isDone() is already
+        // true -- await it rather than reading it synchronously.
+        await("peripheral reports connected",
+                () -> p.getConnectionState() == ConnectionState.CONNECTED);
         Assertions.assertEquals(1, b.getConnectedPeripherals(null).size());
 
         final AsyncResource<List<GattService>> discover =
@@ -310,8 +313,13 @@ public class HelperBleBackendMockTransportTest {
                 "expected a typed BluetoothException, got " + failure);
         Assertions.assertEquals(BluetoothError.IO_ERROR,
                 ((BluetoothException) failure).getError());
-        Assertions.assertEquals(ConnectionState.DISCONNECTED,
-                p.getConnectionState());
+        // The connect future errors synchronously, but the CONNECTING ->
+        // DISCONNECTED transition is delivered on the EDT (as it is for a
+        // real app's own connect callback), so await it rather than reading
+        // it straight off the reader thread -- matching the adapter/state
+        // awaits elsewhere in this suite.
+        await("peripheral disconnects after crash",
+                () -> p.getConnectionState() == ConnectionState.DISCONNECTED);
         await("adapter reports UNSUPPORTED",
                 () -> b.getAdapterState() == AdapterState.UNSUPPORTED);
         Assertions.assertTrue(states.contains(AdapterState.UNSUPPORTED));

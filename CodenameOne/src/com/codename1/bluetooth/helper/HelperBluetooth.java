@@ -49,36 +49,44 @@ public class HelperBluetooth extends Bluetooth {
         this.backend = new HelperBleBackend(transportFactory);
         this.le = new HelperBluetoothLE(backend);
         this.backend.setAdapterStateSink(new BleBackend.AdapterStateSink() {
+            @Override
             public void adapterStateChanged(AdapterState newState) {
                 fireAdapterStateChanged(newState);
             }
         });
     }
 
+    @Override
     public boolean isSupported() {
         return backend.isLeSupported();
     }
 
+    @Override
     public boolean isLeSupported() {
         return backend.isLeSupported();
     }
 
+    @Override
     public boolean isClassicSupported() {
         return backend.isClassicSupported();
     }
 
+    @Override
     public boolean isPeripheralModeSupported() {
         return backend.isPeripheralModeSupported();
     }
 
+    @Override
     public boolean isL2capSupported() {
         return backend.isL2capSupported();
     }
 
+    @Override
     public AdapterState getAdapterState() {
         return backend.getAdapterState();
     }
 
+    @Override
     public BluetoothLE getLE() {
         return le;
     }
@@ -86,10 +94,12 @@ public class HelperBluetooth extends Bluetooth {
     /// Desktop Linux/Windows have no app-level runtime Bluetooth permission
     /// (access is governed by the OS/user session), so permissions are
     /// reported granted and requests resolve `true`.
+    @Override
     public boolean hasPermission(BluetoothPermission permission) {
         return true;
     }
 
+    @Override
     public AsyncResource<Boolean> requestPermissions(
             BluetoothPermission... permissions) {
         AsyncResource<Boolean> r = new AsyncResource<Boolean>();
@@ -100,6 +110,7 @@ public class HelperBluetooth extends Bluetooth {
     /// There is no programmatic adapter-enable on the desktop helper path;
     /// resolves `true` when the adapter is already powered on, else
     /// `false`.
+    @Override
     public AsyncResource<Boolean> requestEnable() {
         AsyncResource<Boolean> r = new AsyncResource<Boolean>();
         r.complete(getAdapterState() == AdapterState.POWERED_ON

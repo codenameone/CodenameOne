@@ -78,6 +78,7 @@ public abstract class NativeSubprocessTransport implements HelperTransport {
     // HelperTransport
     // ------------------------------------------------------------------
 
+    @Override
     public void start(List<String> command) throws IOException {
         if (handle != 0) {
             throw new IOException("transport already started");
@@ -97,6 +98,7 @@ public abstract class NativeSubprocessTransport implements HelperTransport {
         handle = h;
     }
 
+    @Override
     public String readLine() throws IOException {
         long h = handle;
         if (h == 0) {
@@ -131,6 +133,7 @@ public abstract class NativeSubprocessTransport implements HelperTransport {
         }
     }
 
+    @Override
     public void writeLine(String line) throws IOException {
         long h = handle;
         if (h == 0) {
@@ -141,6 +144,7 @@ public abstract class NativeSubprocessTransport implements HelperTransport {
         writeFully(h, writeNewline, 1);
     }
 
+    @Override
     public void close() {
         long h = handle;
         handle = 0;
@@ -149,6 +153,7 @@ public abstract class NativeSubprocessTransport implements HelperTransport {
         }
     }
 
+    @Override
     public boolean isAlive() {
         long h = handle;
         return h != 0 && rawIsAlive(h) != 0;
