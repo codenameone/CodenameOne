@@ -42,6 +42,12 @@ on:
       - '.github/scripts/build_javadocs.sh'
       - '.github/workflows/website-docs.yml'
   workflow_dispatch:
+    inputs:
+      deploy_production:
+        description: 'Deploy this master build to production'
+        required: false
+        default: false
+        type: boolean
   # Daily production rebuild so future-dated blog posts (the daily release
   # follow-ups) publish on their own date with no manual push. Production
   # builds keep HUGO_BUILD_FUTURE=false, so a post only appears once its date
@@ -446,12 +452,12 @@ jobs:
           done < /tmp/cf_deployments_to_delete.txt
 
       - name: Check Cloudflare deploy credentials
-        if: ${{ ((github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master')) || github.event_name == 'schedule') && env.CLOUDFLARE_TOKEN == '' }}
+        if: ${{ ((github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master')) || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.deploy_production && (github.ref_name == 'main' || github.ref_name == 'master'))) && env.CLOUDFLARE_TOKEN == '' }}
         run: |
           echo "::warning::Skipping Cloudflare Pages deploy because no API token secret is configured. Set CLOUDFLARE_TOKEN (preferred) or CF_API_TOKEN."
 
       - name: Deploy to Cloudflare Pages
-        if: ${{ ((github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master')) || github.event_name == 'schedule') && env.CLOUDFLARE_TOKEN != '' }}
+        if: ${{ ((github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'master')) || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.deploy_production && (github.ref_name == 'main' || github.ref_name == 'master'))) && env.CLOUDFLARE_TOKEN != '' }}
         uses: cloudflare/wrangler-action@v3
         env:
           # Keep these env vars explicit so Wrangler can authenticate in non-interactive CI.
