@@ -14471,6 +14471,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private JavaSEBiometrics biometrics;
     private JavaSESecureStorage secureStorage;
     private JavaSENfc nfc;
+    private com.codename1.bluetooth.Bluetooth bluetooth;
     private boolean biometricsBuildHintsInstalled;
     private boolean nfcBuildHintsInstalled;
 
@@ -14499,6 +14500,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             nfc = new JavaSENfc();
         }
         return nfc;
+    }
+
+    @Override
+    public com.codename1.bluetooth.Bluetooth getBluetooth() {
+        if (bluetooth == null) {
+            bluetooth = new com.codename1.impl.javase.bluetooth.JavaSEBluetooth();
+        }
+        return bluetooth;
     }
 
     /**

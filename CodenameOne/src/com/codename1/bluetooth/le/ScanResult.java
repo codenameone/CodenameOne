@@ -71,7 +71,9 @@ public class ScanResult {
         return connectable;
     }
 
-    /// The sighting time in `System.currentTimeMillis()` terms.
+    /// The sighting time -- `System.currentTimeMillis()` terms on device
+    /// ports; the simulator's virtual stack uses a monotonic counter, so
+    /// treat the value as ordered rather than as a wall-clock time.
     public long getTimestamp() {
         return timestamp;
     }
