@@ -143,6 +143,7 @@ class NativeBleBackend implements BleBackend {
         this.helperBinary = resolveHelperBinary(
                 System.getProperty(HELPER_PATH_PROPERTY),
                 System.getProperty("os.name", ""),
+                System.getProperty("os.arch", ""),
                 System.getenv("PATH"), attempted);
         this.resolutionDescription = join(attempted);
         this.launchOverride = null;
@@ -169,7 +170,7 @@ class NativeBleBackend implements BleBackend {
      * collects a human-readable trace for error messages.
      */
     static File resolveHelperBinary(String propertyValue, String osName,
-            String pathEnv, List<String> attempted) {
+            String osArch, String pathEnv, List<String> attempted) {
         if (propertyValue != null && propertyValue.length() > 0) {
             File f = new File(propertyValue);
             if (f.isFile()) {
@@ -183,9 +184,10 @@ class NativeBleBackend implements BleBackend {
             attempted.add("system property " + HELPER_PATH_PROPERTY
                     + " (not set)");
         }
-        String resourcePath = helperResourcePath(osName);
+        String resourcePath = helperResourcePath(osName, osArch);
         if (resourcePath == null) {
-            attempted.add("no bundled helper for os.name=" + osName);
+            attempted.add("no bundled helper for os.name=" + osName
+                    + " os.arch=" + osArch);
         } else {
             File extracted = extractResource(resourcePath, attempted);
             if (extracted != null) {
@@ -201,22 +203,50 @@ class NativeBleBackend implements BleBackend {
     }
 
     /**
-     * Classpath location of the helper binary for the OS, or {@code null}
-     * when btleplug does not support it. The binaries ship from the
-     * cn1-binaries repository ({@code ble/{macos,linux,windows}/}) via the
-     * maven/javase resource mapping.
+     * Classpath location of the helper binary for the OS and CPU
+     * architecture, or {@code null} when no binary is bundled for the
+     * combination. The binaries ship from the cn1-binaries repository via
+     * the maven/javase resource mapping, laid out as
+     * {@code ble/macos/cn1-ble-helper} (a universal Mach-O binary covering
+     * both architectures) and {@code ble/{linux,windows}/{x64,arm64}/}
+     * (ELF and PE have no fat-binary format, so those are per-arch).
      */
-    static String helperResourcePath(String osName) {
+    static String helperResourcePath(String osName, String osArch) {
         String os = osName == null ? "" : osName.toLowerCase();
         if (os.contains("mac") || os.contains("darwin")) {
+            // universal binary: one file serves x86_64 and arm64
             return HELPER_RESOURCE_DIR + "macos/" + HELPER_BASENAME;
         }
+        String arch = normalizeArch(osArch);
+        if (arch == null) {
+            return null;
+        }
         if (os.contains("linux")) {
-            return HELPER_RESOURCE_DIR + "linux/" + HELPER_BASENAME;
+            return HELPER_RESOURCE_DIR + "linux/" + arch + "/"
+                    + HELPER_BASENAME;
         }
         if (os.contains("windows")) {
-            return HELPER_RESOURCE_DIR + "windows/" + HELPER_BASENAME
-                    + ".exe";
+            return HELPER_RESOURCE_DIR + "windows/" + arch + "/"
+                    + HELPER_BASENAME + ".exe";
+        }
+        return null;
+    }
+
+    /**
+     * Maps {@code os.arch} onto the directory names used by the bundled
+     * binaries, or {@code null} for architectures no binary is shipped for
+     * (32-bit x86 and 32-bit ARM among them) -- resolution then falls
+     * through to the {@code PATH} lookup, so a self-built helper still
+     * works there.
+     */
+    static String normalizeArch(String osArch) {
+        String arch = osArch == null ? "" : osArch.toLowerCase();
+        if (arch.equals("amd64") || arch.equals("x86_64")
+                || arch.equals("x64")) {
+            return "x64";
+        }
+        if (arch.equals("aarch64") || arch.equals("arm64")) {
+            return "arm64";
         }
         return null;
     }

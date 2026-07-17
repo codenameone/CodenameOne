@@ -58,7 +58,7 @@ public class NativeBleHelperResolutionTest {
         File binary = fakeBinary("my-helper");
         List<String> attempted = new ArrayList<>();
         File resolved = NativeBleBackend.resolveHelperBinary(
-                binary.getAbsolutePath(), "TestOS", null, attempted);
+                binary.getAbsolutePath(), "TestOS", "x86_64", null, attempted);
         Assertions.assertEquals(binary.getAbsolutePath(),
                 resolved.getAbsolutePath());
         Assertions.assertTrue(attempted.get(0).contains(
@@ -72,7 +72,7 @@ public class NativeBleHelperResolutionTest {
         List<String> attempted = new ArrayList<>();
         File resolved = NativeBleBackend.resolveHelperBinary(
                 new File(tempDir, "no-such-file").getAbsolutePath(),
-                "TestOS", tempDir.getAbsolutePath(), attempted);
+                "TestOS", "x86_64", tempDir.getAbsolutePath(), attempted);
         Assertions.assertEquals(onPath.getAbsolutePath(),
                 resolved.getAbsolutePath());
         String trace = String.valueOf(attempted);
@@ -101,7 +101,7 @@ public class NativeBleHelperResolutionTest {
     public void nothingFoundReportsEveryAttemptedLocation() {
         List<String> attempted = new ArrayList<>();
         File resolved = NativeBleBackend.resolveHelperBinary(null, "TestOS",
-                "", attempted);
+                "x86_64", "", attempted);
         Assertions.assertNull(resolved);
         String trace = String.valueOf(attempted);
         Assertions.assertTrue(trace.contains(
@@ -110,25 +110,71 @@ public class NativeBleHelperResolutionTest {
         Assertions.assertTrue(
                 trace.contains("no bundled helper for os.name=TestOS"),
                 trace);
+        Assertions.assertTrue(trace.contains("os.arch=x86_64"), trace);
         Assertions.assertTrue(trace.contains("PATH lookup"), trace);
     }
 
     @Test
     public void bundledResourceLocationsAreKeyedByOs() {
+        // macOS ships one universal Mach-O binary, so the arch is ignored
         Assertions.assertEquals(NativeBleBackend.HELPER_RESOURCE_DIR
                 + "macos/cn1-ble-helper",
-                NativeBleBackend.helperResourcePath("Mac OS X"));
+                NativeBleBackend.helperResourcePath("Mac OS X", "x86_64"));
         Assertions.assertEquals(NativeBleBackend.HELPER_RESOURCE_DIR
-                + "linux/cn1-ble-helper",
-                NativeBleBackend.helperResourcePath("Linux"));
-        Assertions.assertEquals(NativeBleBackend.HELPER_RESOURCE_DIR
-                + "windows/cn1-ble-helper.exe",
-                NativeBleBackend.helperResourcePath("Windows 11"));
-        Assertions.assertNull(NativeBleBackend.helperResourcePath("TestOS"));
+                + "macos/cn1-ble-helper",
+                NativeBleBackend.helperResourcePath("Mac OS X", "aarch64"));
+        Assertions.assertNull(
+                NativeBleBackend.helperResourcePath("TestOS", "x86_64"));
         Assertions.assertEquals("cn1-ble-helper.exe",
                 NativeBleBackend.helperExecutableName("Windows 11"));
         Assertions.assertEquals("cn1-ble-helper",
                 NativeBleBackend.helperExecutableName("Mac OS X"));
+    }
+
+    @Test
+    public void linuxAndWindowsResourcesAreKeyedByArchitecture() {
+        // ELF and PE have no fat-binary format, so these are per-arch
+        Assertions.assertEquals(NativeBleBackend.HELPER_RESOURCE_DIR
+                + "linux/x64/cn1-ble-helper",
+                NativeBleBackend.helperResourcePath("Linux", "amd64"));
+        Assertions.assertEquals(NativeBleBackend.HELPER_RESOURCE_DIR
+                + "linux/arm64/cn1-ble-helper",
+                NativeBleBackend.helperResourcePath("Linux", "aarch64"));
+        Assertions.assertEquals(NativeBleBackend.HELPER_RESOURCE_DIR
+                + "windows/x64/cn1-ble-helper.exe",
+                NativeBleBackend.helperResourcePath("Windows 11", "amd64"));
+        Assertions.assertEquals(NativeBleBackend.HELPER_RESOURCE_DIR
+                + "windows/arm64/cn1-ble-helper.exe",
+                NativeBleBackend.helperResourcePath("Windows 11", "aarch64"));
+    }
+
+    @Test
+    public void architectureAliasesMapOntoTheBundledDirectories() {
+        Assertions.assertEquals("x64", NativeBleBackend.normalizeArch("amd64"));
+        Assertions.assertEquals("x64",
+                NativeBleBackend.normalizeArch("x86_64"));
+        Assertions.assertEquals("x64", NativeBleBackend.normalizeArch("X64"));
+        Assertions.assertEquals("arm64",
+                NativeBleBackend.normalizeArch("aarch64"));
+        Assertions.assertEquals("arm64",
+                NativeBleBackend.normalizeArch("arm64"));
+        // 32-bit x86/ARM ship no binary: resolution falls through to PATH
+        Assertions.assertNull(NativeBleBackend.normalizeArch("x86"));
+        Assertions.assertNull(NativeBleBackend.normalizeArch("i386"));
+        Assertions.assertNull(NativeBleBackend.normalizeArch("arm"));
+        Assertions.assertNull(NativeBleBackend.normalizeArch(null));
+    }
+
+    @Test
+    public void unknownArchitectureStillFallsBackToPath() throws IOException {
+        File binary = fakeBinary(NativeBleBackend.HELPER_BASENAME);
+        List<String> attempted = new ArrayList<>();
+        File resolved = NativeBleBackend.resolveHelperBinary(null, "Linux",
+                "riscv64", tempDir.getAbsolutePath(), attempted);
+        Assertions.assertEquals(binary.getAbsolutePath(),
+                resolved.getAbsolutePath());
+        Assertions.assertTrue(String.valueOf(attempted).contains(
+                "os.arch=riscv64"), String.valueOf(attempted));
     }
 
     @Test
