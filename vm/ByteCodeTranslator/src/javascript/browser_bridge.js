@@ -1744,6 +1744,590 @@
     return doc.documentElement.getAttribute('data-cn1-app-version');
   });
 
+  // ======================== Web Bluetooth ========================
+  // Main-thread backend for the JS port's Bluetooth API
+  // (com.codename1.impl.html5.JSBluetooth). navigator.bluetooth is a
+  // Window-only API, so the worker natives route here; this side owns the
+  // BluetoothDevice / GATT object handles (the worker only ever sees the
+  // per-origin device.id string and small integer attribute handle ids
+  // assigned during discovery). Handlers never reject: every failure
+  // resolves to {ok:0, code:<BluetoothError name>, message} so the worker
+  // can surface typed errors without string matching.
+
+  var btDevices = {};          // deviceId -> {id, device, chars, descs, nextIid, notifyHandlers, disconnectHooked}
+  var btAnonDeviceSeq = 0;
+  var btEventCallbackId = null;
+  var btAvailabilityHooked = false;
+
+  function btBluetooth() {
+    var nav = global.navigator || (global.window && global.window.navigator);
+    return nav && nav.bluetooth ? nav.bluetooth : null;
+  }
+
+  function btErr(code, message) {
+    return { ok: 0, code: String(code || 'UNKNOWN'), message: message == null ? '' : String(message) };
+  }
+
+  // Streams host-initiated events (adapter state, disconnects,
+  // notifications) back to the worker through the standard
+  // worker-callback channel; the payload is structured-clone friendly
+  // (plain fields + a COPIED Uint8Array for notification values).
+  function btPostEvent(payload) {
+    var target = global.__parparWorker;
+    if (btEventCallbackId == null || !target || typeof target.postMessage !== 'function') {
+      return;
+    }
+    try {
+      target.postMessage({ type: 'worker-callback', callbackId: btEventCallbackId, args: [payload] });
+    } catch (_e) {}
+  }
+
+  // Maps DOMException names onto core BluetoothError names. context is
+  // 'chooser' | 'connect' | 'gatt' -- the same DOMException means
+  // different things per API (NotFoundError from requestDevice is the
+  // user dismissing the chooser; from a GATT call it's a missing
+  // service/characteristic).
+  function btMapDomError(err, context) {
+    var name = err && err.name ? String(err.name) : '';
+    var message = String((err && err.message) || '');
+    if (name === 'NotFoundError') {
+      return context === 'chooser' ? 'USER_CANCELED' : 'GATT_ERROR';
+    }
+    if (name === 'SecurityError') {
+      return 'UNAUTHORIZED';
+    }
+    if (name === 'NotSupportedError') {
+      return 'NOT_SUPPORTED';
+    }
+    if (name === 'InvalidStateError') {
+      return 'NOT_CONNECTED';
+    }
+    if (name === 'NetworkError') {
+      if (context === 'connect') {
+        return 'CONNECTION_FAILED';
+      }
+      return /disconnect/i.test(message) ? 'NOT_CONNECTED' : 'IO_ERROR';
+    }
+    if (name === 'AbortError') {
+      return 'USER_CANCELED';
+    }
+    if (name === 'TypeError') {
+      return context === 'chooser' ? 'SCAN_FAILED' : 'UNKNOWN';
+    }
+    return 'UNKNOWN';
+  }
+
+  function btIsGestureError(err) {
+    return !!(err && err.name === 'SecurityError'
+      && /user (gesture|activation)/i.test(String(err.message || '')));
+  }
+
+  function btStoreDevice(device) {
+    var id = device.id != null && String(device.id).length
+      ? String(device.id) : ('cn1-bt-' + (++btAnonDeviceSeq));
+    var entry = btDevices[id];
+    if (!entry) {
+      entry = { id: id, device: device, chars: {}, descs: {}, nextIid: 1, notifyHandlers: {}, disconnectHooked: false };
+      btDevices[id] = entry;
+    } else {
+      entry.device = device;
+    }
+    return entry;
+  }
+
+  function btEntry(request) {
+    var id = request && request.id != null ? String(request.id) : null;
+    return id ? btDevices[id] : null;
+  }
+
+  function btDataViewToBase64(dv) {
+    if (!dv || !dv.byteLength) {
+      return '';
+    }
+    var bytes = new Uint8Array(dv.buffer, dv.byteOffset, dv.byteLength);
+    var binary = '';
+    for (var i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    var b64 = global.btoa || (global.window && global.window.btoa);
+    return typeof b64 === 'function' ? b64(binary) : '';
+  }
+
+  function btToUint8(value) {
+    if (value == null) {
+      return null;
+    }
+    if (typeof Uint8Array !== 'undefined' && value instanceof Uint8Array) {
+      return value;
+    }
+    if (typeof value.length === 'number') {
+      var out = new Uint8Array(value.length | 0);
+      for (var i = 0; i < out.length; i++) {
+        out[i] = value[i] & 0xff;
+      }
+      return out;
+    }
+    return null;
+  }
+
+  // requestDevice options from the worker's pre-built dictionary. The
+  // manufacturerData dataPrefix/mask arrive as plain number arrays (the
+  // only Web Bluetooth option field that needs a typed-array re-wrap).
+  function btBuildRequestOptions(request) {
+    var r = request || {};
+    var options = {};
+    var built = [];
+    var filters = r.filters || [];
+    for (var i = 0; i < filters.length; i++) {
+      var f = filters[i] || {};
+      var o = {};
+      if (f.services && f.services.length) {
+        var services = [];
+        for (var j = 0; j < f.services.length; j++) {
+          services.push(String(f.services[j]));
+        }
+        o.services = services;
+      }
+      if (f.name != null) {
+        o.name = String(f.name);
+      }
+      if (f.namePrefix != null) {
+        o.namePrefix = String(f.namePrefix);
+      }
+      if (f.manufacturerData && f.manufacturerData.length) {
+        var mans = [];
+        for (var k = 0; k < f.manufacturerData.length; k++) {
+          var m = f.manufacturerData[k] || {};
+          var entry = { companyIdentifier: m.companyIdentifier | 0 };
+          var prefix = btToUint8(m.dataPrefix);
+          if (prefix) {
+            entry.dataPrefix = prefix;
+          }
+          var mask = btToUint8(m.mask);
+          if (mask) {
+            entry.mask = mask;
+          }
+          mans.push(entry);
+        }
+        o.manufacturerData = mans;
+      }
+      var hasCriteria = false;
+      for (var key in o) {
+        if (Object.prototype.hasOwnProperty.call(o, key)) {
+          hasCriteria = true;
+          break;
+        }
+      }
+      if (hasCriteria) {
+        built.push(o);
+      }
+    }
+    if (built.length) {
+      options.filters = built;
+    } else {
+      options.acceptAllDevices = true;
+    }
+    if (r.optionalServices && r.optionalServices.length) {
+      var opt = [];
+      for (var s = 0; s < r.optionalServices.length; s++) {
+        opt.push(String(r.optionalServices[s]));
+      }
+      options.optionalServices = opt;
+    }
+    return options;
+  }
+
+  // ---- user-gesture relay -------------------------------------------
+  // requestDevice must run inside a user gesture. When the forwarded
+  // click's transient activation already expired by the time the worker
+  // round-trip lands here, the attempt is parked and re-fired from the
+  // next REAL user gesture (mirrors the pending-handler idea of
+  // __cn1_register_save_blob__ / __cn1_fire_save_blob__, but hooks actual
+  // DOM gestures because a chooser -- unlike a download click -- can only
+  // open inside genuine user activation). A parked attempt that sees no
+  // gesture within 30s resolves as a typed USER_CANCELED, never a hang.
+  var btPendingGestureJobs = [];
+  var btGestureRelayInstalled = false;
+
+  function btInstallGestureRelay() {
+    if (btGestureRelayInstalled) {
+      return;
+    }
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || typeof doc.addEventListener !== 'function') {
+      return;
+    }
+    btGestureRelayInstalled = true;
+    var run = function() {
+      if (!btPendingGestureJobs.length) {
+        return;
+      }
+      var jobs = btPendingGestureJobs;
+      btPendingGestureJobs = [];
+      for (var i = 0; i < jobs.length; i++) {
+        try { jobs[i](); } catch (_e) {}
+      }
+    };
+    var types = ['pointerup', 'touchend', 'mouseup', 'keyup'];
+    for (var i = 0; i < types.length; i++) {
+      doc.addEventListener(types[i], run, true);
+    }
+  }
+
+  hostBridge.register('__cn1_bt_support__', function() {
+    var bt = btBluetooth();
+    return { ok: 1, supported: bt && typeof bt.requestDevice === 'function' ? 1 : 0 };
+  });
+
+  hostBridge.register('__cn1_bt_adapter_state__', function() {
+    var bt = btBluetooth();
+    if (!bt) {
+      return { ok: 1, state: 'UNSUPPORTED' };
+    }
+    if (typeof bt.getAvailability !== 'function') {
+      return { ok: 1, state: 'UNKNOWN' };
+    }
+    return bt.getAvailability().then(function(available) {
+      return { ok: 1, state: available ? 'POWERED_ON' : 'POWERED_OFF' };
+    }, function() {
+      return { ok: 1, state: 'UNKNOWN' };
+    });
+  });
+
+  hostBridge.register('__cn1_bt_set_event_callback__', function(cb) {
+    // hostBridge.invoke passes args raw, so the worker's callback arrives
+    // as a {__cn1WorkerCallback: id} token (or as an already-materialised
+    // proxy carrying __cn1WorkerCallbackId).
+    if (cb && typeof cb.__cn1WorkerCallback === 'number') {
+      btEventCallbackId = cb.__cn1WorkerCallback;
+    } else if (typeof cb === 'function' && typeof cb.__cn1WorkerCallbackId === 'number') {
+      btEventCallbackId = cb.__cn1WorkerCallbackId;
+    } else {
+      return btErr('UNKNOWN', 'No callback token supplied');
+    }
+    if (!btAvailabilityHooked) {
+      var bt = btBluetooth();
+      if (bt && typeof bt.addEventListener === 'function') {
+        btAvailabilityHooked = true;
+        try {
+          bt.addEventListener('availabilitychanged', function(evt) {
+            btPostEvent({ kind: 'adapter', detail: (evt && evt.value) ? 'POWERED_ON' : 'POWERED_OFF' });
+          });
+        } catch (_e) {
+          btAvailabilityHooked = false;
+        }
+      }
+    }
+    return { ok: 1 };
+  });
+
+  hostBridge.register('__cn1_bt_request_device__', function(request) {
+    var bt = btBluetooth();
+    if (!bt || typeof bt.requestDevice !== 'function') {
+      return btErr('NOT_SUPPORTED', 'Web Bluetooth is not available in this browser/context (requires Chromium + HTTPS)');
+    }
+    var options = btBuildRequestOptions(request);
+    return new Promise(function(resolve) {
+      var settled = false;
+      var deferred = false;
+      function finish(value) {
+        if (!settled) {
+          settled = true;
+          resolve(value);
+        }
+      }
+      function attempt() {
+        if (settled) {
+          return;
+        }
+        var p;
+        try {
+          p = bt.requestDevice(options);
+        } catch (e) {
+          onFailure(e);
+          return;
+        }
+        p.then(function(device) {
+          var entry = btStoreDevice(device);
+          finish({ ok: 1, id: entry.id, name: device.name == null ? null : String(device.name) });
+        }, onFailure);
+      }
+      function onFailure(err) {
+        if (!deferred && btIsGestureError(err)) {
+          // transient activation of the forwarded click already expired:
+          // park the attempt for the next real gesture, bounded by 30s
+          deferred = true;
+          btPendingGestureJobs.push(attempt);
+          btInstallGestureRelay();
+          setTimeout(function() {
+            var idx = btPendingGestureJobs.indexOf(attempt);
+            if (idx >= 0) {
+              btPendingGestureJobs.splice(idx, 1);
+            }
+            finish(btErr('USER_CANCELED', 'requestDevice needs a user gesture and none arrived within 30s'));
+          }, 30000);
+          return;
+        }
+        finish(btErr(btMapDomError(err, 'chooser'), err && err.message));
+      }
+      attempt();
+    });
+  });
+
+  hostBridge.register('__cn1_bt_connect__', function(request) {
+    var entry = btEntry(request);
+    if (!entry) {
+      return btErr('UNKNOWN', 'Unknown Bluetooth device handle -- run the chooser first');
+    }
+    var device = entry.device;
+    if (!device.gatt) {
+      return btErr('NOT_SUPPORTED', 'The selected device exposes no GATT server');
+    }
+    if (!entry.disconnectHooked) {
+      entry.disconnectHooked = true;
+      try {
+        device.addEventListener('gattserverdisconnected', function() {
+          btPostEvent({ kind: 'disconnect', deviceId: entry.id });
+        });
+      } catch (_e) {
+        entry.disconnectHooked = false;
+      }
+    }
+    return device.gatt.connect().then(function() {
+      return { ok: 1 };
+    }, function(err) {
+      return btErr(btMapDomError(err, 'connect'), err && err.message);
+    });
+  });
+
+  hostBridge.register('__cn1_bt_disconnect__', function(request) {
+    var entry = btEntry(request);
+    if (!entry) {
+      return btErr('UNKNOWN', 'Unknown Bluetooth device handle');
+    }
+    try {
+      if (entry.device.gatt && entry.device.gatt.connected) {
+        entry.device.gatt.disconnect();
+      }
+    } catch (_e) {}
+    return { ok: 1 };
+  });
+
+  // One-shot full GATT database dump: services -> characteristics ->
+  // descriptors in a single host call (bridge round-trips are expensive;
+  // the worker gets the whole tree as one JSON payload). Also (re)builds
+  // the per-device attribute handle tables the read/write/subscribe
+  // handlers resolve against.
+  hostBridge.register('__cn1_bt_discover__', function(request) {
+    var entry = btEntry(request);
+    if (!entry) {
+      return btErr('UNKNOWN', 'Unknown Bluetooth device handle');
+    }
+    var gatt = entry.device.gatt;
+    if (!gatt || !gatt.connected) {
+      return btErr('NOT_CONNECTED', 'GATT server is not connected');
+    }
+    entry.chars = {};
+    entry.descs = {};
+    entry.nextIid = 1;
+    entry.notifyHandlers = {};
+
+    function collectCharacteristic(ch, cRecs) {
+      var iid = entry.nextIid++;
+      entry.chars[iid] = ch;
+      var props = ch.properties || {};
+      var mask = 0;
+      if (props.broadcast) { mask |= 0x01; }
+      if (props.read) { mask |= 0x02; }
+      if (props.writeWithoutResponse) { mask |= 0x04; }
+      if (props.write) { mask |= 0x08; }
+      if (props.notify) { mask |= 0x10; }
+      if (props.indicate) { mask |= 0x20; }
+      if (props.authenticatedSignedWrites) { mask |= 0x40; }
+      var cRec = { uuid: String(ch.uuid), iid: iid, properties: mask, descriptors: [] };
+      cRecs.push(cRec);
+      // getDescriptors rejects with NotFoundError when there are none
+      return ch.getDescriptors().then(function(ds) { return ds; }, function() { return []; })
+        .then(function(ds) {
+          for (var i = 0; i < ds.length; i++) {
+            var dIid = entry.nextIid++;
+            entry.descs[dIid] = ds[i];
+            cRec.descriptors.push({ uuid: String(ds[i].uuid), iid: dIid });
+          }
+          return null;
+        });
+    }
+
+    function collectService(svc, out) {
+      var sRec = {
+        uuid: String(svc.uuid),
+        primary: svc.isPrimary === false ? 0 : 1,
+        iid: entry.nextIid++,
+        characteristics: []
+      };
+      out.push(sRec);
+      return svc.getCharacteristics().then(function(chars) { return chars; }, function() { return []; })
+        .then(function(chars) {
+          var chain = Promise.resolve();
+          for (var i = 0; i < chars.length; i++) {
+            (function(ch) {
+              chain = chain.then(function() {
+                return collectCharacteristic(ch, sRec.characteristics);
+              });
+            })(chars[i]);
+          }
+          return chain;
+        });
+    }
+
+    return gatt.getPrimaryServices().then(function(services) {
+      var out = [];
+      var chain = Promise.resolve();
+      for (var i = 0; i < services.length; i++) {
+        (function(svc) {
+          chain = chain.then(function() {
+            return collectService(svc, out);
+          });
+        })(services[i]);
+      }
+      return chain.then(function() {
+        return { ok: 1, services: out };
+      });
+    }, function(err) {
+      return btErr(btMapDomError(err, 'gatt'), err && err.message);
+    }).then(null, function(err) {
+      return btErr(btMapDomError(err, 'gatt'), err && err.message);
+    });
+  });
+
+  function btCharacteristic(request) {
+    var entry = btEntry(request);
+    return entry ? entry.chars[request.iid | 0] : null;
+  }
+
+  hostBridge.register('__cn1_bt_read_char__', function(request) {
+    var ch = btCharacteristic(request);
+    if (!ch) {
+      return btErr('UNKNOWN', 'Unknown characteristic handle -- re-run discoverServices()');
+    }
+    return ch.readValue().then(function(dv) {
+      return { ok: 1, value: btDataViewToBase64(dv) };
+    }, function(err) {
+      return btErr(btMapDomError(err, 'gatt'), err && err.message);
+    });
+  });
+
+  hostBridge.register('__cn1_bt_write_char__', function(request) {
+    var ch = btCharacteristic(request);
+    if (!ch) {
+      return btErr('UNKNOWN', 'Unknown characteristic handle -- re-run discoverServices()');
+    }
+    var data = btToUint8(request && request.value) || new Uint8Array(0);
+    var p;
+    try {
+      if (request && request.withResponse) {
+        p = typeof ch.writeValueWithResponse === 'function'
+          ? ch.writeValueWithResponse(data) : ch.writeValue(data);
+      } else {
+        p = typeof ch.writeValueWithoutResponse === 'function'
+          ? ch.writeValueWithoutResponse(data) : ch.writeValue(data);
+      }
+    } catch (e) {
+      return btErr(btMapDomError(e, 'gatt'), e && e.message);
+    }
+    return p.then(function() {
+      return { ok: 1 };
+    }, function(err) {
+      return btErr(btMapDomError(err, 'gatt'), err && err.message);
+    });
+  });
+
+  hostBridge.register('__cn1_bt_read_desc__', function(request) {
+    var entry = btEntry(request);
+    var d = entry ? entry.descs[request.iid | 0] : null;
+    if (!d) {
+      return btErr('UNKNOWN', 'Unknown descriptor handle -- re-run discoverServices()');
+    }
+    return d.readValue().then(function(dv) {
+      return { ok: 1, value: btDataViewToBase64(dv) };
+    }, function(err) {
+      return btErr(btMapDomError(err, 'gatt'), err && err.message);
+    });
+  });
+
+  hostBridge.register('__cn1_bt_write_desc__', function(request) {
+    var entry = btEntry(request);
+    var d = entry ? entry.descs[request.iid | 0] : null;
+    if (!d) {
+      return btErr('UNKNOWN', 'Unknown descriptor handle -- re-run discoverServices()');
+    }
+    var data = btToUint8(request && request.value) || new Uint8Array(0);
+    return d.writeValue(data).then(function() {
+      return { ok: 1 };
+    }, function(err) {
+      return btErr(btMapDomError(err, 'gatt'), err && err.message);
+    });
+  });
+
+  hostBridge.register('__cn1_bt_set_notify__', function(request) {
+    var entry = btEntry(request);
+    var iid = request ? (request.iid | 0) : 0;
+    var ch = entry ? entry.chars[iid] : null;
+    if (!ch) {
+      return btErr('UNKNOWN', 'Unknown characteristic handle -- re-run discoverServices()');
+    }
+    if (request && request.enable) {
+      if (!entry.notifyHandlers[iid]) {
+        entry.notifyHandlers[iid] = function() {
+          var dv = ch.value;
+          if (!dv) {
+            return;
+          }
+          var copy;
+          try {
+            // COPY the DataView's bytes before posting -- the underlying
+            // buffer is reused by the UA for the next notification
+            copy = new Uint8Array(dv.buffer.slice(dv.byteOffset, dv.byteOffset + dv.byteLength));
+          } catch (_e) {
+            return;
+          }
+          btPostEvent({ kind: 'notify', deviceId: entry.id, detail: String(iid), bytes: copy });
+        };
+      }
+      try {
+        ch.addEventListener('characteristicvaluechanged', entry.notifyHandlers[iid]);
+      } catch (_e) {}
+      return ch.startNotifications().then(function() {
+        return { ok: 1 };
+      }, function(err) {
+        try {
+          ch.removeEventListener('characteristicvaluechanged', entry.notifyHandlers[iid]);
+        } catch (_e) {}
+        return btErr(btMapDomError(err, 'gatt'), err && err.message);
+      });
+    }
+    var handler = entry.notifyHandlers[iid];
+    var stop;
+    try {
+      stop = typeof ch.stopNotifications === 'function' ? ch.stopNotifications() : Promise.resolve();
+    } catch (e) {
+      stop = Promise.resolve();
+    }
+    return stop.then(function() {
+      if (handler) {
+        try { ch.removeEventListener('characteristicvaluechanged', handler); } catch (_e) {}
+      }
+      return { ok: 1 };
+    }, function() {
+      // disarm is best-effort: the subscription bookkeeping on the Java
+      // side already dropped the listeners
+      if (handler) {
+        try { ch.removeEventListener('characteristicvaluechanged', handler); } catch (_e) {}
+      }
+      return { ok: 1 };
+    });
+  });
+
   // Create a DOM element on the MAIN thread and return its host-ref. The worker
   // cannot create DOM nodes (no document, and jQuery isn't loaded there), so the
   // jQuery/`createElement`-based @JSBody helpers (showButton_, FileChooser's
