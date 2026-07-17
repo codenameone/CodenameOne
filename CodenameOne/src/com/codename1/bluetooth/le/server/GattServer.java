@@ -132,6 +132,7 @@ public abstract class GattServer {
     protected final void fireCharacteristicReadRequest(
             final GattReadRequest request) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 listener.characteristicReadRequest(request);
             }
@@ -142,6 +143,7 @@ public abstract class GattServer {
     protected final void fireCharacteristicWriteRequest(
             final GattWriteRequest request) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 listener.characteristicWriteRequest(request);
             }
@@ -152,6 +154,7 @@ public abstract class GattServer {
     protected final void fireDescriptorReadRequest(
             final GattReadRequest request) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 listener.descriptorReadRequest(request);
             }
@@ -162,6 +165,7 @@ public abstract class GattServer {
     protected final void fireDescriptorWriteRequest(
             final GattWriteRequest request) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 listener.descriptorWriteRequest(request);
             }
@@ -173,6 +177,7 @@ public abstract class GattServer {
             final GattLocalCharacteristic characteristic,
             final boolean subscribed) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 listener.subscriptionChanged(central, characteristic,
                         subscribed);
@@ -183,6 +188,7 @@ public abstract class GattServer {
     /// Reports a central connection to the listener on the EDT.
     protected final void fireCentralConnected(final BleCentral central) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 listener.centralConnected(central);
             }
@@ -192,6 +198,7 @@ public abstract class GattServer {
     /// Reports a central disconnection to the listener on the EDT.
     protected final void fireCentralDisconnected(final BleCentral central) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 listener.centralDisconnected(central);
             }

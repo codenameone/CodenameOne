@@ -73,6 +73,7 @@ public class ClassicScanResult {
         return deviceClass;
     }
 
+    @Override
     public String toString() {
         return "ClassicScanResult(" + device.getAddress() + ")";
     }

@@ -78,6 +78,7 @@ public class ScanResult {
         return timestamp;
     }
 
+    @Override
     public String toString() {
         return "ScanResult(" + peripheral.getAddress() + ", rssi=" + rssi + ")";
     }

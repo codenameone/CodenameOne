@@ -56,6 +56,7 @@ public class ConnectionEvent {
         return reason;
     }
 
+    @Override
     public String toString() {
         return "ConnectionEvent(" + peripheral.getAddress() + " -> " + state
                 + (reason != null ? ", reason=" + reason.getError() : "") + ")";

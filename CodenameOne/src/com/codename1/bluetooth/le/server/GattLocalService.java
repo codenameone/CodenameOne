@@ -72,6 +72,7 @@ public class GattLocalService {
         return new ArrayList<GattLocalCharacteristic>(characteristics);
     }
 
+    @Override
     public String toString() {
         return "GattLocalService(" + uuid + ")";
     }

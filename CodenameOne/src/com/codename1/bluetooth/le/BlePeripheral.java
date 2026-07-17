@@ -111,6 +111,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
             pendingConnect = out;
         }
         out.onResult(new AsyncResult<BlePeripheral>() {
+            @Override
             public void onReady(BlePeripheral value, Throwable err) {
                 connectFinished(out, err);
             }
@@ -140,6 +141,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
     private static TimerTask connectTimeoutTask(
             final AsyncResource<BlePeripheral> out, final int timeout) {
         return new TimerTask() {
+            @Override
             public void run() {
                 if (!out.isDone()) {
                     out.error(new BluetoothException(BluetoothError.TIMEOUT,
@@ -153,7 +155,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
     private void connectFinished(AsyncResource<BlePeripheral> out,
             Throwable err) {
         synchronized (stateLock) {
-            if (pendingConnect == out) {
+            if (pendingConnect == out) { //NOPMD CompareObjectsWithEquals
                 pendingConnect = null;
             }
             if (connectTimeout != null) {
@@ -250,6 +252,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
             return out;
         }
         out.onResult(new AsyncResult<List<GattService>>() {
+            @Override
             public void onReady(List<GattService> value, Throwable err) {
                 if (err == null && value != null) {
                     synchronized (stateLock) {
@@ -259,6 +262,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
             }
         });
         queue.enqueue(new GattOperationQueue.Op(out) {
+            @Override
             void start() {
                 doDiscoverServices(out);
             }
@@ -306,6 +310,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
             return out;
         }
         queue.enqueue(new GattOperationQueue.Op(out) {
+            @Override
             void start() {
                 doReadCharacteristic(c, out);
             }
@@ -324,6 +329,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
             return out;
         }
         queue.enqueue(new GattOperationQueue.Op(out) {
+            @Override
             void start() {
                 doWriteCharacteristic(c, value, withResponse, out);
             }
@@ -339,6 +345,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
             return out;
         }
         queue.enqueue(new GattOperationQueue.Op(out) {
+            @Override
             void start() {
                 doReadDescriptor(d, out);
             }
@@ -355,6 +362,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
             return out;
         }
         queue.enqueue(new GattOperationQueue.Op(out) {
+            @Override
             void start() {
                 doWriteDescriptor(d, value, out);
             }
@@ -403,6 +411,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
         if (startArm) {
             final AsyncResource<Boolean> armRes = arm;
             arm.onResult(new AsyncResult<Boolean>() {
+                @Override
                 public void onReady(Boolean value, Throwable err) {
                     synchronized (subscriptions) {
                         armOps.remove(c);
@@ -415,6 +424,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
             });
             final boolean indication = !c.canNotify() && c.canIndicate();
             queue.enqueue(new GattOperationQueue.Op(armRes) {
+                @Override
                 void start() {
                     doSetNotifications(c, true, indication, armRes);
                 }
@@ -468,6 +478,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
         }
         final boolean indication = !c.canNotify() && c.canIndicate();
         queue.enqueue(new GattOperationQueue.Op(out) {
+            @Override
             void start() {
                 doSetNotifications(c, false, indication, out);
             }
@@ -482,6 +493,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
             return out;
         }
         queue.enqueue(new GattOperationQueue.Op(out) {
+            @Override
             void start() {
                 doReadRssi(out);
             }
@@ -498,6 +510,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
             return out;
         }
         out.onResult(new AsyncResult<Integer>() {
+            @Override
             public void onReady(Integer value, Throwable err) {
                 if (err == null && value != null) {
                     BlePeripheral.this.mtu = value.intValue();
@@ -505,6 +518,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
             }
         });
         queue.enqueue(new GattOperationQueue.Op(out) {
+            @Override
             void start() {
                 doRequestMtu(mtu, out);
             }
@@ -527,6 +541,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
             return out;
         }
         queue.enqueue(new GattOperationQueue.Op(out) {
+            @Override
             void start() {
                 doRequestConnectionPriority(priority, out);
             }
@@ -540,6 +555,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
     public final AsyncResource<Boolean> createBond() {
         final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
         queue.enqueue(new GattOperationQueue.Op(out) {
+            @Override
             void start() {
                 doCreateBond(out);
             }
@@ -659,9 +675,10 @@ public abstract class BlePeripheral extends BluetoothDevice {
     private static void dispatchNotification(final Object[] snapshot,
             final GattCharacteristic c, final byte[] value) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
-                for (int i = 0; i < snapshot.length; i++) {
-                    ((GattNotificationListener) snapshot[i])
+                for (Object listener : snapshot) {
+                    ((GattNotificationListener) listener)
                             .valueChanged(c, value);
                 }
             }
@@ -737,9 +754,10 @@ public abstract class BlePeripheral extends BluetoothDevice {
     private static void dispatchConnectionEvent(final Object[] snapshot,
             final ConnectionEvent ev) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
-                for (int i = 0; i < snapshot.length; i++) {
-                    ((ConnectionListener) snapshot[i])
+                for (Object listener : snapshot) {
+                    ((ConnectionListener) listener)
                             .connectionStateChanged(ev);
                 }
             }

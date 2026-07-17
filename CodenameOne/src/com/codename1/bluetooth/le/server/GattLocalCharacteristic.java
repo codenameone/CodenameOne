@@ -23,7 +23,6 @@
 package com.codename1.bluetooth.le.server;
 
 import com.codename1.bluetooth.BluetoothUuid;
-import com.codename1.bluetooth.gatt.GattCharacteristic;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -105,6 +104,7 @@ public class GattLocalCharacteristic {
         return new ArrayList<GattLocalDescriptor>(descriptors);
     }
 
+    @Override
     public String toString() {
         return "GattLocalCharacteristic(" + uuid + ")";
     }

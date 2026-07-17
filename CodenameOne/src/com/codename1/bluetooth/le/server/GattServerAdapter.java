@@ -30,33 +30,40 @@ import com.codename1.bluetooth.gatt.GattStatus;
 /// centrals fail fast instead of timing out.
 public class GattServerAdapter implements GattServerListener {
 
+    @Override
     public void characteristicReadRequest(GattReadRequest request) {
         request.reject(GattStatus.REQUEST_NOT_SUPPORTED);
     }
 
+    @Override
     public void characteristicWriteRequest(GattWriteRequest request) {
         if (request.isResponseRequired()) {
             request.reject(GattStatus.REQUEST_NOT_SUPPORTED);
         }
     }
 
+    @Override
     public void descriptorReadRequest(GattReadRequest request) {
         request.reject(GattStatus.REQUEST_NOT_SUPPORTED);
     }
 
+    @Override
     public void descriptorWriteRequest(GattWriteRequest request) {
         if (request.isResponseRequired()) {
             request.reject(GattStatus.REQUEST_NOT_SUPPORTED);
         }
     }
 
+    @Override
     public void subscriptionChanged(BleCentral central,
             GattLocalCharacteristic characteristic, boolean subscribed) {
     }
 
+    @Override
     public void centralConnected(BleCentral central) {
     }
 
+    @Override
     public void centralDisconnected(BleCentral central) {
     }
 }

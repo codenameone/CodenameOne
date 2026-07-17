@@ -61,6 +61,7 @@ public abstract class BluetoothDevice {
     }
 
     /// Devices are equal when their [#getAddress()] values are equal.
+    @Override
     public final boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -72,11 +73,13 @@ public abstract class BluetoothDevice {
         return a != null && a.equals(((BluetoothDevice) o).getAddress());
     }
 
+    @Override
     public final int hashCode() {
         String a = getAddress();
         return a == null ? System.identityHashCode(this) : a.hashCode();
     }
 
+    @Override
     public String toString() {
         return "BluetoothDevice(" + getAddress() + ", " + getName() + ")";
     }

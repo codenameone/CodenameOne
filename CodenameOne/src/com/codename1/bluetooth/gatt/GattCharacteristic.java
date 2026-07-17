@@ -181,6 +181,7 @@ public class GattCharacteristic {
         return service.getPeripheral().isSubscribed(this);
     }
 
+    @Override
     public String toString() {
         return "GattCharacteristic(" + uuid + ")";
     }

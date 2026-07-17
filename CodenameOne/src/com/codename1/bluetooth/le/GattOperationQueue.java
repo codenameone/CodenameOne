@@ -72,6 +72,7 @@ final class GattOperationQueue {
     /// idle. Safe to call from any thread.
     void enqueue(final Op op) {
         op.result.onResult(new AsyncResult() {
+            @Override
             public void onReady(Object value, Throwable err) {
                 advance(op);
             }
@@ -134,7 +135,7 @@ final class GattOperationQueue {
     private void advance(Op op) {
         Op next;
         synchronized (lock) {
-            if (current != op) {
+            if (current != op) { //NOPMD CompareObjectsWithEquals
                 return;
             }
             cancelTimeout(op);
@@ -152,10 +153,11 @@ final class GattOperationQueue {
             return;
         }
         TimerTask task = new TimerTask() {
+            @Override
             public void run() {
                 boolean isCurrent;
                 synchronized (lock) {
-                    isCurrent = current == op;
+                    isCurrent = current == op; //NOPMD CompareObjectsWithEquals
                 }
                 if (isCurrent && !op.result.isDone()) {
                     op.result.error(new BluetoothException(

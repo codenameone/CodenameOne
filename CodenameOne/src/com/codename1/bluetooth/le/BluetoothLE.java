@@ -74,6 +74,7 @@ public class BluetoothLE {
         reg.settings = settings == null ? new ScanSettings() : settings;
         reg.listener = listener;
         reg.handle = new BleScan() {
+            @Override
             protected void onStop() {
                 unregisterScan(reg);
             }
@@ -290,6 +291,7 @@ public class BluetoothLE {
     private static void dispatchScanResult(
             final ArrayList<ScanListener> targets, final ScanResult result) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 int size = targets.size();
                 for (int i = 0; i < size; i++) {

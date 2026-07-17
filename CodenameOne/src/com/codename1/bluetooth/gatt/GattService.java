@@ -110,6 +110,7 @@ public class GattService {
         includedServices.add(service);
     }
 
+    @Override
     public String toString() {
         return "GattService(" + uuid + ")";
     }

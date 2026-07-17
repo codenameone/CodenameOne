@@ -70,10 +70,9 @@ public enum GattStatus {
     /// Maps a raw ATT status code to its enum constant, falling back to
     /// [#UNLIKELY_ERROR] for codes without a dedicated constant.
     public static GattStatus fromAttCode(int code) {
-        GattStatus[] all = values();
-        for (int i = 0; i < all.length; i++) {
-            if (all[i].attCode == code) {
-                return all[i];
+        for (GattStatus s : values()) {
+            if (s.attCode == code) {
+                return s;
             }
         }
         return UNLIKELY_ERROR;

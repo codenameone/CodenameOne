@@ -191,9 +191,10 @@ public class Bluetooth {
     private static void dispatchAdapterState(final Object[] snapshot,
             final AdapterState newState) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
-                for (int i = 0; i < snapshot.length; i++) {
-                    ((AdapterStateListener) snapshot[i])
+                for (Object listener : snapshot) {
+                    ((AdapterStateListener) listener)
                             .adapterStateChanged(newState);
                 }
             }
@@ -225,9 +226,6 @@ public class Bluetooth {
         static final com.codename1.bluetooth.le.BluetoothLE INSTANCE =
                 new com.codename1.bluetooth.le.BluetoothLE() {
                 };
-
-        private DefaultLE() {
-        }
     }
 
     /// The classic Bluetooth role entry point -- discovery, bonding and
@@ -245,9 +243,6 @@ public class Bluetooth {
         static final com.codename1.bluetooth.classic.BluetoothClassic
                 INSTANCE = new com.codename1.bluetooth.classic.BluetoothClassic() {
                 };
-
-        private DefaultClassic() {
-        }
     }
 
     /// `true` when the given runtime permission is currently granted. See

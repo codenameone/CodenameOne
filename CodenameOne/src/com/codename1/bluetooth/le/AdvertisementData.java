@@ -63,11 +63,6 @@ public class AdvertisementData {
     private Integer txPowerLevel;
     private byte[] rawBytes;
 
-    /// Creates an empty instance for ports to populate; not application
-    /// API.
-    public AdvertisementData() {
-    }
-
     /// Parses raw advertisement bytes -- a sequence of
     /// `length, type, payload` AD structures -- into a populated instance.
     /// Unknown AD types are skipped; a malformed trailing structure ends
@@ -165,7 +160,7 @@ public class AdvertisementData {
             // every platform we run on ships UTF-8; decoding the name with
             // whatever the default encoding happens to be would silently
             // corrupt it, so treat this as impossible rather than guess
-            throw new IllegalStateException("UTF-8 is unavailable: " + e);
+            throw new IllegalStateException("UTF-8 is unavailable", e);
         }
     }
 

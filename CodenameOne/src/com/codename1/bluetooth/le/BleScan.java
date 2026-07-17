@@ -59,6 +59,7 @@ public class BleScan extends AsyncResource<Boolean> {
     }
 
     /// Equivalent to [#stop()].
+    @Override
     public boolean cancel(boolean mayInterruptIfRunning) {
         if (isDone()) {
             return false;

@@ -119,6 +119,7 @@ public final class BluetoothUuid {
 
     /// Canonical lowercase 36 character form, e.g.
     /// `0000180d-0000-1000-8000-00805f9b34fb`.
+    @Override
     public String toString() {
         StringBuilder sb = new StringBuilder(36);
         appendHex(sb, msb >>> 32, 8);
@@ -133,6 +134,7 @@ public final class BluetoothUuid {
         return sb.toString();
     }
 
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -144,6 +146,7 @@ public final class BluetoothUuid {
         return msb == u.msb && lsb == u.lsb;
     }
 
+    @Override
     public int hashCode() {
         long hilo = msb ^ lsb;
         return (int) (hilo >> 32) ^ (int) hilo;
