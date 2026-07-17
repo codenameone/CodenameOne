@@ -235,14 +235,10 @@ jobs:
       - name: Run iOS UI screenshot tests
         env:
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/ios-ui-tests
-          # Strict screenshot gating: fail on any pixel mismatch and on more
-          # missing screenshots than the tolerance below. Enforced centrally
-          # in scripts/lib/cn1ss.sh.
+          # Strict screenshot gating: every expected frame must be captured and
+          # compared. Enforced centrally in scripts/lib/cn1ss.sh.
           CN1SS_FAIL_ON_MISMATCH: '1'
-          # Screenshot-only tolerance for the iOS GL backend. Assertion test
-          # failures are scanned from CN1SS:ERR:suite lines by
-          # run-ios-ui-tests.sh and are never allowed by this value.
-          CN1SS_ALLOWED_MISSING: '2'
+          CN1SS_ALLOWED_MISSING: '0'
           CN1SS_PORT_ID: ios-gl
         run: |
           set -euo pipefail
@@ -690,9 +686,8 @@ jobs:
           CN1SS_COMMENT_LOG_PREFIX: '[run-watch-ui-tests]'
           CN1SS_FAIL_ON_MISMATCH: '1'
           CN1SS_WATCH_TIMEOUT: '2400'
-          # The watch form factor splits the iOS 2x2 graphics grid into separate
-          # full-screen captures; tolerate a small tail drop, matching the GL job.
-          CN1SS_ALLOWED_MISSING: '4'
+          # A missing frame is an incomplete run, not an allowed result.
+          CN1SS_ALLOWED_MISSING: '0'
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"
@@ -853,9 +848,8 @@ jobs:
           CN1SS_SUCCESS_MESSAGE: '✅ Native Apple TV (tvOS, Metal) screenshot tests passed.'
           CN1SS_COMMENT_LOG_PREFIX: '[run-tv-ui-tests]'
           CN1SS_FAIL_ON_MISMATCH: '1'
-          # Tolerate a missing golden set while the tvOS native slice is being
-          # brought up; tighten to match build-ios-watch once goldens are seeded.
-          CN1SS_ALLOWED_MISSING: '4'
+          # A missing frame is an incomplete run, not an allowed result.
+          CN1SS_ALLOWED_MISSING: '0'
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"

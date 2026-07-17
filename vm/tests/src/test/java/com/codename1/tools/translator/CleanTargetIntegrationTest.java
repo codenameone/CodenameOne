@@ -1235,6 +1235,8 @@ class CleanTargetIntegrationTest {
                     java.util.Collections.synchronizedList(new java.util.ArrayList<String>());
             final java.util.List<String> performanceLog =
                     java.util.Collections.synchronizedList(new java.util.ArrayList<String>());
+            final java.util.List<String> suiteLog =
+                    java.util.Collections.synchronizedList(new java.util.ArrayList<String>());
             final Process appF = app;
             Thread areader = new Thread(new Runnable() {
                 public void run() {
@@ -1253,6 +1255,8 @@ class CleanTargetIntegrationTest {
                                     performanceFinished.set(true);
                                 }
                             }
+                            int suite = line.indexOf("CN1SS:");
+                            if (suite >= 0) { suiteLog.add(line.substring(suite)); }
                             if (line.contains("CN1SS:") || line.contains("suite ")) { lastLine.set(line); }
                         }
                     } catch (IOException ignore) {
@@ -1275,6 +1279,8 @@ class CleanTargetIntegrationTest {
             long deadline = System.currentTimeMillis() + 40L * 60 * 1000;
             boolean requirePerformance = Boolean.parseBoolean(
                     System.getenv("CN1_REQUIRE_PERFORMANCE"));
+            boolean requireSuite = Boolean.parseBoolean(
+                    System.getenv("CN1_REQUIRE_SUITE"));
             int pngs = 0;
             int lastPngs = -1;
             long lastChange = System.currentTimeMillis();
@@ -1282,12 +1288,12 @@ class CleanTargetIntegrationTest {
                 if (finished.get()) { break; }
                 pngs = countPngFiles(outDir);
                 if (pngs != lastPngs) { lastPngs = pngs; lastChange = System.currentTimeMillis(); }
-                if (pngs >= minPngs && (System.currentTimeMillis() - lastChange) >= stableMs
+                if (!requireSuite && pngs >= minPngs && (System.currentTimeMillis() - lastChange) >= stableMs
                         && (!requirePerformance || performanceFinished.get())) { break; }
                 Thread.sleep(3000);
             }
             pngs = countPngFiles(outDir);
-            assertTrue(finished.get() || (pngs >= minPngs
+            assertTrue(finished.get() || (!requireSuite && pngs >= minPngs
                             && (!requirePerformance || performanceFinished.get())),
                     "hello suite capture incomplete: pngs=" + pngs + " (need " + minPngs + ")"
                     + " finishedTests=" + finishedTests.get() + " suiteFinished=" + finished.get()
@@ -1317,13 +1323,14 @@ class CleanTargetIntegrationTest {
                             sb.toString().getBytes(StandardCharsets.UTF_8));
                     System.out.println("CN1_SIMD_STATS=" + simdStats.size() + " lines");
                 }
-                StringBuilder perf = new StringBuilder();
-                synchronized (performanceLog) {
-                    for (String l : performanceLog) { perf.append(l).append('\n'); }
+                StringBuilder capturedSuiteLog = new StringBuilder();
+                synchronized (suiteLog) {
+                    for (String l : suiteLog) { capturedSuiteLog.append(l).append('\n'); }
                 }
                 Files.write(dest.resolve("app-output.log"),
-                        perf.toString().getBytes(StandardCharsets.UTF_8));
-                System.out.println("CN1_PERFORMANCE_LOG=" + performanceLog.size() + " lines");
+                        capturedSuiteLog.toString().getBytes(StandardCharsets.UTF_8));
+                System.out.println("CN1_SUITE_LOG=" + suiteLog.size() + " lines"
+                        + " (performance=" + performanceLog.size() + ")");
             }
             System.out.println("CN1_HELLO_SUITE_PNGS=" + pngs);
         } finally {

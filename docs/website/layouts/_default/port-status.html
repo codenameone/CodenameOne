@@ -1,6 +1,7 @@
 {{- define "main" -}}
 {{- $contract := site.Data.port_status -}}
 {{- $reports := site.Data.port_status_reports -}}
+{{- $attempts := default (dict) site.Data.port_status_attempts -}}
 {{- $supplement := site.Data.port_status_supplement -}}
 {{- $support := site.Data.port_status_support -}}
 {{- $environment := site.Data.port_status_environment -}}
@@ -94,7 +95,8 @@
   <section class="cn1-port-status__ports" aria-label="Latest port runs">
     {{- range $contract.ports }}
     {{- $report := index $reports .id -}}
-    {{- partial "port-status-port-state.html" (dict "port" . "report" $report "contract" $contract "now" $snapshotTime) -}}
+    {{- $attempt := index $attempts .id -}}
+    {{- partial "port-status-port-state.html" (dict "port" . "report" $report "attempt" $attempt "contract" $contract "now" $snapshotTime) -}}
     {{- end }}
   </section>
 

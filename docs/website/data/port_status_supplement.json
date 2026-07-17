@@ -7,8 +7,110 @@
       "verification": "The native camera implementations are compiled in their port builds and exercised with granted permissions on real hardware or an interactive browser. Deterministic API assertions use the synthetic camera backend outside this portability table."
     },
     {
+      "test": "AccessibilityTest",
+      "reason": "The JavaScript test depends on browser accessibility semantics that are not exposed through the headless worker bridge used by this runner.",
+      "platform_support": "This is a declared JavaScript test limitation. It is not counted as a pass and does not describe accessibility behavior on the native ports.",
+      "verification": "Native targets run the automated accessibility contract. Browser accessibility requires a separate interactive browser and assistive-technology check until the worker bridge exposes the required semantics."
+    },
+    {
+      "test": "BackgroundThreadUiAccessTest",
+      "reason": "The JavaScript runtime uses a browser worker and does not implement the native background-thread UI access path exercised by this test.",
+      "platform_support": "The skip is limited to this JavaScript-specific runtime contract. Native targets continue to run the same assertion.",
+      "verification": "The test runs on the native ports. JavaScript thread and UI scheduling are covered by browser-worker lifecycle tests until this native-style path is implemented."
+    },
+    {
+      "test": "Base64NativePerformanceTest",
+      "reason": "This test measures a native Base64 bridge. The JavaScript port uses its browser implementation and has no equivalent native bridge to invoke.",
+      "platform_support": "Base64 remains available on the web port; only the native-bridge assertion and timing path are inapplicable there.",
+      "verification": "Native targets run this bridge test. The JavaScript implementation is covered by the shared Base64 correctness tests and the common workload benchmark."
+    },
+    {
+      "test": "BrowserComponentScreenshotTest",
+      "reason": "The iframe load callback is not currently routed from the browser host into the worker, so the unattended test cannot reach its deterministic capture point.",
+      "platform_support": "BrowserComponent support is not inferred from this skip. The missing worker callback remains an explicit JavaScript-port gap.",
+      "verification": "Native ports run the screenshot test. The web path is checked interactively while the worker callback transport is being completed."
+    },
+    {
+      "test": "BytecodeTranslatorRegressionTest",
+      "reason": "This translator regression exercises native generated-code behavior that is not applicable to the JavaScript bytecode runtime.",
+      "platform_support": "The JavaScript port uses a different translation and execution pipeline, so this native-code assertion is not evidence for or against general web support.",
+      "verification": "Native translator jobs run the regression. JavaScript translation is covered by its own compiler and browser-stage harnesses."
+    },
+    {
+      "test": "CallDetectionAPITest",
+      "reason": "Browser workers do not expose a phone-call state API equivalent to the native mobile integration exercised by this test.",
+      "platform_support": "Call detection is unavailable in the JavaScript port. The rest of the web port remains covered independently.",
+      "verification": "Supported mobile targets run the API contract with their native implementation; device-level behavior is verified on telephony-capable hardware."
+    },
+    {
+      "test": "ChartCombinedXYScreenshotTest",
+      "reason": "The combined XY chart enters a non-terminating layout path in the JavaScript runtime before the per-test capture deadline can start.",
+      "platform_support": "This chart variant is a known JavaScript runtime gap, not an intermittent pass. Other chart tests remain active on the web port.",
+      "verification": "The complete chart test runs on other ports. JavaScript keeps the remaining chart matrix active while this layout defect is tracked separately."
+    },
+    {
+      "test": "CryptoApiTest",
+      "reason": "The JavaScript implementation does not yet provide the AES, RSA, signature, and secure-random bridge required by this test.",
+      "platform_support": "Cryptographic support is not claimed from a skipped result. This is an explicit JavaScript-port capability gap.",
+      "verification": "Native ports run the shared crypto assertions. The web row remains skipped until a browser crypto bridge passes the same contract."
+    },
+    {
+      "test": "FileSystemStorageOpenInputStreamMissingTest",
+      "reason": "The missing-file read can stall in the JavaScript LocalForage host call and degrade the worker channel for every test that follows.",
+      "platform_support": "This is a known JavaScript storage-bridge defect. It is skipped deterministically instead of being allowed to fail or hang intermittently.",
+      "verification": "Other storage tests stay active on JavaScript, and native ports run this exact missing-file contract. The skip is removed when the LocalForage call completes reliably."
+    },
+    {
+      "test": "FloatingToStringTest",
+      "reason": "The JavaScript runtime currently formats some floating-point boundary values differently from the shared Java string contract.",
+      "platform_support": "The mismatch is a declared JavaScript compatibility gap. It is not treated as a flaky test or a successful result.",
+      "verification": "Native ports run the shared formatting assertions. JavaScript remains skipped until every boundary case produces the required Java representation."
+    },
+    {
+      "test": "Gpu3DModelScreenshotTest",
+      "reason": "The textured model load wedges the headless SwiftShader WebGL path, and its rasterization is not stable across hosted runner architectures.",
+      "platform_support": "This skip is limited to the headless JavaScript CI environment. Simpler WebGL geometry, texture, and animation tests continue to run there.",
+      "verification": "The model test runs on real-GPU targets. JavaScript keeps cube, textured-cube, and animation coverage active in the deterministic suite."
+    },
+    {
+      "test": "LightweightPickerButtonsScreenshotTest",
+      "reason": "The animated lightweight picker popup can starve the JavaScript worker paint needed to complete the screenshot, leaving the test deadlocked.",
+      "platform_support": "The skip records a specific JavaScript popup-lifecycle defect. Other picker and validation tests remain active.",
+      "verification": "Native ports run the screenshot. The web test returns only after popup editing and capture complete deterministically."
+    },
+    {
+      "test": "LocalNotificationOverrideTest",
+      "reason": "Browser workers do not expose the native local-notification override hook exercised by this test.",
+      "platform_support": "This native integration is unavailable on the JavaScript port; the skip is not a general web-port failure.",
+      "verification": "Native targets run the override contract. Browser notification behavior requires its separate service-worker and permission environment."
+    },
+    {
+      "test": "SimdLargeAllocaTest",
+      "reason": "The large stack-allocation pattern corrupts JavaScript runtime state and can prevent every later canvas test from running.",
+      "platform_support": "This remains an explicit JavaScript runtime defect. The test is parked before execution so it cannot create intermittent downstream failures.",
+      "verification": "Native backends run the SIMD assertion. JavaScript can re-enable it only after the translated allocation path passes without changing shared runtime state."
+    },
+    {
+      "test": "StringApiTest",
+      "reason": "The JavaScript runtime does not yet match Java's regular-expression replacement behavior for a greedy quantified pattern.",
+      "platform_support": "This is a declared JavaScript compatibility gap, not evidence that the shared String API passed.",
+      "verification": "Native ports run the full String contract. JavaScript remains skipped until the same input and replacement produce the Java result."
+    },
+    {
+      "test": "TimeApiTest",
+      "reason": "The JavaScript runtime does not currently parse the fixed-offset GMT-05:00 identifier required by the shared time-zone contract.",
+      "platform_support": "The skip records a specific JavaScript time-zone compatibility gap. Other time APIs continue to run independently.",
+      "verification": "Native ports run the complete time contract. JavaScript returns to the matrix when fixed-offset identifiers match Java behavior."
+    },
+    {
+      "test": "VPNDetectionAPITest",
+      "reason": "Browsers do not expose the native network-interface state needed to determine VPN usage from a worker.",
+      "platform_support": "VPN detection is unavailable on the JavaScript port because of the browser security boundary. This does not affect unrelated networking support.",
+      "verification": "Native targets run the API assertion against their platform integration. The browser result stays skipped unless a reliable browser capability becomes available."
+    },
+    {
       "test": "VideoIORoundTripTest",
-      "reason": "This assertion requires a working video encoder as well as a decoder. Apple simulator and constrained-device runners do not expose a stable encoder to the headless job, so the encode/decode round trip is skipped there.",
+      "reason": "This assertion requires a working video encoder as well as a decoder. Apple simulators, constrained-device runners, and the JavaScript CI runtime do not expose a stable encoder to the headless job, so the encode/decode round trip is skipped there.",
       "platform_support": "The port remains supported. Video playback and frame decoding are measured separately by VideoIODecodedFramesScreenshotTest; this skip is limited to creating a new encoded video in that CI environment.",
       "verification": "Encoder-backed targets run the full counting-frame and audio round trip. Apple media playback and decoding are covered separately, while device-only recording is verified in signed hardware builds."
     }
