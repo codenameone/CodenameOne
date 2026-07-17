@@ -85,7 +85,11 @@ validate_exclusions() {
 header_kind() {
   local file="$1"
   local header_file="$2"
-  sed -n '1,40p' "$file" > "$header_file"
+  # Strip CR so CRLF files are judged on their header text alone: a stray
+  # carriage return would otherwise defeat both the leading "/*" comparison
+  # and the "$"-anchored copyright-line match, failing files whose header is
+  # in fact complete and correct.
+  sed -n '1,40p' "$file" | tr -d '\r' > "$header_file"
 
   if [[ "$(awk 'NF { print; exit }' "$header_file")" != '/*' ]]; then
     return 1
