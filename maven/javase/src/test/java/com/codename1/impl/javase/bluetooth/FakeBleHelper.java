@@ -38,7 +38,7 @@ import java.util.regex.Pattern;
  * {@code Ports/JavaSE/native/cn1-ble-helper/PROTOCOL.md}. Runs in a bare
  * JVM with only the test-classes directory on the classpath, so it must
  * not reference JUnit or Codename One classes; commands are picked apart
- * with regexes, which is fine because {@code NativeBleBackend.Wire}
+ * with regexes, which is fine because {@code com.codename1.bluetooth.helper.Wire}
  * serializes them in a stable single-line form.</p>
  *
  * <p>Scenario (args[0]):</p>

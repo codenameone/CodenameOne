@@ -24,7 +24,8 @@ package com.codename1.impl.javase.bluetooth;
 
 import com.codename1.bluetooth.BluetoothUuid;
 import com.codename1.bluetooth.gatt.GattCharacteristic;
-import com.codename1.impl.javase.bluetooth.NativeBleBackend.Wire;
+import com.codename1.bluetooth.helper.HelperBlePeripheral;
+import com.codename1.bluetooth.helper.Wire;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -410,7 +411,7 @@ public final class BluetoothFixture {
     /**
      * The wire names (see {@code PROTOCOL.md}) of a
      * {@link GattCharacteristic}{@code .PROPERTY_*} bitmask; the inverse
-     * of {@link NativeBlePeripheral#propertiesMask(List)}.
+     * of {@link HelperBlePeripheral#propertiesMask(List)}.
      */
     static String[] propertyNames(int mask) {
         ArrayList<String> out = new ArrayList<String>();
@@ -539,7 +540,7 @@ public final class BluetoothFixture {
             Map<String, Object> ch = Wire.map(chars.get(i));
             CharacteristicRecord c = new CharacteristicRecord(
                     parseUuid(Wire.str(ch, "uuid", "")),
-                    NativeBlePeripheral.propertiesMask(
+                    HelperBlePeripheral.propertiesMask(
                             Wire.list(ch, "properties")));
             if (ch.containsKey("value")) {
                 c.value = Wire.decodeBase64(Wire.str(ch, "value", ""));

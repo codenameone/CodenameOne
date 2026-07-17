@@ -26,6 +26,7 @@ import com.codename1.bluetooth.AdapterState;
 import com.codename1.bluetooth.BluetoothError;
 import com.codename1.bluetooth.BluetoothException;
 import com.codename1.bluetooth.BluetoothUuid;
+import com.codename1.bluetooth.helper.BleBackend;
 import com.codename1.bluetooth.le.AdvertisementData;
 import com.codename1.bluetooth.le.BlePeripheral;
 import com.codename1.bluetooth.le.L2capServer;

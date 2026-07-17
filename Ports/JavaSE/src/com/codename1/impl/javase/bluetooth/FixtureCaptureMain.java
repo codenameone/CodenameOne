@@ -89,7 +89,7 @@ public final class FixtureCaptureMain {
                     gattStrongest = true;
                 } else if ("--helper".equals(a)) {
                     System.setProperty(
-                            NativeBleBackend.HELPER_PATH_PROPERTY,
+                            HelperBinaryResolver.HELPER_PATH_PROPERTY,
                             args[++i]);
                 } else {
                     throw new IllegalArgumentException(

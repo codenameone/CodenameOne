@@ -29,6 +29,7 @@ import com.codename1.bluetooth.BluetoothUuid;
 import com.codename1.bluetooth.gatt.GattCharacteristic;
 import com.codename1.bluetooth.gatt.GattDescriptor;
 import com.codename1.bluetooth.gatt.GattService;
+import com.codename1.bluetooth.helper.BleBackend;
 import com.codename1.bluetooth.le.AdvertisementData;
 import com.codename1.bluetooth.le.BlePeripheral;
 import com.codename1.bluetooth.le.ScanResult;

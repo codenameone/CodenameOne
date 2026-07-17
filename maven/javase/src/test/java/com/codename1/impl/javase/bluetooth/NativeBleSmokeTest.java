@@ -24,6 +24,7 @@ package com.codename1.impl.javase.bluetooth;
 
 import com.codename1.bluetooth.AdapterState;
 import com.codename1.bluetooth.BluetoothException;
+import com.codename1.bluetooth.helper.BleBackend;
 import com.codename1.bluetooth.le.ScanResult;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
@@ -59,7 +60,7 @@ public class NativeBleSmokeTest {
     @EnabledIfSystemProperty(named = "cn1.ble.smoke", matches = "true")
     public void scanTheRealRadioForThreeSeconds() throws Exception {
         String helperPath = System.getProperty(
-                NativeBleBackend.HELPER_PATH_PROPERTY);
+                HelperBinaryResolver.HELPER_PATH_PROPERTY);
         if (helperPath == null) {
             helperPath = new File(
                     "../../Ports/JavaSE/native/cn1-ble-helper/target/"
@@ -69,7 +70,7 @@ public class NativeBleSmokeTest {
         Assumptions.assumeTrue(helper.isFile(),
                 "no helper binary at " + helper.getAbsolutePath()
                         + " -- build it with cargo or pass -D"
-                        + NativeBleBackend.HELPER_PATH_PROPERTY);
+                        + HelperBinaryResolver.HELPER_PATH_PROPERTY);
 
         NativeBleBackend backend = new NativeBleBackend(
                 Arrays.asList(helper.getAbsolutePath()));

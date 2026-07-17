@@ -140,6 +140,11 @@
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-native-ble</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.codenameone</groupId>
             <artifactId>sqlite-jdbc</artifactId>
             <version>${project.version}</version>
         </dependency>

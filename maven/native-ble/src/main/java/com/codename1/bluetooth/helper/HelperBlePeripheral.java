@@ -20,10 +20,11 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.impl.javase.bluetooth;
+package com.codename1.bluetooth.helper;
 
 import com.codename1.bluetooth.BluetoothError;
 import com.codename1.bluetooth.BluetoothException;
+import com.codename1.bluetooth.BluetoothUuid;
 import com.codename1.bluetooth.BondState;
 import com.codename1.bluetooth.DeviceType;
 import com.codename1.bluetooth.gatt.GattCharacteristic;
@@ -34,8 +35,7 @@ import com.codename1.bluetooth.le.ConnectionOptions;
 import com.codename1.bluetooth.le.ConnectionPriority;
 import com.codename1.bluetooth.le.ConnectionState;
 import com.codename1.bluetooth.le.L2capChannel;
-import com.codename1.impl.javase.bluetooth.NativeBleBackend.PendingOp;
-import com.codename1.impl.javase.bluetooth.NativeBleBackend.Wire;
+import com.codename1.bluetooth.helper.HelperBleBackend.PendingOp;
 import com.codename1.util.AsyncResource;
 
 import java.util.ArrayList;
@@ -46,7 +46,7 @@ import java.util.Map;
 /**
  * Real-radio {@link BlePeripheral} bridging the core GATT client contract
  * onto {@code cn1-ble-helper} commands. One canonical instance exists per
- * address (cached by {@link NativeBleBackend}), so discovered
+ * address (cached by {@link HelperBleBackend}), so discovered
  * {@link GattCharacteristic} objects stay identical across the
  * scan/connect/notify lifecycle.
  *
@@ -56,20 +56,20 @@ import java.util.Map;
  * connection-priority hints, and RSSI reads answer with the last
  * advertisement sighting.</p>
  */
-class NativeBlePeripheral extends BlePeripheral {
+public class HelperBlePeripheral extends BlePeripheral {
 
-    private final NativeBleBackend backend;
+    private final HelperBleBackend backend;
     private final String address;
     private volatile String name;
     private volatile int lastRssi = -127;
     private volatile boolean rssiSeen;
 
     private final Object dbLock = new Object();
-    /** service|characteristic uuid -> canonical discovered instance */
+    /** service|characteristic uuid to canonical discovered instance */
     private HashMap<String, GattCharacteristic> characteristicIndex =
             new HashMap<String, GattCharacteristic>();
 
-    NativeBlePeripheral(NativeBleBackend backend, String address) {
+    HelperBlePeripheral(HelperBleBackend backend, String address) {
         this.backend = backend;
         this.address = address;
     }
@@ -153,7 +153,7 @@ class NativeBlePeripheral extends BlePeripheral {
                     name = reportedName;
                 }
                 if (!out.isDone()) {
-                    out.complete(NativeBlePeripheral.this);
+                    out.complete(HelperBlePeripheral.this);
                 }
             }
 
@@ -237,13 +237,12 @@ class NativeBlePeripheral extends BlePeripheral {
         return services;
     }
 
-    private static com.codename1.bluetooth.BluetoothUuid parseUuid(
-            String s) {
-        return com.codename1.bluetooth.BluetoothUuid.fromString(s);
+    private static BluetoothUuid parseUuid(String s) {
+        return BluetoothUuid.fromString(s);
     }
 
     /** Maps the wire property names onto the GattCharacteristic bits. */
-    static int propertiesMask(List<Object> names) {
+    public static int propertiesMask(List<Object> names) {
         int mask = 0;
         int size = names.size();
         for (int i = 0; i < size; i++) {

@@ -20,14 +20,11 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.impl.javase.bluetooth;
+package com.codename1.bluetooth.helper;
 
 import com.codename1.bluetooth.AdapterState;
 import com.codename1.bluetooth.BluetoothError;
 import com.codename1.bluetooth.gatt.GattCharacteristic;
-import com.codename1.bluetooth.helper.HelperBleBackend;
-import com.codename1.bluetooth.helper.HelperBlePeripheral;
-import com.codename1.bluetooth.helper.Wire;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -40,7 +37,7 @@ import java.util.Map;
  * serialization (including escaping), event-line parsing and the typed
  * error / adapter-state mappings. No subprocess, no hardware.
  */
-public class NativeBleWireProtocolTest {
+public class WireTest {
 
     @Test
     public void commandSerializationIsStable() {

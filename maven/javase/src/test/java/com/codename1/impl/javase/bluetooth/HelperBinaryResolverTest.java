@@ -33,13 +33,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The helper-binary resolution order of {@link NativeBleBackend}: system
+ * The helper-binary resolution order of {@link HelperBinaryResolver}: system
  * property, bundled classpath resource, {@code PATH} lookup -- exercised
  * with fake files so the tests never depend on this machine's setup.
  * {@code "TestOS"} is used as the os.name whenever the bundled-resource
  * step must deterministically not resolve (no resource ships for it).
  */
-public class NativeBleHelperResolutionTest {
+public class HelperBinaryResolverTest {
 
     @TempDir
     File tempDir;
@@ -145,15 +145,18 @@ public class NativeBleHelperResolutionTest {
                 HelperBinaryResolver.helperResourcePath("Windows 11", "amd64"));
         Assertions.assertEquals(HelperBinaryResolver.HELPER_RESOURCE_DIR
                 + "windows/arm64/cn1-ble-helper.exe",
-                HelperBinaryResolver.helperResourcePath("Windows 11", "aarch64"));
+                HelperBinaryResolver.helperResourcePath("Windows 11",
+                        "aarch64"));
     }
 
     @Test
     public void architectureAliasesMapOntoTheBundledDirectories() {
-        Assertions.assertEquals("x64", HelperBinaryResolver.normalizeArch("amd64"));
+        Assertions.assertEquals("x64",
+                HelperBinaryResolver.normalizeArch("amd64"));
         Assertions.assertEquals("x64",
                 HelperBinaryResolver.normalizeArch("x86_64"));
-        Assertions.assertEquals("x64", HelperBinaryResolver.normalizeArch("X64"));
+        Assertions.assertEquals("x64",
+                HelperBinaryResolver.normalizeArch("X64"));
         Assertions.assertEquals("arm64",
                 HelperBinaryResolver.normalizeArch("aarch64"));
         Assertions.assertEquals("arm64",
@@ -175,14 +178,5 @@ public class NativeBleHelperResolutionTest {
                 resolved.getAbsolutePath());
         Assertions.assertTrue(String.valueOf(attempted).contains(
                 "os.arch=riscv64"), String.valueOf(attempted));
-    }
-
-    @Test
-    public void unavailableBackendDescribesTheResolutionTrace() {
-        // constructed against the real environment: whether or not a
-        // helper is present here, the description must name the property
-        NativeBleBackend backend = new NativeBleBackend();
-        Assertions.assertTrue(backend.describeResolution().contains(
-                HelperBinaryResolver.HELPER_PATH_PROPERTY));
     }
 }

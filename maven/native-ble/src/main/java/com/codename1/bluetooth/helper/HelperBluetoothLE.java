@@ -20,44 +20,41 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.impl.javase.bluetooth;
+package com.codename1.bluetooth.helper;
 
 import com.codename1.bluetooth.BluetoothException;
 import com.codename1.bluetooth.BluetoothUuid;
-import com.codename1.bluetooth.helper.BleBackend;
 import com.codename1.bluetooth.le.BlePeripheral;
 import com.codename1.bluetooth.le.BluetoothLE;
-import com.codename1.bluetooth.le.L2capServer;
 import com.codename1.bluetooth.le.ScanResult;
 import com.codename1.bluetooth.le.server.AdvertiseData;
 import com.codename1.bluetooth.le.server.AdvertiseSettings;
 import com.codename1.bluetooth.le.server.BleAdvertisement;
 import com.codename1.bluetooth.le.server.GattServer;
 import com.codename1.bluetooth.le.server.GattServerListener;
+import com.codename1.bluetooth.le.L2capServer;
 import com.codename1.util.AsyncResource;
 
 import java.util.List;
 
-/**
- * The one stable {@link BluetoothLE} instance of the JavaSE port. Every
- * hook routes to the owner's <em>current</em> {@link BleBackend}, so
- * switching between the simulator and the future native backend never
- * invalidates references application code holds.
- */
-class JavaSEBluetoothLE extends BluetoothLE {
+/// The BLE central role for ports backed by the `cn1-ble-helper`
+/// subprocess. Delegates every [BluetoothLE] hook to a fixed
+/// [BleBackend]; used by [HelperBluetooth] and shared across the native
+/// Win32/Linux desktop ports.
+class HelperBluetoothLE extends BluetoothLE {
 
-    private final JavaSEBluetooth owner;
+    private final BleBackend backend;
 
-    JavaSEBluetoothLE(JavaSEBluetooth owner) {
-        this.owner = owner;
+    HelperBluetoothLE(BleBackend backend) {
+        this.backend = backend;
     }
 
     protected boolean isScanSupported() {
-        return owner.backend().isLeSupported();
+        return backend.isLeSupported();
     }
 
     protected void startPlatformScan() {
-        owner.backend().startScan(new BleBackend.ScanSink() {
+        backend.startScan(new BleBackend.ScanSink() {
             public void onResult(ScanResult result) {
                 fireScanResult(result);
             }
@@ -69,34 +66,34 @@ class JavaSEBluetoothLE extends BluetoothLE {
     }
 
     protected void stopPlatformScan() {
-        owner.backend().stopScan();
+        backend.stopScan();
     }
 
     public BlePeripheral getPeripheral(String address) {
-        return owner.backend().getPeripheral(address);
+        return backend.getPeripheral(address);
     }
 
     public List<BlePeripheral> getConnectedPeripherals(
             BluetoothUuid serviceFilter) {
-        return owner.backend().getConnectedPeripherals(serviceFilter);
+        return backend.getConnectedPeripherals(serviceFilter);
     }
 
     public List<BlePeripheral> getBondedPeripherals() {
-        return owner.backend().getBondedPeripherals();
+        return backend.getBondedPeripherals();
     }
 
     public AsyncResource<GattServer> openGattServer(
             GattServerListener listener) {
-        return owner.backend().openGattServer(listener);
+        return backend.openGattServer(listener);
     }
 
     public AsyncResource<BleAdvertisement> startAdvertising(
             AdvertiseSettings settings, AdvertiseData data,
             AdvertiseData scanResponse) {
-        return owner.backend().startAdvertising(settings, data, scanResponse);
+        return backend.startAdvertising(settings, data, scanResponse);
     }
 
     public AsyncResource<L2capServer> openL2capServer(boolean secure) {
-        return owner.backend().openL2capServer(secure);
+        return backend.openL2capServer(secure);
     }
 }

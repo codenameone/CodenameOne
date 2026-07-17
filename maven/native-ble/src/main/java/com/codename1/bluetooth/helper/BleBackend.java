@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.impl.javase.bluetooth;
+package com.codename1.bluetooth.helper;
 
 import com.codename1.bluetooth.AdapterState;
 import com.codename1.bluetooth.BluetoothException;
@@ -38,10 +38,10 @@ import com.codename1.util.AsyncResource;
 import java.util.List;
 
 /**
- * The pluggable BLE engine behind {@link JavaSEBluetooth}. The simulator
- * ships {@link SimulatorBleBackend}; a future native backend (btleplug
- * against the host machine's real radio) plugs into the same seam via
- * {@link JavaSEBluetooth#switchBackend(String)}.
+ * The pluggable BLE engine seam. The simulator ships its own
+ * {@code SimulatorBleBackend}; the real-radio {@link HelperBleBackend}
+ * drives the host machine's adapter through the bundled
+ * {@code cn1-ble-helper} process. Ports swap engines behind this interface.
  */
 public interface BleBackend {
 

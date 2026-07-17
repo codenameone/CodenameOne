@@ -25,6 +25,7 @@ package com.codename1.impl.javase.bluetooth;
 import com.codename1.bluetooth.AdapterState;
 import com.codename1.bluetooth.Bluetooth;
 import com.codename1.bluetooth.BluetoothPermission;
+import com.codename1.bluetooth.helper.BleBackend;
 import com.codename1.util.AsyncResource;
 
 /**
@@ -84,7 +85,8 @@ public class JavaSEBluetooth extends Bluetooth {
      * virtual stack; {@code "native"} activates the host machine's real
      * radio through the bundled {@code cn1-ble-helper} process and throws
      * {@code IllegalStateException} when no helper binary could be located
-     * (see {@link NativeBleBackend#HELPER_PATH_PROPERTY}). Unknown names
+     * (see the cn1.bluetooth.helperPath system property).
+     * Unknown names
      * throw {@code IllegalArgumentException}.
      */
     public synchronized void switchBackend(String name) {
