@@ -28,7 +28,9 @@ import com.codename1.bluetooth.BluetoothUuid;
 import com.codename1.bluetooth.le.server.GattLocalCharacteristic;
 import com.codename1.bluetooth.le.server.GattLocalDescriptor;
 import com.codename1.bluetooth.le.server.GattLocalService;
+import com.codename1.impl.javase.bluetooth.BluetoothFixture;
 import com.codename1.impl.javase.bluetooth.BluetoothSimulator;
+import com.codename1.impl.javase.bluetooth.FixtureRecorder;
 import com.codename1.impl.javase.bluetooth.JavaSEBluetooth;
 import com.codename1.impl.javase.bluetooth.SimulatedBluetoothStack;
 import com.codename1.impl.javase.bluetooth.StackEventListener;
@@ -298,6 +300,12 @@ public class BluetoothSimulation extends JFrame {
                 scheduleTreeRefresh();
             }
         }));
+        toolbar.add(button("Record from real hardware", new Runnable() {
+            @Override
+            public void run() {
+                showRecordFixtureDialog();
+            }
+        }));
         toolbar.addSeparator();
         toolbar.add(button("Reset", new Runnable() {
             @Override
@@ -370,6 +378,116 @@ public class BluetoothSimulation extends JFrame {
         } catch (IllegalArgumentException ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(),
                     "Invalid peripheral", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /**
+     * "Record from real hardware": scans this machine's real radio for a
+     * chosen duration through a fresh {@code NativeBleBackend}
+     * ({@link FixtureRecorder}), scrambles the trace with the chosen seed
+     * ({@code FixtureScrambler}) and imports the resulting devices as
+     * virtual peripherals -- optionally also saving the fixture JSON.
+     * The capture runs on a worker thread; Swing only shows the results.
+     */
+    private void showRecordFixtureDialog() {
+        JSpinner duration = new JSpinner(
+                new SpinnerNumberModel(10, 1, 300, 1));
+        JTextField seedField = new JTextField("42", 12);
+        final JCheckBox saveCheck = new JCheckBox("Save fixture JSON to:");
+        JTextField savePath = new JTextField(new java.io.File(
+                System.getProperty("user.home", "."),
+                "bluetooth-fixture.json").getAbsolutePath(), 28);
+
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(2, 4, 2, 4);
+        gbc.anchor = GridBagConstraints.WEST;
+        addRow(panel, gbc, 0, "Scan duration (s):", duration);
+        addRow(panel, gbc, 1, "Scramble seed:", seedField);
+        addRow(panel, gbc, 2, "", saveCheck);
+        addRow(panel, gbc, 3, "", savePath);
+
+        int answer = JOptionPane.showConfirmDialog(this, panel,
+                "Record from real hardware", JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE);
+        if (answer != JOptionPane.OK_OPTION) {
+            return;
+        }
+        final long seed;
+        try {
+            seed = Long.parseLong(seedField.getText().trim());
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "The scramble seed must be a number",
+                    "Invalid seed", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        final long scanMillis =
+                ((Number) duration.getValue()).longValue() * 1000L;
+        final String saveTo = saveCheck.isSelected()
+                ? savePath.getText().trim() : null;
+        Thread worker = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                recordFixture(scanMillis, seed, saveTo);
+            }
+        }, "cn1-bluetooth-fixture-recorder");
+        worker.setDaemon(true);
+        worker.start();
+    }
+
+    /** Worker-thread body of the record-from-real-hardware flow. */
+    private void recordFixture(long scanMillis, long seed, String saveTo) {
+        FixtureRecorder recorder = null;
+        try {
+            recorder = FixtureRecorder.forNativeBackend();
+            BluetoothFixture fixture = recorder.recordScrambled(
+                    scanMillis, null, false, seed);
+            if (saveTo != null && saveTo.length() > 0) {
+                java.io.Writer w = new java.io.OutputStreamWriter(
+                        new java.io.FileOutputStream(saveTo), "UTF-8");
+                try {
+                    w.write(fixture.toJson());
+                } finally {
+                    w.close();
+                }
+            }
+            BluetoothSimulator.loadFixture(fixture);
+            final int count = fixture.getDevices().size();
+            final String path = saveTo;
+            SwingUtilities.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    scheduleTreeRefresh();
+                    JOptionPane.showMessageDialog(BluetoothSimulation.this,
+                            "Recorded " + count + " device(s) from the "
+                                    + "real radio (identities scrambled)."
+                                    + "\nTheir advertisement timelines are "
+                                    + "replaying into the simulation now."
+                                    + (path == null ? ""
+                                            : "\nFixture saved to " + path),
+                            "Recording complete",
+                            JOptionPane.INFORMATION_MESSAGE);
+                }
+            });
+        } catch (final Exception ex) {
+            SwingUtilities.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    JOptionPane.showMessageDialog(BluetoothSimulation.this,
+                            "Recording from the real radio failed:\n"
+                                    + ex.getMessage()
+                                    + "\n\nThe native backend needs the "
+                                    + "bundled cn1-ble-helper binary and "
+                                    + "OS Bluetooth permission for the "
+                                    + "JVM process.",
+                            "Recording failed", JOptionPane.ERROR_MESSAGE);
+                }
+            });
+        } finally {
+            if (recorder != null) {
+                recorder.close();
+            }
         }
     }
 

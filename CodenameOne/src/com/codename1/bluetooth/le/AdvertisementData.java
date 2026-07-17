@@ -226,6 +226,11 @@ public class AdvertisementData {
         return serviceData.get(serviceUuid);
     }
 
+    /// The service UUIDs for which service data is present.
+    public List<BluetoothUuid> getServiceDataUuids() {
+        return new ArrayList<BluetoothUuid>(serviceData.keySet());
+    }
+
     /// The advertised TX power level in dBm, or `null` when absent.
     public Integer getTxPowerLevel() {
         return txPowerLevel;

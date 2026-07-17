@@ -709,6 +709,54 @@ public final class SimulatedBluetoothStack {
         });
     }
 
+    /**
+     * Replays a recorded trace: every fixture device is registered as a
+     * {@link VirtualPeripheral} at its first-sighting time and its RSSI
+     * timeline is replayed through the stack's scheduler
+     * ({@code postDelayed} with the fixture's relative timestamps -- on a
+     * {@link ManualScheduler} that is virtual-clock deterministic).
+     * Devices with a captured GATT database become fully connectable
+     * peripherals; the rest are advertisement-only. Safe to call again
+     * after {@link #reset()}.
+     */
+    public void loadFixture(final BluetoothFixture fixture) {
+        if (fixture == null) {
+            return;
+        }
+        run(new Runnable() {
+            public void run() {
+                List<BluetoothFixture.Device> devices =
+                        fixture.getDevices();
+                fireEvent("fixture", "loading " + devices.size()
+                        + " device(s)");
+                int size = devices.size();
+                for (int i = 0; i < size; i++) {
+                    BluetoothFixture.Device d = devices.get(i);
+                    final VirtualPeripheral p = d.toVirtualPeripheral();
+                    List<BluetoothFixture.RssiSample> timeline =
+                            d.rssiTimeline;
+                    long firstSeen = timeline.isEmpty() ? 0
+                            : timeline.get(0).relTimeMs;
+                    scheduler.postDelayed(new Runnable() {
+                        public void run() {
+                            addPeripheral(p);
+                        }
+                    }, firstSeen);
+                    int ts = timeline.size();
+                    for (int j = 1; j < ts; j++) {
+                        final BluetoothFixture.RssiSample s =
+                                timeline.get(j);
+                        scheduler.postDelayed(new Runnable() {
+                            public void run() {
+                                p.setRssi(s.rssi);
+                            }
+                        }, s.relTimeMs);
+                    }
+                }
+            }
+        });
+    }
+
     public boolean isPeripheralRegistered(String address) {
         synchronized (lock) {
             return peripherals.containsKey(address);

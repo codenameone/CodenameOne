@@ -149,6 +149,11 @@ class SimulatorBleBackend implements BleBackend {
                 : p.getManufacturerData().entrySet()) {
             ad.addManufacturerData(e.getKey().intValue(), e.getValue());
         }
+        for (Map.Entry<BluetoothUuid, byte[]> e
+                : p.getServiceData().entrySet()) {
+            ad.addServiceData(e.getKey(), e.getValue());
+        }
+        ad.setTxPowerLevel(p.getTxPower());
         return new ScanResult(peripheral(p.getAddress()), p.getRssi(), ad,
                 p.isConnectable(), timestamp);
     }

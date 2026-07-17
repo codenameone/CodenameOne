@@ -55,6 +55,9 @@ public final class VirtualPeripheral {
             new ArrayList<BluetoothUuid>();
     private final LinkedHashMap<Integer, byte[]> manufacturerData =
             new LinkedHashMap<Integer, byte[]>();
+    private final LinkedHashMap<BluetoothUuid, byte[]> serviceData =
+            new LinkedHashMap<BluetoothUuid, byte[]>();
+    private Integer txPower;
     private final LinkedHashMap<Integer, SimStreamHandler> l2capEndpoints =
             new LinkedHashMap<Integer, SimStreamHandler>();
 
@@ -192,6 +195,34 @@ public final class VirtualPeripheral {
     /** The advertised manufacturer data, keyed by company id (a snapshot). */
     public synchronized Map<Integer, byte[]> getManufacturerData() {
         return new LinkedHashMap<Integer, byte[]>(manufacturerData);
+    }
+
+    /** Adds service data to the advertisement payload; fluent. */
+    public synchronized VirtualPeripheral addServiceData(BluetoothUuid uuid,
+            byte[] data) {
+        if (uuid != null) {
+            serviceData.put(uuid, ByteArrays.copy(data));
+        }
+        return this;
+    }
+
+    /** The advertised service data, keyed by service UUID (a snapshot). */
+    public synchronized Map<BluetoothUuid, byte[]> getServiceData() {
+        return new LinkedHashMap<BluetoothUuid, byte[]>(serviceData);
+    }
+
+    /**
+     * Sets the advertised TX power in dBm; {@code null} (the default)
+     * omits it from the advertisement. Fluent.
+     */
+    public synchronized VirtualPeripheral setTxPower(Integer txPower) {
+        this.txPower = txPower;
+        return this;
+    }
+
+    /** The advertised TX power in dBm, or {@code null} when absent. */
+    public synchronized Integer getTxPower() {
+        return txPower;
     }
 
     /**

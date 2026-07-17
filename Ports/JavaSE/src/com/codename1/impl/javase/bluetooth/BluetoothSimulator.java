@@ -157,6 +157,24 @@ public final class BluetoothSimulator {
         return getStack().connectVirtualCentral();
     }
 
+    /**
+     * Loads a recorded fixture (see {@link BluetoothFixture}) from its
+     * JSON form and replays it into the shared stack -- devices appear at
+     * their recorded first-sighting times and their RSSI timelines replay
+     * on the stack's scheduler. Returns the parsed fixture.
+     */
+    public static BluetoothFixture loadFixture(java.io.InputStream in)
+            throws java.io.IOException {
+        BluetoothFixture fixture = BluetoothFixture.fromJson(in);
+        getStack().loadFixture(fixture);
+        return fixture;
+    }
+
+    /** Replays an in-memory fixture into the shared stack. */
+    public static void loadFixture(BluetoothFixture fixture) {
+        getStack().loadFixture(fixture);
+    }
+
     /** Registers an event-log listener (for the debug UI). */
     public static void addEventListener(StackEventListener listener) {
         getStack().addEventListener(listener);
