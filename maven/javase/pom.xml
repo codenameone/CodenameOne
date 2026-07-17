@@ -216,6 +216,11 @@
             <resource>
                 <directory>${cn1.binaries}/ble</directory>
                 <targetPath>com/codename1/impl/javase/bluetooth/native</targetPath>
+                <excludes>
+                    <!-- maintainer docs live next to the binaries in
+                         cn1-binaries; no reason to ship them to apps -->
+                    <exclude>**/*.md</exclude>
+                </excludes>
             </resource>
         </resources>
         <plugins>
