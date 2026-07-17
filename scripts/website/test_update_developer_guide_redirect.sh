@@ -4,6 +4,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 UPDATER="${SCRIPT_DIR}/update_developer_guide_redirect.sh"
 
+# GitHub sets this to pull_request while the website PR check runs. These
+# fixtures validate production behavior, so do not inherit the outer event.
+export GITHUB_EVENT_NAME=workflow_dispatch
+
 tmp_dir="$(mktemp -d)"
 cleanup() {
   rm -rf "${tmp_dir}"
