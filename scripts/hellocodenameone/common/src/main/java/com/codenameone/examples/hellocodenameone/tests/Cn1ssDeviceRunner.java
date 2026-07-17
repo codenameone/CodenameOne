@@ -154,7 +154,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new MorphTransitionScrubScreenshotTest(),
             new MorphElementMorphScreenshotTest(),
             new TabsAnimatedIndicatorScreenshotTest(),
-            new TabsLiquidGlassAnimationScreenshotTest(),
             new PullToRefreshSpinnerScreenshotTest(),
             new AnimateLayoutScreenshotTest(),
             new AnimateHierarchyScreenshotTest(),
@@ -439,6 +438,14 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new VideoIORoundTripTest()
     };
 
+    // Visual probes used to compare the simulator renderer with native
+    // reference captures are not portability tests. Keep them available to a
+    // filtered JavaSE run without adding always-skipped rows to the public
+    // cross-port compliance contract.
+    private static final BaseTest[] JAVASE_REFERENCE_TEST_CLASSES = new BaseTest[]{
+            new TabsLiquidGlassAnimationScreenshotTest()
+    };
+
     private static BaseTest prependedTest;
 
     /// Index of the test that has consumed its one-shot silent-timeout retry
@@ -465,12 +472,26 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
 
     private void runNextTest(int index) {
         int offset = prependedTest != null ? 1 : 0;
-        int total = DEFAULT_TEST_CLASSES.length + offset;
+        boolean includeJavaSeReferences = "SE".equals(
+                Display.getInstance().getProperty("OS", ""));
+        int referenceCount = includeJavaSeReferences
+                ? JAVASE_REFERENCE_TEST_CLASSES.length
+                : 0;
+        int total = DEFAULT_TEST_CLASSES.length + referenceCount + offset;
         if (index >= total) {
             finishSuite();
             return;
         }
-        BaseTest testClass = (offset == 1 && index == 0) ? prependedTest : DEFAULT_TEST_CLASSES[index - offset];
+        BaseTest testClass;
+        int suiteIndex = index - offset;
+        if (offset == 1 && index == 0) {
+            testClass = prependedTest;
+        } else if (suiteIndex < DEFAULT_TEST_CLASSES.length) {
+            testClass = DEFAULT_TEST_CLASSES[suiteIndex];
+        } else {
+            testClass = JAVASE_REFERENCE_TEST_CLASSES[
+                    suiteIndex - DEFAULT_TEST_CLASSES.length];
+        }
         String testName = testClass.getClass().getSimpleName();
         if (!matchesFilter(testName)) {
             // Optional subset run: -Dcn1ss.filter=<substr> or CN1SS_FILTER=<substr>

@@ -72,9 +72,12 @@ Renderer variants and CPU architectures intentionally remain separate so a
 regression cannot be hidden by a combined platform result.
 
 The feature contract lives in
-`docs/website/data/port_status.json`. Every test registered in
-`Cn1ssDeviceRunner`, including tests installed through `addTest()`, must appear
-under exactly one feature. Every committed CN1SS golden filename must map back
+`docs/website/data/port_status.json`. Every test in
+`Cn1ssDeviceRunner.DEFAULT_TEST_CLASSES`, and every test installed through
+`addTest()`, must appear under exactly one feature. JavaSE-only visual reference
+probes live separately in `JAVASE_REFERENCE_TEST_CLASSES`: they remain available
+to filtered simulator runs but are not portability tests and do not appear on
+the public Port Status page. Every committed CN1SS golden filename must map back
 to its producing test. Validate both rules from the repository root:
 
 [source,shell]
