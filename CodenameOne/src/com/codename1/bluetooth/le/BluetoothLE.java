@@ -25,7 +25,13 @@ package com.codename1.bluetooth.le;
 import com.codename1.bluetooth.BluetoothError;
 import com.codename1.bluetooth.BluetoothException;
 import com.codename1.bluetooth.BluetoothUuid;
+import com.codename1.bluetooth.le.server.AdvertiseData;
+import com.codename1.bluetooth.le.server.AdvertiseSettings;
+import com.codename1.bluetooth.le.server.BleAdvertisement;
+import com.codename1.bluetooth.le.server.GattServer;
+import com.codename1.bluetooth.le.server.GattServerListener;
 import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -143,6 +149,49 @@ public class BluetoothLE {
     /// BLE or without a bonded-device registry (iOS).
     public List<BlePeripheral> getBondedPeripherals() {
         return new ArrayList<BlePeripheral>();
+    }
+
+    // ------------------------------------------------------------------
+    // peripheral role
+    // ------------------------------------------------------------------
+
+    /// Opens the local GATT server for the peripheral role; the
+    /// listener's methods fire on the EDT. Fails with
+    /// [BluetoothError#NOT_SUPPORTED] on ports without peripheral mode --
+    /// branch via `Bluetooth.getInstance().isPeripheralModeSupported()`.
+    public AsyncResource<GattServer> openGattServer(
+            GattServerListener listener) {
+        AsyncResource<GattServer> r = new AsyncResource<GattServer>();
+        r.error(peripheralNotSupported());
+        return r;
+    }
+
+    /// Starts advertising. Resolves with a live [BleAdvertisement] handle
+    /// once the platform actually started broadcasting, or fails with
+    /// [BluetoothError#ADVERTISE_FAILED] /
+    /// [BluetoothError#NOT_SUPPORTED]. `scanResponse` may be `null`.
+    public AsyncResource<BleAdvertisement> startAdvertising(
+            AdvertiseSettings settings, AdvertiseData data,
+            AdvertiseData scanResponse) {
+        AsyncResource<BleAdvertisement> r =
+                new AsyncResource<BleAdvertisement>();
+        r.error(peripheralNotSupported());
+        return r;
+    }
+
+    /// Opens a listening L2CAP endpoint for the peripheral role; publish
+    /// [L2capServer#getPsm()] to centrals (typically via a GATT
+    /// characteristic). Fails with [BluetoothError#NOT_SUPPORTED] where
+    /// L2CAP or peripheral mode is unavailable.
+    public AsyncResource<L2capServer> openL2capServer(boolean secure) {
+        AsyncResource<L2capServer> r = new AsyncResource<L2capServer>();
+        r.error(peripheralNotSupported());
+        return r;
+    }
+
+    private static BluetoothException peripheralNotSupported() {
+        return new BluetoothException(BluetoothError.NOT_SUPPORTED,
+                "BLE peripheral mode is not supported on this platform");
     }
 
     // ------------------------------------------------------------------

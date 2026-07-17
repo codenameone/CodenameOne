@@ -222,6 +222,26 @@ public class Bluetooth {
         }
     }
 
+    /// The classic Bluetooth role entry point -- discovery, bonding and
+    /// RFCOMM streams. Never `null`: on ports without classic Bluetooth
+    /// (iOS among them) a no-op instance is returned whose operations fail
+    /// fast with [BluetoothError#NOT_SUPPORTED]; branch via
+    /// [#isClassicSupported()].
+    public com.codename1.bluetooth.classic.BluetoothClassic getClassic() {
+        return DefaultClassic.INSTANCE;
+    }
+
+    /// Lazy holder so the fallback classic instance is only created when
+    /// a port without classic support is actually asked for it.
+    private static final class DefaultClassic {
+        static final com.codename1.bluetooth.classic.BluetoothClassic
+                INSTANCE = new com.codename1.bluetooth.classic.BluetoothClassic() {
+                };
+
+        private DefaultClassic() {
+        }
+    }
+
     /// `true` when the given runtime permission is currently granted. See
     /// [BluetoothPermission] for the per-platform mapping. Defaults to
     /// `false`.
