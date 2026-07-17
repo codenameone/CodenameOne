@@ -960,6 +960,10 @@
         "id": 4151334,
         "url": "https://dev.to/codenameone/videoio-pcm-mixing-and-timed-whisper-captions-1l3n",
         "syndicated_at": "2026-07-15T14:58:28+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/be97a6017308/edit",
+        "syndicated_at": "2026-07-17T17:01:32+00:00"
       }
     },
     "game-builder-3d-dungeon": {
@@ -967,6 +971,10 @@
         "id": 4168302,
         "url": "https://dev.to/codenameone/game-builder-tutorial-3-build-a-first-person-3d-dungeon-358h",
         "syndicated_at": "2026-07-17T16:40:46+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/3099f1cd87e7/edit",
+        "syndicated_at": "2026-07-17T17:03:55+00:00"
       }
     },
     "beating-hotspot-performance": {
@@ -977,6 +985,14 @@
         "featured_media_id": 124976,
         "yoast_meta_set": true,
         "syndicated_at": "2026-07-17T16:41:54+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/f1c3107c1300/edit",
+        "syndicated_at": "2026-07-17T17:05:31+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3664310/edit.html",
+        "syndicated_at": "2026-07-17T17:06:57+00:00"
       }
     },
     "2026-07-17-1800-shai-pixel-perfect-is-a-test": {
