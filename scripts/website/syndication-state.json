@@ -961,6 +961,23 @@
         "url": "https://dev.to/codenameone/videoio-pcm-mixing-and-timed-whisper-captions-1l3n",
         "syndicated_at": "2026-07-15T14:58:28+00:00"
       }
+    },
+    "game-builder-3d-dungeon": {
+      "devto": {
+        "id": 4168302,
+        "url": "https://dev.to/codenameone/game-builder-tutorial-3-build-a-first-person-3d-dungeon-358h",
+        "syndicated_at": "2026-07-17T16:40:46+00:00"
+      }
+    },
+    "beating-hotspot-performance": {
+      "foojay": {
+        "id": 124977,
+        "url": "https://foojay.io/wp-admin/post.php?post=124977&action=edit",
+        "preview_url": "https://foojay.io/?p=124977",
+        "featured_media_id": 124976,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-07-17T16:41:54+00:00"
+      }
     }
   }
 }
