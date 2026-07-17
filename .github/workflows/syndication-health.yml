@@ -1,0 +1,211 @@
+name: Syndication Health
+
+on:
+  workflow_run:
+    workflows:
+      - Syndicate Blog Posts
+    types:
+      - completed
+  schedule:
+    # Catch a silent/stalled local browser runner within a few hours.
+    - cron: '17 */4 * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+
+concurrency:
+  group: syndication-health
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out default branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Inspect local-runner queue
+        id: queue_health
+        continue-on-error: true
+        run: |
+          python3 scripts/website/check_syndication_health.py \
+            --output "${RUNNER_TEMP}/syndication-health.json"
+
+      - name: Open, update, or close syndication alert
+        uses: actions/github-script@v8
+        env:
+          HEALTH_REPORT: ${{ runner.temp }}/syndication-health.json
+          # Assign Shai directly so this is harder to miss than an Actions-only
+          # failure. A repository variable can override the recipient later.
+          ALERT_ASSIGNEE: ${{ vars.SYNDICATION_ALERT_ASSIGNEE || 'shai-almog' }}
+        with:
+          script: |
+            const fs = require('fs');
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const title = 'Syndication pipeline needs attention';
+            const marker = '<!-- syndication-health -->';
+            const reminderMarker = '<!-- syndication-health-reminder -->';
+            const problems = new Map();
+            const addProblem = (key, text) => problems.set(key, text);
+
+            let report;
+            try {
+              report = JSON.parse(fs.readFileSync(process.env.HEALTH_REPORT, 'utf8'));
+            } catch (error) {
+              report = { overdue: [], invalid: [], platform_overdue: [] };
+              addProblem('queue-report', `Queue health report could not be read: ${error.message}`);
+            }
+
+            for (const task of report.overdue || []) {
+              addProblem(
+                `overdue:${task.id}`,
+                `Queued task \`${task.id}\` is ${task.overdue_hours} hours beyond its processing grace period (deadline ${task.deadline}).`
+              );
+            }
+            for (const task of report.invalid || []) {
+              addProblem(
+                `invalid:${task.id}`,
+                `Queued task \`${task.id}\` cannot be monitored: ${task.reason}.`
+              );
+            }
+            for (const task of report.platform_overdue || []) {
+              addProblem(
+                `platform:${task.id}`,
+                `Eligible article \`${task.id}\` is ${task.overdue_hours} hours beyond the daily-platform grace period (deadline ${task.deadline}).`
+              );
+            }
+
+            if (context.eventName === 'workflow_run') {
+              const run = context.payload.workflow_run;
+              if (run.conclusion !== 'success') {
+                addProblem(
+                  'blog-run',
+                  `The blog syndication workflow concluded with **${run.conclusion || 'unknown'}**: ${run.html_url}`
+                );
+              }
+            }
+
+            const workflowRuns = await github.rest.actions.listWorkflowRuns({
+              owner,
+              repo,
+              workflow_id: 'blog-syndication.yml',
+              branch: context.payload.repository.default_branch,
+              per_page: 10,
+            });
+            const latest = workflowRuns.data.workflow_runs.find(run => run.status === 'completed');
+            if (!latest) {
+              addProblem('missing-blog-run', 'No completed blog syndication workflow run was found.');
+            } else {
+              const ageHours = (Date.now() - Date.parse(latest.updated_at)) / 3600000;
+              if (latest.conclusion !== 'success') {
+                addProblem(
+                  'blog-run',
+                  `The latest blog syndication workflow concluded with **${latest.conclusion || 'unknown'}**: ${latest.html_url}`
+                );
+              } else if (ageHours > 30) {
+                addProblem(
+                  'stale-blog-run',
+                  `The last successful blog syndication workflow is ${ageHours.toFixed(1)} hours old: ${latest.html_url}`
+                );
+              }
+            }
+
+            const issueList = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100,
+            });
+            let issue = issueList.find(candidate =>
+              !candidate.pull_request && candidate.title === title && (candidate.body || '').includes(marker)
+            );
+
+            if (problems.size === 0) {
+              await core.summary.addHeading('Syndication health').addRaw('Healthy').write();
+              if (issue) {
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: issue.number,
+                  body: `${reminderMarker}\nRecovered at ${new Date().toISOString()}. The workflow is succeeding and no queue entries are overdue.`,
+                });
+                await github.rest.issues.update({
+                  owner,
+                  repo,
+                  issue_number: issue.number,
+                  state: 'closed',
+                  state_reason: 'completed',
+                });
+              }
+              return;
+            }
+
+            const lines = Array.from(problems.values()).map(problem => `- ${problem}`);
+            const body = [
+              marker,
+              'The syndication watchdog found work that needs attention.',
+              '',
+              ...lines,
+              '',
+              `Last checked: ${new Date().toISOString()}`,
+              '',
+              'The GitHub workflow publishes DEV/Foojay and creates queue tasks. The signed-in local runner publishes Medium, DZone, Hashnode, and LinkedIn. This issue stays open until both paths recover.',
+            ].join('\n');
+
+            const assignees = process.env.ALERT_ASSIGNEE ? [process.env.ALERT_ASSIGNEE] : undefined;
+            if (!issue) {
+              const created = await github.rest.issues.create({
+                owner,
+                repo,
+                title,
+                body,
+                assignees,
+              });
+              issue = created.data;
+            } else {
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: issue.number,
+                body,
+                assignees,
+              });
+
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner,
+                repo,
+                issue_number: issue.number,
+                per_page: 100,
+              });
+              const reminders = comments.filter(comment => (comment.body || '').includes(reminderMarker));
+              const lastReminder = reminders.at(-1);
+              const reminderAge = lastReminder
+                ? (Date.now() - Date.parse(lastReminder.created_at)) / 3600000
+                : Infinity;
+              if (reminderAge >= 24) {
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number: issue.number,
+                  body: `${reminderMarker}\nStill failing as of ${new Date().toISOString()}. See the updated issue body for the current blockers.`,
+                });
+              }
+            }
+
+            await core.summary
+              .addHeading('Syndication health failure')
+              .addList(Array.from(problems.values()))
+              .addLink(`Tracking issue #${issue.number}`, issue.html_url)
+              .write();
+            core.setFailed(`Syndication is unhealthy; tracking issue #${issue.number}`);
