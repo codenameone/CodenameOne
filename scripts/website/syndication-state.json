@@ -978,6 +978,15 @@
         "yoast_meta_set": true,
         "syndicated_at": "2026-07-17T16:41:54+00:00"
       }
+    },
+    "2026-07-17-1800-shai-pixel-perfect-is-a-test": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/feed/",
+        "syndicated_at": "2026-07-17T16:57:42+00:00",
+        "account": "shai",
+        "source_slug": "pixel-perfect-is-a-test",
+        "scheduled_at": "2026-07-17T15:00:00+00:00"
+      }
     }
   }
 }
