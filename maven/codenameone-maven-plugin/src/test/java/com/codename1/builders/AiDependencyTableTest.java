@@ -232,6 +232,38 @@ class AiDependencyTableTest {
         }
     }
 
+    @Test
+    void bluetoothEntryFiresForEverySubPackage() {
+        String[] classes = {
+            "com/codename1/bluetooth/Bluetooth",
+            "com/codename1/bluetooth/le/BlePeripheral",
+            "com/codename1/bluetooth/le/server/GattServer",
+            "com/codename1/bluetooth/gatt/GattCharacteristic",
+            "com/codename1/bluetooth/classic/RfcommConnection"
+        };
+        for (String cls : classes) {
+            List<AiDependencyTable.Entry> hits = AiDependencyTable.matchesFor(cls);
+            assertEquals(1, hits.size(), "expected the bluetooth entry for " + cls);
+            AiDependencyTable.Entry e = hits.get(0);
+            assertNotNull(findPlistDefault(e, "NSBluetoothAlwaysUsageDescription"));
+            assertNotNull(findPlistDefault(e, "NSBluetoothPeripheralUsageDescription"));
+            assertTrue(e.iosFrameworks().contains("CoreBluetooth"));
+            // Android permissions deliberately live in
+            // BluetoothManifestFragments (maxSdkVersion / neverForLocation
+            // nuances the table cannot express), not in the entry.
+            assertTrue(e.androidPermissions().isEmpty(),
+                    "bluetooth Android permissions must come from BluetoothManifestFragments");
+        }
+    }
+
+    @Test
+    void bluetoothEntryDoesNotFireForUnrelatedClasses() {
+        assertTrue(AiDependencyTable.matchesFor("com/codename1/ui/Form").isEmpty());
+        // "bluetoothle" cn1lib package must NOT trigger the core entry
+        assertTrue(AiDependencyTable.matchesFor(
+                "com/codename1/bluetoothle/Bluetooth").isEmpty());
+    }
+
     private static String findPlistDefault(AiDependencyTable.Entry e, String key) {
         for (String[] entry : e.iosPlistEntries()) {
             if (key.equals(entry[0])) {
