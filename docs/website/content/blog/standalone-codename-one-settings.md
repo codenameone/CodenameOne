@@ -61,7 +61,7 @@ The file remains the source of truth. The UI is an editor, not a second configur
 
 ## Extensions keep compatibility warnings
 
-The Extensions screen browses the live catalog and installs or removes both Maven dependencies and legacy cn1lib packages. It also retains bundled compatibility metadata when the live catalog omits it. That matters for older entries such as Admob Fullscreen Ads, where installing an obsolete library without a warning is worse than showing stale-looking metadata.
+The Extensions screen browses the live catalog and installs or removes both Maven dependencies and legacy cn1lib packages. It also retains bundled compatibility metadata when the live catalog omits it. That matters for older entries such as AdMob full-screen ads, where installing an obsolete library without a warning is worse than showing stale-looking metadata.
 
 ![The Extensions catalog in the standalone Codename One Settings tool](/blog/standalone-codename-one-settings/settings-extensions.png)
 

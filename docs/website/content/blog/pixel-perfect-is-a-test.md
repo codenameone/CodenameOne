@@ -68,7 +68,7 @@ The iOS golden set is pinned to iOS 26. The Android set is pinned to Material 3 
 
 ## What the percentage means, and what it does not
 
-The current Android baseline contains 54 pairs. Its median tolerant visual score is 95.5%. The worst pair is the dark pressed outlined button at 91.25%. The iOS baseline contains 68 pairs with a 94.4% median. Its worst pair is the dark tab bar at 83.45%.
+The current Android baseline contains 54 pairs. Its median tolerant visual score is 95.5%. The worst pair is the dark outlined button in its pressed state at 91.25%. The iOS baseline contains 68 pairs with a 94.4% median. Its worst pair is the dark tab bar at 83.45%.
 
 Those percentages are useful for a regression gate. They are not a substitute for eyes.
 
@@ -124,7 +124,7 @@ GlassRecipe.liquidPanel(dark);   // general glass surface
 
 The theme assigns a recipe to a UIID. `Component` resolves it and passes the parameters through `Graphics.glassRegion(...)`. Ports receive a material recipe instead of reading iOS-specific constants during paint.
 
-On iOS, the moving lens is a Metal fragment shader on the frame's existing command buffer. There is no GPU readback. The larger glass patch does need backdrop pixels, so it uses a cache keyed by bounds, recipe parameters, and a hash of the actual backdrop bytes. In a profiled suite run, full composition averaged about 90ms when the backdrop changed and a stable cache hit averaged 5.3ms, with 475 hits and 253 misses. That is development instrumentation, not a general app benchmark, but it gave us a concrete cache policy.
+On iOS, the moving lens is a Metal fragment shader on the frame's existing command buffer. It does not transfer pixels from GPU memory back to the CPU. The larger glass patch does need backdrop pixels, so it uses a cache keyed by bounds, recipe parameters, and a hash of the actual backdrop bytes. In a profiled suite run, full composition averaged about 90ms when the backdrop changed and a stable cache hit averaged 5.3ms, with 475 hits and 253 misses. That is development instrumentation, not a general app benchmark, but it gave us a concrete cache policy.
 
 JavaSE originally had no `glassRegion` implementation. It silently reduced the bar to a plain blur, leaving the lens to magnify a gray slab. JavaScript discarded the material parameters and used a flat tint plus uniform zoom. [PR #5388](https://github.com/codenameone/CodenameOne/pull/5388) implements the material on both ports and pins 14 constants across JavaScript, JavaSE, the iOS CPU reference, and the Metal shader. The JavaScript lens now produces the same pixel CRC as JavaSE at all seven probe points.
 
