@@ -75,6 +75,15 @@ Referencing the surfaces package is the build gate. Apps that never use it get n
 A widget publishes one layout and dated entries. Placeholders such as `${status}` resolve from each entry's state map. The operating system advances to the next entry without waking the app.
 
 ```java
+private static Map<String, Object> state(
+        String status, long eta, float progress) {
+    Map<String, Object> values = new HashMap<String, Object>();
+    values.put("status", status);
+    values.put("eta", Long.valueOf(eta));
+    values.put("progress", Float.valueOf(progress));
+    return values;
+}
+
 long now = System.currentTimeMillis();
 long eta = now + 4 * 60000L;
 

@@ -1,13 +1,13 @@
 ---
 title: "Shai: the widget request we called impossible"
-slug: 2026-07-29-0300-shai-widgets-live-activities-dynamic-island
+slug: 2026-07-19-1200-shai-widgets-live-activities-dynamic-island
 platform: linkedin
 account: shai
 source_slug: widgets-live-activities-dynamic-island
-publish_at: '2026-07-29T03:00:00'
+publish_at: '2026-07-19T12:00:00'
 timezone: Asia/Jerusalem
-review_by: '2026-07-24'
-status: draft
+review_by: '2026-07-17'
+status: approved
 image: /blog/widgets-live-activities-dynamic-island.jpg
 ---
 
@@ -19,4 +19,4 @@ Steve's decade-old background-process work supplies fresh data. Timelines carry 
 
 The first version has real limits, especially around Android RemoteViews and desktop process lifetime. The model finally fits the operating systems instead of fighting them.
 
-Full write-up: {{canonical}}
+Full write-up: https://www.codenameone.com/blog/widgets-live-activities-dynamic-island/

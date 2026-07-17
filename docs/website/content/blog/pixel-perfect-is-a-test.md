@@ -35,7 +35,7 @@ The iOS theme changed just as visibly. Buttons became full capsules, state glyph
 
 ![iOS Modern light theme before and after the fidelity pass](/blog/pixel-perfect-is-a-test/ios-showcase-before-after.jpg)
 
-Why is the floating action button still circular on iOS? iOS has no native floating action button equivalent. Importing Material's rounded rectangle into the iOS theme would make it less native, not more. Android follows Material 3. iOS keeps the established circular accent action until there is an iOS component we can honestly target.
+Why is the floating action button still circular on iOS? iOS has no native floating action button equivalent. Importing Material's rounded rectangle into the iOS theme would make it less native, not more. Android follows Material 3. iOS keeps the established circular accent action until there is an iOS component we can target.
 
 ## A native app produces the answer sheet
 

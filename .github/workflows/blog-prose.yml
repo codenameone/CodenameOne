@@ -43,7 +43,7 @@ jobs:
           # base version of each changed post.
           fetch-depth: 0
 
-      - name: Detect changed blog posts
+      - name: Detect changed blog and social prose
         id: detect
         run: |
           set -euo pipefail
@@ -52,9 +52,9 @@ jobs:
           if [ -z "$mb" ]; then
             count=0
           else
-            count="$(git diff --name-only --diff-filter=ACMR "$mb" HEAD -- 'docs/website/content/blog/*.md' | wc -l | tr -d ' ')"
+            count="$(git diff --name-only --diff-filter=ACMR "$mb" HEAD -- 'docs/website/content/blog/*.md' 'docs/website/social/linkedin/*.md' | wc -l | tr -d ' ')"
           fi
-          echo "Changed blog posts: $count"
+          echo "Changed blog and social files: $count"
           if [ "$count" -gt 0 ]; then
             echo "has_posts=true" >> "$GITHUB_OUTPUT"
           else

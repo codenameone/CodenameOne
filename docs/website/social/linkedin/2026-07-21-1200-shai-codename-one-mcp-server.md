@@ -1,13 +1,13 @@
 ---
 title: "Shai: accessibility led to MCP"
-slug: 2026-07-31-0300-shai-codename-one-mcp-server
+slug: 2026-07-21-1200-shai-codename-one-mcp-server
 platform: linkedin
 account: shai
 source_slug: codename-one-mcp-server
-publish_at: '2026-07-31T03:00:00'
+publish_at: '2026-07-21T12:00:00'
 timezone: Asia/Jerusalem
-review_by: '2026-07-24'
-status: draft
+review_by: '2026-07-17'
+status: approved
 image: /blog/codename-one-mcp-server.jpg
 ---
 
@@ -19,4 +19,4 @@ The agent finds `profile-save` and invokes its activate action. It does not gues
 
 This is JavaSE-only today. Native desktop packages and mobile targets still need transport and launcher work.
 
-Full write-up: {{canonical}}
+Full write-up: https://www.codenameone.com/blog/codename-one-mcp-server/

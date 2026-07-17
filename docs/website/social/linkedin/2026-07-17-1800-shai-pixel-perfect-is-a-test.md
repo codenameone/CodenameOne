@@ -1,13 +1,13 @@
 ---
 title: "Shai: own your pixels"
-slug: 2026-07-27-0300-shai-pixel-perfect-is-a-test
+slug: 2026-07-17-1800-shai-pixel-perfect-is-a-test
 platform: linkedin
 account: shai
 source_slug: pixel-perfect-is-a-test
-publish_at: '2026-07-27T03:00:00'
+publish_at: '2026-07-17T18:00:00'
 timezone: Asia/Jerusalem
-review_by: '2026-07-24'
-status: draft
+review_by: '2026-07-17'
+status: approved
 image: /blog/pixel-perfect-is-a-test.jpg
 ---
 
@@ -19,4 +19,4 @@ The price is that we do not inherit a new iOS or Android look for free. This wee
 
 That is work we take on so you can work on your app instead of working for the Apple and Google design teams. You adopt their new look on your schedule, without giving them control of your shipped UI.
 
-Full write-up: {{canonical}}
+Full write-up: https://www.codenameone.com/blog/pixel-perfect-is-a-test/

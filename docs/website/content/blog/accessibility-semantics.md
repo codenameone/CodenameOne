@@ -140,8 +140,12 @@ AccessibilityAssertions.assertNoUnlabeledInteractiveNodes(tree);
 
 AccessibilityNodeSnapshot save =
         tree.getNodeByIdentifier("profile-save");
-assert save.getRole() == AccessibilityRole.BUTTON;
-assert save.getAction(AccessibilityAction.ACTIVATE) != null;
+if (save.getRole() != AccessibilityRole.BUTTON) {
+    throw new AssertionError("profile-save must expose the button role");
+}
+if (save.getAction(AccessibilityAction.ACTIVATE) == null) {
+    throw new AssertionError("profile-save must expose the activate action");
+}
 ```
 
 The snapshot is immutable and can be serialized as JSON. That makes failures reviewable in CI and gives a bug report something more precise than “VoiceOver skipped my button.”
@@ -152,7 +156,7 @@ An automated audit can prove that an interactive node has a label. It cannot pro
 
 The final check still uses VoiceOver, TalkBack, Narrator, Orca, Java Access Bridge, or browser accessibility tools. Navigate in both directions. Activate every action. Change adjustable values. Enter and leave collections. Trigger errors and live updates. Confirm focus after navigation, deletion, and modal dialogs.
 
-That is the honest boundary. The portable semantics tree removes the architectural wall and makes most behavior testable once. Platform assistive technologies still apply their own presentation rules.
+That is the boundary. The portable semantics tree removes the architectural wall and makes most behavior testable once. Platform assistive technologies still apply their own presentation rules.
 
 The surprise is that this tree also describes the screen to software. Tomorrow's post shows how the same immutable snapshot lets an AI agent inspect and drive the simulator over the Model Context Protocol without relying on screenshot coordinates.
 

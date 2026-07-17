@@ -59,7 +59,7 @@ Some tests cannot run meaningfully on a target even when the API works. A device
 
 The status page keeps skips visible and attaches a reason. It does not silently convert every skip to “unsupported,” and it does not turn every skip into a green claim either. This distinction is important when a feature is supported but its current CI proof covers only part of the behavior.
 
-The deployment section applies the same honesty to minimum versions. It separates the declared floor from the environment CI actually ran. An iOS build may compile with an iOS 14 deployment target while hosted CI runs the current Xcode 26 simulator. The page says both. A compiled floor is evidence, but it is not the same as running on an iOS 14 device.
+The deployment section applies the same standard to minimum versions. It separates the declared floor from the environment CI actually ran. An iOS build may compile with an iOS 14 deployment target while hosted CI runs the current Xcode 26 simulator. The page says both. A compiled floor is evidence, but it is not the same as running on an iOS 14 device.
 
 ## Benchmarks use the same application
 
