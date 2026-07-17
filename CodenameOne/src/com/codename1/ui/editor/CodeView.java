@@ -349,7 +349,8 @@ public class CodeView extends EditorView {
             return true;
         }
         if ("\t".equals(text)) {
-            insertSpaces(tabSize);
+            // a tab that still arrives as committed text (rather than KEY_TAB) indents
+            indentSelection();
             return true;
         }
         if (text.length() == 1) {
@@ -416,6 +417,72 @@ public class CodeView extends EditorView {
             sb.append(' ');
         }
         replaceRange(getSelectionStart(), getSelectionEnd(), sb.toString(), true);
+    }
+
+    @Override
+    protected void handleTab(boolean dedent) {
+        if (completionVisible && !dedent) {
+            acceptCompletion();
+            return;
+        }
+        // A plain caret tab (no selection) inserts to the next tab stop; a dedent, or a tab with a
+        // selection, indents / dedents every covered line as a block (IDE behavior).
+        if (!dedent && getSelectionStart() == getSelectionEnd()) {
+            insertSpaces(tabSize);
+            return;
+        }
+        indentOrDedentLines(dedent);
+    }
+
+    private void indentSelection() {
+        if (getSelectionStart() == getSelectionEnd()) {
+            insertSpaces(tabSize);
+        } else {
+            indentOrDedentLines(false);
+        }
+    }
+
+    private void indentOrDedentLines(boolean dedent) {
+        int ss = getSelectionStart();
+        int se = getSelectionEnd();
+        int startLine = getDocument().lineOfOffset(ss);
+        int endLine = getDocument().lineOfOffset(se);
+        // a selection that ends exactly at a line's first column doesn't include that line
+        if (endLine > startLine && se == getDocument().getLineStart(endLine)) {
+            endLine--;
+        }
+        int blockStart = getDocument().getLineStart(startLine);
+        int blockEnd = getDocument().getLineEnd(endLine);
+        StringBuilder out = new StringBuilder();
+        for (int line = startLine; line <= endLine; line++) {
+            if (line > startLine) {
+                out.append('\n');
+            }
+            String text = getDocument().getLineText(line);
+            if (dedent) {
+                out.append(dedentLine(text));
+            } else {
+                for (int i = 0; i < tabSize; i++) {
+                    out.append(' ');
+                }
+                out.append(text);
+            }
+        }
+        replaceRange(blockStart, blockEnd, out.toString(), true);
+        setSelectionRange(blockStart, blockStart + out.length());
+    }
+
+    /// Removes one indentation level from the front of `line`: a leading tab, or up to `tabSize`
+    /// leading spaces.
+    private String dedentLine(String line) {
+        if (line.length() > 0 && line.charAt(0) == '\t') {
+            return line.substring(1);
+        }
+        int remove = 0;
+        while (remove < tabSize && remove < line.length() && line.charAt(remove) == ' ') {
+            remove++;
+        }
+        return line.substring(remove);
     }
 
     private void autoIndentNewline() {

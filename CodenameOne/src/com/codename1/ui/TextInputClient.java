@@ -72,6 +72,9 @@ public interface TextInputClient {
     int KEY_UNDO = 16;
     /// Key command: redo.
     int KEY_REDO = 17;
+    /// Key command: tab. With `#MOD_SHIFT` this is a dedent (shift-tab); otherwise an indent. A plain
+    /// editor with no indentation behavior may treat it as inserting a tab character.
+    int KEY_TAB = 18;
 
     /// Modifier bit: shift held (used to extend a selection).
     int MOD_SHIFT = 1;

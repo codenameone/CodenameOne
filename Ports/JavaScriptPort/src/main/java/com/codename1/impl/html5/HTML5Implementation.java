@@ -2712,13 +2712,15 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         }
                     });
                 } else if (key.getKeyCode() == 9) {
+                    // Tab / Shift+Tab: deliver as KEY_TAB so the client can indent / dedent (a plain
+                    // editor still inserts a tab). preventDefault keeps Tab from moving DOM focus.
                     evt.preventDefault();
                     evt.stopPropagation();
                     enqueueLightweightTextInput(client, new Runnable() {
                         @Override
                         public void run() {
                             if (client == lightweightTextInputClient) {
-                                client.commitText("\t");
+                                client.onKeyCommand(TextInputClient.KEY_TAB, modifiers);
                             }
                         }
                     });

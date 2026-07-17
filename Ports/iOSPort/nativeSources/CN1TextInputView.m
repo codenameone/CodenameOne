@@ -63,6 +63,7 @@ extern JAVA_INT com_codename1_impl_ios_IOSImplementation_tiOffsetAtPoint___int_i
 #define CN1_KEY_SELECT_ALL 15
 #define CN1_KEY_UNDO 16
 #define CN1_KEY_REDO 17
+#define CN1_KEY_TAB 18
 #define CN1_MOD_SHIFT 1
 #define CN1_MOD_CTRL 2
 #define CN1_MOD_ALT 4
@@ -247,7 +248,8 @@ static CN1TextInputView* cn1TextInputView = nil;
             [self insertText:@"\n"];
             return YES;
         case UIKeyboardHIDUsageKeyboardTab:
-            [self insertText:@"\t"];
+            // Deliver as KEY_TAB so the editor can indent / dedent (shift-tab); a plain field inserts a tab.
+            [self cn1KeyCommand:CN1_KEY_TAB mods:mods];
             return YES;
         case UIKeyboardHIDUsageKeyboardLeftArrow:
             [self cn1KeyCommand:((mf & UIKeyModifierCommand) ? CN1_KEY_HOME : CN1_KEY_LEFT) mods:mods];

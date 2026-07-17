@@ -250,6 +250,9 @@ class CN1TextInputConnection extends BaseInputConnection {
                 return TextInputClient.KEY_PAGE_DOWN;
             case KeyEvent.KEYCODE_ESCAPE:
                 return TextInputClient.KEY_ESCAPE;
+            case KeyEvent.KEYCODE_TAB:
+                // deliver as KEY_TAB so the editor can indent / dedent (shift-tab)
+                return TextInputClient.KEY_TAB;
             default:
                 return 0;
         }

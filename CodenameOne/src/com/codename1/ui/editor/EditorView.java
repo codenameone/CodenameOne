@@ -904,6 +904,19 @@ public class EditorView extends Component implements TextInputClient {
         return false;
     }
 
+    /// Handles a tab key press (delivered as `#KEY_TAB`). Feature layers override this for indent /
+    /// dedent behavior. The default inserts a tab character on a plain tab and does nothing on a
+    /// dedent (a plain editor has no indentation to remove).
+    ///
+    /// #### Parameters
+    ///
+    /// - `dedent`: true when shift was held (shift-tab)
+    protected void handleTab(boolean dedent) {
+        if (!dedent) {
+            replaceRange(getSelectionStart(), getSelectionEnd(), "\t", true);
+        }
+    }
+
     /// Returns the host bridge, for feature layers that need to fire editor events.
     protected EditorHost host() {
         return host;
@@ -1843,18 +1856,35 @@ public class EditorView extends Component implements TextInputClient {
     @Override
     public void onKeyCommand(int command, int modifiers) {
         boolean extend = (modifiers & MOD_SHIFT) != 0;
+        // Ctrl / Cmd jump to the line (horizontal) or document (vertical) edge; Alt jumps by word.
+        // Mirrors the raw handleNavKey path so the modifiers behave the same whether or not a
+        // platform text-input source is active.
+        boolean lineJump = (modifiers & MOD_CTRL) != 0;
+        boolean word = (modifiers & MOD_ALT) != 0;
         switch (command) {
             case KEY_LEFT:
-                moveCaret(caretLeft(), extend);
+                if (lineJump) {
+                    lineHome(extend);
+                } else if (word) {
+                    moveCaret(wordLeft(), extend);
+                } else {
+                    moveCaret(caretLeft(), extend);
+                }
                 break;
             case KEY_RIGHT:
-                moveCaret(caretRight(), extend);
+                if (lineJump) {
+                    lineEndKey(extend);
+                } else if (word) {
+                    moveCaret(wordRight(), extend);
+                } else {
+                    moveCaret(caretRight(), extend);
+                }
                 break;
             case KEY_UP:
-                moveCaret(caretVertical(-1), extend);
+                moveCaret(lineJump ? 0 : caretVertical(-1), extend);
                 break;
             case KEY_DOWN:
-                moveCaret(caretVertical(1), extend);
+                moveCaret(lineJump ? doc.length() : caretVertical(1), extend);
                 break;
             case KEY_HOME:
                 lineHome(extend);
@@ -1891,6 +1921,11 @@ public class EditorView extends Component implements TextInputClient {
                 break;
             case KEY_REDO:
                 performRedo();
+                break;
+            case KEY_TAB:
+                if (editable) {
+                    handleTab((modifiers & MOD_SHIFT) != 0);
+                }
                 break;
             default:
                 break;
