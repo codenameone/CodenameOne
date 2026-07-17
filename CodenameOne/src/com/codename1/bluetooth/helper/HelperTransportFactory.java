@@ -22,13 +22,11 @@
  */
 package com.codename1.bluetooth.helper;
 
-/**
- * Creates {@link HelperTransport} instances so {@link HelperBleBackend} can
- * (re)start the helper on activation and after a restart. Each call returns
- * a fresh, un-started transport.
- */
+/// Creates {@link HelperTransport} instances so {@link HelperBleBackend} can
+/// (re)start the helper on activation and after a restart. Each call returns
+/// a fresh, un-started transport.
 public interface HelperTransportFactory {
 
-    /** A new, un-started transport for one helper launch. */
+    /// A new, un-started transport for one helper launch.
     HelperTransport create();
 }

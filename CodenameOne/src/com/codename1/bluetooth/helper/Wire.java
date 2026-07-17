@@ -31,18 +31,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * The line-delimited JSON codec of the {@code cn1-ble-helper} protocol:
- * command serialization (with escaping) and event-line parsing via
- * {@link JSONParser}, with Base64-encoded characteristic/descriptor
- * payloads.
- */
+/// The line-delimited JSON codec of the {@code cn1-ble-helper} protocol:
+/// command serialization (with escaping) and event-line parsing via
+/// {@link JSONParser}, with Base64-encoded characteristic/descriptor
+/// payloads.
 public final class Wire {
 
     private Wire() {
     }
 
-    /** Builder for one command line. */
+    /// Builder for one command line.
     public static final class Obj {
         private final StringBuilder sb = new StringBuilder("{"); //NOPMD AvoidStringBufferField
         private boolean first = true;
@@ -73,7 +71,7 @@ public final class Wire {
             return this;
         }
 
-        /** The finished single-line JSON object. */
+        /// The finished single-line JSON object.
         public String line() {
             return sb.toString() + "}";
         }
@@ -120,7 +118,7 @@ public final class Wire {
         return sb.toString();
     }
 
-    /** Parses one event line into a map. */
+    /// Parses one event line into a map.
     public static Map<String, Object> parse(String line) throws IOException {
         JSONParser parser = new JSONParser();
         parser.setUseLongsInstance(true);

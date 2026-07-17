@@ -46,19 +46,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * Real-radio {@link BlePeripheral} bridging the core GATT client contract
- * onto {@code cn1-ble-helper} commands. One canonical instance exists per
- * address (cached by {@link HelperBleBackend}), so discovered
- * {@link GattCharacteristic} objects stay identical across the
- * scan/connect/notify lifecycle.
- *
- * <p>btleplug constraints surface here: no bonding
- * ({@link #doCreateBond}), no L2CAP ({@link #doOpenL2cap}), no MTU
- * negotiation ({@link #doRequestMtu} resolves with the current value), no
- * connection-priority hints, and RSSI reads answer with the last
- * advertisement sighting.</p>
- */
+/// Real-radio {@link BlePeripheral} bridging the core GATT client contract
+/// onto {@code cn1-ble-helper} commands. One canonical instance exists per
+/// address (cached by {@link HelperBleBackend}), so discovered
+/// {@link GattCharacteristic} objects stay identical across the
+/// scan/connect/notify lifecycle.
+///
+/// <p>btleplug constraints surface here: no bonding
+/// ({@link #doCreateBond}), no L2CAP ({@link #doOpenL2cap}), no MTU
+/// negotiation ({@link #doRequestMtu} resolves with the current value), no
+/// connection-priority hints, and RSSI reads answer with the last
+/// advertisement sighting.</p>
 public class HelperBlePeripheral extends BlePeripheral {
 
     private final HelperBleBackend backend;
@@ -68,7 +66,7 @@ public class HelperBlePeripheral extends BlePeripheral {
     private final AtomicBoolean rssiSeen = new AtomicBoolean();
 
     private final Object dbLock = new Object();
-    /** service|characteristic uuid to canonical discovered instance */
+    /// service|characteristic uuid to canonical discovered instance
     private HashMap<String, GattCharacteristic> characteristicIndex =
             new HashMap<String, GattCharacteristic>();
 
@@ -98,7 +96,7 @@ public class HelperBlePeripheral extends BlePeripheral {
     // backend event entry points
     // ------------------------------------------------------------------
 
-    /** A scan sighting refreshed the advertised name / RSSI. */
+    /// A scan sighting refreshed the advertised name / RSSI.
     void updateFromScan(String advertisedName, int rssi) {
         if (advertisedName != null && advertisedName.length() > 0) {
             name.set(advertisedName);
@@ -107,7 +105,7 @@ public class HelperBlePeripheral extends BlePeripheral {
         rssiSeen.set(true);
     }
 
-    /** OS-observed link establishment (solicited or not). */
+    /// OS-observed link establishment (solicited or not).
     void handleConnected(String reportedName) {
         if (reportedName != null && reportedName.length() > 0) {
             name.set(reportedName);
@@ -115,7 +113,7 @@ public class HelperBlePeripheral extends BlePeripheral {
         fireConnectionStateChanged(ConnectionState.CONNECTED, null);
     }
 
-    /** OS-observed link teardown; {@code reason} is empty when benign. */
+    /// OS-observed link teardown; {@code reason} is empty when benign.
     void handleDisconnected(String reason) {
         BluetoothException cause = null;
         if (reason != null && reason.length() > 0) {
@@ -125,12 +123,12 @@ public class HelperBlePeripheral extends BlePeripheral {
         fireConnectionStateChanged(ConnectionState.DISCONNECTED, cause);
     }
 
-    /** The helper process died with this peripheral possibly connected. */
+    /// The helper process died with this peripheral possibly connected.
     void handleHelperDied(BluetoothException failure) {
         fireConnectionStateChanged(ConnectionState.DISCONNECTED, failure);
     }
 
-    /** Routes a helper notification to the canonical characteristic. */
+    /// Routes a helper notification to the canonical characteristic.
     void handleNotification(String serviceUuid, String characteristicUuid,
             String valueBase64) {
         GattCharacteristic c;
@@ -201,7 +199,7 @@ public class HelperBlePeripheral extends BlePeripheral {
         });
     }
 
-    /** Maps the helper's discovered payload to canonical core instances. */
+    /// Maps the helper's discovered payload to canonical core instances.
     private List<GattService> buildGattModel(Map<String, Object> payload) {
         ArrayList<GattService> services = new ArrayList<GattService>();
         HashMap<String, GattCharacteristic> index =
@@ -244,7 +242,7 @@ public class HelperBlePeripheral extends BlePeripheral {
         return BluetoothUuid.fromString(s);
     }
 
-    /** Maps the wire property names onto the GattCharacteristic bits. */
+    /// Maps the wire property names onto the GattCharacteristic bits.
     public static int propertiesMask(List<Object> names) {
         int mask = 0;
         int size = names.size();
@@ -395,11 +393,9 @@ public class HelperBlePeripheral extends BlePeripheral {
         };
     }
 
-    /**
-     * Completion that decodes a base64 "value" payload into the raw bytes of
-     * a characteristic/descriptor read. Static so it holds no reference to the
-     * enclosing peripheral.
-     */
+    /// Completion that decodes a base64 "value" payload into the raw bytes of
+    /// a characteristic/descriptor read. Static so it holds no reference to the
+    /// enclosing peripheral.
     private static PendingOp bytesOp(final AsyncResource<byte[]> out) {
         return new PendingOp() {
             public void onEvent(String event, Map<String, Object> payload) {

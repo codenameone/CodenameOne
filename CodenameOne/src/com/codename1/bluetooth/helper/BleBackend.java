@@ -37,27 +37,25 @@ import com.codename1.util.AsyncResource;
 
 import java.util.List;
 
-/**
- * The pluggable BLE engine seam. The simulator ships its own
- * {@code SimulatorBleBackend}; the real-radio {@link HelperBleBackend}
- * drives the host machine's adapter through the bundled
- * {@code cn1-ble-helper} process. Ports swap engines behind this interface.
- */
+/// The pluggable BLE engine seam. The simulator ships its own
+/// {@code SimulatorBleBackend}; the real-radio {@link HelperBleBackend}
+/// drives the host machine's adapter through the bundled
+/// {@code cn1-ble-helper} process. Ports swap engines behind this interface.
 public interface BleBackend {
 
-    /** Receives the sightings of the single platform scan. */
+    /// Receives the sightings of the single platform scan.
     interface ScanSink {
         void onResult(ScanResult result);
 
         void onFailed(BluetoothException reason);
     }
 
-    /** Observes adapter state transitions of this backend. */
+    /// Observes adapter state transitions of this backend.
     interface AdapterStateSink {
         void adapterStateChanged(AdapterState newState);
     }
 
-    /** A stable identifier, e.g. {@code "simulator"} or {@code "native"}. */
+    /// A stable identifier, e.g. {@code "simulator"} or {@code "native"}.
     String getName();
 
     boolean isLeSupported();
@@ -70,16 +68,16 @@ public interface BleBackend {
 
     AdapterState getAdapterState();
 
-    /** Registers the single adapter-state observer (the port owner). */
+    /// Registers the single adapter-state observer (the port owner).
     void setAdapterStateSink(AdapterStateSink sink);
 
-    /** Starts the single platform scan; sightings flow into the sink. */
+    /// Starts the single platform scan; sightings flow into the sink.
     void startScan(ScanSink sink);
 
-    /** Stops the platform scan. */
+    /// Stops the platform scan.
     void stopScan();
 
-    /** The canonical peripheral at the address, or {@code null}. */
+    /// The canonical peripheral at the address, or {@code null}.
     BlePeripheral getPeripheral(String address);
 
     List<BlePeripheral> getConnectedPeripherals(BluetoothUuid serviceFilter);
@@ -94,6 +92,6 @@ public interface BleBackend {
 
     AsyncResource<L2capServer> openL2capServer(boolean secure);
 
-    /** Releases backend resources when it is switched away. */
+    /// Releases backend resources when it is switched away.
     void shutdown();
 }

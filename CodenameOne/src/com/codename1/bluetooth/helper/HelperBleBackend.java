@@ -49,56 +49,50 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * The real-radio {@link BleBackend}: drives the host machine's Bluetooth
- * adapter through the bundled {@code cn1-ble-helper} subprocess (a Rust
- * <a href="https://github.com/deviceplug/btleplug">btleplug</a> bridge --
- * CoreBluetooth on macOS, BlueZ on Linux, WinRT on Windows). Commands and
- * events travel as line-delimited JSON over the helper's stdin/stdout; see
- * {@code Ports/JavaSE/native/cn1-ble-helper/PROTOCOL.md}.
- *
- * <p>This class is transport-agnostic: the child process's standard I/O is
- * reached only through a {@link HelperTransport} created by the injected
- * {@link HelperTransportFactory}, so a host with an operating-system process
- * API (the JavaSE simulator) and a host without it (the native Windows/Linux
- * ports, reaching the subprocess through a native bridge) share this exact
- * protocol, GATT and lifecycle logic. Nothing here references an OS process
- * API or a shutdown hook -- the owner calls {@link #shutdown()} on app
- * exit.</p>
- *
- * <p>btleplug is central-only: LE scanning and GATT client operations are
- * supported; peripheral mode (GATT server / advertising), classic
- * Bluetooth, L2CAP channels and bonding are not, and the corresponding
- * capability queries report {@code false}.</p>
- */
+/// The real-radio {@link BleBackend}: drives the host machine's Bluetooth
+/// adapter through the bundled {@code cn1-ble-helper} subprocess (a Rust
+/// <a href="https://github.com/deviceplug/btleplug">btleplug</a> bridge --
+/// CoreBluetooth on macOS, BlueZ on Linux, WinRT on Windows). Commands and
+/// events travel as line-delimited JSON over the helper's stdin/stdout; see
+/// {@code Ports/JavaSE/native/cn1-ble-helper/PROTOCOL.md}.
+///
+/// <p>This class is transport-agnostic: the child process's standard I/O is
+/// reached only through a {@link HelperTransport} created by the injected
+/// {@link HelperTransportFactory}, so a host with an operating-system process
+/// API (the JavaSE simulator) and a host without it (the native Windows/Linux
+/// ports, reaching the subprocess through a native bridge) share this exact
+/// protocol, GATT and lifecycle logic. Nothing here references an OS process
+/// API or a shutdown hook -- the owner calls {@link #shutdown()} on app
+/// exit.</p>
+///
+/// <p>btleplug is central-only: LE scanning and GATT client operations are
+/// supported; peripheral mode (GATT server / advertising), classic
+/// Bluetooth, L2CAP channels and bonding are not, and the corresponding
+/// capability queries report {@code false}.</p>
 public class HelperBleBackend implements BleBackend {
 
-    /** The backend name reported by {@link #getName()}. */
+    /// The backend name reported by {@link #getName()}.
     public static final String NAME = "native";
 
-    /** The name of the fallback simulator backend, for error messages. */
+    /// The name of the fallback simulator backend, for error messages.
     private static final String SIMULATOR_NAME = "simulator";
 
-    /** The wire protocol version this backend speaks. */
+    /// The wire protocol version this backend speaks.
     public static final long PROTOCOL_VERSION = 1;
 
-    /**
-     * Completion of one in-flight helper command. Exactly one of the two
-     * methods fires, from the helper reader thread.
-     */
+    /// Completion of one in-flight helper command. Exactly one of the two
+    /// methods fires, from the helper reader thread.
     public interface PendingOp {
-        /** The command's terminal success event. */
+        /// The command's terminal success event.
         void onEvent(String event, Map<String, Object> payload);
 
-        /** The command failed -- helper error event, crash or shutdown. */
+        /// The command failed -- helper error event, crash or shutdown.
         void onFailure(BluetoothException failure);
     }
 
-    /**
-     * Shared fire-and-forget completion for commands whose result the caller
-     * ignores (e.g. scanStop while already tearing down). Static so it holds
-     * no reference to the enclosing backend.
-     */
+    /// Shared fire-and-forget completion for commands whose result the caller
+    /// ignores (e.g. scanStop while already tearing down). Static so it holds
+    /// no reference to the enclosing backend.
     private static final PendingOp NO_OP = new PendingOp() {
         public void onEvent(String event, Map<String, Object> payload) {
         }
@@ -113,7 +107,7 @@ public class HelperBleBackend implements BleBackend {
     private final Object processLock = new Object();
     private HelperTransport transport;
     private final AtomicBoolean shutdownRequested = new AtomicBoolean();
-    /** Set after a crash: the backend stays dead until switched away. */
+    /// Set after a crash: the backend stays dead until switched away.
     private final AtomicBoolean helperFailed = new AtomicBoolean();
 
     private final AtomicLong nextRequestId = new AtomicLong(1);
@@ -137,12 +131,10 @@ public class HelperBleBackend implements BleBackend {
     private final AtomicReference<Map<String, Object>> capabilities =
             new AtomicReference<Map<String, Object>>();
 
-    /**
-     * Creates a backend that (re)starts the helper through the given
-     * transport factory. The factory is responsible for how the child
-     * process is launched -- resolving the binary and, on the JavaSE
-     * simulator, building the OS subprocess.
-     */
+    /// Creates a backend that (re)starts the helper through the given
+    /// transport factory. The factory is responsible for how the child
+    /// process is launched -- resolving the binary and, on the JavaSE
+    /// simulator, building the OS subprocess.
     public HelperBleBackend(HelperTransportFactory transportFactory) {
         this.transportFactory = transportFactory;
     }
@@ -197,7 +189,7 @@ public class HelperBleBackend implements BleBackend {
         th.start();
     }
 
-    /** Reader thread epilogue: distinguish clean shutdown from a crash. */
+    /// Reader thread epilogue: distinguish clean shutdown from a crash.
     private void onHelperExited(HelperTransport t) {
         synchronized (processLock) {
             if (transport != t) {
@@ -472,11 +464,9 @@ public class HelperBleBackend implements BleBackend {
     // outgoing commands
     // ------------------------------------------------------------------
 
-    /**
-     * Registers the pending op and writes the command line; the id inside
-     * {@code json} must be the returned request id, so callers build the
-     * line via {@link #nextId()} first.
-     */
+    /// Registers the pending op and writes the command line; the id inside
+    /// {@code json} must be the returned request id, so callers build the
+    /// line via {@link #nextId()} first.
     private void send(long id, String json, PendingOp op) {
         pending.put(Long.valueOf(id), op);
         if (!ensureStarted()) {
@@ -584,7 +574,7 @@ public class HelperBleBackend implements BleBackend {
                 .put("address", address).line(), op);
     }
 
-    /** True when the helper's capability handshake advertises the key. */
+    /// True when the helper's capability handshake advertises the key.
     public boolean helperSupports(String capability) {
         Map<String, Object> caps = capabilities.get();
         return caps != null && Wire.boolVal(caps, capability, false);
@@ -594,7 +584,7 @@ public class HelperBleBackend implements BleBackend {
     // peripheral cache
     // ------------------------------------------------------------------
 
-    /** The canonical peripheral wrapper for the address. */
+    /// The canonical peripheral wrapper for the address.
     HelperBlePeripheral peripheral(String address) {
         synchronized (peripheralCache) {
             HelperBlePeripheral p = peripheralCache.get(address);
