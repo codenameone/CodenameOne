@@ -136,13 +136,73 @@ final class PlaygroundCodeEditor {
         if (!completionProviderInstalled) {
             completionProviderInstalled = true;
             editor.setCompletionProvider((ed, code, cursor, results) -> {
-                List<CodeCompletion> out = new ArrayList<CodeCompletion>(uiidCompletions.size());
+                List<CodeCompletion> out = new ArrayList<CodeCompletion>();
+                java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<String>();
                 for (String uiid : uiidCompletions) {
-                    out.add(new CodeCompletion(uiid).setType("uiid"));
+                    if (seen.add(uiid)) {
+                        out.add(new CodeCompletion(uiid).setType("uiid"));
+                    }
+                }
+                // Offer identifiers already present in the source so partially typed variable / method
+                // names (e.g. "varia" -> "variableName") complete. The editor filters by the typed
+                // prefix, so returning the whole set here is fine.
+                for (String word : collectIdentifiers(code, cursor)) {
+                    if (seen.add(word)) {
+                        out.add(new CodeCompletion(word).setType("text"));
+                    }
                 }
                 results.onSucess(out);
             });
         }
+    }
+
+    /// Extracts distinct Java-style identifiers from the source, excluding the token currently being
+    /// typed at {@code cursor} (so a half-typed word doesn't propose itself) and single-character names.
+    private static List<String> collectIdentifiers(String code, int cursor) {
+        List<String> words = new ArrayList<String>();
+        if (code == null || code.length() == 0) {
+            return words;
+        }
+        int typedStart = cursor;
+        while (typedStart > 0 && isIdentPart(code.charAt(typedStart - 1))) {
+            typedStart--;
+        }
+        int typedEnd = cursor;
+        while (typedEnd < code.length() && isIdentPart(code.charAt(typedEnd))) {
+            typedEnd++;
+        }
+        java.util.LinkedHashSet<String> set = new java.util.LinkedHashSet<String>();
+        int i = 0;
+        int n = code.length();
+        while (i < n) {
+            char c = code.charAt(i);
+            if (isIdentStart(c)) {
+                int start = i;
+                i++;
+                while (i < n && isIdentPart(code.charAt(i))) {
+                    i++;
+                }
+                // skip the token straddling the caret and trivial one-character names
+                if (start == typedStart && i == typedEnd) {
+                    continue;
+                }
+                if (i - start > 1) {
+                    set.add(code.substring(start, i));
+                }
+            } else {
+                i++;
+            }
+        }
+        words.addAll(set);
+        return words;
+    }
+
+    private static boolean isIdentStart(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || c == '$';
+    }
+
+    private static boolean isIdentPart(char c) {
+        return isIdentStart(c) || (c >= '0' && c <= '9');
     }
 
     void setInlineMessages(List<PlaygroundRunner.InlineMessage> inlineMessages) {
