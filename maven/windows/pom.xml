@@ -38,15 +38,6 @@
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
         </dependency>
-        <!-- Shared, transport-agnostic cn1-ble-helper client (real BLE
-             central). jar-with-dependencies folds it into WindowsPort.jar so
-             ParparVM translates it; the port supplies the native
-             CreateProcess subprocess transport. -->
-        <dependency>
-            <groupId>com.codenameone</groupId>
-            <artifactId>codenameone-native-ble</artifactId>
-            <version>${project.version}</version>
-        </dependency>
     </dependencies>
 
     <build>

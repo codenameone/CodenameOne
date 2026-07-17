@@ -45,7 +45,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The real-radio {@link BleBackend}: drives the host machine's Bluetooth
@@ -92,13 +94,27 @@ public class HelperBleBackend implements BleBackend {
         void onFailure(BluetoothException failure);
     }
 
+    /**
+     * Shared fire-and-forget completion for commands whose result the caller
+     * ignores (e.g. scanStop while already tearing down). Static so it holds
+     * no reference to the enclosing backend.
+     */
+    private static final PendingOp NO_OP = new PendingOp() {
+        public void onEvent(String event, Map<String, Object> payload) {
+        }
+
+        public void onFailure(BluetoothException failure) {
+            // nothing to report -- the caller does not observe this op
+        }
+    };
+
     private final HelperTransportFactory transportFactory;
 
     private final Object processLock = new Object();
     private HelperTransport transport;
-    private volatile boolean shutdownRequested;
+    private final AtomicBoolean shutdownRequested = new AtomicBoolean();
     /** Set after a crash: the backend stays dead until switched away. */
-    private volatile boolean helperFailed;
+    private final AtomicBoolean helperFailed = new AtomicBoolean();
 
     private final AtomicLong nextRequestId = new AtomicLong(1);
     // ConcurrentHashMap is not on the device API surface (this class is
@@ -112,10 +128,14 @@ public class HelperBleBackend implements BleBackend {
     private final Set<String> connectedAddresses = Collections.synchronizedSet(
             new HashSet<String>());
 
-    private volatile AdapterState adapterState = AdapterState.UNKNOWN;
-    private volatile AdapterStateSink stateSink;
-    private volatile ScanSink scanSink;
-    private volatile Map<String, Object> capabilities;
+    private final AtomicReference<AdapterState> adapterState =
+            new AtomicReference<AdapterState>(AdapterState.UNKNOWN);
+    private final AtomicReference<AdapterStateSink> stateSink =
+            new AtomicReference<AdapterStateSink>();
+    private final AtomicReference<ScanSink> scanSink =
+            new AtomicReference<ScanSink>();
+    private final AtomicReference<Map<String, Object>> capabilities =
+            new AtomicReference<Map<String, Object>>();
 
     /**
      * Creates a backend that (re)starts the helper through the given
@@ -136,7 +156,7 @@ public class HelperBleBackend implements BleBackend {
             if (transport != null && transport.isAlive()) {
                 return true;
             }
-            if (shutdownRequested || helperFailed) {
+            if (shutdownRequested.get() || helperFailed.get()) {
                 return false;
             }
             try {
@@ -155,7 +175,13 @@ public class HelperBleBackend implements BleBackend {
     }
 
     private void startReader(final HelperTransport t) {
+        // Not a daemon thread: Thread.setDaemon is not on the device API
+        // surface (CLDC11) this core class compiles against. The reader
+        // always terminates when the transport closes -- shutdown() closes
+        // it, and JavaSE's ProcessTransport additionally closes it from a
+        // JVM shutdown hook -- so it never blocks process exit.
         Thread th = new Thread("cn1ble-helper-stdout") {
+            @Override
             public void run() {
                 try {
                     String line;
@@ -168,7 +194,6 @@ public class HelperBleBackend implements BleBackend {
                 onHelperExited(t);
             }
         };
-        th.setDaemon(true);
         th.start();
     }
 
@@ -179,11 +204,11 @@ public class HelperBleBackend implements BleBackend {
                 return; // superseded by a restart
             }
             transport = null;
-            if (!shutdownRequested) {
-                helperFailed = true;
+            if (!shutdownRequested.get()) {
+                helperFailed.set(true);
             }
         }
-        if (shutdownRequested) {
+        if (shutdownRequested.get()) {
             return;
         }
         System.err.println("HelperBleBackend: the cn1-ble-helper process "
@@ -194,8 +219,8 @@ public class HelperBleBackend implements BleBackend {
                 BluetoothError.IO_ERROR,
                 "The cn1-ble-helper process terminated unexpectedly");
         failAllPending(failure);
-        ScanSink scan = scanSink;
-        scanSink = null;
+        ScanSink scan = scanSink.get();
+        scanSink.set(null);
         if (scan != null) {
             scan.onFailed(new BluetoothException(BluetoothError.SCAN_FAILED,
                     "Scan aborted: the cn1-ble-helper process terminated"));
@@ -238,11 +263,11 @@ public class HelperBleBackend implements BleBackend {
     }
 
     private void setAdapterState(AdapterState newState) {
-        if (adapterState == newState) {
+        if (adapterState.get() == newState) {
             return;
         }
-        adapterState = newState;
-        AdapterStateSink sink = stateSink;
+        adapterState.set(newState);
+        AdapterStateSink sink = stateSink.get();
         if (sink != null) {
             sink.adapterStateChanged(newState);
         }
@@ -266,7 +291,7 @@ public class HelperBleBackend implements BleBackend {
         }
         String event = Wire.str(obj, "event", "");
         if ("capabilities".equals(event)) {
-            capabilities = obj;
+            capabilities.set(obj);
             long version = Wire.longVal(obj, "version", -1);
             if (version != PROTOCOL_VERSION) {
                 System.err.println("HelperBleBackend: helper speaks "
@@ -345,7 +370,7 @@ public class HelperBleBackend implements BleBackend {
         int rssi = Wire.intVal(obj, "rssi", -127);
         HelperBlePeripheral p = peripheral(address);
         p.updateFromScan(name, rssi);
-        ScanSink sink = scanSink;
+        ScanSink sink = scanSink.get();
         if (sink == null) {
             return;
         }
@@ -561,7 +586,7 @@ public class HelperBleBackend implements BleBackend {
 
     /** True when the helper's capability handshake advertises the key. */
     public boolean helperSupports(String capability) {
-        Map<String, Object> caps = capabilities;
+        Map<String, Object> caps = capabilities.get();
         return caps != null && Wire.boolVal(caps, capability, false);
     }
 
@@ -612,11 +637,11 @@ public class HelperBleBackend implements BleBackend {
     }
 
     public AdapterState getAdapterState() {
-        return adapterState;
+        return adapterState.get();
     }
 
     public void setAdapterStateSink(AdapterStateSink sink) {
-        stateSink = sink;
+        stateSink.set(sink);
         if (sink != null) {
             // installing the sink is the backend's activation point --
             // boot the helper so the adapter state handshake arrives
@@ -626,7 +651,7 @@ public class HelperBleBackend implements BleBackend {
 
     public void startScan(final ScanSink sink) {
         stopScan();
-        scanSink = sink;
+        scanSink.set(sink);
         long id = nextId();
         send(id, Wire.obj().put("cmd", "scanStart").put("id", id).line(),
                 new PendingOp() {
@@ -636,8 +661,8 @@ public class HelperBleBackend implements BleBackend {
                     }
 
                     public void onFailure(BluetoothException failure) {
-                        if (scanSink == sink) {
-                            scanSink = null;
+                        if (scanSink.get() == sink) {
+                            scanSink.set(null);
                         }
                         sink.onFailed(failure);
                     }
@@ -645,23 +670,14 @@ public class HelperBleBackend implements BleBackend {
     }
 
     public void stopScan() {
-        scanSink = null;
+        scanSink.set(null);
         synchronized (processLock) {
             if (transport == null || !transport.isAlive()) {
                 return; // never boot the helper just to stop a scan
             }
         }
         long id = nextId();
-        send(id, Wire.obj().put("cmd", "scanStop").put("id", id).line(),
-                new PendingOp() {
-                    public void onEvent(String event,
-                            Map<String, Object> payload) {
-                    }
-
-                    public void onFailure(BluetoothException failure) {
-                        // already stopping -- nothing to report
-                    }
-                });
+        send(id, Wire.obj().put("cmd", "scanStop").put("id", id).line(), NO_OP);
     }
 
     public BlePeripheral getPeripheral(String address) {
@@ -733,7 +749,7 @@ public class HelperBleBackend implements BleBackend {
     private void shutdownInternal() {
         HelperTransport t;
         synchronized (processLock) {
-            shutdownRequested = true;
+            shutdownRequested.set(true);
             t = transport;
             if (t != null) {
                 try {
@@ -743,7 +759,7 @@ public class HelperBleBackend implements BleBackend {
             }
             transport = null;
         }
-        scanSink = null;
+        scanSink.set(null);
         failAllPending(new BluetoothException(BluetoothError.IO_ERROR,
                 "The native Bluetooth backend was shut down"));
         if (t != null) {

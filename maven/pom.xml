@@ -67,7 +67,6 @@
         <module>svg-transcoder</module>
         <module>lottie-transcoder</module>
         <module>sqlite-jdbc</module>
-        <module>native-ble</module>
         <module>javase</module>
         <module>javase-svg</module>
         <module>android</module>

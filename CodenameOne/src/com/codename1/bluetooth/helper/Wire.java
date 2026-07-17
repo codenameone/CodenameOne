@@ -44,7 +44,7 @@ public final class Wire {
 
     /** Builder for one command line. */
     public static final class Obj {
-        private final StringBuilder sb = new StringBuilder("{");
+        private final StringBuilder sb = new StringBuilder("{"); //NOPMD AvoidStringBufferField
         private boolean first = true;
 
         private void key(String k) {

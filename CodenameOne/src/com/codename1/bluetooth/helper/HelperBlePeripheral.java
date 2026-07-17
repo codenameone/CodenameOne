@@ -42,6 +42,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Real-radio {@link BlePeripheral} bridging the core GATT client contract
@@ -60,9 +63,9 @@ public class HelperBlePeripheral extends BlePeripheral {
 
     private final HelperBleBackend backend;
     private final String address;
-    private volatile String name;
-    private volatile int lastRssi = -127;
-    private volatile boolean rssiSeen;
+    private final AtomicReference<String> name = new AtomicReference<String>();
+    private final AtomicInteger lastRssi = new AtomicInteger(-127);
+    private final AtomicBoolean rssiSeen = new AtomicBoolean();
 
     private final Object dbLock = new Object();
     /** service|characteristic uuid to canonical discovered instance */
@@ -79,7 +82,7 @@ public class HelperBlePeripheral extends BlePeripheral {
     }
 
     public String getName() {
-        return name;
+        return name.get();
     }
 
     public DeviceType getType() {
@@ -98,16 +101,16 @@ public class HelperBlePeripheral extends BlePeripheral {
     /** A scan sighting refreshed the advertised name / RSSI. */
     void updateFromScan(String advertisedName, int rssi) {
         if (advertisedName != null && advertisedName.length() > 0) {
-            name = advertisedName;
+            name.set(advertisedName);
         }
-        lastRssi = rssi;
-        rssiSeen = true;
+        lastRssi.set(rssi);
+        rssiSeen.set(true);
     }
 
     /** OS-observed link establishment (solicited or not). */
     void handleConnected(String reportedName) {
         if (reportedName != null && reportedName.length() > 0) {
-            name = reportedName;
+            name.set(reportedName);
         }
         fireConnectionStateChanged(ConnectionState.CONNECTED, null);
     }
@@ -150,7 +153,7 @@ public class HelperBlePeripheral extends BlePeripheral {
             public void onEvent(String event, Map<String, Object> payload) {
                 String reportedName = Wire.str(payload, "name", null);
                 if (reportedName != null && reportedName.length() > 0) {
-                    name = reportedName;
+                    name.set(reportedName);
                 }
                 if (!out.isDone()) {
                     out.complete(HelperBlePeripheral.this);
@@ -272,21 +275,7 @@ public class HelperBlePeripheral extends BlePeripheral {
             final AsyncResource<byte[]> out) {
         backend.readCharacteristic(address,
                 c.getService().getUuid().toString(), c.getUuid().toString(),
-                new PendingOp() {
-                    public void onEvent(String event,
-                            Map<String, Object> payload) {
-                        if (!out.isDone()) {
-                            out.complete(Wire.decodeBase64(
-                                    Wire.str(payload, "value", "")));
-                        }
-                    }
-
-                    public void onFailure(BluetoothException failure) {
-                        if (!out.isDone()) {
-                            out.error(failure);
-                        }
-                    }
-                });
+                bytesOp(out));
     }
 
     protected void doWriteCharacteristic(GattCharacteristic c, byte[] value,
@@ -302,21 +291,7 @@ public class HelperBlePeripheral extends BlePeripheral {
         GattCharacteristic c = d.getCharacteristic();
         backend.readDescriptor(address,
                 c.getService().getUuid().toString(), c.getUuid().toString(),
-                d.getUuid().toString(), new PendingOp() {
-                    public void onEvent(String event,
-                            Map<String, Object> payload) {
-                        if (!out.isDone()) {
-                            out.complete(Wire.decodeBase64(
-                                    Wire.str(payload, "value", "")));
-                        }
-                    }
-
-                    public void onFailure(BluetoothException failure) {
-                        if (!out.isDone()) {
-                            out.error(failure);
-                        }
-                    }
-                });
+                d.getUuid().toString(), bytesOp(out));
     }
 
     protected void doWriteDescriptor(GattDescriptor d, byte[] value,
@@ -341,8 +316,8 @@ public class HelperBlePeripheral extends BlePeripheral {
         backend.readRssi(address, new PendingOp() {
             public void onEvent(String event, Map<String, Object> payload) {
                 int rssi = Wire.intVal(payload, "rssi", -127);
-                lastRssi = rssi;
-                rssiSeen = true;
+                lastRssi.set(rssi);
+                rssiSeen.set(true);
                 if (!out.isDone()) {
                     out.complete(Integer.valueOf(rssi));
                 }
@@ -355,8 +330,8 @@ public class HelperBlePeripheral extends BlePeripheral {
                 // the platform can't read live RSSI -- fall back to the
                 // last scan sighting when one exists
                 if (failure.getError() == BluetoothError.NOT_SUPPORTED
-                        && rssiSeen) {
-                    out.complete(Integer.valueOf(lastRssi));
+                        && rssiSeen.get()) {
+                    out.complete(Integer.valueOf(lastRssi.get()));
                 } else {
                     out.error(failure);
                 }
@@ -404,11 +379,33 @@ public class HelperBlePeripheral extends BlePeripheral {
         }
     }
 
-    private PendingOp booleanOp(final AsyncResource<Boolean> out) {
+    private static PendingOp booleanOp(final AsyncResource<Boolean> out) {
         return new PendingOp() {
             public void onEvent(String event, Map<String, Object> payload) {
                 if (!out.isDone()) {
                     out.complete(Boolean.TRUE);
+                }
+            }
+
+            public void onFailure(BluetoothException failure) {
+                if (!out.isDone()) {
+                    out.error(failure);
+                }
+            }
+        };
+    }
+
+    /**
+     * Completion that decodes a base64 "value" payload into the raw bytes of
+     * a characteristic/descriptor read. Static so it holds no reference to the
+     * enclosing peripheral.
+     */
+    private static PendingOp bytesOp(final AsyncResource<byte[]> out) {
+        return new PendingOp() {
+            public void onEvent(String event, Map<String, Object> payload) {
+                if (!out.isDone()) {
+                    out.complete(Wire.decodeBase64(
+                            Wire.str(payload, "value", "")));
                 }
             }
 

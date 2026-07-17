@@ -204,7 +204,7 @@ public abstract class NativeSubprocessTransport implements HelperTransport {
         try {
             return new String(b, off, end, "UTF-8");
         } catch (java.io.UnsupportedEncodingException e) {
-            throw new IllegalStateException("UTF-8 unavailable: " + e);
+            throw new IllegalStateException("UTF-8 is unavailable", e);
         }
     }
 
@@ -212,7 +212,7 @@ public abstract class NativeSubprocessTransport implements HelperTransport {
         try {
             return s.getBytes("UTF-8");
         } catch (java.io.UnsupportedEncodingException e) {
-            throw new IllegalStateException("UTF-8 unavailable: " + e);
+            throw new IllegalStateException("UTF-8 is unavailable", e);
         }
     }
 }
