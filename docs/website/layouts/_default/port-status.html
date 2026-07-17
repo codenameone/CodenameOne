@@ -1,0 +1,295 @@
+{{- define "main" -}}
+{{- $contract := site.Data.port_status -}}
+{{- $reports := site.Data.port_status_reports -}}
+{{- $supplement := site.Data.port_status_supplement -}}
+{{- $support := site.Data.port_status_support -}}
+{{- $environment := site.Data.port_status_environment -}}
+{{- $snapshotTime := now.UTC -}}
+<article class="post-single cn1-port-status" data-port-status>
+  <header class="post-header cn1-port-status__header">
+    {{ partial "breadcrumbs.html" . }}
+    <p class="cn1-port-status__eyebrow">Automated compliance report</p>
+    <h1 class="post-title entry-hint-parent">{{ .Title }}</h1>
+    <p class="cn1-port-status__intro">
+      Every row in the automated matrix is backed by one or more tests in the Codename One compliance test suite.
+      A check means every mapped test is successful in the latest available master report for that port.
+    </p>
+    <div class="cn1-port-status__facts" aria-label="Compliance contract size">
+      <span><strong>{{ len $contract.features }}</strong> features</span>
+      {{- $testCount := 0 -}}
+      {{- range $contract.features -}}{{- $testCount = add $testCount (len .tests) -}}{{- end -}}
+      <span><strong>{{ $testCount }}</strong> tests</span>
+      <span><strong>{{ len $contract.ports }}</strong> CI targets</span>
+      <span><strong>{{ len $supplement.features }}</strong> environment-dependent feature families</span>
+    </div>
+  </header>
+
+  <section class="cn1-port-status__notice" role="status">
+    Table snapshot generated
+    <time data-port-status-truth datetime="{{ $snapshotTime.Format "2006-01-02T15:04:05Z07:00" }}">{{ $snapshotTime.Format "2006-01-02 15:04 UTC" }}</time>.
+  </section>
+
+  <section class="cn1-port-status__deployment" data-deployment-support aria-labelledby="deployment-support-title">
+    <header>
+      <p class="cn1-port-status__eyebrow">Deployment support contract</p>
+      <h2 id="deployment-support-title">Supported platforms, architectures, and tested environments</h2>
+      <p>
+        The compliance matrix uses {{ len $contract.ports }} CI targets, not {{ len $contract.ports }} distinct platforms:
+        renderer and CPU variants have separate columns so regressions cannot hide behind a combined result.
+        A deployment floor means the toolchain can target that release. Runtime CI evidence is stated separately,
+        because compiling for an older release is not proof that the application was launched there.
+      </p>
+    </header>
+    <div class="cn1-port-status__support-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Platform</th>
+            <th scope="col">Architectures</th>
+            <th scope="col">Declared range</th>
+            <th scope="col">Runtime CI evidence</th>
+            <th scope="col">Floor evidence and limits</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{- range $support.deployment_support }}
+          <tr data-deployment-row="{{ .id }}">
+            <th scope="row"><strong>{{ .platform }}</strong><small>{{ .support }}</small></th>
+            <td>{{ .architectures }}</td>
+            <td>{{ .declared_range }}</td>
+            <td>{{ .ci_evidence }}</td>
+            <td>{{ .floor_evidence }}</td>
+          </tr>
+          {{- end }}
+        </tbody>
+      </table>
+    </div>
+    <section class="cn1-port-status__browsers" data-browser-evidence aria-labelledby="browser-evidence-title">
+      <h3 id="browser-evidence-title">JavaScript browser engines</h3>
+      <p>
+        Chromium runs the full visual compliance suite. The smaller nightly lifecycle check boots the same
+        generated application in all three major browser engines and records the exact engine version here.
+        A browser family is not assigned an old minimum version until that version is actually exercised.
+      </p>
+      <div class="cn1-port-status__browser-grid">
+        {{- range $environment.browsers }}
+        <article class="is-{{ .status }}" data-browser-result="{{ .id }}">
+          <h4>{{ .name }}</h4>
+          <p><strong>{{ .engine_version }}</strong></p>
+          <p>{{ .coverage }}</p>
+          <span>{{ cond (eq .status "pass") "Passed" (cond (eq .status "fail") "Failed" "Awaiting nightly evidence") }}</span>
+        </article>
+        {{- end }}
+      </div>
+    </section>
+  </section>
+
+  <section class="cn1-port-status__legend" aria-label="Status legend">
+    <span><i class="cn1-port-status__mark is-pass" aria-hidden="true">✓</i> Passed</span>
+    <span><i class="cn1-port-status__mark is-partial" aria-hidden="true">−</i> Partial or skipped</span>
+    <span><i class="cn1-port-status__mark is-fail" aria-hidden="true">×</i> Failed</span>
+    <span><i class="cn1-port-status__mark is-unknown" aria-hidden="true">?</i> No current report</span>
+  </section>
+
+  <section class="cn1-port-status__ports" aria-label="Latest port runs">
+    {{- range $contract.ports }}
+    {{- $report := index $reports .id -}}
+    {{- partial "port-status-port-state.html" (dict "port" . "report" $report "contract" $contract "now" $snapshotTime) -}}
+    {{- end }}
+  </section>
+
+  <div class="cn1-port-status__toolbar">
+    <label>
+      <span>Feature category</span>
+      <select data-category-filter>
+        <option value="">All categories</option>
+        {{- $categories := slice -}}
+        {{- range $contract.features -}}{{- $categories = $categories | append .category -}}{{- end -}}
+        {{- range (sort (uniq $categories)) }}
+        <option value="{{ . }}">{{ . }}</option>
+        {{- end }}
+      </select>
+    </label>
+    <label class="cn1-port-status__search">
+      <span>Find a feature or test</span>
+      <input type="search" data-feature-search placeholder="Graphics, maps, accessibility…">
+    </label>
+  </div>
+
+  <section class="cn1-port-status__matrix" aria-label="Port feature compliance matrix">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Feature</th>
+          {{- range $contract.ports }}
+          <th scope="col"><span>{{ .name }}</span></th>
+          {{- end }}
+        </tr>
+      </thead>
+      <tbody>
+        {{- range $contract.features }}
+        {{- $feature := . }}
+        <tr data-feature-row data-feature-id="{{ .id }}" data-category="{{ .category }}" data-search="{{ lower (printf "%s %s %s %s" .category .name .description (delimit .tests " ")) }}">
+          <th scope="row">
+            <span class="cn1-port-status__category">{{ .category }}</span>
+            <strong>{{ .name }}</strong>
+            <p>{{ .description }}</p>
+            <details>
+              <summary>{{ len .tests }} mapped {{ cond (eq (len .tests) 1) "test" "tests" }}</summary>
+              <ul>
+                {{- range (sort .tests) }}<li><code>{{ . }}</code></li>{{- end }}
+              </ul>
+            </details>
+          </th>
+          {{- range $contract.ports }}
+          {{- $report := index $reports .id -}}
+          {{- partial "port-status-feature-status.html" (dict "feature" $feature "port" . "report" $report "contract" $contract "now" $snapshotTime) -}}
+          {{- end }}
+        </tr>
+        {{- end }}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="cn1-port-status__errata" data-skip-errata aria-labelledby="skip-errata-title">
+    <h2 id="skip-errata-title">Skipped-test errata</h2>
+    <p>
+      A skip describes a limitation of the unattended test environment, not an unsupported Codename One port.
+      Every skipped result in the table is accounted for below.
+    </p>
+    <div class="cn1-port-status__errata-list">
+      {{- range $supplement.skip_reasons }}
+      {{- $erratum := . -}}
+      {{- $skippedPortNames := slice -}}
+      {{- range $contract.ports -}}
+        {{- $port := . -}}
+        {{- $report := index $reports .id -}}
+        {{- with $report -}}
+          {{- $result := index .tests $erratum.test -}}
+          {{- with $result -}}
+            {{- if eq .status "skip" -}}{{- $skippedPortNames = $skippedPortNames | append $port.name -}}{{- end -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+      {{- if gt (len $skippedPortNames) 0 }}
+      <article data-skip-erratum="{{ .test }}">
+        <h3><code>{{ .test }}</code></h3>
+        <p><strong>Skipped on:</strong> {{ delimit $skippedPortNames ", " }}.</p>
+        <p><strong>Why:</strong> {{ .reason }}</p>
+        <p><strong>Port support:</strong> {{ .platform_support }}</p>
+        <p><strong>How it is tested:</strong> {{ .verification }}</p>
+      </article>
+      {{- end }}
+      {{- end }}
+    </div>
+  </section>
+
+  <section class="cn1-port-status__manual" data-manual-coverage aria-labelledby="manual-coverage-title">
+    <header>
+      <p class="cn1-port-status__eyebrow">Environment-dependent coverage</p>
+      <h2 id="manual-coverage-title">Features verified outside the deterministic suite</h2>
+      <p>
+        These are the remaining platform-integration feature families whose decisive behavior depends on hardware,
+        permission UI, signing, store or provider accounts, external services, or an operating-system process.
+        Each row states how support is delivered, how it is verified, and why it cannot honestly be counted as a
+        deterministic result in the automated table above. An unavailable cell applies only to that integration;
+        it does not mean the Codename One port itself is unsupported.
+      </p>
+    </header>
+    <div class="cn1-port-status__legend" aria-label="Environment-dependent support legend">
+      <span><i class="cn1-port-status__mark is-supported" aria-hidden="true">✓</i> Supported backend</span>
+      <span><i class="cn1-port-status__mark is-conditional" aria-hidden="true">◐</i> Hardware, account, or configuration dependent</span>
+      <span><i class="cn1-port-status__mark is-fallback" aria-hidden="true">↪</i> Portable fallback</span>
+      <span><i class="cn1-port-status__mark is-unavailable" aria-hidden="true">—</i> No declared backend</span>
+    </div>
+    <div class="cn1-port-status__matrix cn1-port-status__matrix--manual" aria-label="Environment-dependent feature support matrix">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Feature and testing logic</th>
+            {{- range $contract.ports }}<th scope="col"><span>{{ .name }}</span></th>{{- end }}
+          </tr>
+        </thead>
+        <tbody>
+          {{- range $supplement.features }}
+          {{- $feature := . -}}
+          <tr data-manual-feature-row data-manual-feature-id="{{ .id }}">
+            <th scope="row">
+              <span class="cn1-port-status__category">{{ .category }}</span>
+              <strong>{{ .name }}</strong>
+              <p>{{ .description }}</p>
+              <details>
+                <summary>Testing logic and exclusion</summary>
+                <p><b>Verification:</b> {{ .testing }}</p>
+                <p><b>Why it is outside the suite:</b> {{ .why_not_automated }}</p>
+              </details>
+            </th>
+            {{- range $contract.ports -}}
+              {{- partial "port-status-manual-status.html" (dict "feature" $feature "port" .) -}}
+            {{- end -}}
+          </tr>
+          {{- end }}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="cn1-port-status__performance" data-performance-evidence aria-labelledby="performance-title">
+    <header>
+      <p class="cn1-port-status__eyebrow">Measured performance</p>
+      <h2 id="performance-title">{{ $support.benchmark.title }}</h2>
+      <p>
+        {{ $support.benchmark.configuration }}
+      </p>
+      <p>
+        {{ $support.benchmark.excluded_metrics }}
+      </p>
+    </header>
+    <div class="cn1-port-status__matrix cn1-port-status__matrix--performance" aria-label="Absolute port performance matrix">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Metric and workload</th>
+            {{- range $contract.ports }}<th scope="col"><span>{{ .name }}</span></th>{{- end }}
+          </tr>
+        </thead>
+        <tbody>
+          {{- range $support.benchmark.rows }}
+          {{- $benchmark := . -}}
+          <tr data-performance-row="{{ .id }}">
+            <th scope="row"><strong>{{ .name }}</strong><p>{{ .description }}</p><small>Best measured duration</small></th>
+            {{- range $contract.ports }}
+              {{- $report := index $reports .id -}}
+              <td data-performance-cell data-port="{{ .id }}" title="{{ .name }}: {{ $benchmark.name }} best measured duration">
+                {{- with $report -}}{{- with .performance -}}{{- with .benchmarks -}}{{- with (index . $benchmark.id) -}}
+                  {{- printf "%.2f ms" (div (float .duration_ns) 1000000.0) -}}
+                {{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}{{- else -}}Awaiting nightly{{- end -}}
+              </td>
+            {{- end }}
+          </tr>
+          {{- end }}
+        </tbody>
+      </table>
+    </div>
+    <p class="cn1-port-status__source-note">
+      <a href="https://github.com/codenameone/CodenameOne/blob/master/vm/benchmarks/common/src/main/java/com/bench/CommonWorkloads.java" target="_blank" rel="noopener">ParparVM common-workload benchmark source</a>
+    </p>
+  </section>
+
+  <footer class="cn1-port-status__method">
+    <h2>How to read this page</h2>
+    <p>
+      The feature-to-test map is checked into the repository. CI rejects a registered test or golden screenshot that is not mapped. Each port run stores normalized per-test results, and website CI writes the latest stored result directly into this table.
+    </p>
+    <p>
+      The browser makes no runtime report request. A website build uses the last stored result for ports that did not run, and the timestamp above identifies when this static table was assembled. A platform-specific skip is not a pass. An incomplete report is not a pass. Reports older than {{ $contract.stale_after_days }} days are marked stale.
+    </p>
+    <p>
+      The second matrix is a support inventory, not a synthetic pass/fail score. It records native backends, conditional integrations, portable fallbacks, and unavailable backends together with the verification method that is appropriate for each feature.
+    </p>
+    <p>
+      <a href="https://github.com/codenameone/CodenameOne/blob/master/docs/website/data/port_status.json" target="_blank" rel="noopener">Compliance feature contract</a>
+    </p>
+  </footer>
+</article>
+{{- end -}}

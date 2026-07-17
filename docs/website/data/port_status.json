@@ -1,0 +1,538 @@
+{
+  "schema_version": 1,
+  "report_directory": "docs/website/data/port_status_reports",
+  "stale_after_days": 14,
+  "performance_tests": ["CommonWorkloadBenchmarkTest"],
+  "performance_benchmarks": [
+    "intArithmetic",
+    "longArithmetic",
+    "mathTranscendental",
+    "arraySequential",
+    "arrayRandom",
+    "objectAllocation",
+    "hashMapChurn",
+    "stringBuilding",
+    "recursion",
+    "quicksort"
+  ],
+  "golden_directories": [
+    "scripts/android/screenshots",
+    "scripts/ios/screenshots",
+    "scripts/ios/screenshots-metal",
+    "scripts/ios/screenshots-watch",
+    "scripts/ios/screenshots-tv",
+    "scripts/mac-native/screenshots",
+    "scripts/javascript/screenshots",
+    "scripts/linux/screenshots",
+    "scripts/linux/screenshots-arm",
+    "scripts/windows/screenshots"
+  ],
+  "ports": [
+    {"id": "android", "name": "Android", "detail": "Android emulator, API 36", "workflow": "scripts-android.yml"},
+    {"id": "ios-gl", "name": "iOS (OpenGL)", "detail": "iOS Simulator, legacy renderer", "workflow": "scripts-ios.yml"},
+    {"id": "ios-metal", "name": "iOS (Metal)", "detail": "iOS Simulator, Metal renderer", "workflow": "scripts-ios.yml"},
+    {"id": "mac-native", "name": "macOS native", "detail": "Mac Catalyst native build", "workflow": "scripts-mac-native.yml"},
+    {"id": "javascript", "name": "Web", "detail": "JavaScript port in a headless browser", "workflow": "scripts-javascript.yml"},
+    {"id": "linux-x64", "name": "Linux x64", "detail": "Native GTK3/Cairo build", "workflow": "linux-build-run.yml"},
+    {"id": "linux-arm64", "name": "Linux ARM64", "detail": "Native GTK3/Cairo build", "workflow": "linux-build-run.yml"},
+    {"id": "windows-x64", "name": "Windows x64", "detail": "Native cross-compiled binary on Windows", "workflow": "windows-cross-build-run.yml"},
+    {"id": "windows-arm64", "name": "Windows ARM64", "detail": "Native ARM64 binary on Windows 11", "workflow": "parparvm-tests-windows.yml"},
+    {"id": "watchos", "name": "watchOS", "detail": "Apple Watch Simulator", "workflow": "scripts-ios.yml"},
+    {"id": "tvos", "name": "tvOS", "detail": "Apple TV Simulator", "workflow": "scripts-ios.yml"}
+  ],
+  "features": [
+    {
+      "id": "application-bootstrap",
+      "category": "Application runtime",
+      "name": "Application bootstrap and Java/Kotlin UI",
+      "description": "Starts the application and renders the shared Java and Kotlin UI paths.",
+      "tests": ["KotlinUiTest", "MainScreenScreenshotTest"]
+    },
+    {
+      "id": "ads",
+      "category": "Application runtime",
+      "name": "Advertising components",
+      "description": "Renders banner and native-ad content through the advertising API.",
+      "tests": ["AdsScreenshotTest"]
+    },
+    {
+      "id": "slide-cover-transitions",
+      "category": "Animation and navigation",
+      "name": "Slide and cover transitions",
+      "description": "Exercises horizontal, vertical, back, title, cover, and uncover transition frames.",
+      "tests": ["CoverHorizontalTransitionTest", "SlideFadeTitleTransitionTest", "SlideHorizontalBackTransitionTest", "SlideHorizontalTransitionTest", "SlideVerticalTransitionTest", "UncoverHorizontalTransitionTest"]
+    },
+    {
+      "id": "fade-flip-transitions",
+      "category": "Animation and navigation",
+      "name": "Fade and flip transitions",
+      "description": "Exercises deterministic fade and flip transition frames.",
+      "tests": ["FadeTransitionTest", "FlipTransitionTest"]
+    },
+    {
+      "id": "morph-transitions",
+      "category": "Animation and navigation",
+      "name": "Morph transitions",
+      "description": "Covers element morphing, scrolled sources, snapshots, and scrubbed morph timelines.",
+      "tests": ["MorphElementMorphScreenshotTest", "MorphTransitionScrolledSourceTest", "MorphTransitionScrubScreenshotTest", "MorphTransitionSnapshotTest", "MorphTransitionTest"]
+    },
+    {
+      "id": "layout-animation",
+      "category": "Animation and navigation",
+      "name": "Animated layout changes",
+      "description": "Checks layout, hierarchy, unlayout, replacement, and motion animation paths.",
+      "tests": ["AnimateHierarchyScreenshotTest", "AnimateLayoutScreenshotTest", "AnimateUnlayoutScreenshotTest", "ComponentReplaceFadeScreenshotTest", "ComponentReplaceFlipScreenshotTest", "ComponentReplaceSlideScreenshotTest", "MotionShowcaseScreenshotTest"]
+    },
+    {
+      "id": "scrolling-and-pull",
+      "category": "Animation and navigation",
+      "name": "Scrolling, sticky headers, and pull gestures",
+      "description": "Checks smooth scrolling, sticky-header transitions, pull-to-refresh, and tensile scrolling.",
+      "tests": ["PullToRefreshSpinnerScreenshotTest", "SmoothScrollScreenshotTest", "StickyHeaderFadeTransitionScreenshotTest", "StickyHeaderScreenshotTest", "StickyHeaderSlideTransitionScreenshotTest", "TensileBounceScreenshotTest"]
+    },
+    {
+      "id": "tabs-animation",
+      "category": "Animation and navigation",
+      "name": "Animated tab indicators",
+      "description": "Checks tab indicator animation independently of static tab layout.",
+      "tests": ["TabsAnimatedIndicatorScreenshotTest"]
+    },
+    {
+      "id": "status-bar-events",
+      "category": "Input and lifecycle",
+      "name": "Status-bar tap events",
+      "description": "Verifies delivery and visual handling of platform status-bar tap events.",
+      "tests": ["StatusBarTapDiagnosticScreenshotTest"]
+    },
+    {
+      "id": "graphics-primitives",
+      "category": "2D graphics",
+      "name": "Lines, rectangles, arcs, and polygons",
+      "description": "Draws and fills the core 2D graphics primitives.",
+      "tests": ["DrawArc", "DrawLine", "DrawRect", "DrawRoundRect", "FillArc", "FillPolygon", "FillRect", "FillRoundRect", "FillTriangle"]
+    },
+    {
+      "id": "graphics-text-images",
+      "category": "2D graphics",
+      "name": "Text and image drawing",
+      "description": "Checks text decoration, glyph rendering, image rectangles, and tiled images.",
+      "tests": ["DrawImage", "DrawString", "DrawStringDecorated", "TileImage"]
+    },
+    {
+      "id": "graphics-gradients-filters",
+      "category": "2D graphics",
+      "name": "Gradients and blur filters",
+      "description": "Checks basic and multi-stop gradients plus Gaussian blur.",
+      "tests": ["DrawGradient", "DrawGradientStops", "GaussianBlur"]
+    },
+    {
+      "id": "graphics-shapes-strokes",
+      "category": "2D graphics",
+      "name": "Shapes and strokes",
+      "description": "Checks paths, filled shapes, complex grids, and stroke rendering.",
+      "tests": ["DrawShape", "FillShape", "InscribedTriangleGrid", "StrokeTest"]
+    },
+    {
+      "id": "graphics-clipping",
+      "category": "2D graphics",
+      "name": "Clipping and dirty regions",
+      "description": "Checks empty, rotated, intersected, and partial-flush clip behavior.",
+      "tests": ["Clip", "ClipUnderRotation", "EmptyClip", "LargeStrokeDirtyClipTest", "PartialFlushClipEscape"]
+    },
+    {
+      "id": "graphics-2d-transforms",
+      "category": "2D graphics",
+      "name": "2D transforms",
+      "description": "Checks affine scaling, rotation, translation, and scale transforms.",
+      "tests": ["AffineScale", "Rotate", "Scale", "TransformRotation", "TransformTranslation"]
+    },
+    {
+      "id": "graphics-3d-transforms",
+      "category": "2D graphics",
+      "name": "Perspective and camera transforms",
+      "description": "Checks perspective projection and camera transform support.",
+      "tests": ["TransformCamera", "TransformPerspective"]
+    },
+    {
+      "id": "charts",
+      "category": "Data visualization",
+      "name": "Charts",
+      "description": "Renders line, bar, scatter, bubble, pie, radar, time, combined, and transformed charts.",
+      "tests": ["ChartBarScreenshotTest", "ChartBubbleScreenshotTest", "ChartCombinedXYScreenshotTest", "ChartCubicLineScreenshotTest", "ChartDoughnutScreenshotTest", "ChartLineScreenshotTest", "ChartPieScreenshotTest", "ChartRadarScreenshotTest", "ChartRangeBarScreenshotTest", "ChartRotatedScreenshotTest", "ChartScatterScreenshotTest", "ChartStackedBarScreenshotTest", "ChartTimeChartScreenshotTest", "ChartTransformScreenshotTest"]
+    },
+    {
+      "id": "embedded-web-content",
+      "category": "Rich components",
+      "name": "Browser, rich text, and code editor",
+      "description": "Checks embedded browser content, rich text rendering, and code editing.",
+      "tests": ["BrowserComponentScreenshotTest", "CodeEditorScreenshotTest", "RichTextAreaScreenshotTest"]
+    },
+    {
+      "id": "sheets",
+      "category": "Rich components",
+      "name": "Sheets",
+      "description": "Checks static sheets and slide-up sheet animation.",
+      "tests": ["SheetScreenshotTest", "SheetSlideUpAnimationScreenshotTest"]
+    },
+    {
+      "id": "chat-components",
+      "category": "Rich components",
+      "name": "Chat components",
+      "description": "Checks chat views, input controls, typing state, and light/dark appearance.",
+      "tests": ["ChatInputScreenshotTest", "ChatViewScreenshotTest"]
+    },
+    {
+      "id": "image-viewer-tabs-text",
+      "category": "Rich components",
+      "name": "Image viewer, tabs, and text alignment",
+      "description": "Checks image navigation, tab behavior, and text-area alignment states.",
+      "tests": ["ImageViewerNavigationScreenshotTest", "TabsScreenshotTest", "TextAreaAlignmentScreenshotTest"]
+    },
+    {
+      "id": "pickers-validation",
+      "category": "Input and lifecycle",
+      "name": "Pickers and validation",
+      "description": "Checks lightweight picker placement, cancellation, restoration, and validator integration.",
+      "tests": ["LightweightPickerButtonsScreenshotTest", "PickerCancelRestoreTest", "ValidatorLightweightPickerScreenshotTest"]
+    },
+    {
+      "id": "toast-notifications",
+      "category": "Rich components",
+      "name": "Toast notifications",
+      "description": "Checks placement and rendering of top-positioned toast notifications.",
+      "tests": ["ToastBarTopPositionScreenshotTest"]
+    },
+    {
+      "id": "native-theme-controls",
+      "category": "Themes and styling",
+      "name": "Native-theme controls",
+      "description": "Checks buttons, fields, check boxes, radio buttons, switches, pickers, toolbars, tabs, lists, and multi-buttons in light and dark themes.",
+      "tests": ["ButtonThemeScreenshotTest", "CheckBoxRadioThemeScreenshotTest", "ListThemeScreenshotTest", "MultiButtonThemeScreenshotTest", "PickerThemeScreenshotTest", "SwitchThemeScreenshotTest", "TabsThemeScreenshotTest", "TextFieldThemeScreenshotTest", "ToolbarThemeScreenshotTest"]
+    },
+    {
+      "id": "dialogs-and-labels",
+      "category": "Themes and styling",
+      "name": "Dialogs, labels, and action buttons",
+      "description": "Checks dialog title placement, interaction dialogs, app-review UI, floating actions, and span labels.",
+      "tests": ["AppReviewDialogScreenshotTest", "CenteredDialogTitleScreenshotTest", "CenteredInteractionDialogTitleScreenshotTest", "DialogThemeScreenshotTest", "FloatingActionButtonThemeScreenshotTest", "SpanLabelThemeScreenshotTest"]
+    },
+    {
+      "id": "theme-palette-css",
+      "category": "Themes and styling",
+      "name": "Theme palettes and CSS effects",
+      "description": "Checks light/dark showcases, palette overrides, CSS gradients, and CSS blur filters.",
+      "tests": ["CssFilterBlurScreenshotTest", "CssGradientsScreenshotTest", "DarkLightShowcaseThemeScreenshotTest", "PaletteOverrideThemeScreenshotTest"]
+    },
+    {
+      "id": "surfaces",
+      "category": "System surfaces",
+      "name": "System surfaces",
+      "description": "Checks surface rasterization, serialization, timelines, action dispatch, publication, and Android RemoteViews lowering.",
+      "tests": ["SurfacesActionDispatchTest", "SurfacesPublishTest", "SurfacesRasterizerScreenshotTest", "SurfacesRemoteViewsScreenshotTest", "SurfacesSerializerRoundTripTest", "SurfacesTimelineLogicTest"]
+    },
+    {
+      "id": "vector-maps",
+      "category": "Maps",
+      "name": "Vector maps",
+      "description": "Checks real map tiles, styles, markers, shapes, and the non-native fallback renderer.",
+      "tests": ["NativeMapFallbackScreenshotTest", "RealOsmVectorScreenshotTest", "VectorMapDarkStyleScreenshotTest", "VectorMapMarkersScreenshotTest", "VectorMapShapesScreenshotTest"]
+    },
+    {
+      "id": "native-web-maps",
+      "category": "Maps",
+      "name": "Native and web map providers",
+      "description": "Checks the Google map provider path when credentials and platform support are available.",
+      "tests": ["GoogleWebMapScreenshotTest"]
+    },
+    {
+      "id": "svg-lottie",
+      "category": "Media and graphics",
+      "name": "SVG and Lottie",
+      "description": "Checks static and animated SVG plus Lottie animation rendering.",
+      "tests": ["LottieAnimatedScreenshotTest", "SVGAnimatedScreenshotTest", "SVGStaticScreenshotTest"]
+    },
+    {
+      "id": "audio-media-playback",
+      "category": "Media and graphics",
+      "name": "Audio and media playback",
+      "description": "Checks media playback and the audio mixer API.",
+      "tests": ["AudioMixerApiTest", "MediaPlaybackScreenshotTest"]
+    },
+    {
+      "id": "gpu-3d",
+      "category": "Media and graphics",
+      "name": "GPU 3D",
+      "description": "Checks 3D cubes, textures, models, and animation through the GPU API.",
+      "tests": ["Gpu3DAnimationTest", "Gpu3DCubeScreenshotTest", "Gpu3DModelScreenshotTest", "Gpu3DTexturedCubeScreenshotTest"]
+    },
+    {
+      "id": "orientation",
+      "category": "Input and lifecycle",
+      "name": "Orientation locking",
+      "description": "Checks orientation changes and the rendered landscape state.",
+      "tests": ["OrientationLockScreenshotTest"]
+    },
+    {
+      "id": "text-input",
+      "category": "Input and lifecycle",
+      "name": "Native text input",
+      "description": "Checks in-place editing and device input APIs.",
+      "tests": ["DeviceInputApiTest", "InPlaceEditViewTest"]
+    },
+    {
+      "id": "bytecode-runtime",
+      "category": "Application runtime",
+      "name": "Bytecode translation and bridge transfers",
+      "description": "Checks translator regressions and guards bulk native-bridge transfers.",
+      "tests": ["BridgeBulkTransferGuardTest", "BytecodeTranslatorRegressionTest"]
+    },
+    {
+      "id": "simd",
+      "category": "Application runtime",
+      "name": "SIMD operations",
+      "description": "Checks SIMD correctness, benchmark execution, and large stack allocations.",
+      "tests": ["SimdApiTest", "SimdBenchmarkTest", "SimdLargeAllocaTest"]
+    },
+    {
+      "id": "java-standard-apis",
+      "category": "Application runtime",
+      "name": "Java standard APIs",
+      "description": "Checks streams, strings, time, monotonic time, floating-point conversion, and Java 17 language/runtime support.",
+      "tests": ["FloatingToStringTest", "Java17Tests", "NanoTimeApiTest", "StreamApiTest", "StringApiTest", "TimeApiTest"]
+    },
+    {
+      "id": "threading",
+      "category": "Application runtime",
+      "name": "Threading and EDT enforcement",
+      "description": "Checks background-thread UI access behavior.",
+      "tests": ["BackgroundThreadUiAccessTest"]
+    },
+    {
+      "id": "secure-storage-crypto",
+      "category": "Storage and security",
+      "name": "Secure storage and cryptography",
+      "description": "Checks encrypted storage and cryptographic APIs.",
+      "tests": ["CryptoApiTest", "SecureStorageTest"]
+    },
+    {
+      "id": "filesystem-storage",
+      "category": "Storage and security",
+      "name": "Filesystem error behavior",
+      "description": "Checks missing-file behavior for filesystem input streams.",
+      "tests": ["FileSystemStorageOpenInputStreamMissingTest"]
+    },
+    {
+      "id": "device-security-signals",
+      "category": "Storage and security",
+      "name": "VPN and call-state detection",
+      "description": "Checks platform VPN and call-detection APIs.",
+      "tests": ["CallDetectionAPITest", "VPNDetectionAPITest"]
+    },
+    {
+      "id": "notifications",
+      "category": "Input and lifecycle",
+      "name": "Local notifications",
+      "description": "Checks local-notification override behavior through the native bridge.",
+      "tests": ["LocalNotificationOverrideTest"]
+    },
+    {
+      "id": "native-base64",
+      "category": "Application runtime",
+      "name": "Native Base64 bridge",
+      "description": "Checks the native Base64 implementation and transfer performance.",
+      "tests": ["Base64NativePerformanceTest"]
+    },
+    {
+      "id": "accessibility",
+      "category": "Input and lifecycle",
+      "name": "Accessibility",
+      "description": "Checks accessibility roles, labels, state, and native exposure.",
+      "tests": ["AccessibilityTest"]
+    },
+    {
+      "id": "ar-motion-sensors",
+      "category": "Device APIs",
+      "name": "AR and motion sensors",
+      "description": "Checks augmented-reality and motion-sensor APIs.",
+      "tests": ["ARApiTest", "MotionSensorDeviceTest"]
+    },
+    {
+      "id": "camera-access",
+      "category": "Platform-dependent APIs",
+      "name": "Camera access",
+      "description": "Checks camera discovery and capture where hardware and runtime permissions are available.",
+      "tests": ["CameraApiTest"]
+    },
+    {
+      "id": "mutable-images",
+      "category": "Media and graphics",
+      "name": "Mutable image readback",
+      "description": "Checks image pixel readback with and without active clips.",
+      "tests": ["MutableImageClipReadbackTest", "MutableImageReadbackTest"]
+    },
+    {
+      "id": "desktop-mode",
+      "category": "Desktop integration",
+      "name": "Desktop mode",
+      "description": "Checks desktop-mode layout and native menu integration.",
+      "tests": ["DesktopModeScreenshotTest"]
+    },
+    {
+      "id": "video-decoding",
+      "category": "Media and graphics",
+      "name": "Video frame decoding",
+      "description": "Checks decoded video frames.",
+      "tests": ["VideoIODecodedFramesScreenshotTest"]
+    },
+    {
+      "id": "video-round-trip",
+      "category": "Platform-dependent APIs",
+      "name": "Video encode/decode round trip",
+      "description": "Checks end-to-end video encoding and decoding where the platform provides an encoder.",
+      "tests": ["VideoIORoundTripTest"]
+    },
+    {
+      "id": "immersive-media",
+      "category": "Media and graphics",
+      "name": "VR and 360-degree media",
+      "description": "Checks stereo VR scenes and interactive 360-degree media rendering.",
+      "tests": ["Media360PanoramaScreenshotTest", "VRStereoSceneScreenshotTest"]
+    }
+  ],
+  "screenshot_mappings": [
+    {"pattern": "kotlin", "test": "KotlinUiTest"},
+    {"pattern": "MainActivity", "test": "MainScreenScreenshotTest"},
+    {"pattern": "AdsScreen", "test": "AdsScreenshotTest"},
+    {"pattern": "SlideHorizontalTransitionTest", "test": "SlideHorizontalTransitionTest"},
+    {"pattern": "SlideHorizontalBackTransitionTest", "test": "SlideHorizontalBackTransitionTest"},
+    {"pattern": "SlideVerticalTransitionTest", "test": "SlideVerticalTransitionTest"},
+    {"pattern": "SlideFadeTitleTransitionTest", "test": "SlideFadeTitleTransitionTest"},
+    {"pattern": "CoverHorizontalTransitionTest", "test": "CoverHorizontalTransitionTest"},
+    {"pattern": "UncoverHorizontalTransitionTest", "test": "UncoverHorizontalTransitionTest"},
+    {"pattern": "FadeTransitionTest", "test": "FadeTransitionTest"},
+    {"pattern": "FlipTransitionTest", "test": "FlipTransitionTest"},
+    {"pattern": "MorphTransitionTest", "test": "MorphTransitionTest"},
+    {"pattern": "MorphTransitionScrolledSourceTest", "test": "MorphTransitionScrolledSourceTest"},
+    {"pattern": "MorphTransitionSnapshotTest", "test": "MorphTransitionSnapshotTest"},
+    {"pattern": "MorphTransitionScrubScreenshotTest", "test": "MorphTransitionScrubScreenshotTest"},
+    {"pattern": "MorphElementMorphScreenshotTest", "test": "MorphElementMorphScreenshotTest"},
+    {"pattern": "TabsAnimatedIndicatorScreenshotTest", "test": "TabsAnimatedIndicatorScreenshotTest"},
+    {"pattern": "PullToRefreshSpinnerScreenshotTest", "test": "PullToRefreshSpinnerScreenshotTest"},
+    {"pattern": "AnimateLayoutScreenshotTest", "test": "AnimateLayoutScreenshotTest"},
+    {"pattern": "AnimateHierarchyScreenshotTest", "test": "AnimateHierarchyScreenshotTest"},
+    {"pattern": "AnimateUnlayoutScreenshotTest", "test": "AnimateUnlayoutScreenshotTest"},
+    {"pattern": "SmoothScrollScreenshotTest", "test": "SmoothScrollScreenshotTest"},
+    {"pattern": "StickyHeaderScreenshotTest", "test": "StickyHeaderScreenshotTest"},
+    {"pattern": "StickyHeaderSlideTransitionScreenshotTest", "test": "StickyHeaderSlideTransitionScreenshotTest"},
+    {"pattern": "StickyHeaderFadeTransitionScreenshotTest", "test": "StickyHeaderFadeTransitionScreenshotTest"},
+    {"pattern": "TensileBounceScreenshotTest", "test": "TensileBounceScreenshotTest"},
+    {"pattern": "StatusBarTapDiagnosticScreenshotTest", "test": "StatusBarTapDiagnosticScreenshotTest"},
+    {"pattern": "ComponentReplaceFadeScreenshotTest", "test": "ComponentReplaceFadeScreenshotTest"},
+    {"pattern": "ComponentReplaceSlideScreenshotTest", "test": "ComponentReplaceSlideScreenshotTest"},
+    {"pattern": "ComponentReplaceFlipScreenshotTest", "test": "ComponentReplaceFlipScreenshotTest"},
+    {"pattern": "MotionShowcaseScreenshotTest", "test": "MotionShowcaseScreenshotTest"},
+    {"pattern": "graphics-draw-line*", "test": "DrawLine"},
+    {"pattern": "graphics-fill-rect*", "test": "FillRect"},
+    {"pattern": "graphics-draw-rect*", "test": "DrawRect"},
+    {"pattern": "graphics-fill-round-rect*", "test": "FillRoundRect"},
+    {"pattern": "graphics-draw-round-rect*", "test": "DrawRoundRect"},
+    {"pattern": "graphics-fill-arc*", "test": "FillArc"},
+    {"pattern": "graphics-draw-arc*", "test": "DrawArc"},
+    {"pattern": "graphics-draw-string-decorated*", "test": "DrawStringDecorated"},
+    {"pattern": "graphics-draw-string", "test": "DrawString"},
+    {"pattern": "graphics-draw-string-direct-*", "test": "DrawString"},
+    {"pattern": "graphics-draw-string-image-*", "test": "DrawString"},
+    {"pattern": "graphics-draw-image-rect*", "test": "DrawImage"},
+    {"pattern": "graphics-draw-gradient-stops*", "test": "DrawGradientStops"},
+    {"pattern": "graphics-draw-gradient", "test": "DrawGradient"},
+    {"pattern": "graphics-draw-gradient-direct-*", "test": "DrawGradient"},
+    {"pattern": "graphics-draw-gradient-image-*", "test": "DrawGradient"},
+    {"pattern": "graphics-gaussian-blur*", "test": "GaussianBlur"},
+    {"pattern": "graphics-fill-polygon*", "test": "FillPolygon"},
+    {"pattern": "graphics-affine-scale*", "test": "AffineScale"},
+    {"pattern": "graphics-scale*", "test": "Scale"},
+    {"pattern": "graphics-fill-triangle*", "test": "FillTriangle"},
+    {"pattern": "graphics-draw-shape*", "test": "DrawShape"},
+    {"pattern": "graphics-fill-shape*", "test": "FillShape"},
+    {"pattern": "graphics-inscribed-triangle-grid*", "test": "InscribedTriangleGrid"},
+    {"pattern": "graphics-stroke-test*", "test": "StrokeTest"},
+    {"pattern": "graphics-clip-under-rotation*", "test": "ClipUnderRotation"},
+    {"pattern": "graphics-clip", "test": "Clip"},
+    {"pattern": "graphics-clip-direct-*", "test": "Clip"},
+    {"pattern": "graphics-clip-image-*", "test": "Clip"},
+    {"pattern": "graphics-empty-clip", "test": "EmptyClip"},
+    {"pattern": "graphics-partial-flush-clip-escape", "test": "PartialFlushClipEscape"},
+    {"pattern": "graphics-tile-image*", "test": "TileImage"},
+    {"pattern": "graphics-rotate*", "test": "Rotate"},
+    {"pattern": "graphics-transform-translation*", "test": "TransformTranslation"},
+    {"pattern": "graphics-transform-rotation*", "test": "TransformRotation"},
+    {"pattern": "graphics-transform-perspective*", "test": "TransformPerspective"},
+    {"pattern": "graphics-transform-camera*", "test": "TransformCamera"},
+    {"pattern": "graphics-large-stroke-dirty-clip", "test": "LargeStrokeDirtyClipTest"},
+    {"pattern": "chart-line", "test": "ChartLineScreenshotTest"},
+    {"pattern": "chart-cubic-line", "test": "ChartCubicLineScreenshotTest"},
+    {"pattern": "chart-bar", "test": "ChartBarScreenshotTest"},
+    {"pattern": "chart-bar-stacked", "test": "ChartStackedBarScreenshotTest"},
+    {"pattern": "chart-range-bar", "test": "ChartRangeBarScreenshotTest"},
+    {"pattern": "chart-scatter", "test": "ChartScatterScreenshotTest"},
+    {"pattern": "chart-bubble", "test": "ChartBubbleScreenshotTest"},
+    {"pattern": "chart-pie", "test": "ChartPieScreenshotTest"},
+    {"pattern": "chart-doughnut", "test": "ChartDoughnutScreenshotTest"},
+    {"pattern": "chart-radar", "test": "ChartRadarScreenshotTest"},
+    {"pattern": "chart-time", "test": "ChartTimeChartScreenshotTest"},
+    {"pattern": "chart-combined-xy", "test": "ChartCombinedXYScreenshotTest"},
+    {"pattern": "chart-transform", "test": "ChartTransformScreenshotTest"},
+    {"pattern": "chart-rotated-pie", "test": "ChartRotatedScreenshotTest"},
+    {"pattern": "BrowserComponent", "test": "BrowserComponentScreenshotTest"},
+    {"pattern": "RichTextArea", "test": "RichTextAreaScreenshotTest"},
+    {"pattern": "CodeEditor", "test": "CodeEditorScreenshotTest"},
+    {"pattern": "MediaPlayback", "test": "MediaPlaybackScreenshotTest"},
+    {"pattern": "Sheet", "test": "SheetScreenshotTest"},
+    {"pattern": "SheetSlideUpAnimationScreenshotTest", "test": "SheetSlideUpAnimationScreenshotTest"},
+    {"pattern": "ChatView_*", "test": "ChatViewScreenshotTest"},
+    {"pattern": "ChatInput_*", "test": "ChatInputScreenshotTest"},
+    {"pattern": "ImageViewerNavigationModes", "test": "ImageViewerNavigationScreenshotTest"},
+    {"pattern": "TabsBehavior", "test": "TabsScreenshotTest"},
+    {"pattern": "TextAreaAlignmentStates", "test": "TextAreaAlignmentScreenshotTest"},
+    {"pattern": "ValidatorLightweightPicker", "test": "ValidatorLightweightPickerScreenshotTest"},
+    {"pattern": "LightweightPickerButtons*", "test": "LightweightPickerButtonsScreenshotTest"},
+    {"pattern": "ToastBarTopPosition", "test": "ToastBarTopPositionScreenshotTest"},
+    {"pattern": "ButtonTheme_*", "test": "ButtonThemeScreenshotTest"},
+    {"pattern": "TextFieldTheme_*", "test": "TextFieldThemeScreenshotTest"},
+    {"pattern": "CheckBoxRadioTheme_*", "test": "CheckBoxRadioThemeScreenshotTest"},
+    {"pattern": "SwitchTheme_*", "test": "SwitchThemeScreenshotTest"},
+    {"pattern": "PickerTheme_*", "test": "PickerThemeScreenshotTest"},
+    {"pattern": "ToolbarTheme_*", "test": "ToolbarThemeScreenshotTest"},
+    {"pattern": "TabsTheme_*", "test": "TabsThemeScreenshotTest"},
+    {"pattern": "MultiButtonTheme_*", "test": "MultiButtonThemeScreenshotTest"},
+    {"pattern": "ListTheme_*", "test": "ListThemeScreenshotTest"},
+    {"pattern": "DialogTheme_*", "test": "DialogThemeScreenshotTest"},
+    {"pattern": "CenteredDialogTitle_*", "test": "CenteredDialogTitleScreenshotTest"},
+    {"pattern": "CenteredInteractionDialogTitle_*", "test": "CenteredInteractionDialogTitleScreenshotTest"},
+    {"pattern": "AppReviewDialog", "test": "AppReviewDialogScreenshotTest"},
+    {"pattern": "FloatingActionButtonTheme_*", "test": "FloatingActionButtonThemeScreenshotTest"},
+    {"pattern": "SpanLabelTheme_*", "test": "SpanLabelThemeScreenshotTest"},
+    {"pattern": "ShowcaseTheme_*", "test": "DarkLightShowcaseThemeScreenshotTest"},
+    {"pattern": "PaletteOverrideTheme_*", "test": "PaletteOverrideThemeScreenshotTest"},
+    {"pattern": "css-gradients", "test": "CssGradientsScreenshotTest"},
+    {"pattern": "SurfacesRasterizer", "test": "SurfacesRasterizerScreenshotTest"},
+    {"pattern": "RealOsmVector", "test": "RealOsmVectorScreenshotTest"},
+    {"pattern": "VectorMapDarkStyle", "test": "VectorMapDarkStyleScreenshotTest"},
+    {"pattern": "VectorMapMarkers", "test": "VectorMapMarkersScreenshotTest"},
+    {"pattern": "VectorMapShapes", "test": "VectorMapShapesScreenshotTest"},
+    {"pattern": "NativeMapFallback", "test": "NativeMapFallbackScreenshotTest"},
+    {"pattern": "GoogleWebMap", "test": "GoogleWebMapScreenshotTest"},
+    {"pattern": "SVGStatic", "test": "SVGStaticScreenshotTest"},
+    {"pattern": "SVGAnimatedScreenshotTest", "test": "SVGAnimatedScreenshotTest"},
+    {"pattern": "LottieAnimatedScreenshotTest", "test": "LottieAnimatedScreenshotTest"},
+    {"pattern": "Gpu3DCube", "test": "Gpu3DCubeScreenshotTest"},
+    {"pattern": "Gpu3DTexturedCube", "test": "Gpu3DTexturedCubeScreenshotTest"},
+    {"pattern": "Gpu3DModel", "test": "Gpu3DModelScreenshotTest"},
+    {"pattern": "Gpu3DAnimation", "test": "Gpu3DAnimationTest"},
+    {"pattern": "landscape", "test": "OrientationLockScreenshotTest"},
+    {"pattern": "DesktopMode", "test": "DesktopModeScreenshotTest"},
+    {"pattern": "VideoIODecodedFrames", "test": "VideoIODecodedFramesScreenshotTest"},
+    {"pattern": "VRStereoScene", "test": "VRStereoSceneScreenshotTest"},
+    {"pattern": "Media360Panorama", "test": "Media360PanoramaScreenshotTest"}
+  ]
+}

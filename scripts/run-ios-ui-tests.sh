@@ -1077,6 +1077,10 @@ fi
 COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
 SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"
 COMMENT_FILE="$SCREENSHOT_TMP_DIR/screenshot-comment.md"
+export CN1SS_PORT_ID="${CN1SS_PORT_ID:-ios-gl}"
+export CN1SS_SUITE_LOG="$TEST_LOG"
+export CN1SS_SUITE_LOG_2="$FALLBACK_LOG"
+export CN1SS_BINARY_PATH="$APP_BUNDLE_PATH"
 
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 # All four of these are tunable from the caller so the Metal job can post

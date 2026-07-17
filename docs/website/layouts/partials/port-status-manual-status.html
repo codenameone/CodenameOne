@@ -1,0 +1,22 @@
+{{- $feature := .feature -}}
+{{- $port := .port -}}
+{{- $state := "unavailable" -}}
+{{- $mark := "—" -}}
+{{- $label := "No declared backend" -}}
+{{- $detail := "No coverage entry is registered." -}}
+{{- range $feature.coverage -}}
+  {{- if in .ports $port.id -}}
+    {{- $state = .state -}}
+    {{- $label = .label -}}
+    {{- $detail = .detail -}}
+  {{- end -}}
+{{- end -}}
+{{- if eq $state "supported" -}}{{- $mark = "✓" -}}{{- end -}}
+{{- if eq $state "conditional" -}}{{- $mark = "◐" -}}{{- end -}}
+{{- if eq $state "fallback" -}}{{- $mark = "↪" -}}{{- end -}}
+{{- $tooltip := printf "%s: %s — %s. %s" $port.name $feature.name $label $detail -}}
+<td data-manual-feature-cell data-port="{{ $port.id }}" data-feature="{{ $feature.id }}" class="is-{{ $state }}" title="{{ $tooltip }}">
+  <span class="cn1-port-status__mark is-{{ $state }}" aria-hidden="true">{{ $mark }}</span>
+  <small>{{ $label }}</small>
+  <span class="screen-reader-text">{{ $tooltip }}</span>
+</td>

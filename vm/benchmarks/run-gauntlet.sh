@@ -20,7 +20,8 @@ mkdir -p target/host-classes target/bin
 # FusedTest uses @com.codename1.annotations.Fused -- supply the annotation
 # source for the host compile (ParparVM's JavaAPI carries its own copy)
 "$J8/bin/javac" -nowarn -encoding UTF-8 -d target/host-classes \
-    ../../CodenameOne/src/com/codename1/annotations/Fused.java src/com/bench/*.java
+    ../../CodenameOne/src/com/codename1/annotations/Fused.java \
+    common/src/main/java/com/bench/CommonWorkloads.java src/com/bench/*.java
 
 fail=0
 for t in $TORTURES; do

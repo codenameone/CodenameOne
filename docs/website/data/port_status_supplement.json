@@ -1,0 +1,287 @@
+{
+  "skip_reasons": [
+    {
+      "test": "CameraApiTest",
+      "reason": "The unattended runner cannot respond to operating-system camera permission prompts or provide stable physical-camera input. The test therefore avoids opening a real session on targets where doing so could hang CI or produce nondeterministic frames.",
+      "platform_support": "A skipped camera test does not mean the Codename One port is unsupported. Every listed target remains a supported port; camera availability is a separate runtime capability and depends on the device, permissions, and camera backend.",
+      "verification": "The native camera implementations are compiled in their port builds and exercised with granted permissions on real hardware or an interactive browser. Deterministic API assertions use the synthetic camera backend outside this portability table."
+    },
+    {
+      "test": "VideoIORoundTripTest",
+      "reason": "This assertion requires a working video encoder as well as a decoder. Apple simulator and constrained-device runners do not expose a stable encoder to the headless job, so the encode/decode round trip is skipped there.",
+      "platform_support": "The port remains supported. Video playback and frame decoding are measured separately by VideoIODecodedFramesScreenshotTest; this skip is limited to creating a new encoded video in that CI environment.",
+      "verification": "Encoder-backed targets run the full counting-frame and audio round trip. Apple media playback and decoding are covered separately, while device-only recording is verified in signed hardware builds."
+    }
+  ],
+  "features": [
+    {
+      "id": "real-camera-capture",
+      "category": "Hardware and permissions",
+      "name": "Real camera and media capture",
+      "description": "Live preview, still capture, and device camera selection through the native camera backend.",
+      "testing": "Build each native backend, then run permission-granted capture checks on hardware or an interactive browser and verify a real frame and saved image.",
+      "why_not_automated": "A headless portability run cannot accept consent dialogs, guarantee a camera device, or compare nondeterministic sensor frames.",
+      "coverage": [
+        {"ports": ["android"], "state": "supported", "label": "CameraX", "detail": "Native CameraX backend; runtime permission and hardware required."},
+        {"ports": ["ios-gl", "ios-metal", "mac-native"], "state": "supported", "label": "AVFoundation", "detail": "Native AVFoundation backend; signed build, entitlement, permission, and camera hardware required."},
+        {"ports": ["javascript"], "state": "conditional", "label": "MediaDevices", "detail": "Browser mediaDevices backend when the page is secure and the user grants access."},
+        {"ports": ["linux-x64", "linux-arm64"], "state": "conditional", "label": "Native camera", "detail": "Native desktop camera backend when a compatible host camera is available."},
+        {"ports": ["windows-x64", "windows-arm64"], "state": "conditional", "label": "Media Foundation", "detail": "Native Media Foundation camera backend when the host exposes a camera."},
+        {"ports": ["watchos", "tvos"], "state": "unavailable", "label": "No camera", "detail": "The target form factor does not expose a Codename One camera-capture backend."}
+      ]
+    },
+    {
+      "id": "microphone-recording",
+      "category": "Hardware and permissions",
+      "name": "Microphone and live audio recording",
+      "description": "Audio capture from a physical microphone through the platform media stack.",
+      "testing": "Use a signed permission-granted build, record a calibrated tone or voice sample, and verify duration, level, and playback on the target device.",
+      "why_not_automated": "Hosted runners do not provide consistent microphones and operating systems deliberately require interactive consent.",
+      "coverage": [
+        {"ports": ["android", "ios-gl", "ios-metal", "mac-native"], "state": "supported", "label": "Native recorder", "detail": "Native media recorder with runtime permission and physical input."},
+        {"ports": ["javascript"], "state": "conditional", "label": "Browser capture", "detail": "Available through browser media capture on a secure origin after consent."},
+        {"ports": ["linux-x64", "linux-arm64", "windows-x64", "windows-arm64"], "state": "conditional", "label": "Host audio", "detail": "Available when the native desktop media stack exposes an input device."},
+        {"ports": ["watchos", "tvos"], "state": "unavailable", "label": "No suite backend", "detail": "No general-purpose Codename One recording backend is declared for this target."}
+      ]
+    },
+    {
+      "id": "ar-motion-hardware",
+      "category": "Hardware and permissions",
+      "name": "Live AR and physical motion sensors",
+      "description": "AR sessions plus accelerometer, gyroscope, and other readings from real hardware.",
+      "testing": "Run the AR or sensor sample on supported hardware, verify session startup and sensor updates, and compare motion against a controlled physical action.",
+      "why_not_automated": "Simulators do not provide a real camera pose, AR runtime, or reproducible physical movement; the automated row checks API contracts and unsupported fallbacks instead.",
+      "coverage": [
+        {"ports": ["android"], "state": "conditional", "label": "ARCore / sensors", "detail": "Available on compatible devices with the required vendor services and sensors."},
+        {"ports": ["ios-gl", "ios-metal"], "state": "conditional", "label": "ARKit / sensors", "detail": "Available on compatible iPhone or iPad hardware."},
+        {"ports": ["watchos"], "state": "conditional", "label": "Motion sensors", "detail": "Motion sensing is form-factor dependent; general AR sessions are not applicable."},
+        {"ports": ["javascript"], "state": "conditional", "label": "Browser sensors", "detail": "Browser sensor APIs depend on browser policy, secure context, consent, and hardware."},
+        {"ports": ["mac-native", "linux-x64", "linux-arm64", "windows-x64", "windows-arm64", "tvos"], "state": "unavailable", "label": "Fallback contract", "detail": "The portable API reports that no live AR or motion backend is present."}
+      ]
+    },
+    {
+      "id": "location-geofencing",
+      "category": "Device services",
+      "name": "Location, background location, and geofencing",
+      "description": "Foreground fixes, monitored regions, and background location delivery.",
+      "testing": "Install a signed build, grant the appropriate permission level, feed known routes or physically cross a geofence, and verify foreground and background callbacks.",
+      "why_not_automated": "The result depends on user permission, GPS/radio state, operating-system scheduling, and physical movement outside the hosted runner.",
+      "coverage": [
+        {"ports": ["android", "ios-gl", "ios-metal"], "state": "supported", "label": "Native location", "detail": "Native foreground and background location subject to OS permissions and policy."},
+        {"ports": ["mac-native", "watchos"], "state": "conditional", "label": "Apple location", "detail": "Available where the target and entitlement expose Core Location behavior."},
+        {"ports": ["javascript"], "state": "conditional", "label": "Geolocation", "detail": "Foreground browser geolocation on a secure origin after consent; background behavior is browser-limited."},
+        {"ports": ["linux-x64", "linux-arm64", "windows-x64", "windows-arm64", "tvos"], "state": "unavailable", "label": "No declared backend", "detail": "No complete location and geofencing backend is declared for this portability target."}
+      ]
+    },
+    {
+      "id": "push-notifications",
+      "category": "Cloud and OS services",
+      "name": "Remote push notifications",
+      "description": "Registration, token delivery, background receipt, actions, and badges through platform push services.",
+      "testing": "Use a signed app and real provider credentials, register a device, send from the push service, and verify foreground, background, and launch delivery.",
+      "why_not_automated": "Push requires certificates or provider keys, an externally reachable service, a uniquely registered installation, and asynchronous OS delivery.",
+      "coverage": [
+        {"ports": ["android"], "state": "supported", "label": "FCM", "detail": "Firebase Cloud Messaging with app credentials and notification permission."},
+        {"ports": ["ios-gl", "ios-metal"], "state": "supported", "label": "APNs", "detail": "Apple Push Notification service with signing entitlements and permission."},
+        {"ports": ["javascript"], "state": "conditional", "label": "Web Push", "detail": "Supported by compatible browsers on HTTPS with service-worker and provider setup."},
+        {"ports": ["mac-native"], "state": "conditional", "label": "Apple entitlement", "detail": "Depends on the signed macOS target and its notification entitlements."},
+        {"ports": ["linux-x64", "linux-arm64", "windows-x64", "windows-arm64", "watchos", "tvos"], "state": "unavailable", "label": "No standalone backend", "detail": "No current standalone Codename One remote-push backend is declared for this target."}
+      ]
+    },
+    {
+      "id": "in-app-purchases",
+      "category": "Store services",
+      "name": "In-app purchases and subscriptions",
+      "description": "Store product lookup, checkout, receipt restore, subscription state, and management UI.",
+      "testing": "Create sandbox products, sign with a store account, complete purchase and restore flows, and validate receipts against the store or Commerce backend.",
+      "why_not_automated": "The flow requires store-side product configuration, signed identities, sandbox accounts, payment UI, and mutable server receipt state.",
+      "coverage": [
+        {"ports": ["android"], "state": "supported", "label": "Play Billing", "detail": "Google Play purchase and subscription flow in a store-installed build."},
+        {"ports": ["ios-gl", "ios-metal"], "state": "supported", "label": "StoreKit", "detail": "Apple StoreKit purchase, restore, and subscription flow."},
+        {"ports": ["mac-native"], "state": "conditional", "label": "StoreKit", "detail": "Requires a signed Mac App Store configuration and matching products."},
+        {"ports": ["javascript", "linux-x64", "linux-arm64", "windows-x64", "windows-arm64", "watchos", "tvos"], "state": "unavailable", "label": "No store adapter", "detail": "No standalone Codename One store-purchase adapter is declared for this target."}
+      ]
+    },
+    {
+      "id": "contacts-calendar",
+      "category": "Personal data",
+      "name": "Contacts and calendar integration",
+      "description": "Read or select contacts and create platform calendar entries through protected personal-data APIs.",
+      "testing": "Populate a device test account, grant access, exercise read/select/write operations, and verify the result in the native contacts or calendar application.",
+      "why_not_automated": "Access is permission-gated and the expected result lives in private user databases and native UI outside the test process.",
+      "coverage": [
+        {"ports": ["android", "ios-gl", "ios-metal"], "state": "supported", "label": "Native stores", "detail": "Native contacts and calendar services after the user grants access."},
+        {"ports": ["mac-native"], "state": "conditional", "label": "Apple services", "detail": "Availability depends on the macOS target, entitlement, and user account."},
+        {"ports": ["javascript", "linux-x64", "linux-arm64", "windows-x64", "windows-arm64", "watchos", "tvos"], "state": "unavailable", "label": "No portable store", "detail": "The target does not expose a complete Codename One personal-data backend."}
+      ]
+    },
+    {
+      "id": "biometrics",
+      "category": "Security hardware",
+      "name": "Biometric authentication and protected secrets",
+      "description": "Fingerprint, face, or iris authentication bound to platform keystore material.",
+      "testing": "Enroll biometrics on hardware, run success, cancellation, lockout, and enrollment-change cases, and verify protected-secret invalidation.",
+      "why_not_automated": "Hosted runners have no enrolled biometric hardware and native prompts are intentionally controlled by the user and secure hardware.",
+      "coverage": [
+        {"ports": ["android"], "state": "supported", "label": "BiometricPrompt", "detail": "Android BiometricPrompt or legacy fingerprint support, backed by Android Keystore."},
+        {"ports": ["ios-gl", "ios-metal"], "state": "supported", "label": "LocalAuthentication", "detail": "Face ID or Touch ID through LocalAuthentication and Keychain."},
+        {"ports": ["mac-native", "javascript", "linux-x64", "linux-arm64", "windows-x64", "windows-arm64", "watchos", "tvos"], "state": "unavailable", "label": "NOT_AVAILABLE", "detail": "The portable API returns its documented non-supporting fallback."}
+      ]
+    },
+    {
+      "id": "nfc",
+      "category": "Security hardware",
+      "name": "NFC tags, smart cards, and host card emulation",
+      "description": "NDEF read/write, tag technology exchange, and platform-dependent card emulation.",
+      "testing": "Present known physical tags and cards, verify payloads and errors, and use a certified reader for host-card-emulation exchanges.",
+      "why_not_automated": "NFC requires short-range hardware, physical tags or readers, user presentation, and platform entitlements that hosted runners lack.",
+      "coverage": [
+        {"ports": ["android"], "state": "supported", "label": "Android NFC", "detail": "NDEF, tag technologies, and HCE on compatible hardware."},
+        {"ports": ["ios-gl", "ios-metal"], "state": "conditional", "label": "Core NFC", "detail": "NDEF and selected tag technologies; HCE is restricted by iOS version and region."},
+        {"ports": ["mac-native", "javascript", "linux-x64", "linux-arm64", "windows-x64", "windows-arm64", "watchos", "tvos"], "state": "unavailable", "label": "NOT_AVAILABLE", "detail": "The API returns its documented non-supporting fallback."}
+      ]
+    },
+    {
+      "id": "bluetooth-le",
+      "category": "Security hardware",
+      "name": "Bluetooth Low Energy",
+      "description": "Peripheral discovery, connection, services, characteristics, notifications, and writes through the maintained Bluetooth library.",
+      "testing": "Use a known peripheral or protocol simulator, scan and connect, then verify characteristic reads, writes, notifications, reconnects, and permission denial.",
+      "why_not_automated": "Radio state, nearby peripherals, pairing, permissions, and timing are external to the deterministic screenshot runner.",
+      "coverage": [
+        {"ports": ["android", "ios-gl", "ios-metal"], "state": "conditional", "label": "cn1-bluetooth", "detail": "Maintained native library backend on supported phone and tablet hardware."},
+        {"ports": ["mac-native", "linux-x64", "linux-arm64", "windows-x64", "windows-arm64"], "state": "conditional", "label": "Host-dependent", "detail": "Desktop hardware support depends on the selected maintained library backend and host adapter."},
+        {"ports": ["javascript", "watchos", "tvos"], "state": "unavailable", "label": "No declared backend", "detail": "No maintained general-purpose Bluetooth backend is declared for this target."}
+      ]
+    },
+    {
+      "id": "background-execution",
+      "category": "Lifecycle and scheduling",
+      "name": "Background fetch and long-running device work",
+      "description": "Operating-system scheduled callbacks and policy-compliant work while the application is not foregrounded.",
+      "testing": "Install a signed build, configure the required modes, background or terminate it, and observe callbacks across OS throttling and restart scenarios.",
+      "why_not_automated": "Scheduling is deliberately nondeterministic, power-policy controlled, entitlement dependent, and often takes longer than a CI job window.",
+      "coverage": [
+        {"ports": ["android", "ios-gl", "ios-metal"], "state": "supported", "label": "Native scheduler", "detail": "Platform background mechanisms subject to OS quotas, permissions, and lifecycle policy."},
+        {"ports": ["mac-native"], "state": "conditional", "label": "Target-dependent", "detail": "Availability depends on the macOS application mode and signed capabilities."},
+        {"ports": ["javascript", "linux-x64", "linux-arm64", "windows-x64", "windows-arm64", "watchos", "tvos"], "state": "unavailable", "label": "No equivalent contract", "detail": "No equivalent Codename One background-fetch contract is declared for this target."}
+      ]
+    },
+    {
+      "id": "device-integrity",
+      "category": "Security services",
+      "name": "Root, jailbreak, and hardware-backed attestation",
+      "description": "Runtime compromise signals plus signed Play Integrity or App Attest tokens.",
+      "testing": "Use release-like signed builds, compromised and clean devices, fresh server nonces, and backend verification of vendor-signed verdicts.",
+      "why_not_automated": "Trust verdicts depend on hardware-backed keys, store-distributed builds, vendor services, device state, and an application backend.",
+      "coverage": [
+        {"ports": ["android"], "state": "conditional", "label": "Play Integrity", "detail": "Root signals and optional Google Play Integrity when enabled and verified by a backend."},
+        {"ports": ["ios-gl", "ios-metal"], "state": "conditional", "label": "App Attest", "detail": "Jailbreak signals and optional Apple App Attest when enabled and verified by a backend."},
+        {"ports": ["mac-native", "javascript", "linux-x64", "linux-arm64", "windows-x64", "windows-arm64", "watchos", "tvos"], "state": "unavailable", "label": "Unsupported fallback", "detail": "No hardware-backed Codename One attestation backend is declared for this target."}
+      ]
+    },
+    {
+      "id": "document-gallery-pickers",
+      "category": "Native UI and data",
+      "name": "Document, gallery, and native file pickers",
+      "description": "User-mediated selection of media and documents from platform-owned providers.",
+      "testing": "Seed platform storage, launch the native picker, select and cancel items, and verify temporary URI or security-scoped access after returning to the app.",
+      "why_not_automated": "The decisive UI and permissions belong to another process, and hosted runners do not share an identical populated media or document library.",
+      "coverage": [
+        {"ports": ["android", "ios-gl", "ios-metal", "mac-native", "javascript", "linux-x64", "linux-arm64", "windows-x64", "windows-arm64"], "state": "conditional", "label": "Native picker", "detail": "Uses the target's file, document, or browser picker; available types and access rules vary by OS."},
+        {"ports": ["watchos", "tvos"], "state": "unavailable", "label": "No general picker", "detail": "The form factor has no general-purpose Codename One document/gallery picker."}
+      ]
+    },
+    {
+      "id": "sharing-communications",
+      "category": "Native UI and data",
+      "name": "Share sheets, email, SMS, dialing, and external URLs",
+      "description": "Hand-off to platform applications and user-selected communication targets.",
+      "testing": "Open each native chooser or handler on a configured device, complete and cancel actions, and verify returned result metadata where the OS supplies it.",
+      "why_not_automated": "Installed applications, accounts, SIM capability, chooser UI, and user selection are outside the app process and differ per runner.",
+      "coverage": [
+        {"ports": ["android", "ios-gl", "ios-metal"], "state": "supported", "label": "Native intents", "detail": "Native share and communication handlers when the device has a matching service."},
+        {"ports": ["mac-native", "javascript", "linux-x64", "linux-arm64", "windows-x64", "windows-arm64"], "state": "conditional", "label": "OS/browser handler", "detail": "Uses an installed desktop handler, browser capability, or portable fallback where available."},
+        {"ports": ["watchos", "tvos"], "state": "unavailable", "label": "Form-factor limited", "detail": "No general-purpose Codename One communication chooser is declared for this target."}
+      ]
+    },
+    {
+      "id": "native-app-review",
+      "category": "Store services",
+      "name": "Native in-app review prompt",
+      "description": "Store-owned rating prompt with a portable Codename One fallback sheet.",
+      "testing": "Use a store-eligible build and account, request the prompt under vendor quota rules, and verify fallback behavior separately.",
+      "why_not_automated": "Apple and Google intentionally decide whether the native prompt appears, so a request cannot deterministically assert visible store UI.",
+      "coverage": [
+        {"ports": ["android"], "state": "supported", "label": "Play Review", "detail": "Google Play In-App Review when the build includes the service."},
+        {"ports": ["ios-gl", "ios-metal"], "state": "supported", "label": "StoreKit", "detail": "StoreKit review request subject to Apple's display quota."},
+        {"ports": ["mac-native", "javascript", "linux-x64", "linux-arm64", "windows-x64", "windows-arm64", "watchos", "tvos"], "state": "fallback", "label": "Portable fallback", "detail": "Codename One shows its built-in rating sheet when no native prompt is available."}
+      ]
+    },
+    {
+      "id": "live-maps",
+      "category": "External providers",
+      "name": "Live native and web map providers",
+      "description": "Provider tiles, credentials, native peers, gestures, and network-delivered map content.",
+      "testing": "Use valid provider keys on a networked device, load known coordinates, exercise gestures and markers, and confirm provider attribution and fallback behavior.",
+      "why_not_automated": "Provider keys are secrets, map imagery changes independently, usage may be billed, and native peers or network tiles are not deterministic pixels.",
+      "coverage": [
+        {"ports": ["android", "ios-gl", "ios-metal"], "state": "conditional", "label": "Native provider", "detail": "Native provider when configured, with the portable map renderer as fallback."},
+        {"ports": ["javascript"], "state": "conditional", "label": "Web provider", "detail": "Browser map provider with API key and network access, plus portable fallback."},
+        {"ports": ["mac-native", "linux-x64", "linux-arm64", "windows-x64", "windows-arm64", "watchos", "tvos"], "state": "fallback", "label": "Portable map", "detail": "Portable vector or tile rendering is used when no native provider is active."}
+      ]
+    },
+    {
+      "id": "live-ad-networks",
+      "category": "External providers",
+      "name": "Live advertising networks",
+      "description": "Real provider SDK initialization, inventory requests, consent, click-through, and revenue callbacks.",
+      "testing": "Use provider test-unit identifiers in a signed build, complete consent flows, and verify fill, impression, click, and lifecycle callbacks.",
+      "why_not_automated": "Ad inventory, consent state, provider accounts, network policy, and SDK UI are external and nondeterministic; the first table uses deterministic mock ads.",
+      "coverage": [
+        {"ports": ["android", "ios-gl", "ios-metal"], "state": "conditional", "label": "Provider SDK", "detail": "Supported through configured native ad libraries and provider test units."},
+        {"ports": ["javascript"], "state": "conditional", "label": "Web integration", "detail": "Depends on the selected web advertising integration and hosting policy."},
+        {"ports": ["mac-native", "linux-x64", "linux-arm64", "windows-x64", "windows-arm64", "watchos", "tvos"], "state": "fallback", "label": "Mock/custom", "detail": "The portable ad component can be tested with mock or application-provided content; no bundled live network is claimed."}
+      ]
+    },
+    {
+      "id": "external-surfaces-os",
+      "category": "OS presentation",
+      "name": "Widgets, Live Activities, and OS-owned surfaces",
+      "description": "The final operating-system presentation of shared surface documents outside the main app window.",
+      "testing": "Install the correctly signed app or extension, publish timelines and actions, then inspect the launcher, lock screen, Dynamic Island, notification area, or desktop host.",
+      "why_not_automated": "The first table checks serialization, rasterization, timelines, and dispatch, but the final surface is rendered by a separate OS process with signing and entitlement requirements.",
+      "coverage": [
+        {"ports": ["android"], "state": "supported", "label": "Widgets/notifications", "detail": "Lowers supported surfaces to Android widgets and ongoing notifications."},
+        {"ports": ["ios-gl", "ios-metal"], "state": "conditional", "label": "WidgetKit/ActivityKit", "detail": "Requires supported OS versions, extension packaging, and entitlements."},
+        {"ports": ["mac-native", "linux-x64", "linux-arm64"], "state": "conditional", "label": "Desktop surface", "detail": "Uses the desktop floating-window or preview presentation available to the port."},
+        {"ports": ["windows-x64", "windows-arm64"], "state": "conditional", "label": "Windows surfaces", "detail": "Floating widgets are supported; Widgets Board integration requires MSIX and Windows App SDK packaging."},
+        {"ports": ["javascript"], "state": "fallback", "label": "In-app preview", "detail": "Portable document and rasterizer behavior is available without an OS widget host."},
+        {"ports": ["watchos", "tvos"], "state": "unavailable", "label": "No declared lowering", "detail": "No standalone Codename One external-surface lowering is declared for this target."}
+      ]
+    },
+    {
+      "id": "assistive-technology",
+      "category": "OS presentation",
+      "name": "Real screen-reader and assistive-technology behavior",
+      "description": "How native accessibility services announce, focus, activate, and navigate the rendered application.",
+      "testing": "Enable the platform screen reader, traverse representative forms, verify announcements and actions, and repeat with dynamic content and input devices.",
+      "why_not_automated": "The first table validates semantics and API state, while the final speech, focus order, gestures, and switch-control behavior belong to external OS services.",
+      "coverage": [
+        {"ports": ["android", "ios-gl", "ios-metal", "mac-native", "javascript", "linux-x64", "linux-arm64", "windows-x64", "windows-arm64"], "state": "conditional", "label": "OS assistive tech", "detail": "Semantic output is consumed by the screen reader or accessibility stack available on that OS."},
+        {"ports": ["watchos", "tvos"], "state": "conditional", "label": "Form-factor service", "detail": "Behavior depends on the target's accessibility service and navigation model."}
+      ]
+    },
+    {
+      "id": "packaging-native-integration",
+      "category": "Build integration",
+      "name": "Signing, packaging, entitlements, and native SDK integration",
+      "description": "Production artifacts, platform metadata, native interfaces, third-party SDKs, and architecture-specific binaries.",
+      "testing": "Compile each architecture, inspect the generated package, sign with platform credentials, install it, and exercise the integrated native entry point or SDK in its target environment.",
+      "why_not_automated": "These checks happen before app startup or require private signing identities, store portals, proprietary SDK credentials, and platform-specific source rather than one shared runtime assertion.",
+      "coverage": [
+        {"ports": ["android", "ios-gl", "ios-metal", "mac-native", "javascript", "linux-x64", "linux-arm64", "windows-x64", "windows-arm64", "watchos", "tvos"], "state": "supported", "label": "Target build", "detail": "The port has its own build, packaging, and native-integration path; exact signing and extension capabilities are target specific."}
+      ]
+    }
+  ]
+}

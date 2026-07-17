@@ -1,0 +1,547 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+.cn1-port-status {
+    --cn1-status-border: color-mix(in srgb, var(--primary) 16%, transparent);
+    max-width: 1500px;
+}
+
+.cn1-port-status .screen-reader-text {
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+}
+
+.cn1-port-status__header {
+    max-width: 900px;
+}
+
+.cn1-port-status__eyebrow,
+.cn1-port-status__category {
+    color: #e7652a;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.cn1-port-status__intro {
+    color: var(--secondary);
+    font-size: 1.08rem;
+    line-height: 1.7;
+    margin-top: 1rem;
+    max-width: 800px;
+}
+
+.cn1-port-status__facts,
+.cn1-port-status__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem 1.25rem;
+    margin-top: 1.25rem;
+}
+
+.cn1-port-status__facts span {
+    background: var(--entry);
+    border: 1px solid var(--cn1-status-border);
+    border-radius: 999px;
+    padding: .45rem .8rem;
+}
+
+.cn1-port-status__notice {
+    background: color-mix(in srgb, #27955b 12%, var(--entry));
+    border: 1px solid color-mix(in srgb, #27955b 45%, transparent);
+    border-radius: 12px;
+    margin: 1.5rem 0 0;
+    padding: .8rem 1rem;
+}
+
+.cn1-port-status__notice.is-error {
+    background: color-mix(in srgb, #c38a20 12%, var(--entry));
+    border-color: color-mix(in srgb, #c38a20 45%, transparent);
+}
+
+.cn1-port-status__deployment,
+.cn1-port-status__performance {
+    margin-top: 2.25rem;
+}
+
+.cn1-port-status__deployment > header,
+.cn1-port-status__performance > header {
+    max-width: 980px;
+}
+
+.cn1-port-status__deployment h2,
+.cn1-port-status__performance h2 {
+    margin-bottom: .6rem;
+}
+
+.cn1-port-status__deployment > header > p:last-child,
+.cn1-port-status__performance > header > p:last-child,
+.cn1-port-status__browsers > p,
+.cn1-port-status__performance > p {
+    color: var(--secondary);
+    line-height: 1.65;
+}
+
+.cn1-port-status__support-table {
+    border: 1px solid var(--cn1-status-border);
+    border-radius: 12px;
+    margin-top: 1rem;
+    overflow-x: auto;
+}
+
+.cn1-port-status__support-table table {
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: .82rem;
+    margin: 0;
+    min-width: 1050px;
+    width: 100%;
+}
+
+.cn1-port-status__support-table th,
+.cn1-port-status__support-table td {
+    border-bottom: 1px solid var(--cn1-status-border);
+    border-right: 1px solid var(--cn1-status-border);
+    line-height: 1.5;
+    padding: .75rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+.cn1-port-status__support-table thead th {
+    background: var(--entry);
+    font-size: .72rem;
+}
+
+.cn1-port-status__support-table tbody th {
+    min-width: 145px;
+}
+
+.cn1-port-status__support-table tbody th small {
+    color: var(--secondary);
+    display: block;
+    font-weight: 400;
+    margin-top: .2rem;
+}
+
+.cn1-port-status__support-table tr:last-child th,
+.cn1-port-status__support-table tr:last-child td {
+    border-bottom: 0;
+}
+
+.cn1-port-status__support-table th:last-child,
+.cn1-port-status__support-table td:last-child {
+    border-right: 0;
+}
+
+.cn1-port-status__browsers {
+    margin-top: 1.5rem;
+}
+
+.cn1-port-status__browsers h3,
+.cn1-port-status__performance h3 {
+    font-size: 1.05rem;
+    margin-bottom: .4rem;
+}
+
+.cn1-port-status__browser-grid,
+.cn1-port-status__benchmark-grid {
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    margin-top: 1rem;
+}
+
+.cn1-port-status__browser-grid article,
+.cn1-port-status__benchmark-grid article {
+    background: var(--entry);
+    border: 1px solid var(--cn1-status-border);
+    border-left: 4px solid #7d8791;
+    border-radius: 10px;
+    padding: .85rem;
+}
+
+.cn1-port-status__browser-grid article.is-pass { border-left-color: #27955b; }
+.cn1-port-status__browser-grid article.is-fail { border-left-color: #d24c4c; }
+.cn1-port-status__browser-grid article.is-pending { border-left-color: #c38a20; }
+
+.cn1-port-status__browser-grid h4 {
+    font-size: .95rem;
+    margin: 0;
+}
+
+.cn1-port-status__browser-grid p {
+    color: var(--secondary);
+    font-size: .75rem;
+    line-height: 1.4;
+    margin: .35rem 0;
+}
+
+.cn1-port-status__browser-grid article > span {
+    font-size: .72rem;
+    font-weight: 700;
+}
+
+.cn1-port-status__benchmark-grid {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    margin-bottom: 1.5rem;
+}
+
+.cn1-port-status__benchmark-grid article {
+    border-left-color: #3976c5;
+}
+
+.cn1-port-status__benchmark-grid strong {
+    display: block;
+    font-size: 1.15rem;
+}
+
+.cn1-port-status__benchmark-grid span {
+    color: var(--secondary);
+    font-size: .72rem;
+}
+
+.cn1-port-status__support-table--metrics table {
+    min-width: 680px;
+}
+
+.cn1-port-status__source-note {
+    font-size: .82rem;
+}
+
+.cn1-port-status__legend {
+    color: var(--secondary);
+    font-size: .86rem;
+    margin-bottom: 1.25rem;
+}
+
+.cn1-port-status__legend span {
+    align-items: center;
+    display: inline-flex;
+    gap: .4rem;
+}
+
+.cn1-port-status__mark {
+    align-items: center;
+    border: 2px solid currentColor;
+    border-radius: 5px;
+    display: inline-flex;
+    font-size: .83rem;
+    font-style: normal;
+    font-weight: 800;
+    height: 1.35rem;
+    justify-content: center;
+    line-height: 1;
+    width: 1.35rem;
+}
+
+.cn1-port-status__mark.is-pass { color: #27955b; }
+.cn1-port-status__mark.is-fail { color: #d24c4c; }
+.cn1-port-status__mark.is-partial,
+.cn1-port-status__mark.is-stale { color: #c38a20; }
+.cn1-port-status__mark.is-unknown { color: #7d8791; }
+.cn1-port-status__mark.is-supported { color: #27955b; }
+.cn1-port-status__mark.is-conditional { color: #c38a20; }
+.cn1-port-status__mark.is-fallback { color: #3976c5; }
+.cn1-port-status__mark.is-unavailable { color: #7d8791; }
+
+.cn1-port-status__ports {
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    margin: 1.25rem 0 1.75rem;
+}
+
+.cn1-port-card {
+    background: var(--entry);
+    border: 1px solid var(--cn1-status-border);
+    border-left: 4px solid #7d8791;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    min-height: 150px;
+    padding: 1rem;
+}
+
+.cn1-port-card.is-pass { border-left-color: #27955b; }
+.cn1-port-card.is-fail { border-left-color: #d24c4c; }
+.cn1-port-card.is-partial { border-left-color: #c38a20; }
+
+.cn1-port-card h2 {
+    font-size: 1rem;
+    margin: 0;
+}
+
+.cn1-port-card p {
+    color: var(--secondary);
+    font-size: .78rem;
+    line-height: 1.45;
+    margin: .25rem 0 0;
+}
+
+.cn1-port-card .cn1-port-card__state {
+    color: var(--primary);
+    font-size: .86rem;
+    font-weight: 700;
+    margin-top: auto;
+    padding-top: .8rem;
+}
+
+.cn1-port-status__toolbar {
+    align-items: end;
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: minmax(180px, .45fr) minmax(240px, 1fr);
+    margin-bottom: 1rem;
+}
+
+.cn1-port-status__toolbar label span {
+    display: block;
+    font-size: .78rem;
+    font-weight: 700;
+    margin-bottom: .3rem;
+}
+
+.cn1-port-status__toolbar input,
+.cn1-port-status__toolbar select {
+    background: var(--entry);
+    border: 1px solid var(--cn1-status-border);
+    border-radius: 9px;
+    color: var(--primary);
+    font: inherit;
+    padding: .65rem .75rem;
+    width: 100%;
+}
+
+.cn1-port-status__matrix {
+    border: 1px solid var(--cn1-status-border);
+    border-radius: 12px;
+}
+
+.cn1-port-status__matrix table {
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: .85rem;
+    margin: 0;
+    min-width: 1220px;
+    width: 100%;
+}
+
+.cn1-port-status__matrix th,
+.cn1-port-status__matrix td {
+    border-bottom: 1px solid var(--cn1-status-border);
+    border-right: 1px solid var(--cn1-status-border);
+    padding: .7rem;
+}
+
+.cn1-port-status__matrix thead th {
+    background: var(--entry);
+    box-shadow: 0 1px 0 var(--cn1-status-border);
+    font-size: .72rem;
+    position: sticky;
+    text-align: center;
+    top: 0;
+    z-index: 2;
+}
+
+.cn1-port-status__matrix thead th:first-child,
+.cn1-port-status__matrix tbody th {
+    left: 0;
+    position: sticky;
+    text-align: left;
+    width: 330px;
+    z-index: 1;
+}
+
+.cn1-port-status__matrix thead th:first-child {
+    z-index: 3;
+}
+
+.cn1-port-status__matrix tbody th {
+    background: var(--theme);
+    font-weight: 400;
+}
+
+.cn1-port-status__matrix tbody th strong {
+    display: block;
+    font-size: .9rem;
+    margin-top: .15rem;
+}
+
+.cn1-port-status__matrix tbody th p {
+    color: var(--secondary);
+    font-size: .76rem;
+    line-height: 1.45;
+    margin: .25rem 0;
+}
+
+.cn1-port-status__matrix details {
+    color: var(--secondary);
+    font-size: .72rem;
+}
+
+.cn1-port-status__matrix details ul {
+    margin: .4rem 0 0;
+    max-height: 180px;
+    overflow: auto;
+    padding-left: 1.1rem;
+}
+
+.cn1-port-status__matrix td {
+    min-width: 82px;
+    text-align: center;
+}
+
+.cn1-port-status__matrix td.is-pass { background: color-mix(in srgb, #27955b 8%, transparent); }
+.cn1-port-status__matrix td.is-fail { background: color-mix(in srgb, #d24c4c 9%, transparent); }
+.cn1-port-status__matrix td.is-partial,
+.cn1-port-status__matrix td.is-stale { background: color-mix(in srgb, #c38a20 9%, transparent); }
+
+.cn1-port-status__errata,
+.cn1-port-status__manual {
+    margin-top: 2.25rem;
+}
+
+.cn1-port-status__errata > p,
+.cn1-port-status__manual > header {
+    color: var(--secondary);
+    line-height: 1.65;
+    max-width: 900px;
+}
+
+.cn1-port-status__errata-list {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    margin-top: 1rem;
+}
+
+.cn1-port-status__errata-list article {
+    background: var(--entry);
+    border: 1px solid var(--cn1-status-border);
+    border-left: 4px solid #c38a20;
+    border-radius: 12px;
+    padding: 1.1rem;
+}
+
+.cn1-port-status__errata-list h3 {
+    font-size: 1rem;
+    margin: 0 0 .65rem;
+}
+
+.cn1-port-status__errata-list p {
+    color: var(--secondary);
+    font-size: .84rem;
+    line-height: 1.55;
+    margin: .45rem 0;
+}
+
+.cn1-port-status__manual > header h2 {
+    color: var(--primary);
+    margin-bottom: .6rem;
+}
+
+.cn1-port-status__matrix--manual table {
+    min-width: 1320px;
+}
+
+.cn1-port-status__matrix--performance {
+    margin-top: 1rem;
+}
+
+.cn1-port-status__matrix--performance table {
+    min-width: 1320px;
+}
+
+.cn1-port-status__matrix--performance tbody th small {
+    color: var(--secondary);
+    display: block;
+    font-size: .68rem;
+    margin-top: .35rem;
+}
+
+.cn1-port-status__matrix--performance td {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+}
+
+.cn1-port-status__matrix--manual td small {
+    color: var(--secondary);
+    display: block;
+    font-size: .64rem;
+    line-height: 1.25;
+    margin-top: .35rem;
+}
+
+.cn1-port-status__matrix--manual td.is-supported {
+    background: color-mix(in srgb, #27955b 8%, transparent);
+}
+
+.cn1-port-status__matrix--manual td.is-conditional {
+    background: color-mix(in srgb, #c38a20 9%, transparent);
+}
+
+.cn1-port-status__matrix--manual td.is-fallback {
+    background: color-mix(in srgb, #3976c5 9%, transparent);
+}
+
+.cn1-port-status__matrix--manual td.is-unavailable {
+    background: color-mix(in srgb, #7d8791 7%, transparent);
+}
+
+.cn1-port-status__method {
+    background: var(--entry);
+    border: 1px solid var(--cn1-status-border);
+    border-radius: 12px;
+    margin-top: 1.5rem;
+    padding: 1.25rem;
+}
+
+.cn1-port-status__method h2 {
+    font-size: 1.1rem;
+    margin: 0 0 .6rem;
+}
+
+.cn1-port-status__method p {
+    color: var(--secondary);
+    font-size: .86rem;
+    line-height: 1.65;
+    margin: .5rem 0;
+}
+
+@media (max-width: 720px) {
+    .cn1-port-status__toolbar {
+        grid-template-columns: 1fr;
+    }
+
+    .cn1-port-status__matrix thead th:first-child,
+    .cn1-port-status__matrix tbody th {
+        width: 260px;
+    }
+}

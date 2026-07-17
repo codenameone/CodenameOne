@@ -386,6 +386,65 @@ print(sum(1 for r in results if isinstance(r, dict) and r.get("status") == "miss
 PY
 }
 
+# Write the machine-readable report consumed by /port-status/. Callers opt in
+# with CN1SS_PORT_ID and provide up to three suite logs. Screenshot comparison
+# results come from the same JSON that drives the strict golden gate below.
+cn1ss_generate_port_status() {
+  local compare_json="$1"
+  local artifacts_dir="$2"
+  if [ -z "${CN1SS_PORT_ID:-}" ]; then
+    return 0
+  fi
+
+  local script_dir repo_root status_script python_bin output run_url binary_size
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  repo_root="$(cd "$script_dir/../.." && pwd)"
+  status_script="$repo_root/scripts/hellocodenameone/conformance/port_status.py"
+  python_bin="${CN1SS_PYTHON_BIN:-python3}"
+  output="$artifacts_dir/port-status-${CN1SS_PORT_ID}.json"
+  run_url="${GITHUB_RUN_URL:-}"
+  if [ -z "$run_url" ] && [ -n "${GITHUB_SERVER_URL:-}" ] && [ -n "${GITHUB_REPOSITORY:-}" ] && [ -n "${GITHUB_RUN_ID:-}" ]; then
+    run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+  fi
+
+  if ! command -v "$python_bin" >/dev/null 2>&1; then
+    cn1ss_log "FATAL: Cannot generate port status: $python_bin is unavailable"
+    return 19
+  fi
+  if [ ! -f "$status_script" ]; then
+    cn1ss_log "FATAL: Cannot generate port status: $status_script is missing"
+    return 19
+  fi
+
+  local -a args=(
+    "$status_script" normalize
+    --port "$CN1SS_PORT_ID"
+    --compare "$compare_json"
+    --output "$output"
+    --run-url "$run_url"
+    --commit "${GITHUB_SHA:-}"
+  )
+  local log_var log_path
+  for log_var in CN1SS_SUITE_LOG CN1SS_SUITE_LOG_2 CN1SS_SUITE_LOG_3; do
+    log_path="${!log_var:-}"
+    if [ -n "$log_path" ]; then
+      args+=(--log "$log_path")
+    fi
+  done
+  binary_size="${CN1SS_BINARY_SIZE_BYTES:-}"
+  if [ -z "$binary_size" ] && [ -n "${CN1SS_BINARY_PATH:-}" ] && [ -e "$CN1SS_BINARY_PATH" ]; then
+    binary_size="$($python_bin -c 'from pathlib import Path; import sys; p=Path(sys.argv[1]); print(p.stat().st_size if p.is_file() else sum(f.stat().st_size for f in p.rglob("*") if f.is_file()))' "$CN1SS_BINARY_PATH")"
+  fi
+  if [ -n "$binary_size" ]; then
+    args+=(--binary-size "$binary_size")
+  fi
+  if ! "$python_bin" "${args[@]}"; then
+    cn1ss_log "FATAL: Failed to generate normalized port status for $CN1SS_PORT_ID"
+    return 19
+  fi
+  cn1ss_log "Wrote normalized port status to $output"
+}
+
 # Shared function to generate report, compare screenshots, and post PR comment
 cn1ss_process_and_report() {
   local platform_title="$1"
@@ -498,6 +557,11 @@ cn1ss_process_and_report() {
   if [ -s "$comment_out" ]; then
     cp -f "$comment_out" "$artifacts_dir/screenshot-comment.md" 2>/dev/null || true
   fi
+
+  cn1ss_generate_port_status "$compare_json_out" "$artifacts_dir" || {
+    local port_status_rc=$?
+    return "$port_status_rc"
+  }
 
   cn1ss_log "STAGE:COMMENT_POST -> Submitting PR feedback"
   local comment_rc=0
