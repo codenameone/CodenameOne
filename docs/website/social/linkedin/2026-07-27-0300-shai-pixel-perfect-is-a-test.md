@@ -1,5 +1,5 @@
 ---
-title: "Shai: pixel perfect needs a test"
+title: "Shai: own your pixels"
 slug: 2026-07-27-0300-shai-pixel-perfect-is-a-test
 platform: linkedin
 account: shai
@@ -11,12 +11,12 @@ status: draft
 image: /blog/pixel-perfect-is-a-test.jpg
 ---
 
-We do not use UIKit or Material widgets for the Codename One UI. We paint the UI ourselves.
+An OS update can change the UIKit, SwiftUI, Compose, or Material widgets in an app you already shipped. The platform owns those widget implementations.
 
-That gives us control over every pixel. It also means “pixel perfect” cannot be a slogan.
+Codename One statically links its lightweight UI into the native app. The screen you test stays that way until you decide to change it.
 
-This week we built native iOS and Android reference apps, captured real controls, and made CI compare our themes against them. Pixels, geometry, and fixed animation frames all get separate checks. A one-way gate stops a known result from quietly getting worse.
+The price is that we do not inherit a new iOS or Android look for free. This week we built native reference apps and made CI compare our themes against them. PR #5274 alone changed 1,147 files. It covers pixels, geometry, glass backgrounds, and fixed animation frames.
 
-The current iOS tab bar still has the lowest score. Full-app visual review is still missing from the automated layer. I would rather publish those limits than hide them behind a 95% median.
+That is work we take on so you can work on your app instead of working for the Apple and Google design teams. You adopt their new look on your schedule, without giving them control of your shipped UI.
 
 Full write-up: {{canonical}}

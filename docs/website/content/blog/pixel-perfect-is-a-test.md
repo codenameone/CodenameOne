@@ -1,23 +1,27 @@
 ---
-title: "Pixel Perfect Is a Test, Not a Claim"
+title: "Own Your Pixels: Native Fidelity on Your Schedule"
 slug: pixel-perfect-is-a-test
 url: /blog/pixel-perfect-is-a-test/
 date: '2026-07-17'
 author: Shai Almog
-description: "Codename One now compares its iOS 26 Liquid Glass and Android Material 3 themes against native reference apps in CI. The suite measures pixels, geometry, and fixed animation frames, then prevents the UI from drifting below the recorded baseline."
-feed_html: '<img src="https://www.codenameone.com/blog/pixel-perfect-is-a-test.jpg" alt="Pixel Perfect Is a Test, Not a Claim" /> Codename One now compares its iOS 26 Liquid Glass and Android Material 3 themes against native reference apps in CI, including geometry and animation checks.'
+description: "Codename One statically links its lightweight UI into your native app, so an OS update cannot silently redesign it. New native-reference fidelity tests let us adopt iOS 26 Liquid Glass and Material 3 on our schedule without surrendering control of the pixels."
+feed_html: '<img src="https://www.codenameone.com/blog/pixel-perfect-is-a-test.jpg" alt="Own Your Pixels: Native Fidelity on Your Schedule" /> Codename One now tests its statically linked UI against native iOS 26 and Material 3 references, so themes can move forward without an OS update changing your shipped app.'
 series: ["release-2026-07-17"]
 ---
 
-![Pixel Perfect Is a Test, Not a Claim](/blog/pixel-perfect-is-a-test.jpg)
+![Own Your Pixels: Native Fidelity on Your Schedule](/blog/pixel-perfect-is-a-test.jpg)
 
-Codename One does not wrap UIKit or Material widgets. It compiles to a native app, then paints its own UI. That gives you control over every pixel, but it also creates an obligation: if we say a theme follows iOS 26 or Material 3, we need more than a good screenshot and an adjective.
+An iOS or Android update can change a screen you shipped without you changing a line of code. If your app builds its UI from UIKit, SwiftUI, Compose, or Material widgets, Apple or Google owns those widget implementations. Codename One does something different. It statically links our lightweight component implementation into your native app. The UI you test is the UI your users keep after the next OS update. An update can still break a platform API or permission contract, but it cannot swap our button implementation for a new one.
 
-So we built native iOS and Android apps to grade us.
+Lightweight does not mean a Java paint loop limping behind the platform. On iOS, components paint through our Metal pipeline. The moving Liquid Glass tab lens in this post is a Metal shader on the frame's existing command buffer, with no transfer of pixels back to the CPU. At the same time, [last week's ParparVM work](/blog/beating-hotspot-performance/) brought our ahead-of-time VM to geomean parity with warmed Java 25 across ten benchmarks. Six finished at or ahead of HotSpot.
 
-[Last week's release](/blog/beating-hotspot-performance/) rebuilt large parts of ParparVM. I expected that to remain the most involved work of the summer. The theme fidelity work took longer. [PR #5274](https://github.com/codenameone/CodenameOne/pull/5274) alone reports 53,000 additions across 1,147 changed files. Generated access registries, resources, screenshots, and native goldens account for much of that number, but the scale is still real. Five follow-up PRs then fixed what the first pass exposed.
+The tradeoff is that our UI does not inherit Apple's or Google's latest redesign for free. We have to study it, reproduce the parts that make sense, and test the result. That is work we take on so you can work on your app instead of working for the Apple and Google design teams. You decide when your app adopts a new look. The OS does not decide for you on upgrade day.
 
-The result is not a claim of 100% visual identity. It is a repeatable process for getting closer and for stopping accidental drift.
+The ParparVM and theme-fidelity branches ran in parallel. We wanted them in the same release, but each became too large to merge together safely. The fidelity work took longer. [PR #5274](https://github.com/codenameone/CodenameOne/pull/5274) alone reports 53,000 additions across 1,147 changed files. Generated access registries, resources, screenshots, and native goldens account for much of that number, but the scale is still real. Five follow-up PRs fixed what the first pass exposed.
+
+Owning the component stack also lets us work below the pixels. [PR #5363](https://github.com/codenameone/CodenameOne/pull/5363) adds a portable accessibility hierarchy, virtual semantic nodes, simulator audits, and platform preference detection. That took 6,965 additions across 57 files because proper accessibility is not a label bolted onto a button. Monday's post goes through that work.
+
+We will never make every pixel of every Codename One component land in exactly the same place as every native widget on every device. That is a fool's errand. The useful target is a point where 98% or 99% of people cannot tell which side is Codename One, and where we notice when a later change pulls us away from that level. We are not there on every component yet. These changes get us much closer, and now the gap is measured instead of argued over.
 
 ## The themes were modern, but they were not finished
 
@@ -36,6 +40,8 @@ Why is the floating action button still circular on iOS? iOS has no native float
 ## A native app produces the answer sheet
 
 The fidelity suite contains two standalone reference applications. One is written with UIKit and Swift. The other uses Android's Material components. We run those apps locally on pinned native toolchains and capture real controls in light and dark appearances, including normal, pressed, selected, and disabled states.
+
+Glass needs something behind it. A plain white tile can let a translucent fill pass for blur because there is nothing useful to blur. The glass tests place both implementations over the same photo and gradient backgrounds. That gives the lens edges, refraction, saturation, and backdrop blur real detail to distort. A tinted rounded rectangle cannot fake its way through that comparison.
 
 The native captures are committed as versioned golden sets:
 
@@ -70,21 +76,21 @@ The iOS golden set is pinned to iOS 26. The Android set is pinned to Material 3 
 
 The current Android baseline contains 54 pairs. Its median tolerant visual score is 95.5%. The worst pair is the dark outlined button in its pressed state at 91.25%. The iOS baseline contains 68 pairs with a 94.4% median. Its worst pair is the dark tab bar at 83.45%.
 
-Those percentages are useful for a regression gate. They are not a substitute for eyes.
+Those percentages are useful for a regression gate. They are not a substitute for eyes, and they are harsher on larger, information-dense components. A button has one label and a compact outline. The tab bar has three glyphs, three labels, a lens, a long glass surface, and far more edges. A small repeated mismatch affects more of the tab image. The tab can score 83.45% even when it looks closer to the native reference than a button scoring above 90%.
 
 Thomas made this point in the [PR discussion](https://github.com/codenameone/CodenameOne/pull/5274). A radio button can look identical to a person and still lose points to antialiasing. A large tab bar can hide a wrong icon inside thousands of matching backdrop pixels. A high overlay score can also conceal a wrong width or corner radius.
 
-We changed the suite in response. It now reports bounding-box offsets, width and height ratios, center offsets, and an estimated corner radius separately from the visual score. The comparison mode also comes from an explicit `material: normal|glass|lens` declaration instead of an image heuristic. Human review remains part of the process, especially for motion and complete application screens.
+We changed the suite in response. It now reports bounding-box offsets, width and height ratios, center offsets, and an estimated corner radius separately from the visual score. The comparison mode also comes from an explicit `material: normal|glass|lens` declaration instead of an image heuristic. Human review remains part of the process, especially for motion and translucent effects where one score can hide the wrong detail.
 
-Here are four iOS pairs from the automated report. Native is on the left. Codename One is on the right. The dark picker makes the limitation obvious: the selected row is closer, but the off-row contrast still needs work.
+Here are four current iOS pairs from the automated report. Native is on the left. Codename One is on the right, separated by the thin vertical line. The dark picker makes the limitation obvious: the selected row is close, but the off-row contrast still needs work.
 
 ![Native iOS controls beside Codename One iOS Modern controls](/blog/pixel-perfect-is-a-test/ios-native-vs-cn1.jpg)
 
-The Android report uses the same layout. The floating action button now has Material 3 geometry, while the tab typography and outlined button still show smaller differences that the baseline tracks.
+The Android report uses the same layout and divider. The floating action button now has Material 3 geometry, while the tab typography and outlined button still show smaller differences that the baseline tracks.
 
 ![Native Material 3 controls beside Codename One Android Material controls](/blog/pixel-perfect-is-a-test/android-native-vs-cn1.jpg)
 
-These fixture pairs answer a narrower question than a full app screenshot: does one component match its native reference in a controlled state? They do not prove that every real screen has native spacing, hierarchy, and composition. Thomas asked for known application screens too. That is a fair request, and it is a separate layer we still need to add. The component suite gives us attribution and a CI gate. Full-screen examples give humans context. We need both.
+The suite deliberately stops at the component boundary. Screen spacing, hierarchy, and composition are application design decisions whether you use SwiftUI, Compose, or Codename One. The themes should provide sensible defaults that work across devices. The final layout still belongs to the developer building the product.
 
 ## The tab bar became a rendering project
 
@@ -98,20 +104,17 @@ The static comparison below freezes the useful stages so you can inspect the geo
 
 ![Fixed stages of the iOS 26 native and Codename One tab selection morph](/blog/pixel-perfect-is-a-test/tab-morph-fidelity.png)
 
-The shared motion lives in `TabSelectionMorph`. Given progress, source and target cells, and a small set of theme tokens, its internal model returns the capsule rectangle, lens rectangle, magnification, aberration, tint, and settle position. `Tabs` paints that result. The switch uses the same approach through `SwitchThumbDroplet`, which stretches and squashes the glass thumb while it moves.
+The first native recording sent us in the wrong direction. We changed `selectedIndex` automatically and captured a flat platter sliding across the bar. That is what UIKit shows for a programmatic selection. The full Liquid Glass lens only appears after a real touch. We eventually caught the difference and built a small XCUITest driver that taps the actual tab bar while the simulator records it. The animation above comes from that touch-driven reference.
 
-```text
-progress + source cell + target cell + preset tokens
-    -> pill bounds + lens bounds + optics + settle position
-```
+The shared motion lives in `TabSelectionMorph`. It calculates the pill and lens geometry for each frame from the old tab, the new tab, and the current touch progress. The result also carries the magnification, color separation, tint, and spring settle. `Tabs` paints it. `SwitchThumbDroplet` does the same job for the glass switch thumb, including the stretch and vertical squash during travel.
 
 The public theme surface is intentionally smaller than the internal model. A theme selects `tabsMorphPreset: ios26` or `subtle`, then adjusts duration, lens intensity, and spring percentage. Thirteen low-level motion constants from the first implementation were removed because they made it too easy to tune one screenshot while breaking the path between screenshots.
 
-The test freezes the animation at 0%, 10%, 25%, 50%, 75%, 90%, and 100%. It checks that the frames are distinct, travel is monotonic, and overshoot stays bounded. The committed intermediate frames are Codename One goldens, not native intermediate-frame comparisons. Native motion is still reviewed from the captured video. That distinction matters.
+The test freezes the animation at 0%, 10%, 25%, 50%, 75%, 90%, and 100%. It checks that the frames are distinct, travel is monotonic, and overshoot stays bounded. The committed intermediate frames are Codename One goldens, not native intermediate-frame comparisons. We still review native motion from the captured video because the intermediate frames are not compared automatically yet.
 
 ## Glass is a typed material, not a pile of constants
 
-The first glass pass exposed saturation, blur, scale, offset, refraction, and specular values as unrelated theme constants. Review feedback was right: that would become impossible to keep coherent across a toolbar, panel, button, and moving lens.
+The first glass pass exposed saturation, blur, scale, offset, refraction, and specular values as unrelated theme constants. That did not look good. A toolbar, panel, button, and moving lens could each be tuned into a different material by accident.
 
 `GlassRecipe` now defines four bounded material intents:
 
