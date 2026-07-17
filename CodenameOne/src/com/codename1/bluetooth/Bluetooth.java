@@ -203,6 +203,25 @@ public class Bluetooth {
         return r;
     }
 
+    /// The BLE central role entry point -- scanning, connections, GATT
+    /// client. Never `null`: on ports without BLE a no-op instance is
+    /// returned whose operations fail fast with
+    /// [BluetoothError#NOT_SUPPORTED]; branch via [#isLeSupported()].
+    public com.codename1.bluetooth.le.BluetoothLE getLE() {
+        return DefaultLE.INSTANCE;
+    }
+
+    /// Lazy holder so the fallback LE instance is only created when a
+    /// port without BLE support is actually asked for it.
+    private static final class DefaultLE {
+        static final com.codename1.bluetooth.le.BluetoothLE INSTANCE =
+                new com.codename1.bluetooth.le.BluetoothLE() {
+                };
+
+        private DefaultLE() {
+        }
+    }
+
     /// `true` when the given runtime permission is currently granted. See
     /// [BluetoothPermission] for the per-platform mapping. Defaults to
     /// `false`.
