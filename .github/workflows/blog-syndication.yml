@@ -96,7 +96,10 @@ jobs:
           retention-days: 14
 
       - name: Commit updated syndication state and queue
-        if: ${{ inputs.dry_run != true }}
+        # always() so a successful publish is committed even when a later step
+        # (browser syndication, queueing) fails -- otherwise the recorded state is
+        # discarded and the same post is re-selected and rejected on the next run.
+        if: ${{ always() && inputs.dry_run != true }}
         run: |
           set -euo pipefail
           if git diff --quiet -- scripts/website/syndication-state.json scripts/website/syndication-queue.json; then
