@@ -34,6 +34,10 @@ import java.util.Map;
 /// payloads fail with
 /// [com.codename1.bluetooth.BluetoothError#ADVERTISE_FAILED]. Fluent
 /// setters return `this` for chaining.
+///
+/// Platform note: iOS only broadcasts the local name and service UUIDs --
+/// CoreBluetooth silently ignores manufacturer data, service data and TX
+/// power inclusion when advertising (Android broadcasts everything).
 public class AdvertiseData {
 
     private final ArrayList<BluetoothUuid> serviceUuids =

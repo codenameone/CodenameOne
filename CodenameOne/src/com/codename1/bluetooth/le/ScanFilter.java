@@ -82,6 +82,44 @@ public class ScanFilter {
         return this;
     }
 
+    /// The service UUID criterion, or `null` when unset. Ports use the
+    /// getters to push filters down to the platform scanner -- required
+    /// for background scanning on iOS.
+    public BluetoothUuid getServiceUuid() {
+        return serviceUuid;
+    }
+
+    /// The exact-name criterion, or `null` when unset.
+    public String getName() {
+        return name;
+    }
+
+    /// The name-prefix criterion, or `null` when unset.
+    public String getNamePrefix() {
+        return namePrefix;
+    }
+
+    /// The address criterion, or `null` when unset.
+    public String getAddress() {
+        return address;
+    }
+
+    /// The manufacturer-data company identifier criterion, or `-1` when
+    /// unset.
+    public int getManufacturerId() {
+        return manufacturerId;
+    }
+
+    /// The manufacturer-data payload criterion, or `null`.
+    public byte[] getManufacturerData() {
+        return manufacturerData;
+    }
+
+    /// The manufacturer-data mask, or `null` (exact comparison).
+    public byte[] getManufacturerDataMask() {
+        return manufacturerDataMask;
+    }
+
     /// `true` when the given scan result satisfies every criterion of this
     /// filter. Used by the core scan demultiplexer; ports may also use it
     /// to pre-filter.

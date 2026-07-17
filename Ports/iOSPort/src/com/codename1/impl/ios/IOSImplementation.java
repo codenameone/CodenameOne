@@ -4255,6 +4255,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     private IOSBiometrics biometrics;
     private IOSSecureStorage secureStorage;
     private IOSNfc nfc;
+    private static IOSBluetooth bluetooth;
     private IOSDeviceIntegrity deviceIntegrity;
 
     @Override
@@ -4292,6 +4293,16 @@ public class IOSImplementation extends CodenameOneImplementation {
             nfc = new IOSNfc(nativeInstance);
         }
         return nfc;
+    }
+
+    @Override
+    public com.codename1.bluetooth.Bluetooth getBluetooth() {
+        synchronized (IOSImplementation.class) {
+            if (bluetooth == null) {
+                bluetooth = new IOSBluetooth(nativeInstance);
+            }
+            return bluetooth;
+        }
     }
 
     public LocationManager getLocationManager() {

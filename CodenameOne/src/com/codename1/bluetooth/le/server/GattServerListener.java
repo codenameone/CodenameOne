@@ -37,10 +37,14 @@ public interface GattServerListener {
     /// [GattWriteRequest#respond()] when required.
     void characteristicWriteRequest(GattWriteRequest request);
 
-    /// A central reads a descriptor without a static value.
+    /// A central reads a descriptor without a static value. Platform
+    /// note: iOS serves descriptors from their static values only, so
+    /// this never fires there -- always give local descriptors a static
+    /// value for cross-platform behavior.
     void descriptorReadRequest(GattReadRequest request);
 
-    /// A central writes a descriptor.
+    /// A central writes a descriptor. Never fires on iOS -- see
+    /// [#descriptorReadRequest(GattReadRequest)].
     void descriptorWriteRequest(GattWriteRequest request);
 
     /// A central subscribed to or unsubscribed from a characteristic's
