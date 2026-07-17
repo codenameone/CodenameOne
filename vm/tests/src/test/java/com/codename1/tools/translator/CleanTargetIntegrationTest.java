@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package com.codename1.tools.translator;
 
 import org.junit.jupiter.params.ParameterizedTest;
@@ -1135,6 +1158,16 @@ class CleanTargetIntegrationTest {
         } else {
             exe = buildHelloCodenameOneExe();
         }
+        String performanceBinaryOut = System.getenv("CN1_PERFORMANCE_BINARY_OUT");
+        if (performanceBinaryOut != null && !performanceBinaryOut.trim().isEmpty()) {
+            Path performanceBinary = Paths.get(performanceBinaryOut.trim());
+            if (performanceBinary.getParent() != null) {
+                Files.createDirectories(performanceBinary.getParent());
+            }
+            Files.copy(exe, performanceBinary, StandardCopyOption.REPLACE_EXISTING);
+            System.out.println("Performance binary copied to " + performanceBinary.toAbsolutePath()
+                    + " (" + Files.size(performanceBinary) + " bytes)");
+        }
 
         // Compile the shared cn1ss screenshot server with an available JDK.
         java.util.List<CompilerHelper.CompilerConfig> configs = new java.util.ArrayList<>();
@@ -1187,6 +1220,8 @@ class CleanTargetIntegrationTest {
             appPb.redirectErrorStream(true);
             app = appPb.start();
             final java.util.concurrent.atomic.AtomicBoolean finished = new java.util.concurrent.atomic.AtomicBoolean(false);
+            final java.util.concurrent.atomic.AtomicBoolean performanceFinished =
+                    new java.util.concurrent.atomic.AtomicBoolean(false);
             final java.util.concurrent.atomic.AtomicInteger finishedTests = new java.util.concurrent.atomic.AtomicInteger(0);
             final java.util.concurrent.atomic.AtomicReference<String> lastLine =
                     new java.util.concurrent.atomic.AtomicReference<String>("");
@@ -1197,6 +1232,8 @@ class CleanTargetIntegrationTest {
             // windows-benchmark-stats.txt so the cn1ss report renders them in the PR
             // comment's Benchmark Results table.
             final java.util.List<String> simdStats =
+                    java.util.Collections.synchronizedList(new java.util.ArrayList<String>());
+            final java.util.List<String> performanceLog =
                     java.util.Collections.synchronizedList(new java.util.ArrayList<String>());
             final Process appF = app;
             Thread areader = new Thread(new Runnable() {
@@ -1209,6 +1246,13 @@ class CleanTargetIntegrationTest {
                             if (line.contains("suite finished test=")) { finishedTests.incrementAndGet(); }
                             int s = line.indexOf("CN1SS:STAT:");
                             if (s >= 0) { simdStats.add(line.substring(s + "CN1SS:STAT:".length()).trim()); }
+                            int p = line.indexOf("CN1SS:PERF:");
+                            if (p >= 0) {
+                                performanceLog.add(line.substring(p));
+                                if (line.indexOf("CN1SS:PERF:complete") >= 0) {
+                                    performanceFinished.set(true);
+                                }
+                            }
                             if (line.contains("CN1SS:") || line.contains("suite ")) { lastLine.set(line); }
                         }
                     } catch (IOException ignore) {
@@ -1229,6 +1273,8 @@ class CleanTargetIntegrationTest {
             int minPngs = 100;
             long stableMs = 150_000L;       // > the slowest single inter-screenshot gap
             long deadline = System.currentTimeMillis() + 40L * 60 * 1000;
+            boolean requirePerformance = Boolean.parseBoolean(
+                    System.getenv("CN1_REQUIRE_PERFORMANCE"));
             int pngs = 0;
             int lastPngs = -1;
             long lastChange = System.currentTimeMillis();
@@ -1236,13 +1282,16 @@ class CleanTargetIntegrationTest {
                 if (finished.get()) { break; }
                 pngs = countPngFiles(outDir);
                 if (pngs != lastPngs) { lastPngs = pngs; lastChange = System.currentTimeMillis(); }
-                if (pngs >= minPngs && (System.currentTimeMillis() - lastChange) >= stableMs) { break; }
+                if (pngs >= minPngs && (System.currentTimeMillis() - lastChange) >= stableMs
+                        && (!requirePerformance || performanceFinished.get())) { break; }
                 Thread.sleep(3000);
             }
             pngs = countPngFiles(outDir);
-            assertTrue(finished.get() || pngs >= minPngs,
+            assertTrue(finished.get() || (pngs >= minPngs
+                            && (!requirePerformance || performanceFinished.get())),
                     "hello suite capture incomplete: pngs=" + pngs + " (need " + minPngs + ")"
                     + " finishedTests=" + finishedTests.get() + " suiteFinished=" + finished.get()
+                    + " performanceFinished=" + performanceFinished.get()
                     + " lastLine=" + lastLine.get() + "\n" + serverLog);
 
             String outEnv = System.getenv("CN1_SHOT_OUTPUT_DIR");
@@ -1268,6 +1317,13 @@ class CleanTargetIntegrationTest {
                             sb.toString().getBytes(StandardCharsets.UTF_8));
                     System.out.println("CN1_SIMD_STATS=" + simdStats.size() + " lines");
                 }
+                StringBuilder perf = new StringBuilder();
+                synchronized (performanceLog) {
+                    for (String l : performanceLog) { perf.append(l).append('\n'); }
+                }
+                Files.write(dest.resolve("app-output.log"),
+                        perf.toString().getBytes(StandardCharsets.UTF_8));
+                System.out.println("CN1_PERFORMANCE_LOG=" + performanceLog.size() + " lines");
             }
             System.out.println("CN1_HELLO_SUITE_PNGS=" + pngs);
         } finally {

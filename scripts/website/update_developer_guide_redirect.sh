@@ -3,8 +3,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-REDIRECTS_FILE="${REPO_ROOT}/docs/website/static/_redirects"
-RELEASES_URL="https://api.github.com/repos/codenameone/CodenameOne/releases/latest"
+REDIRECTS_FILE="${REDIRECTS_FILE:-${REPO_ROOT}/docs/website/static/_redirects}"
+RELEASES_URL="${RELEASES_URL:-https://api.github.com/repos/codenameone/CodenameOne/releases/latest}"
+RELEASES_LIST_URL="${RELEASES_LIST_URL:-https://api.github.com/repos/codenameone/CodenameOne/releases?per_page=20}"
 BEGIN_MARKER="# BEGIN: generated developer-guide.pdf redirect"
 END_MARKER="# END: generated developer-guide.pdf redirect"
 
@@ -30,6 +31,7 @@ cleanup() {
 trap cleanup EXIT
 
 release_json="${tmp_dir}/release.json"
+releases_json="${tmp_dir}/releases.json"
 new_redirects="${tmp_dir}/_redirects.new"
 
 curl_args=(
@@ -67,9 +69,38 @@ if [ -z "${asset_url}" ]; then
     asset_url="https://github.com/codenameone/CodenameOne/releases/download/${release_tag}/developer-guide.pdf"
     echo "developer-guide.pdf asset not found in latest release; using PR fallback ${asset_url}" >&2
   else
-    echo "developer-guide.pdf asset not found in latest release." >&2
-    echo "Resolved developer-guide.pdf URL is empty." >&2
-    exit 1
+    echo "developer-guide.pdf asset not found in latest release ${release_tag}; looking for the newest stable release that contains it." >&2
+    curl "${curl_args[@]}" -o "${releases_json}" "${RELEASES_LIST_URL}"
+
+    read -r fallback_tag fallback_url <<<"$(
+      python3 -c '
+import json, sys
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    releases = json.load(f)
+for release in releases:
+    if release.get("draft") or release.get("prerelease"):
+        continue
+    tag = release.get("tag_name", "")
+    if not tag:
+        continue
+    for asset in release.get("assets", []):
+        if asset.get("name") == "developer-guide.pdf":
+            url = asset.get("browser_download_url", "")
+            if url:
+                print(f"{tag} {url}")
+                raise SystemExit(0)
+' "${releases_json}"
+    )"
+
+    if [ -z "${fallback_url:-}" ]; then
+      echo "No stable Codename One release with a developer-guide.pdf asset was found." >&2
+      echo "Resolved developer-guide.pdf URL is empty." >&2
+      exit 1
+    fi
+
+    release_tag="${fallback_tag}"
+    asset_url="${fallback_url}"
+    echo "Using developer-guide.pdf from release ${release_tag} until the latest release asset is available." >&2
   fi
 fi
 

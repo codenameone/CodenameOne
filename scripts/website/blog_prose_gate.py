@@ -26,6 +26,7 @@ import argparse
 import collections
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -41,6 +42,16 @@ REPO_ROOT_DEFAULT = os.path.dirname(os.path.dirname(HERE))
 VALE_CONFIG = "docs/website/.vale.ini"
 DEV_GUIDE_ACCEPT = "docs/developer-guide/languagetool-accept.txt"
 BLOG_ACCEPT = "scripts/website/languagetool-accept-blog.txt"
+
+# Self-certifying language weakens technical copy. State the limitation, evidence,
+# or boundary directly instead of telling the reader how to judge the claim.
+SELF_CERTIFYING_RE = re.compile(
+    r"\b(?:honest|honestly|honesty|truthful|truthfully|truthfulness|truthefully|"
+    r"frankly|candid|candidly|candor)\b"
+    r"|\b(?:to be honest|in all honesty|the truth is|to tell the truth|"
+    r"to be transparent|in all candor)\b",
+    re.IGNORECASE,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -69,6 +80,7 @@ def changed_posts(base_sha, repo_root):
             "HEAD",
             "--",
             "docs/website/content/blog/*.md",
+            "docs/website/social/linkedin/*.md",
         ],
         repo_root,
     )
@@ -142,6 +154,25 @@ def run_capcheck(text, rel):
             "line": f["line"],
             "message": f"Paragraph starts with lowercase '{f['word']}' — {f['excerpt']}",
         })
+    return out
+
+
+def run_self_certifying_language(text, rel):
+    front_matter, body, body_start = blog_text.split_front_matter(text)
+    segments = ((front_matter, 1), (blog_text.author_body(body), body_start))
+    out = []
+    for segment, start_line in segments:
+        for match in SELF_CERTIFYING_RE.finditer(segment):
+            phrase = match.group(0)
+            out.append({
+                "signature": ("house", "SelfCertifyingLanguage", phrase.lower()),
+                "file": rel,
+                "line": start_line + segment.count("\n", 0, match.start()),
+                "message": (
+                    "SelfCertifyingLanguage: state the evidence, limitation, or boundary "
+                    f"directly instead of using [{phrase}]"
+                ),
+            })
     return out
 
 
@@ -273,6 +304,10 @@ def gate_file(path, base_sha, repo_root, lt_ctx):
     new = []
     new += net_new(run_vale(head, path, repo_root), run_vale(base, path, repo_root))
     new += net_new(run_capcheck(head, path), run_capcheck(base, path))
+    new += net_new(
+        run_self_certifying_language(head, path),
+        run_self_certifying_language(base, path),
+    )
     if lt_ctx:
         head_lt = lt_findings(head, path, lt_ctx)
         base_lt = lt_findings(base, path, lt_ctx)

@@ -954,6 +954,65 @@
         "canonical_set": true,
         "syndicated_at": "2026-07-14T15:02:26+00:00"
       }
+    },
+    "videoio-audio-mixer-whisper": {
+      "devto": {
+        "id": 4151334,
+        "url": "https://dev.to/codenameone/videoio-pcm-mixing-and-timed-whisper-captions-1l3n",
+        "syndicated_at": "2026-07-15T14:58:28+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/be97a6017308/edit",
+        "syndicated_at": "2026-07-17T17:01:32+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmrp7dcja00000ai19ctmdr5u",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a5a63ec9039cabd7a494d67",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-17T17:19:31+00:00"
+      }
+    },
+    "game-builder-3d-dungeon": {
+      "devto": {
+        "id": 4168302,
+        "url": "https://dev.to/codenameone/game-builder-tutorial-3-build-a-first-person-3d-dungeon-358h",
+        "syndicated_at": "2026-07-17T16:40:46+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/3099f1cd87e7/edit",
+        "syndicated_at": "2026-07-17T17:03:55+00:00"
+      }
+    },
+    "beating-hotspot-performance": {
+      "foojay": {
+        "id": 124977,
+        "url": "https://foojay.io/wp-admin/post.php?post=124977&action=edit",
+        "preview_url": "https://foojay.io/?p=124977",
+        "featured_media_id": 124976,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-07-17T16:41:54+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/f1c3107c1300/edit",
+        "syndicated_at": "2026-07-17T17:05:31+00:00"
+      },
+      "dzone": {
+        "url": "https://dzone.com/content/3664310/edit.html",
+        "syndicated_at": "2026-07-17T17:06:57+00:00"
+      }
+    },
+    "2026-07-17-1800-shai-pixel-perfect-is-a-test": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/feed/",
+        "syndicated_at": "2026-07-17T16:57:42+00:00",
+        "account": "shai",
+        "source_slug": "pixel-perfect-is-a-test",
+        "scheduled_at": "2026-07-17T15:00:00+00:00"
+      }
     }
   }
 }

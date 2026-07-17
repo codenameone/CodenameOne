@@ -24,6 +24,7 @@ if [ $# -lt 1 ]; then
 fi
 
 BUNDLE_INPUT="$1"
+export CN1SS_BINARY_PATH="$BUNDLE_INPUT"
 REFERENCE_DIR="${2:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/javascript/screenshots}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

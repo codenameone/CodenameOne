@@ -40,7 +40,7 @@ if ! grep -q 'new CodeEditor' "$PLAYGROUND_EDITOR"; then
   echo "Playground source pane is not backed by CodeEditor" >&2
   exit 1
 fi
-for integration in 'setShowLineNumbers(true)' 'setDiagnostics(converted)' 'setTheme('; do
+for integration in 'setShowLineNumbers(true)' 'setDiagnostics(' 'setTheme('; do
   if ! grep -q "$integration" "$PLAYGROUND_EDITOR"; then
     echo "Playground CodeEditor integration is missing ${integration}" >&2
     exit 1

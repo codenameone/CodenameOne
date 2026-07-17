@@ -27,6 +27,8 @@ on:
   # diff limit, so pull_request triggers stopped firing -- dispatch with
   #   gh workflow run <file> --ref <branch>
   workflow_dispatch:
+  schedule:
+    - cron: '45 1 * * *'
   pull_request:
     paths:
       - '.github/workflows/linux-build-run.yml'
@@ -360,7 +362,7 @@ jobs:
   compare-comment:
     name: screenshot-comment
     needs: build-run
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -388,6 +390,18 @@ jobs:
           name: linux-screenshot-raw-arm64
           path: artifacts/linux-port/raw-arm64
         continue-on-error: true
+      - name: Download x64 benchmark binary
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-demo-x64
+          path: artifacts/linux-port/demo-x64
+        continue-on-error: true
+      - name: Download arm64 benchmark binary
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-demo-arm64
+          path: artifacts/linux-port/demo-arm64
+        continue-on-error: true
 
       - name: Post screenshots to PR
         shell: bash
@@ -402,6 +416,7 @@ jobs:
           # screenshot that has no committed golden (missing_expected).
           export CN1SS_FAIL_ON_MISMATCH=1
           export CN1SS_ALLOWED_MISSING=0
+          if [ "${{ github.event_name }}" != "pull_request" ]; then export CN1SS_SKIP_COMMENT=1; fi
           for arch in x64 arm64; do
             raw="$ART/raw-$arch"
             [ -d "$raw" ] || continue
@@ -414,6 +429,9 @@ jobs:
             if [ "$arch" = "arm64" ]; then REF="scripts/linux/screenshots-arm"; else REF="scripts/linux/screenshots"; fi
             echo "Posting ${#entries[@]} screenshot(s) for $arch (baseline $REF)"
             mkdir -p "$ART/previews-$arch"
+            export CN1SS_PORT_ID="linux-$arch"
+            export CN1SS_SUITE_LOG="$raw/app-output.log"
+            export CN1SS_BINARY_PATH="$ART/demo-$arch/codenameone-linux-demo-$arch"
             set +e
             CN1SS_COMMENT_MARKER="<!-- CN1SS_LINUX_${arch}_COMMENT -->" \
             CN1SS_COMMENT_LOG_PREFIX="[linux-gtk-$arch]" \
@@ -439,3 +457,12 @@ jobs:
           done
           if [ "$posted" -eq 0 ]; then echo "No screenshots produced; skipping comment."; fi
           if [ "$fail" -ne 0 ]; then echo "Linux screenshot gate failed."; exit 1; fi
+
+      - name: Upload Linux port status
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: port-status-linux
+          path: artifacts/linux-port/port-status-linux-*.json
+          if-no-files-found: warn
+          retention-days: 14

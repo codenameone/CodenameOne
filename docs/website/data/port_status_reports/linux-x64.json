@@ -1,0 +1,727 @@
+{
+  "commit": "205dcc675896c1c094db47d9b0a2622adf7ec3bf",
+  "generated_at": "2026-07-16T12:37:58Z",
+  "port": "linux-x64",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29496888305",
+  "schema_version": 1,
+  "suite_finished": false,
+  "summary": {
+    "fail": 0,
+    "not-run": 0,
+    "pass": 164,
+    "skip": 0
+  },
+  "tests": {
+    "ARApiTest": {
+      "feature": "ar-motion-sensors",
+      "status": "pass"
+    },
+    "AccessibilityTest": {
+      "feature": "accessibility",
+      "status": "pass"
+    },
+    "AdsScreenshotTest": {
+      "feature": "ads",
+      "status": "pass"
+    },
+    "AffineScale": {
+      "feature": "graphics-2d-transforms",
+      "status": "pass"
+    },
+    "AnimateHierarchyScreenshotTest": {
+      "feature": "layout-animation",
+      "status": "pass"
+    },
+    "AnimateLayoutScreenshotTest": {
+      "feature": "layout-animation",
+      "status": "pass"
+    },
+    "AnimateUnlayoutScreenshotTest": {
+      "feature": "layout-animation",
+      "status": "pass"
+    },
+    "AppReviewDialogScreenshotTest": {
+      "feature": "dialogs-and-labels",
+      "status": "pass"
+    },
+    "AudioMixerApiTest": {
+      "feature": "audio-media-playback",
+      "status": "pass"
+    },
+    "BackgroundThreadUiAccessTest": {
+      "feature": "threading",
+      "status": "pass"
+    },
+    "Base64NativePerformanceTest": {
+      "feature": "native-base64",
+      "status": "pass"
+    },
+    "BridgeBulkTransferGuardTest": {
+      "feature": "bytecode-runtime",
+      "status": "pass"
+    },
+    "BrowserComponentScreenshotTest": {
+      "feature": "embedded-web-content",
+      "status": "pass"
+    },
+    "ButtonThemeScreenshotTest": {
+      "feature": "native-theme-controls",
+      "status": "pass"
+    },
+    "BytecodeTranslatorRegressionTest": {
+      "feature": "bytecode-runtime",
+      "status": "pass"
+    },
+    "CallDetectionAPITest": {
+      "feature": "device-security-signals",
+      "status": "pass"
+    },
+    "CameraApiTest": {
+      "feature": "camera-access",
+      "status": "pass"
+    },
+    "CenteredDialogTitleScreenshotTest": {
+      "feature": "dialogs-and-labels",
+      "status": "pass"
+    },
+    "CenteredInteractionDialogTitleScreenshotTest": {
+      "feature": "dialogs-and-labels",
+      "status": "pass"
+    },
+    "ChartBarScreenshotTest": {
+      "feature": "charts",
+      "status": "pass"
+    },
+    "ChartBubbleScreenshotTest": {
+      "feature": "charts",
+      "status": "pass"
+    },
+    "ChartCombinedXYScreenshotTest": {
+      "feature": "charts",
+      "status": "pass"
+    },
+    "ChartCubicLineScreenshotTest": {
+      "feature": "charts",
+      "status": "pass"
+    },
+    "ChartDoughnutScreenshotTest": {
+      "feature": "charts",
+      "status": "pass"
+    },
+    "ChartLineScreenshotTest": {
+      "feature": "charts",
+      "status": "pass"
+    },
+    "ChartPieScreenshotTest": {
+      "feature": "charts",
+      "status": "pass"
+    },
+    "ChartRadarScreenshotTest": {
+      "feature": "charts",
+      "status": "pass"
+    },
+    "ChartRangeBarScreenshotTest": {
+      "feature": "charts",
+      "status": "pass"
+    },
+    "ChartRotatedScreenshotTest": {
+      "feature": "charts",
+      "status": "pass"
+    },
+    "ChartScatterScreenshotTest": {
+      "feature": "charts",
+      "status": "pass"
+    },
+    "ChartStackedBarScreenshotTest": {
+      "feature": "charts",
+      "status": "pass"
+    },
+    "ChartTimeChartScreenshotTest": {
+      "feature": "charts",
+      "status": "pass"
+    },
+    "ChartTransformScreenshotTest": {
+      "feature": "charts",
+      "status": "pass"
+    },
+    "ChatInputScreenshotTest": {
+      "feature": "chat-components",
+      "status": "pass"
+    },
+    "ChatViewScreenshotTest": {
+      "feature": "chat-components",
+      "status": "pass"
+    },
+    "CheckBoxRadioThemeScreenshotTest": {
+      "feature": "native-theme-controls",
+      "status": "pass"
+    },
+    "Clip": {
+      "feature": "graphics-clipping",
+      "status": "pass"
+    },
+    "ClipUnderRotation": {
+      "feature": "graphics-clipping",
+      "status": "pass"
+    },
+    "CodeEditorScreenshotTest": {
+      "feature": "embedded-web-content",
+      "status": "pass"
+    },
+    "PureEditorScreenshotTest": {
+      "feature": "embedded-web-content",
+      "status": "pass"
+    },
+    "ComponentReplaceFadeScreenshotTest": {
+      "feature": "layout-animation",
+      "status": "pass"
+    },
+    "ComponentReplaceFlipScreenshotTest": {
+      "feature": "layout-animation",
+      "status": "pass"
+    },
+    "ComponentReplaceSlideScreenshotTest": {
+      "feature": "layout-animation",
+      "status": "pass"
+    },
+    "CoverHorizontalTransitionTest": {
+      "feature": "slide-cover-transitions",
+      "status": "pass"
+    },
+    "CryptoApiTest": {
+      "feature": "secure-storage-crypto",
+      "status": "pass"
+    },
+    "CssFilterBlurScreenshotTest": {
+      "feature": "theme-palette-css",
+      "status": "pass"
+    },
+    "CssGradientsScreenshotTest": {
+      "feature": "theme-palette-css",
+      "status": "pass"
+    },
+    "DarkLightShowcaseThemeScreenshotTest": {
+      "feature": "theme-palette-css",
+      "status": "pass"
+    },
+    "DesktopModeScreenshotTest": {
+      "feature": "desktop-mode",
+      "status": "pass"
+    },
+    "DeviceInputApiTest": {
+      "feature": "text-input",
+      "status": "pass"
+    },
+    "DialogThemeScreenshotTest": {
+      "feature": "dialogs-and-labels",
+      "status": "pass"
+    },
+    "DrawArc": {
+      "feature": "graphics-primitives",
+      "status": "pass"
+    },
+    "DrawGradient": {
+      "feature": "graphics-gradients-filters",
+      "status": "pass"
+    },
+    "DrawGradientStops": {
+      "feature": "graphics-gradients-filters",
+      "status": "pass"
+    },
+    "DrawImage": {
+      "feature": "graphics-text-images",
+      "status": "pass"
+    },
+    "DrawLine": {
+      "feature": "graphics-primitives",
+      "status": "pass"
+    },
+    "DrawRect": {
+      "feature": "graphics-primitives",
+      "status": "pass"
+    },
+    "DrawRoundRect": {
+      "feature": "graphics-primitives",
+      "status": "pass"
+    },
+    "DrawShape": {
+      "feature": "graphics-shapes-strokes",
+      "status": "pass"
+    },
+    "DrawString": {
+      "feature": "graphics-text-images",
+      "status": "pass"
+    },
+    "DrawStringDecorated": {
+      "feature": "graphics-text-images",
+      "status": "pass"
+    },
+    "EmptyClip": {
+      "feature": "graphics-clipping",
+      "status": "pass"
+    },
+    "FadeTransitionTest": {
+      "feature": "fade-flip-transitions",
+      "status": "pass"
+    },
+    "FileSystemStorageOpenInputStreamMissingTest": {
+      "feature": "filesystem-storage",
+      "status": "pass"
+    },
+    "FillArc": {
+      "feature": "graphics-primitives",
+      "status": "pass"
+    },
+    "FillPolygon": {
+      "feature": "graphics-primitives",
+      "status": "pass"
+    },
+    "FillRect": {
+      "feature": "graphics-primitives",
+      "status": "pass"
+    },
+    "FillRoundRect": {
+      "feature": "graphics-primitives",
+      "status": "pass"
+    },
+    "FillShape": {
+      "feature": "graphics-shapes-strokes",
+      "status": "pass"
+    },
+    "FillTriangle": {
+      "feature": "graphics-primitives",
+      "status": "pass"
+    },
+    "FlipTransitionTest": {
+      "feature": "fade-flip-transitions",
+      "status": "pass"
+    },
+    "FloatingActionButtonThemeScreenshotTest": {
+      "feature": "dialogs-and-labels",
+      "status": "pass"
+    },
+    "FloatingToStringTest": {
+      "feature": "java-standard-apis",
+      "status": "pass"
+    },
+    "GaussianBlur": {
+      "feature": "graphics-gradients-filters",
+      "status": "pass"
+    },
+    "GoogleWebMapScreenshotTest": {
+      "feature": "native-web-maps",
+      "status": "pass"
+    },
+    "Gpu3DAnimationTest": {
+      "feature": "gpu-3d",
+      "status": "pass"
+    },
+    "Gpu3DCubeScreenshotTest": {
+      "feature": "gpu-3d",
+      "status": "pass"
+    },
+    "Gpu3DModelScreenshotTest": {
+      "feature": "gpu-3d",
+      "status": "pass"
+    },
+    "Gpu3DTexturedCubeScreenshotTest": {
+      "feature": "gpu-3d",
+      "status": "pass"
+    },
+    "ImageViewerNavigationScreenshotTest": {
+      "feature": "image-viewer-tabs-text",
+      "status": "pass"
+    },
+    "InPlaceEditViewTest": {
+      "feature": "text-input",
+      "status": "pass"
+    },
+    "InscribedTriangleGrid": {
+      "feature": "graphics-shapes-strokes",
+      "status": "pass"
+    },
+    "Java17Tests": {
+      "feature": "java-standard-apis",
+      "status": "pass"
+    },
+    "KotlinUiTest": {
+      "feature": "application-bootstrap",
+      "status": "pass"
+    },
+    "LargeStrokeDirtyClipTest": {
+      "feature": "graphics-clipping",
+      "status": "pass"
+    },
+    "LightweightPickerButtonsScreenshotTest": {
+      "feature": "pickers-validation",
+      "status": "pass"
+    },
+    "ListThemeScreenshotTest": {
+      "feature": "native-theme-controls",
+      "status": "pass"
+    },
+    "LocalNotificationOverrideTest": {
+      "feature": "notifications",
+      "status": "pass"
+    },
+    "LottieAnimatedScreenshotTest": {
+      "feature": "svg-lottie",
+      "status": "pass"
+    },
+    "MainScreenScreenshotTest": {
+      "feature": "application-bootstrap",
+      "status": "pass"
+    },
+    "Media360PanoramaScreenshotTest": {
+      "feature": "immersive-media",
+      "status": "pass"
+    },
+    "MediaPlaybackScreenshotTest": {
+      "feature": "audio-media-playback",
+      "status": "pass"
+    },
+    "MorphElementMorphScreenshotTest": {
+      "feature": "morph-transitions",
+      "status": "pass"
+    },
+    "MorphTransitionScrolledSourceTest": {
+      "feature": "morph-transitions",
+      "status": "pass"
+    },
+    "MorphTransitionScrubScreenshotTest": {
+      "feature": "morph-transitions",
+      "status": "pass"
+    },
+    "MorphTransitionSnapshotTest": {
+      "feature": "morph-transitions",
+      "status": "pass"
+    },
+    "MorphTransitionTest": {
+      "feature": "morph-transitions",
+      "status": "pass"
+    },
+    "MotionSensorDeviceTest": {
+      "feature": "ar-motion-sensors",
+      "status": "pass"
+    },
+    "MotionShowcaseScreenshotTest": {
+      "feature": "layout-animation",
+      "status": "pass"
+    },
+    "MultiButtonThemeScreenshotTest": {
+      "feature": "native-theme-controls",
+      "status": "pass"
+    },
+    "MutableImageClipReadbackTest": {
+      "feature": "mutable-images",
+      "status": "pass"
+    },
+    "MutableImageReadbackTest": {
+      "feature": "mutable-images",
+      "status": "pass"
+    },
+    "NanoTimeApiTest": {
+      "feature": "java-standard-apis",
+      "status": "pass"
+    },
+    "NativeMapFallbackScreenshotTest": {
+      "feature": "vector-maps",
+      "status": "pass"
+    },
+    "OrientationLockScreenshotTest": {
+      "feature": "orientation",
+      "status": "pass"
+    },
+    "PaletteOverrideThemeScreenshotTest": {
+      "feature": "theme-palette-css",
+      "status": "pass"
+    },
+    "PartialFlushClipEscape": {
+      "feature": "graphics-clipping",
+      "status": "pass"
+    },
+    "PickerCancelRestoreTest": {
+      "feature": "pickers-validation",
+      "status": "pass"
+    },
+    "PickerThemeScreenshotTest": {
+      "feature": "native-theme-controls",
+      "status": "pass"
+    },
+    "PullToRefreshSpinnerScreenshotTest": {
+      "feature": "scrolling-and-pull",
+      "status": "pass"
+    },
+    "RealOsmVectorScreenshotTest": {
+      "feature": "vector-maps",
+      "status": "pass"
+    },
+    "RichTextAreaScreenshotTest": {
+      "feature": "embedded-web-content",
+      "status": "pass"
+    },
+    "Rotate": {
+      "feature": "graphics-2d-transforms",
+      "status": "pass"
+    },
+    "SVGAnimatedScreenshotTest": {
+      "feature": "svg-lottie",
+      "status": "pass"
+    },
+    "SVGStaticScreenshotTest": {
+      "feature": "svg-lottie",
+      "status": "pass"
+    },
+    "Scale": {
+      "feature": "graphics-2d-transforms",
+      "status": "pass"
+    },
+    "SecureStorageTest": {
+      "feature": "secure-storage-crypto",
+      "status": "pass"
+    },
+    "SheetScreenshotTest": {
+      "feature": "sheets",
+      "status": "pass"
+    },
+    "SheetSlideUpAnimationScreenshotTest": {
+      "feature": "sheets",
+      "status": "pass"
+    },
+    "SimdApiTest": {
+      "feature": "simd",
+      "status": "pass"
+    },
+    "SimdBenchmarkTest": {
+      "feature": "simd",
+      "status": "pass"
+    },
+    "SimdLargeAllocaTest": {
+      "feature": "simd",
+      "status": "pass"
+    },
+    "SlideFadeTitleTransitionTest": {
+      "feature": "slide-cover-transitions",
+      "status": "pass"
+    },
+    "SlideHorizontalBackTransitionTest": {
+      "feature": "slide-cover-transitions",
+      "status": "pass"
+    },
+    "SlideHorizontalTransitionTest": {
+      "feature": "slide-cover-transitions",
+      "status": "pass"
+    },
+    "SlideVerticalTransitionTest": {
+      "feature": "slide-cover-transitions",
+      "status": "pass"
+    },
+    "SmoothScrollScreenshotTest": {
+      "feature": "scrolling-and-pull",
+      "status": "pass"
+    },
+    "SpanLabelThemeScreenshotTest": {
+      "feature": "dialogs-and-labels",
+      "status": "pass"
+    },
+    "StatusBarTapDiagnosticScreenshotTest": {
+      "feature": "status-bar-events",
+      "status": "pass"
+    },
+    "StickyHeaderFadeTransitionScreenshotTest": {
+      "feature": "scrolling-and-pull",
+      "status": "pass"
+    },
+    "StickyHeaderScreenshotTest": {
+      "feature": "scrolling-and-pull",
+      "status": "pass"
+    },
+    "StickyHeaderSlideTransitionScreenshotTest": {
+      "feature": "scrolling-and-pull",
+      "status": "pass"
+    },
+    "StreamApiTest": {
+      "feature": "java-standard-apis",
+      "status": "pass"
+    },
+    "StringApiTest": {
+      "feature": "java-standard-apis",
+      "status": "pass"
+    },
+    "StrokeTest": {
+      "feature": "graphics-shapes-strokes",
+      "status": "pass"
+    },
+    "SurfacesActionDispatchTest": {
+      "feature": "surfaces",
+      "status": "pass"
+    },
+    "SurfacesPublishTest": {
+      "feature": "surfaces",
+      "status": "pass"
+    },
+    "SurfacesRasterizerScreenshotTest": {
+      "feature": "surfaces",
+      "status": "pass"
+    },
+    "SurfacesRemoteViewsScreenshotTest": {
+      "feature": "surfaces",
+      "status": "pass"
+    },
+    "SurfacesSerializerRoundTripTest": {
+      "feature": "surfaces",
+      "status": "pass"
+    },
+    "SurfacesTimelineLogicTest": {
+      "feature": "surfaces",
+      "status": "pass"
+    },
+    "SwitchThemeScreenshotTest": {
+      "feature": "native-theme-controls",
+      "status": "pass"
+    },
+    "TabsAnimatedIndicatorScreenshotTest": {
+      "feature": "tabs-animation",
+      "status": "pass"
+    },
+    "TabsScreenshotTest": {
+      "feature": "image-viewer-tabs-text",
+      "status": "pass"
+    },
+    "TabsThemeScreenshotTest": {
+      "feature": "native-theme-controls",
+      "status": "pass"
+    },
+    "TensileBounceScreenshotTest": {
+      "feature": "scrolling-and-pull",
+      "status": "pass"
+    },
+    "TextAreaAlignmentScreenshotTest": {
+      "feature": "image-viewer-tabs-text",
+      "status": "pass"
+    },
+    "TextFieldThemeScreenshotTest": {
+      "feature": "native-theme-controls",
+      "status": "pass"
+    },
+    "TileImage": {
+      "feature": "graphics-text-images",
+      "status": "pass"
+    },
+    "TimeApiTest": {
+      "feature": "java-standard-apis",
+      "status": "pass"
+    },
+    "ToastBarTopPositionScreenshotTest": {
+      "feature": "toast-notifications",
+      "status": "pass"
+    },
+    "ToolbarThemeScreenshotTest": {
+      "feature": "native-theme-controls",
+      "status": "pass"
+    },
+    "TransformCamera": {
+      "feature": "graphics-3d-transforms",
+      "status": "pass"
+    },
+    "TransformPerspective": {
+      "feature": "graphics-3d-transforms",
+      "status": "pass"
+    },
+    "TransformRotation": {
+      "feature": "graphics-2d-transforms",
+      "status": "pass"
+    },
+    "TransformTranslation": {
+      "feature": "graphics-2d-transforms",
+      "status": "pass"
+    },
+    "UncoverHorizontalTransitionTest": {
+      "feature": "slide-cover-transitions",
+      "status": "pass"
+    },
+    "VPNDetectionAPITest": {
+      "feature": "device-security-signals",
+      "status": "pass"
+    },
+    "VRStereoSceneScreenshotTest": {
+      "feature": "immersive-media",
+      "status": "pass"
+    },
+    "ValidatorLightweightPickerScreenshotTest": {
+      "feature": "pickers-validation",
+      "status": "pass"
+    },
+    "VectorMapDarkStyleScreenshotTest": {
+      "feature": "vector-maps",
+      "status": "pass"
+    },
+    "VectorMapMarkersScreenshotTest": {
+      "feature": "vector-maps",
+      "status": "pass"
+    },
+    "VectorMapShapesScreenshotTest": {
+      "feature": "vector-maps",
+      "status": "pass"
+    },
+    "VideoIODecodedFramesScreenshotTest": {
+      "feature": "video-decoding",
+      "status": "pass"
+    },
+    "VideoIORoundTripTest": {
+      "feature": "video-round-trip",
+      "status": "pass"
+    }
+  },
+  "bootstrap_source": "successful-master-workflow",
+  "workflow_conclusion": "success",
+  "performance": {
+    "benchmark_version": 1,
+    "benchmarks": {
+      "arrayRandom": {
+        "checksum": "-2288487891715278",
+        "duration_ns": 253856480
+      },
+      "arraySequential": {
+        "checksum": "0",
+        "duration_ns": 28233661
+      },
+      "hashMapChurn": {
+        "checksum": "49941",
+        "duration_ns": 27566288
+      },
+      "intArithmetic": {
+        "checksum": "1307491170054",
+        "duration_ns": 82153005
+      },
+      "longArithmetic": {
+        "checksum": "6887886960473257608",
+        "duration_ns": 53960096
+      },
+      "mathTranscendental": {
+        "checksum": "4729652805076374709",
+        "duration_ns": 184573752
+      },
+      "objectAllocation": {
+        "checksum": "2999790376128",
+        "duration_ns": 5754321719
+      },
+      "quicksort": {
+        "checksum": "809667393311589960",
+        "duration_ns": 148385092
+      },
+      "recursion": {
+        "checksum": "33385282",
+        "duration_ns": 183272160
+      },
+      "stringBuilding": {
+        "checksum": "-609121604069",
+        "duration_ns": 33385972
+      }
+    },
+    "method": "minimum of five measured runs after three in-process warm-ups",
+    "missing": [],
+    "status": "complete",
+    "suite_checksum": 0
+  }
+}

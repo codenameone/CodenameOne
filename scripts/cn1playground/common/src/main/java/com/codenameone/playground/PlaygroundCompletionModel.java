@@ -31,12 +31,10 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * "Faux reflection" completion model for the playground Java editor. Mirrors the type inference the
- * old Monaco integration performed in {@code editor.js}, but here it runs in Java against the same
+ * previous browser-based editor performed in JavaScript, but here it runs in Java against the same
  * {@link GeneratedCN1Access} index (the CN1-safe reflection surface). Given a receiver expression
  * like {@code button.} it resolves the receiver's declared type and lists that type's methods and
  * fields; with no receiver it offers the in-scope globals, visible type names and keywords.
@@ -69,12 +67,6 @@ final class PlaygroundCompletionModel {
             "import", "new", "return", "if", "else", "for", "while", "class", "void", "int",
             "boolean", "final", "static", "public", "private"
     };
-
-    // `Type name (= | ; | ,)` -- a local declaration, so `name` maps to `Type`.
-    private static final Pattern DECLARATION =
-            Pattern.compile("\\b([A-Z][A-Za-z0-9_$.<>\\[\\]]*)\\s+([a-zA-Z_$][A-Za-z0-9_$]*)\\s*(=|;|,)");
-    private static final Pattern EXPLICIT_IMPORT =
-            Pattern.compile("(?m)^\\s*import\\s+([a-zA-Z0-9_$.]+)\\s*;\\s*$");
 
     private static PlaygroundCompletionModel instance;
 
@@ -138,9 +130,11 @@ final class PlaygroundCompletionModel {
         for (String pkg : DEFAULT_IMPORTS) {
             mergePackage(visible, pkg);
         }
-        Matcher m = EXPLICIT_IMPORT.matcher(code);
-        while (m.find()) {
-            String imported = m.group(1);
+        for (String line : splitLines(code)) {
+            String imported = importedName(line);
+            if (imported == null) {
+                continue;
+            }
             if (imported.endsWith(".*")) {
                 mergePackage(visible, imported.substring(0, imported.length() - 2));
             } else {
@@ -151,6 +145,26 @@ final class PlaygroundCompletionModel {
             visible.put(g.getKey(), g.getValue());
         }
         return visible;
+    }
+
+    /// If `line` is exactly an `import a.b.C;` (or `import a.b.*;`) statement, returns the imported
+    /// name (`a.b.C` / `a.b.*`); otherwise null. Manual parse -- java.util.regex is not CN1-safe.
+    private static String importedName(String line) {
+        String s = line.trim();
+        if (!s.startsWith("import ") || !s.endsWith(";")) {
+            return null;
+        }
+        String body = s.substring("import ".length(), s.length() - 1).trim();
+        if (body.length() == 0) {
+            return null;
+        }
+        for (int i = 0; i < body.length(); i++) {
+            char c = body.charAt(i);
+            if (!isIdentPart(c) && c != '.' && c != '*') {
+                return null;
+            }
+        }
+        return body;
     }
 
     /// Resolves the qualified type of a receiver token: a bound global, a directly referenced type, or
@@ -165,22 +179,94 @@ final class PlaygroundCompletionModel {
         if (visible.containsKey(receiver)) {
             return visible.get(receiver);
         }
-        Matcher m = DECLARATION.matcher(code);
+        return declaredType(code, receiver, visible);
+    }
+
+    /// Scans for a local declaration `Type receiver (= | ; | ,)` and resolves the type. Manual parse --
+    /// java.util.regex is not CN1-safe. The last matching declaration wins.
+    private String declaredType(String code, String receiver, Map<String, String> visible) {
         String resolved = "";
-        while (m.find()) {
-            if (!receiver.equals(m.group(2))) {
+        int from = 0;
+        while (true) {
+            int at = code.indexOf(receiver, from);
+            if (at < 0) {
+                break;
+            }
+            from = at + receiver.length();
+            // receiver must be a whole identifier
+            if (at > 0 && isIdentPart(code.charAt(at - 1))) {
                 continue;
             }
-            String typeToken = sanitizeTypeToken(m.group(1));
+            int after = from;
+            if (after < code.length() && isIdentPart(code.charAt(after))) {
+                continue;
+            }
+            after = skipSpace(code, after);
+            if (after >= code.length()) {
+                continue;
+            }
+            char sep = code.charAt(after);
+            if (sep != '=' && sep != ';' && sep != ',') {
+                continue;
+            }
+            // the token before `receiver` must be a capitalized type
+            int typeEnd = skipSpaceBack(code, at);
+            int typeStart = typeEnd;
+            while (typeStart > 0 && isTypeChar(code.charAt(typeStart - 1))) {
+                typeStart--;
+            }
+            if (typeStart >= typeEnd) {
+                continue;
+            }
+            char first = code.charAt(typeStart);
+            if (first < 'A' || first > 'Z') {
+                continue;
+            }
+            String typeToken = sanitizeTypeToken(code.substring(typeStart, typeEnd));
             String fqcn = visible.get(typeToken);
             if (fqcn == null) {
                 fqcn = simpleToQualified.get(typeToken);
             }
             if (fqcn != null) {
-                resolved = fqcn; // last declaration wins (closest to the reference is usually latest)
+                resolved = fqcn;
             }
         }
         return resolved;
+    }
+
+    private static boolean isTypeChar(char c) {
+        return isIdentPart(c) || c == '.' || c == '<' || c == '>' || c == '[' || c == ']';
+    }
+
+    private static int skipSpace(String s, int i) {
+        while (i < s.length() && isSpace(s.charAt(i))) {
+            i++;
+        }
+        return i;
+    }
+
+    private static int skipSpaceBack(String s, int i) {
+        while (i > 0 && isSpace(s.charAt(i - 1))) {
+            i--;
+        }
+        return i;
+    }
+
+    private static boolean isSpace(char c) {
+        return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f';
+    }
+
+    private static List<String> splitLines(String text) {
+        List<String> out = new ArrayList<String>();
+        int start = 0;
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) == '\n') {
+                out.add(text.substring(start, i));
+                start = i + 1;
+            }
+        }
+        out.add(text.substring(start));
+        return out;
     }
 
     /// Member display strings (fields, then method signatures) for the given qualified type.

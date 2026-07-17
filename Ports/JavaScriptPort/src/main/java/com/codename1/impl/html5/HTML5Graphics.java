@@ -457,13 +457,23 @@ public class HTML5Graphics {
     }
 
     /**
+     * In-place Liquid Glass material; see
+     * {@link com.codename1.impl.html5.graphics.GlassRegion}.
+     */
+    public void glassRegion(int x, int y, int width, int height, float radius, float cornerRadius,
+            float saturation, float scale, float offset, float refraction, float specular) {
+        dispatchOp(new com.codename1.impl.html5.graphics.GlassRegion(x, y, width, height,
+                radius, cornerRadius, saturation, scale, offset, refraction, specular));
+    }
+
+    /**
      * In-place selection-drop lens (magnify + tint); see
      * {@link com.codename1.impl.html5.graphics.LensRegion}.
      */
     public void lensRegion(int x, int y, int width, int height, float cornerRadius, float magnify,
-            int tintColor, float tintStrength) {
+            float aberration, int tintColor, float tintStrength) {
         dispatchOp(new com.codename1.impl.html5.graphics.LensRegion(x, y, width, height, cornerRadius,
-                magnify, tintColor, tintStrength));
+                magnify, aberration, tintColor, tintStrength));
     }
 
     public void clearRect(int x, int y, int width, int height) {

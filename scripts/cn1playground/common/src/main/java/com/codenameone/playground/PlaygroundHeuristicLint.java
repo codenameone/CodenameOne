@@ -29,19 +29,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
- * Client-side heuristic linter for the playground Java editor, ported from the old Monaco
- * {@code editor.js}. It surfaces the common mistakes that the interpreter's own diagnostics miss on
+ * Client-side heuristic linter for the playground Java editor, ported from the previous
+ * browser-based editor. It surfaces the common mistakes that the interpreter's own diagnostics miss on
  * the fly (before a run completes, and regardless of how leniently the interpreter recovers):
  * unbalanced brackets and references to unknown types. Reported as {@link CodeDiagnostic}s the editor
  * draws as squiggles.
  */
 final class PlaygroundHeuristicLint {
 
-    private static final Pattern TYPE_TOKEN = Pattern.compile("\\b([A-Z][A-Za-z0-9_]*)\\b");
     private static final List<String> ALWAYS_CHECK = Arrays.asList(
             "Component", "Object", "String", "Integer", "Long", "Boolean", "Double", "Float");
 
@@ -138,18 +135,30 @@ final class PlaygroundHeuristicLint {
 
     private static void collectUnknownTypeMarkers(List<CodeDiagnostic> markers, String line, int lineNumber,
             PlaygroundCompletionModel model, Map<String, String> visible) {
-        Matcher m = TYPE_TOKEN.matcher(line);
-        while (m.find()) {
-            String token = m.group(1);
-            int index = m.start();
-            if (isIgnoredTypeToken(line, token, index)) {
-                continue;
-            }
-            if (!model.isKnownType(token, visible)) {
-                markers.add(warning(lineNumber, index + 1, lineNumber, index + token.length() + 1,
-                        "Unknown type " + token));
+        // Scan for capitalized identifiers ([A-Z][A-Za-z0-9_]*) manually -- java.util.regex is not
+        // CN1-safe. Only whole tokens (not preceded/followed by an identifier char) count.
+        int i = 0;
+        int n = line.length();
+        while (i < n) {
+            char c = line.charAt(i);
+            if (c >= 'A' && c <= 'Z' && (i == 0 || !isTokenChar(line.charAt(i - 1)))) {
+                int start = i;
+                i++;
+                while (i < n && isTokenChar(line.charAt(i))) {
+                    i++;
+                }
+                String token = line.substring(start, i);
+                if (!isIgnoredTypeToken(line, token, start) && !model.isKnownType(token, visible)) {
+                    markers.add(warning(lineNumber, start + 1, lineNumber, i + 1, "Unknown type " + token));
+                }
+            } else {
+                i++;
             }
         }
+    }
+
+    private static boolean isTokenChar(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
     }
 
     private static boolean isIgnoredTypeToken(String line, String token, int index) {

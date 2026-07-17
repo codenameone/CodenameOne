@@ -30,21 +30,58 @@ NATIVEREF_BUILD_ONLY=1 "$ROOT/scripts/build-ios-native-ref.sh" "$UDID"
 
 mkdir -p "$OUT_DIR"
 xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
-log "Launching $ANIM/$APPEARANCE animation"
-SIMCTL_CHILD_NATIVEREF_MODE=animate \
-SIMCTL_CHILD_NATIVEREF_ANIM="$ANIM" \
-SIMCTL_CHILD_NATIVEREF_APPEARANCE="$APPEARANCE" \
-xcrun simctl launch "$UDID" "$BUNDLE_ID" >/dev/null
-sleep 2
 
-log "Recording ${SECONDS_TO_RECORD}s -> $OUT"
-rm -f "$OUT"
-xcrun simctl io "$UDID" recordVideo --codec h264 --force "$OUT" &
-REC_PID=$!
-sleep "$SECONDS_TO_RECORD"
-kill -INT "$REC_PID" 2>/dev/null || true
-wait "$REC_PID" 2>/dev/null || true
-xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
+if [ "$ANIM" = "tabs" ]; then
+  # UIKit plays the FULL Liquid Glass tab-selection morph (the frosted
+  # refracting drop) only for genuine touch-driven selection; programmatic
+  # selectedIndex changes play a flat simplified platter slide. Drive the
+  # NativeRef tab bar with REAL taps via the committed XCUITest tap driver
+  # (needs xcodegen, like the input-validation iOS driver).
+  if ! command -v xcodegen >/dev/null 2>&1; then
+    log "xcodegen not on PATH (brew install xcodegen) -- required for tap-driven tab recording" >&2
+    exit 3
+  fi
+  DRIVER_SRC="$ROOT/scripts/fidelity-app/ios-native-ref/tap-driver"
+  DRIVER_TMP="$(mktemp -d)/tap-driver"
+  cp -R "$DRIVER_SRC" "$DRIVER_TMP"
+  (cd "$DRIVER_TMP" && xcodegen generate >/dev/null)
+  log "Building tap driver (xcodebuild build-for-testing)"
+  xcodebuild build-for-testing \
+      -project "$DRIVER_TMP/NativeRefTapDriver.xcodeproj" \
+      -scheme NativeRefTapDriverUITests \
+      -destination "id=$UDID" >/dev/null 2>&1
+  log "Recording tap-driven $ANIM/$APPEARANCE morph -> $OUT"
+  rm -f "$OUT"
+  xcrun simctl io "$UDID" recordVideo --codec h264 --force "$OUT" &
+  REC_PID=$!
+  TEST_RUNNER_TAPDRIVER_APPEARANCE="$APPEARANCE" \
+  xcodebuild test-without-building \
+      -project "$DRIVER_TMP/NativeRefTapDriver.xcodeproj" \
+      -scheme NativeRefTapDriverUITests \
+      -destination "id=$UDID" >/dev/null 2>&1 || {
+    kill -INT "$REC_PID" 2>/dev/null || true
+    log "FATAL: tap-driver test run failed"; exit 4
+  }
+  kill -INT "$REC_PID" 2>/dev/null || true
+  wait "$REC_PID" 2>/dev/null || true
+  xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
+else
+  log "Launching $ANIM/$APPEARANCE animation"
+  SIMCTL_CHILD_NATIVEREF_MODE=animate \
+  SIMCTL_CHILD_NATIVEREF_ANIM="$ANIM" \
+  SIMCTL_CHILD_NATIVEREF_APPEARANCE="$APPEARANCE" \
+  xcrun simctl launch "$UDID" "$BUNDLE_ID" >/dev/null
+  sleep 2
+
+  log "Recording ${SECONDS_TO_RECORD}s -> $OUT"
+  rm -f "$OUT"
+  xcrun simctl io "$UDID" recordVideo --codec h264 --force "$OUT" &
+  REC_PID=$!
+  sleep "$SECONDS_TO_RECORD"
+  kill -INT "$REC_PID" 2>/dev/null || true
+  wait "$REC_PID" 2>/dev/null || true
+  xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
+fi
 
 if [ -s "$OUT" ]; then
   log "Wrote $(du -h "$OUT" | cut -f1) reference video: $OUT"
