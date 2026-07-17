@@ -75,6 +75,17 @@ public class DrawString extends AbstractGraphicsScreenshotTest {
         return "graphics-draw-string";
     }
 
+    @Override
+    protected long extraSettleBeforeCaptureMillis() {
+        // Android can finish loading the native/emoji fallback run after the
+        // mutable-image AA-on cell's first paint. Without a forced repaint the
+        // screenshot occasionally preserves that transient frame only in the
+        // final baseline label (white fallback text instead of settled red
+        // italic text). Repaint after the normal form settle and let that paint
+        // complete before capturing.
+        return 1000;
+    }
+
     private void verifyFontHashing() {
         if (!Font.isNativeFontSchemeSupported()) {
             return;
