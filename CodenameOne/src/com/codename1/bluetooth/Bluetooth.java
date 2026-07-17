@@ -174,14 +174,22 @@ public class Bluetooth {
 
     /// Called by ports (from any thread) when the adapter transitions to a
     /// new state; dispatches to the registered listeners on the EDT.
-    protected final void fireAdapterStateChanged(final AdapterState newState) {
-        final Object[] snapshot;
+    protected final void fireAdapterStateChanged(AdapterState newState) {
+        Object[] snapshot;
         synchronized (this) {
             if (adapterListeners == null || adapterListeners.isEmpty()) {
                 return;
             }
             snapshot = adapterListeners.toArray();
         }
+        dispatchAdapterState(snapshot, newState);
+    }
+
+    // The dispatch lives in a static method so the Runnable doesn't carry a
+    // synthetic outer-Bluetooth reference (SpotBugs
+    // SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static void dispatchAdapterState(final Object[] snapshot,
+            final AdapterState newState) {
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
                 for (int i = 0; i < snapshot.length; i++) {

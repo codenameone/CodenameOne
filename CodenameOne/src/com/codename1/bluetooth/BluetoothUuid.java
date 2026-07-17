@@ -161,9 +161,16 @@ public final class BluetoothUuid {
         return v;
     }
 
+    /// Lowercase hex digits: Character.forDigit is not part of the device
+    /// API surface (CLDC11), so the mapping is spelled out here.
+    private static final char[] HEX = {
+        '0', '1', '2', '3', '4', '5', '6', '7',
+        '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
+    };
+
     private static void appendHex(StringBuilder sb, long value, int digits) {
         for (int i = digits - 1; i >= 0; i--) {
-            sb.append(Character.forDigit((int) ((value >> (i * 4)) & 0xf), 16));
+            sb.append(HEX[(int) ((value >> (i * 4)) & 0xf)]);
         }
     }
 

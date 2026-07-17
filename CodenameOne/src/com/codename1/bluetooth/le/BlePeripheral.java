@@ -62,6 +62,7 @@ public abstract class BlePeripheral extends BluetoothDevice {
     private ConnectionState state = ConnectionState.DISCONNECTED;
     private AsyncResource<BlePeripheral> pendingConnect;
     private TimerTask connectTimeout;
+    private java.util.Timer connectTimeoutTimer;
     private ArrayList<ConnectionListener> connectionListeners;
     private ArrayList<GattService> services;
     private final HashMap<GattCharacteristic, ArrayList<GattNotificationListener>>
@@ -116,19 +117,12 @@ public abstract class BlePeripheral extends BluetoothDevice {
         });
         setState(ConnectionState.CONNECTING, null);
         if (opts.getTimeout() > 0) {
-            TimerTask t = new TimerTask() {
-                public void run() {
-                    if (!out.isDone()) {
-                        out.error(new BluetoothException(BluetoothError.TIMEOUT,
-                                "Connect attempt timed out after "
-                                        + opts.getTimeout() + "ms"));
-                    }
-                }
-            };
+            TimerTask t = connectTimeoutTask(out, opts.getTimeout());
             synchronized (stateLock) {
                 connectTimeout = t;
+                connectTimeoutTimer =
+                        GattOperationQueue.schedule(t, opts.getTimeout());
             }
-            GattOperationQueue.schedule(t, opts.getTimeout());
         }
         try {
             doConnect(opts, out);
@@ -141,6 +135,21 @@ public abstract class BlePeripheral extends BluetoothDevice {
         return out;
     }
 
+    // Static so the TimerTask doesn't carry a synthetic outer-BlePeripheral
+    // reference (SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static TimerTask connectTimeoutTask(
+            final AsyncResource<BlePeripheral> out, final int timeout) {
+        return new TimerTask() {
+            public void run() {
+                if (!out.isDone()) {
+                    out.error(new BluetoothException(BluetoothError.TIMEOUT,
+                            "Connect attempt timed out after " + timeout
+                                    + "ms"));
+                }
+            }
+        };
+    }
+
     private void connectFinished(AsyncResource<BlePeripheral> out,
             Throwable err) {
         synchronized (stateLock) {
@@ -150,6 +159,10 @@ public abstract class BlePeripheral extends BluetoothDevice {
             if (connectTimeout != null) {
                 connectTimeout.cancel();
                 connectTimeout = null;
+            }
+            if (connectTimeoutTimer != null) {
+                connectTimeoutTimer.cancel();
+                connectTimeoutTimer = null;
             }
         }
         if (err == null) {
@@ -637,6 +650,14 @@ public abstract class BlePeripheral extends BluetoothDevice {
             }
             snapshot = list.toArray();
         }
+        dispatchNotification(snapshot, c, value);
+    }
+
+    // The dispatch helpers are static so their Runnables don't carry a
+    // synthetic outer-BlePeripheral reference (SpotBugs
+    // SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static void dispatchNotification(final Object[] snapshot,
+            final GattCharacteristic c, final byte[] value) {
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
                 for (int i = 0; i < snapshot.length; i++) {
@@ -708,17 +729,21 @@ public abstract class BlePeripheral extends BluetoothDevice {
             }
         }
         if (snapshot != null) {
-            final ConnectionEvent ev = new ConnectionEvent(this, newState,
-                    reason);
-            Display.getInstance().callSerially(new Runnable() {
-                public void run() {
-                    for (int i = 0; i < snapshot.length; i++) {
-                        ((ConnectionListener) snapshot[i])
-                                .connectionStateChanged(ev);
-                    }
-                }
-            });
+            dispatchConnectionEvent(snapshot,
+                    new ConnectionEvent(this, newState, reason));
         }
+    }
+
+    private static void dispatchConnectionEvent(final Object[] snapshot,
+            final ConnectionEvent ev) {
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                for (int i = 0; i < snapshot.length; i++) {
+                    ((ConnectionListener) snapshot[i])
+                            .connectionStateChanged(ev);
+                }
+            }
+        });
     }
 
     private boolean failIfNotConnected(AsyncResource<?> out) {

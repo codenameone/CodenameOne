@@ -282,6 +282,13 @@ public class BluetoothLE {
         if (targets.isEmpty()) {
             return;
         }
+        dispatchScanResult(targets, result);
+    }
+
+    // Static so the Runnable doesn't carry a synthetic outer-BluetoothLE
+    // reference (SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static void dispatchScanResult(
+            final ArrayList<ScanListener> targets, final ScanResult result) {
         Display.getInstance().callSerially(new Runnable() {
             public void run() {
                 int size = targets.size();

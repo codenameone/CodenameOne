@@ -45,6 +45,7 @@ final class GattOperationQueue {
     abstract static class Op {
         final AsyncResource<?> result;
         TimerTask timeoutTask;
+        Timer timeoutTimer;
 
         Op(AsyncResource<?> result) {
             this.result = result;
@@ -52,8 +53,6 @@ final class GattOperationQueue {
 
         abstract void start();
     }
-
-    private static Timer timeoutTimer;
 
     private final Object lock = new Object();
     private final LinkedList<Op> pending = new LinkedList<Op>();
@@ -166,7 +165,7 @@ final class GattOperationQueue {
             }
         };
         op.timeoutTask = task;
-        sharedTimer().schedule(task, t);
+        op.timeoutTimer = schedule(task, t);
     }
 
     private void cancelTimeout(Op op) {
@@ -175,18 +174,24 @@ final class GattOperationQueue {
             op.timeoutTask = null;
             task.cancel();
         }
-    }
-
-    /// Schedules a task on the shared daemon timer -- also used by
-    /// [BlePeripheral] for connect timeouts.
-    static void schedule(TimerTask task, int delayMillis) {
-        sharedTimer().schedule(task, delayMillis);
-    }
-
-    private static synchronized Timer sharedTimer() {
-        if (timeoutTimer == null) {
-            timeoutTimer = new Timer(true);
+        Timer timer = op.timeoutTimer;
+        if (timer != null) {
+            op.timeoutTimer = null;
+            // ends the timer thread rather than leaving it parked for the
+            // life of the process
+            timer.cancel();
         }
-        return timeoutTimer;
+    }
+
+    /// Schedules a one-shot task on its own timer and returns it so the
+    /// caller can cancel both task and timer. A timer per pending timeout
+    /// mirrors `Display.setTimeout` and keeps the device API surface
+    /// (CLDC11) satisfied -- it declares no daemon-thread constructor, and
+    /// a shared non-daemon timer would keep a desktop JVM alive after the
+    /// app closes. Also used by [BlePeripheral] for connect timeouts.
+    static Timer schedule(TimerTask task, int delayMillis) {
+        Timer timer = new Timer();
+        timer.schedule(task, delayMillis);
+        return timer;
     }
 }

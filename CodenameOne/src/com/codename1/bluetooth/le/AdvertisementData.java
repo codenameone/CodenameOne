@@ -162,7 +162,10 @@ public class AdvertisementData {
         try {
             return new String(raw, off, len, "UTF-8");
         } catch (java.io.UnsupportedEncodingException e) {
-            return new String(raw, off, len);
+            // every platform we run on ships UTF-8; decoding the name with
+            // whatever the default encoding happens to be would silently
+            // corrupt it, so treat this as impossible rather than guess
+            throw new IllegalStateException("UTF-8 is unavailable: " + e);
         }
     }
 
