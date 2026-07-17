@@ -53,10 +53,25 @@ final class PlaygroundCodeEditor {
         }
     }
 
+    /// CSS property names Codename One's CSS compiler understands, offered as completions in the CSS
+    /// editor (the editor filters by the typed prefix).
+    private static final String[] CSS_PROPERTIES = {
+        "background", "background-color", "background-image", "background-repeat", "background-size",
+        "backdrop-filter", "border", "border-top", "border-right", "border-bottom", "border-left",
+        "border-color", "border-width", "border-style", "border-radius", "border-image", "box-shadow",
+        "color", "cursor", "elevation", "filter", "font", "font-family", "font-size", "font-stretch",
+        "font-style", "font-weight", "height", "icon-gap", "letter-spacing", "line-height", "margin",
+        "margin-top", "margin-right", "margin-bottom", "margin-left", "max-height", "max-width",
+        "min-height", "min-width", "opacity", "padding", "padding-top", "padding-right",
+        "padding-bottom", "padding-left", "text-align", "text-decoration", "text-transform",
+        "width"
+    };
+
     private final CodeEditor editor;
     private final TextArea messages;
     private final Container component;
     private final Listener listener;
+    private final Mode mode;
     private List<PlaygroundRunner.InlineMessage> inlineMessages = new ArrayList<PlaygroundRunner.InlineMessage>();
     private final List<String> uiidCompletions = new ArrayList<String>();
     private boolean completionProviderInstalled;
@@ -66,6 +81,7 @@ final class PlaygroundCodeEditor {
 
     PlaygroundCodeEditor(Mode mode, String source, boolean darkMode, Listener listener) {
         Mode actualMode = mode == null ? Mode.JAVA : mode;
+        this.mode = actualMode;
         this.source = source == null ? "" : source;
         this.listener = listener;
 
@@ -138,9 +154,23 @@ final class PlaygroundCodeEditor {
             editor.setCompletionProvider((ed, code, cursor, results) -> {
                 List<CodeCompletion> out = new ArrayList<CodeCompletion>();
                 java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<String>();
-                for (String uiid : uiidCompletions) {
-                    if (seen.add(uiid)) {
-                        out.add(new CodeCompletion(uiid).setType("uiid"));
+                if (mode == Mode.CSS) {
+                    // CSS pane: property names plus the UIID selectors visible in the preview.
+                    for (String property : CSS_PROPERTIES) {
+                        if (seen.add(property)) {
+                            out.add(new CodeCompletion(property).setType("property"));
+                        }
+                    }
+                    for (String uiid : uiidCompletions) {
+                        if (seen.add(uiid)) {
+                            out.add(new CodeCompletion(uiid).setType("uiid"));
+                        }
+                    }
+                } else {
+                    for (String uiid : uiidCompletions) {
+                        if (seen.add(uiid)) {
+                            out.add(new CodeCompletion(uiid).setType("uiid"));
+                        }
                     }
                 }
                 // Offer identifiers already present in the source so partially typed variable / method
