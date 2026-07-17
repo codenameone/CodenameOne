@@ -106,4 +106,4 @@ jobs:
         if: github.ref == 'refs/heads/master'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run website-docs.yml --ref master
+        run: gh workflow run website-docs.yml --ref master -f deploy_production=true
