@@ -140,6 +140,10 @@ public class BluetoothLE {
     /// The peripherals the *system* currently holds connected (e.g.
     /// paired wearables), optionally filtered to those offering the given
     /// service. Empty on ports without BLE.
+    ///
+    /// iOS filters exactly (CoreBluetooth resolves services); Android can
+    /// only consult its cached SDP/GATT UUIDs, so the filter is
+    /// best-effort there and devices with an empty cache are retained.
     public List<BlePeripheral> getConnectedPeripherals(
             BluetoothUuid serviceFilter) {
         return new ArrayList<BlePeripheral>();
@@ -289,7 +293,10 @@ public class BluetoothLE {
     }
 
     /// Reports that the OS aborted the platform scan; every active handle
-    /// fails with the given reason and the registry is cleared.
+    /// fails with the given reason and the registry is cleared. The base
+    /// class does NOT call [#stopPlatformScan()] on this path -- the
+    /// platform scan is presumed dead, so ports must clean up their own
+    /// scanner state before (or when) calling this.
     protected final void fireScanFailed(BluetoothException reason) {
         final ArrayList<ScanRegistration> failed;
         synchronized (scanLock) {
