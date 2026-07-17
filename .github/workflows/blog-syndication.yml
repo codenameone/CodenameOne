@@ -38,7 +38,9 @@ jobs:
           python-version: '3.12'
 
       - name: Run syndication regression tests
-        run: python3 scripts/website/test_syndicate_blog_posts.py
+        run: |
+          python3 scripts/website/test_syndicate_blog_posts.py
+          python3 scripts/website/test_syndication_health.py
 
       - name: Run API syndication script
         id: syndicate_api
