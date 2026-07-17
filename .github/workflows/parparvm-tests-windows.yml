@@ -63,11 +63,9 @@ jobs:
           - name: x64
             runner: windows-latest
             msvc_arch: amd64
-            experimental: false
           - name: arm64
             runner: windows-11-arm
             msvc_arch: arm64
-            experimental: true
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -215,7 +213,8 @@ jobs:
   # bytecode for the native arm64 leg (windows-port-screenshot-arm64). Pull
   # requests render review artifacts; master runs also produce the durable
   # Windows ARM64 compliance report consumed by the static Port Status page.
-  # Separate from the clean-target gate so a rendering hiccup never blocks merges.
+  # Separate from the clean-target gate so rendering failures are reported as
+  # their own blocking check with dedicated diagnostics.
   windows-port-screenshot:
     name: screenshot-capture (x64)
     if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -314,7 +313,7 @@ jobs:
           if (!(Test-Path "$out/com/codename1/generated/svg/SVGRegistry.class")) { throw "transcode-svg did not produce SVGRegistry" }
 
       - name: Upload hellocodenameone-common classes
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/upload-artifact-with-retry
         with:
           name: windows-port-common-classes
           path: scripts/hellocodenameone/common/target/classes
@@ -328,7 +327,7 @@ jobs:
       # aarch64. Uploaded before the capture step so an x64 capture flake does not
       # block the arm64 leg.
       - name: Upload compiled core + port classes
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/upload-artifact-with-retry
         with:
           name: windows-port-classes
           path: |
@@ -349,16 +348,17 @@ jobs:
       # Fetch the WebView2 SDK so buildHelloCodenameOneExe's CMake compiles the
       # native BrowserComponent peer (cn1_windows_browser.cpp) and links the
       # static loader. WEBVIEW2_SDK_DIR is exported for the capture step below.
-      # Non-fatal: if it fails the browser natives compile as stubs and the
-      # BrowserComponent screenshot is simply absent (no regression).
+      # The fetch script retries transient NuGet failures and fails after bounded
+      # exhaustion. Building browser stubs would silently drop BrowserComponent
+      # coverage, so an unavailable SDK must remain a blocking failure.
       - name: Fetch WebView2 SDK (for the BrowserComponent peer)
-        continue-on-error: true
         shell: pwsh
         run: |
           & "${{ github.workspace }}\scripts\windows\fetch-webview2-sdk.ps1"
-          if (Test-Path "C:\webview2sdk\pkg\build\native\include\WebView2.h") {
-            "WEBVIEW2_SDK_DIR=C:\webview2sdk\pkg\build\native" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          if (!(Test-Path "C:\webview2sdk\pkg\build\native\include\WebView2.h")) {
+            throw "WebView2 SDK header missing after successful fetch"
           }
+          "WEBVIEW2_SDK_DIR=C:\webview2sdk\pkg\build\native" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Build JavaAPI + capture screenshot suite over WebSocket
         working-directory: vm
@@ -389,7 +389,7 @@ jobs:
 
       - name: Upload screenshot artifact (x64)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/upload-artifact-with-retry
         with:
           name: windows-port-screenshot-raw-x64
           path: artifacts/windows-port/raw
@@ -399,8 +399,8 @@ jobs:
   # Native arm64 leg of the screenshot capture: reuses the core + port bytecode
   # compiled by the x64 job (architecture-independent), then translates +
   # clang-cl-builds a native arm64 exe on the windows-11-arm runner and captures
-  # the same Contacts UI over the cn1ss WebSocket. It is advisory on pull
-  # requests but strict for the master report.
+  # the same Contacts UI over the cn1ss WebSocket. Failures are blocking on pull
+  # requests and on master-report runs.
   windows-port-screenshot-arm64:
     name: screenshot-capture (arm64)
     needs: windows-port-screenshot
@@ -444,7 +444,7 @@ jobs:
           cache: 'maven'
 
       - name: Restore compiled core + port classes
-        uses: actions/download-artifact@v4
+        uses: ./.github/actions/download-artifact-with-retry
         with:
           name: windows-port-classes
           path: maven
@@ -453,7 +453,7 @@ jobs:
       # Temurin JDK 8/11), so the hellocodenameone-common bytecode is built once on
       # the x64 leg and reused here (it is architecture-independent).
       - name: Restore hellocodenameone-common classes
-        uses: actions/download-artifact@v4
+        uses: ./.github/actions/download-artifact-with-retry
         with:
           name: windows-port-common-classes
           path: scripts/hellocodenameone/common/target/classes
@@ -474,16 +474,17 @@ jobs:
       # Fetch the WebView2 SDK so buildHelloCodenameOneExe's CMake compiles the
       # native BrowserComponent peer (cn1_windows_browser.cpp) and links the
       # static loader. WEBVIEW2_SDK_DIR is exported for the capture step below.
-      # Non-fatal: if it fails the browser natives compile as stubs and the
-      # BrowserComponent screenshot is simply absent (no regression).
+      # The fetch script retries transient NuGet failures and fails after bounded
+      # exhaustion. Building browser stubs would silently drop BrowserComponent
+      # coverage, so an unavailable SDK must remain a blocking failure.
       - name: Fetch WebView2 SDK (for the BrowserComponent peer)
-        continue-on-error: true
         shell: pwsh
         run: |
           & "${{ github.workspace }}\scripts\windows\fetch-webview2-sdk.ps1"
-          if (Test-Path "C:\webview2sdk\pkg\build\native\include\WebView2.h") {
-            "WEBVIEW2_SDK_DIR=C:\webview2sdk\pkg\build\native" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          if (!(Test-Path "C:\webview2sdk\pkg\build\native\include\WebView2.h")) {
+            throw "WebView2 SDK header missing after successful fetch"
           }
+          "WEBVIEW2_SDK_DIR=C:\webview2sdk\pkg\build\native" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Build JavaAPI + capture screenshot suite over WebSocket
         working-directory: vm
@@ -519,7 +520,7 @@ jobs:
 
       - name: Upload screenshot artifact (arm64)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/upload-artifact-with-retry
         with:
           name: windows-port-screenshot-raw-arm64
           path: artifacts/windows-port/raw
@@ -553,7 +554,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
       - name: Download x64 screenshot artifact
-        uses: actions/download-artifact@v4
+        uses: ./.github/actions/download-artifact-with-retry
         with:
           name: windows-port-screenshot-raw-x64
           path: artifacts/windows-port/raw
@@ -614,6 +615,7 @@ jobs:
     if: >-
       always() &&
       needs.windows-port-screenshot-arm64.result != 'cancelled' &&
+      needs.windows-port-screenshot-arm64.result != 'skipped' &&
       (github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     permissions:
@@ -632,7 +634,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
       - name: Download arm64 screenshot artifact
-        uses: actions/download-artifact@v4
+        uses: ./.github/actions/download-artifact-with-retry
         with:
           name: windows-port-screenshot-raw-arm64
           path: artifacts/windows-port/raw
@@ -660,8 +662,7 @@ jobs:
           source scripts/lib/cn1ss.sh
           cn1ss_setup "$JAVA_HOME/bin/java" "$(pwd)/scripts/common/java"
           REF_DIR="$(pwd)/scripts/windows/screenshots"
-          # Same gate as the x64 leg. The experimental runner is advisory only
-          # on pull requests; master and scheduled evidence is strict.
+          # Same blocking gate as the x64 leg.
           export CN1SS_FAIL_ON_MISMATCH=1
           export CN1SS_ALLOWED_MISSING=0
           export CN1SS_PORT_ID=windows-arm64
@@ -688,7 +689,7 @@ jobs:
 
       - name: Upload Windows ARM64 port status
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: ./.github/actions/upload-artifact-with-retry
         with:
           name: port-status-windows-arm64
           path: artifacts/windows-port/port-status-windows-arm64.json
