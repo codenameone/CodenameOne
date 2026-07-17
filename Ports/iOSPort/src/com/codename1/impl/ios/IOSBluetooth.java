@@ -337,6 +337,13 @@ public final class IOSBluetooth extends Bluetooth {
         }
     }
 
+    // Character.forDigit is not part of the device API surface (CLDC11);
+    // ParparVM would translate it to an undeclared C function.
+    private static final char[] HEX = {
+        '0', '1', '2', '3', '4', '5', '6', '7',
+        '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
+    };
+
     static String bytesToHex(byte[] b) {
         if (b == null) {
             return "";
@@ -344,8 +351,8 @@ public final class IOSBluetooth extends Bluetooth {
         StringBuilder sb = new StringBuilder(b.length * 2);
         for (int i = 0; i < b.length; i++) {
             int v = b[i] & 0xFF;
-            sb.append(Character.forDigit(v >> 4, 16));
-            sb.append(Character.forDigit(v & 0xF, 16));
+            sb.append(HEX[v >> 4]);
+            sb.append(HEX[v & 0xF]);
         }
         return sb.toString();
     }
