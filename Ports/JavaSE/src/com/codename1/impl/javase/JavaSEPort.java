@@ -9128,6 +9128,25 @@ public class JavaSEPort extends CodenameOneImplementation {
             Display.getInstance().setDefaultVirtualKeyboard(null);
         }
 
+        // Deterministic visual probes sometimes need to render at the physical
+        // density of a reference device while keeping the Simulator window small
+        // enough to fit the host display. A skin normally supplies this value via
+        // ppi/pixelRatio; this opt-in override decouples density from window chrome
+        // and is intentionally applied after skin/desktop-mode initialization.
+        String forcedPixelMilliRatio = System.getProperty("cn1.javase.pixelMilliRatio");
+        if (forcedPixelMilliRatio != null) {
+            try {
+                double ratio = Double.parseDouble(forcedPixelMilliRatio.trim());
+                if (ratio > 0) {
+                    pixelMilliRatio = Double.valueOf(ratio);
+                    setDefaultPixelMilliRatio(pixelMilliRatio);
+                }
+            } catch (NumberFormatException err) {
+                System.err.println("Ignoring invalid cn1.javase.pixelMilliRatio="
+                        + forcedPixelMilliRatio);
+            }
+        }
+
         float factor = ((float) getDisplayHeight()) / 480.0f;
         if (factor > 0 && autoAdjustFontSize && getSkin() != null) {
             // set a reasonable default font size
@@ -17200,7 +17219,180 @@ public class JavaSEPort extends CodenameOneImplementation {
             return false;
         }
     }
- 
+
+    /// The full iOS 26 "Liquid Glass" material for backdrop-filter surfaces (the
+    /// floating tab-bar pill, glass buttons). Mirrors IOSImplementation.glassRegion's
+    /// offscreen branch step for step: read the backdrop PADDED and edge-replicated,
+    /// apply the affine colour material (saturation/scale/offset), Gaussian-blur,
+    /// then apply the rounded-shape OPTICS (edge refraction + specular rim + AA mask)
+    /// and composite the pill-shaped patch back. Without this the simulator fell
+    /// back to a plain blur, leaving the bar a flat grey where the device renders a
+    /// bright frost -- every glass-tab comparison read "murky" purely because of the
+    /// missing material under the lens.
+    @Override
+    public boolean glassRegion(Object graphics, int x, int y, int width, int height, float radius,
+            float cornerRadius, float sat, float scaleParam, float offset, float refract, float specular) {
+        if (radius <= 0f || width <= 0 || height <= 0) {
+            return true;
+        }
+        try {
+            BufferedImage dest;
+            double scale;
+            if (graphics instanceof NativeScreenGraphics) {
+                NativeScreenGraphics ng = (NativeScreenGraphics) graphics;
+                if (ng.sourceImage != null) {
+                    dest = ng.sourceImage;
+                    scale = 1.0;
+                } else if (canvas != null && canvas.edtBuffer != null) {
+                    dest = canvas.edtBuffer;
+                    scale = (double) dest.getWidth() / getDisplayWidthImpl();
+                } else {
+                    return false;
+                }
+            } else if (mutableImageGraphics.containsKey(graphics)) {
+                dest = mutableImageGraphics.get(graphics);
+                scale = 1.0;
+            } else {
+                return false;
+            }
+            int rx = (int) Math.round(x * scale);
+            int ry = (int) Math.round(y * scale);
+            int rw = (int) Math.round(width * scale);
+            int rh = (int) Math.round(height * scale);
+            int dw = dest.getWidth(), dh = dest.getHeight();
+            if (rx < 0) { rw += rx; rx = 0; }
+            if (ry < 0) { rh += ry; ry = 0; }
+            if (rx + rw > dw) { rw = dw - rx; }
+            if (ry + rh > dh) { rh = dh - ry; }
+            if (rw <= 0 || rh <= 0) {
+                return true;
+            }
+            float scaledRadius = (float) (radius * scale);
+            float scaledCorner = cornerRadius < 0 ? -1f : (float) (cornerRadius * scale);
+            // Pad by 3*radius of edge-replicated backdrop so the blur's edge fade is
+            // fully contained outside the component (see the iOS port commentary).
+            int pad = (int) Math.ceil(scaledRadius) * 3 + 1;
+            int bw = rw + 2 * pad, bh = rh + 2 * pad;
+            int ax0 = Math.max(0, rx - pad), ay0 = Math.max(0, ry - pad);
+            int ax1 = Math.min(dw, rx + rw + pad), ay1 = Math.min(dh, ry + rh + pad);
+            int aw = ax1 - ax0, ah = ay1 - ay0;
+            int[] avail = dest.getRGB(ax0, ay0, aw, ah, null, 0, aw);
+            int[] prgb = new int[bw * bh];
+            for (int by = 0; by < bh; by++) {
+                int ay = (ry - pad + by) - ay0;
+                if (ay < 0) ay = 0; else if (ay >= ah) ay = ah - 1;
+                int arow = ay * aw, brow = by * bw;
+                for (int bx = 0; bx < bw; bx++) {
+                    int ax = (rx - pad + bx) - ax0;
+                    if (ax < 0) ax = 0; else if (ax >= aw) ax = aw - 1;
+                    prgb[brow + bx] = avail[arow + ax];
+                }
+            }
+            glassMaterialInPlace(prgb, sat, scaleParam, offset);
+            BufferedImage padded = new BufferedImage(bw, bh, BufferedImage.TYPE_INT_ARGB);
+            padded.setRGB(0, 0, bw, bh, prgb, 0, bw);
+            BufferedImage blurredPadded = new GaussianFilter(scaledRadius).filter(padded, null);
+            int[] pbargb = blurredPadded.getRGB(0, 0, bw, bh, null, 0, bw);
+            int[] out = new int[rw * rh];
+            applyGlassOptics(pbargb, bw, bh, pad, out, rw, rh, scaledCorner, refract, specular);
+            BufferedImage patch = new BufferedImage(rw, rh, BufferedImage.TYPE_INT_ARGB);
+            patch.setRGB(0, 0, rw, rh, out, 0, rw);
+            Graphics2D dg = dest.createGraphics();
+            dg.drawImage(patch, rx, ry, null);
+            dg.dispose();
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /// The reverse-engineered iOS Liquid Glass colour material; mirrors
+    /// IOSImplementation.glassMaterialInPlace (validated &lt;1 LSB against a real
+    /// UIVisualEffectView): c' = clamp((lum + (c - lum) * sat) * scale + offset).
+    private static void glassMaterialInPlace(int[] argb, float sat, float scale, float offset) {
+        for (int i = 0; i < argb.length; i++) {
+            int p = argb[i];
+            int a = p & 0xff000000;
+            float r = (p >> 16) & 0xff, g = (p >> 8) & 0xff, b = p & 0xff;
+            float lum = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+            r = (lum + (r - lum) * sat) * scale + offset;
+            g = (lum + (g - lum) * sat) * scale + offset;
+            b = (lum + (b - lum) * sat) * scale + offset;
+            int ri = r < 0 ? 0 : (r > 255 ? 255 : (int) r);
+            int gi = g < 0 ? 0 : (g > 255 ? 255 : (int) g);
+            int bi = b < 0 ? 0 : (b > 255 ? 255 : (int) b);
+            argb[i] = a | (ri << 16) | (gi << 8) | bi;
+        }
+    }
+
+    /// Liquid Glass optics over the blurred material; mirrors
+    /// IOSImplementation.applyGlassOptics: rounded-rect SDF drives an edge
+    /// refraction (quarter-circle displacement toward the centre), a specular rim
+    /// glint (brightest at the top) and the anti-aliased shape mask.
+    private static void applyGlassOptics(int[] src, int bw, int bh, int pad, int[] out,
+            int rw, int rh, float cornerRadius, float refract, float specular) {
+        float hw = rw / 2f, hh = rh / 2f;
+        float r = cornerRadius < 0f ? Math.min(hw, hh) : Math.min(cornerRadius, Math.min(hw, hh));
+        if (r < 0f) r = 0f;
+        float band = Math.min(hw, hh) * 0.6f;       // refraction active in the outer 60%
+        float rimW = 3.0f;                          // specular rim width (px)
+        for (int y = 0; y < rh; y++) {
+            float py = y + 0.5f;
+            for (int x = 0; x < rw; x++) {
+                float px = x + 0.5f;
+                float dx = Math.abs(px - hw) - (hw - r);
+                float dy = Math.abs(py - hh) - (hh - r);
+                float ax = dx > 0 ? dx : 0, ay = dy > 0 ? dy : 0;
+                float outside = (float) Math.sqrt(ax * ax + ay * ay);
+                float inside = Math.min(Math.max(dx, dy), 0f);
+                float sdf = outside + inside - r;
+                float depth = -sdf;
+                if (depth <= 0f) { out[y * rw + x] = 0; continue; }
+                float alpha = depth >= 1f ? 1f : depth;
+                float sx = x, sy = y;
+                if (refract > 0f && band > 0f && depth < band) {
+                    float t = 1f - depth / band;
+                    float distortion = 1f - (float) Math.sqrt(Math.max(0f, 1f - t * t));
+                    sx = x - (px - hw) * distortion * refract;
+                    sy = y - (py - hh) * distortion * refract;
+                }
+                int col = glassSampleBilinear(src, bw, bh, sx + pad, sy + pad);
+                int rr = (col >> 16) & 0xff, gg = (col >> 8) & 0xff, bb = col & 0xff;
+                if (specular > 0f && depth < rimW) {
+                    float rim = 1f - depth / rimW;
+                    float topBias = 0.55f + 0.45f * (1f - py / rh);
+                    int add = (int) (specular * rim * topBias * 70f);
+                    rr = rr + add > 255 ? 255 : rr + add;
+                    gg = gg + add > 255 ? 255 : gg + add;
+                    bb = bb + add > 255 ? 255 : bb + add;
+                }
+                int a = (int) (alpha * 255f);
+                out[y * rw + x] = (a << 24) | (rr << 16) | (gg << 8) | bb;
+            }
+        }
+    }
+
+    /// Bilinear ARGB sample with edge clamping; mirrors IOSImplementation.sampleBilinear.
+    private static int glassSampleBilinear(int[] buf, int w, int h, float fx, float fy) {
+        if (fx < 0f) fx = 0f; else if (fx > w - 1) fx = w - 1;
+        if (fy < 0f) fy = 0f; else if (fy > h - 1) fy = h - 1;
+        int x0 = (int) fx, y0 = (int) fy;
+        int x1 = x0 + 1 < w ? x0 + 1 : x0, y1 = y0 + 1 < h ? y0 + 1 : y0;
+        float tx = fx - x0, ty = fy - y0;
+        int p00 = buf[y0 * w + x0], p10 = buf[y0 * w + x1];
+        int p01 = buf[y1 * w + x0], p11 = buf[y1 * w + x1];
+        int rr = glassBilerp((p00 >> 16) & 0xff, (p10 >> 16) & 0xff, (p01 >> 16) & 0xff, (p11 >> 16) & 0xff, tx, ty);
+        int gg = glassBilerp((p00 >> 8) & 0xff, (p10 >> 8) & 0xff, (p01 >> 8) & 0xff, (p11 >> 8) & 0xff, tx, ty);
+        int bb = glassBilerp(p00 & 0xff, p10 & 0xff, p01 & 0xff, p11 & 0xff, tx, ty);
+        return (rr << 16) | (gg << 8) | bb;
+    }
+
+    private static int glassBilerp(int c00, int c10, int c01, int c11, float tx, float ty) {
+        float top = c00 + (c10 - c00) * tx;
+        float bot = c01 + (c11 - c01) * tx;
+        return (int) (top + (bot - top) * ty + 0.5f);
+    }
+
     // iOS-26 tab selection-DROP lens constants (shared shape with METALView.m
     // glassApplyLens). Uniform magnification in the central MAG_FLAT fraction of the
     // radius, smooth falloff to 1.0 at the rim; chromatic aberration at the rim only;

@@ -26,32 +26,28 @@ package com.codename1.impl.html5.graphics;
 import com.codename1.html5.js.canvas.CanvasRenderingContext2D;
 
 /**
- * In-place iOS 26 selection-drop lens for the Tabs glass indicator. Records
- * {@link SurfaceCommandRecorder#OP_LENS_SELF_REGION}: the host clips to the
- * region and applies the same per-pixel droplet shader as the JavaSE
- * Simulator: centre magnification, rim refraction, chromatic aberration,
- * luminance-keyed accent tint, saturation and subtle glass lighting.
- *
- * <p>Nothing crosses the worker&lt;-&gt;host barrier: the worker records the lens
- * parameters and the host applies them to the destination canvas during
- * ordered command replay.</p>
+ * Records a complete named Liquid Glass material for ordered host-side replay.
+ * The host applies the native affine colour transform, browser Gaussian blur,
+ * rounded shape mask, edge refraction and specular rim to the surface's own
+ * already-painted pixels.
  */
-public class LensRegion implements ExecutableOp {
-    final int x, y, w, h;
-    final float cornerRadius, magnify, aberration, tintStrength;
-    final int tintColor;
+public final class GlassRegion implements ExecutableOp {
+    private final int x, y, width, height;
+    private final float radius, cornerRadius, saturation, scale, offset, refraction, specular;
 
-    public LensRegion(int x, int y, int w, int h, float cornerRadius, float magnify,
-                      float aberration, int tintColor, float tintStrength) {
+    public GlassRegion(int x, int y, int width, int height, float radius, float cornerRadius,
+            float saturation, float scale, float offset, float refraction, float specular) {
         this.x = x;
         this.y = y;
-        this.w = w;
-        this.h = h;
+        this.width = width;
+        this.height = height;
+        this.radius = radius;
         this.cornerRadius = cornerRadius;
-        this.magnify = magnify;
-        this.aberration = aberration;
-        this.tintColor = tintColor;
-        this.tintStrength = tintStrength;
+        this.saturation = saturation;
+        this.scale = scale;
+        this.offset = offset;
+        this.refraction = refraction;
+        this.specular = specular;
     }
 
     @Override
@@ -59,12 +55,12 @@ public class LensRegion implements ExecutableOp {
         if (!(context instanceof SurfaceCommandRecorder)) {
             return;
         }
-        ((SurfaceCommandRecorder) context).lensSelfRegion(x, y, w, h, cornerRadius,
-                magnify, aberration, tintColor, tintStrength);
+        ((SurfaceCommandRecorder) context).glassSelfRegion(x, y, width, height,
+                radius, cornerRadius, saturation, scale, offset, refraction, specular);
     }
 
     @Override
     public String getDescription() {
-        return "LensRegion";
+        return "GlassRegion";
     }
 }

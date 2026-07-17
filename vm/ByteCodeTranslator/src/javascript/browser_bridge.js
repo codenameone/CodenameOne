@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 (function(global) {
   function shouldEnableDiag() {
     if (global.__parparDiagEnabled != null) {
@@ -932,7 +955,7 @@
     CREATE_PATTERN_SURFACE: 57,
     DRAW_IMAGE_XY: 60, DRAW_IMAGE_XYWH: 61, DRAW_IMAGE_SRCDST: 62,
     BLIT_SURFACE_XY: 70, BLIT_SURFACE_XYWH: 71, BLIT_SURFACE_SRCDST: 72,
-    BLUR_SELF_REGION: 80, LENS_SELF_REGION: 81
+    BLUR_SELF_REGION: 80, LENS_SELF_REGION: 81, GLASS_SELF_REGION: 82
   };
   // The display surface id. Mirrors HTML5Implementation.DISPLAY_SURFACE_ID.
   var SURF_DISPLAY_ID = 1;
@@ -977,6 +1000,436 @@
     s = { canvas: cv, ctx: cv.getContext('2d') };
     surfaceTable[id] = s;
     return s;
+  }
+
+  // iOS-26 tab selection lens. Keep these values and the math in lock-step
+  // with JavaSEPort.applyLensBuffer(): the Simulator is the browser renderer's
+  // pixel reference for the glass-tab animation.
+  var LENS_MAG_FLAT = 0.75;
+  var LENS_TINT_HI = 150;
+  var LENS_TINT_LO = 55;
+  var LENS_LIFT_COEF = 0.40;
+  var LENS_GLARE = 0.09;
+  var LENS_RIM = 0.06;
+  var LENS_RIM_W = 0.06;
+  var LENS_REFRACT = 0.16;
+  var LENS_EDGE_SHADOW = 0.12;
+  var LENS_RIM_SCALE = 0.84;
+  var LENS_GLASS_TINT = 0xbcd8ff;
+  var LENS_GLASS_TINT_STR = 0.10;
+  var LENS_SAT_BOOST = 1.32;
+  var LENS_GLASS_START = 1.085;
+  var LENS_GLASS_FULL = 1.25;
+
+  function lensSmoothstep(a, b, x) {
+    var t = (x - a) / (b - a);
+    t = t < 0 ? 0 : (t > 1 ? 1 : t);
+    return t * t * (3 - 2 * t);
+  }
+
+  function lensBilinear(a, b, c, d, tx, ty) {
+    var top = a + (b - a) * tx;
+    var bottom = c + (d - c) * tx;
+    return (top + (bottom - top) * ty) | 0;
+  }
+
+  function lensSample(data, width, height, fx, fy, channel) {
+    if (fx < 0) { fx = 0; } else if (fx > width - 1) { fx = width - 1; }
+    if (fy < 0) { fy = 0; } else if (fy > height - 1) { fy = height - 1; }
+    var x0 = fx | 0, y0 = fy | 0;
+    var x1 = Math.min(x0 + 1, width - 1), y1 = Math.min(y0 + 1, height - 1);
+    var tx = fx - x0, ty = fy - y0;
+    var row0 = y0 * width, row1 = y1 * width;
+    return lensBilinear(
+      data[(row0 + x0) * 4 + channel], data[(row0 + x1) * 4 + channel],
+      data[(row1 + x0) * 4 + channel], data[(row1 + x1) * 4 + channel],
+      tx, ty
+    );
+  }
+
+  function lensDeviceRect(ctx, x, y, width, height) {
+    var tr = ctx.getTransform ? ctx.getTransform() : null;
+    if (!tr) {
+      return { x: Math.round(x), y: Math.round(y), w: Math.round(width), h: Math.round(height), scale: 1 };
+    }
+    // Tabs paint under translation/uniform scaling only. A pixel read ignores
+    // Canvas transforms, so resolve that axis-aligned transform explicitly.
+    // A rotated/sheared lens is outside the v1 contract and safely no-ops.
+    if (Math.abs(tr.b) > 1e-9 || Math.abs(tr.c) > 1e-9) {
+      return null;
+    }
+    var x0 = tr.a * x + tr.e, x1 = tr.a * (x + width) + tr.e;
+    var y0 = tr.d * y + tr.f, y1 = tr.d * (y + height) + tr.f;
+    return {
+      x: Math.round(Math.min(x0, x1)),
+      y: Math.round(Math.min(y0, y1)),
+      w: Math.round(Math.abs(x1 - x0)),
+      h: Math.round(Math.abs(y1 - y0)),
+      scale: Math.min(Math.abs(tr.a), Math.abs(tr.d))
+    };
+  }
+
+  function applyLensSelfRegion(ctx, x, y, width, height, cornerRadius,
+                               magnify, aberration, tintColor, tintStrength) {
+    if (!ctx.canvas || width <= 0 || height <= 0) {
+      return;
+    }
+    var rect = lensDeviceRect(ctx, x, y, width, height);
+    if (!rect || rect.w <= 0 || rect.h <= 0) {
+      return;
+    }
+    var rx = rect.x, ry = rect.y, rw = rect.w, rh = rect.h;
+    var canvasWidth = ctx.canvas.width | 0, canvasHeight = ctx.canvas.height | 0;
+    if (rx < 0) { rw += rx; rx = 0; }
+    if (ry < 0) { rh += ry; ry = 0; }
+    if (rx + rw > canvasWidth) { rw = canvasWidth - rx; }
+    if (ry + rh > canvasHeight) { rh = canvasHeight - ry; }
+    if (rw <= 0 || rh <= 0) {
+      return;
+    }
+
+    var source = ctx.getImageData(rx, ry, rw, rh);
+    var src = source.data;
+    var result = ctx.createImageData(rw, rh);
+    var out = result.data;
+    var hw = rw / 2.0, hh = rh / 2.0;
+    var scaledCorner = cornerRadius * rect.scale;
+    var radius = scaledCorner < 0 ? Math.min(hw, hh)
+                                  : Math.min(scaledCorner, Math.min(hw, hh));
+    if (radius < 0) { radius = 0; }
+    var tr = (tintColor >> 16) & 0xff;
+    var tg = (tintColor >> 8) & 0xff;
+    var tb = tintColor & 0xff;
+    var liftMax = LENS_LIFT_COEF * (magnify - 1.0) * hh;
+    // The 3D-glass cues (edge refraction / edge shadow / glare) belong to the
+    // MORPH droplet, not the settled pill (rest 1.08x, peak 1.18x): they fade
+    // in above rest so a resting selection stays a flat subtle pill.
+    var glassAmount = lensSmoothstep(LENS_GLASS_START, LENS_GLASS_FULL, magnify);
+
+    for (var yy = 0; yy < rh; yy++) {
+      var py = yy + 0.5 - hh;
+      for (var xx = 0; xx < rw; xx++) {
+        var px = xx + 0.5 - hw;
+        var index = (yy * rw + xx) * 4;
+        var dxe = Math.abs(px) - (hw - radius);
+        var dye = Math.abs(py) - (hh - radius);
+        var axx = Math.max(dxe, 0), ayy = Math.max(dye, 0);
+        var outside = Math.sqrt(axx * axx + ayy * ayy);
+        var inside = Math.min(Math.max(dxe, dye), 0);
+        var depth = -(outside + inside - radius);
+        if (depth <= 0) {
+          out[index] = src[index];
+          out[index + 1] = src[index + 1];
+          out[index + 2] = src[index + 2];
+          out[index + 3] = src[index + 3];
+          continue;
+        }
+
+        var alpha = Math.min(depth, 1.0);
+        var rd = Math.min(1.0, Math.sqrt((px * px) / (hw * hw) + (py * py) / (hh * hh)));
+        var edge = lensSmoothstep(LENS_MAG_FLAT, 1.0, rd);
+        var rimScale = 1.0 + (LENS_RIM_SCALE - 1.0) * glassAmount;
+        var mag = magnify + (rimScale - magnify) * edge;
+        if (mag < 0.2) { mag = 0.2; }
+        var abr = aberration * edge;
+        var magR = mag * (1 - abr), magB = mag * (1 + abr);
+        if (magR < 0.05) { magR = 0.05; }
+        if (magB < 0.05) { magB = 0.05; }
+        var lift = liftMax * (1 - rd * rd);
+        var refract = 1.0 + LENS_REFRACT * glassAmount * lensSmoothstep(0.70, 1.0, rd);
+        var sampleYR = hh + (py / magR) * refract + lift;
+        var sampleYG = hh + (py / mag) * refract + lift;
+        var sampleYB = hh + (py / magB) * refract + lift;
+        var sr = lensSample(src, rw, rh, hw + (px / magR) * refract, sampleYR, 0);
+        var sg = lensSample(src, rw, rh, hw + (px / mag) * refract, sampleYG, 1);
+        var sb = lensSample(src, rw, rh, hw + (px / magB) * refract, sampleYB, 2);
+        var lum = 0.2126 * sr + 0.7152 * sg + 0.0722 * sb;
+        var tint = tintStrength * lensSmoothstep(LENS_TINT_HI, LENS_TINT_LO, lum);
+        var fr = sr + (tr - sr) * tint;
+        var fg = sg + (tg - sg) * tint;
+        var fb = sb + (tb - sb) * tint;
+        var glassTint = LENS_GLASS_TINT_STR * glassAmount;
+        fr += (((LENS_GLASS_TINT >> 16) & 0xff) - fr) * glassTint;
+        fg += (((LENS_GLASS_TINT >> 8) & 0xff) - fg) * glassTint;
+        fb += ((LENS_GLASS_TINT & 0xff) - fb) * glassTint;
+        var saturationLum = 0.2126 * fr + 0.7152 * fg + 0.0722 * fb;
+        fr = saturationLum + (fr - saturationLum) * LENS_SAT_BOOST;
+        fg = saturationLum + (fg - saturationLum) * LENS_SAT_BOOST;
+        fb = saturationLum + (fb - saturationLum) * LENS_SAT_BOOST;
+        var gx = px / hw, gy = (py + 0.42 * hh) / hh;
+        var glare = LENS_GLARE * glassAmount * Math.exp(-(gx * gx * 1.15 + gy * gy * 2.6) * 2.1);
+        var rimWidth = Math.max(2.0, LENS_RIM_W * hh);
+        var rim = depth < rimWidth ? (1.0 - depth / rimWidth) * LENS_RIM : 0;
+        var bright = glare + rim;
+        if (bright > 0) {
+          fr += bright * (255 - fr);
+          fg += bright * (255 - fg);
+          fb += bright * (255 - fb);
+        }
+        var edgeShadowWidth = Math.max(2.0, 0.13 * Math.min(hw, hh));
+        if (depth < edgeShadowWidth) {
+          var edgeShadow = (1.0 - depth / edgeShadowWidth) * LENS_EDGE_SHADOW * glassAmount;
+          fr *= 1 - edgeShadow;
+          fg *= 1 - edgeShadow;
+          fb *= 1 - edgeShadow;
+        }
+        fr = fr < 0 ? 0 : (fr > 255 ? 255 : fr | 0);
+        fg = fg < 0 ? 0 : (fg > 255 ? 255 : fg | 0);
+        fb = fb < 0 ? 0 : (fb > 255 ? 255 : fb | 0);
+        out[index] = (src[index] + (fr - src[index]) * alpha) | 0;
+        out[index + 1] = (src[index + 1] + (fg - src[index + 1]) * alpha) | 0;
+        out[index + 2] = (src[index + 2] + (fb - src[index + 2]) * alpha) | 0;
+        out[index + 3] = src[index + 3];
+      }
+    }
+    ctx.putImageData(result, rx, ry);
+  }
+
+  function glassFloatMul(a, b) {
+    return Math.fround(Math.fround(a) * Math.fround(b));
+  }
+
+  function glassFloatAdd(a, b) {
+    return Math.fround(Math.fround(a) + Math.fround(b));
+  }
+
+  // Mirrors IOSImplementation.glassMaterialInPlace(). Math.fround preserves
+  // the native float evaluation points so the material does not drift by a
+  // channel value merely because JavaScript normally evaluates as double.
+  function glassMaterialInPlace(data, saturation, scale, offset) {
+    var sat = Math.fround(saturation), scl = Math.fround(scale), off = Math.fround(offset);
+    var lr = Math.fround(0.2126), lg = Math.fround(0.7152), lb = Math.fround(0.0722);
+    for (var i = 0; i < data.length; i += 4) {
+      var r = Math.fround(data[i]), g = Math.fround(data[i + 1]), b = Math.fround(data[i + 2]);
+      var lum = glassFloatAdd(glassFloatAdd(glassFloatMul(lr, r), glassFloatMul(lg, g)),
+                              glassFloatMul(lb, b));
+      r = glassFloatAdd(glassFloatMul(glassFloatAdd(lum,
+          glassFloatMul(glassFloatAdd(r, -lum), sat)), scl), off);
+      g = glassFloatAdd(glassFloatMul(glassFloatAdd(lum,
+          glassFloatMul(glassFloatAdd(g, -lum), sat)), scl), off);
+      b = glassFloatAdd(glassFloatMul(glassFloatAdd(lum,
+          glassFloatMul(glassFloatAdd(b, -lum), sat)), scl), off);
+      data[i] = r < 0 ? 0 : (r > 255 ? 255 : r | 0);
+      data[i + 1] = g < 0 ? 0 : (g > 255 ? 255 : g | 0);
+      data[i + 2] = b < 0 ? 0 : (b > 255 ? 255 : b | 0);
+    }
+  }
+
+  function glassBilinear(a, b, c, d, tx, ty) {
+    var ftx = Math.fround(tx), fty = Math.fround(ty);
+    var top = glassFloatAdd(a, glassFloatMul(glassFloatAdd(b, -a), ftx));
+    var bottom = glassFloatAdd(c, glassFloatMul(glassFloatAdd(d, -c), ftx));
+    return glassFloatAdd(glassFloatAdd(top,
+        glassFloatMul(glassFloatAdd(bottom, -top), fty)), 0.5) | 0;
+  }
+
+  function glassSample(data, width, height, fx, fy, channel) {
+    var x = Math.fround(fx), y = Math.fround(fy);
+    if (x < 0) { x = 0; } else if (x > width - 1) { x = width - 1; }
+    if (y < 0) { y = 0; } else if (y > height - 1) { y = height - 1; }
+    var x0 = x | 0, y0 = y | 0;
+    var x1 = x0 + 1 < width ? x0 + 1 : x0;
+    var y1 = y0 + 1 < height ? y0 + 1 : y0;
+    var tx = Math.fround(x - x0), ty = Math.fround(y - y0);
+    var row0 = y0 * width, row1 = y1 * width;
+    return glassBilinear(
+      data[(row0 + x0) * 4 + channel], data[(row0 + x1) * 4 + channel],
+      data[(row1 + x0) * 4 + channel], data[(row1 + x1) * 4 + channel],
+      tx, ty
+    );
+  }
+
+  // Mirrors IOSImplementation.applyGlassOptics(). The returned patch retains
+  // the native shape alpha and is composited with drawImage below, just like
+  // IOSImplementation draws its generated ARGB image back onto the target.
+  function applyGlassOptics(blurred, bufferWidth, bufferHeight, pad,
+                             width, height, cornerRadius, refraction, specular) {
+    var result = new Uint8ClampedArray(width * height * 4);
+    var hw = Math.fround(width / 2), hh = Math.fround(height / 2);
+    var radius = cornerRadius < 0 ? Math.min(hw, hh)
+                                  : Math.min(cornerRadius, Math.min(hw, hh));
+    if (radius < 0) { radius = 0; }
+    var band = glassFloatMul(Math.min(hw, hh), Math.fround(0.6));
+    var rimWidth = Math.fround(3.0);
+    var refract = Math.fround(refraction), spec = Math.fround(specular);
+    for (var yy = 0; yy < height; yy++) {
+      var py = Math.fround(yy + 0.5);
+      for (var xx = 0; xx < width; xx++) {
+        var px = Math.fround(xx + 0.5);
+        var dx = Math.fround(Math.abs(Math.fround(px - hw)) - Math.fround(hw - radius));
+        var dy = Math.fround(Math.abs(Math.fround(py - hh)) - Math.fround(hh - radius));
+        var ax = dx > 0 ? dx : 0, ay = dy > 0 ? dy : 0;
+        var outside = Math.fround(Math.sqrt(glassFloatAdd(glassFloatMul(ax, ax), glassFloatMul(ay, ay))));
+        var inside = Math.min(Math.max(dx, dy), 0);
+        var sdf = glassFloatAdd(glassFloatAdd(outside, inside), -radius);
+        var depth = Math.fround(-sdf);
+        if (depth <= 0) {
+          continue;
+        }
+        var coverage = depth >= 1 ? 1 : depth;
+        var sx = Math.fround(xx), sy = Math.fround(yy);
+        if (refract > 0 && band > 0 && depth < band) {
+          var edgeT = Math.fround(1 - Math.fround(depth / band));
+          var root = Math.fround(Math.sqrt(Math.max(0,
+              glassFloatAdd(1, -glassFloatMul(edgeT, edgeT)))));
+          var distortion = glassFloatAdd(1, -root);
+          sx = Math.fround(xx - glassFloatMul(glassFloatMul(Math.fround(px - hw), distortion), refract));
+          sy = Math.fround(yy - glassFloatMul(glassFloatMul(Math.fround(py - hh), distortion), refract));
+        }
+        var red = glassSample(blurred, bufferWidth, bufferHeight,
+                              Math.fround(sx + pad), Math.fround(sy + pad), 0);
+        var green = glassSample(blurred, bufferWidth, bufferHeight,
+                                Math.fround(sx + pad), Math.fround(sy + pad), 1);
+        var blue = glassSample(blurred, bufferWidth, bufferHeight,
+                               Math.fround(sx + pad), Math.fround(sy + pad), 2);
+        if (spec > 0 && depth < rimWidth) {
+          var rim = Math.fround(1 - Math.fround(depth / rimWidth));
+          var topBias = Math.fround(0.55 + glassFloatMul(0.45,
+              Math.fround(1 - Math.fround(py / height))));
+          var add = glassFloatMul(glassFloatMul(glassFloatMul(spec, rim), topBias), 70) | 0;
+          red = Math.min(255, red + add);
+          green = Math.min(255, green + add);
+          blue = Math.min(255, blue + add);
+        }
+        var index = (yy * width + xx) * 4;
+        result[index] = red;
+        result[index + 1] = green;
+        result[index + 2] = blue;
+        result[index + 3] = glassFloatMul(coverage, 255) | 0;
+      }
+    }
+    return result;
+  }
+
+  function createGlassScratchCanvas(width, height) {
+    if (typeof global.OffscreenCanvas === 'function') {
+      return new global.OffscreenCanvas(width, height);
+    }
+    var doc = global.document || (global.window && global.window.document);
+    if (!doc || !doc.createElement) {
+      return null;
+    }
+    var canvas = doc.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    return canvas;
+  }
+
+  function applyBlurSelfRegion(ctx, x, y, width, height, sigma, cornerRadius) {
+    if (width <= 0 || height <= 0 || !ctx.canvas) {
+      return;
+    }
+    ctx.save();
+    try {
+      ctx.beginPath();
+      if (cornerRadius) {
+        var round = cornerRadius < 0 ? Math.min(width, height) / 2
+                                     : Math.min(cornerRadius, Math.min(width, height) / 2);
+        ctx.moveTo(x + round, y);
+        ctx.arcTo(x + width, y, x + width, y + height, round);
+        ctx.arcTo(x + width, y + height, x, y + height, round);
+        ctx.arcTo(x, y + height, x, y, round);
+        ctx.arcTo(x, y, x + width, y, round);
+        ctx.closePath();
+      } else {
+        ctx.rect(x, y, width, height);
+      }
+      ctx.clip();
+      ctx.filter = 'blur(' + sigma + 'px)';
+      ctx.drawImage(ctx.canvas, 0, 0);
+    } finally {
+      ctx.restore();
+    }
+  }
+
+  function applyGlassSelfRegion(ctx, x, y, width, height, blurRadius, cornerRadius,
+                                saturation, scale, offset, refraction, specular) {
+    if (!ctx.canvas || width <= 0 || height <= 0) {
+      return;
+    }
+    var rect = lensDeviceRect(ctx, x, y, width, height);
+    if (!rect || rect.w <= 0 || rect.h <= 0) {
+      return;
+    }
+    var rx = rect.x, ry = rect.y, rw = rect.w, rh = rect.h;
+    var canvasWidth = ctx.canvas.width | 0, canvasHeight = ctx.canvas.height | 0;
+    if (rx < 0) { rw += rx; rx = 0; }
+    if (ry < 0) { rh += ry; ry = 0; }
+    if (rx + rw > canvasWidth) { rw = canvasWidth - rx; }
+    if (ry + rh > canvasHeight) { rh = canvasHeight - ry; }
+    if (rw <= 0 || rh <= 0) {
+      return;
+    }
+
+    // CSS blur() accepts Gaussian sigma while the CN1/iOS recipe carries the
+    // calibrated blur radius. Keep the same radius-to-sigma conversion used
+    // by BlurRegion; the material transform is the missing opacity, not a
+    // stronger blur.
+    var sigma = Math.max(1, blurRadius * rect.scale / 2);
+    var pad = Math.ceil(sigma) * 3 + 1;
+    var bufferWidth = rw + pad * 2, bufferHeight = rh + pad * 2;
+    var ax0 = Math.max(0, rx - pad), ay0 = Math.max(0, ry - pad);
+    var ax1 = Math.min(canvasWidth, rx + rw + pad), ay1 = Math.min(canvasHeight, ry + rh + pad);
+    var availableWidth = ax1 - ax0, availableHeight = ay1 - ay0;
+    if (availableWidth <= 0 || availableHeight <= 0) {
+      return;
+    }
+    var available = ctx.getImageData(ax0, ay0, availableWidth, availableHeight).data;
+    var padded = new Uint8ClampedArray(bufferWidth * bufferHeight * 4);
+    for (var by = 0; by < bufferHeight; by++) {
+      var sourceY = ry - pad + by - ay0;
+      if (sourceY < 0) { sourceY = 0; }
+      if (sourceY >= availableHeight) { sourceY = availableHeight - 1; }
+      for (var bx = 0; bx < bufferWidth; bx++) {
+        var sourceX = rx - pad + bx - ax0;
+        if (sourceX < 0) { sourceX = 0; }
+        if (sourceX >= availableWidth) { sourceX = availableWidth - 1; }
+        var sourceIndex = (sourceY * availableWidth + sourceX) * 4;
+        var targetIndex = (by * bufferWidth + bx) * 4;
+        padded[targetIndex] = available[sourceIndex];
+        padded[targetIndex + 1] = available[sourceIndex + 1];
+        padded[targetIndex + 2] = available[sourceIndex + 2];
+        padded[targetIndex + 3] = available[sourceIndex + 3];
+      }
+    }
+    glassMaterialInPlace(padded, saturation, scale, offset);
+
+    var materialCanvas = createGlassScratchCanvas(bufferWidth, bufferHeight);
+    var blurredCanvas = createGlassScratchCanvas(bufferWidth, bufferHeight);
+    if (!materialCanvas || !blurredCanvas) {
+      applyBlurSelfRegion(ctx, x, y, width, height, sigma, cornerRadius);
+      return;
+    }
+    var materialContext = materialCanvas.getContext('2d');
+    var blurredContext = blurredCanvas.getContext('2d');
+    if (!materialContext || !blurredContext) {
+      applyBlurSelfRegion(ctx, x, y, width, height, sigma, cornerRadius);
+      return;
+    }
+    var materialImage = materialContext.createImageData(bufferWidth, bufferHeight);
+    materialImage.data.set(padded);
+    materialContext.putImageData(materialImage, 0, 0);
+    blurredContext.filter = 'blur(' + sigma + 'px)';
+    blurredContext.drawImage(materialCanvas, 0, 0);
+    var blurred = blurredContext.getImageData(0, 0, bufferWidth, bufferHeight).data;
+    var scaledCorner = cornerRadius * rect.scale;
+    var output = applyGlassOptics(blurred, bufferWidth, bufferHeight, pad,
+                                   rw, rh, scaledCorner, refraction, specular);
+    var outputCanvas = createGlassScratchCanvas(rw, rh);
+    var outputContext = outputCanvas && outputCanvas.getContext('2d');
+    if (!outputContext) {
+      return;
+    }
+    var result = outputContext.createImageData(rw, rh);
+    result.data.set(output);
+    outputContext.putImageData(result, 0, 0);
+    ctx.save();
+    try {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(outputCanvas, rx, ry);
+    } finally {
+      ctx.restore();
+    }
   }
 
   // Replay one command stream (opcodes + nums + objs) onto ``ctx``.
@@ -1097,69 +1550,38 @@
           var _bsig = nums[ni++], _bcr = nums[ni++];
           if (_bw > 0 && _bh > 0 && ctx.canvas) {
             try {
-              ctx.save();
-              ctx.beginPath();
-              if (_bcr) {
-                var _brr = _bcr < 0 ? Math.min(_bw, _bh) / 2
-                                    : Math.min(_bcr, Math.min(_bw, _bh) / 2);
-                ctx.moveTo(_bx + _brr, _by);
-                ctx.arcTo(_bx + _bw, _by, _bx + _bw, _by + _bh, _brr);
-                ctx.arcTo(_bx + _bw, _by + _bh, _bx, _by + _bh, _brr);
-                ctx.arcTo(_bx, _by + _bh, _bx, _by, _brr);
-                ctx.arcTo(_bx, _by, _bx + _bw, _by, _brr);
-                ctx.closePath();
-              } else {
-                ctx.rect(_bx, _by, _bw, _bh);
-              }
-              ctx.clip();
-              ctx.filter = 'blur(' + _bsig + 'px)';
-              ctx.drawImage(ctx.canvas, 0, 0);
+              applyBlurSelfRegion(ctx, _bx, _by, _bw, _bh, _bsig, _bcr);
             } catch (_ebr) {
-            } finally {
-              try { ctx.restore(); } catch (_ebr2) {}
             }
           }
           break;
         }
         case SURF.LENS_SELF_REGION: {
-          // iOS-26 selection DROP: magnify this surface's own pixels in the
-          // region (content bulge), then optionally wash them toward an accent
-          // tint. drawImage(self) snapshots the source bitmap per the HTML
-          // spec. cornerRadius: 0 = rect, -1 = capsule, >0 = rounded px.
+          // iOS-26 selection DROP: run the Simulator-equivalent per-pixel lens
+          // over this surface's own pixels. cornerRadius: 0 = rect, -1 =
+          // capsule, >0 = rounded px.
           var _lx = nums[ni++], _ly = nums[ni++], _lw = nums[ni++], _lh = nums[ni++];
           var _lcr = nums[ni++], _lmag = nums[ni++];
-          var _ltint = objs[oi++];
+          var _lab = nums[ni++], _ltint = nums[ni++] | 0, _ltintStrength = nums[ni++];
           if (_lw > 0 && _lh > 0 && ctx.canvas) {
             try {
-              ctx.save();
-              ctx.beginPath();
-              if (_lcr) {
-                var _lrr = _lcr < 0 ? Math.min(_lw, _lh) / 2
-                                    : Math.min(_lcr, Math.min(_lw, _lh) / 2);
-                ctx.moveTo(_lx + _lrr, _ly);
-                ctx.arcTo(_lx + _lw, _ly, _lx + _lw, _ly + _lh, _lrr);
-                ctx.arcTo(_lx + _lw, _ly + _lh, _lx, _ly + _lh, _lrr);
-                ctx.arcTo(_lx, _ly + _lh, _lx, _ly, _lrr);
-                ctx.arcTo(_lx, _ly, _lx + _lw, _ly, _lrr);
-                ctx.closePath();
-              } else {
-                ctx.rect(_lx, _ly, _lw, _lh);
-              }
-              ctx.clip();
-              // Magnify: draw the region's own pixels scaled about its centre.
-              // Source rect = region shrunk by 1/mag around centre; dest = the
-              // full region -> the content bulges outward like the native lens.
-              var _lm = _lmag > 1 ? _lmag : 1;
-              var _lsw = _lw / _lm, _lsh = _lh / _lm;
-              var _lsx = _lx + (_lw - _lsw) / 2, _lsy = _ly + (_lh - _lsh) / 2;
-              ctx.drawImage(ctx.canvas, _lsx, _lsy, _lsw, _lsh, _lx, _ly, _lw, _lh);
-              if (_ltint) {
-                ctx.fillStyle = _ltint;
-                ctx.fillRect(_lx, _ly, _lw, _lh);
-              }
+              applyLensSelfRegion(ctx, _lx, _ly, _lw, _lh, _lcr,
+                                  _lmag, _lab, _ltint, _ltintStrength);
             } catch (_elr) {
-            } finally {
-              try { ctx.restore(); } catch (_elr2) {}
+            }
+          }
+          break;
+        }
+        case SURF.GLASS_SELF_REGION: {
+          var _gx = nums[ni++], _gy = nums[ni++], _gw = nums[ni++], _gh = nums[ni++];
+          var _gblur = nums[ni++], _gcr = nums[ni++], _gsat = nums[ni++];
+          var _gscale = nums[ni++], _goffset = nums[ni++], _grefract = nums[ni++];
+          var _gspecular = nums[ni++];
+          if (_gw > 0 && _gh > 0 && ctx.canvas) {
+            try {
+              applyGlassSelfRegion(ctx, _gx, _gy, _gw, _gh, _gblur, _gcr,
+                                   _gsat, _gscale, _goffset, _grefract, _gspecular);
+            } catch (_egr) {
             }
           }
           break;

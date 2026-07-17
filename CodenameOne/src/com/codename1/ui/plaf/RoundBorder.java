@@ -688,18 +688,28 @@ public final class RoundBorder extends Border {
                 return;
             }
             if (stroke && this.stroke != null && strokeGradient && strokeAngle == 360 && g.isShapeClipSupported()) {
-                // Gradient-stroked circle: fill the full circle with the stroke
-                // gradient, then lay the background over an inset circle so only
-                // a `sw`-wide gradient ring (the stroke) shows at the edge.
-                int sw = (int) Math.ceil(this.stroke.getLineWidth());
+                // Gradient-stroked circle, in three passes that hold on every
+                // port: (1) the background fills the FULL circle, (2) the
+                // translucent gradient paints over it clipped to the same
+                // circle, (3) the interior is restored clipped to the inset
+                // circle. Passes 2 and 3 go through the same clip+paint
+                // rasterizer, so the leftover `sw`-wide gradient ring has
+                // registration-stable edges even at hairline widths (the old
+                // gradient-fill-then-plain-inner-fill pair mixed two different
+                // rasterizers and read as a broken, muddy stroke), and because
+                // the background lies beneath it the ring glints over the fill
+                // instead of the backdrop. A multi-contour winding ring is NOT
+                // portable: the iOS/Metal clip unions subpaths.
+                int sw = Math.max(1, (int) Math.ceil(this.stroke.getLineWidth()));
                 GeneralPath outer = new GeneralPath();
                 outer.arc(x, y, size, size, 0, 2 * Math.PI);
-                GeneralPath innerBg = new GeneralPath();
-                innerBg.arc(x + sw, y + sw, size - sw * 2, size - sw * 2, 0, 2 * Math.PI);
+                g.fillShape(outer);
                 g.setColor(makeStrokePaint(width, height));
                 g.setAlpha(strokeOpacity);
                 g.fillShape(outer);
-                g.setColor(color);
+                GeneralPath innerBg = new GeneralPath();
+                innerBg.arc(x + sw, y + sw, size - sw * 2, size - sw * 2, 0, 2 * Math.PI);
+                g.setColor(new SolidPaint(color));
                 g.setAlpha(opacity);
                 g.fillShape(innerBg);
             } else if (stroke && this.stroke != null) {
@@ -720,15 +730,17 @@ public final class RoundBorder extends Border {
         } else {
             float sw = (stroke && this.stroke != null) ? this.stroke.getLineWidth() : 0;
             if (stroke && this.stroke != null && strokeGradient && g.isShapeClipSupported()) {
-                // Gradient-stroked pill: fill the full pill with the stroke
-                // gradient, then lay the background over an inset pill so only a
-                // `sw`-wide gradient ring (the stroke) shows at the edge.
+                // Gradient-stroked pill; see the circle branch above for why
+                // this is three passes (background, gradient over it, interior
+                // restored) with the last two on the same clip+paint rasterizer
+                // rather than a multi-contour winding ring.
                 GeneralPath outer = createPillPath(width, height, 0);
-                GeneralPath innerBg = createPillPath(width, height, sw);
+                g.fillShape(outer);
                 g.setColor(makeStrokePaint(width, height));
                 g.setAlpha(strokeOpacity);
                 g.fillShape(outer);
-                g.setColor(color);
+                GeneralPath innerBg = createPillPath(width, height, Math.max(1f, sw));
+                g.setColor(new SolidPaint(color));
                 g.setAlpha(opacity);
                 g.fillShape(innerBg);
                 return;
@@ -782,6 +794,29 @@ public final class RoundBorder extends Border {
                 new float[]{0f, 1f}, new int[]{strokeColor, strokeColor2},
                 MultipleGradientPaint.CycleMethod.NO_CYCLE,
                 MultipleGradientPaint.ColorSpaceType.SRGB, null);
+    }
+
+    /// A solid-colour Paint. Filling through the clip+paint mechanism (rather
+    /// than a plain path fill) keeps the gradient stroke's inner edge on the
+    /// SAME rasterizer as the gradient pass, so the hairline ring between them
+    /// stays registration-stable on every port.
+    private static final class SolidPaint implements Paint {
+        private final int solidColor;
+
+        SolidPaint(int solidColor) {
+            this.solidColor = solidColor;
+        }
+
+        @Override
+        public void paint(Graphics g, com.codename1.ui.geom.Rectangle2D bounds) {
+            paint(g, bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
+        }
+
+        @Override
+        public void paint(Graphics g, double x, double y, double w, double h) {
+            g.setColor(solidColor);
+            g.fillRect((int) x, (int) y, (int) Math.ceil(w), (int) Math.ceil(h));
+        }
     }
 
     @Override

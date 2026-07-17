@@ -13,6 +13,7 @@ on:
       - 'scripts/run-javascript-headless-browser.mjs'
       - 'scripts/run-javascript-lifecycle-tests.mjs'
       - 'scripts/run-javascript-lifecycle-tests.sh'
+      - 'scripts/verify-javascript-lens-parity.mjs'
       - 'scripts/build-javascript-port-hellocodenameone.sh'
       - 'scripts/javascript_browser_harness.py'
       - 'scripts/javascript/screenshots/**'
@@ -35,6 +36,7 @@ on:
       - 'scripts/run-javascript-headless-browser.mjs'
       - 'scripts/run-javascript-lifecycle-tests.mjs'
       - 'scripts/run-javascript-lifecycle-tests.sh'
+      - 'scripts/verify-javascript-lens-parity.mjs'
       - 'scripts/build-javascript-port-hellocodenameone.sh'
       - 'scripts/javascript_browser_harness.py'
       - 'scripts/javascript/screenshots/**'
@@ -140,6 +142,9 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '20'
+
+      - name: Verify JavaScript glass-tab lens parity
+        run: node scripts/verify-javascript-lens-parity.mjs
 
       - name: Cache npm modules for scripts/
         uses: actions/cache@v5

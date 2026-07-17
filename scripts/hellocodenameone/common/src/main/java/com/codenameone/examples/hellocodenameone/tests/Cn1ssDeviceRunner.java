@@ -151,6 +151,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new MorphTransitionScrubScreenshotTest(),
             new MorphElementMorphScreenshotTest(),
             new TabsAnimatedIndicatorScreenshotTest(),
+            new TabsLiquidGlassAnimationScreenshotTest(),
             new PullToRefreshSpinnerScreenshotTest(),
             new AnimateLayoutScreenshotTest(),
             new AnimateHierarchyScreenshotTest(),
