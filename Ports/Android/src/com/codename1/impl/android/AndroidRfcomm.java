@@ -74,21 +74,8 @@ class AndroidRfcomm extends BluetoothClassic {
         final Context ctx = AndroidImplementation.getContext();
         final boolean[] stopped = new boolean[1];
         final BroadcastReceiver[] receiverRef = new BroadcastReceiver[1];
-        final ClassicDiscovery handle = new ClassicDiscovery() {
-            protected void onStop() {
-                synchronized (stopped) {
-                    if (stopped[0]) {
-                        return;
-                    }
-                    stopped[0] = true;
-                }
-                try {
-                    adapter.cancelDiscovery();
-                } catch (Throwable ignore) {
-                }
-                unregisterQuietly(ctx, receiverRef[0]);
-            }
-        };
+        final ClassicDiscovery handle =
+                makeClassicDiscovery(adapter, ctx, stopped, receiverRef);
         if (listener == null) {
             handle.error(new BluetoothException(BluetoothError.UNKNOWN,
                     "startDiscovery requires a listener"));
@@ -106,7 +93,62 @@ class AndroidRfcomm extends BluetoothClassic {
         }
         final Context appCtx = ctx.getApplicationContext() != null
                 ? ctx.getApplicationContext() : ctx;
-        BroadcastReceiver receiver = new BroadcastReceiver() {
+        BroadcastReceiver receiver =
+                makeDiscoveryReceiver(listener, stopped, appCtx, handle);
+        receiverRef[0] = receiver;
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(android.bluetooth.BluetoothDevice.ACTION_FOUND);
+        filter.addAction(
+                android.bluetooth.BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
+        AndroidBluetooth.registerSystemReceiver(appCtx, receiver, filter);
+        boolean started;
+        try {
+            started = adapter.startDiscovery();
+        } catch (SecurityException se) {
+            unregisterQuietly(appCtx, receiver);
+            handle.error(new BluetoothException(BluetoothError.UNAUTHORIZED,
+                    "Missing Bluetooth scan permission", se));
+            return handle;
+        }
+        if (!started) {
+            unregisterQuietly(appCtx, receiver);
+            handle.error(new BluetoothException(BluetoothError.SCAN_FAILED,
+                    "The platform failed to start the inquiry scan"));
+        }
+        return handle;
+    }
+
+    // Static so the ClassicDiscovery doesn't carry a synthetic
+    // outer-AndroidRfcomm reference (SpotBugs
+    // SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static ClassicDiscovery makeClassicDiscovery(
+            final android.bluetooth.BluetoothAdapter adapter,
+            final Context ctx, final boolean[] stopped,
+            final BroadcastReceiver[] receiverRef) {
+        return new ClassicDiscovery() {
+            protected void onStop() {
+                synchronized (stopped) {
+                    if (stopped[0]) {
+                        return;
+                    }
+                    stopped[0] = true;
+                }
+                try {
+                    adapter.cancelDiscovery();
+                } catch (Throwable ignore) {
+                }
+                unregisterQuietly(ctx, receiverRef[0]);
+            }
+        };
+    }
+
+    // Static so the BroadcastReceiver doesn't carry a synthetic
+    // outer-AndroidRfcomm reference (SpotBugs
+    // SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static BroadcastReceiver makeDiscoveryReceiver(
+            final ClassicDiscoveryListener listener, final boolean[] stopped,
+            final Context appCtx, final ClassicDiscovery handle) {
+        return new BroadcastReceiver() {
             @Override
             public void onReceive(Context c, Intent intent) {
                 String action = intent.getAction();
@@ -154,27 +196,6 @@ class AndroidRfcomm extends BluetoothClassic {
                 }
             }
         };
-        receiverRef[0] = receiver;
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(android.bluetooth.BluetoothDevice.ACTION_FOUND);
-        filter.addAction(
-                android.bluetooth.BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
-        AndroidBluetooth.registerSystemReceiver(appCtx, receiver, filter);
-        boolean started;
-        try {
-            started = adapter.startDiscovery();
-        } catch (SecurityException se) {
-            unregisterQuietly(appCtx, receiver);
-            handle.error(new BluetoothException(BluetoothError.UNAUTHORIZED,
-                    "Missing Bluetooth scan permission", se));
-            return handle;
-        }
-        if (!started) {
-            unregisterQuietly(appCtx, receiver);
-            handle.error(new BluetoothException(BluetoothError.SCAN_FAILED,
-                    "The platform failed to start the inquiry scan"));
-        }
-        return handle;
     }
 
     private static void unregisterQuietly(Context ctx,
@@ -265,7 +286,16 @@ class AndroidRfcomm extends BluetoothClassic {
             out.complete(Boolean.FALSE);
             return out;
         }
-        Display.getInstance().callSerially(new Runnable() {
+        Display.getInstance().callSerially(
+                makeRequestDiscoverableRunnable(durationSeconds, out));
+        return out;
+    }
+
+    // Static so the Runnable doesn't carry a synthetic outer-AndroidRfcomm
+    // reference (SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static Runnable makeRequestDiscoverableRunnable(
+            final int durationSeconds, final AsyncResource<Boolean> out) {
+        return new Runnable() {
             public void run() {
                 if (Build.VERSION.SDK_INT >= 31
                         && !AndroidImplementation.checkForPermission(
@@ -298,8 +328,7 @@ class AndroidRfcomm extends BluetoothClassic {
                     out.complete(Boolean.FALSE);
                 }
             }
-        });
-        return out;
+        };
     }
 
     // ------------------------------------------------------------------
@@ -347,7 +376,21 @@ class AndroidRfcomm extends BluetoothClassic {
         }
         final java.util.UUID uuid = AndroidBluetooth.toPlatformUuid(
                 serviceUuid == null ? BluetoothUuid.SPP : serviceUuid);
-        Thread t = new Thread(new Runnable() {
+        Thread t = new Thread(makeConnectRunnable(adapter, platformDevice,
+                uuid, secure, out), "CN1-RFCOMM-connect");
+        t.setDaemon(true);
+        t.start();
+        return out;
+    }
+
+    // Static so the Runnable doesn't carry a synthetic outer-AndroidRfcomm
+    // reference (SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static Runnable makeConnectRunnable(
+            final android.bluetooth.BluetoothAdapter adapter,
+            final android.bluetooth.BluetoothDevice platformDevice,
+            final java.util.UUID uuid, final boolean secure,
+            final AsyncResource<RfcommConnection> out) {
+        return new Runnable() {
             public void run() {
                 android.bluetooth.BluetoothSocket socket = null;
                 try {
@@ -383,10 +426,7 @@ class AndroidRfcomm extends BluetoothClassic {
                             "RFCOMM connect failed: " + ex, ex));
                 }
             }
-        }, "CN1-RFCOMM-connect");
-        t.setDaemon(true);
-        t.start();
-        return out;
+        };
     }
 
     @Override
@@ -405,7 +445,21 @@ class AndroidRfcomm extends BluetoothClassic {
                 serviceUuid == null ? BluetoothUuid.SPP : serviceUuid;
         final java.util.UUID uuid =
                 AndroidBluetooth.toPlatformUuid(effectiveUuid);
-        Thread t = new Thread(new Runnable() {
+        Thread t = new Thread(makeListenRunnable(adapter, serviceName,
+                effectiveUuid, uuid, secure, out), "CN1-RFCOMM-listen");
+        t.setDaemon(true);
+        t.start();
+        return out;
+    }
+
+    // Static so the Runnable doesn't carry a synthetic outer-AndroidRfcomm
+    // reference (SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static Runnable makeListenRunnable(
+            final android.bluetooth.BluetoothAdapter adapter,
+            final String serviceName, final BluetoothUuid effectiveUuid,
+            final java.util.UUID uuid, final boolean secure,
+            final AsyncResource<RfcommServer> out) {
+        return new Runnable() {
             public void run() {
                 try {
                     android.bluetooth.BluetoothServerSocket serverSocket;
@@ -435,10 +489,7 @@ class AndroidRfcomm extends BluetoothClassic {
                             "RFCOMM listen failed: " + ex, ex));
                 }
             }
-        }, "CN1-RFCOMM-listen");
-        t.setDaemon(true);
-        t.start();
-        return out;
+        };
     }
 
     static void closeQuietly(android.bluetooth.BluetoothSocket socket) {

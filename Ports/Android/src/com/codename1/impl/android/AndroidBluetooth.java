@@ -373,7 +373,15 @@ class AndroidBluetooth extends com.codename1.bluetooth.Bluetooth {
             out.complete(Boolean.FALSE);
             return out;
         }
-        Display.getInstance().callSerially(new Runnable() {
+        Display.getInstance().callSerially(makeRequestEnableRunnable(out));
+        return out;
+    }
+
+    // Static so the Runnable doesn't carry a synthetic outer-AndroidBluetooth
+    // reference (SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static Runnable makeRequestEnableRunnable(
+            final AsyncResource<Boolean> out) {
+        return new Runnable() {
             public void run() {
                 if (Build.VERSION.SDK_INT >= 31
                         && !AndroidImplementation.checkForPermission(
@@ -396,8 +404,7 @@ class AndroidBluetooth extends com.codename1.bluetooth.Bluetooth {
                     out.complete(Boolean.FALSE);
                 }
             }
-        });
-        return out;
+        };
     }
 
     // ------------------------------------------------------------------
@@ -480,7 +487,16 @@ class AndroidBluetooth extends com.codename1.bluetooth.Bluetooth {
         }
         // checkForPermission blocks via invokeAndBlock and must run on the
         // EDT
-        Display.getInstance().callSerially(new Runnable() {
+        Display.getInstance().callSerially(
+                makeRequestPermissionsRunnable(perms, out));
+        return out;
+    }
+
+    // Static so the Runnable doesn't carry a synthetic outer-AndroidBluetooth
+    // reference (SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static Runnable makeRequestPermissionsRunnable(
+            final ArrayList<String> perms, final AsyncResource<Boolean> out) {
+        return new Runnable() {
             public void run() {
                 boolean all = true;
                 int size = perms.size();
@@ -491,8 +507,7 @@ class AndroidBluetooth extends com.codename1.bluetooth.Bluetooth {
                 }
                 out.complete(all ? Boolean.TRUE : Boolean.FALSE);
             }
-        });
-        return out;
+        };
     }
 
     // ------------------------------------------------------------------
@@ -838,7 +853,28 @@ class AndroidBluetoothLE extends BluetoothLE {
         final AndroidAdvertisementHandle handle =
                 new AndroidAdvertisementHandle(advertiser);
         android.bluetooth.le.AdvertiseCallback cb =
-                new android.bluetooth.le.AdvertiseCallback() {
+                makeAdvertiseCallback(handle, out);
+        handle.callback = cb;
+        try {
+            advertiser.startAdvertising(platformSettings, platformData,
+                    platformScanResponse, cb);
+        } catch (SecurityException se) {
+            out.error(new BluetoothException(BluetoothError.UNAUTHORIZED,
+                    "Missing BLUETOOTH_ADVERTISE permission", se));
+        } catch (RuntimeException ex) {
+            out.error(new BluetoothException(BluetoothError.ADVERTISE_FAILED,
+                    "Advertising failed to start: " + ex.getMessage(), ex));
+        }
+        return out;
+    }
+
+    // Static so the AdvertiseCallback doesn't carry a synthetic
+    // outer-AndroidBluetoothLE reference (SpotBugs
+    // SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static android.bluetooth.le.AdvertiseCallback makeAdvertiseCallback(
+            final AndroidAdvertisementHandle handle,
+            final AsyncResource<BleAdvertisement> out) {
+        return new android.bluetooth.le.AdvertiseCallback() {
             @Override
             public void onStartSuccess(
                     android.bluetooth.le.AdvertiseSettings settingsInEffect) {
@@ -858,18 +894,6 @@ class AndroidBluetoothLE extends BluetoothLE {
                 }
             }
         };
-        handle.callback = cb;
-        try {
-            advertiser.startAdvertising(platformSettings, platformData,
-                    platformScanResponse, cb);
-        } catch (SecurityException se) {
-            out.error(new BluetoothException(BluetoothError.UNAUTHORIZED,
-                    "Missing BLUETOOTH_ADVERTISE permission", se));
-        } catch (RuntimeException ex) {
-            out.error(new BluetoothException(BluetoothError.ADVERTISE_FAILED,
-                    "Advertising failed to start: " + ex.getMessage(), ex));
-        }
-        return out;
     }
 
     private static android.bluetooth.le.AdvertiseData buildAdvertiseData(
@@ -932,7 +956,19 @@ class AndroidBluetoothLE extends BluetoothLE {
                     "L2CAP channels require Android 10 (API 29) or newer"));
             return out;
         }
-        Thread t = new Thread(new Runnable() {
+        Thread t = new Thread(makeL2capServerRunnable(a, secure, out),
+                "CN1-L2CAP-listen");
+        t.setDaemon(true);
+        t.start();
+        return out;
+    }
+
+    // Static so the Runnable doesn't carry a synthetic outer-AndroidBluetoothLE
+    // reference (SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static Runnable makeL2capServerRunnable(
+            final android.bluetooth.BluetoothAdapter a, final boolean secure,
+            final AsyncResource<L2capServer> out) {
+        return new Runnable() {
             public void run() {
                 try {
                     android.bluetooth.BluetoothServerSocket serverSocket =
@@ -951,10 +987,7 @@ class AndroidBluetoothLE extends BluetoothLE {
                             "L2CAP listen failed: " + ex, ex));
                 }
             }
-        }, "CN1-L2CAP-listen");
-        t.setDaemon(true);
-        t.start();
-        return out;
+        };
     }
 
     /** Live advertisement handle; stop() detaches the platform callback. */
