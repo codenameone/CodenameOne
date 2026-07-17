@@ -35,6 +35,7 @@ import com.codename1.util.SuccessCallback;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /** Playground source pane built on the framework code editor API. */
 final class PlaygroundCodeEditor {
@@ -151,38 +152,105 @@ final class PlaygroundCodeEditor {
         }
         if (!completionProviderInstalled) {
             completionProviderInstalled = true;
-            editor.setCompletionProvider((ed, code, cursor, results) -> {
-                List<CodeCompletion> out = new ArrayList<CodeCompletion>();
-                java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<String>();
-                if (mode == Mode.CSS) {
-                    // CSS pane: property names plus the UIID selectors visible in the preview.
-                    for (String property : CSS_PROPERTIES) {
-                        if (seen.add(property)) {
-                            out.add(new CodeCompletion(property).setType("property"));
-                        }
-                    }
-                    for (String uiid : uiidCompletions) {
-                        if (seen.add(uiid)) {
-                            out.add(new CodeCompletion(uiid).setType("uiid"));
-                        }
-                    }
-                } else {
-                    for (String uiid : uiidCompletions) {
-                        if (seen.add(uiid)) {
-                            out.add(new CodeCompletion(uiid).setType("uiid"));
-                        }
-                    }
-                }
-                // Offer identifiers already present in the source so partially typed variable / method
-                // names (e.g. "varia" -> "variableName") complete. The editor filters by the typed
-                // prefix, so returning the whole set here is fine.
-                for (String word : collectIdentifiers(code, cursor)) {
-                    if (seen.add(word)) {
-                        out.add(new CodeCompletion(word).setType("text"));
-                    }
-                }
-                results.onSucess(out);
-            });
+            editor.setCompletionProvider((ed, code, cursor, results)
+                    -> results.onSucess(buildCompletions(code == null ? "" : code, cursor)));
+        }
+    }
+
+    private List<CodeCompletion> buildCompletions(String code, int cursor) {
+        List<CodeCompletion> out = new ArrayList<CodeCompletion>();
+        Set<String> seen = new java.util.LinkedHashSet<String>();
+        // The editor filters proposals by the typed prefix too, but the index holds ~1500 types, so
+        // filter here as well to keep the returned payload small on every keystroke.
+        String prefix = currentPrefix(code, cursor);
+        if (mode == Mode.CSS) {
+            // CSS pane: property names plus the UIID selectors visible in the preview.
+            for (String property : CSS_PROPERTIES) {
+                add(out, seen, property, prefix, "property", null);
+            }
+            for (String uiid : uiidCompletions) {
+                add(out, seen, uiid, prefix, "uiid", null);
+            }
+            addBufferIdentifiers(out, seen, code, cursor, prefix);
+            return out;
+        }
+
+        // Java pane. After `receiver.` offer that type's members (faux reflection over the CN1
+        // access index) and nothing else -- global names are irrelevant in a member position.
+        PlaygroundCompletionModel model = PlaygroundCompletionModel.get();
+        String receiver = model.findReceiver(code, cursor);
+        if (receiver.length() > 0) {
+            String type = model.inferType(receiver, code, model.visibleTypes(code));
+            for (String member : model.memberSignatures(type)) {
+                add(out, seen, member, prefix, "member", insertFor(member));
+            }
+            return out;
+        }
+
+        // No receiver: UIIDs, in-scope globals, visible type names, buffer identifiers and keywords.
+        for (String uiid : uiidCompletions) {
+            add(out, seen, uiid, prefix, "uiid", null);
+        }
+        for (String global : model.globals().keySet()) {
+            add(out, seen, global, prefix, "variable", null);
+        }
+        for (String simple : model.typeSimpleNames()) {
+            add(out, seen, simple, prefix, "type", null);
+        }
+        addBufferIdentifiers(out, seen, code, cursor, prefix);
+        for (String keyword : model.keywords()) {
+            add(out, seen, keyword, prefix, "keyword", null);
+        }
+        return out;
+    }
+
+    private static void add(List<CodeCompletion> out, Set<String> seen, String display, String prefix,
+            String type, String insert) {
+        if (display == null || display.length() == 0 || !matchesPrefix(display, prefix) || !seen.add(display)) {
+            return;
+        }
+        CodeCompletion cc = insert == null ? new CodeCompletion(display) : new CodeCompletion(display, insert);
+        out.add(cc.setType(type));
+    }
+
+    private static boolean matchesPrefix(String candidate, String prefix) {
+        if (prefix.length() == 0) {
+            return true;
+        }
+        if (candidate.length() < prefix.length()) {
+            return false;
+        }
+        return candidate.regionMatches(true, 0, prefix, 0, prefix.length());
+    }
+
+    /// The identifier characters immediately before the cursor (the part after a member-access dot, or
+    /// the word being typed) -- the prefix the proposals are filtered by.
+    private static String currentPrefix(String code, int cursor) {
+        int end = Math.max(0, Math.min(cursor, code.length()));
+        int start = end;
+        while (start > 0 && isIdentPart(code.charAt(start - 1))) {
+            start--;
+        }
+        return code.substring(start, end);
+    }
+
+    /// Insert text for a member proposal: `name(` for a method with arguments (so the caret lands
+    /// inside the parentheses), `name()` for a no-arg method, and the field name verbatim.
+    private static String insertFor(String signature) {
+        int paren = signature.indexOf('(');
+        if (paren < 0) {
+            return signature;
+        }
+        String name = signature.substring(0, paren);
+        return signature.endsWith("()") ? name + "()" : name + "(";
+    }
+
+    private void addBufferIdentifiers(List<CodeCompletion> out, Set<String> seen, String code, int cursor,
+            String prefix) {
+        // Offer identifiers already present in the source so partially typed variable / method
+        // names (e.g. "varia" -> "variableName") complete.
+        for (String word : collectIdentifiers(code, cursor)) {
+            add(out, seen, word, prefix, "text", null);
         }
     }
 

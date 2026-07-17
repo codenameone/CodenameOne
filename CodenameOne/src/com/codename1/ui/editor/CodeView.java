@@ -530,7 +530,9 @@ public class CodeView extends EditorView {
         if (!completionEnabled) {
             return;
         }
-        if (isIdentPart(c)) {
+        // '.' triggers member completion (the provider resolves the receiver's type); identifier
+        // characters trigger / narrow the prefix. Anything else dismisses the popup.
+        if (isIdentPart(c) || c == '.') {
             requestCompletion();
         } else {
             hideCompletion();
