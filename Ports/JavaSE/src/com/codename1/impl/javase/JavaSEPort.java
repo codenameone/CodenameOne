@@ -917,6 +917,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     static LocationSimulation locSimulation;
     static MotionSimulation motionSimulation;
     static ARSimulation arSimulation;
+    static BluetoothSimulation bluetoothSimulation;
     private JavaSEMotionSensorManager motionSensorManager;
     static PushSimulator pushSimulation;
     private static boolean blockMonitors;
@@ -6063,6 +6064,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
         simulateMenu.add(locationSim);
 
+        JMenuItem bluetoothSim = new JMenuItem("Bluetooth Simulation");
+        bluetoothSim.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                if(bluetoothSimulation == null) {
+                        bluetoothSimulation = new BluetoothSimulation();
+                }
+                bluetoothSimulation.setVisible(true);
+            }
+        });
+        simulateMenu.add(bluetoothSim);
+
         JMenuItem motionSim = new JMenuItem("Motion / Gesture Simulation");
         motionSim.addActionListener(new ActionListener() {
             @Override
@@ -6694,6 +6707,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         simulateMenu.add(appArg);
         simulateMenu.addSeparator();
         simulateMenu.add(locationSim);
+        simulateMenu.add(bluetoothSim);
         simulateMenu.add(motionSim);
         simulateMenu.add(pushSim);
         simulateMenu.add(biometricMenu);
