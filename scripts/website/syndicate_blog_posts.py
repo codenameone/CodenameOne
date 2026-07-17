@@ -437,7 +437,7 @@ def find_devto_article_by_canonical(canonical_url: str, api_key: str) -> dict[st
     """
     target = canonical_url.rstrip("/")
     page = 1
-    while page <= 20:  # dev.to caps per_page at 1000; 20 pages is a hard safety stop
+    while page <= 20:  # Hard stop prevents an unexpected API response from paging forever.
         articles = http_get_json(
             f"https://dev.to/api/articles/me/all?per_page=100&page={page}",
             headers={"api-key": api_key, "Accept": "application/vnd.forem.api-v1+json"},
