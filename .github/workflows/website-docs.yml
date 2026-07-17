@@ -106,6 +106,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
+      - name: Test developer guide PDF redirect resolver
+        run: scripts/website/test_update_developer_guide_redirect.sh
+
       - name: Update developer guide PDF redirect
         run: |
           set -euo pipefail
