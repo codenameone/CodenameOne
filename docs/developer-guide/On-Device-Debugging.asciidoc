@@ -49,9 +49,13 @@ the archetype generated:
 include::../demos/common/src/main/snippets/developer-guide/on-device-debugging.properties[tag=on-device-debugging-properties-001,indent=0]
 ----
 
+The build hint names start at `ios.onDeviceDebug`. Entries in
+`codenameone_settings.properties` use the `codename1.arg.` prefix, as
+shown above.
+
 For a physical device, set `proxyHost` to the laptop's LAN IP (run
-`ifconfig | grep "inet "`) instead of `127.0.0.1`. The native iOS
-simulator can always use `127.0.0.1`.
+`ipconfig` on Windows or `ifconfig` on macOS and Linux) instead of
+`127.0.0.1`. The native iOS simulator can always use `127.0.0.1`.
 
 ==== 2. Build the app as you normally do
 
@@ -68,32 +72,62 @@ not what you want). The Run tool window opens and shows:
 
 ----
 On-device-debug proxy starting:
-  symbols : .../cn1-symbols.txt
   device  : listening on tcp://0.0.0.0:55333
   jdwp    : listening on tcp://0.0.0.0:8000
+  symbols : streamed from the device on connect (no local file)
 [device] listening on port 55333 for ParparVM app to dial in
 [jdwp] listening on port 8000 for debugger (jdb) to attach
 ----
 
-When the last line appears, the JDWP port is bound and ready.
+When both listener lines appear, the proxy is ready for the app.
 
-==== 4. Attach the debugger from IntelliJ
+==== 4. Launch the app and wait for the device handshake
+
+Launch the iOS app in the native iOS simulator under Xcode or on a
+physical device. The app contains its compressed debug symbol table
+and streams it to the proxy when it connects. Wait for these lines
+before attaching the IDE:
+
+----
+[device] connected from ...
+[device] loaded symbols: ...
+[jdwp] device handshake ...
+----
+
+With `waitForAttach=true`, the app remains on the "Waiting for
+debugger" overlay while you complete the next step.
+
+Attaching the IDE before launching the app is also supported. The
+proxy keeps the JDWP session open and waits for the device to stream
+its symbols. If the device still hasn't connected after ten seconds,
+the proxy prints a checklist for the build hint, `proxyHost`, and the
+device port. You can correct the problem and launch the app without
+restarting the IDE session; rebuild and reinstall first if you change a
+build hint.
+
+==== 5. Attach the debugger from IntelliJ
 
 Switch the Run-config dropdown to *CN1 Attach iOS* and click 🐞
-*Debug*. IntelliJ connects to `localhost:8000` and opens a Debug tool
-window.
-
-==== 5. Launch the app
-
-Launch the iOS app (in the native iOS simulator under Xcode, or
-deploy to a tethered device). With `waitForAttach=true` the app boots
-to a "Waiting for debugger" overlay until the proxy's first
-RESUME — set your breakpoints, then let the proxy resume automatically.
+*Debug*. IntelliJ connects to `localhost:8000`, opens a Debug tool
+window, and releases the app after the debugger connection completes.
 
 Set breakpoints, step, inspect, evaluate expressions, just like a
 normal remote attach. Device output from
 `System.out.println` / `Log.p` / `printf` / `NSLog` lands in the
 *CN1 Debug Proxy* Run window prefixed with `[device]`.
+
+=== Attach from NetBeans
+
+NetBeans uses the same proxy and connection order. Start the proxy,
+launch the app, and wait for the device handshake and symbol-loading
+lines shown above. Then choose *Debug > Attach Debugger* in NetBeans.
+Select *Java Debugger (JPDA)* and the *SocketAttach* connector, set
+the host to `localhost` and the port to `8000`, then attach. Keep the
+Codename One project open so NetBeans can resolve your source files
+and breakpoints.
+
+Don't point NetBeans at port `55333`. The iPhone uses `55333` to
+reach the proxy. The IDE uses the proxy's JDWP port, `8000`.
 
 === Quick start (Maven from the command line)
 
@@ -306,7 +340,7 @@ CN1_ON_DEVICE_DEBUG` *without* a leading `//`. If the line is
 still commented out, the build was a release/non-debug build, or
 `ios.onDeviceDebug` wasn't set as a build hint.
 
-==== Make the app wait before running so the IDE can attach first
+==== Make the app wait while the proxy and IDE attach
 
 Set `ios.onDeviceDebug.waitForAttach=true`. The app will block
 at startup until the proxy is connected and the IDE tells the
