@@ -413,7 +413,7 @@ body.dark .cn1-action--primary {
   text-decoration: none;
 }
 
-.cn1-proof-strip__github:hover strong {
+.cn1-proof-strip a:hover strong {
   color: var(--cn1-accent);
 }
 
