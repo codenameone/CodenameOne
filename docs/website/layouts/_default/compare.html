@@ -28,7 +28,7 @@
           <tr><th>Theming</th><td>CSS themes shared across targets, with platform-specific selectors when needed</td><td>Separate SwiftUI/UIKit and Compose/View styling</td><td>Theme and widget code written in Dart</td><td>CSS interpreted by the browser</td></tr>
           <tr><th>Local development</th><td>One JavaSE simulator with device skins, component inspection, networking tools, tests, and MCP control</td><td>Platform simulator and emulator toolchains</td><td>Flutter tooling plus platform simulators for native behavior</td><td>Browser developer tools</td></tr>
           <tr><th>CI testing</th><td>Shared logic, UI, and screenshot tests can run on the JVM or headless JavaScript before native builds</td><td>Separate iOS and Android test jobs</td><td>Dart tests plus native jobs for platform behavior</td><td>Headless browser tests; wrappers need native jobs</td></tr>
-          <tr><th>Runtime and RAM</th><td>Android reuses ART; iOS compiles through ParparVM. No embedded browser or separately shipped Dart engine</td><td>Uses each OS runtime and UI toolkit</td><td>Ships the Flutter engine with the application</td><td>Runs inside a browser engine or WebView</td></tr>
+          <tr><th>Runtime packaging</th><td>Android reuses ART; iOS compiles through ParparVM. The Codename One UI toolkit ships as part of the application, without an embedded browser</td><td>Uses each OS runtime and UI toolkit</td><td>Bundles the Flutter rendering engine and Dart runtime with the application</td><td>Runs inside a browser engine or WebView</td></tr>
           <tr><th>Native OS components</th><td>Native interfaces plus <code>PeerComponent</code> for real maps, browsers, cameras, and other platform views</td><td>Direct access to every platform component</td><td>Platform channels and Platform Views</td><td>Browser APIs or wrapper plugins</td></tr>
           <tr><th>License and direction</th><td>Independent, open source, GPLv2 with Classpath Exception, no royalties</td><td>Controlled separately by Apple and Google</td><td>Open source and directed by Google</td><td>Standards and engines controlled by browser vendors</td></tr>
         </tbody>
@@ -45,8 +45,7 @@
         <li>Theme the shared UI with CSS instead of rebuilding styling in each platform language.</li>
         <li>Run most UI and logic work in the universal JavaSE simulator without waiting for a native build.</li>
         <li>Move fast CI work onto ordinary JVM or headless browser runners, then reserve native builders for native verification.</li>
-        <li>Avoid a JavaScript bridge, embedded browser, or separately shipped Dart engine between your application code and the framework APIs.</li>
-        <li>Keep runtime and RAM overhead low: Android uses ART already on the device, while iOS compiles through ParparVM to native code.</li>
+        <li>Reuse Android's built-in ART runtime. The Codename One UI toolkit ships with the application; it does not add a browser or a second language runtime on Android.</li>
         <li>Embed real OS views when you need them, and call native SDKs synchronously when the platform permits it.</li>
         <li>Ship any number of commercial applications without royalties or per-app fees.</li>
         <li>Work with an independent framework company whose revenue depends on customers shipping across vendors.</li>
@@ -60,7 +59,7 @@
     <article class="cn1-compare-choice">
       <p class="cn1-eyebrow">Flutter</p>
       <h2>A Dart application shipped with Google's UI engine.</h2>
-      <ul><li>Flutter shares UI by shipping its own rendering engine. Codename One also owns its pixels without requiring Dart or a separately shipped Flutter engine.</li><li>A Flutter application adopts Dart packages and Google's framework direction.</li><li>Platform integration uses channels or Platform Views. Codename One uses native interfaces and <code>PeerComponent</code>, including synchronous native calls where the platform permits them.</li></ul>
+      <ul><li>Flutter shares UI by bundling its rendering engine and Dart runtime with the application. Codename One also owns its pixels; on Android, its Java code runs on the device's ART runtime.</li><li>A Flutter application adopts Dart packages and Google's framework direction.</li><li>Platform integration uses channels or Platform Views. Codename One uses native interfaces and <code>PeerComponent</code>, including synchronous native calls where the platform permits them.</li></ul>
     </article>
     <article class="cn1-compare-choice">
       <p class="cn1-eyebrow">Web</p>
