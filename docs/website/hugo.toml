@@ -68,12 +68,6 @@ url = "/compare/"
 weight = 13
 
 [[menu.main]]
-parent = "product"
-name = "Platform Support"
-url = "/port-status/"
-weight = 14
-
-[[menu.main]]
 identifier = "docs"
 name = "Docs"
 url = "#"
@@ -144,6 +138,12 @@ parent = "resources"
 name = "Community Support"
 url = "/discussion-forum/"
 weight = 35
+
+[[menu.main]]
+parent = "resources"
+name = "Port Status"
+url = "/port-status/"
+weight = 36
 
 [[menu.main]]
 identifier = "pricing"

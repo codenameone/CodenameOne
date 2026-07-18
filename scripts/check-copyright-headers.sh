@@ -25,6 +25,9 @@ EOF
 
 is_source_file() {
   case "$1" in
+    # Hugo templates and browser assets follow the website content policy,
+    # not the GPLv2 + Classpath Exception source-header policy.
+    docs/website/*) return 1 ;;
     *.java|*.js|*.jsx|*.ts|*.tsx|*.css|*.c|*.cc|*.cpp|*.cxx|*.h|*.hh|*.hpp|*.hxx|*.m|*.mm|*.metal|*.kt|*.kts|*.swift|*.cs) return 0 ;;
     *) return 1 ;;
   esac
