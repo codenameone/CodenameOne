@@ -1,48 +1,48 @@
 {
-  "commit": "b2380c91f921f24743b05c827031ce08724fd4b4",
-  "generated_at": "2026-07-17T04:38:03Z",
+  "commit": "de2567596c0e200c5c94ef37814dd9dd3ec82a09",
+  "generated_at": "2026-07-18T04:54:03Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 1581100000
+        "duration_ns": 1511899999
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 999600000
+        "duration_ns": 906100000
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 16045000000
+        "duration_ns": 16710899999
       },
       "intArithmetic": {
         "checksum": "1313580095284",
-        "duration_ns": 728600000
+        "duration_ns": 760100001
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 4097300001
+        "duration_ns": 4210300000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 300400000
+        "duration_ns": 297500000
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 3564000000
+        "duration_ns": 3294800000
       },
       "quicksort": {
         "checksum": "786886890168670967",
-        "duration_ns": 707200000
+        "duration_ns": 593200000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 1118000000
+        "duration_ns": 1167500000
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 1393500000
+        "duration_ns": 1354200001
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -51,13 +51,13 @@
     "suite_checksum": 0
   },
   "port": "javascript",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29553726925",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29630000901",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "fail": 18,
+    "fail": 19,
     "not-run": 0,
-    "pass": 145,
+    "pass": 144,
     "skip": 1
   },
   "tests": {
@@ -517,7 +517,10 @@
     },
     "OrientationLockScreenshotTest": {
       "feature": "orientation",
-      "status": "pass"
+      "reasons": [
+        "failed due to timeout waiting for DONE stage=capture-requested"
+      ],
+      "status": "fail"
     },
     "PaletteOverrideThemeScreenshotTest": {
       "feature": "theme-palette-css",
