@@ -120,6 +120,8 @@ Launch the iOS app under the iOS Simulator from Xcode or on the physical device.
 
 With `waitForAttach=true`, the app remains on the "Waiting for debugger" overlay while you complete the next step.
 
+Attaching the IDE before launching the app is also supported. The proxy keeps the JDWP session open and waits for the device to stream its symbols. If the device still hasn't connected after ten seconds, the proxy prints a checklist for the build hint, `proxyHost`, and the device port. You can correct the problem and launch the app without restarting the IDE session; rebuild and reinstall first if you change a build hint.
+
 **5. Attach the debugger.**
 
 Switch the run-config dropdown to **CN1 Attach iOS** and click the 🐞 Debug button. IntelliJ connects to `localhost:8000`, opens its standard Debug tool window, and releases the app after the attach completes. You can set breakpoints anywhere in your Java code or in the framework.

@@ -57,7 +57,7 @@ public final class ProxyMain {
             listener = new LoggingListener();
             jdwpServer = null;
         } else {
-            jdwpServer = new JdwpServer(jdwpPort);
+            jdwpServer = new JdwpServer(jdwpPort, devicePort);
             listener = jdwpServer;
             final JdwpServer js = jdwpServer;
             Thread t = new Thread(() -> {
