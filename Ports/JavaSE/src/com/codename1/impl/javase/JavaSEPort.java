@@ -987,6 +987,34 @@ public class JavaSEPort extends CodenameOneImplementation {
 
     private boolean slowConnectionMode;
     private boolean disconnectedMode;
+    private int connectionStatus;
+
+    static final int CONNECTION_STATUS_REGULAR = 0;
+    static final int CONNECTION_STATUS_SLOW = 1;
+    static final int CONNECTION_STATUS_DISCONNECTED = 2;
+    static final int CONNECTION_STATUS_TIMEOUT = 3;
+
+    void setConnectionStatus(int status) {
+        if (status < CONNECTION_STATUS_REGULAR || status > CONNECTION_STATUS_TIMEOUT) {
+            status = CONNECTION_STATUS_REGULAR;
+        }
+        connectionStatus = status;
+        slowConnectionMode = status == CONNECTION_STATUS_SLOW;
+        disconnectedMode = status == CONNECTION_STATUS_DISCONNECTED;
+    }
+
+    static IOException getSimulatedNetworkError(int status, String url) {
+        if (url == null || !url.toLowerCase().startsWith("http")) {
+            return null;
+        }
+        if (status == CONNECTION_STATUS_DISCONNECTED) {
+            return new IOException("Unreachable");
+        }
+        if (status == CONNECTION_STATUS_TIMEOUT) {
+            return new IOException("The request timed out.");
+        }
+        return null;
+    }
 
     private static boolean exposeFilesystem;
 
@@ -5836,9 +5864,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         regularConnection.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent ae) {
-                slowConnectionMode = false;
-                disconnectedMode = false;
-                pref.putInt("connectionStatus", 0);
+                setConnectionStatus(CONNECTION_STATUS_REGULAR);
+                pref.putInt("connectionStatus", CONNECTION_STATUS_REGULAR);
             }
         });
         networkDebug.add(regularConnection);
@@ -5847,9 +5874,8 @@ public class JavaSEPort extends CodenameOneImplementation {
         slowConnection.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent ae) {
-                slowConnectionMode = true;
-                disconnectedMode = false;
-                pref.putInt("connectionStatus", 1);
+                setConnectionStatus(CONNECTION_STATUS_SLOW);
+                pref.putInt("connectionStatus", CONNECTION_STATUS_SLOW);
             }
         });
         networkDebug.add(slowConnection);
@@ -5858,29 +5884,46 @@ public class JavaSEPort extends CodenameOneImplementation {
         disconnected.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent ae) {
-                slowConnectionMode = false;
-                disconnectedMode = true;
-                pref.putInt("connectionStatus", 2);
+                setConnectionStatus(CONNECTION_STATUS_DISCONNECTED);
+                pref.putInt("connectionStatus", CONNECTION_STATUS_DISCONNECTED);
             }
         });
         networkDebug.add(disconnected);
+
+        JRadioButtonMenuItem timedOut = new JRadioButtonMenuItem("Timed Out");
+        timedOut.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                setConnectionStatus(CONNECTION_STATUS_TIMEOUT);
+                pref.putInt("connectionStatus", CONNECTION_STATUS_TIMEOUT);
+            }
+        });
+        networkDebug.add(timedOut);
 
         ButtonGroup connectionGroup = new ButtonGroup();
         connectionGroup.add(regularConnection);
         connectionGroup.add(slowConnection);
         connectionGroup.add(disconnected);
+        connectionGroup.add(timedOut);
 
-        switch(pref.getInt("connectionStatus", 0)) {
-            case 0:
+        int connectionStatus = pref.getInt("connectionStatus", CONNECTION_STATUS_REGULAR);
+        setConnectionStatus(connectionStatus);
+        switch(connectionStatus) {
+            case CONNECTION_STATUS_REGULAR:
                 regularConnection.setSelected(true);
                 break;
-            case 1:
+            case CONNECTION_STATUS_SLOW:
                 slowConnection.setSelected(true);
-                slowConnectionMode = true;
                 break;
-            case 2:
+            case CONNECTION_STATUS_DISCONNECTED:
                 disconnected.setSelected(true);
-                disconnectedMode = true;
+                break;
+            case CONNECTION_STATUS_TIMEOUT:
+                timedOut.setSelected(true);
+                break;
+            default:
+                setConnectionStatus(CONNECTION_STATUS_REGULAR);
+                regularConnection.setSelected(true);
                 break;
         }
 
@@ -13696,8 +13739,9 @@ public class JavaSEPort extends CodenameOneImplementation {
      * @inheritDoc
      */
     public Object connect(String url, boolean read, boolean write, int timeout) throws IOException {
-        if(disconnectedMode && url.toLowerCase().startsWith("http")) {
-            throw new IOException("Unreachable");
+        IOException simulatedNetworkError = getSimulatedNetworkError(connectionStatus, url);
+        if(simulatedNetworkError != null) {
+            throw simulatedNetworkError;
         }
         if(url.toLowerCase().startsWith("http:"))  {
             if(!warnAboutHttpChecked) {
