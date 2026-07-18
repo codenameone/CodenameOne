@@ -1669,6 +1669,9 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (data.getText(ClipboardContent.MIME_TEXT) != null) {
                 available.add(DataFlavor.stringFlavor);
             }
+            if (imageBytes(data) != null) {
+                available.add(DataFlavor.imageFlavor);
+            }
             String[] mimeTypes = data.getMimeTypes();
             for (int i = 0; i < mimeTypes.length; i++) {
                 if (!ClipboardContent.MIME_TEXT.equals(mimeTypes[i]) && data.getText(mimeTypes[i]) != null) {
@@ -1676,6 +1679,17 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
             }
             flavors = available.toArray(new DataFlavor[available.size()]);
+        }
+
+        private static byte[] imageBytes(ClipboardContent data) {
+            byte[] b = data.getBytes(ClipboardContent.MIME_PNG);
+            if (b == null) {
+                b = data.getBytes(ClipboardContent.MIME_JPEG);
+            }
+            if (b == null) {
+                b = data.getBytes(ClipboardContent.MIME_GIF);
+            }
+            return b;
         }
 
         public DataFlavor[] getTransferDataFlavors() {
@@ -1695,6 +1709,20 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (DataFlavor.stringFlavor.equals(flavor)) {
                 return data.getText(ClipboardContent.MIME_TEXT);
             }
+            if (DataFlavor.imageFlavor.equals(flavor)) {
+                byte[] bytes = imageBytes(data);
+                if (bytes != null) {
+                    try {
+                        java.awt.Image img = ImageIO.read(new ByteArrayInputStream(bytes));
+                        if (img != null) {
+                            return img;
+                        }
+                    } catch (IOException ex) {
+                        // fall through to unsupported
+                    }
+                }
+                throw new UnsupportedFlavorException(flavor);
+            }
             String value = data.getText(flavor.getPrimaryType() + "/" + flavor.getSubType());
             if (value != null) {
                 return value;
@@ -1712,6 +1740,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         for (DataFlavor flavor : clipboard.getAvailableDataFlavors()) {
             try {
                 Object out = clipboard.getData(flavor);
+                if (flavor.equals(DataFlavor.imageFlavor) && out instanceof java.awt.Image
+                        && content.getBytes(ClipboardContent.MIME_PNG) == null) {
+                    byte[] png = imageToPngBytes((java.awt.Image) out);
+                    if (png != null) {
+                        content.setData(ClipboardContent.MIME_PNG, png);
+                    }
+                    continue;
+                }
                 String str = clipboardText(out);
                 if (str == null) {
                     continue;
@@ -1747,6 +1783,31 @@ public class JavaSEPort extends CodenameOneImplementation {
             return plain;
         }
         return super.getPasteDataFromClipboard();
+    }
+
+    /// Encodes an AWT clipboard image as PNG bytes so it can travel through the CN1 clipboard as an
+    /// {@code image/png} representation.
+    private static byte[] imageToPngBytes(java.awt.Image image) {
+        try {
+            BufferedImage buffered;
+            if (image instanceof BufferedImage) {
+                buffered = (BufferedImage) image;
+            } else {
+                int w = Math.max(1, image.getWidth(null));
+                int h = Math.max(1, image.getHeight(null));
+                buffered = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+                java.awt.Graphics2D g = buffered.createGraphics();
+                g.drawImage(image, 0, 0, null);
+                g.dispose();
+            }
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            if (!ImageIO.write(buffered, "png", out)) {
+                return null;
+            }
+            return out.toByteArray();
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     private static String clipboardText(Object value) throws IOException {

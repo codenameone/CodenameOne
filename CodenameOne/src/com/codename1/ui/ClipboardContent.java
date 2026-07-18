@@ -38,6 +38,14 @@ public class ClipboardContent {
     public static final String MIME_RTF = "text/rtf";
     public static final String MIME_MARKDOWN = "text/markdown";
     public static final String MIME_ASCIIDOC = "text/asciidoc";
+    /// PNG image bytes (`byte[]`).
+    public static final String MIME_PNG = "image/png";
+    /// JPEG image bytes (`byte[]`).
+    public static final String MIME_JPEG = "image/jpeg";
+    /// GIF image bytes (`byte[]`).
+    public static final String MIME_GIF = "image/gif";
+    /// A local file reference (a file path / URI `String`, or a `String[]` for several files).
+    public static final String MIME_FILE = "application/x-file-list";
 
     private final List<String> mimeTypes = new ArrayList<String>();
     private final List<Object> values = new ArrayList<Object>();
@@ -69,6 +77,13 @@ public class ClipboardContent {
     public Object getData(String mimeType) {
         int index = mimeTypes.indexOf(normalizeMimeType(mimeType));
         return index < 0 ? null : values.get(index);
+    }
+
+    /// Returns the binary (`byte[]`) representation for a MIME type -- e.g. the raw bytes of an image
+    /// or file -- or null when it isn't available or isn't binary.
+    public byte[] getBytes(String mimeType) {
+        Object value = getData(mimeType);
+        return value instanceof byte[] ? (byte[]) value : null;
     }
 
     /// Returns a string representation, or null when the value isn't a string.

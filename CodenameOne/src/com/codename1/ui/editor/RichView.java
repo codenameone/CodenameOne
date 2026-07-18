@@ -25,8 +25,10 @@ package com.codename1.ui.editor;
 
 import com.codename1.ui.Font;
 import com.codename1.ui.ClipboardContent;
+import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
+import com.codename1.util.Base64;
 import com.codename1.ui.Display;
 import com.codename1.ui.RichTextClipboardData;
 import com.codename1.ui.RichTextFormat;
@@ -164,10 +166,28 @@ public class RichView extends EditorView {
 
     @Override
     protected void pasteClipboardData(Object data) {
+        // an image on the clipboard is inserted inline
+        if (data instanceof Image) {
+            insertImageObject((Image) data, "");
+            return;
+        }
         RichTextFormat format = null;
         String content = null;
         if (data instanceof ClipboardContent) {
             ClipboardContent clipboard = (ClipboardContent) data;
+            String imageMime = clipboard.findPreferredMimeType(new String[] {
+                    ClipboardContent.MIME_PNG, ClipboardContent.MIME_JPEG, ClipboardContent.MIME_GIF
+            });
+            if (imageMime != null) {
+                byte[] bytes = clipboard.getBytes(imageMime);
+                if (bytes != null && bytes.length > 0) {
+                    Image img = decodeImage(bytes);
+                    if (img != null) {
+                        insertImageObject(img, "data:" + imageMime + ";base64," + Base64.encodeNoNewline(bytes));
+                        return;
+                    }
+                }
+            }
             String mimeType = clipboard.findPreferredMimeType(new String[] {
                     ClipboardContent.MIME_HTML, ClipboardContent.MIME_RTF,
                     ClipboardContent.MIME_MARKDOWN, ClipboardContent.MIME_ASCIIDOC,
@@ -495,6 +515,15 @@ public class RichView extends EditorView {
         getUndoManager().breakRun();
         invalidateLayout();
         repaint();
+    }
+
+    /// Decodes encoded image bytes (PNG / JPEG / GIF) into an image, or null when they can't be decoded.
+    private static Image decodeImage(byte[] bytes) {
+        try {
+            return EncodedImage.create(bytes);
+        } catch (Throwable t) { // NOPMD - unsupported / corrupt bytes are simply not pasted as an image
+            return null;
+        }
     }
 
     private static int countNewlines(String s) {
