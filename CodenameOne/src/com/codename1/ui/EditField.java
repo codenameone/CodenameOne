@@ -198,6 +198,7 @@ public class EditField extends EditorView implements EditorHost {
     }
 
     /// Returns the placeholder text.
+    @Override
     public String getHint() {
         return hint;
     }
@@ -274,6 +275,7 @@ public class EditField extends EditorView implements EditorHost {
     }
 
     /// Returns whether the field is editable.
+    @Override
     public boolean isEditable() {
         return isEditableState();
     }

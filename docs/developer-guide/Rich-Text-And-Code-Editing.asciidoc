@@ -16,26 +16,20 @@ image::img/editors-overview.png[RichTextArea and CodeEditor rendered together,sc
 
 Both components extend
 https://www.codenameone.com/javadoc/com/codename1/ui/AbstractEditorComponent.html[`AbstractEditorComponent`].
-The public components send semantic commands and queries to one of three backends:
+The public components send semantic commands and queries to one of two backends:
 
 * A port can provide a native peer through `CodenameOneImplementation.createNativeEditorPeer(...)`.
-* Otherwise, a port that implements the low-level text-input contract uses the pure Codename One
-  engine in `com.codename1.ui.editor`. It paints text, selections, carets, gutters, diagnostics, and
-  completion UI with `Graphics` and `Font`.
-* A port without low-level text input uses a `BrowserComponent` fallback. This is important on the
-  JavaScript port and on any third-party port that hasn't implemented `TextInputClient`; the browser's
-  editable surface supplies keyboard and IME input instead of leaving a canvas editor read-only.
+* Otherwise the components use the pure Codename One engine in `com.codename1.ui.editor`. It paints
+  text, selections, carets, gutters, diagnostics, and completion UI with `Graphics` and `Font`, and
+  it drives keyboard and IME input through the low-level text-input contract.
 
-Backend selection is transparent to application code. `isNativeEditor()` reports only the first case,
-and `getInternalBrowser()` returns the fallback browser when the third case is active. The browser
-backend is a compatibility path, not a requirement for the lightweight renderer. `CodeEditor.setEngineURL()`
-can replace the built-in browser page on a port that needs that fallback; it doesn't replace the pure
-engine on ports that support low-level input.
+Backend selection is transparent to application code. `isNativeEditor()` reports the native-peer case.
+The pure engine is the default renderer on every platform; there is no browser fallback.
 
-Editor initialization can be asynchronous for native and browser peers. Commands issued immediately
-after construction are queued. Use `onReady(Runnable)` or a ready listener when work must run only after
-the backend exists. Reads use callbacks (`getHtml(...)`, `getText(...)`, and
-`getCursorPosition(...)`) so the same application code works with every backend.
+Editor initialization can be asynchronous for a native peer. Commands issued immediately after
+construction are queued. Use `onReady(Runnable)` or a ready listener when work must run only after the
+backend exists. Reads use callbacks (`getHtml(...)`, `getText(...)`, and `getCursorPosition(...)`) so
+the same application code works with either backend.
 
 ==== The editor package
 
@@ -54,8 +48,8 @@ second HTML tokenizer. Fragment parsing and entity decoding go through the frame
 
 `EditorHost` is the narrow bridge between a view and its owner. It starts and stops platform text
 input, pushes updated editing state to the port, and reports semantic editor events. This split lets
-the same document and interaction engine run inside the full editors and the optional lightweight
-mode of standard text components.
+the same document and interaction engine run inside the full editors and inside the lightweight
+`EditField` component.
 
 === Focus, change events, and editability
 
@@ -100,29 +94,27 @@ NOTE: `TextInputClient`, `TextInputConfig`, and `TextInputState` are general por
 lightweight editing components can implement the same protocol, but ordinary applications normally use
 `RichTextArea` or `CodeEditor` and don't bind an input client directly.
 
-=== Optional lightweight TextArea and TextField editing
+=== Lightweight fields with EditField
 
-`TextArea` and `TextField` normally keep their established native editing behavior. Applications that
-want Codename One to retain control of painting, selection, scrolling, focus, and clipboard handling
-can switch all standard text components to the shared lightweight engine. The option is a static,
-application-wide policy, is off by default, and applies to `TextField` through its `TextArea` base
-class. Set it once during application initialization rather than treating it as component state.
+`TextArea` and `TextField` keep their established native editing behavior. When an application wants
+Codename One to retain control of painting, selection, scrolling, focus, and clipboard handling for a
+plain field, use
+https://www.codenameone.com/javadoc/com/codename1/ui/EditField.html[`EditField`]. It offers an API
+familiar from `TextField` -- hint text, constraint, single-line or multiline mode, rows and columns,
+data-change listeners, and action events -- but renders and edits entirely through the pure
+`com.codename1.ui.editor` engine, with no native peer. Adoption is opt-in per component; existing
+`TextField` and `TextArea` usages are unaffected.
 
 [source,java]
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/RichTextAndCodeEditingJavaSnippet.java[tag=rich-text-and-code-editing-java-lightweight-fields,indent=0]
 ----
 
-While editing, the framework places an `EditorView` over the text component in the form's layered
-pane. Changes still flow through the original component's text, data-change listeners, max-size rule,
-constraint, capitalization settings, multiline setting, and action events. The overlay is removed
-when editing ends, so the `TextArea` or `TextField` remains the application-facing component.
-
-The mode requires a port implementation of the low-level text-input contract. A port that doesn't
-provide it falls back to the existing native editor rather than presenting a read-only canvas.
-Password fields also retain native editing so the platform can provide its protected text-entry
-behavior. This lets an application choose one editing architecture globally while ports migrate away
-from heavyweight native text overlays.
+`EditField` extends `EditorView` directly, so selection, caret navigation, arrow-key movement, undo,
+and clipboard commands are the same mechanics the full editors use. A single-line `EditField` fires
+its action event on the return key and strips embedded newlines; a multiline `EditField` grows to its
+configured row count. Because there is no native overlay, the field behaves identically on every
+platform that implements the low-level text-input contract.
 
 === Selection, bidirectional text, and scrolling
 
@@ -172,10 +164,9 @@ mapped directly to the rich model and serialized directly back with `getMarkdown
 `getAsciiDoc(...)`. The RTF importer likewise maps paragraph breaks, Unicode escapes, bold, italic,
 underline, strike-through, and skips metadata destinations such as font and color tables.
 
-On a browser fallback, Markdown, AsciiDoc, and RTF remain in source mode: editing and reading the same
-format returns source text without replacing it with generated HTML. Requesting a
-different output format performs an explicit model conversion and returns canonical output, just as
-`getHtml(...)` canonicalizes a visual rich-text document.
+Editing and reading the same format returns canonical output for that format. Requesting a different
+output format performs an explicit model conversion, just as `getHtml(...)` canonicalizes a visual
+rich-text document.
 
 [source,java]
 ----
@@ -231,8 +222,8 @@ uses the same language highlighting, line-number gutter, keyboard navigation, di
 diagnostic tooltips available to applications. Compiler diagnostics are passed to
 `setDiagnostics(...)` with their source ranges; status messages use lightweight Codename One
 components beneath the editor. The Playground doesn't install or bundle a separate editor engine.
-The browser fallback disables browser spelling and autocorrection for source code; the only wavy
-underlines it draws are diagnostics supplied through `setDiagnostics(...)`.
+Source editing disables platform spelling and autocorrection; the only wavy underlines the editor
+draws are diagnostics supplied through `setDiagnostics(...)`.
 
 ==== Custom syntax highlighters
 
@@ -244,9 +235,8 @@ are lexical by design; a compiler or language server remains the authority for d
 Third-party libraries can register a `SyntaxHighlighter` under any language ID. The highlighter
 receives one line and the state returned for the preceding line, then returns ordered token spans and
 the next state. Tokens can use the built-in semantic kinds or provide explicit light and dark RGB
-colors. Registration is global; the pure renderer invokes it directly, and the browser fallback asks
-the same Java highlighter for spans and applies the returned ranges without requiring a JavaScript
-copy of the language grammar.
+colors. Registration is global and the pure renderer invokes the Java highlighter directly, so a
+custom language needs no platform-specific grammar.
 
 [source,java]
 ----
@@ -283,13 +273,13 @@ empty list clears the current diagnostics.
 
 === Port integration checklist
 
-Port maintainers who want the lightweight engine should implement `isTextInputSupported()`,
-`startTextInput(...)`, `updateTextInputState(...)`, and `stopTextInput(...)` in
-`CodenameOneImplementation`. The binding must distinguish committed from composing text, preserve
-UTF-16 offsets, map native navigation and clipboard actions to `TextInputClient.KEY_*`, update native
-selection state after programmatic edits, and anchor candidate UI with the supplied caret geometry.
+The pure engine drives the editors on every platform, so a port must implement the low-level
+text-input contract: `isTextInputSupported()`, `startTextInput(...)`, `updateTextInputState(...)`, and
+`stopTextInput(...)` in `CodenameOneImplementation`. The binding must distinguish committed from
+composing text, preserve UTF-16 offsets, map native navigation and clipboard actions to
+`TextInputClient.KEY_*`, update native selection state after programmatic edits, and anchor candidate
+UI with the supplied caret geometry.
 
-If a port can't implement that contract, leave `isTextInputSupported()` false so the editor selects its
-editable browser fallback. A port with a better platform editor can instead supply a native peer and
-implement the existing semantic command/query channel. In all three cases application code, change
-listeners, ready handling, and asynchronous queries remain the same.
+A port with a better platform editor can instead supply a native peer and implement the existing
+semantic command/query channel. In both cases application code, change listeners, ready handling, and
+asynchronous queries remain the same.

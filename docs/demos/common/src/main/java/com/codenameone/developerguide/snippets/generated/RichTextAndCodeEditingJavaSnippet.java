@@ -26,10 +26,10 @@ package com.codenameone.developerguide.snippets.generated;
 import com.codename1.ui.CodeCompletion;
 import com.codename1.ui.CodeDiagnostic;
 import com.codename1.ui.CodeEditor;
+import com.codename1.ui.EditField;
 import com.codename1.ui.RichTextArea;
 import com.codename1.ui.RichTextFormat;
 import com.codename1.ui.TextArea;
-import com.codename1.ui.TextField;
 import com.codename1.ui.editor.SyntaxHighlighter;
 import com.codename1.ui.editor.SyntaxHighlightResult;
 import com.codename1.ui.editor.SyntaxToken;
@@ -49,10 +49,14 @@ class RichTextAndCodeEditingJavaSnippet {
 
     void lightweightFields() {
         // tag::rich-text-and-code-editing-java-lightweight-fields[]
-        TextArea.setLightweightEditingEnabled(true);
+        EditField title = new EditField("", "Title", TextArea.ANY);
+        title.setSingleLineTextArea(true);
+        title.setColumns(80);
 
-        TextField title = new TextField("", "Title", 80, TextArea.ANY);
-        TextArea notes = new TextArea("", 5, 30);
+        EditField notes = new EditField();
+        notes.setSingleLineTextArea(false);
+        notes.setRows(5);
+        notes.setColumns(30);
         // end::rich-text-and-code-editing-java-lightweight-fields[]
     }
 
