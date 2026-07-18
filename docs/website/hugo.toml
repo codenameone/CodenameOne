@@ -21,8 +21,8 @@ defaultTheme = "dark"
 disableThemeToggle = false
 mainSections = ["blog"]
 author = "Codename One"
-homeTitle = "Codename One: Native Cross-Platform Apps with Java/Kotlin"
-description = "Open-source Java and Kotlin framework for native mobile, desktop, web, TV, watch, and in-vehicle apps from one shared codebase."
+homeTitle = "Codename One: Native Apps in Java with a UI You Control"
+description = "Build native iOS, Android, desktop, web, watch, TV, and vehicle apps in Java. One codebase, a UI you control, and cloud iOS builds without a Mac."
 keywords = [
   "codename one",
   "cross platform app development",
@@ -44,152 +44,127 @@ iconHeight = 34
 
 [menu]
 [[menu.main]]
-identifier = "developers"
-name = "DEVELOPERS"
+identifier = "product"
+name = "Product"
 url = "#"
 weight = 10
 
 [[menu.main]]
-parent = "developers"
-name = "Getting Started"
-url = "/getting-started/"
+parent = "product"
+name = "How It Works"
+url = "/introduction/"
 weight = 11
 
 [[menu.main]]
-parent = "developers"
-name = "Docs"
-url = "/developing-in-codename-one/"
+parent = "product"
+name = "Demos"
+url = "/demos/"
 weight = 12
 
 [[menu.main]]
-parent = "developers"
-name = "Demos"
-url = "/demos/"
+parent = "product"
+name = "Compare"
+url = "/compare/"
 weight = 13
 
 [[menu.main]]
-parent = "developers"
-name = "Plugins"
-url = "/cn1libs/"
+parent = "product"
+name = "Platform Support"
+url = "/port-status/"
 weight = 14
 
 [[menu.main]]
-parent = "developers"
-name = "Dashboard"
-url = "https://cloud.codenameone.com/console/index.html"
-weight = 15
-
-[[menu.main]]
-parent = "developers"
-name = "Initializr"
-url = "/initializr/"
-weight = 16
-
-[[menu.main]]
-parent = "developers"
-name = "Playground"
-url = "/playground/"
-weight = 17
-
-[[menu.main]]
-parent = "developers"
-name = "Skin Designer"
-url = "/skindesigner/"
-weight = 18
-
-
-[[menu.main]]
-identifier = "resources"
-name = "RESOURCES"
+identifier = "docs"
+name = "Docs"
 url = "#"
 weight = 20
 
 [[menu.main]]
-parent = "resources"
-name = "Academy/Training"
-url = "/training/"
+parent = "docs"
+name = "Getting Started"
+url = "/getting-started/"
 weight = 21
 
 [[menu.main]]
-parent = "resources"
-name = "Tutorials"
-url = "/how-do-i/"
+parent = "docs"
+name = "Developer Guide"
+url = "/developer-guide/"
 weight = 22
+
+[[menu.main]]
+parent = "docs"
+name = "API Reference"
+url = "/api/"
+weight = 23
+
+[[menu.main]]
+parent = "docs"
+name = "How Do I?"
+url = "/how-do-i/"
+weight = 24
+
+[[menu.main]]
+parent = "docs"
+name = "Playground"
+url = "/playground/"
+weight = 25
+
+[[menu.main]]
+identifier = "resources"
+name = "Resources"
+url = "#"
+weight = 30
+
+[[menu.main]]
+parent = "resources"
+name = "Engineering Blog"
+url = "/blog/"
+weight = 31
+
+[[menu.main]]
+parent = "resources"
+name = "Training"
+url = "/training/"
+weight = 32
 
 [[menu.main]]
 parent = "resources"
 name = "Videos"
 url = "/videos/"
-weight = 23
+weight = 33
 
 [[menu.main]]
 parent = "resources"
-name = "Compare"
-url = "/compare/"
-weight = 24
+name = "Libraries"
+url = "/cn1libs/"
+weight = 34
 
 [[menu.main]]
 parent = "resources"
-name = "Port Status"
-url = "/port-status/"
-weight = 25
+name = "Community Support"
+url = "/discussion-forum/"
+weight = 35
 
 [[menu.main]]
-parent = "resources"
-name = "FAQ"
-url = "/faq/"
-weight = 26
-
-[[menu.main]]
-parent = "resources"
-name = "Blog"
-url = "/blog/"
-weight = 27
+identifier = "pricing"
+name = "Pricing"
+url = "/pricing/"
+weight = 40
 
 [[menu.main]]
 identifier = "search"
 name = "Search"
 url = "/search/"
-weight = 80
-
-[[menu.main]]
-identifier = "community"
-name = "COMMUNITY"
-url = "#"
-weight = 30
-
-[[menu.main]]
-parent = "community"
-name = "GitHub"
-url = "https://github.com/codenameone/CodenameOne"
-weight = 31
-
-[[menu.main]]
-parent = "community"
-name = "Stack Overflow"
-url = "https://stackoverflow.com/questions/tagged/codenameone"
-weight = 32
-
-[[menu.main]]
-parent = "community"
-name = "Reddit"
-url = "https://www.reddit.com/r/codenameone/"
-weight = 33
-
-[[menu.main]]
-parent = "community"
-name = "Forum/Help"
-url = "/discussion-forum/"
-weight = 34
-
-[[menu.main]]
-identifier = "pricing"
-name = "PRICING"
-url = "/pricing/"
-weight = 40
+weight = 50
 
 [[menu.main]]
 identifier = "dashboard"
 name = "Dashboard"
 url = "https://cloud.codenameone.com/console/index.html"
 weight = 90
+
+[[menu.main]]
+identifier = "create-project"
+name = "Create Project"
+url = "https://start.codenameone.com/"
+weight = 100

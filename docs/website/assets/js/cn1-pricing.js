@@ -17,7 +17,7 @@
     buttons.forEach((btn) => {
       const active = btn.dataset.billing === mode;
       btn.classList.toggle("is-active", active);
-      btn.setAttribute("aria-selected", active ? "true" : "false");
+      btn.setAttribute("aria-pressed", active ? "true" : "false");
     });
 
     cards.forEach((card) => {
@@ -55,5 +55,5 @@
     btn.addEventListener("click", () => update(btn.dataset.billing));
   });
 
-  update("monthly");
+  update("annual");
 })();

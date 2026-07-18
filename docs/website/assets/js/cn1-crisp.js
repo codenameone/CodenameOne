@@ -119,6 +119,9 @@
     "SigningScreenView", data || { page: "console" }
   );
   crispEvents.buildError = (data) => requestCrispEvent("BuildError", data);
+  crispEvents.conversionClick = (data) => requestCrispEvent(
+    "ConversionClick", data
+  );
   crispEvents.gettingStartedDwell = (data) => scheduleCrispEvent(
     "GettingStartedDwell", 20000, data
   );

@@ -1,0 +1,76 @@
+{{- define "main" -}}
+<article class="cn1-compare-page">
+  <header class="cn1-compare-hero">
+    {{ partial "breadcrumbs.html" . }}
+    <p class="cn1-eyebrow">Framework comparison</p>
+    <h1>The framework choice is a UI ownership choice.</h1>
+    <p>All four approaches can ship useful products. The difference is who controls the UI implementation, how many codebases you maintain, and which platform constraints you accept.</p>
+    <div class="cn1-action-row">
+      {{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "https://start.codenameone.com/" "event" "compare-project" "external" true) }}
+      {{ partial "cn1-cta.html" (dict "label" "Compare the models" "href" "#matrix" "variant" "secondary") }}
+    </div>
+  </header>
+
+  <section class="cn1-compare-matrix" id="matrix">
+    <div class="cn1-v2-section__intro">
+      <p class="cn1-eyebrow">At a glance</p>
+      <h2>Start with the implementation model.</h2>
+      <p>A language or feature checklist misses the architectural choice that shapes maintenance.</p>
+    </div>
+    <div class="cn1-compare-table-wrap" tabindex="0" role="region" aria-label="Framework comparison table">
+      <table>
+        <thead><tr><th>Decision</th><th>Codename One</th><th>Platform UI</th><th>Flutter</th><th>Web</th></tr></thead>
+        <tbody>
+          <tr><th>Primary language</th><td>Java</td><td>Swift and Kotlin</td><td>Dart</td><td>HTML, CSS, JavaScript</td></tr>
+          <tr><th>UI implementation</th><td>Custom-rendered UI shipped with the app</td><td>UIKit/SwiftUI and Android views/Compose</td><td>Flutter rendering engine shipped with the app</td><td>Browser rendering engine</td></tr>
+          <tr><th>Shared UI code</th><td>Across mobile, desktop, web, watch, TV, and vehicle targets</td><td>Separate platform implementations</td><td>Across Flutter-supported targets</td><td>Across browsers; wrappers add app-store targets</td></tr>
+          <tr><th>Platform access</th><td>Native interfaces and <code>PeerComponent</code></td><td>Direct platform APIs</td><td>Plugins, channels, and platform views</td><td>Browser APIs or wrapper plugins</td></tr>
+          <tr><th>iOS build machine</th><td>Cloud build available from Windows or Linux</td><td>Mac or external macOS CI</td><td>Mac or external macOS CI</td><td>Not needed for browser deployment; needed for an iOS wrapper</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="cn1-compare-choices">
+    <article class="cn1-compare-choice cn1-compare-choice--cn1">
+      <p class="cn1-eyebrow">Choose Codename One when</p>
+      <h2>You want native output and an app-owned UI in Java.</h2>
+      <ul><li>One shared UI and application model matters.</li><li>You need mobile plus desktop, web, watch, TV, or vehicle surfaces.</li><li>You want cloud iOS builds without maintaining a Mac build machine.</li><li>You accept a custom-rendered UI and its native-view composition constraints.</li></ul>
+    </article>
+    <article class="cn1-compare-choice">
+      <p class="cn1-eyebrow">Choose platform UI when</p>
+      <h2>The platform itself is the product boundary.</h2>
+      <ul><li>You target one platform or fund separate platform teams.</li><li>You want the newest system components as soon as the OS provides them.</li><li>Direct access to every platform API outweighs shared implementation.</li><li>You accept separate release, test, and maintenance paths.</li></ul>
+    </article>
+    <article class="cn1-compare-choice">
+      <p class="cn1-eyebrow">Choose Flutter when</p>
+      <h2>You want a larger custom-rendered ecosystem and accept Dart.</h2>
+      <ul><li>Flutter's package and hiring ecosystem matters more than Java integration.</li><li>Its rendering fidelity and widget catalog fit the product.</li><li>You are comfortable with Flutter-specific tooling and runtime choices.</li><li>You can maintain native plugins where the package layer stops.</li></ul>
+    </article>
+    <article class="cn1-compare-choice">
+      <p class="cn1-eyebrow">Choose the web when</p>
+      <h2>A URL and browser deployment are the main advantages.</h2>
+      <ul><li>Instant deployment matters more than app-store distribution.</li><li>The browser APIs cover the required device integration.</li><li>Your team and product are web-first.</li><li>You accept browser-engine behavior and wrapper tradeoffs on app stores.</li></ul>
+    </article>
+  </section>
+
+  <section class="cn1-compare-detail">
+    <div class="cn1-v2-section__intro"><p class="cn1-eyebrow">The Codename One model</p><h2>The custom renderer is the source of control and the main tradeoff.</h2></div>
+    <div class="cn1-compare-detail__grid">
+      <article><h3>What you gain</h3><p>The UI runtime and theme ship inside the application. Shared screens keep one implementation across targets, and OS widget changes do not replace that implementation after release.</p></article>
+      <article><h3>What you give up</h3><p>You do not automatically receive every new UIKit or Compose component. Codename One's platform themes also do not match every platform detail as closely as Flutter or a dedicated native implementation.</p></article>
+      <article><h3>Where native still enters</h3><p>Use native interfaces for platform SDKs. Use <code>PeerComponent</code> for heavyweight platform views such as maps and web views. Embedded views can require special handling for animation, z-order, and menus.</p></article>
+    </div>
+  </section>
+
+  <section class="cn1-compare-test">
+    <div><p class="cn1-eyebrow">A useful evaluation</p><h2>Build one real screen before choosing.</h2><p>Use the screen with your hardest layout, one native integration, and one device build. That test exposes the tradeoffs faster than another feature table.</p></div>
+    <ol><li><span>1</span>Generate a Java project.</li><li><span>2</span>Recreate the representative screen.</li><li><span>3</span>Embed the native view you actually need.</li><li><span>4</span>Submit an iOS or Android device build.</li></ol>
+  </section>
+
+  <section class="cn1-v2-final cn1-compare-final">
+    <div><p class="cn1-eyebrow">Test the model</p><h2>Create the project and make the tradeoff concrete.</h2><p>The free cloud tier includes 100 build credits per month. No paid plan is required to evaluate the framework.</p></div>
+    <div class="cn1-action-row">{{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "https://start.codenameone.com/" "event" "compare-final-project" "external" true) }}</div>
+  </section>
+</article>
+{{- end -}}

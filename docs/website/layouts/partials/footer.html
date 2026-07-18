@@ -1,38 +1,46 @@
 {{- if not (.Param "hideFooter") }}
 <footer class="footer cn1-site-footer">
     <div class="cn1-bottom-links">
-        <div class="cn1-bottom-links__col">
-            <h3>Important Links</h3>
-            <ul>
-                <li><a href="/search/">Search This Site</a></li>
-                <li><a href="/introduction/">Documentation</a></li>
-                <li><a href="/discussion-forum/">Community Support</a></li>
-                <li><a href="https://github.com/codenameone/CodenameOne/discussions">GitHub Discussions</a></li>
-                <li><a href="/cn1libs/">Plugins/cn1libs</a></li>
-                <li><a href="/blog/">Blog</a></li>
-                <li><a href="/recommended-sites/">Recommended Sites</a></li>
-                <li><a href="/about-us/">About Us</a></li>
-                <li><a href="/press/">Press</a></li>
-                <li><a href="/privacy/">Privacy Policy</a></li>
-                <li><a href="/terms/">Terms of Service</a></li>
-                <li><a href="/site-map/">Site Map</a></li>
-                <li><a href="#" data-cn1-enable-chat>Enable Chat</a></li>
-                <li><a href="#" data-cn1-manage-chat>Manage Chat Consent</a></li>
-            </ul>
-        </div>
         <div class="cn1-bottom-links__brand">
             <img class="cn1-footer-logo cn1-footer-logo--dark" src="/uploads/footer-logo-1.png" alt="Codename One">
             <img class="cn1-footer-logo cn1-footer-logo--light" src="/uploads/footer-logo.png" alt="Codename One">
-            <p>Reinventing mobile development.</p>
+            <p>Native apps in Java, with a UI you control.</p>
+            <a class="cn1-footer-project" href="https://start.codenameone.com/">Create a Java project</a>
         </div>
-        <div class="cn1-bottom-links__stats">
-            <p><strong>~ 180 M</strong><br><span>Apps Installed</span></p>
-            <p><strong>40 k+</strong><br><span>Developers</span></p>
+        <div class="cn1-bottom-links__col">
+            <h3>Product</h3>
+            <ul>
+                <li><a href="/introduction/">How it works</a></li>
+                <li><a href="/demos/">Demos</a></li>
+                <li><a href="/compare/">Compare</a></li>
+                <li><a href="/pricing/">Pricing</a></li>
+                <li><a href="/port-status/">Platform support</a></li>
+            </ul>
+        </div>
+        <div class="cn1-bottom-links__col">
+            <h3>Learn</h3>
+            <ul>
+                <li><a href="/getting-started/">Getting started</a></li>
+                <li><a href="/developer-guide/">Developer guide</a></li>
+                <li><a href="/api/">API reference</a></li>
+                <li><a href="/how-do-i/">How do I?</a></li>
+                <li><a href="/training/">Training</a></li>
+            </ul>
+        </div>
+        <div class="cn1-bottom-links__col">
+            <h3>Community</h3>
+            <ul>
+                <li><a href="https://github.com/codenameone/CodenameOne">GitHub</a></li>
+                <li><a href="https://github.com/codenameone/CodenameOne/discussions">Discussions</a></li>
+                <li><a href="/blog/">Engineering blog</a></li>
+                <li><a href="/cn1libs/">Libraries</a></li>
+                <li><a href="/about-us/">About</a></li>
+            </ul>
         </div>
     </div>
     <div class="cn1-footer-meta">
-        <p>Codename One LTD &copy; {{ now.Year }}. All Rights Reserved.</p>
-        <p>The Java&reg; logo and name are trademarks of Oracle corp. <a href="/terms/">Terms of Use</a></p>
+        <p>Codename One LTD &copy; {{ now.Year }}. <a href="/privacy/">Privacy</a> <a href="/terms/">Terms</a> <a href="/site-map/">Site map</a></p>
+        <p><a href="#" data-cn1-enable-chat>Enable chat</a> <a href="#" data-cn1-manage-chat>Manage chat consent</a></p>
     </div>
 </footer>
 {{- end }}
@@ -60,16 +68,18 @@
 
 {{- partial "extend_footer.html" . }}
 {{- $cn1Site := resources.Get "js/cn1-site.js" | minify | fingerprint }}
-{{- $cn1Home := resources.Get "js/cn1-home.js" | minify | fingerprint }}
 {{- $cn1Demo := resources.Get "js/cn1-demo.js" | minify | fingerprint }}
 {{- $cn1Pricing := resources.Get "js/cn1-pricing.js" | minify | fingerprint }}
 {{- $cn1Crisp := resources.Get "js/cn1-crisp.js" | minify | fingerprint }}
 {{- $cn1Javadoc := resources.Get "js/cn1-javadoc.js" | minify | fingerprint }}
 {{- $cn1PortStatus := resources.Get "js/cn1-port-status.js" | minify | fingerprint }}
 <script defer src="{{ $cn1Site.RelPermalink }}" integrity="{{ $cn1Site.Data.Integrity }}"></script>
-<script defer src="{{ $cn1Home.RelPermalink }}" integrity="{{ $cn1Home.Data.Integrity }}"></script>
+{{- if or (hasPrefix (.RelPermalink | default "") "/demo-") (eq .Layout "demos") }}
 <script defer src="{{ $cn1Demo.RelPermalink }}" integrity="{{ $cn1Demo.Data.Integrity }}"></script>
+{{- end }}
+{{- if eq .Layout "pricing" }}
 <script defer src="{{ $cn1Pricing.RelPermalink }}" integrity="{{ $cn1Pricing.Data.Integrity }}"></script>
+{{- end }}
 <script defer src="{{ $cn1Crisp.RelPermalink }}" integrity="{{ $cn1Crisp.Data.Integrity }}"></script>
 {{- if eq .Layout "api-javadoc" -}}
 <script defer src="{{ $cn1Javadoc.RelPermalink }}" integrity="{{ $cn1Javadoc.Data.Integrity }}"></script>
@@ -87,16 +97,18 @@
         }
     }
 
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    document.querySelectorAll('a[href^="#"]:not([href="#"])').forEach(anchor => {
         anchor.addEventListener("click", function (e) {
-            e.preventDefault();
             var id = this.getAttribute("href").substr(1);
+            var target = document.getElementById(decodeURIComponent(id));
+            if (!target) return;
+            e.preventDefault();
             if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                target.scrollIntoView({
                     behavior: "smooth"
                 });
             } else {
-                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+                target.scrollIntoView();
             }
             if (id === "top") {
                 history.replaceState(null, null, " ");
@@ -120,24 +132,6 @@
             mybutton.style.opacity = "0";
         }
     };
-
-</script>
-{{- end }}
-
-{{- if (not site.Params.disableThemeToggle) }}
-<script>
-    const themeToggle = document.getElementById("theme-toggle");
-    if (themeToggle) {
-        themeToggle.addEventListener("click", () => {
-            if (document.body.className.includes("dark")) {
-                document.body.classList.remove('dark');
-                localStorage.setItem("pref-theme", 'light');
-            } else {
-                document.body.classList.add('dark');
-                localStorage.setItem("pref-theme", 'dark');
-            }
-        });
-    }
 
 </script>
 {{- end }}

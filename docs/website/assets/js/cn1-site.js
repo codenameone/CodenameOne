@@ -11,6 +11,11 @@
     const items = Array.from(header.querySelectorAll("#menu > li.has-children"));
     const navToggle = header.querySelector("#cn1-nav-toggle");
 
+    const closeNav = () => {
+      header.classList.remove("cn1-nav-open");
+      if (navToggle) navToggle.setAttribute("aria-expanded", "false");
+    };
+
     const closeAll = () => {
       items.forEach((item) => {
         item.classList.remove("open");
@@ -35,13 +40,19 @@
     });
 
     if (navToggle) {
-      navToggle.addEventListener("change", () => {
-        if (!navToggle.checked) closeAll();
+      navToggle.addEventListener("click", () => {
+        const open = !header.classList.contains("cn1-nav-open");
+        header.classList.toggle("cn1-nav-open", open);
+        navToggle.setAttribute("aria-expanded", open ? "true" : "false");
+        if (!open) closeAll();
       });
     }
 
     const resetDesktop = () => {
-      if (!mobileMq.matches) closeAll();
+      if (!mobileMq.matches) {
+        closeNav();
+        closeAll();
+      }
     };
 
     if (mobileMq.addEventListener) {
@@ -55,6 +66,19 @@
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      closeNav();
+      closeAll();
+      if (navToggle && mobileMq.matches) navToggle.focus();
+    });
+
+    header.querySelectorAll(".cn1-nav-links a").forEach((link) => {
+      link.addEventListener("click", () => {
+        if (mobileMq.matches) closeNav();
+      });
+    });
   }
 
   const updateThemeUi = () => {
@@ -116,6 +140,8 @@
       triggers.forEach((trigger) => {
         const active = trigger.getAttribute("data-cn1-tab-trigger") === name;
         trigger.classList.toggle("is-active", active);
+        trigger.setAttribute("aria-selected", active ? "true" : "false");
+        trigger.setAttribute("tabindex", active ? "0" : "-1");
       });
       panels.forEach((panel) => {
         const active = panel.getAttribute("data-cn1-tab-panel") === name;
@@ -128,6 +154,15 @@
       trigger.addEventListener("click", () => {
         setActive(trigger.getAttribute("data-cn1-tab-trigger"));
       });
+      trigger.addEventListener("keydown", (event) => {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        event.preventDefault();
+        const current = triggers.indexOf(trigger);
+        const direction = event.key === "ArrowRight" ? 1 : -1;
+        const next = triggers[(current + direction + triggers.length) % triggers.length];
+        setActive(next.getAttribute("data-cn1-tab-trigger"));
+        next.focus();
+      });
     });
 
     const initial = tabs.querySelector("[data-cn1-tab-trigger].is-active");
@@ -135,6 +170,32 @@
       (initial && initial.getAttribute("data-cn1-tab-trigger")) ||
         triggers[0].getAttribute("data-cn1-tab-trigger")
     );
+  });
+
+  document.querySelectorAll("[data-cn1-conversion]").forEach((link) => {
+    link.addEventListener("click", () => {
+      if (window.cn1CrispEvents && window.cn1CrispEvents.conversionClick) {
+        window.cn1CrispEvents.conversionClick({
+          action: link.getAttribute("data-cn1-conversion"),
+          page: window.location.pathname
+        });
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-cn1-copy-command]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const command = button.parentElement && button.parentElement.querySelector("code");
+      if (!command || !navigator.clipboard) return;
+      try {
+        await navigator.clipboard.writeText(command.textContent.trim());
+        const original = button.textContent;
+        button.textContent = "Copied";
+        window.setTimeout(() => { button.textContent = original; }, 1800);
+      } catch (_) {
+        button.textContent = "Select and copy";
+      }
+    });
   });
 
 })();
