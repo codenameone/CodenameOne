@@ -154,7 +154,7 @@ MAX_WAIT="${CN1SS_TV_TIMEOUT:-1200}"
 TV_REF_DIR="${SCREENSHOT_REF_DIR:-$SCRIPT_DIR/ios/screenshots-tv}"
 EXPECTED="$(/usr/bin/find "$TV_REF_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
 rt_log "Expecting $EXPECTED screenshots (golden set)"
-prev=-1; stable=0; waited=0
+stable=0; waited=0
 while [ "$waited" -lt "$MAX_WAIT" ]; do
   sleep 8; waited=$((waited+8))
   cur="$(/usr/bin/find "$WS_RAW_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
@@ -162,22 +162,11 @@ while [ "$waited" -lt "$MAX_WAIT" ]; do
     stable=$((stable+1)); [ "$stable" -ge 2 ] && break
     continue
   fi
-  if [ "$cur" = "$prev" ] && [ "$cur" -gt 0 ]; then
-    # No-progress guard: a genuinely hung suite emits neither SUITE:FINISHED nor a
-    # crash, so bail on a long stall as a last resort before MAX_WAIT. This must be
-    # well above the slowest LEGITIMATE single-test render gap: a heavy 4K frame or a
-    # network-backed map (VectorMapShapes) can take minutes on the tvOS simulator, and
-    # these tests bunch up at the end of the run. An 80s stall used to fire mid-run
-    # while such a test was still rendering, settling the capture early and dropping
-    # every frame delivered afterwards (11 "missing" screenshots that had in fact been
-    # produced). SUITE:FINISHED below remains the primary done-signal; this only trips
-    # when the suite is truly wedged. ~6 min >> the observed 2.5 min worst-case gap.
-    stable=$((stable+1)); [ "$stable" -ge 45 ] && { rt_log "No screenshot progress for ~6min (cur=$cur); assuming hung suite"; break; }
-  else stable=0; fi
-  prev="$cur"
+  stable=0
   # The suite emits CN1SS:SUITE:FINISHED when done; bail early on that (covers
-  # the seed run where EXPECTED=0) or on an obvious native crash, instead of
-  # blocking the full MAX_WAIT.
+  # the seed run where EXPECTED=0) or on an obvious native crash. Do not infer
+  # a hang from screenshot inactivity: the trailing assertion and performance
+  # tests legitimately run for several minutes without producing a PNG.
   if grep -qa "CN1SS:SUITE:FINISHED" "$APP_CONSOLE" 2>/dev/null; then
     rt_log "Suite reported FINISHED after ${waited}s"; break
   fi

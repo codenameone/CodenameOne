@@ -962,16 +962,24 @@ capture_hang_diagnostics() {
 }
 
 END_MARKER="CN1SS:SUITE:FINISHED"
-# Per-suite budget (seconds). The 300 -> 600 bump from earlier landed
-# back when the suite was ~37 tests; it has since grown to ~90, and the
-# OpenGL build runs noticeably slower per test than the Metal build on
-# the macos-15-arm64 runners. CI build 25414437442 captured 44 of the
-# 90 GL screenshots before the previous 600s cap fired (the remainder
-# came up as missing-reference). Bump to 1500s to give the GL run
-# headroom while still staying well under any reasonable CI slot length;
-# the env override stays for local runs that want to push it further.
-TIMEOUT_SECONDS="${CN1SS_SUITE_TIMEOUT_SECONDS:-1500}"
+# Keep two independent bounds on the suite:
+#
+# * the absolute limit prevents a continuously noisy process from occupying a
+#   runner indefinitely;
+# * the idle limit fails a genuinely stalled DeviceRunner promptly, while a
+#   growing suite that is still emitting CN1SS progress may finish normally.
+#
+# The GL suite exceeded the old 1500-second absolute limit on CI while still
+# making progress and was terminated one second after its final screenshot
+# test started. Keep a bounded ten-minute growth allowance. The benchmark
+# phase has a measured 530-second gap between records, so use a 12-minute idle
+# limit to distinguish that valid work from a genuinely stalled runner.
+TIMEOUT_SECONDS="${CN1SS_SUITE_TIMEOUT_SECONDS:-2100}"
+IDLE_TIMEOUT_SECONDS="${CN1SS_SUITE_IDLE_TIMEOUT_SECONDS:-720}"
 START_TIME="$(date +%s)"
+LAST_PROGRESS_TIME="$START_TIME"
+LAST_PROGRESS_LINE=""
+SUITE_TIMEOUT_REASON=""
 ri_log "Waiting for DeviceRunner completion marker ($END_MARKER)"
 while true; do
   if grep -q "$END_MARKER" "$TEST_LOG"; then
@@ -979,8 +987,20 @@ while true; do
     break
   fi
   NOW="$(date +%s)"
+  PROGRESS_LINE="$(grep 'CN1SS:' "$TEST_LOG" 2>/dev/null | tail -n 1 || true)"
+  if [ -n "$PROGRESS_LINE" ] && [ "$PROGRESS_LINE" != "$LAST_PROGRESS_LINE" ]; then
+    LAST_PROGRESS_LINE="$PROGRESS_LINE"
+    LAST_PROGRESS_TIME="$NOW"
+  fi
   if [ $(( NOW - START_TIME )) -ge $TIMEOUT_SECONDS ]; then
-    ri_log "STAGE:TIMEOUT -> DeviceRunner did not emit completion marker within ${TIMEOUT_SECONDS}s"
+    SUITE_TIMEOUT_REASON="DeviceRunner did not emit completion marker within the ${TIMEOUT_SECONDS}s absolute limit"
+    ri_log "STAGE:TIMEOUT -> $SUITE_TIMEOUT_REASON"
+    capture_hang_diagnostics
+    break
+  fi
+  if [ $(( NOW - LAST_PROGRESS_TIME )) -ge $IDLE_TIMEOUT_SECONDS ]; then
+    SUITE_TIMEOUT_REASON="DeviceRunner emitted no CN1SS progress for ${IDLE_TIMEOUT_SECONDS}s"
+    ri_log "STAGE:TIMEOUT -> $SUITE_TIMEOUT_REASON"
     capture_hang_diagnostics
     break
   fi
@@ -1114,6 +1134,11 @@ comment_rc=$?
 
 cp -f "$BUILD_LOG" "$ARTIFACTS_DIR/xcodebuild-build.log" 2>/dev/null || true
 cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner.log" 2>/dev/null || true
+
+if [ -n "$SUITE_TIMEOUT_REASON" ]; then
+  ri_log "STAGE:TIMEOUT -> failing because $SUITE_TIMEOUT_REASON"
+  exit 18
+fi
 
 if [ -n "$BASE64_BENCHMARK_FAILURE_LINE" ]; then
   ri_log "STAGE:BENCHMARK_FAILED -> $BASE64_BENCHMARK_FAILURE_LINE"

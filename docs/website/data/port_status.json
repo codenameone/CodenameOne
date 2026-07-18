@@ -531,6 +531,7 @@
     {"pattern": "PaletteOverrideTheme_*", "test": "PaletteOverrideThemeScreenshotTest"},
     {"pattern": "css-gradients", "test": "CssGradientsScreenshotTest"},
     {"pattern": "SurfacesRasterizer", "test": "SurfacesRasterizerScreenshotTest"},
+    {"pattern": "SurfacesRemoteViews", "test": "SurfacesRemoteViewsScreenshotTest"},
     {"pattern": "RealOsmVector", "test": "RealOsmVectorScreenshotTest"},
     {"pattern": "VectorMapDarkStyle", "test": "VectorMapDarkStyleScreenshotTest"},
     {"pattern": "VectorMapMarkers", "test": "VectorMapMarkersScreenshotTest"},

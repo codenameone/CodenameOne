@@ -27,11 +27,12 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringTokenizer;
+import org.cef.CN1JcefRuntime;
 
 /**
- * A utility class which will dynamically add CEF to the classpath if it is available.  This is
- * used by the CSS compiler, and should also be used by other desktop CN1 apps that need to use
- * CEF.
+ * Bootstraps the reloadable JavaSE classpath while keeping native-backed
+ * libraries such as JCEF in the parent classloader. This is used by the CSS
+ * compiler and desktop Codename One applications.
  * @author shannah
  */
 public class CN1Bootstrap {
@@ -59,6 +60,21 @@ public class CN1Bootstrap {
             return true;
         } catch (Throwable ex){}
         return false;
+    }
+
+    /**
+     * Checks whether JCEF Maven provides a native runtime for this platform.
+     * The runtime itself is installed lazily when the first BrowserComponent
+     * is created.
+     *
+     * @return true if JCEF is available for this platform
+     */
+    public static boolean isCEFSupported() {
+        try {
+            return CN1JcefRuntime.isSupported();
+        } catch (Throwable ex) {
+            return false;
+        }
     }
 
     private static boolean hasFFmpeg() {
@@ -89,9 +105,9 @@ public class CN1Bootstrap {
     }
     
     /**
-     * <p>Run the given mainclass with a bootstrapped classpath (i.e. it will first attempt to 
-     * add CEF to the classpath, and then run the main() method of the given class using the
-     * bootstrapped classloader.</p>
+     * <p>Run the given main class with a bootstrapped classpath, keeping JCEF
+     * in the parent classloader and running the main method with the reloadable
+     * child classloader.</p>
      * 
      * <p>NOTE: This will only execute the main class if bootstrapping had not already occurred.  This is
      * is to allow you to call this method inside your class's main() method without infinite recursion, as follows:</p>
@@ -163,30 +179,7 @@ public class CN1Bootstrap {
             fxSupported = true;
         } catch (Throwable ex) {}
         boolean fxOnSystemPath = fxSupported;
-        File cef = System.getProperty("cef.dir") != null ? new File(System.getProperty("cef.dir")) : new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "cef");
-        //File cef = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "cef");
-        if (cef.exists()) {
-            if (isUnix && !is64Bit) {
-                System.out.println("Found CEF, but not using because CEF is only supported on 64 bit platforms.  Try running inside a 64 bit JVM");
-            } else {
-                
-            
-                cefSupported = true;
-                System.out.println("Adding CEF to classpath " + cef);
-                String cn1LibPath = System.getProperty("cn1.library.path", ".");
-                String bitSuffix = is64Bit ? "64" : "32";
-                String nativeDir = isMac ? "macos64" : isWindows ? ("lib" + File.separator + "win"+bitSuffix) : ("lib" + File.separator + "linux"+bitSuffix);
-                System.setProperty("cn1.library.path", cn1LibPath + File.pathSeparator + cef.getAbsolutePath() + File.separator + nativeDir);
-
-                // Necessary to modify java.libary.path property on windows as it is used by CefApp to locate jcef_helper.exe
-                System.setProperty("java.library.path", cef.getAbsolutePath()+File.separator+nativeDir+File.pathSeparator+System.getProperty("java.library.path", "."));
-                for (File jar : cef.listFiles()) {
-                    if (jar.getName().endsWith(".jar")) {
-                        files.add(jar);
-                    }
-                }
-            }
-        }
+        cefSupported = isCEFSupported();
         
         File jmf = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "jmf-2.1.1e.jar");
         if (jmf.exists()) {
@@ -199,7 +192,8 @@ public class CN1Bootstrap {
         
         if (implementation.equalsIgnoreCase("cef") && !cefSupported) {
             // We will use CEF
-            System.err.println("cn1.javase.implementation=cef but CEF was not found.  Please update your Codename One libraries and try again.\nAlternatively, you can try using a different implementation.");
+            System.err.println("cn1.javase.implementation=cef but JCEF Maven does not support "
+                    + "this platform. Please try a different JavaSE implementation.");
             System.exit(1);
         }
         if (implementation.equalsIgnoreCase("fx") && !fxSupported) {
@@ -237,6 +231,7 @@ public class CN1Bootstrap {
             
         }
         ((ClassPathLoader)ldr).addExclude("org.cef.");
+        ((ClassPathLoader)ldr).addExclude("me.friwi.jcefmaven.");
         
         final ClassLoader fLdr = ldr;
         Class c = Class.forName(mainClass, true, ldr);
@@ -251,27 +246,4 @@ public class CN1Bootstrap {
     private static boolean isWindows = (OS.indexOf("win") >= 0);
     
 
-    private static boolean isMac =  (OS.indexOf("mac") >= 0);
-    private static final String ARCH = System.getProperty("os.arch");
-
-    private static boolean isUnix = (OS.indexOf("nux") >= 0);
-    private static final boolean is64Bit = is64Bit();
-    private static final boolean is64Bit() {
-        
-        String model = System.getProperty("sun.arch.data.model",
-                                          System.getProperty("com.ibm.vm.bitmode"));
-        if (model != null) {
-            return "64".equals(model);
-        }
-        if ("x86-64".equals(ARCH)
-            || "ia64".equals(ARCH)
-            || "ppc64".equals(ARCH) || "ppc64le".equals(ARCH)
-            || "sparcv9".equals(ARCH)
-            || "mips64".equals(ARCH) || "mips64el".equals(ARCH)
-            || "amd64".equals(ARCH)
-            || "aarch64".equals(ARCH)) {
-            return true;
-        }
-        return false;
-    }
 }

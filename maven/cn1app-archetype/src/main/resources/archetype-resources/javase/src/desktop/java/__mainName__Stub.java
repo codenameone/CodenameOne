@@ -76,11 +76,10 @@ public class ${mainName}Stub implements Runnable, WindowListener {
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-        // Bootstrap the classpath/native library path (CEF) the same way the
-        // simulator does before touching any CEF class. This puts the JCEF native
-        // directory (from cef.dir) on java.library.path so chrome_elf/libcef load,
-        // then re-invokes this main() inside the bootstrapped classloader. It is a
-        // no-op (returns false) once bootstrapping has already happened.
+        // Bootstrap through the same parent classloader used by the simulator.
+        // JCEF Maven installs and loads the platform native runtime when the first
+        // BrowserComponent is created. This is a no-op once bootstrapping has
+        // already happened.
         try {
             if (CN1Bootstrap.run(${mainName}Stub.class, args)) {
                 return;
@@ -90,9 +89,9 @@ public class ${mainName}Stub implements Runnable, WindowListener {
             bootstrapError.printStackTrace();
         }
         try {
-            Class.forName("org.cef.CefApp");
-            System.setProperty("cn1.javase.implementation", "cef");
-            //System.setProperty("cn1.cef.bundled", "true");
+            if (CN1Bootstrap.isCEFSupported()) {
+                System.setProperty("cn1.javase.implementation", "cef");
+            }
         } catch (Throwable ex){}
 
         JavaSEPort.setNativeTheme("/NativeTheme.res");

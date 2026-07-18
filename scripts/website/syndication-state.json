@@ -985,6 +985,16 @@
       "medium": {
         "url": "https://medium.com/p/3099f1cd87e7/edit",
         "syndicated_at": "2026-07-17T17:03:55+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmrp8h61s00010aj0bvqz66qq",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a5a6b2d9d37331971aa4401",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-17T17:50:29+00:00"
       }
     },
     "beating-hotspot-performance": {
@@ -1003,6 +1013,21 @@
       "dzone": {
         "url": "https://dzone.com/content/3664310/edit.html",
         "syndicated_at": "2026-07-17T17:06:57+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmrp8jltl00000aj81pcp726w",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a5a6b9ed24e418183bd040f",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-17T17:52:23+00:00"
+      },
+      "devto": {
+        "id": 4174245,
+        "url": "https://dev.to/codenameone/how-we-beat-hotspot-performance-by-cheating-but-not-like-that-2187",
+        "syndicated_at": "2026-07-18T14:17:43+00:00"
       }
     },
     "2026-07-17-1800-shai-pixel-perfect-is-a-test": {
@@ -1012,6 +1037,27 @@
         "account": "shai",
         "source_slug": "pixel-perfect-is-a-test",
         "scheduled_at": "2026-07-17T15:00:00+00:00"
+      }
+    },
+    "2026-07-18-1200-shai-standalone-codename-one-settings": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/feed/",
+        "syndicated_at": "2026-07-18T09:01:00+00:00",
+        "account": "shai",
+        "source_slug": "standalone-codename-one-settings",
+        "scheduled_at": "2026-07-18T09:00:00+00:00"
+      }
+    },
+    "standalone-certificate-wizard": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmrqhwq6w00000ahs4hligf1q",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a5b953f03eaeeb7bc9e8832",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-18T15:02:18+00:00"
       }
     }
   }

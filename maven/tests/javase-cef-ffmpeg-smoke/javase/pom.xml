@@ -108,7 +108,6 @@
                             <longClasspath>true</longClasspath>
                             <arguments>
                                 <argument>-Xmx1024M</argument>
-                                <argument>-Dcef.dir=${cef.dir}</argument>
                                 <argument>-Dffmpeg.dir=${ffmpeg.dir}</argument>
                                 <argument>-Dcn1.test.video=${cn1.test.video}</argument>
                                 <argument>-Dcodename1.designer.jar=${codename1.designer.jar}</argument>

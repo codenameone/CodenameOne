@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.examples.hellocodenameone.tests.graphics;
 
 import com.codename1.ui.Font;
@@ -73,6 +95,17 @@ public class DrawString extends AbstractGraphicsScreenshotTest {
     @Override
     protected String screenshotName() {
         return "graphics-draw-string";
+    }
+
+    @Override
+    protected long extraSettleBeforeCaptureMillis() {
+        // Android can finish loading the native/emoji fallback run after the
+        // mutable-image AA-on cell's first paint. Without a forced repaint the
+        // screenshot occasionally preserves that transient frame only in the
+        // final baseline label (white fallback text instead of settled red
+        // italic text). Repaint after the normal form settle and let that paint
+        // complete before capturing.
+        return 1000;
     }
 
     private void verifyFontHashing() {

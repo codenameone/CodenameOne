@@ -6,6 +6,19 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.debug.proxy;
 
@@ -78,11 +91,13 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
     private static final int SP_ALL          = 2;
 
     private final int port;
+    private final int devicePort;
     // Delivered by the device over the wire (CMD_GET_SYMBOLS), not a local
-    // file. Null until the device dials in and streams its table. VM_START is
-    // gated on this being set, and JDWP clients don't enumerate classes until
-    // they see VM_START — so symbol-dependent handlers never run against null.
+    // file. Null until the device dials in and streams its table. Some JDWP
+    // clients query classes before VM_START, so an IDE-first connection waits
+    // on symbolsLock before dispatching any commands.
     private volatile SymbolTable symbols;
+    private final Object symbolsLock = new Object();
     private volatile DeviceConnection device;
 
     private Socket socket;
@@ -141,7 +156,12 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
     }
 
     public JdwpServer(int port) {
+        this(port, 55333);
+    }
+
+    public JdwpServer(int port, int devicePort) {
         this.port = port;
+        this.devicePort = devicePort;
     }
 
     public void setDevice(DeviceConnection device) {
@@ -150,12 +170,14 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
 
     /**
      * Receives the symbol table streamed off the device, just before onHello.
-     * onHello then fires VM_START (if an IDE is attached), which is the signal
-     * JDWP clients wait for before enumerating classes — so by the time any
-     * symbol-dependent query arrives, {@link #symbols} is set.
+     * Wakes an IDE that attached before the device so its queued JDWP requests
+     * can continue against a complete table.
      */
     @Override public void onSymbols(SymbolTable symbols) {
-        this.symbols = symbols;
+        synchronized (symbolsLock) {
+            this.symbols = symbols;
+            symbolsLock.notifyAll();
+        }
     }
 
     public void acceptAndServe() throws IOException {
@@ -178,28 +200,15 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                     continue;
                 }
                 System.out.println("[jdwp] handshake complete");
-                // If the device already streamed its symbols (it connected
-                // before this IDE attach), fire VM_START now. Otherwise onHello
-                // will fire it once the device dials in and delivers symbols.
-                // Gating VM_START on symbols!=null means the IDE won't
-                // enumerate classes until the table is present. Idempotent, so
-                // onHello racing this is harmless.
-                if (symbols != null) {
-                    sendVmStart();
-                }
-                // Auto-release the device-side waitForAttach gate after a
-                // short delay. The delay gives the IDE time to register
-                // breakpoints via EventRequest.Set so the device doesn't race
-                // past them when it resumes. Most JDWP debuggers (IntelliJ,
-                // VS Code) don't auto-send VM.Resume on attach, so without
-                // this nudge the app would sit on the waiting overlay forever.
-                Thread autoResume = new Thread(() -> {
-                    try { Thread.sleep(500); } catch (InterruptedException ignore) {}
-                    try { if (device != null) device.resumeAll(); }
-                    catch (IOException ignore) {}
-                }, "cn1-debug-auto-resume");
-                autoResume.setDaemon(true);
-                autoResume.start();
+
+                // NetBeans queries classes immediately after the JDWP
+                // handshake, before VM_START. Wait here instead of dispatching
+                // those commands against a null symbol table. Commands already
+                // sent by the IDE remain buffered on the socket and are handled
+                // after the device connects.
+                waitForSymbols();
+                sendVmStart();
+                scheduleAutoResume();
 
                 try {
                     packetLoop();
@@ -211,6 +220,51 @@ public final class JdwpServer implements DeviceConnection.DeviceListener {
                 System.out.println("[jdwp] debugger session ended; listening for the next attach");
             }
         }
+    }
+
+    private SymbolTable waitForSymbols() throws IOException {
+        SymbolTable current = symbols;
+        if (current != null) {
+            return current;
+        }
+
+        System.out.println("[jdwp] debugger attached before the iOS app; waiting for device symbols");
+        System.out.println("[jdwp] launch the app now; this debugger session will continue when it connects");
+        boolean troubleshootingShown = false;
+        synchronized (symbolsLock) {
+            while ((current = symbols) == null) {
+                try {
+                    symbolsLock.wait(10000L);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted while waiting for device symbols", e);
+                }
+                if (symbols == null && !troubleshootingShown) {
+                    System.err.println("[jdwp] still waiting for the iOS app on device port " + devicePort);
+                    System.err.println("[jdwp] verify the installed build uses "
+                            + "codename1.arg.ios.onDeviceDebug=true, proxyHost is this computer's "
+                            + "LAN IP, and the firewall allows TCP " + devicePort);
+                    troubleshootingShown = true;
+                }
+            }
+        }
+        System.out.println("[jdwp] device symbols received; continuing debugger session");
+        return current;
+    }
+
+    /**
+     * Releases the device-side waitForAttach gate only after both sides are
+     * connected. The delay gives the IDE time to register breakpoints. Most
+     * JDWP debuggers don't send VM.Resume automatically on attach.
+     */
+    private void scheduleAutoResume() {
+        Thread autoResume = new Thread(() -> {
+            try { Thread.sleep(500); } catch (InterruptedException ignore) {}
+            try { if (device != null) device.resumeAll(); }
+            catch (IOException ignore) {}
+        }, "cn1-debug-auto-resume");
+        autoResume.setDaemon(true);
+        autoResume.start();
     }
 
     private void closeJdwpSession() {

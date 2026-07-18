@@ -1,0 +1,91 @@
+name: Upload artifact with retry
+description: Retry transient artifact-service failures and fail if every upload attempt fails.
+
+inputs:
+  name:
+    description: Artifact name.
+    required: true
+  path:
+    description: File, directory, or multiline paths to upload.
+    required: true
+  if-no-files-found:
+    description: Behavior when no files match the path.
+    required: false
+    default: warn
+  retention-days:
+    description: Number of days to retain the artifact.
+    required: false
+    default: '1'
+  compression-level:
+    description: Zlib compression level from 0 to 9.
+    required: false
+    default: '6'
+  include-hidden-files:
+    description: Whether to include hidden files.
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    # GitHub's artifact client retries many server errors internally, but treats
+    # some transient intermediary responses (including the observed finalize
+    # 403) as non-retryable. These are real retries: individual attempts may
+    # continue only so a later attempt can run, and the final step fails the
+    # action when all three attempts fail.
+    - name: Upload artifact (attempt 1 of 3)
+      id: upload_1
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+        if-no-files-found: ${{ inputs.if-no-files-found }}
+        retention-days: ${{ inputs.retention-days }}
+        compression-level: ${{ inputs.compression-level }}
+        include-hidden-files: ${{ inputs.include-hidden-files }}
+
+    - name: Wait before second attempt
+      if: always() && steps.upload_1.outcome == 'failure'
+      shell: bash
+      run: sleep 5
+
+    - name: Upload artifact (attempt 2 of 3)
+      id: upload_2
+      if: always() && steps.upload_1.outcome == 'failure'
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+        if-no-files-found: ${{ inputs.if-no-files-found }}
+        retention-days: ${{ inputs.retention-days }}
+        compression-level: ${{ inputs.compression-level }}
+        include-hidden-files: ${{ inputs.include-hidden-files }}
+        overwrite: true
+
+    - name: Wait before third attempt
+      if: always() && steps.upload_2.outcome == 'failure'
+      shell: bash
+      run: sleep 15
+
+    - name: Upload artifact (attempt 3 of 3)
+      id: upload_3
+      if: always() && steps.upload_2.outcome == 'failure'
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+        if-no-files-found: ${{ inputs.if-no-files-found }}
+        retention-days: ${{ inputs.retention-days }}
+        compression-level: ${{ inputs.compression-level }}
+        include-hidden-files: ${{ inputs.include-hidden-files }}
+        overwrite: true
+
+    - name: Require a successful upload
+      if: always() && steps.upload_3.outcome == 'failure'
+      shell: bash
+      run: |
+        echo "::error::Artifact '${{ inputs.name }}' failed to upload after 3 attempts."
+        exit 1

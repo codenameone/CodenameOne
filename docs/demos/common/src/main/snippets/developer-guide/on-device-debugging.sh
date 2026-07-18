@@ -4,7 +4,9 @@
 # Terminal 1 — start the proxy
 mvn cn1:ios-on-device-debugging
 
-# Terminal 2 — attach jdb
+# Launch the app and wait for the proxy to report that it loaded symbols.
+
+# Terminal 2 — attach jdb after the device handshake
 jdb -attach localhost:8000
 // end::on-device-debugging-bash-001[]
 

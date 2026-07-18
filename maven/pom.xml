@@ -47,6 +47,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>1.8</java.version>
         <java-tests.version>11</java-tests.version>
+        <jcefmaven.version>135.0.20</jcefmaven.version>
         <jcef.version>jcef-ca49ada+cef-135.0.20+ge7de5c3+chromium-135.0.7049.85</jcef.version>
         <ffmpeg.version>7.1-1.5.11</ffmpeg.version>
         <rhino.version>1.7.11</rhino.version>
@@ -124,8 +125,8 @@
             </dependency>
             <dependency>
                 <groupId>me.friwi</groupId>
-                <artifactId>jcef-api</artifactId>
-                <version>${jcef.version}</version>
+                <artifactId>jcefmaven</artifactId>
+                <version>${jcefmaven.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.bytedeco</groupId>
@@ -328,7 +329,7 @@
             <dependency>
                 <groupId>commons-io</groupId>
                 <artifactId>commons-io</artifactId>
-                <version>2.14.0</version>
+                <version>2.16.1</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.commons</groupId>

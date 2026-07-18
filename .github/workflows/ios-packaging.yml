@@ -210,7 +210,9 @@ jobs:
             "${{ steps.build_ios_app.outputs.workspace }}" \
             "" \
             "${{ steps.build_ios_app.outputs.scheme }}"
-        timeout-minutes: 45
+        # run-ios-ui-tests.sh has a 12-minute no-progress watchdog and a
+        # bounded 35-minute suite cap; include native build/cleanup headroom.
+        timeout-minutes: 65
 
       - name: Run native iOS notification tests
         env:
