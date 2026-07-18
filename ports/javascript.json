@@ -1,48 +1,48 @@
 {
-  "commit": "96cbe1d246ac9f633633205aa191c01a9a1dd1f6",
-  "generated_at": "2026-07-18T17:18:13Z",
+  "commit": "98fa4258e0a0cf7c6db655bbe55b573cc523ca2c",
+  "generated_at": "2026-07-18T18:28:36Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 1531899999
+        "duration_ns": 1175600001
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 950900001
+        "duration_ns": 681500000
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 15605000000
+        "duration_ns": 12845800000
       },
       "intArithmetic": {
         "checksum": "1313580095284",
-        "duration_ns": 718900000
+        "duration_ns": 593400001
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 3975600000
+        "duration_ns": 3301000000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 300300000
+        "duration_ns": 231000000
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 3576300000
+        "duration_ns": 2555700000
       },
       "quicksort": {
         "checksum": "786886890168670967",
-        "duration_ns": 574500000
+        "duration_ns": 462800001
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 1083400000
+        "duration_ns": 892500000
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 1308900000
+        "duration_ns": 995500000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -51,13 +51,13 @@
     "suite_checksum": 0
   },
   "port": "javascript",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29652685132",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29654800963",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "fail": 18,
+    "fail": 17,
     "not-run": 0,
-    "pass": 145,
+    "pass": 148,
     "skip": 1
   },
   "tests": {
@@ -237,8 +237,12 @@
       "feature": "graphics-clipping",
       "status": "pass"
     },
+    "ClipboardRoundTripTest": {
+      "feature": "clipboard",
+      "status": "pass"
+    },
     "CodeEditorScreenshotTest": {
-      "feature": "embedded-web-content",
+      "feature": "pure-text-editing",
       "status": "pass"
     },
     "ComponentReplaceFadeScreenshotTest": {
@@ -539,12 +543,16 @@
       "feature": "scrolling-and-pull",
       "status": "pass"
     },
+    "PureEditorScreenshotTest": {
+      "feature": "pure-text-editing",
+      "status": "pass"
+    },
     "RealOsmVectorScreenshotTest": {
       "feature": "vector-maps",
       "status": "pass"
     },
     "RichTextAreaScreenshotTest": {
-      "feature": "embedded-web-content",
+      "feature": "pure-text-editing",
       "status": "pass"
     },
     "Rotate": {
@@ -636,10 +644,7 @@
     },
     "StringApiTest": {
       "feature": "java-standard-apis",
-      "reasons": [
-        "failed: String API test failed: java.lang.RuntimeException: replaceAll greedy + quantifier failed; Expected [XbXcX], Actual [aabacaa]"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "StrokeTest": {
       "feature": "graphics-shapes-strokes",
