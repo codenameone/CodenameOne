@@ -124,7 +124,7 @@ Attaching the IDE before launching the app is also supported. The proxy keeps th
 
 **5. Attach the debugger.**
 
-Switch the run-config dropdown to **CN1 Attach iOS** and click the 🐞 Debug button. IntelliJ connects to `localhost:8000`, opens its standard Debug tool window, and releases the app after the attach completes. You can set breakpoints anywhere in your Java code or in the framework.
+Switch the run-config dropdown to **CN1 Attach iOS** and click the 🐞 Debug button. IntelliJ connects to `localhost:8000`, opens its standard Debug tool window, and releases the app after the debugger connection completes. You can set breakpoints anywhere in your Java code or in the framework.
 
 **The proxy's Run window is also your device console.** Anything the app writes to `System.out`, `Log.p`, `printf`, or `NSLog` from native code is forwarded to the proxy and printed in the **CN1 Debug Proxy** Run window with a `[device]` prefix. This is genuinely useful and is one fewer thing you need Xcode for. The caveat is that the forwarding starts when the proxy connection is established, so output written during the very first millisecond of process launch (before `Display.init`) is not always captured. If you need every byte from `t=0`, attach Xcode's console for that specific run.
 

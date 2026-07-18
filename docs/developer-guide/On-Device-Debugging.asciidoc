@@ -109,7 +109,7 @@ build hint.
 
 Switch the Run-config dropdown to *CN1 Attach iOS* and click 🐞
 *Debug*. IntelliJ connects to `localhost:8000`, opens a Debug tool
-window, and releases the app after the attach completes.
+window, and releases the app after the debugger connection completes.
 
 Set breakpoints, step, inspect, evaluate expressions, just like a
 normal remote attach. Device output from
