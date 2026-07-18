@@ -289,13 +289,10 @@ public class CSSWatcher implements Runnable {
                         + "(which both fetches the right designer into m2 and pins it via -Dcodename1.designer.jar).");
             }
         }
-        String cefDir = System.getProperty("cef.dir", cn1Home + File.separator + "cef");
-        
         //List<String> args = new ArrayList<String>();
         ProcessBuilder pb = new ProcessBuilder(
                 javaBin.getAbsolutePath(),
                 "-jar", "-Dcli=true", 
-                "-Dcef.dir="+cefDir, 
                 "-Dparent.port="+pulseSocket.getLocalPort(), 
                 designerJar.getAbsolutePath(), 
                 "-css"    

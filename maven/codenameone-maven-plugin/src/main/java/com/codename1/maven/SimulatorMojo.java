@@ -201,13 +201,6 @@ private static final String GROUP_ID="com.codenameone";
         Log log = getLog();
         log.debug("Preparing classpath for Simulator");
         Path classpath = java.createClasspath();
-        if (System.getProperty("cef.dir") != null) {
-            Variable v = new Variable();
-            v.setKey("cef.dir");
-            v.setValue(System.getProperty("cef.dir"));
-            java.addSysproperty(v);
-            
-        }
         if (System.getProperty("ffmpeg.dir") != null) {
             Variable v = new Variable();
             v.setKey("ffmpeg.dir");

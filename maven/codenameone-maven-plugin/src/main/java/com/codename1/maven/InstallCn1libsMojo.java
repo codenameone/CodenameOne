@@ -113,8 +113,6 @@ public class InstallCn1libsMojo extends AbstractCN1Mojo {
     
     @Override
     public void executeImpl() throws MojoExecutionException, MojoFailureException {
-        setupCef();
-        
         Exception[] err = new Exception[1];
         List<Artifact> cn1libArtifacts = new ArrayList<>();
         

@@ -272,11 +272,6 @@ class CompileCSSMojoTest {
         }
 
         @Override
-        protected void setupCef() {
-            // Skip CEF setup during tests.
-        }
-
-        @Override
         protected File getDesignerJar() {
             return designerJar;
         }

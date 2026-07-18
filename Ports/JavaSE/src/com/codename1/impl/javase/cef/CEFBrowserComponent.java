@@ -15,14 +15,11 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.BrowserNavigationCallback;
 import java.awt.EventQueue;
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import javax.swing.JFrame;
-import org.cef.CefApp;
-import org.cef.CefSettings;
 
 /**
  *
@@ -35,26 +32,6 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     private static final boolean isWindows = isWindows();
     private static final boolean isMac = isMac();
     private static final boolean isUnix = isUnix();
-    private static final boolean is64Bit = is64Bit();
-    private static final String ARCH = System.getProperty("os.arch");
-    private static final boolean is64Bit() {
-        
-        String model = System.getProperty("sun.arch.data.model",
-                                          System.getProperty("com.ibm.vm.bitmode"));
-        if (model != null) {
-            return "64".equals(model);
-        }
-        if ("x86-64".equals(ARCH)
-            || "ia64".equals(ARCH)
-            || "ppc64".equals(ARCH) || "ppc64le".equals(ARCH)
-            || "sparcv9".equals(ARCH)
-            || "mips64".equals(ARCH) || "mips64el".equals(ARCH)
-            || "amd64".equals(ARCH)
-            || "aarch64".equals(ARCH)) {
-            return true;
-        }
-        return false;
-    }
     private static boolean isWindows() {
         return (OS.indexOf("win") >= 0);
     }
@@ -121,45 +98,9 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     
     
     
-    private static String getLibPath() {
-        String out = System.getProperty("cef.libPath", null);
-        if (out != null) {
-            return out;
-        }
-        
-        if (isMac) {
-            String cefRoot = System.getProperty("cef.dir",
-                    System.getProperty("user.home")+File.separator+".codenameone"+File.separator+"cef")+File.separator;
-
-            return cefRoot + "macos64";
-        } else if (isWindows) {
-            String bitSuffix = is64Bit ? "64" : "32";
-            String cefRoot = System.getProperty("cef.dir",
-                    System.getProperty("user.home")+File.separator+".codenameone"+File.separator+"cef")+File.separator+"lib"+File.separator;
-            return cefRoot + "win"+bitSuffix;
-        } else if (isUnix && is64Bit) {
-            
-            String bitSuffix = is64Bit ? "64" : "32";
-            String cefRoot = System.getProperty("cef.dir",
-                    System.getProperty("user.home")+File.separator+".codenameone"+File.separator+"cef")+File.separator+"lib"+File.separator;
-            return cefRoot + "linux"+bitSuffix;
-        }else {
-            throw new UnsupportedOperationException("CEF Not implemented on this platform yet");
-        }
-    }
-    
     private static String[] createArgs() {
         List<String> args = new ArrayList<String>();
         if (isMac) {
-
-            if (!"true".equals(System.getProperty("cn1.cef.bundled"))) {
-                // The cn1.cef.bundled flag is set in SEWrapper to indicate that CEF is bundled in the .app
-                // Otherwise it needs to get CEF from the central location specified 
-                args.add(String.format("--framework-dir-path=%s/Chromium Embedded Framework.framework", getLibPath()));
-                args.add(String.format("--main-bundle-path=%s/jcef Helper.app", getLibPath()));
-                args.add(String.format("--browser-subprocess-path=%s/jcef Helper.app/Contents/MacOS/jcef Helper", getLibPath()));
-            }
-            
             args.add("--disable-gpu");
         } else if (isWindows) {
             // no extra stuff here
@@ -196,19 +137,7 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
         return create(null, parent);
     }
     public static CEFBrowserComponent create(final String startingURL, final CEFBrowserComponentListener parent) {
-        CefSettings settings = new CefSettings();
-        
         String[] args = createArgs();
-        // Perform startup initialization on platforms that require it.
-        if (!"true".equals(System.getProperty("cef.started", "false"))) {
-            if (!CefApp.startup(args)) {
-                System.err.println("CEFStartup initialization failed");
-                throw new RuntimeException("CEF Startup initialization failed!");
-
-            }
-            System.setProperty("cef.started", "true");
-        }
-        
 
         // OSR mode is enabled by default on Linux.
         // and disabled by default on Windows and Mac OS X.

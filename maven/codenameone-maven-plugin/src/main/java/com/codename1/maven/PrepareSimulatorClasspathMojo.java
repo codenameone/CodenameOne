@@ -78,18 +78,10 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
         }
         //props.setProperty("exec.args", properties.getProperty("codename1.packageName")+"."+properties.getProperty("codename1.mainName"));
         project.getModel().addProperty("codename1.mainClass", properties.getProperty("codename1.packageName")+"."+properties.getProperty("codename1.mainName"));
-        // Setup CEF directory
-        if (!isCefSetup()) {
-            getLog().debug("CEF Not set up yet.  Setting it up now");
-            setupCef();
-        } else {
-            getLog().debug("CEF is already set up. cef.dir="+System.getProperty("cef.dir"));
-        }
         if (!isFFmpegSetup()) {
             getLog().debug("FFmpeg not set up yet. Setting it up now");
             setupFFmpeg();
         }
-        project.getProperties().setProperty("cef.dir", System.getProperty("cef.dir"));
         if (System.getProperty("ffmpeg.dir") != null) {
             project.getProperties().setProperty("ffmpeg.dir", System.getProperty("ffmpeg.dir"));
         }
@@ -199,9 +191,6 @@ public class PrepareSimulatorClasspathMojo extends AbstractCN1Mojo {
         } catch (Exception ex){}
 
         try (FileOutputStream fos = new FileOutputStream(simulatorPropertiesFile)) {
-            if (System.getProperty("cef.dir") != null) {
-                simulatorProperties.setProperty("cef.dir", System.getProperty("cef.dir"));
-            }
             if (System.getProperty("ffmpeg.dir") != null) {
                 simulatorProperties.setProperty("ffmpeg.dir", System.getProperty("ffmpeg.dir"));
             }

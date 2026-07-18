@@ -37,8 +37,10 @@ import java.lang.ref.WeakReference;
 import java.net.ServerSocket;
 import javax.swing.JButton;
 import javax.swing.SwingUtilities;
+import me.friwi.jcefmaven.CefAppBuilder;
 import org.cef.CefApp;
 import org.cef.CefClient;
+import org.cef.CN1JcefRuntime;
 import org.cef.CefSettings;
 import org.cef.OS;
 import org.cef.browser.CN1CefBrowser;
@@ -179,7 +181,13 @@ public abstract class BrowserPanel extends CN1JPanel {
             //    application arguments to it, if you want to handle any
             //    chromium or CEF related switches/attributes in
             //    the native world.
-           CefSettings settings = new CefSettings();
+            CefAppBuilder builder;
+            try {
+                builder = CN1JcefRuntime.createBuilder(args);
+            } catch (Exception ex) {
+                throw new RuntimeException("Failed to configure JCEF", ex);
+            }
+            CefSettings settings = builder.getCefSettings();
             //settings.log_severity = CefSettings.LogSeverity.LOGSEVERITY_VERBOSE;
             //settings.log_file = "/tmp/cef.log";
             
@@ -199,7 +207,12 @@ public abstract class BrowserPanel extends CN1JPanel {
             
             settings.remote_debugging_port = port;
             JavaSEPort.instance.setChromeDebugPort(port);
-            myApp = CefApp.getInstance(args, settings);
+            builder.setAppHandler(new AppHandler());
+            try {
+                myApp = CN1JcefRuntime.build(builder);
+            } catch (Exception ex) {
+                throw new RuntimeException("Failed to install or initialize JCEF", ex);
+            }
 
             CefApp.CefVersion version = myApp.getVersion();
             System.out.println("Using:\n" + version);
@@ -212,7 +225,6 @@ public abstract class BrowserPanel extends CN1JPanel {
             
             
             
-            CefApp.addAppHandler(new AppHandler(args));
         } else {
             myApp = CefApp.getInstance(args);
         }

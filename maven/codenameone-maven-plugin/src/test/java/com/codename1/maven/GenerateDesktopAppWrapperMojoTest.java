@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -65,6 +66,10 @@ class GenerateDesktopAppWrapperMojoTest {
                 "default title bar mode must be native");
         assertTrue(src.contains("APP_DESKTOP_INTERACTIVE_SCROLLBARS = true;"),
                 "interactive scrollbars must default on");
+        assertTrue(src.contains("CN1Bootstrap.isCEFSupported()"),
+                "desktop apps must select the JCEF Maven runtime when supported");
+        assertFalse(src.contains("cef.dir"),
+                "desktop apps must not require a pre-extracted CEF directory");
     }
 
     @Test

@@ -40,14 +40,6 @@ public class GenerateDesktopAppWrapperMojo extends AbstractCN1Mojo {
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
-        // Provision the JCEF natives and set the cef.dir property for the desktop
-        // app the same way the simulator goals do. Without this the desktop run
-        // has the jcef-natives jar on its classpath but the actual native binaries
-        // (e.g. chrome_elf.dll on Windows) are never extracted to disk nor placed
-        // on java.library.path, so opening a BrowserComponent fails with
-        // "no chrome_elf in java.library.path" / "Failed to create CEF browser".
-        // The generated stub boots through CN1Bootstrap, which consumes cef.dir.
-        setupCef();
         generateIcons();
         generateStub();
         registerCustomStubSourceRoot();

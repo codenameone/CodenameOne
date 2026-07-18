@@ -6,17 +6,17 @@ package com.codename1.impl.javase.cef;
 
 import java.util.HashMap;
 import java.util.Map;
+import me.friwi.jcefmaven.MavenCefAppHandlerAdapter;
 import org.cef.CefApp;
 import org.cef.CefApp.CefAppState;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
 import org.cef.callback.CefSchemeHandlerFactory;
 import org.cef.callback.CefSchemeRegistrar;
-import org.cef.handler.CefAppHandlerAdapter;
 import org.cef.handler.CefResourceHandler;
 import org.cef.network.CefRequest;
 
-public class AppHandler extends CefAppHandlerAdapter  {
+public class AppHandler extends MavenCefAppHandlerAdapter  {
     
    
     
@@ -25,8 +25,8 @@ public class AppHandler extends CefAppHandlerAdapter  {
     // We're registering our own schemes to demonstrate how to use
     // CefAppHandler.onRegisterCustomSchemes() in combination with
     // CefApp.registerSchemeHandlerFactory().
-    public AppHandler(String[] args) {
-        super(args);
+    public AppHandler() {
+        super();
     }
     
     
