@@ -26,7 +26,7 @@ for cls in Button Container Dialog Display Form Label List TextField BrowserComp
 done
 
 echo "Verifying new editor APIs are available to playground scripts..."
-for member in 'setLightweightEditingEnabled(boolean)' 'setContent(String, RichTextFormat)' \
+for member in 'setContent(String, RichTextFormat)' \
               'setMarkdown(String)' 'setAsciiDoc(String)' 'setRtf(String)'; do
   if ! grep -q "$member" "$ROOT/common/src/main/java/bsh/cn1/GeneratedCN1Access.java"; then
     echo "GeneratedCN1Access is missing editor API ${member}" >&2

@@ -150,61 +150,6 @@ class TextAreaTest extends UITestBase {
     }
 
     @FormTest
-    void testLightweightEditingIsOptInAndUsesTextInputClient() {
-        TextArea.setLightweightEditingEnabled(false);
-        TextField field = new TextField("ab");
-        field.setMaxSize(5);
-        try {
-            assertFalse(TextArea.isLightweightEditingEnabled());
-            TextArea.setLightweightEditingEnabled(true);
-            assertTrue(TextArea.isLightweightEditingEnabled());
-
-            Form form = new Form(BoxLayout.y());
-            form.add(field);
-            form.show();
-            flushSerialCalls();
-            field.startEditing();
-            flushSerialCalls();
-
-            assertTrue(field.isEditing());
-            assertTrue(form.getFocused() instanceof TextInputClient);
-            TextInputClient input = (TextInputClient) form.getFocused();
-            assertFalse(input.getConfig().isMultiline());
-            input.commitText("\ncdXYZ");
-            assertEquals("ab cd", field.getText(), "single-line and max-size filtering should happen in the editor engine");
-
-            field.stopEditing();
-            assertFalse(field.isEditing());
-            assertEquals("ab cd", field.getText());
-        } finally {
-            TextArea.setLightweightEditingEnabled(false);
-        }
-    }
-
-    @FormTest
-    void testLightweightTextAreaAcceptsMultilineImeInput() {
-        TextArea area = new TextArea("one", 3, 20);
-        area.setMaxSize(20);
-        TextArea.setLightweightEditingEnabled(true);
-        try {
-            Form form = new Form(BoxLayout.y());
-            form.add(area);
-            form.show();
-            flushSerialCalls();
-
-            area.startEditing();
-            flushSerialCalls();
-            TextInputClient input = (TextInputClient) form.getFocused();
-            assertTrue(input.getConfig().isMultiline());
-            input.commitText("\ntwo");
-            assertEquals("one\ntwo", area.getText());
-            area.stopEditing();
-        } finally {
-            TextArea.setLightweightEditingEnabled(false);
-        }
-    }
-
-    @FormTest
     void testGrowByContent() {
         TextArea textArea = new TextArea();
 
