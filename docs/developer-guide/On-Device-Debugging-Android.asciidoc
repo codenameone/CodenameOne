@@ -45,6 +45,10 @@ archetype generated:
 include::../demos/common/src/main/snippets/developer-guide/on-device-debugging-android.properties[tag=on-device-debugging-android-properties-001,indent=0]
 ----
 
+The build hint name is `android.onDeviceDebug`. Entries in
+`codenameone_settings.properties` use the `codename1.arg.` prefix, as
+shown above.
+
 This flips the generated `AndroidManifest.xml` to
 `debuggable="true"` and disables R8/proguard so symbols and locals
 survive the build. Release builds (anything without this hint) are

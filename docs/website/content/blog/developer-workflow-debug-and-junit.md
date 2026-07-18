@@ -72,17 +72,17 @@ The Codename One archetype now generates two run configurations under an *On-Dev
 Open `common/codenameone_settings.properties` and uncomment the four lines the archetype generated:
 
 ```
-ios.onDeviceDebug=true
-ios.onDeviceDebug.proxyHost=127.0.0.1
-ios.onDeviceDebug.proxyPort=55333
-ios.onDeviceDebug.waitForAttach=true
+codename1.arg.ios.onDeviceDebug=true
+codename1.arg.ios.onDeviceDebug.proxyHost=127.0.0.1
+codename1.arg.ios.onDeviceDebug.proxyPort=55333
+codename1.arg.ios.onDeviceDebug.waitForAttach=true
 ```
 
-`ios.onDeviceDebug=true` flips the iOS build into the instrumented variant. The other three configure the proxy connection.
+The build hint names start at `ios.onDeviceDebug`. Entries in `codenameone_settings.properties` use the `codename1.arg.` prefix, as shown above. `ios.onDeviceDebug=true` flips the iOS build into the instrumented variant. The other three hints configure the proxy connection.
 
 The fourth hint, `ios.onDeviceDebug.waitForAttach=true`, is the **block-on-load** option, and we recommend leaving it on. With it enabled, the iOS app shows a "Waiting for debugger" overlay at launch and does not progress past `Display.init` until the proxy issues its first resume. The recommendation is mostly about making the on-device-debug variant visible. Without the overlay it is easy to launch an on-device-debug build expecting the debugger to attach and not realize it is silently waiting for a proxy that is not running, and it is also easy to mistake an on-device-debug build for a regular build and then be surprised when it does not perform as smoothly as the release variant. The overlay rules out both of those.
 
-For a physical iPhone the `proxyHost` value should be the laptop's LAN IP (run `ifconfig | grep "inet "` to find it) rather than `127.0.0.1`. The iOS Simulator can always use `127.0.0.1`.
+For a physical iPhone the `proxyHost` value should be the laptop's LAN IP rather than `127.0.0.1`. Run `ipconfig` on Windows or `ifconfig` on macOS and Linux to find it. The iOS Simulator can always use `127.0.0.1`.
 
 **2. Build the iOS app.**
 
@@ -99,24 +99,38 @@ In IntelliJ, pick **CN1 Debug Proxy** from the run-config dropdown and click the
 
 ```
 On-device-debug proxy starting:
-  symbols : .../cn1-symbols.txt
   device  : listening on tcp://0.0.0.0:55333
   jdwp    : listening on tcp://0.0.0.0:8000
+  symbols : streamed from the device on connect (no local file)
 [device] listening on port 55333 for ParparVM app to dial in
 [jdwp]   listening on port 8000 for debugger (jdb) to attach
 ```
 
-When the `[jdwp]` line appears, the proxy is ready.
+When both listener lines appear, the proxy is ready for the app.
 
-**4. Attach the debugger.**
+**4. Launch the app and wait for the device handshake.**
 
-Switch the run-config dropdown to **CN1 Attach iOS** and click the 🐞 Debug button. IntelliJ connects to `localhost:8000` and opens its standard Debug tool window. You can now set breakpoints anywhere in your Java code or in the framework.
+Launch the iOS app under the iOS Simulator from Xcode or on the physical device. The app contains its compressed debug symbol table and streams it to the proxy when it connects. Wait for these lines before attaching the IDE:
 
-**5. Launch the app.**
+```
+[device] connected from ...
+[device] loaded symbols: ...
+[jdwp] device handshake ...
+```
 
-Launch the iOS app under the iOS Simulator (from Xcode) or on the tethered device. With `waitForAttach=true` it pauses at the "Waiting for debugger" overlay until the proxy issues its first resume. Hit Resume on the IntelliJ Debug toolbar; the app proceeds, your breakpoints fire as the app exercises them.
+With `waitForAttach=true`, the app remains on the "Waiting for debugger" overlay while you complete the next step.
+
+**5. Attach the debugger.**
+
+Switch the run-config dropdown to **CN1 Attach iOS** and click the 🐞 Debug button. IntelliJ connects to `localhost:8000`, opens its standard Debug tool window, and releases the app after the attach completes. You can set breakpoints anywhere in your Java code or in the framework.
 
 **The proxy's Run window is also your device console.** Anything the app writes to `System.out`, `Log.p`, `printf`, or `NSLog` from native code is forwarded to the proxy and printed in the **CN1 Debug Proxy** Run window with a `[device]` prefix. This is genuinely useful and is one fewer thing you need Xcode for. The caveat is that the forwarding starts when the proxy connection is established, so output written during the very first millisecond of process launch (before `Display.init`) is not always captured. If you need every byte from `t=0`, attach Xcode's console for that specific run.
+
+### NetBeans + iOS
+
+NetBeans uses the same proxy and the same connection order. Start the proxy, launch the app, and wait for the device handshake and symbol-loading lines shown above. Then choose **Debug > Attach Debugger** in NetBeans. Select **Java Debugger (JPDA)** and the **SocketAttach** connector, set the host to `localhost` and the port to `8000`, then attach. Keep the Codename One project open so NetBeans can resolve your source files and breakpoints.
+
+Don't point NetBeans at port `55333`. The iPhone uses `55333` to reach the proxy. The IDE uses the proxy's JDWP port, `8000`.
 
 ### Tutorial: IntelliJ + Android
 
@@ -127,10 +141,10 @@ Android is simpler because the proxy is not needed. The archetype generates two 
 In `common/codenameone_settings.properties`:
 
 ```
-android.onDeviceDebug=true
+codename1.arg.android.onDeviceDebug=true
 ```
 
-This single hint flips the manifest to `debuggable="true"` and turns R8 / Proguard off for this build. Release builds without the hint are unaffected.
+The build hint name is `android.onDeviceDebug`; the `codename1.arg.` prefix is how you write it in `codenameone_settings.properties`. This hint flips the manifest to `debuggable="true"` and turns R8 / Proguard off for this build. Release builds without the hint are unaffected.
 
 **2. Run CN1 Android On-Device Debug.**
 

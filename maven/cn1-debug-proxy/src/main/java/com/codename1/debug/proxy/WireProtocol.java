@@ -41,7 +41,7 @@ public final class WireProtocol {
     // Pull the symbol table off the device. Payload: offset(4) maxLen(4).
     // The device replies with EVT_SYMBOLS carrying one chunk; the proxy
     // loops until it has assembled totalLen bytes. This replaces the old
-    // cn1-symbols.txt sidecar so a cloud-built app (Windows/Linux, where the
+    // legacy local symbol sidecar so a cloud-built app (Windows/Linux, where the
     // translator ran on the build server) still yields symbols locally.
     public static final int CMD_GET_SYMBOLS       = 0x11;
 

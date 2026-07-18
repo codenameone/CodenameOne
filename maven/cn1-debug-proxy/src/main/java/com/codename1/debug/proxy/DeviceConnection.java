@@ -39,7 +39,7 @@ public final class DeviceConnection implements AutoCloseable {
         /**
          * The device's symbol table, fetched over the wire and inflated,
          * delivered before {@link #onHello} so downstream JDWP handling can
-         * rely on it. Replaces the old local cn1-symbols.txt sidecar.
+         * rely on it. Replaces the old local symbol sidecar.
          */
         void onSymbols(SymbolTable symbols);
         void onHello(int version);
