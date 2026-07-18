@@ -1047,6 +1047,18 @@
         "source_slug": "standalone-codename-one-settings",
         "scheduled_at": "2026-07-18T09:00:00+00:00"
       }
+    },
+    "standalone-certificate-wizard": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmrqhwq6w00000ahs4hligf1q",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a5b953f03eaeeb7bc9e8832",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-18T15:02:18+00:00"
+      }
     }
   }
 }
