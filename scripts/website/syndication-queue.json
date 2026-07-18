@@ -2,25 +2,6 @@
   "_comment": "Queue of browser-only syndication tasks (Medium, DZone, Hashnode) drained by a local syndication tool that runs on the maintainer's machine inside an already-signed-in browser session. Tasks are appended by scripts/website/queue_browser_syndication.py which is invoked by the daily blog-syndication workflow, and the local tool writes the resulting URLs back into syndication-state.json.",
   "tasks": [
     {
-      "id": "linkedin:2026-07-18-1200-shai-standalone-codename-one-settings",
-      "site": "linkedin",
-      "kind": "social",
-      "slug": "2026-07-18-1200-shai-standalone-codename-one-settings",
-      "source_slug": "standalone-codename-one-settings",
-      "account": "shai",
-      "title": "Shai: refreshing the tools around Codename One",
-      "canonical": "https://www.codenameone.com/blog/standalone-codename-one-settings/",
-      "cover_image_url": "https://www.codenameone.com/blog/standalone-codename-one-settings.jpg",
-      "body_text": "Old developer tools rarely become bad in one dramatic step. They accumulate jobs until nobody can explain where one tool ends and another begins.\n\nCodename One Settings had reached that point. Project configuration lived beside account login, certificates, build monitoring, and extensions inside the old GUI Builder jar.\n\nWe rewrote it as a standalone tool, but the larger goal is to refresh the development environment around Codename One. Settings now owns project configuration. Signing, accounts, and cloud builds have their own homes.\n\nThis is less about a new command and more about removing old assumptions one tool at a time. Smaller tools with clear boundaries are easier to understand, replace, and improve.\n\nFull write-up: https://www.codenameone.com/blog/standalone-codename-one-settings/",
-      "scheduled_at": "2026-07-18T09:00:00+00:00",
-      "scheduled_local": "2026-07-18T12:00+03:00",
-      "timezone": "Asia/Jerusalem",
-      "review_by": "2026-07-17",
-      "approved_by": null,
-      "approved_at": null,
-      "queued_at": "2026-07-17T16:43:06+00:00"
-    },
-    {
       "id": "linkedin:2026-07-19-1200-shai-widgets-live-activities-dynamic-island",
       "site": "linkedin",
       "kind": "social",

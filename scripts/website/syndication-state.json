@@ -1033,6 +1033,15 @@
         "source_slug": "pixel-perfect-is-a-test",
         "scheduled_at": "2026-07-17T15:00:00+00:00"
       }
+    },
+    "2026-07-18-1200-shai-standalone-codename-one-settings": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/feed/",
+        "syndicated_at": "2026-07-18T09:01:00+00:00",
+        "account": "shai",
+        "source_slug": "standalone-codename-one-settings",
+        "scheduled_at": "2026-07-18T09:00:00+00:00"
+      }
     }
   }
 }
