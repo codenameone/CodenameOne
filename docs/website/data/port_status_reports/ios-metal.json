@@ -677,6 +677,10 @@
         "encode-unavailable-on-ios:Failed"
       ],
       "status": "skip"
+    },
+    "ClipboardRoundTripTest": {
+      "feature": "clipboard",
+      "status": "not-run"
     }
   },
   "bootstrap_source": "successful-master-workflow",

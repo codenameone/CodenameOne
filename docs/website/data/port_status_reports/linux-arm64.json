@@ -671,6 +671,10 @@
     "VideoIORoundTripTest": {
       "feature": "video-round-trip",
       "status": "pass"
+    },
+    "ClipboardRoundTripTest": {
+      "feature": "clipboard",
+      "status": "not-run"
     }
   },
   "bootstrap_source": "successful-master-workflow",

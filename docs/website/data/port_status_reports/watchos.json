@@ -677,6 +677,10 @@
         "VideoIO-unsupported-on-ios"
       ],
       "status": "skip"
+    },
+    "ClipboardRoundTripTest": {
+      "feature": "clipboard",
+      "status": "not-run"
     }
   },
   "bootstrap_source": "successful-master-workflow",

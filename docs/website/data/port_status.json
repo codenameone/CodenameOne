@@ -315,6 +315,13 @@
       "tests": ["BackgroundThreadUiAccessTest"]
     },
     {
+      "id": "clipboard",
+      "category": "Application runtime",
+      "name": "Generic clipboard",
+      "description": "Checks that text, HTML, image and file representations survive a copy/paste round trip through the system clipboard.",
+      "tests": ["ClipboardRoundTripTest"]
+    },
+    {
       "id": "secure-storage-crypto",
       "category": "Storage and security",
       "name": "Secure storage and cryptography",

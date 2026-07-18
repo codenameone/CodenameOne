@@ -8863,23 +8863,127 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     clipboard.setText(obj.toString());
                 } else {
                     android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
-                    android.content.ClipData clip;
+                    android.content.ClipData clip = null;
                     if (sdk >= 16 && obj instanceof ClipboardContent
                             && ((ClipboardContent) obj).getText(ClipboardContent.MIME_HTML) != null) {
                         ClipboardContent rich = (ClipboardContent) obj;
                         clip = ClipData.newHtmlText("Codename One",
                                 rich.getText(ClipboardContent.MIME_TEXT),
                                 rich.getText(ClipboardContent.MIME_HTML));
-                    } else if (obj instanceof ClipboardContent) {
+                    } else if (obj instanceof ClipboardContent
+                            && ((ClipboardContent) obj).getText(ClipboardContent.MIME_TEXT) != null) {
                         clip = ClipData.newPlainText("Codename One",
                                 ((ClipboardContent)obj).getText(ClipboardContent.MIME_TEXT));
-                    } else {
+                    } else if (!(obj instanceof ClipboardContent)) {
                         clip = ClipData.newPlainText("Codename One", obj.toString());
+                    }
+                    if (obj instanceof ClipboardContent) {
+                        try {
+                            clip = enrichClipWithBinaryContent((ClipboardContent) obj, clip);
+                        } catch (Throwable t) {
+                            com.codename1.io.Log.e(t);
+                        }
+                    }
+                    if (clip == null) {
+                        clip = ClipData.newPlainText("Codename One", "");
                     }
                     clipboard.setPrimaryClip(clip);
                 }
             }
         });
+    }
+
+    /**
+     * Enriches the given base ClipData (which may be null) with image bytes and/or file
+     * references carried by the ClipboardContent, exposing binary content as FileProvider
+     * content:// URIs. Returns the (possibly newly created) ClipData, or the original clip on
+     * failure. Never throws.
+     */
+    private ClipData enrichClipWithBinaryContent(ClipboardContent content, ClipData clip) throws IOException {
+        String authority = getContext().getPackageName() + ".provider";
+
+        // Image bytes: prefer PNG, then JPEG, then GIF
+        String imageMime = null;
+        byte[] imageBytes = null;
+        String imageExt = null;
+        if (content.getBytes(ClipboardContent.MIME_PNG) != null) {
+            imageMime = ClipboardContent.MIME_PNG;
+            imageBytes = content.getBytes(ClipboardContent.MIME_PNG);
+            imageExt = "png";
+        } else if (content.getBytes(ClipboardContent.MIME_JPEG) != null) {
+            imageMime = ClipboardContent.MIME_JPEG;
+            imageBytes = content.getBytes(ClipboardContent.MIME_JPEG);
+            imageExt = "jpg";
+        } else if (content.getBytes(ClipboardContent.MIME_GIF) != null) {
+            imageMime = ClipboardContent.MIME_GIF;
+            imageBytes = content.getBytes(ClipboardContent.MIME_GIF);
+            imageExt = "gif";
+        }
+        if (imageBytes != null) {
+            File imageFile = new File(getContext().getCacheDir(),
+                    "cn1-clip-image-" + System.currentTimeMillis() + "." + imageExt);
+            imageFile.getParentFile().mkdirs();
+            OutputStream os = new FileOutputStream(imageFile);
+            try {
+                os.write(imageBytes);
+            } finally {
+                os.close();
+            }
+            Uri imageUri = FileProvider.getUriForFile(getContext(), authority, imageFile);
+            // Grant broadly so any paste target can read the content:// URI
+            getContext().grantUriPermission("android", imageUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            if (clip == null) {
+                clip = new ClipData("Codename One", new String[]{ imageMime }, new ClipData.Item(imageUri));
+            } else {
+                clip.addItem(new ClipData.Item(imageUri));
+            }
+        }
+
+        // File references: MIME_FILE may be a single String or a String[]
+        Object fileData = content.getData(ClipboardContent.MIME_FILE);
+        if (fileData != null) {
+            String[] paths;
+            if (fileData instanceof String[]) {
+                paths = (String[]) fileData;
+            } else {
+                paths = new String[]{ fileData.toString() };
+            }
+            for (int i = 0; i < paths.length; i++) {
+                String pathOrUri = paths[i];
+                if (pathOrUri == null || pathOrUri.length() == 0) {
+                    continue;
+                }
+                Uri u;
+                if (pathOrUri.startsWith("content:") || pathOrUri.startsWith("file:")) {
+                    u = Uri.parse(pathOrUri);
+                } else {
+                    u = Uri.fromFile(new File(pathOrUri));
+                }
+                if (clip == null) {
+                    clip = new ClipData("Codename One", new String[]{ "text/uri-list" }, new ClipData.Item(u));
+                } else {
+                    clip.addItem(new ClipData.Item(u));
+                }
+            }
+        }
+        return clip;
+    }
+
+    /**
+     * Maps a content resolver image MIME type to the corresponding ClipboardContent MIME constant,
+     * defaulting to PNG for unrecognized image types.
+     */
+    private static String mimeForImageType(String type) {
+        if (type == null) {
+            return ClipboardContent.MIME_PNG;
+        }
+        if (type.startsWith(ClipboardContent.MIME_JPEG)) {
+            return ClipboardContent.MIME_JPEG;
+        }
+        if (type.startsWith(ClipboardContent.MIME_GIF)) {
+            return ClipboardContent.MIME_GIF;
+        }
+        return ClipboardContent.MIME_PNG;
     }
 
     /**
@@ -8903,15 +9007,62 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     if (clip == null || clip.getItemCount() == 0) {
                         return;
                     }
-                    ClipData.Item item = clip.getItemAt(0);
-                    String html = sdk >= 16 ? item.getHtmlText() : null;
-                    CharSequence plain = item.coerceToText(getContext());
-                    if (html != null && html.length() > 0) {
-                        response[0] = new ClipboardContent()
-                                .setData(ClipboardContent.MIME_TEXT, plain == null ? "" : plain.toString())
-                                .setData(ClipboardContent.MIME_HTML, html);
+                    ClipboardContent content = new ClipboardContent();
+                    String plain = null;
+                    String html = null;
+                    boolean hasImage = false;
+                    List<String> fileUris = new ArrayList<String>();
+                    for (int i = 0; i < clip.getItemCount(); i++) {
+                        ClipData.Item item = clip.getItemAt(i);
+                        try {
+                            Uri uri = item.getUri();
+                            if (uri != null) {
+                                String type = getContext().getContentResolver().getType(uri);
+                                if (type != null && type.startsWith("image/")) {
+                                    InputStream in = getContext().getContentResolver().openInputStream(uri);
+                                    if (in != null) {
+                                        try {
+                                            byte[] bytes = Util.readInputStream(in);
+                                            content.setData(mimeForImageType(type), bytes);
+                                            hasImage = true;
+                                        } finally {
+                                            in.close();
+                                        }
+                                    }
+                                    continue;
+                                }
+                                // Non-image URI -> file reference
+                                fileUris.add(uri.toString());
+                                continue;
+                            }
+                        } catch (Throwable t) {
+                            com.codename1.io.Log.e(t);
+                        }
+                        if (html == null && sdk >= 16) {
+                            String itemHtml = item.getHtmlText();
+                            if (itemHtml != null && itemHtml.length() > 0) {
+                                html = itemHtml;
+                            }
+                        }
+                        if (plain == null) {
+                            CharSequence text = item.coerceToText(getContext());
+                            if (text != null && text.length() > 0) {
+                                plain = text.toString();
+                            }
+                        }
+                    }
+                    if (html != null) {
+                        content.setData(ClipboardContent.MIME_HTML, html);
+                    }
+                    if (!fileUris.isEmpty()) {
+                        content.setData(ClipboardContent.MIME_FILE,
+                                fileUris.size() == 1 ? (Object) fileUris.get(0) : (Object) fileUris.toArray(new String[0]));
+                    }
+                    content.setData(ClipboardContent.MIME_TEXT, plain == null ? "" : plain);
+                    if (hasImage || html != null || !fileUris.isEmpty()) {
+                        response[0] = content;
                     } else {
-                        response[0] = plain == null ? null : plain.toString();
+                        response[0] = plain;
                     }
                 }
             }

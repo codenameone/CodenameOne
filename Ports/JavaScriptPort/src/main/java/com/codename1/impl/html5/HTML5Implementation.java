@@ -1258,7 +1258,79 @@ public class HTML5Implementation extends CodenameOneImplementation {
     
     @JSBody(params={"evt"}, script="try {if (evt.clipboardFiles) return evt.clipboardFiles; return evt.clipboardData.files;} catch(e){return null}")
     private native static FileList getPasteEventFileList(Event evt);
-    
+
+    /// Populates a {@link ClipboardContent} with any files carried by a paste event. The temp-file
+    /// path(s) are exposed as {@link ClipboardContent#MIME_FILE} (a single {@code String} for one file,
+    /// a {@code String[]} for several) and, for each file whose blob MIME type is a recognised image,
+    /// the raw bytes are additionally exposed under the matching image MIME
+    /// ({@link ClipboardContent#MIME_PNG}/{@code MIME_JPEG}/{@code MIME_GIF}) so a rich text view can
+    /// consume the image directly. Fully null-safe: a failure to read a single file is swallowed so the
+    /// text flavors keep working.
+    private void addClipboardFiles(ClipboardContent content, FileList files, String[] filePaths) {
+        if (content == null || filePaths == null || filePaths.length == 0) {
+            return;
+        }
+        try {
+            if (filePaths.length == 1) {
+                content.setData(ClipboardContent.MIME_FILE, filePaths[0]);
+            } else {
+                content.setData(ClipboardContent.MIME_FILE, filePaths);
+            }
+            if (files == null) {
+                return;
+            }
+            int len = Math.min(files.getLength(), filePaths.length);
+            for (int i = 0; i < len; i++) {
+                try {
+                    Blob file = files.item(i);
+                    String imageMime = imageMimeForType(file == null ? null : file.getType());
+                    if (imageMime != null && !content.hasMimeType(imageMime)) {
+                        byte[] bytes = readTempFileBytes(filePaths[i]);
+                        if (bytes != null && bytes.length > 0) {
+                            content.setData(imageMime, bytes);
+                        }
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /// Maps a blob MIME type to the matching {@link ClipboardContent} image MIME, or null when the type
+    /// is not a PNG/JPEG/GIF image (other image types are left as a file-only reference rather than
+    /// being mislabeled).
+    private static String imageMimeForType(String type) {
+        if (type == null) {
+            return null;
+        }
+        String t = type.toLowerCase();
+        if (t.startsWith("image/png")) {
+            return ClipboardContent.MIME_PNG;
+        }
+        if (t.startsWith("image/jpeg") || t.startsWith("image/jpg")) {
+            return ClipboardContent.MIME_JPEG;
+        }
+        if (t.startsWith("image/gif")) {
+            return ClipboardContent.MIME_GIF;
+        }
+        return null;
+    }
+
+    /// Reads the bytes of a temp file ({@code tmp://} path) via the file system input stream. Returns
+    /// null on any failure.
+    private byte[] readTempFileBytes(String path) {
+        InputStream in = null;
+        try {
+            in = openFileInputStream(path);
+            return Util.readInputStream(in);
+        } catch (Throwable ex) {
+            return null;
+        } finally {
+            Util.cleanup(in);
+        }
+    }
+
     private void firePasteEvent() {
         final TextInputClient client = lightweightTextInputClient;
         if (client != null) {
@@ -1516,15 +1588,21 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         filePaths[i] = createTempFile(file);
                     }
                 }
+                boolean hasFiles = filePaths != null && filePaths.length > 0;
                 if ((rtfText != null && rtfText.length() > 0)
                         || (markdownText != null && markdownText.length() > 0)
-                        || (asciidocText != null && asciidocText.length() > 0)) {
+                        || (asciidocText != null && asciidocText.length() > 0)
+                        || hasFiles) {
                     ClipboardContent content = new ClipboardContent()
                             .setData(ClipboardContent.MIME_TEXT, plainText == null ? "" : plainText)
                             .setData(ClipboardContent.MIME_HTML, emptyToNull(htmlText))
                             .setData(ClipboardContent.MIME_RTF, emptyToNull(rtfText))
                             .setData(ClipboardContent.MIME_MARKDOWN, emptyToNull(markdownText))
                             .setData(ClipboardContent.MIME_ASCIIDOC, emptyToNull(asciidocText));
+                    // Expose pasted files (and image bytes) alongside the text flavors. This also
+                    // preempts the coordinator's plainer file handling below, which only surfaces a
+                    // file list and never the decoded image bytes a rich view needs.
+                    addClipboardFiles(content, files, filePaths);
                     setPasteDataFromClipboard(content);
                     firePasteEvent();
                     return;
@@ -2675,6 +2753,19 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         .setData(ClipboardContent.MIME_RTF, emptyToNull(getPasteEventData(evt, 2)))
                         .setData(ClipboardContent.MIME_MARKDOWN, emptyToNull(getPasteEventData(evt, 3)))
                         .setData(ClipboardContent.MIME_ASCIIDOC, emptyToNull(getPasteEventData(evt, 4)));
+                // Pasted files/images (e.g. Ctrl+V of an image into the editor) arrive as
+                // clipboardData.files; surface them as MIME_FILE plus decoded image bytes, mirroring
+                // the document-level listener.
+                FileList files = getPasteEventFileList(evt);
+                String[] filePaths = null;
+                if (files != null) {
+                    int len = files.getLength();
+                    filePaths = new String[len];
+                    for (int i = 0; i < len; i++) {
+                        filePaths[i] = createTempFile(files.item(i));
+                    }
+                }
+                addClipboardFiles(content, files, filePaths);
                 enqueueLightweightTextInput(client, new Runnable() {
                     @Override
                     public void run() {
@@ -11199,6 +11290,48 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private native static boolean nativeBrowserCopyToClipboard(String text, String html, String rtf,
             String markdown, String asciidoc);
 
+    // Best-effort image copy via the modern async clipboard API. Like the text native above, this
+    // @JSBody is only reached by the legacy main-thread (TeaVM) runtime; the worker-based port
+    // overrides it with a port.js binding that routes to the main-thread host (navigator.clipboard is
+    // Window-only). navigator.clipboard.write REPLACES the whole clipboard and is permission-gated, so
+    // everything is wrapped in try/catch and returns false on any failure. The dataUrl is a
+    // "data:<mime>;base64,<...>" string; the blob MIME is derived from its header.
+    @JSBody(params={"dataUrl"}, script=
+        "try {" +
+        "  if (dataUrl == null) return false;" +
+        "  if (!navigator.clipboard || typeof navigator.clipboard.write !== 'function' || typeof ClipboardItem === 'undefined') return false;" +
+        "  var str = '' + dataUrl;" +
+        "  var comma = str.indexOf(',');" +
+        "  if (comma < 0) return false;" +
+        "  var header = str.substring(0, comma);" +
+        "  var colon = header.indexOf(':');" +
+        "  var semi = header.indexOf(';');" +
+        "  var mime = (colon >= 0 && semi > colon) ? header.substring(colon + 1, semi) : 'image/png';" +
+        "  var byteString = atob(str.substring(comma + 1));" +
+        "  var len = byteString.length;" +
+        "  var bytes = new Uint8Array(len);" +
+        "  for (var i = 0; i < len; i++) { bytes[i] = byteString.charCodeAt(i); }" +
+        "  var blob = new Blob([bytes], {type: mime});" +
+        "  var item = {};" +
+        "  item[mime] = blob;" +
+        "  navigator.clipboard.write([new ClipboardItem(item)]);" +
+        "  return true;" +
+        "} catch (e) { return false; }")
+    private native static boolean nativeBrowserCopyImageToClipboard(String dataUrl);
+
+    /// Returns a {@code data:<mime>;base64,<...>} URL for the first image flavor
+    /// (PNG, then JPEG, then GIF) carried by the clipboard content, or null when none is present.
+    private static String firstClipboardImageDataUrl(ClipboardContent rich) {
+        String[] mimes = { ClipboardContent.MIME_PNG, ClipboardContent.MIME_JPEG, ClipboardContent.MIME_GIF };
+        for (int i = 0; i < mimes.length; i++) {
+            byte[] bytes = rich.getBytes(mimes[i]);
+            if (bytes != null && bytes.length > 0) {
+                return "data:" + mimes[i] + ";base64," + Base64.encodeNoNewline(bytes);
+            }
+        }
+        return null;
+    }
+
     @Override
     public void copyToClipboard(Object obj) {
         final ClipboardCopyRequest request = (obj instanceof ClipboardCopyRequest) ? (ClipboardCopyRequest)obj : new ClipboardCopyRequest(obj);
@@ -11206,6 +11339,16 @@ public class HTML5Implementation extends CodenameOneImplementation {
         super.copyToClipboard(obj);
         ClipboardContent rich = obj instanceof ClipboardContent ? (ClipboardContent)obj : null;
         if (rich != null) {
+            // Best-effort image copy. clipboard.write replaces the whole clipboard, so when an image
+            // is present we prefer it and return on success; otherwise we fall through to the text path
+            // below. Guarded so a text-only copy is unaffected and a permission failure is silent.
+            try {
+                String imageDataUrl = firstClipboardImageDataUrl(rich);
+                if (imageDataUrl != null && nativeBrowserCopyImageToClipboard(imageDataUrl)) {
+                    return;
+                }
+            } catch (Throwable ignored) {
+            }
             obj = rich.getText(ClipboardContent.MIME_TEXT);
         }
         if (!(obj instanceof String)) {

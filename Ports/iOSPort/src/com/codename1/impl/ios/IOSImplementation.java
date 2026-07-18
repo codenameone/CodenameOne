@@ -7940,6 +7940,16 @@ public class IOSImplementation extends CodenameOneImplementation {
                         nativeInstance.getClipboardContent(com.codename1.ui.ClipboardContent.MIME_MARKDOWN))
                 .setData(com.codename1.ui.ClipboardContent.MIME_ASCIIDOC,
                         nativeInstance.getClipboardContent(com.codename1.ui.ClipboardContent.MIME_ASCIIDOC));
+        byte[] image = nativeInstance.getClipboardImage();
+        if(image != null && image.length > 0) {
+            content.setData(com.codename1.ui.ClipboardContent.MIME_PNG, image);
+        }
+        String files = nativeInstance.getClipboardFileUris();
+        if(files != null && files.length() > 0) {
+            String[] parts = splitClipboardFileUris(files);
+            content.setData(com.codename1.ui.ClipboardContent.MIME_FILE,
+                    parts.length == 1 ? parts[0] : parts);
+        }
         int mimeCount = content.getMimeTypes().length;
         if(mimeCount > 1 || (s == null && mimeCount > 0)) {
             return content;
@@ -7965,7 +7975,9 @@ public class IOSImplementation extends CodenameOneImplementation {
                     content.getText(com.codename1.ui.ClipboardContent.MIME_HTML),
                     content.getText(com.codename1.ui.ClipboardContent.MIME_RTF),
                     content.getText(com.codename1.ui.ClipboardContent.MIME_MARKDOWN),
-                    content.getText(com.codename1.ui.ClipboardContent.MIME_ASCIIDOC));
+                    content.getText(com.codename1.ui.ClipboardContent.MIME_ASCIIDOC),
+                    clipboardImageBytes(content),
+                    clipboardFileUris(content));
             super.copyToClipboard(obj);
             return;
         }
@@ -7976,6 +7988,58 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         nativeInstance.setClipboardString(null);
         super.copyToClipboard(obj);
+    }
+
+    /// Preferred image representation (PNG, then JPEG, then GIF bytes) for the pasteboard, or null.
+    private static byte[] clipboardImageBytes(com.codename1.ui.ClipboardContent content) {
+        byte[] b = content.getBytes(com.codename1.ui.ClipboardContent.MIME_PNG);
+        if(b == null) {
+            b = content.getBytes(com.codename1.ui.ClipboardContent.MIME_JPEG);
+        }
+        if(b == null) {
+            b = content.getBytes(com.codename1.ui.ClipboardContent.MIME_GIF);
+        }
+        return b;
+    }
+
+    /// Newline-joined file URIs from the MIME_FILE representation (a String or String[]), or null.
+    private static String clipboardFileUris(com.codename1.ui.ClipboardContent content) {
+        Object value = content.getData(com.codename1.ui.ClipboardContent.MIME_FILE);
+        if(value instanceof String) {
+            return (String)value;
+        }
+        if(value instanceof String[]) {
+            String[] arr = (String[])value;
+            StringBuilder sb = new StringBuilder();
+            for(int i = 0 ; i < arr.length ; i++) {
+                if(arr[i] == null || arr[i].length() == 0) {
+                    continue;
+                }
+                if(sb.length() > 0) {
+                    sb.append('\n');
+                }
+                sb.append(arr[i]);
+            }
+            return sb.length() == 0 ? null : sb.toString();
+        }
+        return null;
+    }
+
+    private static String[] splitClipboardFileUris(String joined) {
+        java.util.List<String> parts = new java.util.ArrayList<String>();
+        int start = 0;
+        for(int i = 0 ; i < joined.length() ; i++) {
+            if(joined.charAt(i) == '\n') {
+                if(i > start) {
+                    parts.add(joined.substring(start, i));
+                }
+                start = i + 1;
+            }
+        }
+        if(start < joined.length()) {
+            parts.add(joined.substring(start));
+        }
+        return parts.toArray(new String[parts.size()]);
     }
 
     /*class RunnableCleanup implements Runnable {

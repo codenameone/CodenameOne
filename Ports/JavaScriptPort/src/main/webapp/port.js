@@ -1839,6 +1839,27 @@ bindNative([
   return result ? 1 : 0;
 });
 
+// Image copy is likewise routed to the main thread, where navigator.clipboard +
+// ClipboardItem live. Best-effort and permission-gated. The host handler
+// (__cn1_copy_image_to_clipboard__) ships from the translator's browser_bridge.js,
+// which may lag this port.js; a missing handler rejects the call, so swallow the
+// error and report failure (copyToClipboard then falls back to the text path).
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyImageToClipboard_java_lang_String_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyImageToClipboard___java_lang_String_R_boolean"
+], function*(dataUrl) {
+  if (typeof jvm.invokeHostNative !== "function" || dataUrl == null) {
+    return 0;
+  }
+  let result;
+  try {
+    result = yield jvm.invokeHostNative("__cn1_copy_image_to_clipboard__", [jvm.toNativeString(dataUrl)]);
+  } catch (err) {
+    return 0;
+  }
+  return result ? 1 : 0;
+});
+
 // navigator.share lives on the main-thread Window only, so the worker cannot
 // answer "is native share supported" itself -- route the check to the host.
 // (The actual share() invocations are void and self-route via the @JSBody

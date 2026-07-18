@@ -2209,6 +2209,45 @@
     return execCommandClipboardFallback(text) ? 1 : 0;
   });
 
+  // Image copy: the worker routes here because navigator.clipboard + ClipboardItem
+  // are Window-only. Best-effort and permission-gated -- clipboard.write REPLACES
+  // the whole clipboard. The argument is a "data:<mime>;base64,<...>" URL; the blob
+  // MIME is derived from its header. Resolves 1 on success, 0 on any failure.
+  hostBridge.register('__cn1_copy_image_to_clipboard__', function(dataUrl) {
+    var nav = global.navigator || (global.window && global.window.navigator);
+    try {
+      if (!dataUrl || !nav || !nav.clipboard || typeof nav.clipboard.write !== 'function'
+          || typeof global.ClipboardItem !== 'function') {
+        return 0;
+      }
+      var str = String(dataUrl);
+      var comma = str.indexOf(',');
+      if (comma < 0) {
+        return 0;
+      }
+      var header = str.substring(0, comma);
+      var colon = header.indexOf(':');
+      var semi = header.indexOf(';');
+      var mime = (colon >= 0 && semi > colon) ? header.substring(colon + 1, semi) : 'image/png';
+      var byteString = global.atob(str.substring(comma + 1));
+      var len = byteString.length;
+      var bytes = new global.Uint8Array(len);
+      for (var i = 0; i < len; i++) {
+        bytes[i] = byteString.charCodeAt(i);
+      }
+      var blob = new global.Blob([bytes], {type: mime});
+      var item = {};
+      item[mime] = blob;
+      return nav.clipboard.write([new global.ClipboardItem(item)]).then(function() {
+        return 1;
+      }, function() {
+        return 0;
+      });
+    } catch (err) {
+      return 0;
+    }
+  });
+
   // Web Share API (navigator.share / navigator.canShare) is Window-only and so
   // is unreachable from the worker that runs the translated Java. Both the
   // capability check and the share invocation are routed here to the main

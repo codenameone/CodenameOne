@@ -1672,9 +1672,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             if (imageBytes(data) != null) {
                 available.add(DataFlavor.imageFlavor);
             }
+            if (fileList(data) != null) {
+                available.add(DataFlavor.javaFileListFlavor);
+            }
             String[] mimeTypes = data.getMimeTypes();
             for (int i = 0; i < mimeTypes.length; i++) {
-                if (!ClipboardContent.MIME_TEXT.equals(mimeTypes[i]) && data.getText(mimeTypes[i]) != null) {
+                if (!ClipboardContent.MIME_TEXT.equals(mimeTypes[i])
+                        && !ClipboardContent.MIME_FILE.equals(mimeTypes[i])
+                        && data.getText(mimeTypes[i]) != null) {
                     available.add(new DataFlavor(mimeTypes[i] + ";class=java.lang.String", mimeTypes[i]));
                 }
             }
@@ -1690,6 +1695,46 @@ public class JavaSEPort extends CodenameOneImplementation {
                 b = data.getBytes(ClipboardContent.MIME_GIF);
             }
             return b;
+        }
+
+        /// Resolves the `application/x-file-list` representation (a single path/URI `String` or a
+        /// `String[]` of them) to AWT `File` objects for the native file-list clipboard flavor.
+        private static java.util.List<java.io.File> fileList(ClipboardContent data) {
+            Object value = data.getData(ClipboardContent.MIME_FILE);
+            if (value == null) {
+                return null;
+            }
+            String[] paths;
+            if (value instanceof String[]) {
+                paths = (String[]) value;
+            } else if (value instanceof String) {
+                paths = new String[] { (String) value };
+            } else {
+                return null;
+            }
+            java.util.List<java.io.File> files = new java.util.ArrayList<java.io.File>();
+            for (int i = 0; i < paths.length; i++) {
+                java.io.File f = pathToFile(paths[i]);
+                if (f != null) {
+                    files.add(f);
+                }
+            }
+            return files.isEmpty() ? null : files;
+        }
+
+        /// Accepts either a plain filesystem path or a `file:` URI and returns a `File`, or null.
+        private static java.io.File pathToFile(String pathOrUri) {
+            if (pathOrUri == null || pathOrUri.length() == 0) {
+                return null;
+            }
+            if (pathOrUri.startsWith("file:")) {
+                try {
+                    return new java.io.File(new java.net.URI(pathOrUri));
+                } catch (Exception ex) {
+                    return null;
+                }
+            }
+            return new java.io.File(pathOrUri);
         }
 
         public DataFlavor[] getTransferDataFlavors() {
@@ -1723,6 +1768,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
                 throw new UnsupportedFlavorException(flavor);
             }
+            if (DataFlavor.javaFileListFlavor.equals(flavor)) {
+                java.util.List<java.io.File> files = fileList(data);
+                if (files != null) {
+                    return files;
+                }
+                throw new UnsupportedFlavorException(flavor);
+            }
             String value = data.getText(flavor.getPrimaryType() + "/" + flavor.getSubType());
             if (value != null) {
                 return value;
@@ -1745,6 +1797,21 @@ public class JavaSEPort extends CodenameOneImplementation {
                     byte[] png = imageToPngBytes((java.awt.Image) out);
                     if (png != null) {
                         content.setData(ClipboardContent.MIME_PNG, png);
+                    }
+                    continue;
+                }
+                if (flavor.equals(DataFlavor.javaFileListFlavor) && out instanceof java.util.List
+                        && content.getData(ClipboardContent.MIME_FILE) == null) {
+                    java.util.List<?> list = (java.util.List<?>) out;
+                    java.util.List<String> paths = new java.util.ArrayList<String>();
+                    for (Object o : list) {
+                        if (o instanceof java.io.File) {
+                            paths.add(((java.io.File) o).getAbsolutePath());
+                        }
+                    }
+                    if (!paths.isEmpty()) {
+                        content.setData(ClipboardContent.MIME_FILE, paths.size() == 1
+                                ? paths.get(0) : paths.toArray(new String[paths.size()]));
                     }
                     continue;
                 }
