@@ -100,12 +100,14 @@ body ::selection {
 .cn1-header .logo,
 .cn1-header .logo a {
   flex: 0 0 auto;
+  margin: 0;
 }
 
 .cn1-header .logo a img,
 .cn1-header .logo a svg,
 .cn1-brand-logo {
   height: 30px;
+  margin: 0;
 }
 
 body:not(.dark) .cn1-brand-logo {
@@ -156,6 +158,9 @@ body:not(.dark) .cn1-brand-logo {
 }
 
 .cn1-header #menu .sub-menu {
+  position: absolute;
+  display: none;
+  left: 0;
   min-width: 230px;
   top: calc(100% + 8px);
   padding: 8px;
@@ -163,6 +168,17 @@ body:not(.dark) .cn1-brand-logo {
   border: 1px solid var(--cn1-border);
   border-radius: var(--cn1-radius);
   box-shadow: var(--cn1-shadow-lg);
+}
+
+@media (min-width: 981px) {
+  .cn1-header #menu > li.has-children {
+    position: relative;
+  }
+
+  .cn1-header #menu > li.has-children:hover > .sub-menu,
+  .cn1-header #menu > li.has-children:focus-within > .sub-menu {
+    display: block;
+  }
 }
 
 .cn1-header #menu .sub-menu li + li {
@@ -234,7 +250,7 @@ body:not(.dark) .cn1-brand-logo {
   color: var(--cn1-text);
 }
 
-.cn1-create-project-link {
+.cn1-header .cn1-create-project-link {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1233,6 +1249,11 @@ body.dark .cn1-v2-feature--accent p {
   .cn1-header .logo a img,
   .cn1-header .logo a svg,
   .cn1-brand-logo {
+    height: 25px;
+  }
+
+  .cn1-header.cn1-header--compact .logo a img,
+  .cn1-header.cn1-header--compact .logo a svg {
     height: 25px;
   }
 

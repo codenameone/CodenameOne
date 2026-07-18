@@ -165,6 +165,10 @@
   font: 700 13px var(--cn1-mono);
 }
 
+.cn1-gs-step__body {
+  min-width: 0;
+}
+
 .cn1-gs-step__body h2,
 .cn1-gs-help h2 {
   margin: 0;
@@ -203,6 +207,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
+  width: 100%;
   max-width: 650px;
   margin: 22px 0;
   padding: 14px 16px;
@@ -212,6 +217,7 @@
 }
 
 .cn1-command code {
+  flex: 1 1 auto;
   min-width: 0;
   overflow-x: auto;
   color: var(--cn1-code-text);
@@ -221,6 +227,7 @@
 }
 
 .cn1-command button {
+  flex: 0 0 auto;
   margin-left: auto;
   border: 0;
   background: transparent;
