@@ -100,7 +100,7 @@ Only if you use push services/crash protection or other cloud features. If you d
 
 Can I use Codename One for free on a commercial project?
 
-Yes. To avoid abuse free users are limited to 100 build credits every month. Paid users have no such restriction. Enterprise/Pro developers are allowed to send multiple builds concurrently without any limitations. Builds are prioritized based on subscription level, some of the build servers are dedicated strictly for Enterprise/Pro subscription hence providing them with better service/speed.
+Yes. To avoid abuse free users are limited to 100 free cloud build credits each month. Paid users have no such restriction. Enterprise/Pro developers are allowed to send multiple builds concurrently without any limitations. Builds are prioritized based on subscription level, some of the build servers are dedicated strictly for Enterprise/Pro subscription hence providing them with better service/speed.
 
 Can I build to all devices for free?
 

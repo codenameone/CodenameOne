@@ -25,6 +25,10 @@ EOF
 
 is_source_file() {
   case "$1" in
+    # Hugo browser assets follow the website content policy, not the GPLv2 +
+    # Classpath Exception source-header policy. JVM/native source accidentally
+    # placed below docs/website is still checked by the source-extension rule.
+    docs/website/*.js|docs/website/*.jsx|docs/website/*.ts|docs/website/*.tsx|docs/website/*.css) return 1 ;;
     *.java|*.js|*.jsx|*.ts|*.tsx|*.css|*.c|*.cc|*.cpp|*.cxx|*.h|*.hh|*.hpp|*.hxx|*.m|*.mm|*.metal|*.kt|*.kts|*.swift|*.cs) return 0 ;;
     *) return 1 ;;
   esac

@@ -1,0 +1,10 @@
+{{- $label := .label -}}
+{{- $href := .href -}}
+{{- $variant := .variant | default "primary" -}}
+{{- $event := .event | default "" -}}
+<a class="cn1-action cn1-action--{{ $variant }}" href="{{ $href }}"{{ with $event }} data-cn1-conversion="{{ . }}"{{ end }}{{ if .external }} target="_blank" rel="noopener noreferrer"{{ end }}>
+  <span>{{ $label }}</span>
+  {{- if ne $variant "text" }}
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+  {{- end }}
+</a>
