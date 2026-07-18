@@ -3,17 +3,17 @@
   <section class="cn1-v2-hero">
     <div class="cn1-v2-hero__copy">
       <p class="cn1-eyebrow">Native, and you own the UI</p>
-      <h1>Native apps in Java.<br><span>A UI you control.</span></h1>
+      <h1>Native apps in Java<br><span>A UI you control</span></h1>
       <p class="cn1-v2-hero__lead">
         Codename One compiles one Java codebase into native apps across mobile, desktop, web, watch, TV, and vehicles. Its UI ships with your app instead of being restyled by the platform after release.
       </p>
       <div class="cn1-action-row">
         {{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "https://start.codenameone.com/" "event" "home-primary-project" "external" true) }}
-        {{ partial "cn1-cta.html" (dict "label" "See how it works" "href" "/introduction/" "variant" "secondary") }}
+        {{ partial "cn1-cta.html" (dict "label" "View source on GitHub" "href" "https://github.com/codenameone/CodenameOne" "variant" "secondary" "external" true) }}
       </div>
-      <p class="cn1-v2-hero__note">Open-source framework. Free cloud-build tier. Build iOS from Windows or Linux.</p>
+      <p class="cn1-v2-hero__note">GPLv2 with the Classpath Exception. Free for commercial use. No royalties.</p>
     </div>
-    <div class="cn1-v2-hero__product" aria-label="Codename One Java code and simulator">
+    <div class="cn1-v2-hero__product" aria-label="Codename One Java code and target platforms">
       <div class="cn1-code-window">
         <div class="cn1-code-window__bar"><span></span><span></span><span></span><strong>Main.java</strong></div>
         <pre><code><span class="cn1-code-keyword">Form</span> app = <span class="cn1-code-keyword">new</span> Form(
@@ -26,10 +26,20 @@ app.add(<span class="cn1-code-keyword">new</span> Label(
 ));
 app.show();</code></pre>
       </div>
-      <figure class="cn1-product-shot">
-        <img src="/uploads/Simulator-ComponentInspector.png" alt="Codename One simulator with the component inspector" width="1200" height="750">
-        <figcaption>Run locally, inspect the component tree, and update CSS while the app is running.</figcaption>
-      </figure>
+      <div class="cn1-output-card" aria-label="Targets produced from one Java project">
+        <p>One Java project</p>
+        <strong>One codebase across every target</strong>
+        <ul aria-label="Supported targets">
+          <li>iOS</li>
+          <li>Android</li>
+          <li>Desktop</li>
+          <li>Web</li>
+          <li>Watch</li>
+          <li>TV</li>
+          <li>Vehicle</li>
+        </ul>
+        <span>Run locally, then build with native toolchains.</span>
+      </div>
     </div>
   </section>
 
@@ -45,17 +55,17 @@ app.show();</code></pre>
     </div>
     <div class="cn1-v2-ownership__grid">
       <article class="cn1-v2-feature cn1-v2-feature--accent">
-        <span class="cn1-v2-feature__number">01</span>
+        <svg class="cn1-v2-feature__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M7 14v6"/></svg>
         <h3>Control the pixels</h3>
         <p>Theme the shared UI with CSS, draw directly when you need to, and keep brand behavior consistent across targets.</p>
       </article>
       <article class="cn1-v2-feature">
-        <span class="cn1-v2-feature__number">02</span>
+        <svg class="cn1-v2-feature__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="7" height="14" rx="2"/><rect x="14" y="5" width="7" height="14" rx="2"/><path d="M10 12h4"/></svg>
         <h3>Ship one behavior</h3>
         <p>Fix shared application logic and UI once instead of maintaining separate screen implementations for each platform.</p>
       </article>
       <article class="cn1-v2-feature">
-        <span class="cn1-v2-feature__number">03</span>
+        <svg class="cn1-v2-feature__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 4l-4 16"/></svg>
         <h3>Drop to native when it matters</h3>
         <p>Call platform SDKs through native interfaces. Embed a map, web view, camera surface, or other heavyweight view with <code>PeerComponent</code>.</p>
       </article>
@@ -160,7 +170,7 @@ app.show();</code></pre>
     <div>
       <p class="cn1-eyebrow">Start with the real thing</p>
       <h2>Create the project. Run it locally. Build for iOS.</h2>
-      <p>Initializr generates the Maven project. The free cloud tier includes 100 build credits each month; an iOS build uses 8.</p>
+      <p>The framework is open source and free to use commercially. Initializr generates a Maven project you can run locally, then build with local or cloud toolchains.</p>
     </div>
     <div class="cn1-action-row">
       {{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "https://start.codenameone.com/" "event" "home-final-project" "external" true) }}
