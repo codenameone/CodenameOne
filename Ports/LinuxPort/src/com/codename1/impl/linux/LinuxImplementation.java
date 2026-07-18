@@ -1995,10 +1995,9 @@ public class LinuxImplementation extends CodenameOneImplementation {
      */
     @Override
     public void copyToClipboard(Object obj) {
-        if (obj instanceof String || obj instanceof com.codename1.ui.ClipboardContent) {
-            LinuxNative.clipboardSetText(obj instanceof com.codename1.ui.ClipboardContent
-                    ? ((com.codename1.ui.ClipboardContent) obj)
-                            .getText(com.codename1.ui.ClipboardContent.MIME_TEXT) : (String) obj);
+        String text = getPlainTextForClipboard(obj);
+        if (text != null) {
+            LinuxNative.clipboardSetText(text);
         }
         super.copyToClipboard(obj);
     }

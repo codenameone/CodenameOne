@@ -5227,6 +5227,29 @@ public abstract class CodenameOneImplementation {
         lightweightClipboard = data;
     }
 
+    /// Extracts a plain-text representation from an arbitrary clipboard payload for ports whose system
+    /// clipboard is text only. Handles a raw `String` and any `ClipboardContent` (including its
+    /// `RichTextClipboardData` subtype) uniformly, so every text-only port degrades a generic
+    /// `ClipboardContent` the same way instead of each reimplementing the check. Returns null when the
+    /// payload carries no text representation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: the clipboard payload passed to `copyToClipboard(Object)`
+    ///
+    /// #### Returns
+    ///
+    /// the plain-text representation, or null
+    protected final String getPlainTextForClipboard(Object obj) {
+        if (obj instanceof String) {
+            return (String) obj;
+        }
+        if (obj instanceof ClipboardContent) {
+            return ((ClipboardContent) obj).getText(ClipboardContent.MIME_TEXT);
+        }
+        return null;
+    }
+
     /// Returns the clipboard representations available to framework code. The default adapter keeps
     /// old ports source-compatible while exposing plain text and content written through the new API.
     public ClipboardContent getClipboardContent() {

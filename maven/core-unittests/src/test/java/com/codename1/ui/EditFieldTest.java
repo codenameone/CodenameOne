@@ -24,6 +24,7 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.layouts.BorderLayout;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -122,5 +123,40 @@ class EditFieldTest extends UITestBase {
         assertFalse(f.isEditable());
         f.commitText("z");
         assertEquals("abc", f.getText(), "no edit while non-editable");
+    }
+
+    @FormTest
+    void implementsCommonTextInterfaces() {
+        EditField f = new EditField("abc");
+        // usable wherever the framework expects a TextHolder or an ActionSource
+        TextHolder holder = f;
+        assertEquals("abc", holder.getText());
+        holder.setText("def");
+        assertEquals("def", f.getText());
+        ActionSource<?> source = f;
+        assertNotNull(source, "EditField is an ActionSource");
+    }
+
+    @FormTest
+    void multiLineConstructorStartsMultiLine() {
+        EditField f = show(new EditField(4, 30));
+        assertFalse(f.isSingleLineTextArea(), "(rows, columns) constructor is multi-line");
+        assertTrue(f.getConfig().isMultiline());
+        assertEquals(4, f.getRows());
+        assertEquals(30, f.getColumns());
+        f.commitText("a");
+        f.commitText("\n");
+        f.commitText("b");
+        assertEquals("a\nb", f.getText(), "newlines kept in a multi-line field");
+    }
+
+    @FormTest
+    void textFieldStyleConstructorStaysSingleLine() {
+        EditField f = show(new EditField("hi", "Name", 12, TextArea.EMAILADDR));
+        assertTrue(f.isSingleLineTextArea(), "(text, hint, columns, constraint) constructor is single-line");
+        assertEquals("hi", f.getText());
+        assertEquals("Name", f.getHint());
+        assertEquals(12, f.getColumns());
+        assertEquals(TextArea.EMAILADDR, f.getConstraint());
     }
 }

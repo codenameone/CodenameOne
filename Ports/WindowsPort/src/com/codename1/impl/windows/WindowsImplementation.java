@@ -1998,9 +1998,9 @@ public class WindowsImplementation extends CodenameOneImplementation {
      */
     @Override
     public void copyToClipboard(Object obj) {
-        if (obj instanceof String || obj instanceof com.codename1.ui.RichTextClipboardData) {
-            WindowsNative.clipboardSetText(obj instanceof com.codename1.ui.RichTextClipboardData
-                    ? ((com.codename1.ui.RichTextClipboardData) obj).getPlainText() : (String) obj);
+        String text = getPlainTextForClipboard(obj);
+        if (text != null) {
+            WindowsNative.clipboardSetText(text);
         }
         super.copyToClipboard(obj);
     }
@@ -2010,8 +2010,9 @@ public class WindowsImplementation extends CodenameOneImplementation {
         String text = WindowsNative.clipboardGetText();
         if (text != null) {
             Object lightweight = super.getPasteDataFromClipboard();
-            if (lightweight instanceof com.codename1.ui.RichTextClipboardData
-                    && text.equals(((com.codename1.ui.RichTextClipboardData) lightweight).getPlainText())) {
+            if (lightweight instanceof com.codename1.ui.ClipboardContent
+                    && text.equals(((com.codename1.ui.ClipboardContent) lightweight)
+                            .getText(com.codename1.ui.ClipboardContent.MIME_TEXT))) {
                 return lightweight;
             }
             return text;

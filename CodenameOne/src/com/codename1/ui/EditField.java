@@ -27,6 +27,7 @@ import com.codename1.ui.editor.EditorHost;
 import com.codename1.ui.editor.EditorView;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
@@ -43,20 +44,27 @@ import com.codename1.ui.util.EventDispatcher;
 /// -- it never floats above the UI, scrolls perfectly with its parent and can live anywhere a
 /// `Component` can.
 ///
-/// It intentionally mirrors the common `TextField` API (`#setText(String)`, `#getText()`,
+/// It intentionally mirrors the common `TextField` / `TextArea` API (`#setText(String)`, `#getText()`,
 /// `#setHint(String)`, `#setConstraint(int)`, `#addDataChangedListener(DataChangedListener)`,
-/// `#addActionListener(ActionListener)`, `#setSingleLineTextArea(boolean)`) so existing code can adopt
-/// it with minimal changes, but it is a distinct class -- not assignable to `TextField` / `TextArea` --
-/// so switching to the pure engine is always a deliberate, opt-in choice.
+/// `#addActionListener(ActionListener)`, `#setSingleLineTextArea(boolean)`) and implements the same
+/// `TextHolder` and `ActionSource` interfaces those components do, so code written against those
+/// interfaces (validators, form binding, generic listeners) works unchanged. It also offers the same
+/// constructor families: the `TextField`-style constructors create single-line fields while the
+/// `TextArea`-style `(rows, columns)` constructors create multi-line editors, making the single- vs
+/// multi-line choice explicit at construction. It is still a distinct class -- not assignable to
+/// `TextField` / `TextArea` -- so switching to the pure engine is always a deliberate, opt-in choice.
 ///
 /// ```java
-/// EditField name = new EditField();
-/// name.setHint("Name");
-/// name.setConstraint(TextArea.EMAILADDR);
+/// // single line, like TextField
+/// EditField name = new EditField("", "Name", TextArea.EMAILADDR);
 /// name.addActionListener(e -> submit(name.getText()));
 /// form.add(name);
+///
+/// // multi line, like TextArea
+/// EditField notes = new EditField(5, 30);
+/// form.add(notes);
 /// ```
-public class EditField extends EditorView implements EditorHost {
+public class EditField extends EditorView implements EditorHost, TextHolder, ActionSource {
     private String hint = "";
     private boolean singleLine = true;
     private int rows = 1;
@@ -69,6 +77,16 @@ public class EditField extends EditorView implements EditorHost {
     /// Creates an empty single-line field.
     public EditField() {
         this("");
+    }
+
+    /// Creates an empty single-line field with the given visible column count.
+    ///
+    /// #### Parameters
+    ///
+    /// - `columns`: the number of visible columns used to compute the preferred width
+    public EditField(int columns) {
+        this("");
+        setColumns(columns);
     }
 
     /// Creates a single-line field with the given initial text.
@@ -85,7 +103,31 @@ public class EditField extends EditorView implements EditorHost {
         }
     }
 
-    /// Creates a field with the given text, hint and constraint.
+    /// Creates a single-line field with the given text and visible column count.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the initial text
+    ///
+    /// - `columns`: the number of visible columns
+    public EditField(String text, int columns) {
+        this(text);
+        setColumns(columns);
+    }
+
+    /// Creates a single-line field with the given text and hint.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the initial text
+    ///
+    /// - `hint`: the placeholder shown while empty
+    public EditField(String text, String hint) {
+        this(text);
+        setHint(hint);
+    }
+
+    /// Creates a single-line field with the given text, hint and constraint.
     ///
     /// #### Parameters
     ///
@@ -97,6 +139,76 @@ public class EditField extends EditorView implements EditorHost {
     public EditField(String text, String hint, int constraint) {
         this(text);
         setHint(hint);
+        setConstraint(constraint);
+    }
+
+    /// Creates a single-line field with the given text, hint, visible column count and constraint.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the initial text
+    ///
+    /// - `hint`: the placeholder shown while empty
+    ///
+    /// - `columns`: the number of visible columns
+    ///
+    /// - `constraint`: one of the `TextArea` constraint constants (e.g. `TextArea#EMAILADDR`)
+    public EditField(String text, String hint, int columns, int constraint) {
+        this(text);
+        setHint(hint);
+        setColumns(columns);
+        setConstraint(constraint);
+    }
+
+    /// Creates an empty multi-line field with the given visible row and column counts (the `TextArea`
+    /// equivalent). Using this constructor sets the field to multi-line mode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: the number of visible rows used to compute the preferred height
+    ///
+    /// - `columns`: the number of visible columns
+    public EditField(int rows, int columns) {
+        this("");
+        setSingleLineTextArea(false);
+        setRows(rows);
+        setColumns(columns);
+    }
+
+    /// Creates a multi-line field with the given text, visible row and column counts (the `TextArea`
+    /// equivalent). Using this constructor sets the field to multi-line mode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the initial text
+    ///
+    /// - `rows`: the number of visible rows
+    ///
+    /// - `columns`: the number of visible columns
+    public EditField(String text, int rows, int columns) {
+        this(text);
+        setSingleLineTextArea(false);
+        setRows(rows);
+        setColumns(columns);
+    }
+
+    /// Creates a multi-line field with the given text, visible row and column counts and constraint
+    /// (the `TextArea` equivalent). Using this constructor sets the field to multi-line mode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the initial text
+    ///
+    /// - `rows`: the number of visible rows
+    ///
+    /// - `columns`: the number of visible columns
+    ///
+    /// - `constraint`: one of the `TextArea` constraint constants
+    public EditField(String text, int rows, int columns, int constraint) {
+        this(text);
+        setSingleLineTextArea(false);
+        setRows(rows);
+        setColumns(columns);
         setConstraint(constraint);
     }
 
