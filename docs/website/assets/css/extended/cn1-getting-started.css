@@ -179,7 +179,7 @@
   letter-spacing: -0.035em;
 }
 
-.cn1-gs-step__body > p:not(.cn1-eyebrow, .cn1-gs-step__expected) {
+.cn1-gs-step__body > p:not(.cn1-eyebrow) {
   margin: 18px 0 22px;
   color: var(--cn1-muted);
   font-size: 15px;
@@ -198,10 +198,12 @@
 .cn1-gs-step__media img {
   display: block;
   width: 100%;
-  max-height: 330px;
-  object-fit: cover;
-  object-position: top;
+  height: auto;
   border-radius: 8px;
+}
+
+#agent .cn1-gs-step__body .cn1-action-row {
+  margin-top: 32px;
 }
 
 .cn1-gs-target {
@@ -339,20 +341,6 @@
   color: #8bb2ff;
   font: 700 11px var(--cn1-font);
   cursor: pointer;
-}
-
-.cn1-gs-step__expected {
-  margin: 20px 0 0;
-  padding: 16px 18px;
-  border-left: 3px solid var(--cn1-success);
-  background: var(--cn1-surface-soft);
-  color: var(--cn1-muted);
-  font-size: 12px;
-  line-height: 1.65;
-}
-
-.cn1-gs-step__expected strong {
-  color: var(--cn1-text);
 }
 
 .cn1-gs-link-grid {

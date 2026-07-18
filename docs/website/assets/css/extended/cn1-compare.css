@@ -64,6 +64,14 @@
   border-collapse: collapse;
 }
 
+.cn1-compare-table-wrap tr > :nth-child(2) {
+  background: color-mix(in srgb, var(--cn1-accent-soft) 54%, var(--cn1-surface));
+}
+
+.cn1-compare-table-wrap thead tr > :nth-child(2) {
+  color: var(--cn1-accent);
+}
+
 .cn1-compare-table-wrap th,
 .cn1-compare-table-wrap td {
   padding: 18px;
@@ -96,7 +104,7 @@
 
 .cn1-compare-choices {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   padding-top: 16px;
   padding-bottom: 96px;
@@ -111,8 +119,16 @@
 }
 
 .cn1-compare-choice--cn1 {
+  grid-column: 1 / -1;
+  min-height: 0;
   border-color: var(--cn1-accent);
   background: var(--cn1-accent-soft);
+}
+
+.cn1-compare-choice--cn1 ul {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px 28px;
+  margin-top: 38px;
 }
 
 .cn1-compare-choice h2 {
@@ -236,6 +252,10 @@
 @media (max-width: 900px) {
   .cn1-compare-choices,
   .cn1-compare-detail__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cn1-compare-choice--cn1 ul {
     grid-template-columns: 1fr;
   }
 

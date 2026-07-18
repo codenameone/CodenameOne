@@ -88,7 +88,7 @@ weight = 23
 [[menu.main]]
 parent = "docs"
 name = "API Reference"
-url = "/api/"
+url = "/javadoc/"
 weight = 24
 
 [[menu.main]]

@@ -1,0 +1,54 @@
+{{- define "main" -}}
+<article class="cn1-support-page">
+  <header class="cn1-support-hero">
+    {{ partial "breadcrumbs.html" . }}
+    <p class="cn1-eyebrow">Community support</p>
+    <h1>Ask where Codename One developers are listening.</h1>
+    <p>Start with GitHub Discussions for Codename One questions. Reddit works well for broader conversation, while Stack Overflow remains useful for focused programming questions that have a reproducible answer.</p>
+  </header>
+
+  <section class="cn1-support-channels" aria-label="Community support channels">
+    <article class="cn1-support-channel cn1-support-channel--primary">
+      <p class="cn1-eyebrow">Recommended</p>
+      <h2>GitHub Discussions</h2>
+      <p>Use Discussions for framework questions, troubleshooting, API design, feature ideas, and conversations that may need follow-up from maintainers.</p>
+      {{ partial "cn1-cta.html" (dict "label" "Open GitHub Discussions" "href" "https://github.com/codenameone/CodenameOne/discussions" "external" true "event" "support-github-discussions") }}
+    </article>
+    <article class="cn1-support-channel">
+      <p class="cn1-eyebrow">Community conversation</p>
+      <h2>Reddit</h2>
+      <p>Use <code>r/cn1</code> for open-ended discussion, project experiences, architecture questions, and topics that do not fit a narrowly scoped Q&amp;A format.</p>
+      {{ partial "cn1-cta.html" (dict "label" "Visit r/cn1" "href" "https://www.reddit.com/r/cn1/" "variant" "secondary" "external" true "event" "support-reddit") }}
+    </article>
+    <article class="cn1-support-channel">
+      <p class="cn1-eyebrow">Focused Q&amp;A</p>
+      <h2>Stack Overflow</h2>
+      <p>Use the <code>codenameone</code> tag for a specific programming problem with code, an error, and a clear expected result. Search existing answers before posting.</p>
+      {{ partial "cn1-cta.html" (dict "label" "Browse Stack Overflow" "href" "https://stackoverflow.com/questions/tagged/codenameone" "variant" "secondary" "external" true "event" "support-stack-overflow") }}
+    </article>
+  </section>
+
+  <section class="cn1-support-chat">
+    <div>
+      <p class="cn1-eyebrow">Support on this website</p>
+      <h2>Leave a message in chat.</h2>
+      <p>The chat bubble in the lower-right corner is a support channel. Send the question with the relevant error, target platform, Codename One version, and a small reproducer when possible. Replies are asynchronous, so you can close the page after leaving the message.</p>
+    </div>
+    <div class="cn1-support-chat__consent">
+      <h3>If you previously declined chat cookies</h3>
+      <p>Select <strong>Enable website chat</strong> below. You can also use <strong>Enable chat</strong> in the footer. <strong>Manage chat consent</strong> reopens the consent panel if you want to change the choice later.</p>
+      <a class="cn1-action cn1-action--primary" href="#" data-cn1-enable-chat data-cn1-conversion="support-enable-chat"><span>Enable website chat</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+    </div>
+  </section>
+
+  <section class="cn1-support-report">
+    <div><p class="cn1-eyebrow">Make the question answerable</p><h2>Attach the evidence another developer needs.</h2></div>
+    <ul>
+      <li>Codename One and JDK versions</li>
+      <li>Target platform and device or simulator</li>
+      <li>Complete error and relevant build log</li>
+      <li>Small reproducer or public repository</li>
+    </ul>
+  </section>
+</article>
+{{- end -}}

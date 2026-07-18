@@ -44,7 +44,7 @@
         {{ partial "cn1-cta.html" (dict "label" "Open Initializr" "href" "/initializr/" "variant" "secondary" "event" "getting-started-step-1") }}
       </div>
       <figure class="cn1-gs-step__media">
-        <img src="/proof/initializr-current.png" alt="The current Codename One Initializr with Java 17 selected" loading="lazy" width="1180" height="900">
+        <img src="/proof/initializr-current.png" alt="The current Codename One Initializr with Java 17 selected" loading="eager" width="1180" height="900">
       </figure>
     </section>
 
@@ -54,11 +54,10 @@
         <p class="cn1-eyebrow">Verify locally</p>
         <h2>Run the project in the simulator.</h2>
         <p>Open the generated project root and let the IDE import its Maven modules. Select the <strong>Run in Simulator</strong> target, then press Run. Initializr supplies that target for IntelliJ IDEA, NetBeans, Eclipse, and VS Code.</p>
-        <p class="cn1-gs-step__expected"><strong>Expected result:</strong> the application opens in the Codename One simulator. You can switch device skins and inspect the component tree without submitting a cloud build.</p>
       </div>
       <figure class="cn1-gs-step__media">
         <figcaption class="cn1-gs-target"><span aria-hidden="true">▶</span><strong>Run in Simulator</strong><small>Generated IDE target</small></figcaption>
-        <img src="/blog/liquid-glass-material-3-modern-native-themes/showcase-ios.png" alt="Current iOS Modern theme running in Codename One" loading="lazy" width="820" height="373">
+        <img src="/blog/liquid-glass-material-3-modern-native-themes/showcase-ios.png" alt="Current iOS Modern theme running in Codename One" loading="eager" width="820" height="373">
       </figure>
     </section>
 
@@ -69,7 +68,6 @@
         <h2>Give Codex or Claude the project context.</h2>
         <p>Java 17 projects include the Codename One authoring skill in the downloaded project. Open the project in Codex or Claude Code so the agent can use the framework-specific build, UI, testing, and screenshot instructions instead of guessing.</p>
         <p>Run the simulator, open its <strong>MCP</strong> menu, and choose <strong>Install in MCP Hosts</strong>. The built-in server lets supported hosts inspect the semantic UI tree, enter text, activate components, and call application tools.</p>
-        <p class="cn1-gs-step__expected"><strong>Current scope:</strong> MCP control works with the simulator and JavaSE-hosted desktop tools. Packaged native and mobile apps do not yet include the launcher and transport.</p>
         <div class="cn1-action-row">
           {{ partial "cn1-cta.html" (dict "label" "Read the MCP guide" "href" "/blog/codename-one-mcp-server/" "variant" "secondary") }}
         </div>
@@ -93,12 +91,11 @@
       <div class="cn1-gs-step__body">
         <p class="cn1-eyebrow">Reach a device</p>
         <h2>Submit a native build.</h2>
-        <p>Sign in to your Codename One account, then select <strong>Build Android</strong> or <strong>Build iOS</strong> from the generated IDE targets. Android builds can start immediately. iOS device builds also need Apple signing assets; the certificate wizard guides that setup.</p>
+        <p>Sign in to your Codename One account, then select <strong>Build Android</strong> or <strong>Build iOS</strong> from the generated IDE targets. Android builds can start immediately. iOS device builds also need Apple signing assets; the certificate wizard guides that setup. The cloud path runs the native toolchain and returns the device binary without requiring a Mac.</p>
         <div class="cn1-gs-link-grid">
           <a href="/signing/"><strong>Configure signing</strong><span>Apple certificates and Android keystores</span></a>
           <a href="https://cloud.codenameone.com/console/index.html" data-cn1-conversion="getting-started-dashboard"><strong>Open the build dashboard</strong><span>Watch the build and download the result</span></a>
         </div>
-        <p class="cn1-gs-step__expected"><strong>No Mac required for the cloud path.</strong> The build server runs the native toolchain and returns the device binary.</p>
       </div>
       <aside class="cn1-gs-build-targets" aria-label="Generated native build targets">
         <p>Generated IDE targets</p>
