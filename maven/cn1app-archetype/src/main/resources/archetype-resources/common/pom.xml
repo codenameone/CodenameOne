@@ -19,6 +19,18 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Flutter support: uncomment this dependency and create
+             src/main/flutter to drop Flutter/Dart widget files into this
+             app. They compile to plain Codename One UI at build time via
+             the transcode-flutter goal (no Dart SDK required; JDK 17+). -->
+        <!--
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-flutter-runtime</artifactId>
+            <version>${cn1.version}</version>
+        </dependency>
+        -->
+
         <!--
           Test-scope deps needed if you add JUnit 5 tests under
           src/test/java that drive the simulator via
@@ -373,6 +385,16 @@
                         <phase>generate-sources</phase>
                         <goals>
                             <goal>transcode-svg</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <!-- Transpiles src/main/flutter/**.dart into Java
+                             running on the Codename One Flutter runtime.
+                             Silent no-op when the directory is absent. -->
+                        <id>transcode-flutter</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>transcode-flutter</goal>
                         </goals>
                     </execution>
                     <execution>

@@ -1,0 +1,176 @@
+package com.codename1.dart.transpiler.codegen;
+
+import com.codename1.dart.transpiler.ast.Ast;
+import com.codename1.dart.transpiler.ast.Ast.*;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * Conservative capture analysis for one method body: a local must be boxed
+ * into a Ref holder when it is referenced inside a closure AND assigned
+ * anywhere in the method (Java lambdas require effectively-final captures).
+ *
+ * <p>Conservative means: a name declared inside the closure itself that is
+ * also assigned gets boxed too — semantically correct, marginally less
+ * pretty output.</p>
+ */
+final class CaptureScan {
+
+    private final Set<String> assigned = new HashSet<String>();
+    private final Set<String> referencedInLambda = new HashSet<String>();
+    private int lambdaDepth;
+
+    private CaptureScan() {
+    }
+
+    static Set<String> boxedLocals(Block body) {
+        CaptureScan scan = new CaptureScan();
+        if (body != null) {
+            scan.walkBlock(body);
+        }
+        Set<String> boxed = new HashSet<String>(scan.assigned);
+        boxed.retainAll(scan.referencedInLambda);
+        return boxed;
+    }
+
+    static Set<String> boxedLocals(Expr exprBody) {
+        CaptureScan scan = new CaptureScan();
+        if (exprBody != null) {
+            scan.walkExpr(exprBody);
+        }
+        Set<String> boxed = new HashSet<String>(scan.assigned);
+        boxed.retainAll(scan.referencedInLambda);
+        return boxed;
+    }
+
+    private void walkBlock(Block b) {
+        for (Stmt s : b.statements) {
+            walkStmt(s);
+        }
+    }
+
+    private void walkStmt(Stmt s) {
+        if (s == null) {
+            return;
+        }
+        if (s instanceof Block) {
+            walkBlock((Block) s);
+        } else if (s instanceof ExprStmt) {
+            walkExpr(((ExprStmt) s).expr);
+        } else if (s instanceof VarDeclStmt) {
+            VarDeclStmt v = (VarDeclStmt) s;
+            if (v.initializer != null) {
+                walkExpr(v.initializer);
+            }
+        } else if (s instanceof IfStmt) {
+            IfStmt i = (IfStmt) s;
+            walkExpr(i.condition);
+            walkStmt(i.thenStmt);
+            walkStmt(i.elseStmt);
+        } else if (s instanceof WhileStmt) {
+            walkExpr(((WhileStmt) s).condition);
+            walkStmt(((WhileStmt) s).body);
+        } else if (s instanceof ForStmt) {
+            ForStmt f = (ForStmt) s;
+            walkStmt(f.init);
+            walkExpr(f.condition);
+            for (Expr e : f.updates) {
+                walkExpr(e);
+            }
+            walkStmt(f.body);
+        } else if (s instanceof ForInStmt) {
+            ForInStmt f = (ForInStmt) s;
+            walkExpr(f.iterable);
+            walkStmt(f.body);
+        } else if (s instanceof ReturnStmt) {
+            walkExpr(((ReturnStmt) s).value);
+        }
+    }
+
+    private void walkExprs(List<Expr> list) {
+        for (Expr e : list) {
+            walkExpr(e);
+        }
+    }
+
+    private void walkExpr(Expr e) {
+        if (e == null) {
+            return;
+        }
+        if (e instanceof Ident) {
+            if (lambdaDepth > 0) {
+                referencedInLambda.add(((Ident) e).name);
+            }
+        } else if (e instanceof Assign) {
+            Assign a = (Assign) e;
+            if (a.lhs instanceof Ident) {
+                assigned.add(((Ident) a.lhs).name);
+            }
+            walkExpr(a.lhs);
+            walkExpr(a.rhs);
+        } else if (e instanceof IncDec) {
+            IncDec i = (IncDec) e;
+            if (i.operand instanceof Ident) {
+                assigned.add(((Ident) i.operand).name);
+            }
+            walkExpr(i.operand);
+        } else if (e instanceof Lambda) {
+            Lambda l = (Lambda) e;
+            lambdaDepth++;
+            if (l.body != null) {
+                walkBlock(l.body);
+            }
+            walkExpr(l.exprBody);
+            lambdaDepth--;
+        } else if (e instanceof Binary) {
+            walkExpr(((Binary) e).left);
+            walkExpr(((Binary) e).right);
+        } else if (e instanceof Unary) {
+            walkExpr(((Unary) e).operand);
+        } else if (e instanceof Conditional) {
+            Conditional c = (Conditional) e;
+            walkExpr(c.condition);
+            walkExpr(c.thenExpr);
+            walkExpr(c.elseExpr);
+        } else if (e instanceof PropertyGet) {
+            walkExpr(((PropertyGet) e).target);
+        } else if (e instanceof Call) {
+            Call c = (Call) e;
+            walkExpr(c.target);
+            walkExprs(c.args.positional);
+            for (NamedArg na : c.args.named) {
+                walkExpr(na.value);
+            }
+        } else if (e instanceof CtorCall) {
+            CtorCall c = (CtorCall) e;
+            walkExprs(c.args.positional);
+            for (NamedArg na : c.args.named) {
+                walkExpr(na.value);
+            }
+        } else if (e instanceof IndexGet) {
+            walkExpr(((IndexGet) e).target);
+            walkExpr(((IndexGet) e).index);
+        } else if (e instanceof ListLit) {
+            walkExprs(((ListLit) e).elements);
+        } else if (e instanceof MapLit) {
+            walkExprs(((MapLit) e).keys);
+            walkExprs(((MapLit) e).values);
+        } else if (e instanceof StringLit) {
+            for (Object part : ((StringLit) e).parts) {
+                if (part instanceof Expr) {
+                    walkExpr((Expr) part);
+                }
+            }
+        } else if (e instanceof NotNullAssert) {
+            walkExpr(((NotNullAssert) e).operand);
+        } else if (e instanceof IsTest) {
+            walkExpr(((IsTest) e).operand);
+        } else if (e instanceof AsCast) {
+            walkExpr(((AsCast) e).operand);
+        } else if (e instanceof ParenExpr) {
+            walkExpr(((ParenExpr) e).inner);
+        }
+    }
+}

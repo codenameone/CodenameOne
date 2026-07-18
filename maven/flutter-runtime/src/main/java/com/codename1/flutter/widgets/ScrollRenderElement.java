@@ -1,0 +1,140 @@
+package com.codename1.flutter.widgets;
+
+import com.codename1.flutter.Element;
+import com.codename1.flutter.RenderElement;
+import com.codename1.flutter.Widget;
+import com.codename1.flutter.rendering.BoxConstraints;
+import com.codename1.flutter.rendering.RenderHost;
+import com.codename1.flutter.rendering.ScrollRootLayout;
+import com.codename1.flutter.rendering.Size;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+
+import dart.runtime.Funcs;
+
+/**
+ * Base render element for the vertical scrollables
+ * (SingleChildScrollView/ListView/GridView). The content subtree becomes a
+ * REAL CN1 scroll boundary: this element owns a nested scrollable-Y
+ * {@link Container} with its own {@link RenderHost} and
+ * {@link ScrollRootLayout} scope, so the content's leaf components are flat
+ * children of the pane (not of the outer host container) and CN1's native
+ * tensile scrolling drives the scroll. Inside the pane the content is laid
+ * out with a tight viewport width and an unbounded main axis.
+ *
+ * <p>Headless (no Display) there is no pane; layout runs the same
+ * content-constraint math directly so scroll layout is unit-testable.</p>
+ */
+public abstract class ScrollRenderElement extends RenderElement {
+
+    private Element content;
+    private RenderHost innerHost;
+
+    protected ScrollRenderElement(Widget widget) {
+        super(widget);
+    }
+
+    /**
+     * The widget describing the scrolled content (rebuilt on every sync from
+     * the current configuration), or null for an empty scrollable.
+     */
+    protected abstract Widget buildContent();
+
+    /**
+     * When true the scrollable sizes its main axis to the content instead of
+     * filling the incoming constraints.
+     */
+    protected boolean shrinkWrap() {
+        return false;
+    }
+
+    private RenderHost innerHost() {
+        if (innerHost == null) {
+            innerHost = new RenderHost();
+            innerHost.rootSupplier(new Funcs.Func0<Element>() {
+                @Override
+                public Element call() {
+                    return content;
+                }
+            });
+        }
+        return innerHost;
+    }
+
+    @Override
+    protected RenderHost hostForChild(int slot) {
+        return innerHost();
+    }
+
+    @Override
+    protected Component createComponent() {
+        if (!Display.isInitialized()) {
+            // headless unit tests: no CN1 components can exist
+            return null;
+        }
+        Container pane = new Container(new ScrollRootLayout(innerHost()));
+        pane.setUIID("FlutterScroll");
+        pane.getAllStyles().setPadding(0, 0, 0, 0);
+        pane.getAllStyles().setMargin(0, 0, 0, 0);
+        pane.getAllStyles().setBgTransparency(0);
+        pane.setScrollableY(true);
+        innerHost().container(pane);
+        return pane;
+    }
+
+    @Override
+    protected void syncChildren() {
+        content = updateChild(content, buildContent(), 0);
+    }
+
+    @Override
+    public void visitChildren(Funcs.VoidFunc1<Element> visitor) {
+        if (content != null) {
+            visitor.call(content);
+        }
+    }
+
+    public Element contentElement() {
+        return content;
+    }
+
+    protected RenderElement contentRender() {
+        return findRenderElement(content);
+    }
+
+    @Override
+    protected Size performLayout(BoxConstraints constraints) {
+        RenderElement c = contentRender();
+        double width = constraints.hasBoundedWidth() ? constraints.maxWidth() : 0;
+        Size cs = Size.ZERO;
+        if (c != null) {
+            cs = c.layout(constraints.hasBoundedWidth()
+                    ? ScrollRootLayout.contentConstraints(width)
+                    : BoxConstraints.loose(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY));
+            if (!constraints.hasBoundedWidth()) {
+                width = cs.width();
+            }
+        }
+        double height;
+        if (shrinkWrap() || !constraints.hasBoundedHeight()) {
+            height = cs.height();
+        } else {
+            height = constraints.maxHeight();
+        }
+        return constraints.constrain(new Size(width, height));
+    }
+
+    @Override
+    protected void positionChildren(int x, int y) {
+        // With a real pane the content lives in the inner host and the pane's
+        // ScrollRootLayout positions it in pane coordinates. Headless we
+        // position the content directly so tests observe absolute positions.
+        if (component() == null) {
+            RenderElement c = contentRender();
+            if (c != null) {
+                c.position(x, y);
+            }
+        }
+    }
+}

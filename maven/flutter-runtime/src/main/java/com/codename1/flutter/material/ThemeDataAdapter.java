@@ -1,0 +1,161 @@
+package com.codename1.flutter.material;
+
+import com.codename1.flutter.Color;
+import com.codename1.ui.Form;
+import com.codename1.ui.plaf.Style;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Converts the ACTIVE {@link ThemeData} into a CN1 UIManager theme overlay
+ * for the Flutter* UIID namespace ({@code UIManager.addThemeProps}), plus
+ * direct styling of the Flutter-owned Form.
+ *
+ * <p><b>Theme isolation:</b> the overlay only ever writes keys in the
+ * {@code Flutter*} UIID namespace — non-Flutter UIIDs (Label, Button, Form,
+ * Toolbar, ...) are never touched globally, so a Flutter subtree embedded in
+ * a regular CN1 app can't restyle the host. The Form and Toolbar backgrounds
+ * that Flutter DOES own (the runApp Form, the root Scaffold's Toolbar) are
+ * styled per-instance ({@link #applyToForm}, AppBarRenderElement) rather
+ * than through global theme constants.</p>
+ *
+ * <p>Prop table (colors are CN1 theme hex strings):</p>
+ * <ul>
+ *   <li>colorScheme.surface — FlutterScaffold (the root canvas) bgColor, and
+ *       Drawer/BottomNavigationBar backgrounds</li>
+ *   <li>colorScheme.onSurface — FlutterText/FlutterRichText/FlutterIcon
+ *       fgColor, FlutterIconButton fgColor</li>
+ *   <li>colorScheme.primary/onPrimary — FlutterElevatedButton bg/fg;
+ *       primary — FlutterTextButton/FlutterOutlinedButton fg</li>
+ *   <li>colorScheme.inversePrimary — FlutterAppBar bgColor (the strip-mode
+ *       app bar; toolbar mode is styled per-instance by
+ *       AppBarRenderElement)</li>
+ * </ul>
+ *
+ * <p>State-metric invariance (see RenderElement.unifyStateMetrics): the
+ * overlay also writes the {@code sel#}/{@code press#}/{@code dis#} variants
+ * of every color so a focus/press state change never swaps in a stale
+ * base-theme color.</p>
+ */
+public final class ThemeDataAdapter {
+
+    private ThemeDataAdapter() {
+    }
+
+    /**
+     * The pure prop table for a theme (headless-testable). Every key is in
+     * the Flutter* UIID namespace.
+     */
+    public static Map<String, Object> themeProps(ThemeData t) {
+        ColorScheme cs = t.colorScheme();
+        String surface = hex(cs.surface());
+        String onSurface = hex(cs.onSurface());
+        String primary = hex(cs.primary());
+        String onPrimary = hex(cs.onPrimary());
+        String inversePrimary = hex(cs.inversePrimary());
+
+        Map<String, Object> p = new HashMap<String, Object>();
+
+        // The Flutter canvas (root host container) and full-bleed surfaces.
+        bg(p, "FlutterScaffold", surface);
+        bg(p, "FlutterDrawer", surface);
+        bg(p, "FlutterBottomNavigationBar", surface);
+
+        // Content foregrounds.
+        fg(p, "FlutterText", onSurface);
+        fg(p, "FlutterRichText", onSurface);
+        fg(p, "FlutterIcon", onSurface);
+        fg(p, "FlutterListTile", onSurface);
+
+        // Buttons (ButtonRenderElement also styles programmatically from
+        // Theme.of; these keep the UIID defaults consistent).
+        bg(p, "FlutterElevatedButton", primary);
+        fg(p, "FlutterElevatedButton", onPrimary);
+        fg(p, "FlutterTextButton", primary);
+        fg(p, "FlutterOutlinedButton", primary);
+        fg(p, "FlutterIconButton", onSurface);
+
+        // Strip-mode app bar; the ThemeData default is inversePrimary.
+        bg(p, "FlutterAppBar", inversePrimary);
+        fg(p, "FlutterAppBar", onSurface);
+
+        return p;
+    }
+
+    /**
+     * Installs the theme's prop table as a UIManager overlay. Safe headless
+     * (logs and returns).
+     */
+    public static void install(ThemeData t) {
+        try {
+            java.util.Hashtable<String, Object> h =
+                    new java.util.Hashtable<String, Object>(themeProps(t));
+            com.codename1.ui.plaf.UIManager.getInstance().addThemeProps(h);
+        } catch (Throwable err) {
+            log("could not install ThemeData overlay: " + err);
+        }
+    }
+
+    /**
+     * Styles the Flutter-owned Form per-instance: the form and content pane
+     * backgrounds become colorScheme.surface. Instance styling (not theme
+     * constants) keeps non-Flutter UIIDs untouched globally.
+     */
+    public static void applyToForm(Form f, ThemeData t) {
+        if (f == null) {
+            return;
+        }
+        try {
+            int surface = t.colorScheme().surface().rgb();
+            paintSolid(f.getAllStyles(), surface);
+            paintSolid(f.getContentPane().getAllStyles(), surface);
+        } catch (Throwable err) {
+            log("could not style the Form from ThemeData: " + err);
+        }
+    }
+
+    /**
+     * Solid-color background: BACKGROUND_NONE drops any theme background
+     * image/gradient that would otherwise paint OVER the bgColor.
+     */
+    public static void paintSolid(Style s, int rgb) {
+        s.setBackgroundType(Style.BACKGROUND_NONE);
+        s.setBgColor(rgb);
+        s.setBgTransparency(255);
+    }
+
+    /**
+     * CN1 theme hex string for a color's 24-bit RGB portion.
+     */
+    public static String hex(Color c) {
+        String s = Integer.toHexString(c.rgb());
+        while (s.length() < 6) {
+            s = "0" + s;
+        }
+        return s;
+    }
+
+    private static void bg(Map<String, Object> p, String uiid, String color) {
+        for (String state : STATES) {
+            p.put(uiid + "." + state + "bgColor", color);
+            p.put(uiid + "." + state + "transparency", "255");
+        }
+    }
+
+    private static void fg(Map<String, Object> p, String uiid, String color) {
+        for (String state : STATES) {
+            p.put(uiid + "." + state + "fgColor", color);
+        }
+    }
+
+    private static final String[] STATES = {"", "sel#", "press#", "dis#"};
+
+    private static void log(String msg) {
+        try {
+            com.codename1.io.Log.p("Flutter runtime: " + msg);
+        } catch (Throwable t) {
+            // headless: Log has no storage backend
+        }
+    }
+}

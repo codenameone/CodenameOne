@@ -1,0 +1,412 @@
+package com.codename1.flutter;
+
+import com.codename1.flutter.rendering.RenderHost;
+
+import dart.runtime.Funcs;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * An instantiation of a {@link Widget} at a particular location in the tree.
+ * Elements are the retained structure: they survive across rebuilds when the
+ * incoming widget {@link Widget#canUpdate(Widget, Widget) can update} the one
+ * they currently hold. This class implements Flutter's reconciliation
+ * decision table ({@link #updateChild}) and the keyed linear multi-child
+ * reconciler ({@link #updateChildren}).
+ */
+public abstract class Element implements BuildContext {
+
+    Widget widget;
+    Element parent;
+    int slot;
+    int depth;
+    boolean dirty;
+    boolean mounted;
+    BuildOwner owner;
+    RenderHost host;
+
+    protected Element(Widget widget) {
+        this.widget = widget;
+    }
+
+    // ------------------------------------------------------------------
+    // Accessors
+    // ------------------------------------------------------------------
+
+    public Widget widget() {
+        return widget;
+    }
+
+    public Element parent() {
+        return parent;
+    }
+
+    public boolean isMounted() {
+        return mounted;
+    }
+
+    public boolean isDirty() {
+        return dirty;
+    }
+
+    public int depth() {
+        return depth;
+    }
+
+    public BuildOwner owner() {
+        return owner;
+    }
+
+    public RenderHost host() {
+        return host;
+    }
+
+    // ------------------------------------------------------------------
+    // BuildContext
+    // ------------------------------------------------------------------
+
+    @Override
+    public <W extends Widget> W findAncestorWidgetOfExactType(Class<W> widgetType) {
+        Element a = parent;
+        while (a != null) {
+            if (a.widget != null && a.widget.getClass() == widgetType) {
+                return widgetType.cast(a.widget);
+            }
+            a = a.parent;
+        }
+        return null;
+    }
+
+    // ------------------------------------------------------------------
+    // Lifecycle
+    // ------------------------------------------------------------------
+
+    /**
+     * Assigns the owner and render host of a root element before mounting.
+     * Non-root elements inherit both from their parent during {@link #mount}.
+     */
+    public void bootstrap(BuildOwner owner, RenderHost host) {
+        this.owner = owner;
+        this.host = host;
+    }
+
+    /**
+     * Adds this element to the tree. Subclasses extend this to create their
+     * retained objects (State, CN1 components) and inflate their children.
+     */
+    public void mount(Element parent, int slot) {
+        this.parent = parent;
+        this.slot = slot;
+        if (parent != null) {
+            this.owner = parent.owner;
+            this.host = parent.hostForChild(slot);
+            this.depth = parent.depth + 1;
+        }
+        this.mounted = true;
+    }
+
+    /**
+     * The render host a child mounted in {@code slot} should attach its CN1
+     * components to. Overridden by elements that route a child subtree into a
+     * different CN1 container (e.g. a root Scaffold's appBar into the
+     * Toolbar's title area).
+     */
+    protected RenderHost hostForChild(int slot) {
+        return host;
+    }
+
+    /**
+     * Absorbs a new widget configuration. Callers guarantee
+     * {@code Widget.canUpdate(this.widget, newWidget)}.
+     */
+    public void update(Widget newWidget) {
+        this.widget = newWidget;
+    }
+
+    /**
+     * Removes this element (only) from the tree. Subclasses release their
+     * retained resources here. Use {@link #deactivateChild} to remove a whole
+     * subtree.
+     */
+    public void unmount() {
+        this.mounted = false;
+        this.dirty = false;
+    }
+
+    /**
+     * Visits the direct children of this element in tree order.
+     */
+    public void visitChildren(Funcs.VoidFunc1<Element> visitor) {
+    }
+
+    /**
+     * Notifies this subtree that the effective theme changed (M4): render
+     * elements re-apply their programmatic, theme-derived styling. Called by
+     * MaterialAppElement after re-installing the UIManager overlay — a plain
+     * rebuild would miss subtrees whose widget INSTANCES were reused
+     * (Element.updateChild's identity shortcut skips their update()).
+     */
+    public void themeChanged() {
+        visitChildren(new Funcs.VoidFunc1<Element>() {
+            @Override
+            public void call(Element c) {
+                c.themeChanged();
+            }
+        });
+    }
+
+    // ------------------------------------------------------------------
+    // Building
+    // ------------------------------------------------------------------
+
+    /**
+     * Marks this element dirty and schedules it with the build owner.
+     */
+    public void markNeedsBuild() {
+        FlutterUI.assertEdt();
+        if (!mounted || dirty) {
+            return;
+        }
+        dirty = true;
+        if (owner != null) {
+            owner.scheduleBuildFor(this);
+        }
+    }
+
+    /**
+     * Rebuilds this element if it is dirty.
+     */
+    public void rebuild() {
+        if (!mounted || !dirty) {
+            return;
+        }
+        performRebuild();
+    }
+
+    /**
+     * Actually rebuilds: composition elements call build() and reconcile the
+     * result, render elements re-sync their configuration and children.
+     * Implementations must clear the dirty flag.
+     */
+    protected abstract void performRebuild();
+
+    // ------------------------------------------------------------------
+    // Reconciliation
+    // ------------------------------------------------------------------
+
+    /**
+     * Flutter's updateChild decision table:
+     * <pre>
+     *                     newWidget == null      newWidget != null
+     * child == null       returns null           returns new Element
+     * child != null       old child removed      old child updated in place
+     *                                            when canUpdate, else removed
+     *                                            and a new Element inflated
+     * </pre>
+     */
+    protected Element updateChild(Element child, Widget newWidget, int newSlot) {
+        if (newWidget == null) {
+            if (child != null) {
+                deactivateChild(child);
+            }
+            return null;
+        }
+        if (child != null) {
+            if (child.widget == newWidget) {
+                child.slot = newSlot;
+                return child;
+            }
+            if (Widget.canUpdate(child.widget, newWidget)) {
+                child.slot = newSlot;
+                child.update(newWidget);
+                return child;
+            }
+            // Mid-life replacement: anchor the host's attach cursor at the
+            // flat-container index the replaced subtree's components occupy,
+            // so the replacement's components land there (element-tree order)
+            // instead of at the end of the container (z-order drift).
+            RenderHost childHost = child.host;
+            int anchor = childHost == null ? -1 : childHost.firstAttachIndex(child);
+            deactivateChild(child);
+            if (anchor >= 0) {
+                int prev = childHost.beginInsertion(anchor);
+                try {
+                    return inflateWidget(newWidget, newSlot);
+                } finally {
+                    childHost.endInsertion(prev);
+                }
+            }
+        }
+        return inflateWidget(newWidget, newSlot);
+    }
+
+    protected Element inflateWidget(Widget newWidget, int newSlot) {
+        Element child = newWidget.createElement();
+        child.mount(this, newSlot);
+        return child;
+    }
+
+    /**
+     * Removes a child subtree from the tree. M1 has no GlobalKey
+     * reactivation, so deactivation unmounts immediately and recursively.
+     */
+    protected void deactivateChild(Element child) {
+        child.unmountRecursively();
+        child.parent = null;
+    }
+
+    final void unmountRecursively() {
+        visitChildren(new Funcs.VoidFunc1<Element>() {
+            @Override
+            public void call(Element c) {
+                c.unmountRecursively();
+            }
+        });
+        unmount();
+    }
+
+    /**
+     * Flutter's keyed linear multi-child reconciler
+     * (RenderObjectElement.updateChildren): sync a leading run and a trailing
+     * run by canUpdate, match the middle by key, inflate everything else,
+     * deactivate leftovers.
+     */
+    protected List<Element> updateChildren(List<Element> oldChildren, List<Widget> newWidgets) {
+        int newChildrenTop = 0;
+        int oldChildrenTop = 0;
+        int newChildrenBottom = newWidgets.size() - 1;
+        int oldChildrenBottom = oldChildren.size() - 1;
+
+        Element[] newChildren = new Element[newWidgets.size()];
+
+        // Update the top of the list.
+        while ((oldChildrenTop <= oldChildrenBottom) && (newChildrenTop <= newChildrenBottom)) {
+            Element oldChild = oldChildren.get(oldChildrenTop);
+            Widget newWidget = newWidgets.get(newChildrenTop);
+            if (oldChild == null || !Widget.canUpdate(oldChild.widget, newWidget)) {
+                break;
+            }
+            newChildren[newChildrenTop] = updateChild(oldChild, newWidget, newChildrenTop);
+            newChildrenTop++;
+            oldChildrenTop++;
+        }
+
+        // Scan the bottom of the list (matched pairs are synced later so
+        // middle inserts/removes keep correct slots).
+        while ((oldChildrenTop <= oldChildrenBottom) && (newChildrenTop <= newChildrenBottom)) {
+            Element oldChild = oldChildren.get(oldChildrenBottom);
+            Widget newWidget = newWidgets.get(newChildrenBottom);
+            if (oldChild == null || !Widget.canUpdate(oldChild.widget, newWidget)) {
+                break;
+            }
+            oldChildrenBottom--;
+            newChildrenBottom--;
+        }
+
+        // Scan the old middle: collect keyed children, drop the rest.
+        Map<Key, Element> oldKeyedChildren = null;
+        boolean haveOldChildren = oldChildrenTop <= oldChildrenBottom;
+        if (haveOldChildren) {
+            oldKeyedChildren = new HashMap<Key, Element>();
+            while (oldChildrenTop <= oldChildrenBottom) {
+                Element oldChild = oldChildren.get(oldChildrenTop);
+                if (oldChild != null) {
+                    Key k = oldChild.widget == null ? null : oldChild.widget.getKey();
+                    if (k != null) {
+                        oldKeyedChildren.put(k, oldChild);
+                    } else {
+                        deactivateChild(oldChild);
+                    }
+                }
+                oldChildrenTop++;
+            }
+        }
+
+        // Update the new middle, reusing keyed matches.
+        while (newChildrenTop <= newChildrenBottom) {
+            Element oldChild = null;
+            Widget newWidget = newWidgets.get(newChildrenTop);
+            if (haveOldChildren) {
+                Key key = newWidget.getKey();
+                if (key != null) {
+                    oldChild = oldKeyedChildren.get(key);
+                    if (oldChild != null) {
+                        if (Widget.canUpdate(oldChild.widget, newWidget)) {
+                            oldKeyedChildren.remove(key);
+                        } else {
+                            oldChild = null;
+                        }
+                    }
+                }
+            }
+            newChildren[newChildrenTop] = updateChild(oldChild, newWidget, newChildrenTop);
+            newChildrenTop++;
+        }
+
+        // Sync the bottom run that was scanned earlier.
+        newChildrenBottom = newWidgets.size() - 1;
+        oldChildrenBottom = oldChildren.size() - 1;
+        while ((oldChildrenTop <= oldChildrenBottom) && (newChildrenTop <= newChildrenBottom)) {
+            Element oldChild = oldChildren.get(oldChildrenTop);
+            Widget newWidget = newWidgets.get(newChildrenTop);
+            newChildren[newChildrenTop] = updateChild(oldChild, newWidget, newChildrenTop);
+            newChildrenTop++;
+            oldChildrenTop++;
+        }
+
+        // Deactivate leftover keyed children that were not reused.
+        if (haveOldChildren && !oldKeyedChildren.isEmpty()) {
+            for (Element leftover : oldKeyedChildren.values()) {
+                deactivateChild(leftover);
+            }
+        }
+
+        List<Element> result = new ArrayList<Element>(newChildren.length);
+        for (Element e : newChildren) {
+            result.add(e);
+        }
+        // Keyed children matched in a NEW order keep their elements (and CN1
+        // components) but those components still sit at their OLD flat
+        // container indices; move them so paint order and hit-testing match
+        // the new tree order.
+        reattachInTreeOrder(result);
+        return result;
+    }
+
+    /**
+     * Ensures the flat container components of the given children (this
+     * host's attach entries under each child subtree) appear in the
+     * container in tree order, moving survivors as needed. Subtree-internal
+     * order is preserved — nested reorders are each child's own concern.
+     */
+    private void reattachInTreeOrder(List<Element> childrenInTreeOrder) {
+        if (host == null) {
+            return;
+        }
+        java.util.Set<Element> attached = new HashSet<Element>(host.attachOrder());
+        List<RenderElement> desired = new ArrayList<RenderElement>();
+        for (Element c : childrenInTreeOrder) {
+            if (c != null) {
+                collectAttached(c, attached, desired);
+            }
+        }
+        host.reorderToTreeOrder(desired);
+    }
+
+    private void collectAttached(Element e, final java.util.Set<Element> attached,
+                                 final List<RenderElement> out) {
+        if (e.host == host && attached.contains(e)) {
+            out.add((RenderElement) e);
+        }
+        e.visitChildren(new Funcs.VoidFunc1<Element>() {
+            @Override
+            public void call(Element c) {
+                collectAttached(c, attached, out);
+            }
+        });
+    }
+}

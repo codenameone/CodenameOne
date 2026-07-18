@@ -89,6 +89,9 @@
         <module>css-compiler</module>
         <module>svg-transcoder</module>
         <module>lottie-transcoder</module>
+        <module>dart-runtime</module>
+        <module>dart-transpiler</module>
+        <module>flutter-runtime</module>
         <module>sqlite-jdbc</module>
         <!-- The backend runtime, after sqlite-jdbc because it depends on it. -->
         <module>backend</module>

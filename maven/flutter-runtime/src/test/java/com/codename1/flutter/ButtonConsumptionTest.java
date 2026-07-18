@@ -1,0 +1,89 @@
+package com.codename1.flutter;
+
+import com.codename1.flutter.material.ButtonRenderElement;
+import com.codename1.flutter.material.ElevatedButton;
+import com.codename1.flutter.material.IconButton;
+import com.codename1.flutter.material.OutlinedButton;
+import com.codename1.flutter.material.TextButton;
+import com.codename1.flutter.rendering.RenderHost;
+import com.codename1.flutter.testsupport.ProbeBox;
+import com.codename1.flutter.widgets.Icon;
+import com.codename1.flutter.widgets.Text;
+
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * Buttons consume a Text child as their label and an Icon child as their
+ * material glyph (headless — the CN1 Button itself only exists with a
+ * Display).
+ */
+class ButtonConsumptionTest {
+
+    private ButtonRenderElement mount(Widget w) {
+        BuildOwner owner = new BuildOwner();
+        RenderHost host = new RenderHost();
+        FlutterUI.mount(w, host, owner);
+        return (ButtonRenderElement) host.rootRenderElement();
+    }
+
+    @Test
+    void textChildBecomesTheLabel() {
+        ElevatedButton b = new ElevatedButton();
+        b.onPressed(() -> {
+        });
+        b.child(new Text("Save"));
+        ButtonRenderElement el = mount(b);
+        assertEquals("Save", el.consumedLabel());
+        assertEquals(0, el.consumedIconChar());
+    }
+
+    @Test
+    void iconChildBecomesTheMaterialGlyph() {
+        TextButton b = new TextButton();
+        b.child(new Icon(Icons.add));
+        ButtonRenderElement el = mount(b);
+        assertNull(el.consumedLabel());
+        assertEquals(Icons.add.codePoint(), el.consumedIconChar());
+    }
+
+    @Test
+    void outlinedButtonConsumesLikeTheOthers() {
+        OutlinedButton b = new OutlinedButton();
+        b.child(new Text("Cancel"));
+        ButtonRenderElement el = mount(b);
+        assertEquals("Cancel", el.consumedLabel());
+    }
+
+    @Test
+    void iconButtonConsumesItsIconParameter() {
+        IconButton b = new IconButton();
+        b.icon(new Icon(Icons.settings));
+        b.iconSize(32.0);
+        ButtonRenderElement el = mount(b);
+        assertNull(el.consumedLabel());
+        assertEquals(Icons.settings.codePoint(), el.consumedIconChar());
+    }
+
+    @Test
+    void unsupportedChildFallsBackToItsToString() {
+        ElevatedButton b = new ElevatedButton();
+        b.child(new ProbeBox(1, 1));
+        ButtonRenderElement el = mount(b);
+        String label = el.consumedLabel();
+        assertNotNull(label);
+        assertTrue(label.contains("ProbeBox"), "toString fallback expected, got: " + label);
+    }
+
+    @Test
+    void missingChildYieldsNoLabelAndNoIcon() {
+        TextButton b = new TextButton();
+        ButtonRenderElement el = mount(b);
+        assertNull(el.consumedLabel());
+        assertEquals(0, el.consumedIconChar());
+    }
+}

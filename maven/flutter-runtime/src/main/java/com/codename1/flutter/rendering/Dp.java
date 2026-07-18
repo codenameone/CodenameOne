@@ -1,0 +1,96 @@
+package com.codename1.flutter.rendering;
+
+import com.codename1.ui.Display;
+
+/**
+ * Flutter logical pixel to CN1 device pixel conversion.
+ *
+ * <p>Flutter's logical pixel is defined as roughly 1/160 inch (a Material dp,
+ * i.e. 0.15875mm). When a CN1 Display is available, logical values are
+ * converted through {@code Display.convertToPixels} using that physical
+ * definition; without a Display (headless unit tests) the scale is 1, so
+ * logical values and pixels coincide.</p>
+ */
+public final class Dp {
+
+    private static final double MM_PER_LP = 25.4 / 160.0;
+    private static double cachedScale = -1;
+
+    private Dp() {
+    }
+
+    /**
+     * Device pixels per Flutter logical pixel.
+     */
+    public static double scale() {
+        if (!Display.isInitialized()) {
+            return 1;
+        }
+        if (cachedScale <= 0) {
+            cachedScale = bucketScale(Display.getInstance().getDeviceDensity());
+            if (cachedScale <= 0) {
+                // unknown bucket: fall back to physical measurement
+                int px = Display.getInstance().convertToPixels((float) (MM_PER_LP * 100));
+                cachedScale = px / 100.0;
+            }
+            if (cachedScale <= 0) {
+                cachedScale = 1;
+            }
+        }
+        return cachedScale;
+    }
+
+    /**
+     * Flutter/Android-style devicePixelRatio per CN1 density bucket.
+     * Flutter buckets its devicePixelRatio exactly like Android dp buckets
+     * (mdpi=1, hdpi=1.5, xhdpi=2, xxhdpi=3, xxxhdpi=4), so mapping CN1's
+     * density constants beats measuring physical millimeters — a 256dpi
+     * panel is an xhdpi/2.0 device, not a 1.6 one.
+     */
+    private static double bucketScale(int density) {
+        switch (density) {
+            case Display.DENSITY_VERY_LOW:
+                return 0.5;
+            case Display.DENSITY_LOW:
+                return 0.75;
+            case Display.DENSITY_MEDIUM:
+                return 1.0;
+            case Display.DENSITY_HIGH:
+                return 1.5;
+            case Display.DENSITY_VERY_HIGH:
+                return 2.0;
+            case Display.DENSITY_HD:
+                return 3.0;
+            case Display.DENSITY_560:
+                return 3.5;
+            case Display.DENSITY_2HD:
+                return 4.0;
+            case Display.DENSITY_4K:
+                return 5.0;
+            default:
+                return -1;
+        }
+    }
+
+    /**
+     * Converts logical pixels to (fractional) device pixels.
+     */
+    public static double px(double lp) {
+        return lp * scale();
+    }
+
+    /**
+     * Converts logical pixels to millimeters (for CN1 APIs that take mm sizes,
+     * e.g. FontImage.createMaterial).
+     */
+    public static float mm(double lp) {
+        return (float) (lp * MM_PER_LP);
+    }
+
+    /**
+     * Test hook / hot-reload hook: forgets the cached scale.
+     */
+    public static void resetCache() {
+        cachedScale = -1;
+    }
+}
