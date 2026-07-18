@@ -1,7 +1,24 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.impl.javase.cef;
 
@@ -15,14 +32,11 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.BrowserNavigationCallback;
 import java.awt.EventQueue;
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import javax.swing.JFrame;
-import org.cef.CefApp;
-import org.cef.CefSettings;
 
 /**
  *
@@ -35,26 +49,6 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     private static final boolean isWindows = isWindows();
     private static final boolean isMac = isMac();
     private static final boolean isUnix = isUnix();
-    private static final boolean is64Bit = is64Bit();
-    private static final String ARCH = System.getProperty("os.arch");
-    private static final boolean is64Bit() {
-        
-        String model = System.getProperty("sun.arch.data.model",
-                                          System.getProperty("com.ibm.vm.bitmode"));
-        if (model != null) {
-            return "64".equals(model);
-        }
-        if ("x86-64".equals(ARCH)
-            || "ia64".equals(ARCH)
-            || "ppc64".equals(ARCH) || "ppc64le".equals(ARCH)
-            || "sparcv9".equals(ARCH)
-            || "mips64".equals(ARCH) || "mips64el".equals(ARCH)
-            || "amd64".equals(ARCH)
-            || "aarch64".equals(ARCH)) {
-            return true;
-        }
-        return false;
-    }
     private static boolean isWindows() {
         return (OS.indexOf("win") >= 0);
     }
@@ -121,45 +115,9 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
     
     
     
-    private static String getLibPath() {
-        String out = System.getProperty("cef.libPath", null);
-        if (out != null) {
-            return out;
-        }
-        
-        if (isMac) {
-            String cefRoot = System.getProperty("cef.dir",
-                    System.getProperty("user.home")+File.separator+".codenameone"+File.separator+"cef")+File.separator;
-
-            return cefRoot + "macos64";
-        } else if (isWindows) {
-            String bitSuffix = is64Bit ? "64" : "32";
-            String cefRoot = System.getProperty("cef.dir",
-                    System.getProperty("user.home")+File.separator+".codenameone"+File.separator+"cef")+File.separator+"lib"+File.separator;
-            return cefRoot + "win"+bitSuffix;
-        } else if (isUnix && is64Bit) {
-            
-            String bitSuffix = is64Bit ? "64" : "32";
-            String cefRoot = System.getProperty("cef.dir",
-                    System.getProperty("user.home")+File.separator+".codenameone"+File.separator+"cef")+File.separator+"lib"+File.separator;
-            return cefRoot + "linux"+bitSuffix;
-        }else {
-            throw new UnsupportedOperationException("CEF Not implemented on this platform yet");
-        }
-    }
-    
     private static String[] createArgs() {
         List<String> args = new ArrayList<String>();
         if (isMac) {
-
-            if (!"true".equals(System.getProperty("cn1.cef.bundled"))) {
-                // The cn1.cef.bundled flag is set in SEWrapper to indicate that CEF is bundled in the .app
-                // Otherwise it needs to get CEF from the central location specified 
-                args.add(String.format("--framework-dir-path=%s/Chromium Embedded Framework.framework", getLibPath()));
-                args.add(String.format("--main-bundle-path=%s/jcef Helper.app", getLibPath()));
-                args.add(String.format("--browser-subprocess-path=%s/jcef Helper.app/Contents/MacOS/jcef Helper", getLibPath()));
-            }
-            
             args.add("--disable-gpu");
         } else if (isWindows) {
             // no extra stuff here
@@ -196,19 +154,7 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
         return create(null, parent);
     }
     public static CEFBrowserComponent create(final String startingURL, final CEFBrowserComponentListener parent) {
-        CefSettings settings = new CefSettings();
-        
         String[] args = createArgs();
-        // Perform startup initialization on platforms that require it.
-        if (!"true".equals(System.getProperty("cef.started", "false"))) {
-            if (!CefApp.startup(args)) {
-                System.err.println("CEFStartup initialization failed");
-                throw new RuntimeException("CEF Startup initialization failed!");
-
-            }
-            System.setProperty("cef.started", "true");
-        }
-        
 
         // OSR mode is enabled by default on Linux.
         // and disabled by default on Windows and Mac OS X.

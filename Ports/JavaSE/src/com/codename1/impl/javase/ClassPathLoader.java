@@ -52,6 +52,8 @@ class ClassPathLoader extends ClassLoader {
         excludes.add("netscape.javascript");
         excludes.add("javafx");
         excludes.add("org.sqlite");
+        excludes.add("org.cef.");
+        excludes.add("me.friwi.jcefmaven.");
         excludes.add("org.w3c");
     }
     private List<String> includes = new ArrayList<String>();

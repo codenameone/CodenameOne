@@ -609,6 +609,21 @@ public class CN1CefBrowser extends CefBrowser_N {
         }
         return true;
     }
+
+    /**
+     * Compatibility entry point used directly by JCEF's native render handler.
+     *
+     * JCEF normally invokes render callbacks on the object returned by
+     * {@link #getRenderHandler()}, but its native GetScreenInfo implementation
+     * invokes this method on the browser object itself.  Keep this exact public
+     * signature even though the Java render handler delegates to
+     * {@link #getScreenInfoImpl(org.cef.browser.CefBrowser, org.cef.handler.CefScreenInfo)}.
+     * Without it JNI raises NoSuchMethodError and CEF never receives the HiDPI
+     * device scale factor.
+     */
+    public boolean getScreenInfo(CefBrowser browser, CefScreenInfo screenInfo) {
+        return getScreenInfoImpl(browser, screenInfo);
+    }
     
     private static double calcRetinaScale() {
         

@@ -40,8 +40,11 @@ mvn -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java
 mvn -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
   -Dexec.classpathScope=test \
   -Dexec.mainClass=com.codenameone.playground.PlaygroundSyntaxMatrixHarness
+# This harness checks only the native CN1 chrome. Keep its BrowserComponent as
+# a placeholder instead of provisioning a full JCEF runtime during the test.
 mvn -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
   -Dexec.classpathScope=test \
+  -Dcn1.javase.implementation=jmf \
   -Dexec.mainClass=com.codenameone.playground.PlaygroundLayoutHarness
 mvn -f common/pom.xml -DskipTests org.codehaus.mojo:exec-maven-plugin:3.0.0:java \
   -Dexec.classpathScope=test \

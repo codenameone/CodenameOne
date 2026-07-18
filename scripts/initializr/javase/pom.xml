@@ -411,10 +411,6 @@
                                     the initialize phase. -->
 
 
-                              <!-- The location of CEF.  This property is set in the
-                                  prepare-simulator-classpath goal, and the CEF files are
-                                  managed by maven. -->
-                              <argument>-Dcef.dir=${cef.dir}</argument>
 
                               <!-- The location of the designer jar.  This property is set in the
                                   prepare-simulator-classpath goal, and the file itself is managed
@@ -516,10 +512,6 @@
                                     the initialize phase. -->
 
 
-                              <!-- The location of CEF.  This property is set in the
-                                  prepare-simulator-classpath goal, and the CEF files are
-                                  managed by maven. -->
-                              <argument>-Dcef.dir=${cef.dir}</argument>
 
                               <!-- The location of the designer jar.  This property is set in the
                                   prepare-simulator-classpath goal, and the file itself is managed
@@ -614,10 +606,6 @@
                           <arguments>
                               <argument>-Xmx1024M</argument>
 
-                              <!-- The location of CEF.  This property is set in the
-                                  prepare-simulator-classpath goal, and the CEF files are
-                                  managed by maven. -->
-                              <argument>-Dcef.dir=${cef.dir}</argument>
 
                               <!-- The location of the designer jar.  This property is set in the
                                   prepare-simulator-classpath goal, and the file itself is managed
@@ -725,13 +713,6 @@
                                     are set in the prepare-simulator-classpath goal
                                     of the codenameone-maven-plugin which was run during
                                     the initialize phase. -->
-                              <systemProperty>
-                                  <!-- The location of CEF.  This property is set in the
-                                  prepare-simulator-classpath goal, and the CEF files are
-                                  managed by maven. -->
-                                  <key>cef.dir</key>
-                                  <value>${cef.dir}</value>
-                              </systemProperty>
                               <systemProperty>
                                   <!-- The location of the designer jar.  This property is set in the
                                   prepare-simulator-classpath goal, and the file itself is managed

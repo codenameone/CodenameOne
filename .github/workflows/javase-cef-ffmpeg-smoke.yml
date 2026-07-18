@@ -50,7 +50,9 @@ jobs:
       - name: Cache Maven dependencies
         uses: actions/cache@v4
         with:
-          path: .m2/repository
+          path: |
+            .m2/repository
+            ~/.codenameone/jcef
           key: ${{ runner.os }}-javase-smoke-m2-${{ hashFiles('maven/**/*.xml', 'maven/**/*.pom', 'maven/tests/javase-cef-ffmpeg-smoke/**') }}
           restore-keys: |
             ${{ runner.os }}-javase-smoke-m2-
