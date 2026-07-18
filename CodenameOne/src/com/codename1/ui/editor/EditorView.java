@@ -46,7 +46,7 @@ import com.codename1.ui.geom.Dimension;
 /// styled rich text) subclass it and override `#paintContent(Graphics, int, int, int, int)` and the
 /// document/measurement hooks.
 public class EditorView extends Component implements TextInputClient {
-    private final EditorHost host;
+    private EditorHost host;
     private final boolean codeMode;
     private EditorDocument doc = new EditorDocument();
     private final UndoManager undo = new UndoManager();
@@ -106,6 +106,12 @@ public class EditorView extends Component implements TextInputClient {
         scrollX = clampInt(scrollX - deltaX, 0, maxScrollX());
         scrollY = clampInt(scrollY - deltaY, 0, maxScroll());
         repaint();
+    }
+
+    /// Binds the editor host after construction. Used by a subclass that is its own host (see
+    /// `com.codename1.ui.EditField`), which cannot pass `this` to the constructor.
+    protected final void setEditorHost(EditorHost h) {
+        this.host = h;
     }
 
     /// Returns the backing document.
