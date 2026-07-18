@@ -8,17 +8,34 @@
         Codename One compiles one Java codebase into native apps across mobile, desktop, web, watch, TV, and vehicles. Its UI ships with your app instead of being restyled by the platform after release.
       </p>
       <div class="cn1-action-row">
-        {{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "https://start.codenameone.com/" "event" "home-primary-project" "external" true) }}
+        {{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "/initializr/" "event" "home-primary-project") }}
         {{ partial "cn1-cta.html" (dict "label" "View source on GitHub" "href" "https://github.com/codenameone/CodenameOne" "variant" "secondary" "external" true) }}
       </div>
       <p class="cn1-v2-hero__note">GPLv2 with the Classpath Exception. Free for commercial use. No royalties.</p>
     </div>
-    <figure class="cn1-hero-showcase">
-      <a href="/blog/liquid-glass-material-3-modern-native-themes/">
-        <img src="/blog/liquid-glass-material-3-modern-native-themes.jpg" alt="Codename One applications using modern iOS and Android themes" width="1024" height="512">
+    <div class="cn1-v2-hero__product" aria-label="Java source and real Codename One runtime captures">
+      <div class="cn1-code-window">
+        <div class="cn1-code-window__bar"><span></span><span></span><span></span><strong>Main.java</strong></div>
+        <pre><code><span class="cn1-code-keyword">Form</span> app = <span class="cn1-code-keyword">new</span> Form(
+    <span class="cn1-code-string">"Explore"</span>, <span class="cn1-code-keyword">new</span> BorderLayout()
+);
+
+app.add(CENTER, buildContent());
+app.add(SOUTH, buildTabs());
+app.show();</code></pre>
+      </div>
+      <a class="cn1-runtime-proof" href="/blog/pixel-perfect-is-a-test/" aria-label="See the iOS Liquid Glass fidelity tests">
+        <div class="cn1-runtime-proof__comparison">
+          <p><span>Native iOS 26</span><span>Codename One Metal</span></p>
+          <img src="/blog/pixel-perfect-is-a-test/tab-morph-native-vs-cn1.gif" alt="Native iOS 26 and Codename One Liquid Glass tab selection animations in light and dark appearance" width="900" height="323">
+        </div>
+        <div class="cn1-runtime-proof__device cn1-runtime-proof__device--android">
+          <span class="cn1-runtime-proof__camera" aria-hidden="true"></span>
+          <img src="/blog/liquid-glass-material-3-modern-native-themes/showcase-android.png" alt="Codename One Android Material 3 light and dark theme test capture" width="800" height="600">
+        </div>
+        <span class="cn1-runtime-proof__caption"><strong>Real runtime captures</strong> Native reference beside Codename One Liquid Glass, plus Android Material 3.</span>
       </a>
-      <figcaption><strong>Liquid Glass and Material 3</strong><span>Platform-aware themes, versioned with your application.</span></figcaption>
-    </figure>
+    </div>
   </section>
 
   <div class="cn1-section-shell">
@@ -78,9 +95,39 @@
         <span>3</span>
         <h3>Build with native toolchains</h3>
         <p>Generate platform projects or use the cloud service to build app-store binaries, including iOS builds without a Mac.</p>
-        <a href="/build-server/">Understand cloud builds</a>
+        <a href="/getting-started/#build">Submit your first native build</a>
       </li>
     </ol>
+  </section>
+
+  <section class="cn1-v2-section cn1-v2-agent" id="agentic-development">
+    <div class="cn1-v2-agent__intro">
+      <p class="cn1-eyebrow">Agentic development</p>
+      <h2>Give the agent a strict codebase and a short feedback loop.</h2>
+      <p>A generated Java 17 project includes Codename One instructions for coding agents. The simulator can expose the running UI to Codex, Claude Code, and other MCP hosts, so the agent can inspect meaning and invoke actions instead of guessing screen coordinates.</p>
+      <div class="cn1-action-row">
+        {{ partial "cn1-cta.html" (dict "label" "Connect an agent" "href" "/getting-started/#agent" "variant" "secondary") }}
+        {{ partial "cn1-cta.html" (dict "label" "Read the MCP implementation" "href" "/blog/codename-one-mcp-server/" "variant" "text") }}
+      </div>
+    </div>
+    <div class="cn1-v2-agent__grid">
+      <article>
+        <span>Java</span>
+        <h3>Java keeps edits in bounds</h3>
+        <p>Agents know Java deeply. Static types, bytecode compliance, and the compiler reject unsupported APIs and invalid calls before they reach a device.</p>
+      </article>
+      <article>
+        <span>Local</span>
+        <h3>Fast loops use fewer tokens</h3>
+        <p>Compile, run tests, and inspect the simulator locally. Short feedback cycles mean fewer speculative retries and less context spent diagnosing a distant native build.</p>
+      </article>
+      <article>
+        <span>Tools</span>
+        <h3>Skills and MCP ship with the tools</h3>
+        <p>Initializr places the Codename One authoring skill in the project. The JavaSE tooling can register its built-in semantic UI tools with supported MCP hosts.</p>
+      </article>
+    </div>
+    <p class="cn1-v2-agent__scope">MCP control currently covers the simulator and JavaSE-hosted desktop tools. Packaged native and mobile targets do not yet include the launcher and transport.</p>
   </section>
 
   <section class="cn1-v2-section cn1-v2-reach">
@@ -145,7 +192,7 @@
       <p>The framework is open source and free to use commercially. Initializr generates a Maven project you can run locally, then build with local or cloud toolchains.</p>
     </div>
     <div class="cn1-action-row">
-      {{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "https://start.codenameone.com/" "event" "home-final-project" "external" true) }}
+      {{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "/initializr/" "event" "home-final-project") }}
       {{ partial "cn1-cta.html" (dict "label" "Follow the build guide" "href" "/getting-started/" "variant" "secondary") }}
     </div>
   </section>

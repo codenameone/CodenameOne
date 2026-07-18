@@ -57,15 +57,9 @@ weight = 11
 
 [[menu.main]]
 parent = "product"
-name = "Demos"
-url = "/demos/"
-weight = 12
-
-[[menu.main]]
-parent = "product"
 name = "Compare"
 url = "/compare/"
-weight = 13
+weight = 12
 
 [[menu.main]]
 identifier = "docs"
@@ -81,33 +75,63 @@ weight = 21
 
 [[menu.main]]
 parent = "docs"
-name = "Developer Guide"
+name = "Developer Guide HTML"
 url = "/developer-guide/"
 weight = 22
 
 [[menu.main]]
 parent = "docs"
+name = "Developer Guide PDF"
+url = "/files/developer-guide.pdf"
+weight = 23
+
+[[menu.main]]
+parent = "docs"
 name = "API Reference"
 url = "/api/"
-weight = 23
+weight = 24
 
 [[menu.main]]
 parent = "docs"
 name = "How Do I?"
 url = "/how-do-i/"
-weight = 24
+weight = 25
 
 [[menu.main]]
-parent = "docs"
+identifier = "tools"
+name = "Tools"
+url = "#"
+weight = 30
+
+[[menu.main]]
+parent = "tools"
+name = "Initializr"
+url = "/initializr/"
+weight = 31
+
+[[menu.main]]
+parent = "tools"
 name = "Playground"
 url = "/playground/"
-weight = 25
+weight = 32
+
+[[menu.main]]
+parent = "tools"
+name = "Skin Designer"
+url = "/skindesigner/"
+weight = 33
+
+[[menu.main]]
+parent = "tools"
+name = "Demos"
+url = "/demos/"
+weight = 34
 
 [[menu.main]]
 identifier = "resources"
 name = "Resources"
 url = "#"
-weight = 30
+weight = 40
 
 [[menu.main]]
 parent = "resources"
@@ -149,13 +173,13 @@ weight = 36
 identifier = "pricing"
 name = "Pricing"
 url = "/pricing/"
-weight = 40
+weight = 50
 
 [[menu.main]]
 identifier = "search"
 name = "Search"
 url = "/search/"
-weight = 50
+weight = 60
 
 [[menu.main]]
 identifier = "dashboard"
@@ -166,5 +190,5 @@ weight = 90
 [[menu.main]]
 identifier = "create-project"
 name = "Create Project"
-url = "https://start.codenameone.com/"
+url = "/initializr/"
 weight = 100

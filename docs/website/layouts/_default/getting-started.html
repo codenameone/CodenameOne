@@ -7,7 +7,7 @@
       <h1>Create the project.<br>Run it. Build for iOS.</h1>
       <p>Initializr generates a Maven project you can open in IntelliJ IDEA, NetBeans, Eclipse, or VS Code. Run the simulator locally, then use the cloud service to build for a device.</p>
       <div class="cn1-action-row">
-        {{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "https://start.codenameone.com/" "event" "getting-started-project" "external" true) }}
+        {{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "/initializr/" "event" "getting-started-project") }}
         {{ partial "cn1-cta.html" (dict "label" "Read prerequisites" "href" "#prerequisites" "variant" "secondary") }}
       </div>
       <p class="cn1-gs-hero__note">The free tier includes 100 free cloud build credits each month. An iOS build uses 8 credits.</p>
@@ -17,8 +17,9 @@
       <ol>
         <li><a href="#create"><span>1</span>Create the project</a></li>
         <li><a href="#run"><span>2</span>Run the simulator</a></li>
-        <li><a href="#build"><span>3</span>Submit a native build</a></li>
-        <li><a href="#next"><span>4</span>Install and continue</a></li>
+        <li><a href="#agent"><span>3</span>Connect your agent</a></li>
+        <li><a href="#build"><span>4</span>Submit a native build</a></li>
+        <li><a href="#next"><span>5</span>Install and continue</a></li>
       </ol>
     </aside>
   </section>
@@ -35,54 +36,81 @@
 
   <div class="cn1-gs-steps">
     <section class="cn1-gs-step" id="create">
-      <div class="cn1-gs-step__number">01</div>
+      <div class="cn1-gs-step__number">Step 1</div>
       <div class="cn1-gs-step__body">
         <p class="cn1-eyebrow">Generate</p>
         <h2>Create a Java project with Initializr.</h2>
         <p>Choose the Java template, enter the group and artifact names, and download the generated Maven project. Unpack it into a normal source directory, not a temporary download folder.</p>
-        {{ partial "cn1-cta.html" (dict "label" "Open Initializr" "href" "https://start.codenameone.com/" "variant" "secondary" "event" "getting-started-step-1" "external" true) }}
+        {{ partial "cn1-cta.html" (dict "label" "Open Initializr" "href" "/initializr/" "variant" "secondary" "event" "getting-started-step-1") }}
       </div>
       <figure class="cn1-gs-step__media">
-        <img src="/uploads/Netbeans-New-Project-Wizard.png" alt="A Codename One Maven project open in an IDE" loading="lazy">
+        <img src="/proof/initializr-current.png" alt="The current Codename One Initializr with Java 17 selected" loading="lazy" width="1180" height="900">
       </figure>
     </section>
 
     <section class="cn1-gs-step" id="run">
-      <div class="cn1-gs-step__number">02</div>
+      <div class="cn1-gs-step__number">Step 2</div>
       <div class="cn1-gs-step__body">
         <p class="cn1-eyebrow">Verify locally</p>
         <h2>Run the project in the simulator.</h2>
-        <p>Open the project root in your IDE and let Maven resolve the modules. Run the simulator action supplied by the generated project, or use the command below from the project root.</p>
-        <div class="cn1-command">
-          <code>mvn verify -P simulator -Dcodename1.platform=javase</code>
-          <button type="button" data-cn1-copy-command aria-label="Copy simulator command">Copy</button>
-        </div>
+        <p>Open the generated project root and let the IDE import its Maven modules. Select the <strong>Run in Simulator</strong> target, then press Run. Initializr supplies that target for IntelliJ IDEA, NetBeans, Eclipse, and VS Code.</p>
         <p class="cn1-gs-step__expected"><strong>Expected result:</strong> the application opens in the Codename One simulator. You can switch device skins and inspect the component tree without submitting a cloud build.</p>
       </div>
       <figure class="cn1-gs-step__media">
-        <img src="/uploads/Simulator-Skins.png" alt="Codename One simulator device skins" loading="lazy">
+        <figcaption class="cn1-gs-target"><span aria-hidden="true">▶</span><strong>Run in Simulator</strong><small>Generated IDE target</small></figcaption>
+        <img src="/blog/liquid-glass-material-3-modern-native-themes/showcase-ios.png" alt="Current iOS Modern theme running in Codename One" loading="lazy" width="820" height="373">
       </figure>
     </section>
 
+    <section class="cn1-gs-step" id="agent">
+      <div class="cn1-gs-step__number">Step 3</div>
+      <div class="cn1-gs-step__body">
+        <p class="cn1-eyebrow">Connect the agent</p>
+        <h2>Give Codex or Claude the project context.</h2>
+        <p>Java 17 projects include the Codename One authoring skill in the downloaded project. Open the project in Codex or Claude Code so the agent can use the framework-specific build, UI, testing, and screenshot instructions instead of guessing.</p>
+        <p>Run the simulator, open its <strong>MCP</strong> menu, and choose <strong>Install in MCP Hosts</strong>. The built-in server lets supported hosts inspect the semantic UI tree, enter text, activate components, and call application tools.</p>
+        <p class="cn1-gs-step__expected"><strong>Current scope:</strong> MCP control works with the simulator and JavaSE-hosted desktop tools. Packaged native and mobile apps do not yet include the launcher and transport.</p>
+        <div class="cn1-action-row">
+          {{ partial "cn1-cta.html" (dict "label" "Read the MCP guide" "href" "/blog/codename-one-mcp-server/" "variant" "secondary") }}
+        </div>
+      </div>
+      <aside class="cn1-gs-agent-files" aria-label="Agent resources included with a generated project">
+        <p>Included in the project</p>
+        <code>.agent-skills/codename-one/</code>
+        <ul>
+          <li>Build and run targets</li>
+          <li>UI and CSS rules</li>
+          <li>Tests and screenshots</li>
+          <li>Native interfaces</li>
+        </ul>
+        <p>Available from the simulator</p>
+        <code>MCP → Install in MCP Hosts</code>
+      </aside>
+    </section>
+
     <section class="cn1-gs-step" id="build">
-      <div class="cn1-gs-step__number">03</div>
+      <div class="cn1-gs-step__number">Step 4</div>
       <div class="cn1-gs-step__body">
         <p class="cn1-eyebrow">Reach a device</p>
         <h2>Submit a native build.</h2>
-        <p>Sign in to the Codename One account from the project tools, then choose a device build. Android builds can start immediately. iOS device builds also need Apple signing assets; the certificate wizard guides that setup.</p>
+        <p>Sign in to your Codename One account, then select <strong>Build Android</strong> or <strong>Build iOS</strong> from the generated IDE targets. Android builds can start immediately. iOS device builds also need Apple signing assets; the certificate wizard guides that setup.</p>
         <div class="cn1-gs-link-grid">
           <a href="/signing/"><strong>Configure signing</strong><span>Apple certificates and Android keystores</span></a>
           <a href="https://cloud.codenameone.com/console/index.html" data-cn1-conversion="getting-started-dashboard"><strong>Open the build dashboard</strong><span>Watch the build and download the result</span></a>
         </div>
         <p class="cn1-gs-step__expected"><strong>No Mac required for the cloud path.</strong> The build server runs the native toolchain and returns the device binary.</p>
       </div>
-      <figure class="cn1-gs-step__media">
-        <img src="/uploads/NetBeans-Build-App.png" alt="Codename One device build action in an IDE" loading="lazy">
-      </figure>
+      <aside class="cn1-gs-build-targets" aria-label="Generated native build targets">
+        <p>Generated IDE targets</p>
+        <strong><span>Android</span> Build Android</strong>
+        <strong><span>iOS</span> Build iOS</strong>
+        <strong><span>Desktop</span> Build native desktop</strong>
+        <small>The cloud dashboard shows the queue, log, result, and install link.</small>
+      </aside>
     </section>
 
     <section class="cn1-gs-step" id="next">
-      <div class="cn1-gs-step__number">04</div>
+      <div class="cn1-gs-step__number">Step 5</div>
       <div class="cn1-gs-step__body">
         <p class="cn1-eyebrow">First build complete</p>
         <h2>Install it, then make one real change.</h2>
@@ -94,8 +122,8 @@
       </div>
       <aside class="cn1-gs-success">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
-        <strong>You reached the activation point.</strong>
-        <p>The project runs locally and the native build pipeline is connected.</p>
+        <strong>You won. You are on your way to a full app.</strong>
+        <p>Your project runs locally, your agent has the project context, and the native build pipeline is connected.</p>
       </aside>
     </section>
   </div>
