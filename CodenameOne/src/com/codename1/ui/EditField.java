@@ -403,11 +403,13 @@ public class EditField extends EditorView implements EditorHost, TextHolder, Act
     }
 
     /// Adds a listener notified when the action key (return on a single-line field) is pressed.
+    @Override
     public void addActionListener(ActionListener l) {
         actionListeners.addListener(l);
     }
 
     /// Removes an action listener.
+    @Override
     public void removeActionListener(ActionListener l) {
         actionListeners.removeListener(l);
     }
