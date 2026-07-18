@@ -1998,15 +1998,76 @@ public class WindowsImplementation extends CodenameOneImplementation {
      */
     @Override
     public void copyToClipboard(Object obj) {
-        if (obj instanceof String) {
-            WindowsNative.clipboardSetText((String) obj);
+        String text = getPlainTextForClipboard(obj);
+        if (text != null) {
+            WindowsNative.clipboardSetText(text);
+        }
+        if (obj instanceof com.codename1.ui.ClipboardContent) {
+            com.codename1.ui.ClipboardContent content = (com.codename1.ui.ClipboardContent) obj;
+            /*
+             * Each native setter opens/empties the clipboard independently, so the
+             * last one wins and clears any format written before it. Order the calls
+             * so the richest representation survives: text, then files, then image.
+             */
+            String[] files = clipboardFilePaths(content);
+            if (files != null) {
+                WindowsNative.clipboardSetFiles(files);
+            }
+            byte[] image = content.getBytes(com.codename1.ui.ClipboardContent.MIME_PNG);
+            if (image == null) {
+                image = content.getBytes(com.codename1.ui.ClipboardContent.MIME_JPEG);
+            }
+            if (image == null) {
+                image = content.getBytes(com.codename1.ui.ClipboardContent.MIME_GIF);
+            }
+            if (image != null) {
+                WindowsNative.clipboardSetImage(image);
+            }
         }
         super.copyToClipboard(obj);
+    }
+
+    /**
+     * Extracts the MIME_FILE representation of {@code content} as a String[] of
+     * paths (a single String path is wrapped), or null when no file list present.
+     */
+    private static String[] clipboardFilePaths(com.codename1.ui.ClipboardContent content) {
+        Object value = content.getData(com.codename1.ui.ClipboardContent.MIME_FILE);
+        if (value instanceof String[]) {
+            return (String[]) value;
+        }
+        if (value instanceof String) {
+            return new String[] { (String) value };
+        }
+        return null;
     }
 
     @Override
     public Object getPasteDataFromClipboard() {
         String text = WindowsNative.clipboardGetText();
+        byte[] image = WindowsNative.clipboardGetImage();
+        String[] files = WindowsNative.clipboardGetFiles();
+        if (text != null) {
+            Object lightweight = super.getPasteDataFromClipboard();
+            if (lightweight instanceof com.codename1.ui.ClipboardContent
+                    && text.equals(((com.codename1.ui.ClipboardContent) lightweight)
+                            .getText(com.codename1.ui.ClipboardContent.MIME_TEXT))) {
+                return lightweight;
+            }
+        }
+        if (image != null || files != null) {
+            com.codename1.ui.ClipboardContent content = new com.codename1.ui.ClipboardContent();
+            if (text != null) {
+                content.setData(com.codename1.ui.ClipboardContent.MIME_TEXT, text);
+            }
+            if (image != null) {
+                content.setData(com.codename1.ui.ClipboardContent.MIME_PNG, image);
+            }
+            if (files != null) {
+                content.setData(com.codename1.ui.ClipboardContent.MIME_FILE, files);
+            }
+            return content;
+        }
         if (text != null) {
             return text;
         }

@@ -301,7 +301,6 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesAppleSignIn;
     private boolean usesWebauthn;
     private boolean usesAppReview;
-    private boolean usesCodeEditor;
     private boolean vibratePermission;
     private boolean smsPermission;
     private boolean gpsPermission;
@@ -1352,13 +1351,6 @@ public class AndroidGradleBuilder extends Executor {
                     // actual usage so apps that never review stay lean.
                     if (!usesAppReview && cls.indexOf("com/codename1/appreview") == 0) {
                         usesAppReview = true;
-                    }
-                    // CodeEditor optionally upgrades its built-in highlighter to
-                    // the bundled CodeMirror web assets. Detected from actual
-                    // usage so apps that never embed a code editor pay nothing
-                    // (see the bundling step further below).
-                    if (!usesCodeEditor && cls.indexOf("com/codename1/ui/CodeEditor") == 0) {
-                        usesCodeEditor = true;
                     }
                     if (cls.indexOf("com/codename1/location/Geofence") > -1) {
                         if (!"true".equals(playServicesValue)) {
@@ -4687,15 +4679,6 @@ public class AndroidGradleBuilder extends Executor {
         if (usesAppReview) {
             String reviewVersion = request.getArg("android.appReview.version", "2.0.1");
             additionalDependencies += " implementation 'com.google.android.play:review:"+reviewVersion+"'\n";
-        }
-
-        // CodeEditor (com.codename1.ui.CodeEditor) can upgrade its self-contained
-        // built-in highlighter to the bundled CodeMirror assets. We only flag the
-        // bundling when the app actually references CodeEditor (detected during the
-        // class scan above) so apps that never embed a code editor stay lean.
-        if (usesCodeEditor) {
-            debug("CodeEditor detected: enabling CodeMirror asset bundling");
-            request.putArgument("codeEditor.bundleCodeMirror", "true");
         }
 
         // OidcClient routes sign-in through androidx.browser Custom Tabs.

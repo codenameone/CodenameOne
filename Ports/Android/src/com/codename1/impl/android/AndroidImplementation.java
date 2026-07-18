@@ -1,25 +1,26 @@
 /*
- * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+
 package com.codename1.impl.android;
 
 import android.Manifest;
@@ -76,6 +77,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Font;
 import com.codename1.ui.Image;
 import com.codename1.ui.PeerComponent;
+import com.codename1.ui.ClipboardContent;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.VirtualKeyboardInterface;
@@ -291,7 +293,289 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public static CodenameOneActivity getActivity() {
         return activity;
     }
-    
+
+    // ---- low level text input source (pure Codename One editors) ----
+
+    private static volatile com.codename1.ui.TextInputClient activeInputClient;
+    private static volatile com.codename1.ui.TextInputState activeInputState;
+    private static volatile com.codename1.ui.TextInputConfig activeInputConfig;
+    /// Synchronous mirror of edits the input connection has posted but the EDT has not yet
+    /// applied and echoed back. IMEs (notably Gboard) commit text and immediately re-read the
+    /// surrounding text; without this mirror they would see pre-commit text and desync their
+    /// suggestion model. Cleared when the authoritative state from the EDT has caught up with
+    /// every posted edit (the seq pair below).
+    private static volatile com.codename1.ui.TextInputState pendingInputState;
+    /// Generation of the last edit the input connection posted (written on the IME thread).
+    private static volatile int pendingPostedSeq;
+    /// Generation of the last posted edit the EDT applied (written on the EDT).
+    private static volatile int pendingAppliedSeq;
+
+    /// Returns the editing state as the IME must see it right now: the pending synchronous
+    /// mirror when an edit is in flight, otherwise the last state pushed from the EDT.
+    static com.codename1.ui.TextInputState currentInputState() {
+        com.codename1.ui.TextInputState pending = pendingInputState;
+        return pending != null ? pending : activeInputState;
+    }
+
+    /// Records the input connection's synchronous mirror of an in-flight edit and returns the
+    /// edit's generation; the connection marks it applied from the EDT runnable that delivers
+    /// the edit to the client.
+    static int setPendingInputState(com.codename1.ui.TextInputState state) {
+        pendingInputState = state;
+        return ++pendingPostedSeq;
+    }
+
+    /// Marks a posted edit as applied on the EDT (called right before the client mutation whose
+    /// state push may then retire the mirror).
+    static void markPendingApplied(int seq) {
+        pendingAppliedSeq = seq;
+    }
+
+    /// Routes a hardware (Bluetooth / Chromebook) key event to the bound text input client.
+    /// Hardware keys bypass the IME entirely, and the pure editor's raw key path is disabled
+    /// while a platform session is active, so without this they would be silently dropped.
+    /// Returns true when the event was consumed for the client (including the matching key-up
+    /// of a consumed key-down); false leaves the event to the regular Codename One pipeline
+    /// (BACK, D-pad game keys on non-editor forms, ...).
+    static boolean routeHardwareKeyToActiveClient(boolean down, android.view.KeyEvent event) {
+        com.codename1.ui.TextInputClient client = activeInputClient;
+        if (client == null || event == null) {
+            return false;
+        }
+        return CN1TextInputConnection.deliverHardwareKey(client, event, down);
+    }
+
+    /// Re-requests the soft keyboard for the bound text input client. Called on every tap so a
+    /// keyboard the user dismissed (back gesture) returns when the editor is tapped again, the
+    /// same behavior a native EditText has. No-op when no client is bound.
+    static void showSoftInputForActiveClient() {
+        if (activeInputClient == null) {
+            return;
+        }
+        final CodenameOneActivity a = getActivity();
+        final CodenameOneSurface view = instance != null ? instance.myView : null;
+        if (a == null || view == null) {
+            return;
+        }
+        a.runOnUiThread(new Runnable() {
+            public void run() {
+                if (activeInputClient == null) {
+                    return;
+                }
+                android.view.View v = view.getAndroidView();
+                v.requestFocus();
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
+                        a.getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.showSoftInput(v, 0);
+                }
+            }
+        });
+    }
+
+    static com.codename1.ui.TextInputConfig currentInputConfig() {
+        return activeInputConfig;
+    }
+
+    /// Called by the rendering view's `onCreateInputConnection` to supply the custom input connection
+    /// when a pure editor is bound. Returns null when no client is active so the view keeps its default
+    /// behavior.
+    static android.view.inputmethod.InputConnection createEditorInputConnection(android.view.View view, android.view.inputmethod.EditorInfo editorInfo) {
+        com.codename1.ui.TextInputClient client = activeInputClient;
+        if (client == null) {
+            return null;
+        }
+        configureEditorInfo(editorInfo, activeInputConfig);
+        return new CN1TextInputConnection(view, client);
+    }
+
+    /// True when a pure editor text input client is currently bound.
+    static boolean hasActiveInputClient() {
+        return activeInputClient != null;
+    }
+
+    private static void configureEditorInfo(android.view.inputmethod.EditorInfo editorInfo, com.codename1.ui.TextInputConfig cfg) {
+        int constraint = cfg == null ? 0 : cfg.getConstraint();
+        int inputType;
+        switch (constraint & 0xffff) {
+            case com.codename1.ui.TextArea.NUMERIC:
+                inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                        | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED;
+                break;
+            case com.codename1.ui.TextArea.DECIMAL:
+                inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                        | android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
+                        | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL;
+                break;
+            case com.codename1.ui.TextArea.PHONENUMBER:
+                inputType = android.text.InputType.TYPE_CLASS_PHONE;
+                break;
+            case com.codename1.ui.TextArea.EMAILADDR:
+                inputType = android.text.InputType.TYPE_CLASS_TEXT
+                        | android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS;
+                break;
+            case com.codename1.ui.TextArea.URL:
+                inputType = android.text.InputType.TYPE_CLASS_TEXT
+                        | android.text.InputType.TYPE_TEXT_VARIATION_URI;
+                break;
+            default:
+                inputType = android.text.InputType.TYPE_CLASS_TEXT;
+                break;
+        }
+        boolean text = (inputType & android.text.InputType.TYPE_MASK_CLASS) == android.text.InputType.TYPE_CLASS_TEXT;
+        boolean password = (constraint & com.codename1.ui.TextArea.PASSWORD) != 0;
+        if (password) {
+            inputType = text
+                    ? inputType | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+                    : android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD;
+            text = (inputType & android.text.InputType.TYPE_MASK_CLASS) == android.text.InputType.TYPE_CLASS_TEXT;
+        }
+        boolean multiline = cfg == null || cfg.isMultiline();
+        if (text) {
+            if (multiline) {
+                inputType |= android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE;
+            }
+            if (password || (cfg != null && !cfg.isAutoCorrect())) {
+                inputType |= android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
+            }
+            if (!password && cfg != null && cfg.isAutoCapitalize()) {
+                inputType |= android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES;
+            }
+        }
+        editorInfo.inputType = inputType;
+        editorInfo.imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI;
+        if (multiline) {
+            editorInfo.imeOptions |= android.view.inputmethod.EditorInfo.IME_ACTION_NONE;
+        } else {
+            editorInfo.imeOptions |= imeActionFor(cfg == null
+                    ? com.codename1.ui.TextInputConfig.ACTION_DEFAULT : cfg.getActionType());
+        }
+        editorInfo.initialSelStart = activeInputState != null ? activeInputState.getSelectionStart() : 0;
+        editorInfo.initialSelEnd = activeInputState != null ? activeInputState.getSelectionEnd() : 0;
+    }
+
+    private static int imeActionFor(int actionType) {
+        switch (actionType) {
+            case com.codename1.ui.TextInputConfig.ACTION_NEXT:
+                return android.view.inputmethod.EditorInfo.IME_ACTION_NEXT;
+            case com.codename1.ui.TextInputConfig.ACTION_SEARCH:
+                return android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH;
+            case com.codename1.ui.TextInputConfig.ACTION_SEND:
+                return android.view.inputmethod.EditorInfo.IME_ACTION_SEND;
+            case com.codename1.ui.TextInputConfig.ACTION_DONE:
+            default:
+                return android.view.inputmethod.EditorInfo.IME_ACTION_DONE;
+        }
+    }
+
+    /// Maps an Android `EditorInfo.IME_ACTION_*` code back to the `TextInputConfig` action constant
+    /// delivered to `TextInputClient.onEditorAction`.
+    static int textInputActionFor(int imeActionCode) {
+        switch (imeActionCode) {
+            case android.view.inputmethod.EditorInfo.IME_ACTION_NEXT:
+                return com.codename1.ui.TextInputConfig.ACTION_NEXT;
+            case android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH:
+                return com.codename1.ui.TextInputConfig.ACTION_SEARCH;
+            case android.view.inputmethod.EditorInfo.IME_ACTION_SEND:
+                return com.codename1.ui.TextInputConfig.ACTION_SEND;
+            case android.view.inputmethod.EditorInfo.IME_ACTION_DONE:
+                return com.codename1.ui.TextInputConfig.ACTION_DONE;
+            default:
+                return com.codename1.ui.TextInputConfig.ACTION_DEFAULT;
+        }
+    }
+
+    @Override
+    public boolean isTextInputSupported() {
+        return true;
+    }
+
+    @Override
+    public Object startTextInput(com.codename1.ui.TextInputClient client, com.codename1.ui.TextInputConfig config) {
+        activeInputClient = client;
+        activeInputConfig = config;
+        activeInputState = client.getEditingState();
+        pendingInputState = null;
+        final CodenameOneActivity a = getActivity();
+        final CodenameOneSurface view = myView;
+        if (a == null || view == null) {
+            return client;
+        }
+        a.runOnUiThread(new Runnable() {
+            public void run() {
+                android.view.View v = view.getAndroidView();
+                v.setFocusable(true);
+                v.setFocusableInTouchMode(true);
+                v.requestFocus();
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
+                        a.getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.restartInput(v);
+                    imm.showSoftInput(v, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+                }
+            }
+        });
+        return client;
+    }
+
+    @Override
+    public void updateTextInputState(Object handle, com.codename1.ui.TextInputState state) {
+        if (handle == null || handle != activeInputClient || state == null) {
+            // a stale handle (an unbalanced session that was already replaced) must not
+            // disturb the currently bound client
+            return;
+        }
+        activeInputState = state;
+        // retire the connection's synchronous mirror only when this push reflects every posted
+        // edit; clearing early would hide an in-flight edit from the IME's immediate re-reads
+        if (pendingAppliedSeq == pendingPostedSeq) {
+            pendingInputState = null;
+        }
+        final CodenameOneActivity a = getActivity();
+        final CodenameOneSurface view = myView;
+        if (a == null || view == null) {
+            return;
+        }
+        a.runOnUiThread(new Runnable() {
+            public void run() {
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
+                        a.getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                if (imm != null && activeInputClient != null) {
+                    com.codename1.ui.TextInputState s = activeInputState;
+                    imm.updateSelection(view.getAndroidView(), s.getSelectionStart(), s.getSelectionEnd(),
+                            s.getComposingStart(), s.getComposingEnd());
+                }
+            }
+        });
+    }
+
+    @Override
+    public void stopTextInput(Object handle) {
+        if (handle == null || handle != activeInputClient) {
+            return;
+        }
+        activeInputClient = null;
+        activeInputState = null;
+        activeInputConfig = null;
+        pendingInputState = null;
+        final CodenameOneActivity a = getActivity();
+        final CodenameOneSurface view = myView;
+        if (a == null || view == null) {
+            return;
+        }
+        a.runOnUiThread(new Runnable() {
+            public void run() {
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
+                        a.getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.hideSoftInputFromWindow(view.getAndroidView().getWindowToken(), 0);
+                    imm.restartInput(view.getAndroidView());
+                }
+            }
+        });
+    }
+
+
     @Override
     public void setDisableScreenshots(final boolean disable) {
         final CodenameOneActivity a = getActivity();
@@ -8566,6 +8850,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      * @inheritDoc
      */
     public void copyToClipboard(final Object obj) {
+        super.copyToClipboard(obj);
         if (getActivity() == null) {
             return;
         }
@@ -8578,11 +8863,127 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     clipboard.setText(obj.toString());
                 } else {
                     android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
-                    android.content.ClipData clip = ClipData.newPlainText("Codename One", obj.toString());
+                    android.content.ClipData clip = null;
+                    if (sdk >= 16 && obj instanceof ClipboardContent
+                            && ((ClipboardContent) obj).getText(ClipboardContent.MIME_HTML) != null) {
+                        ClipboardContent rich = (ClipboardContent) obj;
+                        clip = ClipData.newHtmlText("Codename One",
+                                rich.getText(ClipboardContent.MIME_TEXT),
+                                rich.getText(ClipboardContent.MIME_HTML));
+                    } else if (obj instanceof ClipboardContent
+                            && ((ClipboardContent) obj).getText(ClipboardContent.MIME_TEXT) != null) {
+                        clip = ClipData.newPlainText("Codename One",
+                                ((ClipboardContent)obj).getText(ClipboardContent.MIME_TEXT));
+                    } else if (!(obj instanceof ClipboardContent)) {
+                        clip = ClipData.newPlainText("Codename One", obj.toString());
+                    }
+                    if (obj instanceof ClipboardContent) {
+                        try {
+                            clip = enrichClipWithBinaryContent((ClipboardContent) obj, clip);
+                        } catch (Throwable t) {
+                            com.codename1.io.Log.e(t);
+                        }
+                    }
+                    if (clip == null) {
+                        clip = ClipData.newPlainText("Codename One", "");
+                    }
                     clipboard.setPrimaryClip(clip);
                 }
             }
         });
+    }
+
+    /**
+     * Enriches the given base ClipData (which may be null) with image bytes and/or file
+     * references carried by the ClipboardContent, exposing binary content as FileProvider
+     * content:// URIs. Returns the (possibly newly created) ClipData, or the original clip on
+     * failure. Never throws.
+     */
+    private ClipData enrichClipWithBinaryContent(ClipboardContent content, ClipData clip) throws IOException {
+        String authority = getContext().getPackageName() + ".provider";
+
+        // Image bytes: prefer PNG, then JPEG, then GIF
+        String imageMime = null;
+        byte[] imageBytes = null;
+        String imageExt = null;
+        if (content.getBytes(ClipboardContent.MIME_PNG) != null) {
+            imageMime = ClipboardContent.MIME_PNG;
+            imageBytes = content.getBytes(ClipboardContent.MIME_PNG);
+            imageExt = "png";
+        } else if (content.getBytes(ClipboardContent.MIME_JPEG) != null) {
+            imageMime = ClipboardContent.MIME_JPEG;
+            imageBytes = content.getBytes(ClipboardContent.MIME_JPEG);
+            imageExt = "jpg";
+        } else if (content.getBytes(ClipboardContent.MIME_GIF) != null) {
+            imageMime = ClipboardContent.MIME_GIF;
+            imageBytes = content.getBytes(ClipboardContent.MIME_GIF);
+            imageExt = "gif";
+        }
+        if (imageBytes != null) {
+            File imageFile = new File(getContext().getCacheDir(),
+                    "cn1-clip-image-" + System.currentTimeMillis() + "." + imageExt);
+            imageFile.getParentFile().mkdirs();
+            OutputStream os = new FileOutputStream(imageFile);
+            try {
+                os.write(imageBytes);
+            } finally {
+                os.close();
+            }
+            Uri imageUri = FileProvider.getUriForFile(getContext(), authority, imageFile);
+            // Grant broadly so any paste target can read the content:// URI
+            getContext().grantUriPermission("android", imageUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            if (clip == null) {
+                clip = new ClipData("Codename One", new String[]{ imageMime }, new ClipData.Item(imageUri));
+            } else {
+                clip.addItem(new ClipData.Item(imageUri));
+            }
+        }
+
+        // File references: MIME_FILE may be a single String or a String[]
+        Object fileData = content.getData(ClipboardContent.MIME_FILE);
+        if (fileData != null) {
+            String[] paths;
+            if (fileData instanceof String[]) {
+                paths = (String[]) fileData;
+            } else {
+                paths = new String[]{ fileData.toString() };
+            }
+            for (int i = 0; i < paths.length; i++) {
+                String pathOrUri = paths[i];
+                if (pathOrUri == null || pathOrUri.length() == 0) {
+                    continue;
+                }
+                Uri u;
+                if (pathOrUri.startsWith("content:") || pathOrUri.startsWith("file:")) {
+                    u = Uri.parse(pathOrUri);
+                } else {
+                    u = Uri.fromFile(new File(pathOrUri));
+                }
+                if (clip == null) {
+                    clip = new ClipData("Codename One", new String[]{ "text/uri-list" }, new ClipData.Item(u));
+                } else {
+                    clip.addItem(new ClipData.Item(u));
+                }
+            }
+        }
+        return clip;
+    }
+
+    /**
+     * Maps a content resolver image MIME type to the corresponding ClipboardContent MIME constant,
+     * defaulting to PNG for unrecognized image types.
+     */
+    private static String mimeForImageType(String type) {
+        if (type == null) {
+            return ClipboardContent.MIME_PNG;
+        }
+        if (type.startsWith(ClipboardContent.MIME_JPEG)) {
+            return ClipboardContent.MIME_JPEG;
+        }
+        if (type.startsWith(ClipboardContent.MIME_GIF)) {
+            return ClipboardContent.MIME_GIF;
+        }
+        return ClipboardContent.MIME_PNG;
     }
 
     /**
@@ -8602,8 +9003,67 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     response[0] = clipboard.getText().toString();
                 } else {
                     android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getActivity().getSystemService(Context.CLIPBOARD_SERVICE);
-                    ClipData.Item item = clipboard.getPrimaryClip().getItemAt(0);
-                    response[0] = item.getText();
+                    ClipData clip = clipboard.getPrimaryClip();
+                    if (clip == null || clip.getItemCount() == 0) {
+                        return;
+                    }
+                    ClipboardContent content = new ClipboardContent();
+                    String plain = null;
+                    String html = null;
+                    boolean hasImage = false;
+                    List<String> fileUris = new ArrayList<String>();
+                    for (int i = 0; i < clip.getItemCount(); i++) {
+                        ClipData.Item item = clip.getItemAt(i);
+                        try {
+                            Uri uri = item.getUri();
+                            if (uri != null) {
+                                String type = getContext().getContentResolver().getType(uri);
+                                if (type != null && type.startsWith("image/")) {
+                                    InputStream in = getContext().getContentResolver().openInputStream(uri);
+                                    if (in != null) {
+                                        try {
+                                            byte[] bytes = Util.readInputStream(in);
+                                            content.setData(mimeForImageType(type), bytes);
+                                            hasImage = true;
+                                        } finally {
+                                            in.close();
+                                        }
+                                    }
+                                    continue;
+                                }
+                                // Non-image URI -> file reference
+                                fileUris.add(uri.toString());
+                                continue;
+                            }
+                        } catch (Throwable t) {
+                            com.codename1.io.Log.e(t);
+                        }
+                        if (html == null && sdk >= 16) {
+                            String itemHtml = item.getHtmlText();
+                            if (itemHtml != null && itemHtml.length() > 0) {
+                                html = itemHtml;
+                            }
+                        }
+                        if (plain == null) {
+                            CharSequence text = item.coerceToText(getContext());
+                            if (text != null && text.length() > 0) {
+                                plain = text.toString();
+                            }
+                        }
+                    }
+                    if (html != null) {
+                        content.setData(ClipboardContent.MIME_HTML, html);
+                    }
+                    if (!fileUris.isEmpty()) {
+                        content.setData(ClipboardContent.MIME_FILE,
+                                fileUris.size() == 1 ? (Object) fileUris.get(0) : (Object) fileUris.toArray(new String[0]));
+                    }
+                    content.setData(ClipboardContent.MIME_TEXT, plain == null ? "" : plain);
+                    if (hasImage || html != null || !fileUris.isEmpty()) {
+                        response[0] = content;
+                    } else {
+                        response[0] = plain;
+                    }
                 }
             }
         });

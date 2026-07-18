@@ -1411,7 +1411,305 @@ public class IOSImplementation extends CodenameOneImplementation {
                 }
             }
         });
-        
+
+    }
+
+    // ---- low level text input source (pure Codename One editors) ----
+
+    private static com.codename1.ui.TextInputClient tiClient;
+    /// Immutable snapshot of the client's last pushed editing state; UIKit's synchronous
+    /// text/selection queries are answered from this on the iOS main thread (the EDT is a
+    /// separate ParparVM thread, so reading the live document there would race edits).
+    private static volatile com.codename1.ui.TextInputState tiSnapshot;
+    /// Generation of the last native-originated edit APPLIED to the Java document. Echoed back
+    /// with every state push so the native shadow can drop echoes that predate a newer local
+    /// edit (fast typing would otherwise regress the shadow text and caret).
+    private static volatile int tiNativeSeq;
+
+    @Override
+    public boolean isTextInputSupported() {
+        return true;
+    }
+
+    @Override
+    public Object startTextInput(com.codename1.ui.TextInputClient client, com.codename1.ui.TextInputConfig config) {
+        tiClient = client;
+        com.codename1.ui.TextInputState st = client.getEditingState();
+        tiSnapshot = st;
+        tiNativeSeq = 0;
+        int constraint = config != null ? config.getConstraint() : 0;
+        boolean autoCorrect = config == null || config.isAutoCorrect();
+        boolean autoCap = config == null || config.isAutoCapitalize();
+        boolean multiline = config == null || config.isMultiline();
+        nativeInstance.startTextInput(constraint, autoCorrect, autoCap, multiline,
+                st.getText(), st.getSelectionStart(), st.getSelectionEnd(),
+                config != null ? config.getActionType() : com.codename1.ui.TextInputConfig.ACTION_DEFAULT);
+        return client;
+    }
+
+    @Override
+    public void updateTextInputState(Object handle, com.codename1.ui.TextInputState state) {
+        if (handle == null || handle != tiClient || state == null) {
+            // a stale handle (an unbalanced session that was already replaced) must not
+            // disturb the currently bound client
+            return;
+        }
+        com.codename1.ui.TextInputClient c = tiClient;
+        int[] r = c != null ? c.getCaretRect() : new int[]{0, 0, 0, 0};
+        tiSnapshot = state;
+        nativeInstance.updateTextInputState(state.getText(), state.getSelectionStart(), state.getSelectionEnd(),
+                r[0], r[1], r[2], r[3], tiNativeSeq);
+        // Push the editor component's absolute bounds so the native input view can gate its touch region to
+        // the editor (letting iOS draw its selection loupe/handles there) while passing other touches through.
+        if (c instanceof com.codename1.ui.Component) {
+            com.codename1.ui.Component comp = (com.codename1.ui.Component) c;
+            nativeInstance.setTextInputBounds(comp.getAbsoluteX(), comp.getAbsoluteY(),
+                    comp.getWidth(), comp.getHeight());
+        }
+        tiKeepNativeCallbacksAlive();
+    }
+
+    // The ti* callbacks below are invoked ONLY from native code (CN1TextInputView.m). ParparVM's dead
+    // code eliminator does not reliably retain such methods from the native-source scan, so it stubs some
+    // of them to an empty body and the native call silently does nothing. Referencing them from this
+    // reachable method (behind a guard that is always false at runtime) forces the eliminator to keep
+    // their real bodies. tiKeepAlive is never set true.
+    private static boolean tiKeepAlive = false;
+
+    /// Consumes the keep-alive results below; several ti* queries are now pure snapshot reads,
+    /// and an ignored pure return would trip the static analysis gate.
+    private static int tiKeepAliveSink;
+
+    private static void tiKeepNativeCallbacksAlive() {
+        if (tiKeepAlive) {
+            tiCommit("", 0);
+            tiSetComposing("", 0, 0);
+            tiFinishComposing(0);
+            tiDeleteBackward(0);
+            tiKeyCommand(0, 0);
+            tiEditorAction(0);
+            tiReplaceRange(0, 0, "", 0);
+            tiSetSelection(0, 0, 0);
+            tiKeepAliveSink = tiTextLength()
+                    + tiTextRange(0, 0).length()
+                    + tiSelectionStart()
+                    + tiSelectionEnd()
+                    + tiRectForOffset(0).length
+                    + tiOffsetAtPoint(0, 0)
+                    + tiSelectionRects(0, 0).length
+                    + tiKeepAliveSink;
+        }
+    }
+
+    @Override
+    public void stopTextInput(Object handle) {
+        if (handle == null || handle != tiClient) {
+            return;
+        }
+        tiClient = null;
+        nativeInstance.stopTextInput();
+    }
+
+    /// Callback from native: committed text. `seq` is the native edit generation, recorded on the
+    /// EDT right before the edit applies so subsequent state pushes echo it back.
+    public static void tiCommit(final String text, final int seq) {
+        final com.codename1.ui.TextInputClient c = tiClient;
+        if (c == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                tiNativeSeq = seq;
+                c.commitText(text);
+            }
+        });
+    }
+
+    /// Callback from native: IME composing (marked) text.
+    public static void tiSetComposing(final String text, final int rel, final int seq) {
+        final com.codename1.ui.TextInputClient c = tiClient;
+        if (c == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                tiNativeSeq = seq;
+                c.setComposingText(text, rel);
+            }
+        });
+    }
+
+    /// Callback from native: composition finished.
+    public static void tiFinishComposing(final int seq) {
+        final com.codename1.ui.TextInputClient c = tiClient;
+        if (c == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                tiNativeSeq = seq;
+                c.finishComposing();
+            }
+        });
+    }
+
+    /// Callback from native: delete backward (one character before caret).
+    public static void tiDeleteBackward(final int seq) {
+        final com.codename1.ui.TextInputClient c = tiClient;
+        if (c == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                tiNativeSeq = seq;
+                c.deleteSurroundingText(1, 0);
+            }
+        });
+    }
+
+    /// Callback from native: a navigation / editing key command.
+    public static void tiKeyCommand(final int command, final int modifiers) {
+        final com.codename1.ui.TextInputClient c = tiClient;
+        if (c == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                c.onKeyCommand(command, modifiers);
+            }
+        });
+    }
+
+    /// Callback from native: keyboard return / action key.
+    public static void tiEditorAction(final int action) {
+        final com.codename1.ui.TextInputClient c = tiClient;
+        if (c == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                c.onEditorAction(action);
+            }
+        });
+    }
+
+    // ---- UITextInput text/selection/geometry queries. These arrive synchronously on the iOS
+    // MAIN thread while the EDT (a separate ParparVM thread) may be mid-edit, so text and
+    // selection are answered from the volatile immutable snapshot pushed with each state
+    // update, and layout-dependent geometry marshals onto the EDT. ----
+
+    /// Total document length in UTF-16 characters.
+    public static int tiTextLength() {
+        com.codename1.ui.TextInputState s = tiSnapshot;
+        return s != null ? s.getText().length() : 0;
+    }
+
+    /// Text in the range `[start, end)`.
+    public static String tiTextRange(int start, int end) {
+        com.codename1.ui.TextInputState s = tiSnapshot;
+        if (s == null) {
+            return "";
+        }
+        String t = s.getText();
+        int a = Math.max(0, Math.min(t.length(), start));
+        int b = Math.max(a, Math.min(t.length(), end));
+        return t.substring(a, b);
+    }
+
+    /// Current selection start offset.
+    public static int tiSelectionStart() {
+        com.codename1.ui.TextInputState s = tiSnapshot;
+        return s != null ? s.getSelectionStart() : 0;
+    }
+
+    /// Current selection end offset.
+    public static int tiSelectionEnd() {
+        com.codename1.ui.TextInputState s = tiSnapshot;
+        return s != null ? s.getSelectionEnd() : 0;
+    }
+
+    /// Runs a geometry query against the live editor on the EDT and returns its result. The main
+    /// thread never holds locks the EDT needs (all native UI work is dispatched asynchronously),
+    /// so the bounded wait cannot deadlock.
+    private static int[] tiGeometryQuery(final TiGeometryOp op) {
+        final com.codename1.ui.TextInputClient c = tiClient;
+        if (c == null) {
+            return new int[0];
+        }
+        Display d = Display.getInstance();
+        if (d.isEdt()) {
+            return op.run(c);
+        }
+        final int[][] out = new int[1][];
+        d.callSeriallyAndWait(new Runnable() {
+            public void run() {
+                if (c == tiClient) {
+                    out[0] = op.run(c);
+                }
+            }
+        });
+        return out[0] != null ? out[0] : new int[0];
+    }
+
+    private interface TiGeometryOp {
+        int[] run(com.codename1.ui.TextInputClient c);
+    }
+
+    /// Caret rectangle for an offset, absolute screen pixels `{x, y, w, h}`.
+    public static int[] tiRectForOffset(final int offset) {
+        int[] r = tiGeometryQuery(new TiGeometryOp() {
+            public int[] run(com.codename1.ui.TextInputClient c) {
+                return c.rectForOffset(offset);
+            }
+        });
+        return r.length >= 4 ? r : new int[]{0, 0, 0, 0};
+    }
+
+    /// Document offset nearest an absolute screen point (pixels).
+    public static int tiOffsetAtPoint(final int x, final int y) {
+        int[] r = tiGeometryQuery(new TiGeometryOp() {
+            public int[] run(com.codename1.ui.TextInputClient c) {
+                return new int[]{c.offsetAtPoint(x, y)};
+            }
+        });
+        return r.length > 0 ? r[0] : 0;
+    }
+
+    /// Selection rectangles for `[start, end)`, flat array of absolute-pixel `{x, y, w, h, ...}`.
+    public static int[] tiSelectionRects(final int start, final int end) {
+        return tiGeometryQuery(new TiGeometryOp() {
+            public int[] run(com.codename1.ui.TextInputClient c) {
+                return c.selectionRects(start, end);
+            }
+        });
+    }
+
+    /// Callback from native: replace a range with text (range based edit).
+    public static void tiReplaceRange(final int start, final int end, final String text, final int seq) {
+        final com.codename1.ui.TextInputClient c = tiClient;
+        if (c == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                tiNativeSeq = seq;
+                c.replaceRange(start, end, text);
+            }
+        });
+    }
+
+    /// Callback from native: set the selection range.
+    public static void tiSetSelection(final int start, final int end, final int seq) {
+        final com.codename1.ui.TextInputClient c = tiClient;
+        if (c == null) {
+            return;
+        }
+        Display.getInstance().callSerially(new Runnable() {
+            public void run() {
+                tiNativeSeq = seq;
+                c.setSelectionRange(start, end);
+            }
+        });
     }
 
     @Override
@@ -7632,7 +7930,37 @@ public class IOSImplementation extends CodenameOneImplementation {
     @Override
     public Object getPasteDataFromClipboard() {
         String s = nativeInstance.getClipboardString();
+        com.codename1.ui.ClipboardContent content = new com.codename1.ui.ClipboardContent()
+                .setData(com.codename1.ui.ClipboardContent.MIME_TEXT, s)
+                .setData(com.codename1.ui.ClipboardContent.MIME_HTML,
+                        nativeInstance.getClipboardContent(com.codename1.ui.ClipboardContent.MIME_HTML))
+                .setData(com.codename1.ui.ClipboardContent.MIME_RTF,
+                        nativeInstance.getClipboardContent(com.codename1.ui.ClipboardContent.MIME_RTF))
+                .setData(com.codename1.ui.ClipboardContent.MIME_MARKDOWN,
+                        nativeInstance.getClipboardContent(com.codename1.ui.ClipboardContent.MIME_MARKDOWN))
+                .setData(com.codename1.ui.ClipboardContent.MIME_ASCIIDOC,
+                        nativeInstance.getClipboardContent(com.codename1.ui.ClipboardContent.MIME_ASCIIDOC));
+        byte[] image = nativeInstance.getClipboardImage();
+        if(image != null && image.length > 0) {
+            content.setData(com.codename1.ui.ClipboardContent.MIME_PNG, image);
+        }
+        String files = nativeInstance.getClipboardFileUris();
+        if(files != null && files.length() > 0) {
+            String[] parts = splitClipboardFileUris(files);
+            content.setData(com.codename1.ui.ClipboardContent.MIME_FILE,
+                    parts.length == 1 ? parts[0] : parts);
+        }
+        int mimeCount = content.getMimeTypes().length;
+        if(mimeCount > 1 || (s == null && mimeCount > 0)) {
+            return content;
+        }
         if(s != null) {
+            Object lightweight = super.getPasteDataFromClipboard();
+            if(lightweight instanceof com.codename1.ui.ClipboardContent
+                    && s.equals(((com.codename1.ui.ClipboardContent)lightweight)
+                            .getText(com.codename1.ui.ClipboardContent.MIME_TEXT))) {
+                return lightweight;
+            }
             return s;
         }
         return super.getPasteDataFromClipboard();
@@ -7640,6 +7968,19 @@ public class IOSImplementation extends CodenameOneImplementation {
     
     @Override
     public void copyToClipboard(Object obj) {
+        if(obj instanceof com.codename1.ui.ClipboardContent) {
+            com.codename1.ui.ClipboardContent content = (com.codename1.ui.ClipboardContent)obj;
+            nativeInstance.setClipboardContent(
+                    content.getText(com.codename1.ui.ClipboardContent.MIME_TEXT),
+                    content.getText(com.codename1.ui.ClipboardContent.MIME_HTML),
+                    content.getText(com.codename1.ui.ClipboardContent.MIME_RTF),
+                    content.getText(com.codename1.ui.ClipboardContent.MIME_MARKDOWN),
+                    content.getText(com.codename1.ui.ClipboardContent.MIME_ASCIIDOC),
+                    clipboardImageBytes(content),
+                    clipboardFileUris(content));
+            super.copyToClipboard(obj);
+            return;
+        }
         if(obj instanceof String) {
             nativeInstance.setClipboardString((String)obj);
             super.copyToClipboard(obj);
@@ -7647,6 +7988,58 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         nativeInstance.setClipboardString(null);
         super.copyToClipboard(obj);
+    }
+
+    /// Preferred image representation (PNG, then JPEG, then GIF bytes) for the pasteboard, or null.
+    private static byte[] clipboardImageBytes(com.codename1.ui.ClipboardContent content) {
+        byte[] b = content.getBytes(com.codename1.ui.ClipboardContent.MIME_PNG);
+        if(b == null) {
+            b = content.getBytes(com.codename1.ui.ClipboardContent.MIME_JPEG);
+        }
+        if(b == null) {
+            b = content.getBytes(com.codename1.ui.ClipboardContent.MIME_GIF);
+        }
+        return b;
+    }
+
+    /// Newline-joined file URIs from the MIME_FILE representation (a String or String[]), or null.
+    private static String clipboardFileUris(com.codename1.ui.ClipboardContent content) {
+        Object value = content.getData(com.codename1.ui.ClipboardContent.MIME_FILE);
+        if(value instanceof String) {
+            return (String)value;
+        }
+        if(value instanceof String[]) {
+            String[] arr = (String[])value;
+            StringBuilder sb = new StringBuilder();
+            for(int i = 0 ; i < arr.length ; i++) {
+                if(arr[i] == null || arr[i].length() == 0) {
+                    continue;
+                }
+                if(sb.length() > 0) {
+                    sb.append('\n');
+                }
+                sb.append(arr[i]);
+            }
+            return sb.length() == 0 ? null : sb.toString();
+        }
+        return null;
+    }
+
+    private static String[] splitClipboardFileUris(String joined) {
+        java.util.List<String> parts = new java.util.ArrayList<String>();
+        int start = 0;
+        for(int i = 0 ; i < joined.length() ; i++) {
+            if(joined.charAt(i) == '\n') {
+                if(i > start) {
+                    parts.add(joined.substring(start, i));
+                }
+                start = i + 1;
+            }
+        }
+        if(start < joined.length()) {
+            parts.add(joined.substring(start));
+        }
+        return parts.toArray(new String[parts.size()]);
     }
 
     /*class RunnableCleanup implements Runnable {

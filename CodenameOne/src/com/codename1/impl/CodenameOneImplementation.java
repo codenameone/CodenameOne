@@ -75,6 +75,7 @@ import com.codename1.ui.BrowserWindow;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Command;
+import com.codename1.ui.ClipboardContent;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
@@ -5200,6 +5201,12 @@ public abstract class CodenameOneImplementation {
         lightweightClipboard = obj;
     }
 
+    /// Copies multiple native clipboard representations in one operation. Ports should override
+    /// `copyToClipboard(Object)` and publish every MIME representation they support.
+    public void copyToClipboard(ClipboardContent content) {
+        copyToClipboard((Object) content);
+    }
+
     /// Returns the current content of the clipboard
     ///
     /// #### Returns
@@ -5207,6 +5214,53 @@ public abstract class CodenameOneImplementation {
     /// can be any object or null see copyToClipboard
     public Object getPasteDataFromClipboard() {
         return lightweightClipboard;
+    }
+
+    /// Stores clipboard data received from a native paste event without publishing it back to the
+    /// system clipboard. Ports that negotiate multiple native clipboard representations should call
+    /// this before dispatching the framework paste event.
+    ///
+    /// #### Parameters
+    ///
+    /// - `data`: the clipboard payload exposed to `getPasteDataFromClipboard()`
+    protected final void setPasteDataFromClipboard(Object data) {
+        lightweightClipboard = data;
+    }
+
+    /// Extracts a plain-text representation from an arbitrary clipboard payload for ports whose system
+    /// clipboard is text only. Handles a raw `String` and any `ClipboardContent` (including its
+    /// `RichTextClipboardData` subtype) uniformly, so every text-only port degrades a generic
+    /// `ClipboardContent` the same way instead of each reimplementing the check. Returns null when the
+    /// payload carries no text representation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: the clipboard payload passed to `copyToClipboard(Object)`
+    ///
+    /// #### Returns
+    ///
+    /// the plain-text representation, or null
+    protected final String getPlainTextForClipboard(Object obj) {
+        if (obj instanceof String) {
+            return (String) obj;
+        }
+        if (obj instanceof ClipboardContent) {
+            return ((ClipboardContent) obj).getText(ClipboardContent.MIME_TEXT);
+        }
+        return null;
+    }
+
+    /// Returns the clipboard representations available to framework code. The default adapter keeps
+    /// old ports source-compatible while exposing plain text and content written through the new API.
+    public ClipboardContent getClipboardContent() {
+        Object value = getPasteDataFromClipboard();
+        if (value instanceof ClipboardContent) {
+            return (ClipboardContent) value;
+        }
+        if (value instanceof String) {
+            return new ClipboardContent().setData(ClipboardContent.MIME_TEXT, value);
+        }
+        return null;
     }
 
     /// Returns true if the device is currently in portrait mode
@@ -5350,6 +5404,55 @@ public abstract class CodenameOneImplementation {
     /// the queried value or null
     public String editorPeerQuery(PeerComponent peer, String name, String arg) {
         return null;
+    }
+
+    /// Returns true when this platform can bind a `com.codename1.ui.TextInputClient` to a low level text
+    /// input source (soft keyboard / IME / hardware keyboard) so a component can capture raw text input
+    /// while rendering the document itself. When false the pure Codename One editors fall back to their
+    /// `BrowserComponent` backend. The default returns false.
+    public boolean isTextInputSupported() {
+        return false;
+    }
+
+    /// Binds a `com.codename1.ui.TextInputClient` to the platform text input source and shows the soft
+    /// keyboard on touch devices. The platform then routes committed text, IME composition, deletions and
+    /// key commands into the client, and reads back the client's editing state and caret rectangle. The
+    /// returned handle identifies this binding for `#updateTextInputState` and `#stopTextInput`. The
+    /// default returns null (unsupported).
+    ///
+    /// #### Parameters
+    ///
+    /// - `client`: the input client to bind
+    ///
+    /// - `config`: the desired keyboard type and input behavior
+    ///
+    /// #### Returns
+    ///
+    /// an opaque handle for this binding, or null when unsupported
+    public Object startTextInput(com.codename1.ui.TextInputClient client, com.codename1.ui.TextInputConfig config) {
+        return null;
+    }
+
+    /// Pushes the client's authoritative editing state (surrounding text, selection, composition and
+    /// caret rectangle) down to the platform input source so autocorrect, prediction and the IME
+    /// candidate window stay in sync after a Codename One side edit (programmatic change, undo, reflow).
+    /// No-op by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `handle`: the handle returned by `#startTextInput`
+    ///
+    /// - `state`: the current editing state
+    public void updateTextInputState(Object handle, com.codename1.ui.TextInputState state) {
+    }
+
+    /// Unbinds a text input client bound with `#startTextInput` and hides the soft keyboard on touch
+    /// devices. No-op by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `handle`: the handle returned by `#startTextInput`
+    public void stopTextInput(Object handle) {
     }
 
     /// Posts a message to the window in a BrowserComponent.  This is intended to be an abstraction of the Javascript postMessage() API.

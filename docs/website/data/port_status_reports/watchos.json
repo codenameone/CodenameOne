@@ -168,7 +168,11 @@
       "status": "pass"
     },
     "CodeEditorScreenshotTest": {
-      "feature": "embedded-web-content",
+      "feature": "pure-text-editing",
+      "status": "pass"
+    },
+    "PureEditorScreenshotTest": {
+      "feature": "pure-text-editing",
       "status": "pass"
     },
     "ComponentReplaceFadeScreenshotTest": {
@@ -456,7 +460,7 @@
       "status": "pass"
     },
     "RichTextAreaScreenshotTest": {
-      "feature": "embedded-web-content",
+      "feature": "pure-text-editing",
       "status": "pass"
     },
     "Rotate": {
@@ -673,6 +677,10 @@
         "VideoIO-unsupported-on-ios"
       ],
       "status": "skip"
+    },
+    "ClipboardRoundTripTest": {
+      "feature": "clipboard",
+      "status": "not-run"
     }
   },
   "bootstrap_source": "successful-master-workflow",

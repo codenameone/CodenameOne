@@ -177,8 +177,8 @@ public class HTML5BrowserComponent extends HTML5Peer {
             // iframe -- i.e. when #codenameone-canvas has been flipped to
             // pointer-events:none over a transparent ("punched") hole because the
             // peer is showing through (see browser_bridge.js installPeerPointerToggle).
-            // In that state the event genuinely belongs to the peer (e.g. typing /
-            // clicking in the Playground's Monaco editor), so re-dispatching a
+            // In that state the event genuinely belongs to the peer (e.g. typing or
+            // clicking in an embedded editor), so re-dispatching a
             // synthetic copy back into CN1 is wrong: CN1 treats it as a press on the
             // peer component and relayout/refocus churn reloads the iframe, wiping
             // the editor back to its bootstrap source. When the canvas is opaque the
@@ -601,8 +601,8 @@ public class HTML5BrowserComponent extends HTML5Peer {
     // so ``doc.documentElement.contains(el)`` compares the worker's doc proxy
     // against the el proxy and ALWAYS returns false. initComponent() then thinks the
     // iframe was never added and re-appends it on every call -- and re-inserting an
-    // iframe RELOADS it, which re-runs editor.js / re-bootstraps Monaco and wipes the
-    // user's edits back to the bootstrap source ("typed character erased immediately"
+    // iframe RELOADS its document and wipes the user's edits back to the bootstrap source
+    // ("typed character erased immediately"
     // / "no interaction"). Because clicking a peer now actually reaches it (the
     // pointer-events toggle), initComponent gets driven repeatedly and the editor
     // reloaded on every interaction. Probe through the JSO bridge instead:

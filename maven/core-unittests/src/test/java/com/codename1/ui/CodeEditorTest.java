@@ -1,12 +1,39 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.editor.SyntaxHighlightResult;
+import com.codename1.ui.editor.SyntaxToken;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -64,6 +91,31 @@ class CodeEditorTest extends UITestBase {
         assertTrue(c.contains("setTheme:dark"));
         assertTrue(c.contains("setLineNumbers:0"));
         assertTrue(c.contains("setTabSize:2"));
+    }
+
+    @FormTest
+    void testThirdPartyHighlighterUsedByPureEditor() {
+        // A registered third-party highlighter is consumed by the pure code view directly (it tokenizes
+        // with it while painting); there is no browser highlight round-trip.
+        CodeEditor.registerSyntaxHighlighter("properties", (line, state) ->
+                new SyntaxHighlightResult(Arrays.asList(
+                        new SyntaxToken(0, Math.max(0, line.indexOf('=')), SyntaxToken.PROPERTY,
+                                0x112233, 0x445566)), 0));
+        try {
+            assertNotNull(CodeEditor.getRegisteredSyntaxHighlighter("properties"));
+            implementation.setEditorNativePeerSupported(false);
+            CodeEditor editor = new CodeEditor("properties", "accent=#0a66c2");
+            Form f = new Form("code", new BorderLayout());
+            f.add(BorderLayout.CENTER, editor);
+            f.show();
+            pump();
+            assertFalse(editor.isNativeEditor());
+            Component view = editor.getComponentAt(0);
+            assertTrue(view instanceof com.codename1.ui.editor.CodeView,
+                    "pure CodeView, got " + view.getClass().getName());
+        } finally {
+            CodeEditor.registerSyntaxHighlighter("properties", null);
+        }
     }
 
     @FormTest
@@ -216,14 +268,38 @@ class CodeEditorTest extends UITestBase {
     }
 
     @FormTest
-    void testBrowserFallbackUsesCodeEditorPage() {
-        // no native peer -> cross platform browser backend
-        CodeEditor editor = new CodeEditor();
+    void testPureBackendUsedWhenNoNativePeer() {
+        // no native peer -> pure Codename One code engine
+        CodeEditor editor = new CodeEditor("java", "class A {}");
         Form f = new Form("code", new BorderLayout());
         f.add(BorderLayout.CENTER, editor);
         f.show();
         pump();
         assertFalse(editor.isNativeEditor());
-        assertNotNull(editor.getInternalBrowser());
+        assertTrue(editor.isEditorReady());
+        final java.util.concurrent.atomic.AtomicReference<String> text =
+                new java.util.concurrent.atomic.AtomicReference<String>();
+        editor.getText(new com.codename1.util.SuccessCallback<String>() {
+            public void onSucess(String v) {
+                text.set(v);
+            }
+        });
+        pump();
+        assertEquals("class A {}", text.get());
+    }
+
+    @FormTest
+    void testPureEditorUsedWithoutLowLevelTextInput() {
+        // With no low-level text input the editor still uses the pure engine (raw keyboard path);
+        // there is no browser fallback.
+        implementation.setTextInputSupported(false);
+        CodeEditor editor = new CodeEditor("java", "class A {}");
+        Form f = new Form("code", new BorderLayout());
+        f.add(BorderLayout.CENTER, editor);
+        f.show();
+        pump();
+        assertFalse(editor.isNativeEditor());
+        assertTrue(editor.isEditorReady());
+        assertTrue(editor.getComponentAt(0) instanceof com.codename1.ui.editor.EditorView);
     }
 }

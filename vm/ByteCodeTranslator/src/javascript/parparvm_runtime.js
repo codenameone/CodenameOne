@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 (function(global) {
 const CN1_STRING_VALUE = "cn1_java_lang_String_value";
 const CN1_STRING_OFFSET = "cn1_java_lang_String_offset";
@@ -1892,6 +1915,10 @@ const jvm = {
       obj.__classDef.assignableTo[className] = 1;
       return true;
     }
+    if (obj.__array && obj.__class && jvm.arrayAssignable(obj.__class, className)) {
+      obj.__classDef.assignableTo[className] = 1;
+      return true;
+    }
     return false;
   },
   /**
@@ -3524,11 +3551,43 @@ jvm.nO = jvm.newObject;
 // always a valid cast per JVM spec. Replaces ~280 chars of inline
 // assignableTo/enhanceJsWrapper boilerplate at each of the ~2200
 // CHECKCAST call sites in Initializr.
+// JVM array covariance. The ``classes`` graph only holds declared types, so
+// array casts resolve structurally here: any array is an Object / Cloneable /
+// Serializable; a multi-dimensional or object array is an Object[] (this is
+// what ``List.toArray(new int[n][])`` relies on -- the erased signature
+// checkcasts the argument to Object[]); and same-dimension object arrays
+// follow component covariance through the class graph.
+jvm.arrayAssignable = function(srcClass, targetClass) {
+  if (typeof srcClass !== "string" || typeof targetClass !== "string") return false;
+  if (srcClass.length < 2 || srcClass.indexOf("[]", srcClass.length - 2) < 0) return false;
+  if (targetClass === "java_lang_Object" || targetClass === "java_lang_Cloneable"
+      || targetClass === "java_io_Serializable") {
+    return true;
+  }
+  let s = srcClass;
+  let t = targetClass;
+  while (s.indexOf("[]", s.length - 2) >= 0 && t.indexOf("[]", t.length - 2) >= 0) {
+    s = s.substring(0, s.length - 2);
+    t = t.substring(0, t.length - 2);
+  }
+  if (t.indexOf("[]", t.length - 2) >= 0) return false; // target has more dimensions
+  const sIsArray = s.indexOf("[]", s.length - 2) >= 0;
+  if (t === "java_lang_Object" || t === "java_lang_Cloneable" || t === "java_io_Serializable") {
+    // a deeper array component is itself an object; a bare primitive is not
+    return sIsArray || s.indexOf("JAVA_") !== 0;
+  }
+  if (sIsArray || s.indexOf("JAVA_") === 0) return s === t;
+  return s === t || jvm.assignableViaAncestors(s, t);
+};
 jvm.cC = function(value, className) {
   if (value == null) return;
   const cd = value.__classDef;
   if (value.__class === className || (cd && cd.assignableTo && cd.assignableTo[className])) return;
   if (value.__class && jvm.assignableViaAncestors(value.__class, className)) {
+    if (cd && cd.assignableTo) cd.assignableTo[className] = 1;
+    return;
+  }
+  if (value.__array && value.__class && jvm.arrayAssignable(value.__class, className)) {
     if (cd && cd.assignableTo) cd.assignableTo[className] = 1;
     return;
   }
@@ -3577,6 +3636,10 @@ jvm.iO = function(value, className) {
   const cd = value.__classDef;
   if (cd && cd.assignableTo && cd.assignableTo[className]) return true;
   if (value.__class && jvm.assignableViaAncestors(value.__class, className)) {
+    if (cd && cd.assignableTo) cd.assignableTo[className] = 1;
+    return true;
+  }
+  if (value.__array && value.__class && jvm.arrayAssignable(value.__class, className)) {
     if (cd && cd.assignableTo) cd.assignableTo[className] = 1;
     return true;
   }
@@ -5194,7 +5257,15 @@ bindNative(["cn1_java_lang_System_nanoTime_R_long", "cn1_java_lang_System_nanoTi
 });
 bindNative(["cn1_java_lang_System_identityHashCode_java_lang_Object_R_int", "cn1_java_lang_System_identityHashCode___java_lang_Object_R_int"], function(obj) { return identityHash(obj); });
 bindNative(["cn1_java_lang_System_arraycopy_java_lang_Object_int_java_lang_Object_int_int", "cn1_java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int"], function(src, srcOffset, dst, dstOffset, length) {
-  for (let i = 0; i < length; i++) dst[dstOffset + i] = src[srcOffset + i];
+  // System.arraycopy has memmove semantics when source and destination ranges
+  // overlap.  Copying forward unconditionally corrupts right-shifts such as
+  // StringBuilder.insert(), repeating the character at the insertion point
+  // through the rest of the buffer.
+  if (src === dst && dstOffset > srcOffset && dstOffset < srcOffset + length) {
+    for (let i = length - 1; i >= 0; i--) dst[dstOffset + i] = src[srcOffset + i];
+  } else {
+    for (let i = 0; i < length; i++) dst[dstOffset + i] = src[srcOffset + i];
+  }
   return null;
 });
 bindNative(["cn1_java_lang_System_gcLight", "cn1_java_lang_System_gcLight__"], function() { return null; });

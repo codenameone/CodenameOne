@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package bsh.cn1.gen;
 
 import bsh.cn1.CN1AccessException;
@@ -111,6 +134,10 @@ public final class GeneratedAccess_com_codename1_ui_html {
             if (matches(safeArgs, new Class<?>[0], false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[0], false);
                 return new com.codename1.ui.html.HTMLParser();
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Boolean.class}, false);
+                return new com.codename1.ui.html.HTMLParser(((Boolean) adaptedArgs[0]).booleanValue());
             }
         }
         throw unsupportedConstruct(type, safeArgs);
@@ -484,6 +511,15 @@ public final class GeneratedAccess_com_codename1_ui_html {
     }
 
     private static Object invoke4(com.codename1.ui.html.HTMLComponent typedTarget, String name, Object[] safeArgs) throws Exception {
+        if ("accessibilityChanged".equals(name)) {
+            if (safeArgs.length == 0) {
+                typedTarget.accessibilityChanged(); return null;
+            }
+            if (matches(safeArgs, new Class<?>[]{java.lang.Integer.class}, false)) {
+                Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{java.lang.Integer.class}, false);
+                typedTarget.accessibilityChanged(toIntValue(adaptedArgs[0])); return null;
+            }
+        }
         if ("actionPerformed".equals(name)) {
             if (matches(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false)) {
                 Object[] adaptedArgs = adaptArgs(safeArgs, new Class<?>[]{com.codename1.ui.events.ActionEvent.class}, false);
@@ -833,6 +869,11 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("getAbsoluteY".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getAbsoluteY();
+            }
+        }
+        if ("getAccessibilityNode".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getAccessibilityNode();
             }
         }
         if ("getAccessibilityText".equals(name)) {
@@ -1302,6 +1343,11 @@ public final class GeneratedAccess_com_codename1_ui_html {
         if ("getSelectedStyle".equals(name)) {
             if (safeArgs.length == 0) {
                 return typedTarget.getSelectedStyle();
+            }
+        }
+        if ("getSemantics".equals(name)) {
+            if (safeArgs.length == 0) {
+                return typedTarget.getSemantics();
             }
         }
         if ("getSideGap".equals(name)) {

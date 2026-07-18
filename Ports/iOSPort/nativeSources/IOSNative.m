@@ -613,6 +613,99 @@ void com_codename1_impl_ios_IOSNative_setClipboardString___java_lang_String(CN1_
 #endif // !TARGET_OS_WATCH && !TARGET_OS_TV
 }
 
+static NSString* cn1PasteboardTypeForMime(NSString* mimeType) {
+    if ([mimeType isEqualToString:@"text/plain"]) return @"public.utf8-plain-text";
+    if ([mimeType isEqualToString:@"text/html"]) return @"public.html";
+    if ([mimeType isEqualToString:@"text/rtf"]) return @"public.rtf";
+    return mimeType;
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardContent___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT mimeType) {
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+    POOL_BEGIN();
+    NSString* type = cn1PasteboardTypeForMime(toNSString(CN1_THREAD_STATE_PASS_ARG mimeType));
+    NSData* data = [[UIPasteboard generalPasteboard] dataForPasteboardType:type];
+    NSString* value = data == nil ? nil : [[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] autorelease];
+    JAVA_OBJECT result = fromNSString(CN1_THREAD_STATE_PASS_ARG value);
+    POOL_END();
+    return result;
+#else
+    return JAVA_NULL;
+#endif
+}
+
+extern NSData* arrayToData(JAVA_OBJECT arr);
+extern JAVA_OBJECT nsDataToByteArr(NSData *data);
+
+void com_codename1_impl_ios_IOSNative_setClipboardContent___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT plain, JAVA_OBJECT html, JAVA_OBJECT rtf, JAVA_OBJECT markdown, JAVA_OBJECT asciidoc, JAVA_OBJECT image, JAVA_OBJECT fileUris) {
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+    POOL_BEGIN();
+    NSMutableDictionary* item = [NSMutableDictionary dictionary];
+    JAVA_OBJECT values[] = { plain, html, rtf, markdown, asciidoc };
+    NSString* types[] = { @"public.utf8-plain-text", @"public.html", @"public.rtf", @"text/markdown", @"text/asciidoc" };
+    for (int i = 0; i < 5; i++) {
+        if (values[i] != JAVA_NULL) {
+            NSString* value = toNSString(CN1_THREAD_STATE_PASS_ARG values[i]);
+            NSData* data = [value dataUsingEncoding:NSUTF8StringEncoding];
+            if (data != nil) [item setObject:data forKey:types[i]];
+        }
+    }
+    if (image != JAVA_NULL) {
+        NSData* imgData = arrayToData(image);
+        if (imgData != nil && imgData.length > 0) [item setObject:imgData forKey:@"public.png"];
+    }
+    NSMutableArray* items = [NSMutableArray array];
+    if ([item count] > 0) [items addObject:item];
+    if (fileUris != JAVA_NULL) {
+        NSString* joined = toNSString(CN1_THREAD_STATE_PASS_ARG fileUris);
+        for (NSString* u in [joined componentsSeparatedByString:@"\n"]) {
+            if (u.length == 0) continue;
+            NSData* urlData = [u dataUsingEncoding:NSUTF8StringEncoding];
+            if (urlData != nil) [items addObject:[NSDictionary dictionaryWithObject:urlData forKey:@"public.url"]];
+        }
+    }
+    [UIPasteboard generalPasteboard].items = items;
+    POOL_END();
+#endif
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardImage___R_byte_1ARRAY(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+    POOL_BEGIN();
+    UIPasteboard* pb = [UIPasteboard generalPasteboard];
+    NSData* data = [pb dataForPasteboardType:@"public.png"];
+    if (data == nil && pb.hasImages) {
+        UIImage* img = pb.image;
+        if (img != nil) data = UIImagePNGRepresentation(img);
+    }
+    JAVA_OBJECT result = (data == nil || data.length == 0) ? JAVA_NULL : nsDataToByteArr(data);
+    POOL_END();
+    return result;
+#else
+    return JAVA_NULL;
+#endif
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_getClipboardFileUris___R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+    POOL_BEGIN();
+    UIPasteboard* pb = [UIPasteboard generalPasteboard];
+    NSString* joined = nil;
+    if (pb.hasURLs) {
+        NSMutableArray* parts = [NSMutableArray array];
+        for (NSURL* u in pb.URLs) {
+            if (u != nil) [parts addObject:[u absoluteString]];
+        }
+        if (parts.count > 0) joined = [parts componentsJoinedByString:@"\n"];
+    }
+    JAVA_OBJECT result = fromNSString(CN1_THREAD_STATE_PASS_ARG joined);
+    POOL_END();
+    return result;
+#else
+    return JAVA_NULL;
+#endif
+}
+
 
 void retainCN1(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT o){
     com_codename1_impl_ios_IOSImplementation_retain___java_lang_Object(CN1_THREAD_STATE_PASS_ARG o);

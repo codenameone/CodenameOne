@@ -662,6 +662,22 @@ public class JSOImplementations {
         @JSProperty
         public boolean isRepeat();
     }
+
+    public interface CompositionEvent extends Event {
+        @JSProperty
+        public String getData();
+    }
+
+    public interface InputEvent extends Event {
+        @JSProperty
+        public String getData();
+
+        @JSProperty
+        public String getInputType();
+
+        @JSProperty
+        public boolean isComposing();
+    }
     
     
     

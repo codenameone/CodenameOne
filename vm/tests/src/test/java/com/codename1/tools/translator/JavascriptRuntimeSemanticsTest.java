@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package com.codename1.tools.translator;
 
 import org.junit.jupiter.params.ParameterizedTest;
@@ -18,7 +41,7 @@ class JavascriptRuntimeSemanticsTest {
     void executesArrayCovarianceInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
         WorkerRunResult result = translateAndRunFixture(config, "JsArrayCovarianceApp.java", "JsArrayCovarianceApp");
 
-        assertEquals(511, result.result, "Translated runtime should preserve CN1-relevant array covariance semantics");
+        assertEquals(4095, result.result, "Translated runtime should preserve CN1-relevant array covariance semantics");
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
     }
 
@@ -287,8 +310,8 @@ class JavascriptRuntimeSemanticsTest {
     void preservesPrimitiveArrayLiteralAndCopySemanticsInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
         WorkerRunResult result = translateAndRunFixture(config, "JsPrimitiveArraySemanticsApp.java", "JsPrimitiveArraySemanticsApp");
 
-        assertEquals(255, result.result,
-                "Translated runtime should preserve primitive byte[]/float[] literals and System.arraycopy semantics. raw="
+        assertEquals(1023, result.result,
+                "Translated runtime should preserve primitive array literals and overlapping System.arraycopy semantics. raw="
                         + result.rawMessage + " err=" + result.errorMessage);
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
     }

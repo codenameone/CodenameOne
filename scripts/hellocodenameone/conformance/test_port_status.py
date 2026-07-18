@@ -15,7 +15,7 @@ class PortStatusTest(unittest.TestCase):
 
     def test_contract_covers_registered_tests_and_goldens(self):
         counts = port_status.validate(self.manifest)
-        self.assertEqual(164, counts["tests"])
+        self.assertEqual(166, counts["tests"])
         self.assertEqual(1, counts["performance_tests"])
         self.assertGreaterEqual(counts["features"], 51)
         self.assertEqual(11, counts["ports"])

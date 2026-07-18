@@ -1995,8 +1995,34 @@ public class LinuxImplementation extends CodenameOneImplementation {
      */
     @Override
     public void copyToClipboard(Object obj) {
-        if (obj instanceof String) {
-            LinuxNative.clipboardSetText((String) obj);
+        String text = getPlainTextForClipboard(obj);
+        // GTK clipboard set-calls replace each other, so the last non-null wins.
+        // Set text first, then image, then files, so a richer representation
+        // survives while a text-only copy still works.
+        if (text != null) {
+            LinuxNative.clipboardSetText(text);
+        }
+        if (obj instanceof com.codename1.ui.ClipboardContent) {
+            com.codename1.ui.ClipboardContent content = (com.codename1.ui.ClipboardContent) obj;
+            byte[] image = content.getBytes(com.codename1.ui.ClipboardContent.MIME_PNG);
+            if (image == null) {
+                image = content.getBytes(com.codename1.ui.ClipboardContent.MIME_JPEG);
+            }
+            if (image == null) {
+                image = content.getBytes(com.codename1.ui.ClipboardContent.MIME_GIF);
+            }
+            if (image != null) {
+                LinuxNative.clipboardSetImage(image);
+            }
+            Object files = content.getData(com.codename1.ui.ClipboardContent.MIME_FILE);
+            if (files instanceof String[]) {
+                String[] paths = (String[]) files;
+                if (paths.length > 0) {
+                    LinuxNative.clipboardSetFiles(paths);
+                }
+            } else if (files instanceof String) {
+                LinuxNative.clipboardSetFiles(new String[] { (String) files });
+            }
         }
         super.copyToClipboard(obj);
     }
@@ -2004,7 +2030,31 @@ public class LinuxImplementation extends CodenameOneImplementation {
     @Override
     public Object getPasteDataFromClipboard() {
         String text = LinuxNative.clipboardGetText();
+        byte[] image = LinuxNative.clipboardGetImage();
+        String[] files = LinuxNative.clipboardGetFiles();
+        // When the system clipboard carries an image or files (or more than one
+        // representation), reconstruct a full ClipboardContent for the caller.
+        if (image != null || (files != null && files.length > 0)) {
+            com.codename1.ui.ClipboardContent content = new com.codename1.ui.ClipboardContent();
+            if (text != null) {
+                content.setData(com.codename1.ui.ClipboardContent.MIME_TEXT, text);
+            }
+            if (image != null) {
+                content.setData(com.codename1.ui.ClipboardContent.MIME_PNG, image);
+            }
+            if (files != null && files.length > 0) {
+                content.setData(com.codename1.ui.ClipboardContent.MIME_FILE,
+                        files.length == 1 ? files[0] : files);
+            }
+            return content;
+        }
         if (text != null) {
+            Object lightweight = super.getPasteDataFromClipboard();
+            if (lightweight instanceof com.codename1.ui.ClipboardContent
+                    && text.equals(((com.codename1.ui.ClipboardContent) lightweight)
+                            .getText(com.codename1.ui.ClipboardContent.MIME_TEXT))) {
+                return lightweight;
+            }
             return text;
         }
         return super.getPasteDataFromClipboard();

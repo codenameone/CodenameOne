@@ -554,6 +554,231 @@ JAVA_OBJECT com_codename1_impl_windows_WindowsNative_clipboardGetText___R_java_l
     return result;
 }
 
+/*
+ * Image clipboard. PNG bytes are stored verbatim under a privately registered
+ * "PNG" clipboard format (RegisterClipboardFormatW). This round-trips within the
+ * app and interoperates with apps that read the "PNG" format (Chrome, Firefox,
+ * GIMP). CF_DIB interop with Explorer is intentionally skipped to avoid C/C++
+ * WIC/COM interop from this C translation unit.
+ */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_clipboardSetImage___byte_1ARRAY(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    UINT cf;
+    BYTE* bytes;
+    DWORD len;
+    HGLOBAL mem;
+    void* dst;
+    if (__cn1Arg1 == JAVA_NULL) {
+        return;
+    }
+    bytes = (BYTE*) (*(JAVA_ARRAY) __cn1Arg1).data;
+    len = (DWORD) (*(JAVA_ARRAY) __cn1Arg1).length;
+    cf = RegisterClipboardFormatW(L"PNG");
+    if (cf == 0) {
+        return;
+    }
+    if (!OpenClipboard(cn1Win.hwnd)) {
+        return;
+    }
+    EmptyClipboard();
+    mem = GlobalAlloc(GMEM_MOVEABLE, (SIZE_T) len);
+    if (mem == NULL) {
+        CloseClipboard();
+        return;
+    }
+    dst = GlobalLock(mem);
+    if (dst == NULL) {
+        GlobalFree(mem);
+        CloseClipboard();
+        return;
+    }
+    memcpy(dst, bytes, (size_t) len);
+    GlobalUnlock(mem);
+    if (SetClipboardData(cf, mem) == NULL) {
+        /* ownership only transfers on success; free on failure */
+        GlobalFree(mem);
+    }
+    CloseClipboard();
+}
+
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_clipboardGetImage___R_byte_1ARRAY(
+        CODENAME_ONE_THREAD_STATE) {
+    UINT cf;
+    HANDLE data;
+    SIZE_T sz;
+    void* p;
+    JAVA_OBJECT result;
+    cf = RegisterClipboardFormatW(L"PNG");
+    if (cf == 0) {
+        return JAVA_NULL;
+    }
+    if (!OpenClipboard(cn1Win.hwnd)) {
+        return JAVA_NULL;
+    }
+    data = GetClipboardData(cf);
+    if (data == NULL) {
+        CloseClipboard();
+        return JAVA_NULL;
+    }
+    sz = GlobalSize(data);
+    p = GlobalLock(data);
+    if (p == NULL || sz == 0) {
+        if (p != NULL) {
+            GlobalUnlock(data);
+        }
+        CloseClipboard();
+        return JAVA_NULL;
+    }
+    result = allocArray(threadStateData, (int) sz, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
+    if (result != JAVA_NULL) {
+        memcpy((*(JAVA_ARRAY) result).data, p, (size_t) sz);
+    }
+    GlobalUnlock(data);
+    CloseClipboard();
+    return result;
+}
+
+/*
+ * File clipboard via CF_HDROP. Each incoming path is converted to UTF-16; a path
+ * that starts with "file:" is minimally normalized to a plain Win32 path (strip
+ * the scheme and leading slashes, turn '/' into '\'). The paths are packed into a
+ * DROPFILES structure followed by a double-NUL-terminated wide string list, the
+ * shape CF_HDROP requires.
+ */
+JAVA_VOID com_codename1_impl_windows_WindowsNative_clipboardSetFiles___java_lang_String_1ARRAY(
+        CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1) {
+    int n, i;
+    JAVA_OBJECT* elems;
+    WCHAR** paths;
+    size_t totalChars;
+    HGLOBAL mem;
+    DROPFILES* df;
+    WCHAR* cursor;
+    if (__cn1Arg1 == JAVA_NULL) {
+        return;
+    }
+    n = (int) (*(JAVA_ARRAY) __cn1Arg1).length;
+    if (n <= 0) {
+        return;
+    }
+    elems = (JAVA_OBJECT*) (*(JAVA_ARRAY) __cn1Arg1).data;
+    paths = (WCHAR**) calloc((size_t) n, sizeof(WCHAR*));
+    if (paths == NULL) {
+        return;
+    }
+    totalChars = 0;
+    for (i = 0; i < n; i++) {
+        UINT32 l = 0;
+        WCHAR* w = cn1WinJavaStringToWide(threadStateData, elems[i], &l);
+        if (w != NULL && wcsncmp(w, L"file:", 5) == 0) {
+            WCHAR* src = w + 5;
+            WCHAR* plain;
+            while (*src == L'/') {
+                src++;
+            }
+            plain = (WCHAR*) malloc((wcslen(src) + 1) * sizeof(WCHAR));
+            if (plain != NULL) {
+                size_t j = 0;
+                for (; src[j] != 0; j++) {
+                    plain[j] = (src[j] == L'/') ? L'\\' : src[j];
+                }
+                plain[j] = 0;
+                free(w);
+                w = plain;
+            }
+        }
+        paths[i] = w;
+        if (w != NULL) {
+            totalChars += wcslen(w) + 1; /* path + its NUL separator */
+        }
+    }
+    totalChars += 1; /* final NUL -> double-NUL terminated list */
+
+    mem = GlobalAlloc(GMEM_MOVEABLE, sizeof(DROPFILES) + totalChars * sizeof(WCHAR));
+    if (mem == NULL) {
+        for (i = 0; i < n; i++) {
+            if (paths[i] != NULL) {
+                free(paths[i]);
+            }
+        }
+        free(paths);
+        return;
+    }
+    df = (DROPFILES*) GlobalLock(mem);
+    if (df == NULL) {
+        GlobalFree(mem);
+        for (i = 0; i < n; i++) {
+            if (paths[i] != NULL) {
+                free(paths[i]);
+            }
+        }
+        free(paths);
+        return;
+    }
+    ZeroMemory(df, sizeof(DROPFILES));
+    df->pFiles = sizeof(DROPFILES);
+    df->fWide = TRUE;
+    cursor = (WCHAR*) ((BYTE*) df + sizeof(DROPFILES));
+    for (i = 0; i < n; i++) {
+        if (paths[i] != NULL) {
+            size_t l = wcslen(paths[i]);
+            memcpy(cursor, paths[i], (l + 1) * sizeof(WCHAR));
+            cursor += l + 1;
+        }
+    }
+    *cursor = 0; /* trailing NUL closes the double-NUL terminated list */
+    GlobalUnlock(mem);
+
+    for (i = 0; i < n; i++) {
+        if (paths[i] != NULL) {
+            free(paths[i]);
+        }
+    }
+    free(paths);
+
+    if (!OpenClipboard(cn1Win.hwnd)) {
+        GlobalFree(mem);
+        return;
+    }
+    EmptyClipboard();
+    if (SetClipboardData(CF_HDROP, mem) == NULL) {
+        GlobalFree(mem);
+    }
+    CloseClipboard();
+}
+
+JAVA_OBJECT com_codename1_impl_windows_WindowsNative_clipboardGetFiles___R_java_lang_String_1ARRAY(
+        CODENAME_ONE_THREAD_STATE) {
+    HANDLE data;
+    HDROP drop;
+    UINT count, i;
+    JAVA_OBJECT arr;
+    if (!OpenClipboard(cn1Win.hwnd)) {
+        return JAVA_NULL;
+    }
+    data = GetClipboardData(CF_HDROP);
+    if (data == NULL) {
+        CloseClipboard();
+        return JAVA_NULL;
+    }
+    drop = (HDROP) data;
+    count = DragQueryFileW(drop, 0xFFFFFFFF, NULL, 0);
+    arr = allocArray(threadStateData, (int) count, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
+    if (arr != JAVA_NULL) {
+        JAVA_OBJECT* elements = (JAVA_OBJECT*) (*(JAVA_ARRAY) arr).data;
+        for (i = 0; i < count; i++) {
+            WCHAR path[MAX_PATH];
+            path[0] = 0;
+            /* the HDROP is owned by the clipboard: query only, no DragFinish */
+            if (DragQueryFileW(drop, i, path, MAX_PATH) > 0) {
+                elements[i] = cn1WinWideToJavaString(threadStateData, path);
+            }
+        }
+    }
+    CloseClipboard();
+    return arr;
+}
+
 /* ----------------------------------------------------------- shell / launch */
 
 /*

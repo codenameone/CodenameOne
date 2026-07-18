@@ -11,4 +11,6 @@ if [ -d /etc/apt/sources.list.d ]; then
     -print -delete || true
 fi
 
-sudo apt-get update -o Acquire::Retries=3
+# ForceIPv4: the ARM runners intermittently lose IPv6 routes to ports.ubuntu.com
+# mid-job, and apt's IPv6-first dial then times out every mirror.
+sudo apt-get update -o Acquire::ForceIPv4=true -o Acquire::Retries=5

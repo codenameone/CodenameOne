@@ -23,6 +23,8 @@
  */
 package com.codename1.ui;
 
+import com.codename1.ui.editor.PureEditor;
+import com.codename1.ui.editor.RichPureEditor;
 import com.codename1.util.SuccessCallback;
 
 /// A native visual editor for rich text / HTML content (a WYSIWYG editor).
@@ -31,10 +33,10 @@ import com.codename1.util.SuccessCallback;
 /// headings and more - and exchange the result as HTML with your application. It works on phones and
 /// tablets (with the on screen virtual keyboard) as well as on desktops (with a physical keyboard).
 ///
-/// By default the editor is implemented as a `contenteditable` surface hosted inside the platform's
-/// native web widget (`BrowserComponent`), which makes it 100% cross platform and gives correct
-/// keyboard, selection and IME behavior on every device for free. A platform port may transparently
-/// replace this with a fully native editing widget; see
+/// On ports with low-level text input the editor uses the pure Codename One text engine
+/// (`com.codename1.ui.editor`), which renders the document itself and binds to the soft keyboard,
+/// hardware keyboard and IME. Ports without that contract use an editable `BrowserComponent` fallback.
+/// A platform port may transparently replace either with a fully native editing widget; see
 /// `com.codename1.impl.CodenameOneImplementation#createNativeEditorPeer(Object, String)`.
 ///
 /// #### Basic usage
@@ -79,6 +81,11 @@ public class RichTextArea extends AbstractEditorComponent {
         return "richtext";
     }
 
+    @Override
+    PureEditor createPureEditor() {
+        return new RichPureEditor(this, getEditorType());
+    }
+
     /// Replaces the entire editor content with the supplied HTML.
     ///
     /// #### Parameters
@@ -88,13 +95,45 @@ public class RichTextArea extends AbstractEditorComponent {
         command("setHtml", html == null ? "" : html);
     }
 
+    /// Replaces the editor content from any supported rich-text interchange format.
+    public void setContent(String content, RichTextFormat format) {
+        final String value = content == null ? "" : content;
+        final RichTextFormat actual = format == null ? RichTextFormat.PLAIN_TEXT : format;
+        if (actual == RichTextFormat.HTML) {
+            setHtml(value);
+            return;
+        }
+        command(setCommand(actual), value);
+    }
+
+    /// Replaces the editor content with RTF.
+    public void setRtf(String rtf) {
+        setContent(rtf, RichTextFormat.RTF);
+    }
+
+    /// Replaces the editor content with Markdown.
+    public void setMarkdown(String markdown) {
+        setContent(markdown, RichTextFormat.MARKDOWN);
+    }
+
+    /// Replaces the editor content with AsciiDoc.
+    public void setAsciiDoc(String asciidoc) {
+        setContent(asciidoc, RichTextFormat.ASCIIDOC);
+    }
+
     /// Retrieves the current editor content as an HTML string. The callback is invoked on the EDT.
     ///
     /// #### Parameters
     ///
     /// - `callback`: receives the HTML content
     public void getHtml(SuccessCallback<String> callback) {
-        query("getHtml", null, callback);
+        final SuccessCallback<String> result = callback;
+        onReady(new Runnable() {
+            @Override
+            public void run() {
+                query("getHtml", null, result);
+            }
+        });
     }
 
     /// Retrieves the current editor content as plain text (markup stripped). The callback is invoked on
@@ -107,6 +146,31 @@ public class RichTextArea extends AbstractEditorComponent {
         query("getText", null, callback);
     }
 
+    /// Retrieves the current content as Markdown.
+    public void getMarkdown(SuccessCallback<String> callback) {
+        queryContent("getMarkdown", callback);
+    }
+
+    /// Retrieves the current content as AsciiDoc.
+    public void getAsciiDoc(SuccessCallback<String> callback) {
+        queryContent("getAsciiDoc", callback);
+    }
+
+    /// Retrieves the current content as RTF.
+    public void getRtf(SuccessCallback<String> callback) {
+        queryContent("getRtf", callback);
+    }
+
+    private void queryContent(final String queryName, final SuccessCallback<String> callback) {
+        // The pure editor serializes to any requested format directly.
+        onReady(new Runnable() {
+            @Override
+            public void run() {
+                query(queryName, null, callback);
+            }
+        });
+    }
+
     /// Inserts the supplied HTML fragment at the current cursor position.
     ///
     /// #### Parameters
@@ -114,6 +178,60 @@ public class RichTextArea extends AbstractEditorComponent {
     /// - `html`: the HTML fragment to insert
     public void insertHtml(String html) {
         command("insertHtml", html);
+    }
+
+    /// Inserts content in any supported rich-text interchange format at the current selection.
+    public void insertContent(String content, RichTextFormat format) {
+        final String value = content == null ? "" : content;
+        final RichTextFormat actual = format == null ? RichTextFormat.PLAIN_TEXT : format;
+        // The pure editor parses each interchange format directly.
+        onReady(new Runnable() {
+            @Override
+            public void run() {
+                command(insertCommand(actual), value);
+            }
+        });
+    }
+
+    private static String setCommand(RichTextFormat format) {
+        if (format == RichTextFormat.MARKDOWN) {
+            return "setMarkdown";
+        }
+        if (format == RichTextFormat.ASCIIDOC) {
+            return "setAsciiDoc";
+        }
+        if (format == RichTextFormat.RTF) {
+            return "setRtf";
+        }
+        return "setPlainText";
+    }
+
+    private static String insertCommand(RichTextFormat format) {
+        if (format == RichTextFormat.MARKDOWN) {
+            return "insertMarkdown";
+        }
+        if (format == RichTextFormat.ASCIIDOC) {
+            return "insertAsciiDoc";
+        }
+        if (format == RichTextFormat.RTF) {
+            return "insertRtf";
+        }
+        return "insertPlainText";
+    }
+
+    /// Inserts RTF at the current selection.
+    public void insertRtf(String rtf) {
+        insertContent(rtf, RichTextFormat.RTF);
+    }
+
+    /// Inserts Markdown at the current selection.
+    public void insertMarkdown(String markdown) {
+        insertContent(markdown, RichTextFormat.MARKDOWN);
+    }
+
+    /// Inserts AsciiDoc at the current selection.
+    public void insertAsciiDoc(String asciidoc) {
+        insertContent(asciidoc, RichTextFormat.ASCIIDOC);
     }
 
     /// Inserts an image at the current cursor position.
@@ -294,60 +412,5 @@ public class RichTextArea extends AbstractEditorComponent {
             s = "0" + s;
         }
         return "#" + s;
-    }
-
-    @Override
-    String createEditorHtml() {
-        // A self-contained contenteditable editor. No external resources are required which keeps the
-        // editor fully functional offline and adds zero footprint to apps that do not use it.
-        return "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
-            + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no\">"
-            + "<meta name=\"color-scheme\" content=\"light\">"
-            + "<style>"
-            // The native web widget is created transparent (e.g. iOS WKWebView opaque=NO), so without an
-            // explicit opaque background the dark peer behind it shows through and the editor looks black.
-            // Pin a light color-scheme so the platform UA does not invert colors in device dark mode.
-            + "html,body{margin:0;padding:0;height:100%;-webkit-text-size-adjust:100%;background:#ffffff;color:#24292e;color-scheme:light;}"
-            + "*{-webkit-tap-highlight-color:rgba(0,0,0,0);box-sizing:border-box;}"
-            + "#ed{min-height:100%;padding:8px;outline:none;font:16px -apple-system,Roboto,'Segoe UI',sans-serif;"
-            + "line-height:1.4;word-wrap:break-word;-webkit-user-select:text;user-select:text;}"
-            + "#ed:empty:before{content:attr(data-ph);color:#9aa0a6;pointer-events:none;}"
-            + "#ed img{max-width:100%;height:auto;}"
-            + "#ed[contenteditable=false]{opacity:.7;}"
-            + "</style></head><body>"
-            + "<div id=\"ed\" contenteditable=\"true\" data-ph=\"\"></div>"
-            + "<script>"
-            + "var ed=document.getElementById('ed');"
-            + "function cn1post(m){try{if(window.cn1PostMessage){window.cn1PostMessage(m);}else if(window.parent&&window.parent!==window){window.parent.postMessage(m,'*');}}catch(e){}}"
-            + "function fire(t,v){cn1post('cn1ed:'+t+(v==null?'':(':'+v)));}"
-            + "ed.addEventListener('input',function(){fire('change',null);});"
-            + "document.addEventListener('selectionchange',function(){fire('selection',null);});"
-            + "function exec(c,a){try{document.execCommand(c,false,a);}catch(e){}ed.focus();}"
-            + "window.cn1editor={"
-            + "cmd:function(name,arg){"
-            + "switch(name){"
-            + "case 'setHtml':ed.innerHTML=arg||'';fire('change',null);break;"
-            + "case 'insertHtml':exec('insertHTML',arg);break;"
-            + "case 'insertImage':exec('insertImage',arg);break;"
-            + "case 'setPlaceholder':ed.setAttribute('data-ph',arg||'');break;"
-            + "case 'setEditable':ed.setAttribute('contenteditable',arg=='1'?'true':'false');break;"
-            + "case 'focus':ed.focus();break;"
-            + "case 'blur':ed.blur();break;"
-            + "case 'createLink':exec('createLink',arg);break;"
-            + "case 'foreColor':exec('foreColor',arg);break;"
-            + "case 'hiliteColor':if(!document.execCommand('hiliteColor',false,arg)){exec('backColor',arg);}break;"
-            + "case 'formatBlock':exec('formatBlock',arg);break;"
-            + "case 'fontSize':exec('fontSize',arg);break;"
-            + "default:exec(name,arg);break;"
-            + "}},"
-            + "query:function(name,arg){"
-            + "switch(name){"
-            + "case 'getHtml':return ed.innerHTML;"
-            + "case 'getText':return ed.innerText||ed.textContent||'';"
-            + "case 'state':try{return document.queryCommandState(arg)?'1':'0';}catch(e){return '0';}"
-            + "default:return '';"
-            + "}}};"
-            + "fire('ready',null);"
-            + "</script></body></html>";
     }
 }
