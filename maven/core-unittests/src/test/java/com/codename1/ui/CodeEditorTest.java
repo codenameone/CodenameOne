@@ -29,7 +29,6 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.editor.SyntaxHighlightResult;
 import com.codename1.ui.editor.SyntaxToken;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -37,9 +36,6 @@ import java.util.List;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import javax.script.Compilable;
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -50,28 +46,6 @@ import static org.junit.jupiter.api.Assertions.*;
  * fully exercised without a real web view.
  */
 class CodeEditorTest extends UITestBase {
-
-    @Test
-    void browserFallbackToleratesMissingSelectionDuringStartup() {
-        assertTrue(CodeEditorHtml.PAGE.contains("var sel=window.getSelection();if(!sel){return;}"));
-    }
-
-    @Test
-    void browserFallbackDecoratesOnlyDiagnosticRangesAndKeepsArrowFocus() {
-        assertTrue(CodeEditorHtml.PAGE.contains("function decorateDiagnostics()"));
-        assertFalse(CodeEditorHtml.PAGE.contains("function applyDiagLines"));
-        assertTrue(CodeEditorHtml.PAGE.contains("keydown',function(e){e.stopPropagation();"));
-    }
-
-    @Test
-    void browserFallbackJavaScriptParses() throws Exception {
-        int start = CodeEditorHtml.PAGE.indexOf("<script>") + "<script>".length();
-        int end = CodeEditorHtml.PAGE.lastIndexOf("</script>");
-        ScriptEngine engine = new ScriptEngineManager().getEngineByName("nashorn");
-        Assumptions.assumeTrue(engine instanceof Compilable,
-                "No compilable JavaScript engine is bundled with this JDK");
-        ((Compilable)engine).compile(CodeEditorHtml.PAGE.substring(start, end));
-    }
 
     private void pump() {
         for (int i = 0; i < 6; i++) {
@@ -120,20 +94,25 @@ class CodeEditorTest extends UITestBase {
     }
 
     @FormTest
-    void testThirdPartyHighlighterServesBrowserRanges() {
+    void testThirdPartyHighlighterUsedByPureEditor() {
+        // A registered third-party highlighter is consumed by the pure code view directly (it tokenizes
+        // with it while painting); there is no browser highlight round-trip.
         CodeEditor.registerSyntaxHighlighter("properties", (line, state) ->
                 new SyntaxHighlightResult(Arrays.asList(
                         new SyntaxToken(0, Math.max(0, line.indexOf('=')), SyntaxToken.PROPERTY,
                                 0x112233, 0x445566)), 0));
         try {
-            CodeEditor editor = showNativeEditor();
-            editor.setLanguage("properties");
-            assertTrue(cmds().contains("setCustomHighlighter:1"));
-            editor.fireEditorEvent("highlight", "7:accent=#0a66c2");
-            String command = implementation.getLastEditorCommand();
-            assertTrue(command.startsWith("applyCustomHighlight:7:"));
-            assertTrue(command.contains("--cl:#112233;--cd:#445566"));
-            assertTrue(command.contains("accent"));
+            assertNotNull(CodeEditor.getRegisteredSyntaxHighlighter("properties"));
+            implementation.setEditorNativePeerSupported(false);
+            CodeEditor editor = new CodeEditor("properties", "accent=#0a66c2");
+            Form f = new Form("code", new BorderLayout());
+            f.add(BorderLayout.CENTER, editor);
+            f.show();
+            pump();
+            assertFalse(editor.isNativeEditor());
+            Component view = editor.getComponentAt(0);
+            assertTrue(view instanceof com.codename1.ui.editor.CodeView,
+                    "pure CodeView, got " + view.getClass().getName());
         } finally {
             CodeEditor.registerSyntaxHighlighter("properties", null);
         }
@@ -298,7 +277,6 @@ class CodeEditorTest extends UITestBase {
         pump();
         assertFalse(editor.isNativeEditor());
         assertTrue(editor.isEditorReady());
-        assertNull(editor.getInternalBrowser());
         final java.util.concurrent.atomic.AtomicReference<String> text =
                 new java.util.concurrent.atomic.AtomicReference<String>();
         editor.getText(new com.codename1.util.SuccessCallback<String>() {
@@ -311,7 +289,9 @@ class CodeEditorTest extends UITestBase {
     }
 
     @FormTest
-    void testBrowserFallbackUsedWithoutLowLevelTextInput() {
+    void testPureEditorUsedWithoutLowLevelTextInput() {
+        // With no low-level text input the editor still uses the pure engine (raw keyboard path);
+        // there is no browser fallback.
         implementation.setTextInputSupported(false);
         CodeEditor editor = new CodeEditor("java", "class A {}");
         Form f = new Form("code", new BorderLayout());
@@ -319,6 +299,7 @@ class CodeEditorTest extends UITestBase {
         f.show();
         pump();
         assertFalse(editor.isNativeEditor());
-        assertNotNull(editor.getInternalBrowser());
+        assertTrue(editor.isEditorReady());
+        assertTrue(editor.getComponentAt(0) instanceof com.codename1.ui.editor.EditorView);
     }
 }

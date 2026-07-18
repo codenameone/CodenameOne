@@ -70,7 +70,6 @@ class RichTextAreaTest extends UITestBase {
         assertTrue(editor.isNativeEditor());
         assertTrue(editor.isEditorReady());
         assertEquals("richtext", implementation.getLastEditorType());
-        assertNull(editor.getInternalBrowser());
     }
 
     @FormTest
@@ -281,7 +280,6 @@ class RichTextAreaTest extends UITestBase {
         pump();
         assertFalse(editor.isNativeEditor());
         assertTrue(editor.isEditorReady());
-        assertNull(editor.getInternalBrowser());
     }
 
     @FormTest
@@ -328,12 +326,4 @@ class RichTextAreaTest extends UITestBase {
         assertFalse(markdown.get().contains("<h1>"));
     }
 
-    @Test
-    void browserBackendKeepsSourceFormatsBidirectional() {
-        String page = new RichTextArea().createEditorHtml();
-        assertTrue(page.contains("case 'setMarkdown':sourceFormat='markdown';ed.textContent=arg||''"));
-        assertTrue(page.contains("case 'getMarkdown':return sourceFormat=='markdown'"));
-        assertTrue(page.contains("case 'setAsciiDoc':sourceFormat='asciidoc';ed.textContent=arg||''"));
-        assertTrue(page.contains("case 'getAsciiDoc':return sourceFormat=='asciidoc'"));
-    }
 }

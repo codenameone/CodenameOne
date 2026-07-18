@@ -6538,6 +6538,7 @@ public final class GeneratedAccess_com_codename1_ui_editor {
         if ("KEY_REDO".equals(name)) return com.codename1.ui.editor.CodeView.KEY_REDO;
         if ("KEY_RIGHT".equals(name)) return com.codename1.ui.editor.CodeView.KEY_RIGHT;
         if ("KEY_SELECT_ALL".equals(name)) return com.codename1.ui.editor.CodeView.KEY_SELECT_ALL;
+        if ("KEY_TAB".equals(name)) return com.codename1.ui.editor.CodeView.KEY_TAB;
         if ("KEY_UNDO".equals(name)) return com.codename1.ui.editor.CodeView.KEY_UNDO;
         if ("KEY_UP".equals(name)) return com.codename1.ui.editor.CodeView.KEY_UP;
         if ("LEFT".equals(name)) return com.codename1.ui.editor.CodeView.LEFT;
@@ -6596,6 +6597,7 @@ public final class GeneratedAccess_com_codename1_ui_editor {
         if ("KEY_REDO".equals(name)) return com.codename1.ui.editor.EditorView.KEY_REDO;
         if ("KEY_RIGHT".equals(name)) return com.codename1.ui.editor.EditorView.KEY_RIGHT;
         if ("KEY_SELECT_ALL".equals(name)) return com.codename1.ui.editor.EditorView.KEY_SELECT_ALL;
+        if ("KEY_TAB".equals(name)) return com.codename1.ui.editor.EditorView.KEY_TAB;
         if ("KEY_UNDO".equals(name)) return com.codename1.ui.editor.EditorView.KEY_UNDO;
         if ("KEY_UP".equals(name)) return com.codename1.ui.editor.EditorView.KEY_UP;
         if ("LEFT".equals(name)) return com.codename1.ui.editor.EditorView.LEFT;
@@ -6668,6 +6670,7 @@ public final class GeneratedAccess_com_codename1_ui_editor {
         if ("KEY_REDO".equals(name)) return com.codename1.ui.editor.RichView.KEY_REDO;
         if ("KEY_RIGHT".equals(name)) return com.codename1.ui.editor.RichView.KEY_RIGHT;
         if ("KEY_SELECT_ALL".equals(name)) return com.codename1.ui.editor.RichView.KEY_SELECT_ALL;
+        if ("KEY_TAB".equals(name)) return com.codename1.ui.editor.RichView.KEY_TAB;
         if ("KEY_UNDO".equals(name)) return com.codename1.ui.editor.RichView.KEY_UNDO;
         if ("KEY_UP".equals(name)) return com.codename1.ui.editor.RichView.KEY_UP;
         if ("LEFT".equals(name)) return com.codename1.ui.editor.RichView.LEFT;

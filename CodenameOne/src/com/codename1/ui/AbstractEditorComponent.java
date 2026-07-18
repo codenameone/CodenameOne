@@ -34,7 +34,7 @@ import com.codename1.util.SuccessCallback;
 import java.util.ArrayList;
 import java.util.List;
 
-/// Base class for the native visual editors (rich text and code) introduced by Codename One.
+/// Base class for the pure Codename One visual editors (rich text and code).
 ///
 /// The editor components are designed around a *semantic command channel* rather than a single
 /// hard-coded implementation. Every concrete editor (`RichTextArea`, `CodeEditor`) speaks to its
@@ -44,10 +44,9 @@ import java.util.List;
 ///
 /// 1. The pure Codename One text engine (`com.codename1.ui.editor`) which renders the document itself
 ///    with `Graphics`/`Font` and binds to the platform text input source (soft keyboard, hardware
-///    keyboard and IME). This is the default where the port exposes low-level text input.
-/// 2. A `BrowserComponent` fallback on ports that don't expose low-level text input. Its
-///    `contenteditable` surface remains editable through the platform web view.
-/// 3. An optional native backend supplied by the platform port (see
+///    keyboard and IME) where available, falling back to the raw physical-keyboard path elsewhere.
+///    This is the default on every port.
+/// 2. An optional native backend supplied by the platform port (see
 ///    `com.codename1.impl.CodenameOneImplementation#createNativeEditorPeer(AbstractEditorComponent, String)`).
 ///    When a port returns a non-null native peer the editor drives it through
 ///    `editorPeerCommand` / `editorPeerQuery` instead of the pure engine, allowing a platform to provide a
@@ -58,10 +57,6 @@ import java.util.List;
 ///
 /// @author Shai Almog
 public abstract class AbstractEditorComponent extends Container implements EditorHost {
-    /// Prefix used for messages sent from the browser fallback to Codename One.
-    static final String MESSAGE_PREFIX = "cn1ed:";
-
-    private BrowserComponent browser;
     private PeerComponent nativePeer;
     private PureEditor pureEditor;
     private boolean nativeMode;
@@ -91,6 +86,9 @@ public abstract class AbstractEditorComponent extends Container implements Edito
     }
 
     private void initBackend() {
+        // A platform may still supply a native editor peer; otherwise the pure Codename One text
+        // engine is used on every port (the low-level text-input SPI drives it where available, the
+        // raw physical-keyboard path elsewhere). There is no browser / HTML editor backend.
         nativePeer = Display.impl.createNativeEditorPeer(this, getEditorType());
         if (nativePeer != null) {
             nativeMode = true;
@@ -104,55 +102,11 @@ public abstract class AbstractEditorComponent extends Container implements Edito
             return;
         }
         nativeMode = false;
-        if (isTextInputSupported()) {
-            pureEditor = createPureEditor();
-            removeComponent(placeholder);
-            addComponent(BorderLayout.CENTER, pureEditor.getView());
-            markReady();
-            revalidateLater();
-            return;
-        }
-        initBrowserBackend();
-    }
-
-    private void initBrowserBackend() {
-        browser = new BrowserComponent();
-        browser.setProperty("BackgroundColor", 0xffffff);
-        browser.addWebEventListener(BrowserComponent.onMessage, new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent evt) {
-                handleBrowserMessage((String) evt.getSource());
-            }
-        });
-        browser.addWebEventListener(BrowserComponent.onLoad, new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent evt) {
-                markReady();
-            }
-        });
+        pureEditor = createPureEditor();
         removeComponent(placeholder);
-        addComponent(BorderLayout.CENTER, browser);
-        String engineUrl = getEngineURL();
-        if (engineUrl != null) {
-            try {
-                browser.setURLHierarchy(engineUrl);
-            } catch (java.io.IOException err) {
-                browser.setURL(engineUrl);
-            }
-        } else {
-            browser.setPage(createEditorHtml(), getEditorBaseURL());
-        }
+        addComponent(BorderLayout.CENTER, pureEditor.getView());
+        markReady();
         revalidateLater();
-    }
-
-    private void handleBrowserMessage(String msg) {
-        if (msg == null || !msg.startsWith(MESSAGE_PREFIX)) {
-            return;
-        }
-        String body = msg.substring(MESSAGE_PREFIX.length());
-        int colon = body.indexOf(':');
-        onEditorEvent(colon < 0 ? body : body.substring(0, colon),
-                colon < 0 ? null : body.substring(colon + 1));
     }
 
     private void markReady() {
@@ -178,19 +132,6 @@ public abstract class AbstractEditorComponent extends Container implements Edito
     /// Returns the editor type identifier passed to the native peer factory, e.g.
     /// `"richtext"` or `"code"`.
     abstract String getEditorType();
-
-    /// Returns the self-contained page used by the browser fallback.
-    abstract String createEditorHtml();
-
-    /// Base URL for relative resources in the browser fallback page.
-    String getEditorBaseURL() {
-        return "https://cn1editor.codenameone.com/";
-    }
-
-    /// Optional app-hierarchy URL for a custom browser editor engine.
-    String getEngineURL() {
-        return null;
-    }
 
     /// Inbound event dispatch from either backend. Subclasses override to react to editor side events
     /// (content changes, selection changes, completion requests, ...). Always call
@@ -256,8 +197,6 @@ public abstract class AbstractEditorComponent extends Container implements Edito
             Display.impl.editorPeerCommand(nativePeer, name, arg);
         } else if (pureEditor != null) {
             pureEditor.cmd(name, arg);
-        } else {
-            browser.execute("window.cn1editor.cmd(${0}, ${1})", new Object[]{name, arg == null ? "" : arg});
         }
     }
 
@@ -287,22 +226,6 @@ public abstract class AbstractEditorComponent extends Container implements Edito
         }
         if (pureEditor != null) {
             callback.onSucess(pureEditor.query(name, arg));
-            return;
-        }
-        browser.execute("callback.onSuccess(window.cn1editor.query(${0}, ${1}))",
-                new Object[]{name, arg == null ? "" : arg}, new JSRefStringCallback(callback));
-    }
-
-    private static final class JSRefStringCallback implements SuccessCallback<BrowserComponent.JSRef> {
-        private final SuccessCallback<String> delegate;
-
-        JSRefStringCallback(SuccessCallback<String> delegate) {
-            this.delegate = delegate;
-        }
-
-        @Override
-        public void onSucess(BrowserComponent.JSRef value) {
-            delegate.onSucess(value == null ? null : value.getValue());
         }
     }
 
@@ -325,15 +248,9 @@ public abstract class AbstractEditorComponent extends Container implements Edito
         return ready;
     }
 
-    /// True when a platform supplied native editor backend is in use, false for the pure and browser
-    /// backends.
+    /// True when a platform supplied native editor backend is in use, false for the pure backend.
     public boolean isNativeEditor() {
         return nativeMode;
-    }
-
-    /// Returns the browser fallback, or null when the pure or native backend is active.
-    public BrowserComponent getInternalBrowser() {
-        return browser;
     }
 
     /// Adds a listener notified whenever the editor content changes.
