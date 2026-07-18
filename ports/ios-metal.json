@@ -1,48 +1,48 @@
 {
-  "commit": "96cbe1d246ac9f633633205aa191c01a9a1dd1f6",
-  "generated_at": "2026-07-18T18:12:24Z",
+  "commit": "98fa4258e0a0cf7c6db655bbe55b573cc523ca2c",
+  "generated_at": "2026-07-18T18:55:19Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 324726000
+        "duration_ns": 283748000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 21498000
+        "duration_ns": 20516000
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 48505000
+        "duration_ns": 38786000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 133992000
+        "duration_ns": 107936000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 70708000
+        "duration_ns": 66611000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 637572000
+        "duration_ns": 287811000
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 295063000
+        "duration_ns": 325489000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 147850000
+        "duration_ns": 125790000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 189048000
+        "duration_ns": 152534000
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 56491000
+        "duration_ns": 46578000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -51,13 +51,13 @@
     "suite_checksum": 0
   },
   "port": "ios-metal",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29652685140",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29654800968",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 162,
+    "pass": 164,
     "skip": 2
   },
   "tests": {
@@ -216,8 +216,12 @@
       "feature": "graphics-clipping",
       "status": "pass"
     },
+    "ClipboardRoundTripTest": {
+      "feature": "clipboard",
+      "status": "pass"
+    },
     "CodeEditorScreenshotTest": {
-      "feature": "embedded-web-content",
+      "feature": "pure-text-editing",
       "status": "pass"
     },
     "ComponentReplaceFadeScreenshotTest": {
@@ -500,12 +504,16 @@
       "feature": "scrolling-and-pull",
       "status": "pass"
     },
+    "PureEditorScreenshotTest": {
+      "feature": "pure-text-editing",
+      "status": "pass"
+    },
     "RealOsmVectorScreenshotTest": {
       "feature": "vector-maps",
       "status": "pass"
     },
     "RichTextAreaScreenshotTest": {
-      "feature": "embedded-web-content",
+      "feature": "pure-text-editing",
       "status": "pass"
     },
     "Rotate": {
