@@ -22,13 +22,13 @@
         <thead><tr><th>Decision</th><th>Codename One</th><th>Platform UI</th><th>Flutter</th><th>Web</th></tr></thead>
         <tbody>
           <tr><th>Primary ecosystem</th><td>Java, Maven, JVM libraries, and mainstream Java IDEs</td><td>Swift/Xcode plus Kotlin or Java/Android Studio</td><td>Dart, pub packages, and Flutter tooling</td><td>HTML, CSS, JavaScript, and browser tooling</td></tr>
-          <tr><th>Android execution</th><td>Java runs on Android's ART runtime and calls Android APIs directly</td><td>Kotlin or Java runs on ART with direct Android APIs</td><td>AOT-compiled Dart with the Flutter engine</td><td>JavaScript inside a browser or WebView</td></tr>
-          <tr><th>iOS execution</th><td>ParparVM translates Java bytecode to C, then Xcode produces the native binary</td><td>Swift or Objective-C compiled by Xcode</td><td>AOT-compiled Dart with the Flutter engine</td><td>JavaScript in WebKit, or a native wrapper around it</td></tr>
+          <tr><th>Android execution</th><td>Java bytecode runs on Android's ART runtime and calls Android APIs directly</td><td>Kotlin or Java runs on ART with direct Android APIs</td><td>AOT-compiled Dart code runs with the Flutter engine</td><td>JavaScript inside a browser or WebView</td></tr>
+          <tr><th>iOS execution</th><td>ParparVM translates Java bytecode to C, then Xcode compiles the native binary</td><td>Swift or Objective-C compiled by Xcode</td><td>AOT-compiled Dart code runs with the Flutter engine</td><td>JavaScript in WebKit, or a native wrapper around it</td></tr>
           <tr><th>Shared UI</th><td>One UI implementation across mobile, desktop, web, watch, TV, and vehicle targets</td><td>Separate Swift and Kotlin UI implementations</td><td>Shared across Flutter-supported targets</td><td>Shared across browsers; native wrappers add platform work</td></tr>
           <tr><th>Theming</th><td>CSS themes shared across targets, with platform-specific selectors when needed</td><td>Separate SwiftUI/UIKit and Compose/View styling</td><td>Theme and widget code written in Dart</td><td>CSS interpreted by the browser</td></tr>
           <tr><th>Local development</th><td>One JavaSE simulator with device skins, component inspection, networking tools, tests, and MCP control</td><td>Platform simulator and emulator toolchains</td><td>Flutter tooling plus platform simulators for native behavior</td><td>Browser developer tools</td></tr>
           <tr><th>CI testing</th><td>Shared logic, UI, and screenshot tests can run on the JVM or headless JavaScript before native builds</td><td>Separate iOS and Android test jobs</td><td>Dart tests plus native jobs for platform behavior</td><td>Headless browser tests; wrappers need native jobs</td></tr>
-          <tr><th>Runtime packaging</th><td>Android reuses ART; iOS compiles through ParparVM. The Codename One UI toolkit ships as part of the application, without an embedded browser</td><td>Uses each OS runtime and UI toolkit</td><td>Bundles the Flutter rendering engine and Dart runtime with the application</td><td>Runs inside a browser engine or WebView</td></tr>
+          <tr><th>Runtime packaging</th><td>Android application bytecode runs on ART. On iOS, ParparVM translates Java bytecode to C before Xcode compiles the native binary. The Codename One UI toolkit is bundled with the app</td><td>Uses each OS runtime and UI toolkit</td><td>Release builds bundle AOT-compiled Dart code with the Flutter engine and its Dart runtime support</td><td>Runs inside a browser engine or WebView</td></tr>
           <tr><th>Native OS components</th><td>Native interfaces plus <code>PeerComponent</code> for real maps, browsers, cameras, and other platform views</td><td>Direct access to every platform component</td><td>Platform channels and Platform Views</td><td>Browser APIs or wrapper plugins</td></tr>
           <tr><th>License and direction</th><td>Independent, open source, GPLv2 with Classpath Exception, no royalties</td><td>Controlled separately by Apple and Google</td><td>Open source and directed by Google</td><td>Standards and engines controlled by browser vendors</td></tr>
         </tbody>
@@ -58,8 +58,8 @@
     </article>
     <article class="cn1-compare-choice">
       <p class="cn1-eyebrow">Flutter</p>
-      <h2>A Dart application shipped with Google's UI engine.</h2>
-      <ul><li>Flutter shares UI by bundling its rendering engine and Dart runtime with the application. Codename One also owns its pixels; on Android, its Java code runs on the device's ART runtime.</li><li>A Flutter application adopts Dart packages and Google's framework direction.</li><li>Platform integration uses channels or Platform Views. Codename One uses native interfaces and <code>PeerComponent</code>, including synchronous native calls where the platform permits them.</li></ul>
+      <h2>A Dart codebase built around the Flutter engine.</h2>
+      <ul><li>Release builds include AOT-compiled Dart code, the Flutter engine, and Flutter runtime support. On Android, Codename One application bytecode runs on ART.</li><li>Moving from Java to Flutter means adopting Dart, pub packages, and a Google-directed framework instead of retaining JVM libraries, Maven, and Java tooling.</li><li>Native integration crosses asynchronous platform channels or embeds Platform Views. Codename One uses native interfaces and <code>PeerComponent</code>, including synchronous native calls where the platform permits them.</li></ul>
     </article>
     <article class="cn1-compare-choice">
       <p class="cn1-eyebrow">Web</p>
