@@ -59,7 +59,7 @@
                 {{- if and (not .Parent) (ne .Identifier "dashboard") (ne .Identifier "create-project") }}
                 <li class="{{ if .HasChildren }}has-children{{ end }}">
                     {{- if .HasChildren }}
-                    <button class="cn1-menu-trigger" type="button" aria-expanded="false">
+                    <button class="cn1-menu-trigger" type="button" aria-expanded="false" aria-haspopup="true">
                         <span>{{- .Name -}}</span>
                     </button>
                     <ul class="sub-menu">

@@ -55,9 +55,10 @@ function validate() {
     const resourcesMenu = home.match(
         /<button\b[^>]*>[\s\S]*?<span>RESOURCES<\/span>[\s\S]*?<\/button>\s*<ul\b[^>]*class=(?:["']?sub-menu["']?)[^>]*>([\s\S]*?)<\/ul>/i
     );
+    const homePortStatusCta = /<a\b(?=[^>]*\bclass=(?:["'][^"']*\bcn1-reach-link\b[^"']*["']|cn1-reach-link(?:\s|>)))(?=[^>]*\bhref=(?:["']?\/port-status\/["']?))[^>]*>\s*Inspect every port and test\s*<\/a>/i;
     if (!resourcesMenu || !/<a\b[^>]*href=(?:["']?\/port-status\/["']?)[^>]*>[\s\S]*?Port Status[\s\S]*?<\/a>/i.test(resourcesMenu[1]) ||
-        countMatches(home, /href=(?:["']?\/port-status\/["']?)/gi) !== 1) {
-        fail("the Resources menu must contain the only /port-status/ navigation item");
+        !homePortStatusCta.test(home) || countMatches(home, /href=(?:["']?\/port-status\/["']?)/gi) !== 2) {
+        fail("the Resources menu and homepage reach section must contain the two /port-status/ links");
     }
 
     const pageText = page.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");

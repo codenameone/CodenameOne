@@ -13,34 +13,12 @@
       </div>
       <p class="cn1-v2-hero__note">GPLv2 with the Classpath Exception. Free for commercial use. No royalties.</p>
     </div>
-    <div class="cn1-v2-hero__product" aria-label="Codename One Java code and target platforms">
-      <div class="cn1-code-window">
-        <div class="cn1-code-window__bar"><span></span><span></span><span></span><strong>Main.java</strong></div>
-        <pre><code><span class="cn1-code-keyword">Form</span> app = <span class="cn1-code-keyword">new</span> Form(
-    <span class="cn1-code-string">"One UI. Every target."</span>,
-    BoxLayout.y()
-);
-
-app.add(<span class="cn1-code-keyword">new</span> Label(
-    <span class="cn1-code-string">"The UI ships with your app."</span>
-));
-app.show();</code></pre>
-      </div>
-      <div class="cn1-output-card" aria-label="Targets produced from one Java project">
-        <p>One Java project</p>
-        <strong>One codebase across every target</strong>
-        <ul aria-label="Supported targets">
-          <li>iOS</li>
-          <li>Android</li>
-          <li>Desktop</li>
-          <li>Web</li>
-          <li>Watch</li>
-          <li>TV</li>
-          <li>Vehicle</li>
-        </ul>
-        <span>Run locally, then build with native toolchains.</span>
-      </div>
-    </div>
+    <figure class="cn1-hero-showcase">
+      <a href="/blog/liquid-glass-material-3-modern-native-themes/">
+        <img src="/blog/liquid-glass-material-3-modern-native-themes.jpg" alt="Codename One applications using modern iOS and Android themes" width="1024" height="512">
+      </a>
+      <figcaption><strong>Liquid Glass and Material 3</strong><span>Platform-aware themes, versioned with your application.</span></figcaption>
+    </figure>
   </section>
 
   <div class="cn1-section-shell">
@@ -70,10 +48,10 @@ app.show();</code></pre>
         <p>Call platform SDKs through native interfaces. Embed a map, web view, camera surface, or other heavyweight view with <code>PeerComponent</code>.</p>
       </article>
     </div>
-    <aside class="cn1-tradeoff">
-      <strong>The tradeoff</strong>
-      <p>Codename One does not map every component to UIKit or Android widgets. Embedded native views also carry composition, animation, and z-order constraints. The payoff is a UI whose implementation belongs to your app.</p>
-      <a href="/compare/">Read the framework comparison</a>
+    <aside class="cn1-ownership-proof">
+      <strong>Adopt platform changes on your schedule</strong>
+      <p>Ship Liquid Glass, Material 3, or your own design as a versioned part of the application. An OS upgrade does not silently replace the UI you tested.</p>
+      <a href="/blog/liquid-glass-material-3-modern-native-themes/">See the current themes</a>
     </aside>
   </section>
 
@@ -107,40 +85,30 @@ app.show();</code></pre>
 
   <section class="cn1-v2-section cn1-v2-reach">
     <div class="cn1-v2-reach__copy">
-      <p class="cn1-eyebrow">One substrate, more screens</p>
-      <h2>Reach beyond the phone without starting over.</h2>
-      <p>Share the same application model across the surfaces your product needs. Adapt the interface where the form factor demands it.</p>
+      <p class="cn1-eyebrow">Deployment targets</p>
+      <h2>One Java project across the ports we test.</h2>
+      <p>The same application model reaches phones, native desktops, browsers, watches, and TV. The Port Status page publishes the architecture, operating-system floor, and CI evidence for each target.</p>
+      <a class="cn1-reach-link" href="/port-status/">Inspect every port and test</a>
     </div>
-    <ul class="cn1-platform-grid" aria-label="Supported platform families">
-      <li><strong>Mobile</strong><span>iOS · Android</span></li>
-      <li><strong>Desktop</strong><span>macOS · Windows · Linux</span></li>
-      <li><strong>Web</strong><span>JavaScript · PWA</span></li>
-      <li><strong>Wearables</strong><span>watchOS · Wear OS</span></li>
-      <li><strong>Living room</strong><span>tvOS · Android TV</span></li>
-      <li><strong>Vehicle</strong><span>CarPlay · Android Auto</span></li>
+    <ul class="cn1-platform-grid" aria-label="Supported deployment targets">
+      {{- range site.Data.port_status_support.deployment_support }}
+      <li>
+        <strong>{{ .platform }}</strong>
+        <span>{{ .architectures }}</span>
+        <small>{{ .declared_range }}</small>
+      </li>
+      {{- end }}
+      <li>
+        <strong>Vehicle integrations</strong>
+        <span>CarPlay and Android Auto</span>
+        <small>Native vehicle surfaces connected to the shared application.</small>
+      </li>
+      <li>
+        <strong>System surfaces</strong>
+        <span>Widgets, Live Activities, Dynamic Island</span>
+        <small>One Java API for Apple, Android, and desktop surfaces.</small>
+      </li>
     </ul>
-  </section>
-
-  <section class="cn1-v2-section cn1-v2-proof">
-    <div class="cn1-v2-section__intro">
-      <p class="cn1-eyebrow">Working applications</p>
-      <h2>Inspect what teams built.</h2>
-      <p>Real applications are stronger evidence than a feature list. Open the demos, view source where available, and check the interaction patterns.</p>
-    </div>
-    <div class="cn1-app-grid">
-      <article>
-        <img src="/uploads/arrivu.png" alt="Arrivu application screen" loading="lazy">
-        <div><p>Voice and AI</p><h3>Arrivu</h3><a href="https://www.arrivu.com/" target="_blank" rel="noopener noreferrer">Visit application</a></div>
-      </article>
-      <article>
-        <img src="/uploads/Ordyx-Codename-One.png" alt="Ordyx point-of-sale application screen" loading="lazy">
-        <div><p>Restaurant operations</p><h3>Ordyx POS</h3><a href="/demos/">Explore demos</a></div>
-      </article>
-      <article>
-        <img src="/uploads/yHomework.png" alt="yHomework application screen" loading="lazy">
-        <div><p>Education</p><h3>yHomework</h3><a href="/demos/">Explore demos</a></div>
-      </article>
-    </div>
   </section>
 
   <section class="cn1-v2-section cn1-v2-engineering">
@@ -151,10 +119,14 @@ app.show();</code></pre>
     <div class="cn1-engineering-grid">
       {{- range first 3 (sort (where site.RegularPages "Section" "blog") "Date" "desc") -}}
       {{- $thumb := .Params.cover.image | default .Params.thumbnail | default .Params.image -}}
+      {{- if not $thumb -}}
+        {{- $candidate := printf "%s.jpg" (strings.TrimSuffix "/" .RelPermalink) -}}
+        {{- if fileExists (printf "static%s" $candidate) -}}{{- $thumb = $candidate -}}{{- end -}}
+      {{- end -}}
       <article>
         <a class="cn1-engineering-grid__image" href="{{ .RelPermalink }}">
           {{- with $thumb -}}
-          <img src="{{ . }}" alt="" loading="lazy">
+          <img src="{{ . }}" alt="">
           {{- else -}}
           <span aria-hidden="true">{ }</span>
           {{- end -}}

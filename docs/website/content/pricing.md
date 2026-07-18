@@ -21,7 +21,7 @@ The optional cloud build service includes a free quota and lets developers on Wi
 ### What are the limits of the free version?
 These limits apply to cloud builds only.
 
-- 100 build credits per month.
+- 100 free cloud build credits each month.
 - 1 build credit per build (iOS uses 8 credits due to Mac build costs).
 - 8.5 MB user JAR size limit.
 

@@ -33,33 +33,33 @@
 
   <section class="cn1-compare-choices">
     <article class="cn1-compare-choice cn1-compare-choice--cn1">
-      <p class="cn1-eyebrow">Choose Codename One when</p>
-      <h2>You want native output and an app-owned UI in Java.</h2>
-      <ul><li>One shared UI and application model matters.</li><li>You need mobile plus desktop, web, watch, TV, or vehicle surfaces.</li><li>You want cloud iOS builds without maintaining a Mac build machine.</li><li>You accept a custom-rendered UI and its native-view composition constraints.</li></ul>
+      <p class="cn1-eyebrow">Codename One</p>
+      <h2>One Java codebase, native output, and an app-owned UI.</h2>
+      <ul><li>Share application logic and UI across every supported target.</li><li>Call platform SDKs through native interfaces, including synchronous calls where the platform permits them.</li><li>Embed maps, browsers, cameras, and other platform views with <code>PeerComponent</code>.</li><li>Build iOS in the cloud without maintaining a Mac build machine.</li></ul>
     </article>
     <article class="cn1-compare-choice">
-      <p class="cn1-eyebrow">Choose platform UI when</p>
-      <h2>The platform itself is the product boundary.</h2>
-      <ul><li>You target one platform or fund separate platform teams.</li><li>You want the newest system components as soon as the OS provides them.</li><li>Direct access to every platform API outweighs shared implementation.</li><li>You accept separate release, test, and maintenance paths.</li></ul>
+      <p class="cn1-eyebrow">Platform UI</p>
+      <h2>Direct platform APIs with separate Swift and Kotlin implementations.</h2>
+      <ul><li>UIKit, SwiftUI, Android Views, and Compose expose vendor APIs directly.</li><li>Each platform has its own UI implementation, tests, and release path.</li><li>New OS components arrive first in the vendor toolkits.</li><li>OS updates can change the appearance or behavior of existing components.</li></ul>
     </article>
     <article class="cn1-compare-choice">
-      <p class="cn1-eyebrow">Choose Flutter when</p>
-      <h2>You want a larger custom-rendered ecosystem and accept Dart.</h2>
-      <ul><li>Flutter's package and hiring ecosystem matters more than Java integration.</li><li>Its rendering fidelity and widget catalog fit the product.</li><li>You are comfortable with Flutter-specific tooling and runtime choices.</li><li>You can maintain native plugins where the package layer stops.</li></ul>
+      <p class="cn1-eyebrow">Flutter</p>
+      <h2>A larger framework-specific ecosystem built around Dart.</h2>
+      <ul><li>Flutter has a large package catalog, mature tooling, and a broad framework community.</li><li>It owns its pixels through the Flutter rendering engine, as Codename One does through its renderer.</li><li>Dart is the primary application language; Java has the larger general-purpose ecosystem and hiring pool.</li><li>Platform channels call native SDKs, while Platform Views embed native controls.</li></ul>
     </article>
     <article class="cn1-compare-choice">
-      <p class="cn1-eyebrow">Choose the web when</p>
-      <h2>A URL and browser deployment are the main advantages.</h2>
+      <p class="cn1-eyebrow">Web</p>
+      <h2>A URL-first deployment model backed by the browser.</h2>
       <ul><li>Instant deployment matters more than app-store distribution.</li><li>The browser APIs cover the required device integration.</li><li>Your team and product are web-first.</li><li>You accept browser-engine behavior and wrapper tradeoffs on app stores.</li></ul>
     </article>
   </section>
 
   <section class="cn1-compare-detail">
-    <div class="cn1-v2-section__intro"><p class="cn1-eyebrow">The Codename One model</p><h2>The custom renderer is the source of control and the main tradeoff.</h2></div>
+    <div class="cn1-v2-section__intro"><p class="cn1-eyebrow">The Codename One model</p><h2>The renderer gives the application control of its UI.</h2></div>
     <div class="cn1-compare-detail__grid">
-      <article><h3>What you gain</h3><p>The UI runtime and theme ship inside the application. Shared screens keep one implementation across targets, and OS widget changes do not replace that implementation after release.</p></article>
-      <article><h3>What you give up</h3><p>You do not automatically receive every new UIKit or Compose component. Codename One's platform themes also do not match every platform detail as closely as Flutter or a dedicated native implementation.</p></article>
-      <article><h3>Where native still enters</h3><p>Use native interfaces for platform SDKs. Use <code>PeerComponent</code> for heavyweight platform views such as maps and web views. Embedded views can require special handling for animation, z-order, and menus.</p></article>
+      <article><h3>Versioned UI</h3><p>The UI runtime and theme ship inside the application. Shared screens keep one implementation, and an OS update cannot silently replace the component implementation after release.</p></article>
+      <article><h3>Current platform styling</h3><p>Codename One is actively improving fidelity with Liquid Glass and Material 3 themes. You adopt those changes by updating and testing the application rather than waiting for an OS update to restyle it.</p></article>
+      <article><h3>Direct native integration</h3><p>Native interfaces expose platform SDKs without forcing every call through an asynchronous channel. <code>PeerComponent</code> places heavyweight platform views inside the shared UI.</p></article>
     </div>
   </section>
 
@@ -69,7 +69,7 @@
   </section>
 
   <section class="cn1-v2-final cn1-compare-final">
-    <div><p class="cn1-eyebrow">Test the model</p><h2>Create the project and make the tradeoff concrete.</h2><p>The free cloud tier includes 100 build credits per month. No paid plan is required to evaluate the framework.</p></div>
+    <div><p class="cn1-eyebrow">Test the model</p><h2>Create the project and build a real screen.</h2><p>The free cloud tier includes 100 free cloud build credits each month. No paid plan is required to evaluate the framework.</p></div>
     <div class="cn1-action-row">{{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "https://start.codenameone.com/" "event" "compare-final-project" "external" true) }}</div>
   </section>
 </article>

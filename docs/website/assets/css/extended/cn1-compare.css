@@ -70,7 +70,7 @@
   border-right: 1px solid var(--cn1-border);
   border-bottom: 1px solid var(--cn1-border);
   color: var(--cn1-muted);
-  font-size: 11px;
+  font-size: 14px;
   line-height: 1.55;
   text-align: left;
   vertical-align: top;
@@ -136,7 +136,7 @@
   position: relative;
   padding-left: 18px;
   color: var(--cn1-muted);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.55;
 }
 
@@ -167,13 +167,13 @@
 .cn1-compare-detail__grid h3 {
   margin: 0 0 16px;
   color: var(--cn1-text);
-  font-size: 18px;
+  font-size: 21px;
 }
 
 .cn1-compare-detail__grid p {
   margin: 0;
   color: var(--cn1-muted);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.7;
 }
 
@@ -197,7 +197,7 @@
 
 .cn1-compare-test > div > p:not(.cn1-eyebrow) {
   color: var(--cn1-muted);
-  font-size: 15px;
+  font-size: 17px;
   line-height: 1.7;
 }
 
@@ -216,7 +216,7 @@
   gap: 16px;
   padding: 16px 20px;
   color: var(--cn1-text);
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .cn1-compare-test li + li {

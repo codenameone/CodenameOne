@@ -28,7 +28,6 @@
       const trigger = item.querySelector(".cn1-menu-trigger");
       if (!trigger) return;
       trigger.addEventListener("click", (event) => {
-        if (!mobileMq.matches) return;
         event.preventDefault();
         const willOpen = !item.classList.contains("open");
         closeAll();
@@ -37,6 +36,10 @@
           trigger.setAttribute("aria-expanded", "true");
         }
       });
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!header.contains(event.target)) closeAll();
     });
 
     if (navToggle) {
