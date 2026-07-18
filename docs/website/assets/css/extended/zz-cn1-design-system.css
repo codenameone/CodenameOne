@@ -21,7 +21,7 @@
   --cn1-radius-lg: 24px;
   --cn1-shell: 1240px;
   --cn1-reading: 780px;
-  --cn1-font: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --cn1-font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --cn1-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --theme: var(--cn1-bg);
   --entry: var(--cn1-surface);
@@ -622,13 +622,18 @@ body.dark .cn1-action--primary {
   letter-spacing: 0.04em;
 }
 
-.cn1-runtime-proof__comparison > img {
+.cn1-runtime-proof__comparison > img,
+.cn1-runtime-proof__comparison > video {
   display: block;
   width: 100%;
   height: calc(100% - 38px);
   object-fit: contain;
   object-position: center;
   background: #9b9b9b;
+}
+
+.cn1-runtime-proof__still {
+  display: none !important;
 }
 
 .cn1-runtime-proof__device--android > img {
@@ -882,6 +887,10 @@ body.dark .cn1-v2-feature.cn1-v2-feature--accent p {
   color: var(--cn1-muted);
   font-size: 17px;
   line-height: 1.7;
+}
+
+.cn1-v2-agent__intro .cn1-action-row {
+  margin-top: 32px;
 }
 
 .cn1-v2-agent__grid {
@@ -1639,5 +1648,13 @@ body.dark .cn1-footer-logo {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+  }
+
+  .cn1-runtime-proof__motion {
+    display: none !important;
+  }
+
+  .cn1-runtime-proof__still {
+    display: block !important;
   }
 }

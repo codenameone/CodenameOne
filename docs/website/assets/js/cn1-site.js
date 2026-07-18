@@ -1,4 +1,5 @@
 (() => {
+  const CONVERSION_ARRIVAL_KEY = "cn1-conversion-arrival-v1";
   const path = window.location.pathname || "";
   const isBlogPath = path === "/blog/" || path.startsWith("/blog/");
   if (isBlogPath) {
@@ -127,6 +128,31 @@
     scheme.addListener(updateThemeUi);
   }
 
+  const motionProof = document.querySelector("[data-cn1-motion-proof]");
+  if (motionProof) {
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const syncMotionProof = () => {
+      if (reducedMotion.matches) {
+        motionProof.pause();
+        motionProof.removeAttribute("src");
+        motionProof.load();
+        return;
+      }
+      if (!motionProof.getAttribute("src")) {
+        motionProof.setAttribute("src", motionProof.getAttribute("data-src"));
+        motionProof.load();
+      }
+      const playback = motionProof.play();
+      if (playback && playback.catch) playback.catch(() => {});
+    };
+    syncMotionProof();
+    if (reducedMotion.addEventListener) {
+      reducedMotion.addEventListener("change", syncMotionProof);
+    } else if (reducedMotion.addListener) {
+      reducedMotion.addListener(syncMotionProof);
+    }
+  }
+
   document.querySelectorAll("[data-cn1-tabs]").forEach((tabs) => {
     const triggers = Array.from(tabs.querySelectorAll("[data-cn1-tab-trigger]"));
     if (!triggers.length) return;
@@ -158,11 +184,18 @@
         setActive(trigger.getAttribute("data-cn1-tab-trigger"));
       });
       trigger.addEventListener("keydown", (event) => {
-        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
         event.preventDefault();
         const current = triggers.indexOf(trigger);
-        const direction = event.key === "ArrowRight" ? 1 : -1;
-        const next = triggers[(current + direction + triggers.length) % triggers.length];
+        let next;
+        if (event.key === "Home") {
+          next = triggers[0];
+        } else if (event.key === "End") {
+          next = triggers[triggers.length - 1];
+        } else {
+          const direction = event.key === "ArrowRight" ? 1 : -1;
+          next = triggers[(current + direction + triggers.length) % triggers.length];
+        }
         setActive(next.getAttribute("data-cn1-tab-trigger"));
         next.focus();
       });
@@ -175,28 +208,36 @@
     );
   });
 
-  document.querySelectorAll("[data-cn1-conversion]").forEach((link) => {
-    link.addEventListener("click", () => {
-      if (window.cn1CrispEvents && window.cn1CrispEvents.conversionClick) {
-        window.cn1CrispEvents.conversionClick({
-          action: link.getAttribute("data-cn1-conversion"),
-          page: window.location.pathname
-        });
-      }
-    });
-  });
+  const fireConversion = (link) => {
+    if (window.cn1CrispEvents && window.cn1CrispEvents.conversionClick) {
+      window.cn1CrispEvents.conversionClick({
+        action: link.getAttribute("data-cn1-conversion"),
+        page: window.location.pathname
+      });
+    }
+  };
 
-  document.querySelectorAll("[data-cn1-copy-command]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const command = button.parentElement && button.parentElement.querySelector("code");
-      if (!command || !navigator.clipboard) return;
+  document.querySelectorAll("[data-cn1-conversion]").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      const destination = new URL(link.href, window.location.href);
+      const current = `${window.location.pathname}${window.location.search}`;
+      const target = `${destination.pathname}${destination.search}`;
+      const opensElsewhere = link.target === "_blank" || event.metaKey || event.ctrlKey ||
+        event.shiftKey || event.altKey || event.button !== 0;
+      if (destination.origin !== window.location.origin || opensElsewhere || target === current) {
+        fireConversion(link);
+        return;
+      }
+
       try {
-        await navigator.clipboard.writeText(command.textContent.trim());
-        const original = button.textContent;
-        button.textContent = "Copied";
-        window.setTimeout(() => { button.textContent = original; }, 1800);
+        sessionStorage.setItem(CONVERSION_ARRIVAL_KEY, JSON.stringify({
+          action: link.getAttribute("data-cn1-conversion"),
+          source: current,
+          destination: target,
+          createdAt: Date.now()
+        }));
       } catch (_) {
-        button.textContent = "Select and copy";
+        fireConversion(link);
       }
     });
   });

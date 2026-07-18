@@ -3,6 +3,7 @@
   const CONSENT_COOKIE = "cn1_crisp_consent";
   const WEBSITE_ID = "e0201fca-1e59-4f30-9d00-8c37aa18293e";
   const CONSENT_TTL_DAYS = 365;
+  const CONVERSION_ARRIVAL_KEY = "cn1-conversion-arrival-v1";
 
   const readCookie = (name) => {
     const prefix = `${name}=`;
@@ -53,11 +54,12 @@
   const fireCrispEvent = (name, data) => {
     // Consent can change after a page schedules a dwell event. Check it at the
     // moment the event fires, before touching either deduplication guard.
-    if (getConsent() !== "accepted" || !window.$crisp || firedThisView[name]) {
+    const dedupeName = data && data.action ? `${name}-${data.action}` : name;
+    if (getConsent() !== "accepted" || !window.$crisp || firedThisView[dedupeName]) {
       return false;
     }
     try {
-      const sessionKey = `cn1-crisp-ev-${name}`;
+      const sessionKey = `cn1-crisp-ev-${dedupeName}`;
       if (sessionStorage.getItem(sessionKey)) {
         return false; // already fired earlier this session
       }
@@ -67,9 +69,9 @@
     try {
       const event = data ? [name, data, "blue"] : [name];
       window.$crisp.push(["set", "session:event", [[event]]]);
-      firedThisView[name] = true;
+      firedThisView[dedupeName] = true;
       try {
-        sessionStorage.setItem(`cn1-crisp-ev-${name}`, "1");
+        sessionStorage.setItem(`cn1-crisp-ev-${dedupeName}`, "1");
       } catch (e) {
         // sessionStorage unavailable — the per-view guard still applies
       }
@@ -136,6 +138,34 @@
   };
   window.cn1CrispEvents = crispEvents;
 
+  const consumeConversionArrival = () => {
+    let raw;
+    try {
+      raw = sessionStorage.getItem(CONVERSION_ARRIVAL_KEY);
+      if (!raw) return;
+      sessionStorage.removeItem(CONVERSION_ARRIVAL_KEY);
+    } catch (e) {
+      return;
+    }
+
+    try {
+      const arrival = JSON.parse(raw);
+      const current = `${window.location.pathname}${window.location.search}`;
+      const referrer = document.referrer ? new URL(document.referrer) : null;
+      const referrerPath = referrer ? `${referrer.pathname}${referrer.search}` : "";
+      const isFresh = Number.isFinite(arrival.createdAt) && Date.now() - arrival.createdAt < 10 * 60 * 1000;
+      if (arrival.action && arrival.destination === current && isFresh && referrer &&
+          referrer.origin === window.location.origin && referrerPath === arrival.source) {
+        crispEvents.conversionClick({
+          action: arrival.action,
+          page: arrival.source,
+          destination: current
+        });
+      }
+    } catch (e) {
+      // Ignore malformed or stale navigation state.
+    }
+  };
   const loadCrisp = () => {
     if (window.CRISP_WEBSITE_ID || document.getElementById("cn1-crisp-loader")) {
       return;
@@ -207,6 +237,7 @@
   } else {
     openBanner();
   }
+  consumeConversionArrival();
 
   if (acceptBtn) {
     acceptBtn.addEventListener("click", acceptConsent);

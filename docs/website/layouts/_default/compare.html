@@ -41,7 +41,7 @@
       <p class="cn1-eyebrow">The Codename One advantage</p>
       <h2>One strict Java codebase, one simulator, one set of tests.</h2>
       <ul>
-        <li>Use Java's libraries, profilers, debuggers, Maven ecosystem, and hiring pool.</li>
+        <li>Keep Java's library ecosystem, Maven builds, and mainstream profiling and debugging tools.</li>
         <li>Theme the shared UI with CSS instead of rebuilding styling in each platform language.</li>
         <li>Run most UI and logic work in the universal JavaSE simulator without waiting for a native build.</li>
         <li>Move fast CI work onto ordinary JVM or headless browser runners, then reserve native builders for native verification.</li>
@@ -60,7 +60,7 @@
     <article class="cn1-compare-choice">
       <p class="cn1-eyebrow">Flutter</p>
       <h2>A Dart application shipped with Google's UI engine.</h2>
-      <ul><li>Flutter shares UI by owning its pixels, the same broad architectural choice Codename One made.</li><li>The application adopts Dart, Flutter-specific packages, the Flutter engine, and Google's framework direction.</li><li>Platform integration crosses channels or embeds Platform Views.</li></ul>
+      <ul><li>Flutter shares UI by shipping its own rendering engine. Codename One also owns its pixels without requiring Dart or a separately shipped Flutter engine.</li><li>A Flutter application adopts Dart packages and Google's framework direction.</li><li>Platform integration uses channels or Platform Views. Codename One uses native interfaces and <code>PeerComponent</code>, including synchronous native calls where the platform permits them.</li></ul>
     </article>
     <article class="cn1-compare-choice">
       <p class="cn1-eyebrow">Web</p>
