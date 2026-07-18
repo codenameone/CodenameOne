@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package com.codename1.impl.android;
 
 import android.app.Activity;
@@ -37,12 +60,38 @@ class AndroidScreenshotTask implements Runnable {
         }
 
         if (Build.VERSION.SDK_INT >= 26) {
-            tryPixelCopy(w, h);
+            captureAfterNextFrame(w, h);
             return;
         }
 
         // Pre-Oreo: fallback to drawing the view
         tryFallbackDraw(w, h);
+    }
+
+    /// PixelCopy reads the window's last PRESENTED frame, which has no ordering
+    /// guarantee against Codename One paints that were only just enqueued on the
+    /// EDT (the async view renders them on a later UI-thread frame). A capture
+    /// requested right after a repaint could therefore read the previous frame --
+    /// observed as the pure text editor screenshot tests uploading an empty
+    /// content area from the CI emulator. Force a draw pass and only issue the
+    /// PixelCopy once that frame has been up for a vsync.
+    private void captureAfterNextFrame(final int w, final int h) {
+        final View v = (View) view;
+        v.invalidate();
+        // Wait two vsyncs after the invalidate: the first frame draws and commits the
+        // invalidated content, the second fires once that frame is up, so the PixelCopy
+        // reads a surface that contains every paint enqueued before the capture request.
+        android.view.Choreographer.getInstance().postFrameCallback(new android.view.Choreographer.FrameCallback() {
+            @Override
+            public void doFrame(long frameTimeNanos) {
+                android.view.Choreographer.getInstance().postFrameCallback(new android.view.Choreographer.FrameCallback() {
+                    @Override
+                    public void doFrame(long frameTimeNanos2) {
+                        tryPixelCopy(w, h);
+                    }
+                });
+            }
+        });
     }
 
     private void tryPixelCopy(final int w, final int h) {

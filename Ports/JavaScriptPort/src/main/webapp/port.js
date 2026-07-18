@@ -1823,14 +1823,40 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag_java_lan
 // navigator.clipboard is Window-only), so route the write to the main thread
 // host bridge, which performs it within the forwarded click's user activation.
 bindNative([
-  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyToClipboard_java_lang_String_R_boolean",
-  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyToClipboard___java_lang_String_R_boolean"
-], function*(text) {
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyToClipboard_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyToClipboard___java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_boolean"
+], function*(text, html, rtf, markdown, asciidoc) {
   if (typeof jvm.invokeHostNative !== "function") {
     return 0;
   }
   const value = text == null ? "" : jvm.toNativeString(text);
-  const result = yield jvm.invokeHostNative("__cn1_copy_to_clipboard__", [{ text: value }]);
+  const request = { text: value };
+  if (html != null) request.html = jvm.toNativeString(html);
+  if (rtf != null) request.rtf = jvm.toNativeString(rtf);
+  if (markdown != null) request.markdown = jvm.toNativeString(markdown);
+  if (asciidoc != null) request.asciidoc = jvm.toNativeString(asciidoc);
+  const result = yield jvm.invokeHostNative("__cn1_copy_to_clipboard__", [request]);
+  return result ? 1 : 0;
+});
+
+// Image copy is likewise routed to the main thread, where navigator.clipboard +
+// ClipboardItem live. Best-effort and permission-gated. The host handler
+// (__cn1_copy_image_to_clipboard__) ships from the translator's browser_bridge.js,
+// which may lag this port.js; a missing handler rejects the call, so swallow the
+// error and report failure (copyToClipboard then falls back to the text path).
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyImageToClipboard_java_lang_String_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5Implementation_nativeBrowserCopyImageToClipboard___java_lang_String_R_boolean"
+], function*(dataUrl) {
+  if (typeof jvm.invokeHostNative !== "function" || dataUrl == null) {
+    return 0;
+  }
+  let result;
+  try {
+    result = yield jvm.invokeHostNative("__cn1_copy_image_to_clipboard__", [jvm.toNativeString(dataUrl)]);
+  } catch (err) {
+    return 0;
+  }
   return result ? 1 : 0;
 });
 

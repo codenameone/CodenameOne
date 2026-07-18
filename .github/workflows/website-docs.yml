@@ -165,6 +165,11 @@ jobs:
           set -euo pipefail
           node scripts/website/validate_port_status.mjs docs/website/public
 
+      - name: Validate comparison page claims
+        run: |
+          set -euo pipefail
+          node scripts/website/validate_compare_page.mjs docs/website/public
+
       - name: Validate Initializr page output
         run: |
           set -euo pipefail
@@ -329,13 +334,28 @@ jobs:
             echo "wrangler pages deploy exited with status ${wrangler_status}" >&2
             exit "${wrangler_status}"
           fi
-          preview_url="$(grep -Eo 'https://[A-Za-z0-9._-]+\.pages\.dev' "${deploy_log}" | tail -n1 || true)"
-          if [ -z "${preview_url}" ]; then
-            echo "Could not determine Cloudflare preview URL from deploy output." >&2
+          deployment_url="$(grep 'Deployment complete!' "${deploy_log}" | grep -Eo 'https://[A-Za-z0-9._-]+\.pages\.dev' | tail -n1 || true)"
+          preview_url="$(grep 'Deployment alias URL:' "${deploy_log}" | grep -Eo 'https://[A-Za-z0-9._-]+\.pages\.dev' | tail -n1 || true)"
+          if [ -z "${deployment_url}" ] || [ -z "${preview_url}" ]; then
+            echo "Could not determine the immutable deployment URL and preview alias from deploy output." >&2
             exit 1
           fi
+          echo "deployment_url=${deployment_url}" >> "${GITHUB_OUTPUT}"
           echo "preview_url=${preview_url}" >> "${GITHUB_OUTPUT}"
           echo "preview_branch=${PREVIEW_BRANCH}" >> "${GITHUB_OUTPUT}"
+
+      - name: Validate deployed comparison page
+        if: ${{ steps.cf_preview.outputs.deployment_url != '' }}
+        run: |
+          set -euo pipefail
+          deployed_compare="$(mktemp)"
+          curl --fail --silent --show-error \
+            --retry 6 \
+            --retry-delay 2 \
+            --retry-all-errors \
+            "${{ steps.cf_preview.outputs.deployment_url }}/compare/" \
+            --output "${deployed_compare}"
+          node scripts/website/validate_compare_page.mjs "${deployed_compare}"
 
       - name: Publish Cloudflare preview link in CI summary
         if: ${{ steps.cf_preview.outputs.preview_url != '' }}
@@ -394,7 +414,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ env.CLOUDFLARE_TOKEN }}
           PREVIEW_BRANCH: ${{ steps.cf_preview.outputs.preview_branch }}
-          PREVIEW_URL: ${{ steps.cf_preview.outputs.preview_url }}
+          DEPLOYMENT_URL: ${{ steps.cf_preview.outputs.deployment_url }}
         run: |
           set -euo pipefail
           api_base="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${CF_PAGES_PROJECT_NAME}/deployments"
@@ -408,21 +428,12 @@ jobs:
           import json
           import sys
 
-          path, preview_branch, preview_url = sys.argv[1:]
+          path, preview_branch, deployment_url = sys.argv[1:]
           data = json.load(open(path, encoding="utf-8"))
           result = data.get("result", []) or []
 
-          def aliases_of(dep):
-              aliases = dep.get("aliases") or []
-              out = []
-              for a in aliases:
-                  if isinstance(a, str):
-                      out.append(a)
-                  elif isinstance(a, dict):
-                      v = a.get("url")
-                      if isinstance(v, str):
-                          out.append(v)
-              return out
+          def normalized(value):
+              return (value or "").rstrip("/")
 
           def branch_of(dep):
               trig = dep.get("deployment_trigger") or {}
@@ -431,9 +442,14 @@ jobs:
 
           current_id = None
           for dep in result:
-              if preview_url in aliases_of(dep):
+              if normalized(dep.get("url")) == normalized(deployment_url):
                   current_id = dep.get("id")
                   break
+
+          if not current_id:
+              raise SystemExit(
+                  f"Could not identify current Cloudflare deployment for {deployment_url}; refusing to prune"
+              )
 
           for dep in result:
               dep_id = dep.get("id")
@@ -443,7 +459,7 @@ jobs:
                   print(dep_id)
           PY
 
-          python3 /tmp/cf_preview_cleanup.py "${tmp_json}" "${PREVIEW_BRANCH}" "${PREVIEW_URL}" > /tmp/cf_deployments_to_delete.txt
+          python3 /tmp/cf_preview_cleanup.py "${tmp_json}" "${PREVIEW_BRANCH}" "${DEPLOYMENT_URL}" > /tmp/cf_deployments_to_delete.txt
 
           while IFS= read -r dep_id; do
             [ -z "${dep_id}" ] && continue

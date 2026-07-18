@@ -1,7 +1,24 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.maven;
 
@@ -16,9 +33,6 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.PathMatcher;
 import java.util.*;
 
 import org.apache.commons.io.FileUtils;
@@ -854,59 +868,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     }
     protected static String OS = System.getProperty("os.name").toLowerCase();
     protected static boolean isWindows = (OS.indexOf("win") >= 0);
-    
-
-    protected static boolean isMac =  (OS.indexOf("mac") >= 0);
-    protected static final String ARCH = System.getProperty("os.arch");
-
-    protected static boolean isUnix = (OS.indexOf("nux") >= 0);
-    protected static final boolean is64Bit = is64Bit();
-    protected static final boolean is64Bit() {
-        
-        String model = System.getProperty("sun.arch.data.model",
-                                          System.getProperty("com.ibm.vm.bitmode"));
-        if (model != null) {
-            return "64".equals(model);
-        }
-        if ("x86-64".equals(ARCH)
-            || "ia64".equals(ARCH)
-            || "ppc64".equals(ARCH) || "ppc64le".equals(ARCH)
-            || "sparcv9".equals(ARCH)
-            || "mips64".equals(ARCH) || "mips64el".equals(ARCH)
-            || "amd64".equals(ARCH)
-            || "aarch64".equals(ARCH)) {
-            return true;
-        }
-        return false;
-    }
-    
-    protected String getCefPlatform() {
-        if (isMac) return "mac";
-        if (isWindows) return is64Bit ? "win64" : "win32";
-        if (isUnix && is64Bit && ("amd64".equals(ARCH) || "aarch64".equals(ARCH))) return "linux64";
-        return null;
-    }
-
-    protected String getJcefNativeArtifactId() {
-        if (isMac) return "aarch64".equals(ARCH) ? "jcef-natives-macosx-arm64" : "jcef-natives-macosx-amd64";
-        if (isWindows) return "aarch64".equals(ARCH) ? "jcef-natives-windows-arm64" : "jcef-natives-windows-amd64";
-        if (isUnix && is64Bit) return "aarch64".equals(ARCH) ? "jcef-natives-linux-arm64" : "jcef-natives-linux-amd64";
-        return null;
-    }
-
-    protected String getCefRuntimeSubdir() {
-        if (isMac) return "macos64";
-        if (isWindows) return path("lib", is64Bit ? "win64" : "win32");
-        if (isUnix) return path("lib", is64Bit ? "linux64" : "linux32");
-        return null;
-    }
-
-    protected File getCefDir() {
-        String path = System.getProperty("cef.dir", null);
-
-        if (path == null || path.isEmpty()) return null;
-        return new File(path);
-    }
+    protected static boolean isMac = (OS.indexOf("mac") >= 0);
 
     protected File getFFmpegDir() {
         String path = System.getProperty("ffmpeg.dir", null);
@@ -920,180 +882,6 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             return false;
         }
         return findExecutable(dir, "ffmpeg") != null && findExecutable(dir, "ffprobe") != null;
-    }
-
-    protected boolean isCefSetup() {
-        File cefDir = getCefDir();
-        if (cefDir == null) return false;
-        return cefDir.exists();
-    }
-
-    private void fixCefPermissions(File cefDir) {
-        getLog().debug("Checking permissions on "+cefDir+" and fixing if necessary");
-        Set<String> patterns = new HashSet<String>();
-        patterns.add("*.dylib");
-        patterns.add("*.so");
-        patterns.add("jcef_helper");
-        patterns.add("*.framework");
-        patterns.add("jcef Helper*");
-        patterns.add("Chromium Embedded Framework");
-        setExecutableRecursive(cefDir, patterns);
-
-        if ("linux64".equals(getCefPlatform())) {
-            getLog().debug("On linux platform.  Checking if we need to workaround issue with libjawt.so");
-            // There is a bug on many versions of linux because libjawt.so isn't in the LD_LIBRARY_PATH
-            // An easy way to fix this is to just copy it into the lib directory
-            File dest = new File(getCefDir(), path("lib", "linux64", "libjawt.so") );
-            File javaHome = new File(System.getProperty("java.home"));
-            File src = new File(javaHome, path("lib", "amd64", "libjawt.so"));
-            if (!src.exists()) {
-                src = new File(javaHome, path("lib", "libjawt.so"));
-            }
-            if (!dest.exists()) {
-                getLog().debug("libjawt.so fix has not been applied yet as "+dest+" does not exist");
-                if (src.exists()) {
-                    getLog().debug("We can attempt to apply libjawt.so fix since "+src+ " was found");
-                } else {
-                    getLog().debug("Cannot attempt to apply libjawt.so fix since "+src+" does not exist");
-                }
-            }
-
-            if (!dest.exists() && src.exists()) {
-                try {
-                    getLog().info("Copying "+src+" to "+dest+" to workaround issue with UnsatisfiedLinkError in CEF related to libjawt.so not being found in LD_LIBRARY_PATH");
-                    FileUtils.copyFile(src, dest);
-                } catch (Exception ex) {
-                    getLog().warn("Failed to copy libjawt.so into CEF lib directory.  There may be problems using the BrowserComponent and media.  If you experience problems try copying the file "+src+" into "+dest, ex);
-
-                }
-            }
-        }
-    }
-
-
-    private boolean match(File file, Collection<String> patterns) {
-        for (String pattern : patterns) {
-            if (pattern.contains("*")) {
-                PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:"+pattern);
-                if (matcher.matches(file.toPath().getFileName())) {
-                    return true;
-                }
-            } else {
-                if (pattern.equals(file.getName())) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private void setExecutableRecursive(File root, Collection<String> patterns) {
-        if (match(root, patterns)) {
-            if (root.exists()) {
-                root.setExecutable(true, false);
-            }
-        }
-        if (root.isDirectory()) {
-            for (File child : root.listFiles()) {
-                setExecutableRecursive(child, patterns);
-            }
-        }
-
-    }
-
-    private File extractCefBundle(File nativeJar, String version) {
-        File extractedDir = new File(project.getBuild().getDirectory(), "cn1-cef-" + getCefPlatform());
-        File cefRoot = new File(extractedDir, "cef");
-        File runtimeDir = new File(cefRoot, getCefRuntimeSubdir());
-        File tempExtract = new File(extractedDir, "tmp");
-        // The version stamp guards against reusing a stale extraction after a JCEF
-        // upgrade. The native binary and the jcef-api Java classes must match: a
-        // mismatch surfaces at runtime as a native<->Java skew (e.g. a
-        // NoSuchMethodError for getScreenInfo, which also silently breaks HiDPI
-        // scaling). A timestamp check alone misses this because the previously
-        // extracted directory can be newer than a freshly resolved native jar.
-        File versionStamp = new File(cefRoot, ".cn1-jcef-version");
-        boolean versionMatches = version != null && version.equals(readVersionStamp(versionStamp));
-        boolean needsRefresh = !runtimeDir.exists()
-                || extractedDir.lastModified() < nativeJar.lastModified()
-                || !versionMatches;
-        if (isMac) {
-            File chromiumEmbeddedFramework = new File(runtimeDir, "Chromium Embedded Framework.framework/Chromium Embedded Framework");
-            needsRefresh = needsRefresh || !Files.isSymbolicLink(chromiumEmbeddedFramework.toPath());
-        }
-        if (!needsRefresh) {
-            return cefRoot;
-        }
-        if (runtimeDir.exists() && !versionMatches) {
-            getLog().info("Refreshing CEF: extracted JCEF native version does not match "
-                    + (version == null ? "the resolved version" : version));
-        }
-
-        if (extractedDir.exists()) {
-            delTree(extractedDir);
-        }
-        runtimeDir.mkdirs();
-        tempExtract.mkdirs();
-
-        getLog().info("Expanding CEF");
-        Expand expand = (Expand) antProject.createTask("unzip");
-        expand.setDest(tempExtract);
-        expand.setSrc(nativeJar);
-        expand.execute();
-
-        File tarball = findFileBySuffix(tempExtract, ".tar.gz");
-        if (tarball == null) {
-            throw new IllegalStateException("Failed to find native JCEF tarball in " + nativeJar);
-        }
-        ExecTask tar = (ExecTask) antProject.createTask("exec");
-        tar.setExecutable("tar");
-        tar.createArg().setValue("-xzf");
-        tar.createArg().setFile(tarball);
-        tar.createArg().setValue("-C");
-        tar.createArg().setFile(runtimeDir);
-        tar.execute();
-        delTree(tempExtract);
-        writeVersionStamp(versionStamp, version);
-        return cefRoot;
-    }
-
-    private String readVersionStamp(File versionStamp) {
-        if (!versionStamp.exists()) {
-            return null;
-        }
-        try {
-            return new String(Files.readAllBytes(versionStamp.toPath()), "UTF-8").trim();
-        } catch (IOException ex) {
-            getLog().debug("Could not read CEF version stamp " + versionStamp, ex);
-            return null;
-        }
-    }
-
-    private void writeVersionStamp(File versionStamp, String version) {
-        if (version == null) {
-            return;
-        }
-        try {
-            Files.write(versionStamp.toPath(), version.getBytes("UTF-8"));
-        } catch (IOException ex) {
-            getLog().debug("Could not write CEF version stamp " + versionStamp, ex);
-        }
-    }
-
-    private File findFileBySuffix(File root, String suffix) {
-        if (root == null || !root.exists()) {
-            return null;
-        }
-        if (root.isFile()) {
-            return root.getName().endsWith(suffix) ? root : null;
-        }
-        for (File child : root.listFiles()) {
-            File found = findFileBySuffix(child, suffix);
-            if (found != null) {
-                return found;
-            }
-        }
-        return null;
     }
 
     private File findExecutable(File root, String name) {
@@ -1125,34 +913,6 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             project.getProperties().setProperty("ffmpeg.dir", getFFmpegDir().getAbsolutePath());
             System.setProperty("ffmpeg.dir", getFFmpegDir().getAbsolutePath());
         }
-    }
-
-    protected void setupCef() {
-        if (isCefSetup()) {
-            fixCefPermissions(getCefDir());
-            return;
-        }
-        String platform = getCefPlatform();
-        if (platform == null) {
-            getLog().warn("CEF not supported on this platform.  Not adding dependency");
-            return;
-        }
-        String artifactId = getJcefNativeArtifactId();
-        if (artifactId == null) {
-            getLog().warn("No upstream JCEF artifact is configured for this platform");
-            return;
-        }
-        Artifact nativeArtifact = getArtifact("me.friwi", artifactId);
-        File nativeJar = nativeArtifact == null ? null : getJar(nativeArtifact);
-        if (nativeJar == null || !nativeJar.exists()) {
-            getLog().warn("Upstream JCEF native bundle " + artifactId + " not found in dependencies. Not adding CEF dependency");
-            return;
-        }
-        File cefDir = extractCefBundle(nativeJar, nativeArtifact.getVersion());
-        project.getProperties().setProperty("cef.dir", cefDir.getAbsolutePath());
-        System.setProperty("cef.dir", cefDir.getAbsolutePath());
-        fixCefPermissions(cefDir);
-        
     }
 
     /**

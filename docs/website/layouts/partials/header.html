@@ -40,82 +40,26 @@
 {{- end }}
 
 <header class="header cn1-header">
-    <div class="cn1-top-strip">
-        <a class="cn1-top-strip__link" href="https://github.com/codenameone/CodenameOne" target="_blank" rel="noopener noreferrer">
-            <i class="fab fa-github" aria-hidden="true"></i>
-            <span>Open Source &amp; Free</span>
-        </a>
-    </div>
-    <nav class="nav cn1-nav">
+    <nav class="nav cn1-nav" aria-label="Primary navigation">
         <div class="logo">
             {{- $label_text := (site.Params.label.text | default site.Title) }}
             {{- if site.Title }}
             <a href="/" accesskey="h" title="{{ $label_text }} (Alt + H)">
                 <img class="cn1-brand-logo" src="/uploads/Codename-One-White-Logo.png" alt="{{ $label_text }}">
-                {{- $label_text -}}
             </a>
             {{- end }}
-            <div class="logo-switches">
-                {{- if (not site.Params.disableThemeToggle) }}
-                <button id="theme-toggle" accesskey="t" title="(Alt + T)" aria-label="Toggle theme">
-                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
-                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                        stroke-linejoin="round">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                    </svg>
-                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
-                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                        stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="5"></circle>
-                        <line x1="12" y1="1" x2="12" y2="3"></line>
-                        <line x1="12" y1="21" x2="12" y2="23"></line>
-                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                        <line x1="1" y1="12" x2="3" y2="12"></line>
-                        <line x1="21" y1="12" x2="23" y2="12"></line>
-                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                    </svg>
-                </button>
-                {{- end }}
-                
-                {{- if (not site.Params.disableLangToggle) }}
-                    {{- $lang := .Lang}}
-                    {{- $separator := or $label_text (not site.Params.disableThemeToggle)}}
-                    {{- with site.Home.Translations }}
-                    <ul class="lang-switch">
-                        {{- if $separator }}<li>|</li>{{ end }}
-                        {{- range . -}}
-                        {{- if ne $lang .Lang }}
-                        <li>
-                            <a href="{{- .Permalink -}}" title="{{ .Language.Params.languageAltTitle | default (.Language.LanguageName | emojify) | default (.Lang | title) }}"
-                                aria-label="{{ .Language.LanguageName | default (.Lang | title) }}">
-                                {{- if (and site.Params.displayFullLangName (.Language.LanguageName)) }}
-                                {{- .Language.LanguageName | emojify -}}
-                                {{- else }}
-                                {{- .Lang | title -}}
-                                {{- end -}}
-                            </a>
-                        </li>
-                        {{- end -}}
-                        {{- end}}
-                    </ul>
-                    {{- end }}
-                {{- end }}
-            </div>
         </div>
-        <input type="checkbox" id="cn1-nav-toggle" class="cn1-nav-toggle" aria-label="Toggle menu">
-        <label for="cn1-nav-toggle" class="cn1-nav-toggle-btn" aria-label="Toggle menu">
-            <i class="fas fa-bars"></i>
-            <i class="fas fa-times"></i>
-        </label>
-        <div class="cn1-nav-links">
+        <button type="button" id="cn1-nav-toggle" class="cn1-nav-toggle-btn" aria-label="Toggle menu" aria-expanded="false" aria-controls="cn1-primary-menu">
+            <svg class="cn1-nav-toggle-btn__open" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            <svg class="cn1-nav-toggle-btn__close" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+        <div class="cn1-nav-links" id="cn1-primary-menu">
             <ul id="menu">
                 {{- range site.Menus.main }}
-                {{- if and (not .Parent) (ne .Identifier "dashboard") }}
+                {{- if and (not .Parent) (ne .Identifier "dashboard") (ne .Identifier "create-project") }}
                 <li class="{{ if .HasChildren }}has-children{{ end }}">
                     {{- if .HasChildren }}
-                    <button class="cn1-menu-trigger" type="button" aria-expanded="false">
+                    <button class="cn1-menu-trigger" type="button" aria-expanded="false" aria-haspopup="true">
                         <span>{{- .Name -}}</span>
                     </button>
                     <ul class="sub-menu">
@@ -130,7 +74,7 @@
                     {{- else }}
                     {{- if eq .Identifier "search" }}
                     <a class="cn1-menu-search-link" href="{{ .URL | relLangURL }}" aria-label="Search">
-                        <i class="fas fa-search" aria-hidden="true"></i>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 4 4"/></svg>
                     </a>
                     {{- else }}
                     <a href="{{ .URL | relLangURL }}">
@@ -144,14 +88,22 @@
             </ul>
         </div>
         <div class="cn1-theme-controls">
-            <button class="cn1-theme-toggle-btn" type="button" data-cn1-theme-toggle>
-                <i class="fas fa-adjust" aria-hidden="true"></i>
+            <button class="cn1-theme-toggle-btn" type="button" data-cn1-theme-toggle accesskey="t" aria-label="Switch color theme">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9c0-.7-.08-1.38-.23-2.03A7 7 0 0 1 12 3Z"/></svg>
             </button>
         </div>
         {{- range site.Menus.main }}
         {{- if eq .Identifier "dashboard" }}
         <a class="cn1-dashboard-link" href="{{ .URL }}" title="{{ .Title | default .Name }}">
             <span>{{- .Name -}}</span>
+        </a>
+        {{- end }}
+        {{- end }}
+        {{- range site.Menus.main }}
+        {{- if eq .Identifier "create-project" }}
+        <a class="cn1-create-project-link" href="{{ .URL }}" title="{{ .Title | default .Name }}">
+            <span>{{- .Name -}}</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </a>
         {{- end }}
         {{- end }}

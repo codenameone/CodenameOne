@@ -32,9 +32,11 @@ import com.codename1.teavm.io.ArrayBufferInputStream;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.CodenameOneThread;
 import com.codename1.impl.html5.JSOImplementations.CN1Native;
+import com.codename1.impl.html5.JSOImplementations.CompositionEvent;
 import com.codename1.impl.html5.JSOImplementations.HTMLIFrameElement;
 import com.codename1.impl.html5.JSOImplementations.HTMLMediaElement;
 import com.codename1.impl.html5.JSOImplementations.ImageExt;
+import com.codename1.impl.html5.JSOImplementations.InputEvent;
 import com.codename1.impl.html5.JSOImplementations.KeyEvent;
 import com.codename1.impl.html5.JSOImplementations.Navigator;
 import com.codename1.impl.html5.JSOImplementations.TextElement;
@@ -91,10 +93,14 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.PeerComponent;
+import com.codename1.ui.ClipboardContent;
 import com.codename1.ui.Sheet;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
+import com.codename1.ui.TextInputClient;
+import com.codename1.ui.TextInputConfig;
+import com.codename1.ui.TextInputState;
 import com.codename1.ui.TextSelection;
 import com.codename1.ui.Transform;
 import com.codename1.ui.events.ActionEvent;
@@ -237,6 +243,13 @@ public class HTML5Implementation extends CodenameOneImplementation {
     private String pendingTextChanges;
     private TextArea currentEditingField;
     private HTMLInputElement currentInputField;
+    private TextInputClient lightweightTextInputClient;
+    private TextInputConfig lightweightTextInputConfig;
+    private TextInputState lightweightTextInputState;
+    private HTMLTextAreaElement lightweightTextInputElement;
+    private boolean lightweightTextInputComposing;
+    private final List<Runnable> lightweightTextInputQueue = new ArrayList<Runnable>();
+    private boolean lightweightTextInputDrainScheduled;
     private boolean editingStartingUp;
     private static double devicePixelRatio=-1;
     private EasyThread nativeEdt;
@@ -1240,13 +1253,95 @@ public class HTML5Implementation extends CodenameOneImplementation {
         Window.current().dispatchEvent(evt);
     }
     
-    @JSBody(params={"evt", "mimeType"}, script="try {return evt.clipboardData.getData(mimeType)}catch(e){return ''}")
-    private native static String getPasteEventData(Event evt, String mimeType);
+    @JSBody(params={"evt", "mimeType"}, script="try {var types=['text/plain','text/html','text/rtf','text/markdown','text/asciidoc']; var type=types[mimeType]; if (evt.clipboardDataByType) return evt.clipboardDataByType[type] || ''; return evt.clipboardData.getData(type)}catch(e){return ''}")
+    private native static String getPasteEventData(Event evt, int mimeType);
     
-    @JSBody(params={"evt"}, script="try {return evt.clipboardData.files;} catch(e){return null}")
+    @JSBody(params={"evt"}, script="try {if (evt.clipboardFiles) return evt.clipboardFiles; return evt.clipboardData.files;} catch(e){return null}")
     private native static FileList getPasteEventFileList(Event evt);
-    
+
+    /// Populates a {@link ClipboardContent} with any files carried by a paste event. The temp-file
+    /// path(s) are exposed as {@link ClipboardContent#MIME_FILE} (a single {@code String} for one file,
+    /// a {@code String[]} for several) and, for each file whose blob MIME type is a recognised image,
+    /// the raw bytes are additionally exposed under the matching image MIME
+    /// ({@link ClipboardContent#MIME_PNG}/{@code MIME_JPEG}/{@code MIME_GIF}) so a rich text view can
+    /// consume the image directly. Fully null-safe: a failure to read a single file is swallowed so the
+    /// text flavors keep working.
+    private void addClipboardFiles(ClipboardContent content, FileList files, String[] filePaths) {
+        if (content == null || filePaths == null || filePaths.length == 0) {
+            return;
+        }
+        try {
+            if (filePaths.length == 1) {
+                content.setData(ClipboardContent.MIME_FILE, filePaths[0]);
+            } else {
+                content.setData(ClipboardContent.MIME_FILE, filePaths);
+            }
+            if (files == null) {
+                return;
+            }
+            int len = Math.min(files.getLength(), filePaths.length);
+            for (int i = 0; i < len; i++) {
+                try {
+                    Blob file = files.item(i);
+                    String imageMime = imageMimeForType(file == null ? null : file.getType());
+                    if (imageMime != null && !content.hasMimeType(imageMime)) {
+                        byte[] bytes = readTempFileBytes(filePaths[i]);
+                        if (bytes != null && bytes.length > 0) {
+                            content.setData(imageMime, bytes);
+                        }
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /// Maps a blob MIME type to the matching {@link ClipboardContent} image MIME, or null when the type
+    /// is not a PNG/JPEG/GIF image (other image types are left as a file-only reference rather than
+    /// being mislabeled).
+    private static String imageMimeForType(String type) {
+        if (type == null) {
+            return null;
+        }
+        String t = type.toLowerCase();
+        if (t.startsWith("image/png")) {
+            return ClipboardContent.MIME_PNG;
+        }
+        if (t.startsWith("image/jpeg") || t.startsWith("image/jpg")) {
+            return ClipboardContent.MIME_JPEG;
+        }
+        if (t.startsWith("image/gif")) {
+            return ClipboardContent.MIME_GIF;
+        }
+        return null;
+    }
+
+    /// Reads the bytes of a temp file ({@code tmp://} path) via the file system input stream. Returns
+    /// null on any failure.
+    private byte[] readTempFileBytes(String path) {
+        InputStream in = null;
+        try {
+            in = openFileInputStream(path);
+            return Util.readInputStream(in);
+        } catch (Throwable ex) {
+            return null;
+        } finally {
+            Util.cleanup(in);
+        }
+    }
+
     private void firePasteEvent() {
+        final TextInputClient client = lightweightTextInputClient;
+        if (client != null) {
+            enqueueLightweightTextInput(client, new Runnable() {
+                @Override
+                public void run() {
+                    client.onKeyCommand(TextInputClient.KEY_PASTE, 0);
+                }
+            });
+            return;
+        }
         callSerially(new Runnable() {
             public void run() {
                 Form f = CN.getCurrentForm();
@@ -1472,8 +1567,17 @@ public class HTML5Implementation extends CodenameOneImplementation {
         onPaste = new EventListener() {
             @Override
             public void handleEvent(Event evt) {
-                String plainText = getPasteEventData(evt, "text/plain");
-                String htmlText = getPasteEventData(evt, "text/html");
+                if (lightweightTextInputClient != null) {
+                    // The editor consumes the negotiated ClipboardContent below. Do not also let the
+                    // hidden textarea perform a plain-text paste, which would insert the same payload a
+                    // second time and discard HTML/RTF/Markdown/AsciiDoc flavors.
+                    evt.preventDefault();
+                }
+                String plainText = getPasteEventData(evt, 0);
+                String htmlText = getPasteEventData(evt, 1);
+                String rtfText = getPasteEventData(evt, 2);
+                String markdownText = getPasteEventData(evt, 3);
+                String asciidocText = getPasteEventData(evt, 4);
                 FileList files = getPasteEventFileList(evt);
                 String[] filePaths = null;
                 if (files != null) {
@@ -1484,15 +1588,36 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         filePaths[i] = createTempFile(file);
                     }
                 }
+                boolean hasFiles = filePaths != null && filePaths.length > 0;
+                if ((rtfText != null && rtfText.length() > 0)
+                        || (markdownText != null && markdownText.length() > 0)
+                        || (asciidocText != null && asciidocText.length() > 0)
+                        || hasFiles) {
+                    ClipboardContent content = new ClipboardContent()
+                            .setData(ClipboardContent.MIME_TEXT, plainText == null ? "" : plainText)
+                            .setData(ClipboardContent.MIME_HTML, emptyToNull(htmlText))
+                            .setData(ClipboardContent.MIME_RTF, emptyToNull(rtfText))
+                            .setData(ClipboardContent.MIME_MARKDOWN, emptyToNull(markdownText))
+                            .setData(ClipboardContent.MIME_ASCIIDOC, emptyToNull(asciidocText));
+                    // Expose pasted files (and image bytes) alongside the text flavors. This also
+                    // preempts the coordinator's plainer file handling below, which only surfaces a
+                    // file list and never the decoded image bytes a rich view needs.
+                    addClipboardFiles(content, files, filePaths);
+                    setPasteDataFromClipboard(content);
+                    firePasteEvent();
+                    return;
+                }
                 JavaScriptBrowserLifecycleCoordinator.handlePaste(new JavaScriptBrowserLifecycleCoordinator.PasteHooks() {
                     @Override
                     public void copyPlainText(String text) {
-                        HTML5Implementation.super.copyToClipboard(text);
+                        setPasteDataFromClipboard(text);
                     }
 
                     @Override
-                    public void copyHtmlText(String html) {
-                        HTML5Implementation.super.copyToClipboard(html);
+                    public void copyRichText(String plainText, String html) {
+                        setPasteDataFromClipboard(new ClipboardContent()
+                                .setData(ClipboardContent.MIME_TEXT, plainText)
+                                .setData(ClipboardContent.MIME_HTML, html));
                     }
 
                     @Override
@@ -1501,7 +1626,7 @@ public class HTML5Implementation extends CodenameOneImplementation {
                         for (int i = 0; i < paths.length; i++) {
                             cn1Files[i] = new com.codename1.io.File(paths[i]);
                         }
-                        HTML5Implementation.super.copyToClipboard(cn1Files);
+                        setPasteDataFromClipboard(cn1Files);
                     }
 
                     @Override
@@ -2159,6 +2284,12 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
             @Override
             public void handleEvent(Event evt) {
+                if (lightweightTextInputClient != null) {
+                    // The hidden input owns this event. Dispatching it through the regular CN1
+                    // key pipeline as well lets Component focus traversal see navigation keys
+                    // and can move focus away from the editor.
+                    return;
+                }
                 final KeyEvent kevt = (KeyEvent) evt;
                 JavaScriptKeyboardInteractionAdapter.handleKeyDown(new JavaScriptKeyboardInteractionAdapter.EditingState() {
                     @Override
@@ -2238,6 +2369,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
             @Override
             public void handleEvent(Event evt) {
+                if (lightweightTextInputClient != null) {
+                    return;
+                }
                 final KeyEvent kevt = (KeyEvent) evt;
                 JavaScriptKeyboardInteractionAdapter.handleKeyUp(new JavaScriptKeyboardInteractionAdapter.BacksideHooks() {
                     @Override
@@ -2311,6 +2445,9 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
             @Override
             public void handleEvent(Event evt) {
+                if (lightweightTextInputClient != null) {
+                    return;
+                }
                 final KeyEvent kevt = (KeyEvent) evt;
                 JavaScriptKeyboardInteractionAdapter.handleKeyPress(new JavaScriptKeyboardInteractionAdapter.EditingState() {
                     @Override
@@ -2447,6 +2584,561 @@ public class HTML5Implementation extends CodenameOneImplementation {
         }
         scheduleAnimationFrame();
         
+    }
+
+    private static String emptyToNull(String value) {
+        return value == null || value.length() == 0 ? null : value;
+    }
+
+    // ---- low-level text input source for canvas-rendered editors ----
+
+    @Override
+    public boolean isTextInputSupported() {
+        return true;
+    }
+
+    @Override
+    public Object startTextInput(TextInputClient client, TextInputConfig config) {
+        if (client == null) {
+            return null;
+        }
+        ensureLightweightTextInputElement();
+        lightweightTextInputClient = client;
+        lightweightTextInputConfig = config == null ? client.getConfig() : config;
+        lightweightTextInputState = client.getEditingState();
+        lightweightTextInputComposing = false;
+        clearLightweightTextInputQueue();
+        configureLightweightTextInputElement();
+        syncLightweightTextInputElement(lightweightTextInputState);
+        lightweightTextInputElement.getStyle().setProperty("display", "block");
+        lightweightTextInputElement.focus();
+        client.inputFocusGained();
+        return client;
+    }
+
+    @Override
+    public void updateTextInputState(Object handle, TextInputState state) {
+        if (handle == null || handle != lightweightTextInputClient || state == null) {
+            return;
+        }
+        lightweightTextInputState = state;
+        if (!lightweightTextInputComposing) {
+            syncLightweightTextInputElement(state);
+            // Re-assert DOM focus on every state push. Anything that silently moves focus off the
+            // hidden textarea (a browser overlay, an extension, a focus change the bridge guard
+            // could not cancel) otherwise leaves the session bound but deaf -- the window key
+            // pipeline defers to the active session, so every key goes dead until the session is
+            // restarted. The editor pushes state on each pointer interaction, so clicking back
+            // into the editor heals the binding. focus() on an already-focused element is a no-op.
+            lightweightTextInputElement.focus();
+        }
+    }
+
+    @Override
+    public void stopTextInput(Object handle) {
+        if (handle == null || handle != lightweightTextInputClient) {
+            return;
+        }
+        TextInputClient client = lightweightTextInputClient;
+        lightweightTextInputClient = null;
+        lightweightTextInputConfig = null;
+        lightweightTextInputState = null;
+        lightweightTextInputComposing = false;
+        clearLightweightTextInputQueue();
+        if (lightweightTextInputElement != null) {
+            lightweightTextInputElement.blur();
+            lightweightTextInputElement.getStyle().setProperty("display", "none");
+        }
+        client.inputFocusLost();
+    }
+
+    private void ensureLightweightTextInputElement() {
+        if (lightweightTextInputElement != null) {
+            return;
+        }
+        final HTMLTextAreaElement element = (HTMLTextAreaElement) doc().createElement("textarea");
+        lightweightTextInputElement = element;
+        element.setAttribute("class", "cn1-lightweight-text-input");
+        element.setAttribute("data-cn1-worker-text-input", "true");
+        element.setAttribute("aria-hidden", "true");
+        element.setTabIndex(-1);
+        CSSStyleDeclaration style = element.getStyle();
+        style.setProperty("position", "fixed");
+        style.setProperty("display", "none");
+        style.setProperty("width", "1px");
+        style.setProperty("height", "1px");
+        style.setProperty("padding", "0");
+        style.setProperty("margin", "0");
+        style.setProperty("border", "0");
+        style.setProperty("outline", "0");
+        style.setProperty("opacity", "0");
+        style.setProperty("color", "transparent");
+        style.setProperty("background", "transparent");
+        style.setProperty("caret-color", "transparent");
+        style.setProperty("pointer-events", "none");
+        style.setProperty("font-size", "16px");
+        style.setProperty("resize", "none");
+        style.setProperty("overflow", "hidden");
+
+        element.addEventListener("beforeinput", new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                final InputEvent input = (InputEvent) evt;
+                final TextInputClient client = lightweightTextInputClient;
+                if (client == null || input.isComposing()) {
+                    return;
+                }
+                final String inputType = input.getInputType();
+                final String data = input.getData();
+                if (!isHandledLightweightBeforeInput(inputType)) {
+                    return;
+                }
+                // Keep the hidden textarea from mutating independently of the Java document. Full
+                // textarea value snapshots race the worker/EDT round-trip and can overwrite a later
+                // keystroke. Queue the browser's explicit edit operation instead, preserving order.
+                evt.preventDefault();
+                evt.stopPropagation();
+                enqueueLightweightTextInput(client, new Runnable() {
+                    @Override
+                    public void run() {
+                        if (client == lightweightTextInputClient) {
+                            applyLightweightBeforeInput(client, inputType, data);
+                        }
+                    }
+                });
+            }
+        }, true);
+
+        element.addEventListener("input", new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                if (lightweightTextInputComposing) {
+                    return;
+                }
+                // Safari fires the composition's final input event AFTER compositionend has
+                // already cleared the composing flag and committed the text; diffing the
+                // textarea value again would insert the composed string twice.
+                String inputType = ((InputEvent) evt).getInputType();
+                if ("insertCompositionText".equals(inputType) || "deleteCompositionText".equals(inputType)) {
+                    return;
+                }
+                final TextInputClient client = lightweightTextInputClient;
+                final String value = element.getValue();
+                if (client == null) {
+                    return;
+                }
+                enqueueLightweightTextInput(client, new Runnable() {
+                    @Override
+                    public void run() {
+                        if (client == lightweightTextInputClient) {
+                            applyLightweightBrowserEdit(client, value);
+                        }
+                    }
+                });
+            }
+        }, true);
+
+        element.addEventListener("paste", new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                final TextInputClient client = lightweightTextInputClient;
+                if (client == null) {
+                    return;
+                }
+                evt.preventDefault();
+                evt.stopPropagation();
+                final ClipboardContent content = new ClipboardContent()
+                        .setData(ClipboardContent.MIME_TEXT, getPasteEventData(evt, 0))
+                        .setData(ClipboardContent.MIME_HTML, emptyToNull(getPasteEventData(evt, 1)))
+                        .setData(ClipboardContent.MIME_RTF, emptyToNull(getPasteEventData(evt, 2)))
+                        .setData(ClipboardContent.MIME_MARKDOWN, emptyToNull(getPasteEventData(evt, 3)))
+                        .setData(ClipboardContent.MIME_ASCIIDOC, emptyToNull(getPasteEventData(evt, 4)));
+                // Pasted files/images (e.g. Ctrl+V of an image into the editor) arrive as
+                // clipboardData.files; surface them as MIME_FILE plus decoded image bytes, mirroring
+                // the document-level listener.
+                FileList files = getPasteEventFileList(evt);
+                String[] filePaths = null;
+                if (files != null) {
+                    int len = files.getLength();
+                    filePaths = new String[len];
+                    for (int i = 0; i < len; i++) {
+                        filePaths[i] = createTempFile(files.item(i));
+                    }
+                }
+                addClipboardFiles(content, files, filePaths);
+                enqueueLightweightTextInput(client, new Runnable() {
+                    @Override
+                    public void run() {
+                        if (client == lightweightTextInputClient) {
+                            setPasteDataFromClipboard(content);
+                            client.onKeyCommand(TextInputClient.KEY_PASTE, 0);
+                        }
+                    }
+                });
+            }
+        }, true);
+
+        element.addEventListener("keydown", new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                final KeyEvent key = (KeyEvent) evt;
+                final TextInputClient client = lightweightTextInputClient;
+                if (client == null || lightweightTextInputComposing) {
+                    // while an IME composition is active the arrows / Escape / Enter navigate
+                    // the candidate list; routing them to the client would corrupt the
+                    // composition (the composition listeners own this phase)
+                    return;
+                }
+                final int modifiers = lightweightModifiers(key);
+                final int command = lightweightKeyCommand(key, modifiers);
+                if (command != 0) {
+                    evt.preventDefault();
+                    evt.stopPropagation();
+                    enqueueLightweightTextInput(client, new Runnable() {
+                        @Override
+                        public void run() {
+                            if (client == lightweightTextInputClient) {
+                                client.onKeyCommand(command, modifiers);
+                            }
+                        }
+                    });
+                } else if (key.getKeyCode() == 9) {
+                    // Tab / Shift+Tab: deliver as KEY_TAB so the client can indent / dedent (a plain
+                    // editor still inserts a tab). preventDefault keeps Tab from moving DOM focus.
+                    evt.preventDefault();
+                    evt.stopPropagation();
+                    enqueueLightweightTextInput(client, new Runnable() {
+                        @Override
+                        public void run() {
+                            if (client == lightweightTextInputClient) {
+                                client.onKeyCommand(TextInputClient.KEY_TAB, modifiers);
+                            }
+                        }
+                    });
+                }
+                // Enter is deliberately NOT handled here: on the worker runtime this
+                // preventDefault lands after the browser's dispatch window, so the keydown
+                // still produces a beforeinput insertLineBreak/insertParagraph -- handling
+                // both would fire onEditorAction twice on single-line fields. The
+                // applyLightweightBeforeInput path owns Enter for both runtimes.
+            }
+        }, true);
+
+        element.addEventListener("compositionstart", new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                lightweightTextInputComposing = true;
+            }
+        }, true);
+        element.addEventListener("compositionupdate", new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                final TextInputClient client = lightweightTextInputClient;
+                final String data = ((CompositionEvent) evt).getData();
+                if (client == null) {
+                    return;
+                }
+                enqueueLightweightTextInput(client, new Runnable() {
+                    @Override
+                    public void run() {
+                        if (client == lightweightTextInputClient) {
+                            client.setComposingText(data == null ? "" : data,
+                                    data == null ? 0 : data.length());
+                        }
+                    }
+                });
+            }
+        }, true);
+        element.addEventListener("compositionend", new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                final TextInputClient client = lightweightTextInputClient;
+                final String data = ((CompositionEvent) evt).getData();
+                lightweightTextInputComposing = false;
+                if (client == null) {
+                    return;
+                }
+                enqueueLightweightTextInput(client, new Runnable() {
+                    @Override
+                    public void run() {
+                        if (client == lightweightTextInputClient) {
+                            client.commitText(data == null ? "" : data);
+                        }
+                    }
+                });
+            }
+        }, true);
+
+        element.addEventListener("copy", new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                routeLightweightClipboardCommand(evt, TextInputClient.KEY_COPY);
+            }
+        }, true);
+        element.addEventListener("cut", new EventListener() {
+            @Override
+            public void handleEvent(Event evt) {
+                routeLightweightClipboardCommand(evt, TextInputClient.KEY_CUT);
+            }
+        }, true);
+        doc().getBody().appendChild(element);
+    }
+
+    private static int lightweightModifiers(KeyEvent key) {
+        int modifiers = 0;
+        if (key.isShiftKey()) {
+            modifiers |= TextInputClient.MOD_SHIFT;
+        }
+        if (key.isCtrlKey() || key.isMetaKey()) {
+            modifiers |= TextInputClient.MOD_CTRL;
+        }
+        if (key.isAltKey()) {
+            modifiers |= TextInputClient.MOD_ALT;
+        }
+        return modifiers;
+    }
+
+    private static boolean isHandledLightweightBeforeInput(String inputType) {
+        return "insertText".equals(inputType)
+                || "insertReplacementText".equals(inputType)
+                || "insertLineBreak".equals(inputType)
+                || "insertParagraph".equals(inputType)
+                || "deleteContentBackward".equals(inputType)
+                || "deleteContentForward".equals(inputType)
+                || "historyUndo".equals(inputType)
+                || "historyRedo".equals(inputType);
+    }
+
+    private void applyLightweightBeforeInput(TextInputClient client, String inputType, String data) {
+        if ("insertText".equals(inputType) || "insertReplacementText".equals(inputType)) {
+            client.commitText(data == null ? "" : data);
+        } else if ("insertLineBreak".equals(inputType) || "insertParagraph".equals(inputType)) {
+            TextInputConfig config = lightweightTextInputConfig;
+            if (config == null || config.isMultiline()) {
+                client.commitText("\n");
+            } else {
+                client.onEditorAction(config.getActionType());
+            }
+        } else if ("deleteContentBackward".equals(inputType)) {
+            client.onKeyCommand(TextInputClient.KEY_BACKSPACE, 0);
+        } else if ("deleteContentForward".equals(inputType)) {
+            client.onKeyCommand(TextInputClient.KEY_DELETE, 0);
+        } else if ("historyUndo".equals(inputType)) {
+            client.onKeyCommand(TextInputClient.KEY_UNDO, 0);
+        } else if ("historyRedo".equals(inputType)) {
+            client.onKeyCommand(TextInputClient.KEY_REDO, 0);
+        }
+    }
+
+    private static int lightweightKeyCommand(KeyEvent key, int modifiers) {
+        int keyCode = key.getKeyCode();
+        if ((modifiers & TextInputClient.MOD_CTRL) != 0) {
+            switch (keyCode) {
+                case 65:
+                    return TextInputClient.KEY_SELECT_ALL;
+                case 89:
+                    return TextInputClient.KEY_REDO;
+                case 90:
+                    return (modifiers & TextInputClient.MOD_SHIFT) != 0
+                            ? TextInputClient.KEY_REDO : TextInputClient.KEY_UNDO;
+                default:
+                    // Copy, cut, and paste remain native browser events so their ClipboardEvent
+                    // carries all negotiated MIME flavors and retains user activation. Navigation
+                    // and deletion keys fall through so Ctrl+arrow word movement, Ctrl+Home/End
+                    // and Ctrl+Backspace/Delete reach the client with their modifiers -- the
+                    // bridge cancels their keydown unconditionally, so mapping them to nothing
+                    // here would make the modified keys dead.
+                    break;
+            }
+        }
+        switch (keyCode) {
+            case 8:
+                return TextInputClient.KEY_BACKSPACE;
+            case 27:
+                return TextInputClient.KEY_ESCAPE;
+            case 33:
+                return TextInputClient.KEY_PAGE_UP;
+            case 34:
+                return TextInputClient.KEY_PAGE_DOWN;
+            case 35:
+                return TextInputClient.KEY_END;
+            case 36:
+                return TextInputClient.KEY_HOME;
+            case 37:
+                return TextInputClient.KEY_LEFT;
+            case 38:
+                return TextInputClient.KEY_UP;
+            case 39:
+                return TextInputClient.KEY_RIGHT;
+            case 40:
+                return TextInputClient.KEY_DOWN;
+            case 46:
+                return TextInputClient.KEY_DELETE;
+            default:
+                return 0;
+        }
+    }
+
+    private void routeLightweightClipboardCommand(Event evt, final int command) {
+        final TextInputClient client = lightweightTextInputClient;
+        if (client == null) {
+            return;
+        }
+        evt.preventDefault();
+        evt.stopPropagation();
+        enqueueLightweightTextInput(client, new Runnable() {
+            @Override
+            public void run() {
+                if (client == lightweightTextInputClient) {
+                    client.onKeyCommand(command, TextInputClient.MOD_CTRL);
+                }
+            }
+        });
+    }
+
+    private void enqueueLightweightTextInput(final TextInputClient client, Runnable operation) {
+        boolean scheduleDrain = false;
+        synchronized (lightweightTextInputQueue) {
+            if (client != lightweightTextInputClient) {
+                return;
+            }
+            lightweightTextInputQueue.add(operation);
+            if (!lightweightTextInputDrainScheduled) {
+                lightweightTextInputDrainScheduled = true;
+                scheduleDrain = true;
+            }
+        }
+        if (scheduleDrain) {
+            callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    drainLightweightTextInput(client);
+                }
+            });
+        }
+    }
+
+    private void drainLightweightTextInput(TextInputClient client) {
+        while (true) {
+            Runnable operation;
+            synchronized (lightweightTextInputQueue) {
+                if (client != lightweightTextInputClient) {
+                    // This drain was scheduled for a session that has since been replaced.
+                    // The queue now belongs to the successor (startTextInput cleared the old
+                    // entries and the successor scheduled its own drain), so leave both the
+                    // queue and the drain flag alone.
+                    return;
+                }
+                if (lightweightTextInputQueue.isEmpty()) {
+                    lightweightTextInputDrainScheduled = false;
+                    return;
+                }
+                operation = lightweightTextInputQueue.remove(0);
+            }
+            operation.run();
+        }
+    }
+
+    private void clearLightweightTextInputQueue() {
+        synchronized (lightweightTextInputQueue) {
+            lightweightTextInputQueue.clear();
+            lightweightTextInputDrainScheduled = false;
+        }
+    }
+
+    private void configureLightweightTextInputElement() {
+        TextInputConfig config = lightweightTextInputConfig;
+        if (config == null || lightweightTextInputElement == null) {
+            return;
+        }
+        lightweightTextInputElement.setAttribute("autocomplete", config.isAutoCorrect() ? "on" : "off");
+        lightweightTextInputElement.setAttribute("autocorrect", config.isAutoCorrect() ? "on" : "off");
+        lightweightTextInputElement.setAttribute("spellcheck", config.isAutoCorrect() ? "true" : "false");
+        lightweightTextInputElement.setAttribute("autocapitalize", config.isAutoCapitalize() ? "sentences" : "off");
+
+        String inputMode = "text";
+        switch (config.getConstraint() & 0xffff) {
+            case TextArea.EMAILADDR:
+                inputMode = "email";
+                break;
+            case TextArea.NUMERIC:
+                inputMode = "numeric";
+                break;
+            case TextArea.PHONENUMBER:
+                inputMode = "tel";
+                break;
+            case TextArea.URL:
+                inputMode = "url";
+                break;
+            default:
+                break;
+        }
+        lightweightTextInputElement.setAttribute("inputmode", inputMode);
+        switch (config.getActionType()) {
+            case TextInputConfig.ACTION_DONE:
+                lightweightTextInputElement.setAttribute("enterkeyhint", "done");
+                break;
+            case TextInputConfig.ACTION_NEXT:
+                lightweightTextInputElement.setAttribute("enterkeyhint", "next");
+                break;
+            case TextInputConfig.ACTION_SEARCH:
+                lightweightTextInputElement.setAttribute("enterkeyhint", "search");
+                break;
+            case TextInputConfig.ACTION_SEND:
+                lightweightTextInputElement.setAttribute("enterkeyhint", "send");
+                break;
+            default:
+                lightweightTextInputElement.setAttribute("enterkeyhint", "enter");
+                break;
+        }
+    }
+
+    private void syncLightweightTextInputElement(TextInputState state) {
+        if (lightweightTextInputElement == null || state == null) {
+            return;
+        }
+        String value = state.getText();
+        lightweightTextInputElement.setValue(value);
+        int start = clampTextInputOffset(state.getSelectionStart(), value.length());
+        int end = clampTextInputOffset(state.getSelectionEnd(), value.length());
+        lightweightTextInputElement.setSelectionStart(start);
+        lightweightTextInputElement.setSelectionEnd(end);
+
+        TextInputClient client = lightweightTextInputClient;
+        int[] caret = client == null ? null : client.getCaretRect();
+        if (caret != null && caret.length >= 4) {
+            lightweightTextInputElement.getStyle().setProperty("left", scaleCoord(caret[0]) + "px");
+            lightweightTextInputElement.getStyle().setProperty("top", scaleCoord(caret[1]) + "px");
+        }
+    }
+
+    private void applyLightweightBrowserEdit(TextInputClient client, String browserValue) {
+        TextInputState oldState = lightweightTextInputState;
+        String oldValue = oldState == null ? client.getEditingState().getText() : oldState.getText();
+        String newValue = browserValue == null ? "" : browserValue;
+        if (oldValue.equals(newValue)) {
+            return;
+        }
+
+        int prefix = 0;
+        int common = Math.min(oldValue.length(), newValue.length());
+        while (prefix < common && oldValue.charAt(prefix) == newValue.charAt(prefix)) {
+            prefix++;
+        }
+        int oldEnd = oldValue.length();
+        int newEnd = newValue.length();
+        while (oldEnd > prefix && newEnd > prefix
+                && oldValue.charAt(oldEnd - 1) == newValue.charAt(newEnd - 1)) {
+            oldEnd--;
+            newEnd--;
+        }
+
+        client.setSelectionRange(prefix, oldEnd);
+        client.commitText(newValue.substring(prefix, newEnd));
+    }
+
+    private static int clampTextInputOffset(int value, int length) {
+        return value < 0 ? 0 : value > length ? length : value;
     }
 
     @SuppressSyncErrors
@@ -10584,25 +11276,93 @@ public class HTML5Implementation extends CodenameOneImplementation {
     // main thread (the worker has no document/execCommand and no
     // navigator.clipboard), so the @JSBody below is only ever used by the legacy
     // main-thread (TeaVM) runtime, where document.execCommand is available.
-    @JSBody(params={"text"}, script=
+    @JSBody(params={"text", "html", "rtf", "markdown", "asciidoc"}, script=
         "try {" +
         "  var ta = document.createElement('textarea');" +
         "  ta.setAttribute('readonly', '');" +
         "  ta.style.position = 'fixed'; ta.style.top = '-1000px'; ta.style.left = '0'; ta.style.opacity = '0';" +
         "  document.body.appendChild(ta);" +
         "  ta.value = text;" +
+        "  var oncopy = function(e) {" +
+        "    try {" +
+        "      e.clipboardData.setData('text/plain', text || '');" +
+        "      if (html != null) e.clipboardData.setData('text/html', html);" +
+        "      if (rtf != null) e.clipboardData.setData('text/rtf', rtf);" +
+        "      if (markdown != null) e.clipboardData.setData('text/markdown', markdown);" +
+        "      if (asciidoc != null) e.clipboardData.setData('text/asciidoc', asciidoc);" +
+        "      e.preventDefault();" +
+        "    } catch (ignored) {}" +
+        "  };" +
         "  var ok = false;" +
-        "  try { ta.focus(); ta.select(); ok = !!document.execCommand('copy'); } catch (e) { ok = false; }" +
+        "  try { document.addEventListener('copy', oncopy); ta.focus(); ta.select(); ok = !!document.execCommand('copy'); } catch (e) { ok = false; }" +
+        "  document.removeEventListener('copy', oncopy);" +
         "  document.body.removeChild(ta);" +
         "  return ok;" +
         "} catch (e) { return false; }")
-    private native static boolean nativeBrowserCopyToClipboard(String text);
+    private native static boolean nativeBrowserCopyToClipboard(String text, String html, String rtf,
+            String markdown, String asciidoc);
+
+    // Best-effort image copy via the modern async clipboard API. Like the text native above, this
+    // @JSBody is only reached by the legacy main-thread (TeaVM) runtime; the worker-based port
+    // overrides it with a port.js binding that routes to the main-thread host (navigator.clipboard is
+    // Window-only). navigator.clipboard.write REPLACES the whole clipboard and is permission-gated, so
+    // everything is wrapped in try/catch and returns false on any failure. The dataUrl is a
+    // "data:<mime>;base64,<...>" string; the blob MIME is derived from its header.
+    @JSBody(params={"dataUrl"}, script=
+        "try {" +
+        "  if (dataUrl == null) return false;" +
+        "  if (!navigator.clipboard || typeof navigator.clipboard.write !== 'function' || typeof ClipboardItem === 'undefined') return false;" +
+        "  var str = '' + dataUrl;" +
+        "  var comma = str.indexOf(',');" +
+        "  if (comma < 0) return false;" +
+        "  var header = str.substring(0, comma);" +
+        "  var colon = header.indexOf(':');" +
+        "  var semi = header.indexOf(';');" +
+        "  var mime = (colon >= 0 && semi > colon) ? header.substring(colon + 1, semi) : 'image/png';" +
+        "  var byteString = atob(str.substring(comma + 1));" +
+        "  var len = byteString.length;" +
+        "  var bytes = new Uint8Array(len);" +
+        "  for (var i = 0; i < len; i++) { bytes[i] = byteString.charCodeAt(i); }" +
+        "  var blob = new Blob([bytes], {type: mime});" +
+        "  var item = {};" +
+        "  item[mime] = blob;" +
+        "  navigator.clipboard.write([new ClipboardItem(item)]);" +
+        "  return true;" +
+        "} catch (e) { return false; }")
+    private native static boolean nativeBrowserCopyImageToClipboard(String dataUrl);
+
+    /// Returns a {@code data:<mime>;base64,<...>} URL for the first image flavor
+    /// (PNG, then JPEG, then GIF) carried by the clipboard content, or null when none is present.
+    private static String firstClipboardImageDataUrl(ClipboardContent rich) {
+        String[] mimes = { ClipboardContent.MIME_PNG, ClipboardContent.MIME_JPEG, ClipboardContent.MIME_GIF };
+        for (int i = 0; i < mimes.length; i++) {
+            byte[] bytes = rich.getBytes(mimes[i]);
+            if (bytes != null && bytes.length > 0) {
+                return "data:" + mimes[i] + ";base64," + Base64.encodeNoNewline(bytes);
+            }
+        }
+        return null;
+    }
 
     @Override
     public void copyToClipboard(Object obj) {
         final ClipboardCopyRequest request = (obj instanceof ClipboardCopyRequest) ? (ClipboardCopyRequest)obj : new ClipboardCopyRequest(obj);
         obj = request.content;
         super.copyToClipboard(obj);
+        ClipboardContent rich = obj instanceof ClipboardContent ? (ClipboardContent)obj : null;
+        if (rich != null) {
+            // Best-effort image copy. clipboard.write replaces the whole clipboard, so when an image
+            // is present we prefer it and return on success; otherwise we fall through to the text path
+            // below. Guarded so a text-only copy is unaffected and a permission failure is silent.
+            try {
+                String imageDataUrl = firstClipboardImageDataUrl(rich);
+                if (imageDataUrl != null && nativeBrowserCopyImageToClipboard(imageDataUrl)) {
+                    return;
+                }
+            } catch (Throwable ignored) {
+            }
+            obj = rich.getText(ClipboardContent.MIME_TEXT);
+        }
         if (!(obj instanceof String)) {
             return;
         }
@@ -10611,7 +11371,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
         // async clipboard API (or an execCommand fallback). This is the only
         // path that works on the worker-based port; the textarea/execCommand
         // dance below runs in the worker where document is unavailable.
-        if (nativeBrowserCopyToClipboard(selectedText)) {
+        if (nativeBrowserCopyToClipboard(selectedText,
+                rich == null ? null : rich.getText(ClipboardContent.MIME_HTML),
+                rich == null ? null : rich.getText(ClipboardContent.MIME_RTF),
+                rich == null ? null : rich.getText(ClipboardContent.MIME_MARKDOWN),
+                rich == null ? null : rich.getText(ClipboardContent.MIME_ASCIIDOC))) {
             return;
         }
         HTMLDocument doc = Window.current().getDocument();

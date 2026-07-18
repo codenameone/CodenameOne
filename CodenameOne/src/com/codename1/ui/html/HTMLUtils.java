@@ -62,6 +62,23 @@ public final class HTMLUtils {
             "Ugrave", "Uacute", "Ucirc", "Uuml", "Yacute", "THORN", "szlig", "agrave", "aacute", "acirc", "atilde", "auml", "aring", "aelig", "ccedil", "egrave", "eacute", "ecirc",
             "euml", "igrave", "iacute", "icirc", "iuml", "eth", "ntilde", "ograve", "oacute", "ocirc", "otilde", "ouml", "divide", "oslash", "ugrave", "uacute", "ucirc", "uuml",
             "yacute", "thorn", "yuml"};
+    /// Common HTML 4 named entities outside the contiguous ISO-8859-1 range above. Keeping these in
+    /// the shared parser utility lets all tolerant HTMLParser clients decode modern pasted fragments
+    /// without maintaining their own entity tables.
+    private static final String[] HTML_EXTENDED_CHAR_ENTITY_STRINGS = {
+            "OElig", "oelig", "Scaron", "scaron", "Yuml", "fnof", "circ", "tilde",
+            "ensp", "emsp", "thinsp", "zwnj", "zwj", "lrm", "rlm", "ndash", "mdash",
+            "lsquo", "rsquo", "sbquo", "ldquo", "rdquo", "bdquo", "dagger", "Dagger", "bull",
+            "hellip", "permil", "prime", "Prime", "lsaquo", "rsaquo", "oline", "frasl", "euro",
+            "image", "weierp", "real", "trade", "alefsym"
+    };
+    private static final int[] HTML_EXTENDED_CHAR_ENTITY_VALUES = {
+            338, 339, 352, 353, 376, 402, 710, 732,
+            8194, 8195, 8201, 8204, 8205, 8206, 8207, 8211, 8212,
+            8216, 8217, 8218, 8220, 8221, 8222, 8224, 8225, 8226,
+            8230, 8240, 8242, 8243, 8249, 8250, 8254, 8260, 8364,
+            8465, 8472, 8476, 8482, 8501
+    };
 
     // Prevents instantiation - this class has static method only
     private HTMLUtils() {
@@ -158,6 +175,10 @@ public final class HTMLUtils {
                 val = getStringVal(symbol, HTML_BASIC_CHAR_ENTITY_STRINGS);
                 if (val != -1) {
                     return val + 160;
+                }
+                val = getStringVal(symbol, HTML_EXTENDED_CHAR_ENTITY_STRINGS);
+                if (val != -1) {
+                    return HTML_EXTENDED_CHAR_ENTITY_VALUES[val];
                 }
             }
 

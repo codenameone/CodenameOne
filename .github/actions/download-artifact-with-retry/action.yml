@@ -1,0 +1,58 @@
+name: Download artifact with retry
+description: Retry transient artifact-service failures and fail if every download attempt fails.
+
+inputs:
+  name:
+    description: Artifact name.
+    required: true
+  path:
+    description: Destination directory.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Individual attempts continue only so a later retry can run. The final
+    # step fails this action if GitHub's artifact service rejects all attempts.
+    - name: Download artifact (attempt 1 of 3)
+      id: download_1
+      continue-on-error: true
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+
+    - name: Wait before second attempt
+      if: always() && steps.download_1.outcome == 'failure'
+      shell: bash
+      run: sleep 5
+
+    - name: Download artifact (attempt 2 of 3)
+      id: download_2
+      if: always() && steps.download_1.outcome == 'failure'
+      continue-on-error: true
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+
+    - name: Wait before third attempt
+      if: always() && steps.download_2.outcome == 'failure'
+      shell: bash
+      run: sleep 15
+
+    - name: Download artifact (attempt 3 of 3)
+      id: download_3
+      if: always() && steps.download_2.outcome == 'failure'
+      continue-on-error: true
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+
+    - name: Require a successful download
+      if: always() && steps.download_3.outcome == 'failure'
+      shell: bash
+      run: |
+        echo "::error::Artifact '${{ inputs.name }}' failed to download after 3 attempts."
+        exit 1

@@ -119,7 +119,26 @@ class AndroidGraphics {
         return font;
     }
 
+    // setNativeFont passes the Font object's own paint, so every graphics context
+    // drawing the same font aliases one Paint. The screen pipeline mutates those
+    // shared paints on the UI thread while the EDT paints mutable images with the
+    // same fonts, so a mutable-image drawString could render with another
+    // context's color mid-draw (observed on the CI emulator). Mutable-image
+    // contexts therefore keep a private copy, re-copied only on a font change.
+    // The screen contexts keep aliasing the shared paint - the async view's
+    // enqueue-time caches rely on that identity, and copying there washed out
+    // live text rendering.
+    private CodenameOneTextPaint fontSource;
+
     void setFont(CodenameOneTextPaint font) {
+        if (isMutableImageGraphics) {
+            if (font != fontSource) { // NOPMD CompareObjectsWithEquals - identity tracks the shared source paint
+                fontSource = font;
+                font = new CodenameOneTextPaint(font);
+            } else {
+                font = this.font;
+            }
+        }
         this.font = font;
         this.font.setColor(this.paint.getColor());
     }

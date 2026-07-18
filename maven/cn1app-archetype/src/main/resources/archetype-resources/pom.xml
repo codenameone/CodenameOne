@@ -61,13 +61,10 @@
                 <version>${cn1.version}</version>
             </dependency>
             <!--
-              Desktop runtime binaries (JCEF for the BrowserComponent + bundled
-              ffmpeg for media). This aggregator carries the jcef-api Java classes,
-              the per-platform jcef-natives, and ffmpeg-platform. jcef-api is
-              declared optional inside codenameone-javase, so it is NOT inherited
-              transitively; the javase module below must depend on this aggregator
-              explicitly or the simulator/desktop app has no org.cef on its
-              classpath and silently runs without a working BrowserComponent.
+              Optional desktop media binaries. BrowserComponent receives JCEF
+              Maven transitively from codenameone-javase and downloads the native
+              runtime for the current platform on first use. This aggregator is
+              retained for the bundled ffmpeg media implementation.
             -->
             <dependency>
                 <groupId>com.codenameone</groupId>

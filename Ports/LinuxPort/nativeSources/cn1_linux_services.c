@@ -48,6 +48,9 @@
 extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char* str);
 extern const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str);
 extern GtkWidget* cn1LinuxWindowWidget(void);
+extern JAVA_OBJECT cn1LinuxNewByteArray(CODENAME_ONE_THREAD_STATE, const void* src, int n);
+extern JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim);
+extern struct clazz class_array1__java_lang_String;
 
 /* The run-on-GTK-thread-and-wait helper (cn1LinuxRunOnMainAndWait) is shared from
  * cn1_linux_window.c. */
@@ -176,6 +179,152 @@ JAVA_OBJECT com_codename1_impl_linux_LinuxNative_clipboardGetText___R_java_lang_
         g_free(text);
     }
     return result;
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_clipboardSetImage___byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT png) {
+    unsigned char* bytes;
+    int len;
+    GdkPixbufLoader* loader;
+    GdkPixbuf* pix;
+    GtkClipboard* cb;
+    if (png == JAVA_NULL) {
+        return;
+    }
+    bytes = (unsigned char*) (*(JAVA_ARRAY) png).data;
+    len = (int) (*(JAVA_ARRAY) png).length;
+    if (len <= 0) {
+        return;
+    }
+    loader = gdk_pixbuf_loader_new();
+    if (!gdk_pixbuf_loader_write(loader, bytes, (gsize) len, NULL)) {
+        gdk_pixbuf_loader_close(loader, NULL);
+        g_object_unref(loader);
+        return;
+    }
+    gdk_pixbuf_loader_close(loader, NULL);
+    /* Borrowed reference owned by the loader; do not unref pix directly. */
+    pix = gdk_pixbuf_loader_get_pixbuf(loader);
+    if (pix) {
+        cb = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
+        gtk_clipboard_set_image(cb, pix);
+        gtk_clipboard_store(cb);
+    }
+    g_object_unref(loader);
+}
+
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_clipboardGetImage___R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE) {
+    GtkClipboard* cb = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
+    GdkPixbuf* pix = gtk_clipboard_wait_for_image(cb);
+    gchar* buf = NULL;
+    gsize len = 0;
+    JAVA_OBJECT result;
+    if (!pix) {
+        return JAVA_NULL;
+    }
+    if (!gdk_pixbuf_save_to_buffer(pix, &buf, &len, "png", NULL, NULL) || buf == NULL) {
+        if (buf) {
+            g_free(buf);
+        }
+        g_object_unref(pix);
+        return JAVA_NULL;
+    }
+    result = cn1LinuxNewByteArray(threadStateData, buf, (int) len);
+    g_free(buf);
+    g_object_unref(pix);
+    return result;
+}
+
+/* Holds the NULL-terminated URI list handed to the clipboard; freed by the
+ * clear-func when the clipboard content is replaced. */
+typedef struct { gchar** uris; } CN1UriListData;
+
+static void cn1UriListGet(GtkClipboard* cb, GtkSelectionData* selection, guint info, gpointer userData) {
+    CN1UriListData* d = (CN1UriListData*) userData;
+    (void) cb;
+    (void) info;
+    if (d && d->uris) {
+        gtk_selection_data_set_uris(selection, d->uris);
+    }
+}
+
+static void cn1UriListClear(GtkClipboard* cb, gpointer userData) {
+    CN1UriListData* d = (CN1UriListData*) userData;
+    (void) cb;
+    if (d) {
+        if (d->uris) {
+            g_strfreev(d->uris);
+        }
+        g_free(d);
+    }
+}
+
+JAVA_VOID com_codename1_impl_linux_LinuxNative_clipboardSetFiles___java_lang_String_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT paths) {
+    int n, i;
+    JAVA_OBJECT* elements;
+    CN1UriListData* data;
+    GtkClipboard* cb;
+    GtkTargetList* tl;
+    GtkTargetEntry* targets;
+    gint nTargets = 0;
+    if (paths == JAVA_NULL) {
+        return;
+    }
+    n = (int) (*(JAVA_ARRAY) paths).length;
+    if (n <= 0) {
+        return;
+    }
+    elements = (JAVA_OBJECT*) (*(JAVA_ARRAY) paths).data;
+    data = (CN1UriListData*) g_malloc0(sizeof(CN1UriListData));
+    data->uris = (gchar**) g_malloc0(sizeof(gchar*) * (n + 1));
+    for (i = 0; i < n; i++) {
+        const char* p = elements[i] == JAVA_NULL ? "" : stringToUTF8(threadStateData, elements[i]);
+        if (g_str_has_prefix(p, "file:") || strstr(p, "://") != NULL) {
+            data->uris[i] = g_strdup(p);
+        } else {
+            gchar* uri = g_filename_to_uri(p, NULL, NULL);
+            data->uris[i] = uri ? uri : g_strdup(p);
+        }
+    }
+    data->uris[n] = NULL;
+
+    cb = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
+    tl = gtk_target_list_new(NULL, 0);
+    gtk_target_list_add_uri_targets(tl, 0);
+    targets = gtk_target_table_new_from_list(tl, &nTargets);
+    if (!gtk_clipboard_set_with_data(cb, targets, nTargets, cn1UriListGet, cn1UriListClear, data)) {
+        cn1UriListClear(cb, data);
+    } else {
+        gtk_clipboard_set_can_store(cb, targets, nTargets);
+        gtk_clipboard_store(cb);
+    }
+    if (targets) {
+        gtk_target_table_free(targets, nTargets);
+    }
+    gtk_target_list_unref(tl);
+}
+
+JAVA_OBJECT com_codename1_impl_linux_LinuxNative_clipboardGetFiles___R_java_lang_String_1ARRAY(CODENAME_ONE_THREAD_STATE) {
+    GtkClipboard* cb = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
+    gchar** uris = gtk_clipboard_wait_for_uris(cb);
+    int n = 0;
+    int i;
+    JAVA_OBJECT arr;
+    JAVA_OBJECT* elements;
+    if (!uris) {
+        return JAVA_NULL;
+    }
+    while (uris[n] != NULL) {
+        n++;
+    }
+    arr = allocArray(threadStateData, n, &class_array1__java_lang_String, sizeof(JAVA_OBJECT), 1);
+    if (arr != JAVA_NULL) {
+        elements = (JAVA_OBJECT*) (*(JAVA_ARRAY) arr).data;
+        for (i = 0; i < n; i++) {
+            elements[i] = newStringFromCString(threadStateData, uris[i]);
+        }
+    }
+    g_strfreev(uris);
+    return arr;
 }
 
 /* ------------------------------------------------------ shell / launch */

@@ -206,15 +206,10 @@ jobs:
       - name: Run Mac native UI screenshot tests
         env:
           ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/mac-native-ui-tests
-          # Strict screenshot gating: fail on any pixel mismatch and on more
-          # missing screenshots than the tolerance below. Enforced centrally
-          # in scripts/lib/cn1ss.sh.
+          # Strict screenshot gating: every expected frame must be captured and
+          # compared. Enforced centrally in scripts/lib/cn1ss.sh.
           CN1SS_FAIL_ON_MISMATCH: '1'
-          # Screenshot-only tolerance while the Mac native (Catalyst) backend
-          # is maturing. Assertion test failures are scanned from
-          # CN1SS:ERR:suite lines by run-mac-native-ui-tests.sh and are never
-          # allowed by this value. Lower this to 0 as the port matures.
-          CN1SS_ALLOWED_MISSING: '2'
+          CN1SS_ALLOWED_MISSING: '0'
         run: |
           set -euo pipefail
           mkdir -p "${ARTIFACTS_DIR}"

@@ -25,6 +25,10 @@ EOF
 
 is_source_file() {
   case "$1" in
+    # Hugo browser assets follow the website content policy, not the GPLv2 +
+    # Classpath Exception source-header policy. JVM/native source accidentally
+    # placed below docs/website is still checked by the source-extension rule.
+    docs/website/*.js|docs/website/*.jsx|docs/website/*.ts|docs/website/*.tsx|docs/website/*.css) return 1 ;;
     *.java|*.js|*.jsx|*.ts|*.tsx|*.css|*.c|*.cc|*.cpp|*.cxx|*.h|*.hh|*.hpp|*.hxx|*.m|*.mm|*.metal|*.kt|*.kts|*.swift|*.cs) return 0 ;;
     *) return 1 ;;
   esac
@@ -85,10 +89,8 @@ validate_exclusions() {
 header_kind() {
   local file="$1"
   local header_file="$2"
-  # Strip CR so CRLF files are judged on their header text alone: a stray
-  # carriage return would otherwise defeat both the leading "/*" comparison
-  # and the "$"-anchored copyright-line match, failing files whose header is
-  # in fact complete and correct.
+  # normalize CRLF so historically Windows-ended sources (parts of the Android
+  # port) are judged on their header text, not their line endings
   sed -n '1,40p' "$file" | tr -d '\r' > "$header_file"
 
   if [[ "$(awk 'NF { print; exit }' "$header_file")" != '/*' ]]; then

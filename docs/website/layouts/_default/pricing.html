@@ -1,141 +1,135 @@
 {{- define "main" -}}
 <article class="post-single cn1-pricing-page">
-  <header class="post-header cn1-pricing-header">
+  <header class="cn1-pricing-header">
     {{ partial "breadcrumbs.html" . }}
-    <h1 class="post-title entry-hint-parent">{{ .Title }}</h1>
-    <p class="cn1-pricing-subtitle">Unlimited apps, no royalties, no hidden restrictions.</p>
-    <p class="cn1-pricing-note">30-day money back guarantee. Cancel anytime.</p>
+    <p class="cn1-eyebrow">Cloud builds and production services</p>
+    <h1>Open source. No royalties.<br>Pay for services when you need them.</h1>
+    <p>The framework does not charge per application, per install, or as a share of revenue. Plans cover cloud-build capacity, native sources, push, Crash Protection, automated store submission, and support.</p>
   </header>
 
-  <section class="cn1-pricing-toggle" data-billing-toggle>
-    <span class="cn1-pricing-toggle__label">Billing</span>
-    <div class="cn1-pricing-toggle__switch" role="tablist" aria-label="Billing interval">
-      <button type="button" class="is-active" data-billing="monthly" aria-selected="true">Monthly</button>
-      <button type="button" data-billing="annual" aria-selected="false">Annual</button>
+  <section class="cn1-pricing-license">
+    <div>
+      <p class="cn1-eyebrow">GPLv2 with the Classpath Exception</p>
+      <h2>Ship unlimited commercial applications without royalties.</h2>
     </div>
-    <p class="cn1-pricing-toggle__hint" data-billing-hint>Switch to annual to reduce monthly cost and lock in lower pricing.</p>
+    <p>Your subscription pays for Codename One cloud and support services, not permission to distribute your application. There is no per-app fee, revenue share, or runtime royalty. Built applications keep working if a subscription ends.</p>
+  </section>
+
+  <section class="cn1-free-plan">
+    <div>
+      <p class="cn1-eyebrow">Start here</p>
+      <h2>Free</h2>
+      <p>Build real applications before choosing a paid plan.</p>
+    </div>
+    <ul>
+      <li><strong>100</strong><span>build credits each month</span></li>
+      <li><strong>8 credits</strong><span>per iOS cloud build</span></li>
+      <li><strong>8.5 MB</strong><span>user JAR limit</span></li>
+      <li><strong>No royalties</strong><span>for commercial applications</span></li>
+    </ul>
+    {{ partial "cn1-cta.html" (dict "label" "Create a free project" "href" "/initializr/" "event" "pricing-free-project") }}
+  </section>
+
+  <section class="cn1-pricing-controls" data-billing-toggle>
+    <div>
+      <p class="cn1-eyebrow">Paid plans</p>
+      <h2>Upgrade when you hit a limit.</h2>
+    </div>
+    <div>
+      <div class="cn1-pricing-toggle__switch" role="group" aria-label="Billing interval">
+        <button type="button" class="is-active" data-billing="annual" aria-pressed="true">Annual</button>
+        <button type="button" data-billing="monthly" aria-pressed="false">Monthly</button>
+      </div>
+      <p class="cn1-pricing-toggle__hint" data-billing-hint>Annual billing selected. Prices shown are monthly equivalents with yearly billing.</p>
+    </div>
   </section>
 
   <section class="cn1-pricing-grid">
-    <article class="cn1-price-card cn1-price-card--free">
-      <header>
-        <p class="cn1-price-card__tier">Free</p>
-        <p class="cn1-price-card__price"><span>$0</span>/month</p>
-        <p class="cn1-price-card__bill">Always free</p>
-      </header>
-      <ul>
-        <li>iOS builds</li>
-        <li>Android builds</li>
-        <li>Windows UWP builds</li>
-        <li>8.5 MB build JAR size</li>
-        <li>Push notifications (1K/month)</li>
-        <li>Unlimited local builds</li>
-        <li>Versioning (master only)</li>
-        <li>Community support</li>
-        <li>Royalty free</li>
-        <li>Commerce IAP validation up to $200/mo</li>
-      </ul>
-      <a class="cn1-price-card__cta" href="https://cloud.codenameone.com/console/index.html" target="_blank" rel="noopener noreferrer">Sign Up</a>
-    </article>
-
     <article class="cn1-price-card" data-plan="basic" data-monthly="29" data-annual-monthly="25" data-annual-total="300">
       <header>
+        <p class="cn1-price-card__fit">For independent developers shipping regularly</p>
         <p class="cn1-price-card__tier">Basic</p>
-        <p class="cn1-price-card__price"><span data-price>29</span> USD/month</p>
-        <p class="cn1-price-card__bill" data-bill>Billed monthly</p>
+        <p class="cn1-price-card__price"><span data-price>25</span> <small>USD / month</small></p>
+        <p class="cn1-price-card__bill" data-bill>Billed annually at $300/year</p>
       </header>
+      <p class="cn1-price-card__trigger">Choose Basic when the free build quota or JAR limit blocks normal development.</p>
       <ul>
-        <li>Everything in Free</li>
         <li>Unlimited build credits</li>
-        <li>Access to native sources</li>
+        <li>Native platform sources</li>
         <li>50 MB build JAR size</li>
-        <li>Versioning (master + 2 weeks)</li>
-        <li>Push notifications (5K/month)</li>
-        <li>Commerce IAP validation up to $10K/mo</li>
-        <li>Automated submission: App Store, Google Play, AppGallery (5/mo, beta)</li>
-        <li>Multi-store Android distribution (reach beyond Google Play)</li>
-        <li>Store metadata &amp; screenshots as code</li>
+        <li>5,000 push notifications/month</li>
+        <li>5 automated submissions/month (beta)</li>
       </ul>
-      <a
-        class="cn1-price-card__cta"
-        data-signup-link
-        data-level="basic"
-        href="https://cloud.codenameone.com/secure/signup?level=basic&mode=monthly"
-        target="_blank"
-        rel="noopener noreferrer">
-        Sign Up
-      </a>
+      <details>
+        <summary>More Basic features</summary>
+        <p>Two weeks of versioning, multi-store Android distribution, store metadata and screenshots as code, and Commerce validation up to $10,000/month.</p>
+      </details>
+      <a class="cn1-price-card__cta" data-signup-link data-level="basic" data-cn1-conversion="pricing-basic" href="https://cloud.codenameone.com/secure/signup?level=basic&amp;mode=annual" target="_blank" rel="noopener noreferrer">Choose Basic</a>
     </article>
 
     <article class="cn1-price-card cn1-price-card--featured" data-plan="pro" data-monthly="99" data-annual-monthly="85" data-annual-total="1020">
       <header>
-        <p class="cn1-price-card__badge">Most Popular</p>
+        <p class="cn1-price-card__badge">Production default</p>
+        <p class="cn1-price-card__fit">For teams shipping and operating production apps</p>
         <p class="cn1-price-card__tier">Pro</p>
-        <p class="cn1-price-card__price"><span data-price>99</span> USD/month</p>
-        <p class="cn1-price-card__bill" data-bill>Billed monthly</p>
+        <p class="cn1-price-card__price"><span data-price>85</span> <small>USD / month</small></p>
+        <p class="cn1-price-card__bill" data-bill>Billed annually at $1020/year</p>
       </header>
+      <p class="cn1-price-card__trigger">Choose Pro when you need concurrent builds, Crash Protection, desktop output, or email support.</p>
       <ul>
         <li>Everything in Basic</li>
-        <li>Versioning (master + 2 months)</li>
-        <li>Crash reporting</li>
-        <li>Native desktop apps</li>
-        <li>Push notifications (1M/month)</li>
+        <li>Concurrent cloud builds</li>
+        <li>Crash Protection with GitHub Issues</li>
+        <li>1 million push notifications/month</li>
         <li>Email support</li>
-        <li>Concurrent builds</li>
-        <li>Commerce IAP validation up to $200K/mo</li>
-        <li>Production store submission &amp; review tracking</li>
-        <li>50 automated submissions/month</li>
       </ul>
-      <a
-        class="cn1-price-card__cta"
-        data-signup-link
-        data-level="pro"
-        href="https://cloud.codenameone.com/secure/signup?level=pro&mode=monthly"
-        target="_blank"
-        rel="noopener noreferrer">
-        Start 14-Day Trial
-      </a>
+      <details>
+        <summary>More Pro features</summary>
+        <p>Native desktop apps, two months of versioning, 50 automated submissions/month, production review tracking, and Commerce validation up to $200,000/month.</p>
+      </details>
+      <a class="cn1-price-card__cta" data-signup-link data-level="pro" data-cn1-conversion="pricing-pro" href="https://cloud.codenameone.com/secure/signup?level=pro&amp;mode=annual" target="_blank" rel="noopener noreferrer">Start 14-day trial</a>
     </article>
 
     <article class="cn1-price-card" data-plan="enterprise" data-monthly="499" data-annual-monthly="450" data-annual-total="5400">
       <header>
+        <p class="cn1-price-card__fit">For organizations needing priority and procurement support</p>
         <p class="cn1-price-card__tier">Enterprise</p>
-        <p class="cn1-price-card__price"><span data-price>499</span> USD/month</p>
-        <p class="cn1-price-card__bill" data-bill>Billed monthly</p>
+        <p class="cn1-price-card__price"><span data-price>450</span> <small>USD / month</small></p>
+        <p class="cn1-price-card__bill" data-bill>Billed annually at $5400/year</p>
       </header>
+      <p class="cn1-price-card__trigger">Choose Enterprise for high-priority builds, CI, on-device tests, phone support, or invoicing.</p>
       <ul>
         <li>Everything in Pro</li>
-        <li>JavaScript app generation</li>
-        <li>High priority builds</li>
-        <li>Versioning (master + 6 months)</li>
-        <li>Continuous integration</li>
+        <li>High-priority builds and CI</li>
         <li>On-device unit tests</li>
-        <li>Push notifications (10M/month)</li>
-        <li>Phone support (office hours)</li>
-        <li>Commerce IAP validation (unlimited)</li>
-        <li>Unlimited automated submissions</li>
-        <li>Zero-touch auto-submit on build</li>
+        <li>10 million push notifications/month</li>
+        <li>Phone support during office hours</li>
       </ul>
-      <a
-        class="cn1-price-card__cta"
-        data-signup-link
-        data-level="enterprise"
-        href="https://cloud.codenameone.com/secure/signup?level=enterprise&mode=monthly"
-        target="_blank"
-        rel="noopener noreferrer">
-        Sign Up
-      </a>
+      <details>
+        <summary>More Enterprise features</summary>
+        <p>JavaScript app generation, six months of versioning, unlimited automated submissions, zero-touch submission, unlimited Commerce validation, and annual invoicing.</p>
+      </details>
+      <a class="cn1-price-card__cta" data-signup-link data-level="enterprise" data-cn1-conversion="pricing-enterprise" href="https://cloud.codenameone.com/secure/signup?level=enterprise&amp;mode=annual" target="_blank" rel="noopener noreferrer">Choose Enterprise</a>
     </article>
   </section>
 
-  <p class="cn1-pricing-note cn1-pricing-note--commerce">
-    Commerce (IAP/subscription validation) is <strong>optional</strong> — in-app purchases work without it through the standard <code>Purchase</code> API or your own server. The figure shown is the monthly <em>validated transaction volume</em> per seat; above it, validation gracefully falls back to store-direct and purchases are never blocked. See the <a href="#what-is-commerce">Commerce FAQ</a> below.
-  </p>
+  <section class="cn1-pricing-risk">
+    <div><strong>No royalties or per-app fees</strong><span>Commercial distribution is included by the framework license.</span></div>
+    <div><strong>30-day money-back guarantee</strong><span>Applies to paid purchases.</span></div>
+    <div><strong>Per developer seat</strong><span>Plans are not priced per application.</span></div>
+    <div><strong>Your built apps keep working</strong><span>A lapsed subscription does not disable shipped binaries.</span></div>
+  </section>
 
-  {{ partial "cn1-social-proof.html" . }}
+  <aside class="cn1-pricing-commerce">
+    <strong>Commerce is optional.</strong>
+    <p>In-app purchases work through the standard <code>Purchase</code> API or your own server without the managed Commerce service. Crossing the validation volume for a plan never blocks a real store purchase.</p>
+    <a href="#what-is-commerce">Read the Commerce FAQ</a>
+  </aside>
 
   {{- if .Content }}
   <section class="post-content cn1-pricing-faq">
+    <p class="cn1-eyebrow">Plan details</p>
+    <h2>Pricing questions</h2>
     {{- if not (.Param "disableAnchoredHeadings") -}}
       {{- partial "anchored_headings.html" .Content -}}
     {{- else -}}

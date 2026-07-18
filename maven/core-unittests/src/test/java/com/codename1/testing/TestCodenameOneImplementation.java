@@ -20,6 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+
 package com.codename1.testing;
 
 import com.codename1.capture.VideoCaptureConstraints;
@@ -169,6 +170,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private final List<String> browserExecuted = new ArrayList<>();
     private final Map<PeerComponent, String> browserUrls = new HashMap<PeerComponent, String>();
     private boolean editorNativePeerSupported = false;
+    private boolean textInputSupported = true;
     private String lastEditorType;
     private PeerComponent lastEditorPeer;
     private final List<String> editorCommands = new ArrayList<String>();
@@ -1055,6 +1057,15 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return editorNativePeerSupported;
     }
 
+    @Override
+    public boolean isTextInputSupported() {
+        return textInputSupported;
+    }
+
+    public void setTextInputSupported(boolean supported) {
+        textInputSupported = supported;
+    }
+
     public String getLastEditorType() {
         return lastEditorType;
     }
@@ -1205,6 +1216,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         browserExecuted.clear();
         browserUrls.clear();
         editorNativePeerSupported = false;
+        textInputSupported = true;
         lastEditorType = null;
         lastEditorPeer = null;
         editorCommands.clear();

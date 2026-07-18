@@ -17,40 +17,6 @@
 
     <dependencies>
         <dependency>
-            <groupId>me.friwi</groupId>
-            <artifactId>jcef-api</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>me.friwi</groupId>
-            <artifactId>jcef-natives-macosx-arm64</artifactId>
-            <version>${jcef.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>me.friwi</groupId>
-            <artifactId>jcef-natives-macosx-amd64</artifactId>
-            <version>${jcef.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>me.friwi</groupId>
-            <artifactId>jcef-natives-linux-amd64</artifactId>
-            <version>${jcef.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>me.friwi</groupId>
-            <artifactId>jcef-natives-linux-arm64</artifactId>
-            <version>${jcef.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>me.friwi</groupId>
-            <artifactId>jcef-natives-windows-amd64</artifactId>
-            <version>${jcef.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>me.friwi</groupId>
-            <artifactId>jcef-natives-windows-arm64</artifactId>
-            <version>${jcef.version}</version>
-        </dependency>
-        <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>ffmpeg-platform</artifactId>
         </dependency>

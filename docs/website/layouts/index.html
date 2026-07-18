@@ -1,392 +1,201 @@
 {{- define "main" -}}
-<section class="cn1-hero">
-  <div class="cn1-hero__content">
-    <p class="cn1-hero__eyebrow">Write Once, Run Anywhere</p>
-    <h1 class="cn1-hero__title">Build Native Apps Everywhere with Java or Kotlin</h1>
-    <p class="cn1-hero__platforms">
-      <i class="fab fa-android" aria-label="Android"></i>
-      <i class="fab fa-apple" aria-label="iOS"></i>
-      <i class="fab fa-windows" aria-label="Windows"></i>
-      <i class="fab fa-linux" aria-label="Linux"></i>
-      <i class="fab fa-js-square" aria-label="JavaScript"></i>
-    </p>
-    <p class="cn1-hero__copy">
-      One open-source framework for mobile, desktop, web, TV, watch, and in-vehicle apps—with a shared UI and direct access to every native platform.
-    </p>
-    <p class="cn1-hero__trust">Open source since 2012 &middot; Commercially supported</p>
-    <div class="cn1-hero__actions">
-      <a class="cn1-btn cn1-btn--primary" href="/getting-started/">Build an App</a>
-      <a class="cn1-btn cn1-btn--ghost" href="https://github.com/codenameone/CodenameOne">Star</a>
-    </div>
-  </div>
-  <div class="cn1-hero__art">
-    <img src="/uploads/CN1-Hero-illustration-1-1024x787.png" alt="Codename One cross-platform illustration">
-  </div>
-</section>
-
-<section class="cn1-band">
-  <h2>
-    <span>Write Once</span>
-    <span class="cn1-band__icons" aria-hidden="true">
-      <i class="fas fa-mug-hot"></i>
-    </span>
-    <span>Run Anywhere</span>
-    <span class="cn1-band__icons" aria-hidden="true">
-      <i class="fab fa-android"></i>
-      <i class="fab fa-windows"></i>
-      <i class="fab fa-apple"></i>
-      <i class="fab fa-js-square"></i>
-    </span>
-  </h2>
-</section>
-
-<section class="cn1-cards">
-  <article class="cn1-card">
-    <h3>One Codebase, Every Form Factor</h3>
-    <p>Share application logic and UI across <strong>Android, iOS, Windows, Linux, macOS, web, TV, watch, and vehicle</strong> targets using Java or Kotlin.</p>
-    <a href="/introduction/">Learn about the Architecture</a>
-  </article>
-  <article class="cn1-card">
-    <h3>Developer-friendly Tooling</h3>
-    <p>Write, debug, and test inside <strong>IntelliJ, Eclipse, VS Code, or NetBeans</strong> with Maven, an instant simulator, live CSS, inspectors, JUnit, screenshot tests, and on-device debugging.</p>
-    <a href="/development-environment/">Learn about the Development Environment</a>
-  </article>
-  <article class="cn1-card">
-    <h3>Portable UI, Native Reach</h3>
-    <p>Build a consistent, fully themeable UI with CSS and complete drawing control. Mix in native views or call platform SDKs directly whenever you need them.</p>
-    <div class="cn1-card__links">
-      <a href="/demos/">Demo Showcase</a>
-      <a href="/javadoc/com/codename1/ui/package-summary.html">Component Gallery</a>
-    </div>
-  </article>
-</section>
-
-<section class="cn1-why">
-  <h2>Why Codename One?</h2>
-  <div class="cn1-why__grid">
-    <article>
-      <i class="fas fa-mobile-alt" aria-hidden="true"></i>
-      <h3>Native, Self-contained Output</h3>
-      <p>Builds with official platform toolchains. Apple, Windows, and Linux targets ship without requiring a JVM on the user's device.</p>
-    </article>
-    <article>
-      <i class="fas fa-plug" aria-hidden="true"></i>
-      <h3>Complete Application APIs</h3>
-      <p>Networking, databases, media, maps, background work, notifications, security, payments, device hardware, and more.</p>
-    </article>
-    <article>
-      <i class="fas fa-sync-alt" aria-hidden="true"></i>
-      <h3>Beyond Phones</h3>
-      <p>Native desktop, PWA, TV, watch, CarPlay, Android Auto, foldables, and first-class keyboard, mouse, and stylus input.</p>
-    </article>
-    <article>
-      <i class="fas fa-paint-brush" aria-hidden="true"></i>
-      <h3>3D, Games, AR, VR, and AI</h3>
-      <p>Portable GPU and game APIs, AR and VR, LLMs, speech, transcription, TensorFlow Lite, and ML Kit integrations.</p>
-    </article>
-    <article>
-      <i class="fas fa-certificate" aria-hidden="true"></i>
-      <h3>Fast Development Loop</h3>
-      <p>Instant simulator startup, device skins, code reload, CSS live update, component and network inspectors, and automated tests.</p>
-    </article>
-    <article>
-      <i class="fab fa-github" aria-hidden="true"></i>
-      <h3>Free and Open Source</h3>
-      <p>The core of Codename One is free and open source (GPL + CE), so it is free to use with commercial projects.</p>
-    </article>
-  </div>
-  <p class="cn1-why__cta"><a href="/introduction/">Explore the Features</a></p>
-</section>
-
-<section class="cn1-how">
-  <h2>How it works</h2>
-  <p class="cn1-how__intro">Codename One combines a portable application runtime and UI toolkit with native compilers, platform ports, build tools, and direct access to native SDKs.</p>
-  <div class="cn1-how__layout">
-    <div class="cn1-how__list">
-      <h3>What Codename One is...</h3>
-      <div class="cn1-accordion">
-        <article class="cn1-acc-item is-open">
-          <button class="cn1-acc-trigger" type="button" aria-expanded="true">
-            <span class="cn1-acc-icon cn1-acc-icon--ok"><i class="fas fa-check"></i></span>
-            <span>Runtime Library</span>
-            <span class="cn1-acc-caret"><i class="fas fa-chevron-down"></i></span>
-          </button>
-          <div class="cn1-acc-panel">
-            <p>A cross-platform runtime and UI library for mobile, desktop, browser, TV, watch, and vehicle applications.</p>
-          </div>
-        </article>
-        <article class="cn1-acc-item">
-          <button class="cn1-acc-trigger" type="button" aria-expanded="false">
-            <span class="cn1-acc-icon cn1-acc-icon--ok"><i class="fas fa-check"></i></span>
-            <span>Build Tools</span>
-            <span class="cn1-acc-caret"><i class="fas fa-chevron-right"></i></span>
-          </button>
-          <div class="cn1-acc-panel">
-            <p>Maven tools that turn JVM bytecode into platform-native projects and executables, locally or through the cloud build service.</p>
-          </div>
-        </article>
-        <article class="cn1-acc-item">
-          <button class="cn1-acc-trigger" type="button" aria-expanded="false">
-            <span class="cn1-acc-icon cn1-acc-icon--ok"><i class="fas fa-check"></i></span>
-            <span>Add-Ons</span>
-            <span class="cn1-acc-caret"><i class="fas fa-chevron-right"></i></span>
-          </button>
-          <div class="cn1-acc-panel">
-            <p>Official and community libraries that can bundle portable code, native SDKs, build configuration, and simulator integrations.</p>
-          </div>
-        </article>
-        <article class="cn1-acc-item">
-          <button class="cn1-acc-trigger" type="button" aria-expanded="false">
-            <span class="cn1-acc-icon cn1-acc-icon--ok"><i class="fas fa-check"></i></span>
-            <span>Widgets</span>
-            <span class="cn1-acc-caret"><i class="fas fa-chevron-right"></i></span>
-          </button>
-          <div class="cn1-acc-panel">
-            <p>Lightweight cross-platform UI components that adapt from touch screens to desktop, TV, watch, and vehicle input.</p>
-          </div>
-        </article>
-        <article class="cn1-acc-item">
-          <button class="cn1-acc-trigger" type="button" aria-expanded="false">
-            <span class="cn1-acc-icon cn1-acc-icon--ok"><i class="fas fa-check"></i></span>
-            <span>GUI Builder</span>
-            <span class="cn1-acc-caret"><i class="fas fa-chevron-right"></i></span>
-          </button>
-          <div class="cn1-acc-panel">
-            <p>Drag-and-drop UI builder for rapid visual layout authoring.</p>
-          </div>
-        </article>
-        <article class="cn1-acc-item">
-          <button class="cn1-acc-trigger" type="button" aria-expanded="false">
-            <span class="cn1-acc-icon cn1-acc-icon--ok"><i class="fas fa-check"></i></span>
-            <span>Build Server</span>
-            <span class="cn1-acc-caret"><i class="fas fa-chevron-right"></i></span>
-          </button>
-          <div class="cn1-acc-panel">
-            <p>Build app-store ready binaries without maintaining local native toolchains.</p>
-          </div>
-        </article>
-        <article class="cn1-acc-item">
-          <button class="cn1-acc-trigger" type="button" aria-expanded="false">
-            <span class="cn1-acc-icon cn1-acc-icon--ok"><i class="fas fa-check"></i></span>
-            <span>Simulator</span>
-            <span class="cn1-acc-caret"><i class="fas fa-chevron-right"></i></span>
-          </button>
-          <div class="cn1-acc-panel">
-            <p>Run and debug instantly with device skins, inspectors, simulated services, live CSS, and automated tests.</p>
-          </div>
-        </article>
+<div class="cn1-home-v2">
+  <section class="cn1-v2-hero">
+    <div class="cn1-v2-hero__copy">
+      <p class="cn1-eyebrow">Native, and you own the UI</p>
+      <h1>Native apps in Java<br><span>A UI you control</span></h1>
+      <p class="cn1-v2-hero__lead">
+        Codename One compiles one Java codebase into native apps across mobile, desktop, web, watch, TV, and vehicles. Its UI ships with your app instead of being restyled by the platform after release.
+      </p>
+      <div class="cn1-action-row">
+        {{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "/initializr/" "event" "home-primary-project") }}
+        {{ partial "cn1-cta.html" (dict "label" "View source on GitHub" "href" "https://github.com/codenameone/CodenameOne" "variant" "secondary" "external" true) }}
       </div>
+      <p class="cn1-v2-hero__note">GPLv2 with the Classpath Exception. Free for commercial use. No royalties.</p>
     </div>
-    <div class="cn1-how__diagram">
-      <img src="/uploads/codename-one-architecture-1.png" alt="Codename One architecture diagram">
-    </div>
-    <div class="cn1-how__list">
-      <h3>What Codename One is NOT...</h3>
-      <div class="cn1-accordion cn1-accordion--not">
-        <article class="cn1-acc-item">
-          <button class="cn1-acc-trigger" type="button" aria-expanded="false">
-            <span class="cn1-acc-icon cn1-acc-icon--no"><i class="fas fa-times"></i></span>
-            <span>HTML5/Javascript</span>
-            <span class="cn1-acc-caret"><i class="fas fa-chevron-right"></i></span>
-          </button>
-          <div class="cn1-acc-panel">
-            <p>Codename One apps compile to native targets, not just wrapped web content.</p>
-          </div>
-        </article>
-        <article class="cn1-acc-item is-open">
-          <button class="cn1-acc-trigger" type="button" aria-expanded="true">
-            <span class="cn1-acc-icon cn1-acc-icon--no"><i class="fas fa-minus"></i></span>
-            <span>Java bindings to Native Widgets and APIs</span>
-            <span class="cn1-acc-caret"><i class="fas fa-chevron-down"></i></span>
-          </button>
-          <div class="cn1-acc-panel">
-            <p>Unlike toolkits that only bind native components, Codename One provides its own lightweight, cross-platform UI. Application logic and UI can be shared while platform-specific adaptations remain available where they add value.</p>
-          </div>
-        </article>
-        <article class="cn1-acc-item">
-          <button class="cn1-acc-trigger" type="button" aria-expanded="false">
-            <span class="cn1-acc-icon cn1-acc-icon--q"><i class="fas fa-question"></i></span>
-            <span>Can I still use native widgets in my app?</span>
-            <span class="cn1-acc-caret"><i class="fas fa-chevron-right"></i></span>
-          </button>
-          <div class="cn1-acc-panel">
-            <p>Yes. You can mix native widgets and lightweight widgets seamlessly.</p>
-          </div>
-        </article>
-        <article class="cn1-acc-item">
-          <button class="cn1-acc-trigger" type="button" aria-expanded="false">
-            <span class="cn1-acc-icon cn1-acc-icon--q"><i class="fas fa-question"></i></span>
-            <span>Can I access native APIs in my app?</span>
-            <span class="cn1-acc-caret"><i class="fas fa-chevron-right"></i></span>
-          </button>
-          <div class="cn1-acc-panel">
-            <p>Yes. Access both system APIs and third-party native frameworks.</p>
-          </div>
-        </article>
+    <div class="cn1-v2-hero__product" aria-label="Java source and real Codename One runtime captures">
+      <div class="cn1-code-window">
+        <div class="cn1-code-window__bar"><span></span><span></span><span></span><strong>Main.java</strong></div>
+        <pre><code><span class="cn1-code-keyword">Form</span> app = <span class="cn1-code-keyword">new</span> Form(
+    <span class="cn1-code-string">"Explore"</span>, <span class="cn1-code-keyword">new</span> BorderLayout()
+);
+
+app.add(CENTER, buildContent());
+app.add(SOUTH, buildTabs());
+app.show();</code></pre>
       </div>
-    </div>
-  </div>
-</section>
-
-<section class="cn1-made">
-  <h2>Made with Codename One</h2>
-  <div class="cn1-carousel" data-carousel>
-    <button class="cn1-carousel__prev" aria-label="Previous"><i class="fas fa-chevron-left"></i></button>
-    <div class="cn1-carousel__viewport">
-      <div class="cn1-carousel__track">
-        <article class="cn1-carousel__slide is-active">
-          <img src="/uploads/arrivu.png" alt="Arrivu app screenshot">
-          <h3>Arrivu</h3>
-          <p>Voice/AI technology solutions.</p>
-          <a href="https://www.arrivu.com/" aria-label="Arrivu website"><i class="fas fa-globe"></i></a>
-        </article>
-        <article class="cn1-carousel__slide">
-          <img src="/uploads/BeRider-Codename-One.png" alt="BeRider">
-          <h3>BeRider</h3>
-          <p>Shared electric scooters in Prague.</p>
-          <a href="https://play.google.com/store/apps/details?id=com.berider.app" aria-label="BeRider app"><i class="fas fa-globe"></i></a>
-        </article>
-        <article class="cn1-carousel__slide">
-          <img src="/uploads/Jubilee-Motor-Codename-One.png" alt="Jubilee Motor">
-          <h3>Jubilee Motor</h3>
-          <p>Car insurance app by Jubilee General Insurance.</p>
-          <a href="https://play.google.com/store/apps/details?id=com.jubilee" aria-label="Jubilee app"><i class="fas fa-globe"></i></a>
-        </article>
-        <article class="cn1-carousel__slide">
-          <img src="/uploads/Ordyx-Codename-One.png" alt="Ordyx POS">
-          <h3>Ordyx POS</h3>
-          <p>Restaurant point-of-sale and operations platform.</p>
-          <a href="/blog/" aria-label="Ordyx case study"><i class="fas fa-globe"></i></a>
-        </article>
-        <article class="cn1-carousel__slide">
-          <img src="/uploads/Paltel-Codename-One.png" alt="Paltel">
-          <h3>Paltel</h3>
-          <p>Telecom self-service app for customer accounts.</p>
-          <a href="/blog/" aria-label="Paltel app details"><i class="fas fa-globe"></i></a>
-        </article>
-        <article class="cn1-carousel__slide">
-          <img src="/uploads/Oxbridge-Academy-Codename-One.png" alt="Oxbridge Academy">
-          <h3>Oxbridge Academy</h3>
-          <p>Student learning and campus engagement app.</p>
-          <a href="/blog/" aria-label="Oxbridge Academy app details"><i class="fas fa-globe"></i></a>
-        </article>
-        <article class="cn1-carousel__slide">
-          <img src="/uploads/HBZ-Codename-One.png" alt="HBZ">
-          <h3>HBZ</h3>
-          <p>Community and member services mobile experience.</p>
-          <a href="/blog/" aria-label="HBZ app details"><i class="fas fa-globe"></i></a>
-        </article>
-        <article class="cn1-carousel__slide">
-          <img src="/uploads/yHomework.png" alt="yHomework">
-          <h3>yHomework</h3>
-          <p>Education app helping students track assignments.</p>
-          <a href="/blog/" aria-label="yHomework app details"><i class="fas fa-globe"></i></a>
-        </article>
-      </div>
-    </div>
-    <button class="cn1-carousel__next" aria-label="Next"><i class="fas fa-chevron-right"></i></button>
-    <div class="cn1-carousel__dots" aria-label="Made with Codename One pages"></div>
-  </div>
-</section>
-
-{{ partial "cn1-social-proof.html" . }}
-
-<section class="cn1-blog">
-  {{- $blogSection := site.GetPage "section" "blog" -}}
-  <h2>{{ if $blogSection }}<a href="{{ $blogSection.RelPermalink }}">Blog</a>{{ else }}Blog{{ end }}</h2>
-  <div class="cn1-carousel" data-carousel>
-    <div class="cn1-carousel__viewport">
-      <div class="cn1-carousel__track">
-        {{- $posts := first 9 (sort (where site.RegularPages "Section" "blog") "Date" "desc") -}}
-        {{- $chunkSize := 3 -}}
-        {{- $total := len $posts -}}
-        {{- if gt $total 0 -}}
-          {{- range $i, $post := $posts -}}
-            {{- if eq (mod $i $chunkSize) 0 -}}
-        <div class="cn1-carousel__slide {{ if eq $i 0 }}is-active{{ end }}">
-          <div class="cn1-blog__grid">
-            {{- end -}}
-            {{- $thumb := "" -}}
-            {{- with $post.Params.cover.image -}}
-              {{- $thumb = . -}}
-            {{- else -}}
-              {{- with $post.Params.thumbnail -}}
-                {{- $thumb = . -}}
-              {{- else -}}
-                {{- with $post.Params.image -}}
-                  {{- $thumb = . -}}
-                {{- else -}}
-                  {{- with $post.Params.images -}}
-                    {{- $thumb = index . 0 -}}
-                  {{- end -}}
-                {{- end -}}
-              {{- end -}}
-            {{- end -}}
-            {{- if not $thumb -}}
-              {{- $imgMatch := findRESubmatch `!\[[^\]]*\]\(([^ )]+)` $post.RawContent 1 -}}
-              {{- if gt (len $imgMatch) 0 -}}
-                {{- $thumb = index (index $imgMatch 0) 1 -}}
-              {{- end -}}
-            {{- end -}}
-            {{- if not $thumb -}}
-              {{- $thumb = "/uploads/CN1-Hero-illustration-1-1024x787.png" -}}
-            {{- end -}}
-            <article>
-              <a href="{{ $post.RelPermalink }}"><img src="{{ $thumb }}" alt="{{ $post.Title }}"></a>
-              <div>
-                <h3><a href="{{ $post.RelPermalink }}">{{ $post.Title }}</a></h3>
-                <p><i class="far fa-clock"></i> {{ $post.Date | time.Format "January 2, 2006" }}</p>
-              </div>
-            </article>
-            {{- $endOfChunk := eq (mod (add $i 1) $chunkSize) 0 -}}
-            {{- $isLast := eq (add $i 1) $total -}}
-            {{- if or $endOfChunk $isLast -}}
-          </div>
+      <a class="cn1-runtime-proof" href="/blog/pixel-perfect-is-a-test/" aria-label="See the iOS Liquid Glass fidelity tests">
+        <div class="cn1-runtime-proof__comparison">
+          <p><span>Native iOS 26</span><span>Codename One Metal</span></p>
+          <video class="cn1-runtime-proof__motion" data-cn1-motion-proof data-src="/proof/tab-morph-native-vs-cn1.mp4" poster="/proof/tab-morph-native-vs-cn1.png" muted loop playsinline aria-label="Native iOS 26 and Codename One Liquid Glass tab selection animations in light and dark appearance" width="900" height="324"></video>
+          <img class="cn1-runtime-proof__still" src="/proof/tab-morph-native-vs-cn1.png" alt="Native iOS 26 and Codename One Liquid Glass tab selection states in light and dark appearance" width="900" height="323">
         </div>
-            {{- end -}}
+        <div class="cn1-runtime-proof__device cn1-runtime-proof__device--android">
+          <span class="cn1-runtime-proof__camera" aria-hidden="true"></span>
+          <img src="/proof/android-material3-showcase.png" alt="Codename One Android Material 3 light and dark theme test capture" width="800" height="600">
+        </div>
+        <span class="cn1-runtime-proof__caption"><strong>Real runtime captures</strong> Native reference beside Codename One Liquid Glass, plus Android Material 3.</span>
+      </a>
+    </div>
+  </section>
+
+  <div class="cn1-section-shell">
+    {{ partial "cn1-proof-strip.html" . }}
+  </div>
+
+  <section class="cn1-v2-section cn1-v2-ownership" id="ownership">
+    <div class="cn1-v2-section__intro">
+      <p class="cn1-eyebrow">Own the result</p>
+      <h2>The screen you test is the screen you ship.</h2>
+      <p>Codename One draws its own components. The runtime and theme are packaged with the application, so an OS update does not silently swap in a different widget implementation.</p>
+    </div>
+    <div class="cn1-v2-ownership__grid">
+      <article class="cn1-v2-feature cn1-v2-feature--accent">
+        <svg class="cn1-v2-feature__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M7 14v6"/></svg>
+        <h3>Control the pixels</h3>
+        <p>Theme the shared UI with CSS, draw directly when you need to, and keep brand behavior consistent across targets.</p>
+      </article>
+      <article class="cn1-v2-feature">
+        <svg class="cn1-v2-feature__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="7" height="14" rx="2"/><rect x="14" y="5" width="7" height="14" rx="2"/><path d="M10 12h4"/></svg>
+        <h3>Ship one behavior</h3>
+        <p>Fix shared application logic and UI once instead of maintaining separate screen implementations for each platform.</p>
+      </article>
+      <article class="cn1-v2-feature">
+        <svg class="cn1-v2-feature__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M14 4l-4 16"/></svg>
+        <h3>Drop to native when it matters</h3>
+        <p>Call platform SDKs through native interfaces. Embed a map, web view, camera surface, or other heavyweight view with <code>PeerComponent</code>.</p>
+      </article>
+    </div>
+    <aside class="cn1-ownership-proof">
+      <strong>Adopt platform changes on your schedule</strong>
+      <p>Ship Liquid Glass, Material 3, or your own design as a versioned part of the application. An OS upgrade does not silently replace the UI you tested.</p>
+      <a href="/blog/liquid-glass-material-3-modern-native-themes/">See the current themes</a>
+    </aside>
+  </section>
+
+  <section class="cn1-v2-section cn1-v2-how">
+    <div class="cn1-v2-section__intro cn1-v2-section__intro--center">
+      <p class="cn1-eyebrow">The build path</p>
+      <h2>Java in. Native applications out.</h2>
+      <p>Use Maven and your existing IDE. Codename One supplies the portable runtime, platform ports, and build tooling.</p>
+    </div>
+    <ol class="cn1-v2-steps">
+      <li>
+        <span>1</span>
+        <h3>Write the application once</h3>
+        <p>Application logic and the shared UI stay in a standard Maven project.</p>
+        <a href="/getting-started/">Start the project</a>
+      </li>
+      <li>
+        <span>2</span>
+        <h3>Run and inspect locally</h3>
+        <p>The simulator provides device skins, component and network inspectors, test recording, and live CSS.</p>
+        <a href="/development-environment/">See the development tools</a>
+      </li>
+      <li>
+        <span>3</span>
+        <h3>Build with native toolchains</h3>
+        <p>Generate platform projects or use the cloud service to build app-store binaries, including iOS builds without a Mac.</p>
+        <a href="/getting-started/#build">Submit your first native build</a>
+      </li>
+    </ol>
+  </section>
+
+  <section class="cn1-v2-section cn1-v2-agent" id="agentic-development">
+    <div class="cn1-v2-agent__intro">
+      <p class="cn1-eyebrow">Agentic development</p>
+      <h2>Give the agent a strict codebase and a short feedback loop.</h2>
+      <p>A generated Java 17 project includes Codename One instructions for coding agents. The simulator can expose the running UI to Codex, Claude Code, and other MCP hosts, so the agent can inspect meaning and invoke actions instead of guessing screen coordinates.</p>
+      <div class="cn1-action-row">
+        {{ partial "cn1-cta.html" (dict "label" "Connect an agent" "href" "/getting-started/#agent" "variant" "secondary") }}
+        {{ partial "cn1-cta.html" (dict "label" "Read the MCP implementation" "href" "/blog/codename-one-mcp-server/" "variant" "text") }}
+      </div>
+    </div>
+    <div class="cn1-v2-agent__grid">
+      <article>
+        <span>Java</span>
+        <h3>Java keeps edits in bounds</h3>
+        <p>Agents know Java deeply. Static types, bytecode compliance, and the compiler reject unsupported APIs and invalid calls before they reach a device.</p>
+      </article>
+      <article>
+        <span>Local</span>
+        <h3>Fast loops use fewer tokens</h3>
+        <p>Compile, run tests, and inspect the simulator locally. Short feedback cycles mean fewer speculative retries and less context spent diagnosing a distant native build.</p>
+      </article>
+      <article>
+        <span>Tools</span>
+        <h3>Skills and MCP ship with the tools</h3>
+        <p>Initializr places the Codename One authoring skill in the project. The JavaSE tooling can register its built-in semantic UI tools with supported MCP hosts.</p>
+      </article>
+    </div>
+    <p class="cn1-v2-agent__scope">MCP control currently covers the simulator and JavaSE-hosted desktop tools. Packaged native and mobile targets do not yet include the launcher and transport.</p>
+  </section>
+
+  <section class="cn1-v2-section cn1-v2-reach">
+    <div class="cn1-v2-reach__copy">
+      <p class="cn1-eyebrow">Deployment targets</p>
+      <h2>One Java project across the ports we test.</h2>
+      <p>The same application model reaches phones, native desktops, browsers, watches, and TV. The Port Status page publishes the architecture, operating-system floor, and CI evidence for each target.</p>
+      <a class="cn1-reach-link" href="/port-status/">Inspect every port and test</a>
+    </div>
+    <ul class="cn1-platform-grid" aria-label="Supported deployment targets">
+      {{- range site.Data.port_status_support.deployment_support }}
+      <li>
+        <strong>{{ .platform }}</strong>
+        <span>{{ .architectures }}</span>
+        <small>{{ .declared_range }}</small>
+      </li>
+      {{- end }}
+      <li>
+        <strong>Vehicle integrations</strong>
+        <span>CarPlay and Android Auto</span>
+        <small>Portable Java templates map to native CarPlay and Android Auto UI.</small>
+      </li>
+      <li>
+        <strong>System surfaces</strong>
+        <span>Widgets, Live Activities, Dynamic Island</span>
+        <small>Portable Java surface APIs publish to iOS, Android, and desktop renderers.</small>
+      </li>
+    </ul>
+  </section>
+
+  <section class="cn1-v2-section cn1-v2-engineering">
+    <div class="cn1-v2-section__intro cn1-v2-section__intro--split">
+      <div><p class="cn1-eyebrow">Engineering notes</p><h2>Read the mechanisms, not a brochure.</h2></div>
+      <a href="/blog/">All engineering posts</a>
+    </div>
+    <div class="cn1-engineering-grid">
+      {{- range first 3 (sort (where site.RegularPages "Section" "blog") "Date" "desc") -}}
+      {{- $thumb := .Params.cover.image | default .Params.thumbnail | default .Params.image -}}
+      {{- if not $thumb -}}
+        {{- $candidate := printf "%s.jpg" (strings.TrimSuffix "/" .RelPermalink) -}}
+        {{- if fileExists (printf "static%s" $candidate) -}}{{- $thumb = $candidate -}}{{- end -}}
+      {{- end -}}
+      <article>
+        <a class="cn1-engineering-grid__image" href="{{ .RelPermalink }}">
+          {{- with $thumb -}}
+          <img src="{{ . }}" alt="">
+          {{- else -}}
+          <span aria-hidden="true">{ }</span>
           {{- end -}}
-        {{- else -}}
-        <div class="cn1-carousel__slide is-active">
-          <div class="cn1-blog__grid">
-            <article>
-              <a href="/blog/"><img src="/uploads/CN1-Hero-illustration-1-1024x787.png" alt="Codename One Blog"></a>
-              <div>
-                <h3><a href="/blog/">Blog posts are coming soon</a></h3>
-                <p><i class="far fa-clock"></i> Stay tuned</p>
-              </div>
-            </article>
-          </div>
-        </div>
-        {{- end -}}
-      </div>
+        </a>
+        <p>{{ .Date | time.Format "January 2, 2006" }}</p>
+        <h3><a href="{{ .RelPermalink }}">{{ .Title }}</a></h3>
+      </article>
+      {{- end -}}
     </div>
-    <div class="cn1-carousel__dots" aria-label="Blog pages"></div>
-  </div>
-</section>
+  </section>
 
-<section class="cn1-cta-row">
-  <article>
-    <i class="far fa-paper-plane"></i>
-    <h3>Quick Start with Codename One initializr</h3>
-    <a href="/getting-started/">Get Started</a>
-  </article>
-  <article>
-    <i class="fas fa-tools"></i>
-    <h3>Learn all about building native mobile apps using Java</h3>
-    <a href="/training/">CN1 Academy</a>
-  </article>
-</section>
-
-{{/*
-<section class="cn1-newsletter">
-  <h2>Newsletter</h2>
-  <p>Subscribe to our Newsletter to get important News &amp; Updates:</p>
-  <form action="/newsletter/" method="get">
-    <input type="email" name="email" placeholder="Enter your email" required>
-    <input type="text" name="name" placeholder="Full name">
-    <button type="submit">SUBSCRIBE</button>
-  </form>
-</section>
-*/}}
-
+  <section class="cn1-v2-final">
+    <div>
+      <p class="cn1-eyebrow">Start with the real thing</p>
+      <h2>Create the project. Run it locally. Build for iOS.</h2>
+      <p>The framework is open source and free to use commercially. Initializr generates a Maven project you can run locally, then build with local or cloud toolchains.</p>
+    </div>
+    <div class="cn1-action-row">
+      {{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "/initializr/" "event" "home-final-project") }}
+      {{ partial "cn1-cta.html" (dict "label" "Follow the build guide" "href" "/getting-started/" "variant" "secondary") }}
+    </div>
+  </section>
+</div>
 {{- end -}}

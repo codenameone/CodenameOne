@@ -3,17 +3,15 @@ title: "Pricing"
 date: 2020-09-02
 slug: "pricing"
 layout: "pricing"
-description: "Build unlimited number of cross-platform mobile apps with Java or Kotlin. No royalties, no restrictions!"
+description: "Compare Codename One cloud-build plans, quotas, Crash Protection, push, native sources, store submission, and support. The framework remains open source and royalty free."
 keywords:
   - "Codename One Pricing"
 ---
 
-## FAQs
-
 ### What is Codename One? How does it work?
-Codename One is an open-source cross-platform WORA (Write Once Run Anywhere) mobile app development framework that lets Java and Kotlin developers build truly native multi-platform apps with high code reuse.
+Codename One is an open-source framework for building native applications in Java. It provides a shared runtime and custom-rendered UI across mobile, desktop, web, watch, TV, and vehicle targets.
 
-Apps are compiled down to native code for strong performance and smooth UX.
+Platform builds use native toolchains. You can also call platform SDKs or embed heavyweight native views when a shared component is not the right fit.
 
 ### Is Codename One free? Is it open source?
 Yes. Codename One is open source and can be used commercially and non-commercially with no royalties or restrictions.
@@ -23,14 +21,14 @@ The optional cloud build service includes a free quota and lets developers on Wi
 ### What are the limits of the free version?
 These limits apply to cloud builds only.
 
-- 100 build credits per month.
+- 100 free cloud build credits each month.
 - 1 build credit per build (iOS uses 8 credits due to Mac build costs).
 - 8.5 MB user JAR size limit.
 
 You can still use generated apps commercially. Paid plans mainly add higher quotas and advanced cloud features.
 
 ### Can I cancel or change plan anytime?
-Yes. Codename One includes a 30-day money back guarantee for paid purchases.
+Yes. Codename One includes a 30-day money-back guarantee for paid purchases.
 
 ### What payment methods do you accept?
 Credit card and debit card through the Codename One secure signup flow.

@@ -21,7 +21,6 @@ Use this page to quickly navigate the most important parts of the Codename One w
 - [Developer Guide (HTML)](/developer-guide)
 - [Developer Guide (PDF)](/files/developer-guide.pdf)
 - [JavaDocs](/javadoc/)
-- [API Overview](/api/)
 - [Build Tools](/build-tools/)
 - [Development Environment](/development-environment/)
 - [Architecture of the GUI Builder](/architecture-of-the-gui-builder/)

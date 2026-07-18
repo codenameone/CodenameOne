@@ -122,8 +122,21 @@
     <dependencies>
         <dependency>
             <groupId>me.friwi</groupId>
-            <artifactId>jcef-api</artifactId>
-            <optional>true</optional>
+            <artifactId>jcefmaven</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>commons-io</groupId>
+                    <artifactId>commons-io</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- commons-compress 1.27.1, used by JCEF Maven to extract native
+             bundles, requires BoundedInputStream.builder() from Commons IO
+             2.16.1. The reactor otherwise manages Commons IO at 2.14.0. -->
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>2.16.1</version>
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>

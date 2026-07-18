@@ -1,3 +1,4 @@
-# Editor inside the platform web widget; absorb minor render variance.
+# Pure Codename One text editor render; absorb minor glyph anti-aliasing
+# variance between CI runs / GPU backends.
 maxChannelDelta=16
 maxMismatchPercent=2.0

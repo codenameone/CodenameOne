@@ -566,6 +566,25 @@
     if ('altKey'   in evt) out.altKey   = !!evt.altKey;
     if ('metaKey'  in evt) out.metaKey  = !!evt.metaKey;
     if ('repeat'   in evt) out.repeat   = !!evt.repeat;
+    if ('inputType' in evt) out.inputType = evt.inputType == null ? '' : String(evt.inputType);
+    if ('isComposing' in evt) out.isComposing = !!evt.isComposing;
+    if (evt.clipboardData) {
+      var clipboardTypes = ['text/plain', 'text/html', 'text/rtf', 'text/markdown', 'text/asciidoc'];
+      var clipboardDataByType = {};
+      for (var clipboardIndex = 0; clipboardIndex < clipboardTypes.length; clipboardIndex++) {
+        var clipboardType = clipboardTypes[clipboardIndex];
+        try {
+          clipboardDataByType[clipboardType] = evt.clipboardData.getData(clipboardType) || '';
+        } catch (clipboardErr) {
+          clipboardDataByType[clipboardType] = '';
+        }
+      }
+      out.clipboardDataByType = clipboardDataByType;
+      if (evt.clipboardData.files && evt.clipboardData.files.length > 0
+              && typeof storeHostRef === 'function') {
+        out.clipboardFiles = storeHostRef(evt.clipboardData.files);
+      }
+    }
     // MessageEvent fields (window.postMessage / BrowserComponent.onMessage).
     // Without these the worker-side MessageEvent.getDataAsString() returns null
     // and the source-identity check (getEventSource(e) == iframe.contentWindow)
@@ -630,6 +649,64 @@
         payload = null;
       }
       try {
+        // A worker callback cannot call preventDefault() inside the browser's
+        // dispatch window.  Lightweight text input marks its hidden textarea
+        // so the small set of events consumed by Java are cancelled here,
+        // before they can also mutate the native textarea and race the editor
+        // state sent back by the worker.
+        var eventTarget = event && event.target;
+        var eventCurrentTarget = event && event.currentTarget;
+        var workerTextInput = !!((eventTarget && eventTarget.getAttribute
+                && eventTarget.getAttribute('data-cn1-worker-text-input') === 'true')
+                || (eventCurrentTarget && eventCurrentTarget.getAttribute
+                && eventCurrentTarget.getAttribute('data-cn1-worker-text-input') === 'true'));
+        var cancelWorkerTextInputEvent = false;
+        // While the lightweight text input session owns the keyboard, a press on
+        // the render canvas must not move DOM focus: the browser's default
+        // mousedown/touchstart action blurs the hidden textarea (focus falls to
+        // <body>), the window key pipeline defers to the active session, and
+        // every key goes dead until the session restarts. The worker's own
+        // preventDefault (the pointer-routing "consume" decision) arrives after
+        // the dispatch window, so cancel the focus change here, synchronously.
+        if (event && (event.type === 'mousedown' || event.type === 'touchstart')
+            && !workerTextInput
+            && ((eventTarget && eventTarget.tagName === 'CANVAS')
+                || (eventCurrentTarget && eventCurrentTarget.tagName === 'CANVAS'))) {
+          var bridgeDoc = global.document || (global.window && global.window.document);
+          var activeEl = bridgeDoc && bridgeDoc.activeElement;
+          if (activeEl && activeEl.getAttribute
+              && activeEl.getAttribute('data-cn1-worker-text-input') === 'true'
+              && typeof event.preventDefault === 'function') {
+            event.preventDefault();
+          }
+        }
+        if (workerTextInput && event) {
+          if (event.type === 'beforeinput') {
+            var inputType = event.inputType || '';
+            cancelWorkerTextInputEvent = inputType === 'insertText'
+                    || inputType === 'insertReplacementText'
+                    || inputType === 'insertLineBreak'
+                    || inputType === 'insertParagraph'
+                    || inputType === 'deleteContentBackward'
+                    || inputType === 'deleteContentForward'
+                    || inputType === 'historyUndo'
+                    || inputType === 'historyRedo';
+          } else if (event.type === 'keydown' && !event.isComposing) {
+            // isComposing keydowns navigate the IME candidate list; cancelling them
+            // would break composition on browsers that deliver real keyCodes mid-IME
+            var keyCode = event.keyCode | 0;
+            var commandModifier = !!(event.ctrlKey || event.metaKey);
+            cancelWorkerTextInputEvent = (commandModifier && (keyCode === 65 || keyCode === 89 || keyCode === 90))
+                    || keyCode === 8 || keyCode === 9 || keyCode === 27
+                    || (keyCode >= 33 && keyCode <= 40) || keyCode === 46;
+          } else if (event.type === 'copy' || event.type === 'cut' || event.type === 'paste') {
+            cancelWorkerTextInputEvent = true;
+          }
+        }
+        if (cancelWorkerTextInputEvent) {
+          if (typeof event.preventDefault === 'function') event.preventDefault();
+          if (typeof event.stopPropagation === 'function') event.stopPropagation();
+        }
         target.postMessage({
           type: 'worker-callback',
           callbackId: callbackId,
@@ -2105,10 +2182,24 @@
     var text = (request && request.text != null) ? String(request.text) : '';
     var nav = global.navigator || (global.window && global.window.navigator);
     try {
-      if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
-        return nav.clipboard.writeText(text).then(function() {
+      if (nav && nav.clipboard && typeof nav.clipboard.write === 'function'
+          && typeof global.ClipboardItem === 'function' && request) {
+        var values = {'text/plain': new global.Blob([text], {type: 'text/plain'})};
+        var supports = typeof global.ClipboardItem.supports === 'function'
+          ? function(type) { return global.ClipboardItem.supports(type); }
+          : function(type) { return type === 'text/plain' || type === 'text/html'; };
+        if (request.html != null && supports('text/html')) values['text/html'] = new global.Blob([String(request.html)], {type: 'text/html'});
+        if (request.rtf != null && supports('text/rtf')) values['text/rtf'] = new global.Blob([String(request.rtf)], {type: 'text/rtf'});
+        if (request.markdown != null && supports('text/markdown')) values['text/markdown'] = new global.Blob([String(request.markdown)], {type: 'text/markdown'});
+        if (request.asciidoc != null && supports('text/asciidoc')) values['text/asciidoc'] = new global.Blob([String(request.asciidoc)], {type: 'text/asciidoc'});
+        return nav.clipboard.write([new global.ClipboardItem(values)]).then(function() {
           return 1;
         }, function() {
+          return execCommandClipboardFallback(text) ? 1 : 0;
+        });
+      }
+      if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
+        return nav.clipboard.writeText(text).then(function() { return 1; }, function() {
           return execCommandClipboardFallback(text) ? 1 : 0;
         });
       }
@@ -2116,6 +2207,45 @@
       // navigator.clipboard can throw synchronously in insecure contexts.
     }
     return execCommandClipboardFallback(text) ? 1 : 0;
+  });
+
+  // Image copy: the worker routes here because navigator.clipboard + ClipboardItem
+  // are Window-only. Best-effort and permission-gated -- clipboard.write REPLACES
+  // the whole clipboard. The argument is a "data:<mime>;base64,<...>" URL; the blob
+  // MIME is derived from its header. Resolves 1 on success, 0 on any failure.
+  hostBridge.register('__cn1_copy_image_to_clipboard__', function(dataUrl) {
+    var nav = global.navigator || (global.window && global.window.navigator);
+    try {
+      if (!dataUrl || !nav || !nav.clipboard || typeof nav.clipboard.write !== 'function'
+          || typeof global.ClipboardItem !== 'function') {
+        return 0;
+      }
+      var str = String(dataUrl);
+      var comma = str.indexOf(',');
+      if (comma < 0) {
+        return 0;
+      }
+      var header = str.substring(0, comma);
+      var colon = header.indexOf(':');
+      var semi = header.indexOf(';');
+      var mime = (colon >= 0 && semi > colon) ? header.substring(colon + 1, semi) : 'image/png';
+      var byteString = global.atob(str.substring(comma + 1));
+      var len = byteString.length;
+      var bytes = new global.Uint8Array(len);
+      for (var i = 0; i < len; i++) {
+        bytes[i] = byteString.charCodeAt(i);
+      }
+      var blob = new global.Blob([bytes], {type: mime});
+      var item = {};
+      item[mime] = blob;
+      return nav.clipboard.write([new global.ClipboardItem(item)]).then(function() {
+        return 1;
+      }, function() {
+        return 0;
+      });
+    } catch (err) {
+      return 0;
+    }
   });
 
   // Web Share API (navigator.share / navigator.canShare) is Window-only and so
@@ -4314,7 +4444,7 @@
   // (z-index 0) of native peer components (BrowserComponent iframes, GL/video
   // surfaces) parked behind it at z-index -1000 and shown through transparent
   // ("punched") regions of the canvas. With the canvas at pointer-events:auto it
-  // captures EVERY pointer event, so peers (e.g. the Playground's Monaco editor)
+  // captures EVERY pointer event, so interactive iframe peers
   // never receive clicks/keys -- they look live but can't be interacted with.
   // Fix on the main thread (no per-move worker round-trip): on pointer move,
   // flip the canvas to pointer-events:none whenever a real peer element is under

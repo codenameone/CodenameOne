@@ -1,0 +1,93 @@
+{{- define "main" -}}
+<article class="cn1-compare-page">
+  <header class="cn1-compare-hero">
+    {{ partial "breadcrumbs.html" . }}
+    <p class="cn1-eyebrow">Why Codename One</p>
+    <h1>Native apps from Java, without a browser or scripting bridge.</h1>
+    <p>Codename One runs Java on Android's native runtime and translates Java bytecode to C for a native iOS build. You keep one UI and application codebase, use the Java ecosystem, and ship without royalties or a platform vendor setting the framework agenda.</p>
+    <div class="cn1-action-row">
+      {{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "/initializr/" "event" "compare-project") }}
+      {{ partial "cn1-cta.html" (dict "label" "See the architecture" "href" "#matrix" "variant" "secondary") }}
+    </div>
+  </header>
+
+  <section class="cn1-compare-matrix" id="matrix">
+    <div class="cn1-v2-section__intro">
+      <p class="cn1-eyebrow">Architecture at a glance</p>
+      <h2>Compare what your application actually ships.</h2>
+      <p>The language, runtime, UI layer, test cycle, and vendor incentives affect the product long after the first screen works.</p>
+    </div>
+    <div class="cn1-compare-table-wrap" tabindex="0" role="region" aria-label="Application architecture comparison table">
+      <table>
+        <thead><tr><th>Decision</th><th>Codename One</th><th>Platform UI</th><th>Flutter</th><th>Web</th></tr></thead>
+        <tbody>
+          <tr><th>Primary ecosystem</th><td>Java, Maven, JVM libraries, and mainstream Java IDEs</td><td>Swift/Xcode plus Kotlin or Java/Android Studio</td><td>Dart, pub packages, and Flutter tooling</td><td>HTML, CSS, JavaScript, and browser tooling</td></tr>
+          <tr><th>Android execution</th><td>Java bytecode runs on Android's ART runtime and calls Android APIs directly</td><td>Kotlin or Java runs on ART with direct Android APIs</td><td>AOT-compiled Dart code runs with the Flutter engine</td><td>JavaScript inside a browser or WebView</td></tr>
+          <tr><th>iOS execution</th><td>ParparVM translates Java bytecode to C, then Xcode compiles the native binary</td><td>Swift or Objective-C compiled by Xcode</td><td>AOT-compiled Dart code runs with the Flutter engine</td><td>JavaScript in WebKit, or a native wrapper around it</td></tr>
+          <tr><th>Shared UI</th><td>One UI implementation across mobile, desktop, web, watch, TV, and vehicle targets</td><td>Separate Swift and Kotlin UI implementations</td><td>Shared across Flutter-supported targets</td><td>Shared across browsers; native wrappers add platform work</td></tr>
+          <tr><th>Theming</th><td>CSS themes shared across targets, with platform-specific selectors when needed</td><td>Separate SwiftUI/UIKit and Compose/View styling</td><td>Theme and widget code written in Dart</td><td>CSS interpreted by the browser</td></tr>
+          <tr><th>Local development</th><td>One JavaSE simulator with device skins, component inspection, networking tools, tests, and MCP control</td><td>Platform simulator and emulator toolchains</td><td>Flutter tooling plus platform simulators for native behavior</td><td>Browser developer tools</td></tr>
+          <tr><th>CI testing</th><td>Shared logic, UI, and screenshot tests can run on the JVM or headless JavaScript before native builds</td><td>Separate iOS and Android test jobs</td><td>Dart tests plus native jobs for platform behavior</td><td>Headless browser tests; wrappers need native jobs</td></tr>
+          <tr><th>Runtime packaging</th><td>Android application bytecode runs on ART. On iOS, ParparVM translates Java bytecode to C before Xcode compiles the native binary. The Codename One UI toolkit is bundled with the app</td><td>Uses each OS runtime and UI toolkit</td><td>Release builds bundle AOT-compiled Dart code with the Flutter engine and its Dart runtime support</td><td>Runs inside a browser engine or WebView</td></tr>
+          <tr><th>Native OS components</th><td>Native interfaces plus <code>PeerComponent</code> for real maps, browsers, cameras, and other platform views</td><td>Direct access to every platform component</td><td>Platform channels and Platform Views</td><td>Browser APIs or wrapper plugins</td></tr>
+          <tr><th>License and direction</th><td>Independent, open source, GPLv2 with Classpath Exception, no royalties</td><td>Controlled separately by Apple and Google</td><td>Open source and directed by Google</td><td>Standards and engines controlled by browser vendors</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="cn1-compare-choices" aria-label="Framework models">
+    <article class="cn1-compare-choice cn1-compare-choice--cn1">
+      <p class="cn1-eyebrow">The Codename One advantage</p>
+      <h2>One strict Java codebase, one simulator, one set of tests.</h2>
+      <ul>
+        <li>Keep Java's library ecosystem, Maven builds, and mainstream profiling and debugging tools.</li>
+        <li>Theme the shared UI with CSS instead of rebuilding styling in each platform language.</li>
+        <li>Run most UI and logic work in the universal JavaSE simulator without waiting for a native build.</li>
+        <li>Move fast CI work onto ordinary JVM or headless browser runners, then reserve native builders for native verification.</li>
+        <li>Reuse Android's built-in ART runtime. The Codename One UI toolkit ships with the application; it does not add a browser or a second language runtime on Android.</li>
+        <li>Embed real OS views when you need them, and call native SDKs synchronously when the platform permits it.</li>
+        <li>Ship any number of commercial applications without royalties or per-app fees.</li>
+        <li>Work with an independent framework company whose revenue depends on customers shipping across vendors.</li>
+      </ul>
+    </article>
+    <article class="cn1-compare-choice">
+      <p class="cn1-eyebrow">Platform UI</p>
+      <h2>Two vendor toolkits and two UI implementations.</h2>
+      <ul><li>You get immediate access to each vendor's newest APIs.</li><li>You also maintain separate Swift and Kotlin screens, tests, behavior, and release work.</li><li>Apple or Google can restyle platform-owned controls after your application ships.</li></ul>
+    </article>
+    <article class="cn1-compare-choice">
+      <p class="cn1-eyebrow">Flutter</p>
+      <h2>A Dart codebase built around the Flutter engine.</h2>
+      <ul><li>Release builds include AOT-compiled Dart code, the Flutter engine, and Flutter runtime support. On Android, Codename One application bytecode runs on ART.</li><li>Moving from Java to Flutter means adopting Dart, pub packages, and a Google-directed framework instead of retaining JVM libraries, Maven, and Java tooling.</li><li>Native integration crosses asynchronous platform channels or embeds Platform Views. Codename One uses native interfaces and <code>PeerComponent</code>, including synchronous native calls where the platform permits them.</li></ul>
+    </article>
+    <article class="cn1-compare-choice">
+      <p class="cn1-eyebrow">Web</p>
+      <h2>A URL-first application inside the browser.</h2>
+      <ul><li>The web is a strong deployment target when a URL and browser APIs match the product.</li><li>App-store packaging adds a WebView wrapper and native integration layer.</li><li>Codename One includes a JavaScript port when the same Java application also needs web reach.</li></ul>
+    </article>
+  </section>
+
+  <section class="cn1-compare-detail">
+    <div class="cn1-v2-section__intro"><p class="cn1-eyebrow">Control the whole development loop</p><h2>Codename One removes duplicated work before the store build.</h2></div>
+    <div class="cn1-compare-detail__grid">
+      <article><h3>Java is native on Android</h3><p>Your application code runs as Java bytecode on Android's own ART runtime. Codename One adds a portable UI and API layer; it does not hide Android behind JavaScript.</p></article>
+      <article><h3>Java tooling stays useful</h3><p>Use Maven, IntelliJ IDEA, NetBeans, Eclipse, VS Code, JUnit, profilers, and the wider JVM library ecosystem. The mobile project remains a Java project.</p></article>
+      <article><h3>CSS controls the UI</h3><p>One CSS theme covers the shared component hierarchy. Platform selectors and constants let you diverge deliberately without creating another screen implementation.</p></article>
+      <article><h3>Test before native CI</h3><p>The JavaSE simulator runs the same shared UI and business logic locally. JVM and headless JavaScript jobs catch routine failures before scarce macOS or device infrastructure is involved.</p></article>
+      <article><h3>Native integration is explicit</h3><p>Native interfaces expose platform SDKs. <code>PeerComponent</code> embeds heavyweight OS views such as maps and browsers inside the shared UI.</p></article>
+      <article><h3>No royalties or vendor agenda</h3><p>The framework is open source and independent. Commercial applications have no royalty or per-app fee, and the business succeeds when customers keep shipping across Apple, Google, desktop, and web targets.</p></article>
+    </div>
+  </section>
+
+  <section class="cn1-compare-test">
+    <div><p class="cn1-eyebrow">Verify it in your codebase</p><h2>Build the screen that makes other frameworks expensive.</h2><p>Use a screen with real layout, CSS, business logic, and one native view. Run it in the simulator, add a JVM test, then submit iOS and Android builds from the same project.</p></div>
+    <ol><li><span>1</span>Generate the Java project.</li><li><span>2</span>Build and theme one representative screen.</li><li><span>3</span>Add the native view your product needs.</li><li><span>4</span>Run local tests, then build for both stores.</li></ol>
+  </section>
+
+  <section class="cn1-v2-final cn1-compare-final">
+    <div><p class="cn1-eyebrow">Keep the codebase</p><h2>Create a Java project and test the architecture yourself.</h2><p>The framework is open source and royalty free. The free cloud tier includes 100 free cloud build credits each month.</p></div>
+    <div class="cn1-action-row">{{ partial "cn1-cta.html" (dict "label" "Create a Java project" "href" "/initializr/" "event" "compare-final-project") }}</div>
+  </section>
+</article>
+{{- end -}}

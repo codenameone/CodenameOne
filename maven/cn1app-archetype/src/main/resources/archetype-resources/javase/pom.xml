@@ -73,13 +73,9 @@
           <scope>provided</scope>
       </dependency>
       <!--
-        Desktop runtime binaries: the JCEF Java API + per-platform natives (for
-        the BrowserComponent) and bundled ffmpeg (for media). codenameone-javase
-        declares jcef-api as optional, so it is not inherited transitively; this
-        aggregator puts org.cef on the app classpath for every profile (simulator,
-        IntelliJ run, run-desktop, executable-jar). Without it the simulator/desktop
-        app runs but the BrowserComponent fails to initialize CEF. The plugin
-        provisions and extracts the matching native binaries at run/build time.
+        Optional bundled ffmpeg runtime for desktop media. BrowserComponent gets
+        JCEF Maven transitively from codenameone-javase; JCEF Maven downloads and
+        installs the matching native runtime on first use.
       -->
       <dependency>
           <groupId>com.codenameone</groupId>
@@ -436,10 +432,6 @@
                                     the initialize phase. -->
 
 
-                              <!-- The location of CEF.  This property is set in the
-                                  prepare-simulator-classpath goal, and the CEF files are
-                                  managed by maven. -->
-                              <argument>-Dcef.dir=${cef.dir}</argument>
 
                               <!-- The location of the designer jar.  This property is set in the
                                   prepare-simulator-classpath goal, and the file itself is managed
@@ -541,10 +533,6 @@
                                     the initialize phase. -->
 
 
-                              <!-- The location of CEF.  This property is set in the
-                                  prepare-simulator-classpath goal, and the CEF files are
-                                  managed by maven. -->
-                              <argument>-Dcef.dir=${cef.dir}</argument>
 
                               <!-- The location of the designer jar.  This property is set in the
                                   prepare-simulator-classpath goal, and the file itself is managed
@@ -639,10 +627,6 @@
                           <arguments>
                               <argument>-Xmx1024M</argument>
 
-                              <!-- The location of CEF.  This property is set in the
-                                  prepare-simulator-classpath goal, and the CEF files are
-                                  managed by maven. -->
-                              <argument>-Dcef.dir=${cef.dir}</argument>
 
                               <!-- The location of the designer jar.  This property is set in the
                                   prepare-simulator-classpath goal, and the file itself is managed
@@ -750,13 +734,6 @@
                                     are set in the prepare-simulator-classpath goal
                                     of the codenameone-maven-plugin which was run during
                                     the initialize phase. -->
-                              <systemProperty>
-                                  <!-- The location of CEF.  This property is set in the
-                                  prepare-simulator-classpath goal, and the CEF files are
-                                  managed by maven. -->
-                                  <key>cef.dir</key>
-                                  <value>${cef.dir}</value>
-                              </systemProperty>
                               <systemProperty>
                                   <!-- The location of the designer jar.  This property is set in the
                                   prepare-simulator-classpath goal, and the file itself is managed

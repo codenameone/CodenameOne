@@ -163,9 +163,16 @@
     {
       "id": "embedded-web-content",
       "category": "Rich components",
-      "name": "Browser, rich text, and code editor",
-      "description": "Checks embedded browser content, rich text rendering, and code editing.",
-      "tests": ["BrowserComponentScreenshotTest", "CodeEditorScreenshotTest", "RichTextAreaScreenshotTest"]
+      "name": "Embedded browser content",
+      "description": "Checks embedded browser content rendered by a native web view.",
+      "tests": ["BrowserComponentScreenshotTest"]
+    },
+    {
+      "id": "pure-text-editing",
+      "category": "Rich components",
+      "name": "Rich text and code editors",
+      "description": "Checks the pure Codename One rich text and code editors, which render and edit text with the framework's own text engine (no web view).",
+      "tests": ["CodeEditorScreenshotTest", "RichTextAreaScreenshotTest", "PureEditorScreenshotTest"]
     },
     {
       "id": "sheets",
@@ -306,6 +313,13 @@
       "name": "Threading and EDT enforcement",
       "description": "Checks background-thread UI access behavior.",
       "tests": ["BackgroundThreadUiAccessTest"]
+    },
+    {
+      "id": "clipboard",
+      "category": "Application runtime",
+      "name": "Generic clipboard",
+      "description": "Checks that text, HTML, image and file representations survive a copy/paste round trip through the system clipboard.",
+      "tests": ["ClipboardRoundTripTest"]
     },
     {
       "id": "secure-storage-crypto",
@@ -486,6 +500,7 @@
     {"pattern": "BrowserComponent", "test": "BrowserComponentScreenshotTest"},
     {"pattern": "RichTextArea", "test": "RichTextAreaScreenshotTest"},
     {"pattern": "CodeEditor", "test": "CodeEditorScreenshotTest"},
+    {"pattern": "PureEditors", "test": "PureEditorScreenshotTest"},
     {"pattern": "MediaPlayback", "test": "MediaPlaybackScreenshotTest"},
     {"pattern": "Sheet", "test": "SheetScreenshotTest"},
     {"pattern": "SheetSlideUpAnimationScreenshotTest", "test": "SheetSlideUpAnimationScreenshotTest"},
@@ -516,6 +531,7 @@
     {"pattern": "PaletteOverrideTheme_*", "test": "PaletteOverrideThemeScreenshotTest"},
     {"pattern": "css-gradients", "test": "CssGradientsScreenshotTest"},
     {"pattern": "SurfacesRasterizer", "test": "SurfacesRasterizerScreenshotTest"},
+    {"pattern": "SurfacesRemoteViews", "test": "SurfacesRemoteViewsScreenshotTest"},
     {"pattern": "RealOsmVector", "test": "RealOsmVectorScreenshotTest"},
     {"pattern": "VectorMapDarkStyle", "test": "VectorMapDarkStyleScreenshotTest"},
     {"pattern": "VectorMapMarkers", "test": "VectorMapMarkersScreenshotTest"},

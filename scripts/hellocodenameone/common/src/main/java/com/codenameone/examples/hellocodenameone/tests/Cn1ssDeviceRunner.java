@@ -244,6 +244,12 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new BrowserComponentScreenshotTest(),
             new RichTextAreaScreenshotTest(),
             new CodeEditorScreenshotTest(),
+            // Runs with the other editor screenshot tests, after the graphics
+            // suite: creating a pure editor warms Android's native-font path,
+            // which perturbs the default-font rendering the graphics-draw-string
+            // / inscribed-triangle-grid goldens capture. Keeping every editor
+            // test after the graphics tests preserves their cold-font ordering.
+            new PureEditorScreenshotTest(),
             new MediaPlaybackScreenshotTest(),
             new SheetScreenshotTest(),
             new SheetSlideUpAnimationScreenshotTest(),
@@ -371,6 +377,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new TimeApiTest(),
             new NanoTimeApiTest(),
             new FloatingToStringTest(),
+            new ClipboardRoundTripTest(),
             // External surfaces assertion tests (no screenshots): the serializer wire format
             // round-tripped through JSONParser on the device VM, the timeline-selection helpers
             // the desktop widget renderers use, action dispatch (cold-start queue + EDT

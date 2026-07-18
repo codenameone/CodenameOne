@@ -45,10 +45,23 @@ if [ "$USE_LOCAL_SOURCES" = "true" ]; then
   # works the same as release-jar mode. Falls back gracefully if the
   # snapshot isn't installed.
   LOCAL_VERSION="${CN1_LOCAL_VERSION:-8.0-SNAPSHOT}"
-  LOCAL_M2="$HOME/.m2/repository/com/codenameone"
+  # Maven builds may use a workspace-local repository (for example in CI or
+  # an isolated development checkout). Allow callers to point validation at
+  # those freshly-built jars instead of silently picking up stale snapshots
+  # from the default user repository.
+  LOCAL_M2="${CN1_LOCAL_M2:-$HOME/.m2/repository/com/codenameone}"
   LOCAL_JARS=""
   for artifact in codenameone-core java-runtime codenameone-javase; do
-    candidate="$LOCAL_M2/$artifact/$LOCAL_VERSION/${artifact}-${LOCAL_VERSION}.jar"
+    case "$artifact" in
+      codenameone-core) workspace_candidate="$REPO_ROOT/maven/core/target/${artifact}-${LOCAL_VERSION}.jar" ;;
+      java-runtime) workspace_candidate="$REPO_ROOT/maven/java-runtime/target/${artifact}-${LOCAL_VERSION}.jar" ;;
+      codenameone-javase) workspace_candidate="$REPO_ROOT/maven/javase/target/${artifact}-${LOCAL_VERSION}.jar" ;;
+    esac
+    if [ -f "$workspace_candidate" ]; then
+      candidate="$workspace_candidate"
+    else
+      candidate="$LOCAL_M2/$artifact/$LOCAL_VERSION/${artifact}-${LOCAL_VERSION}.jar"
+    fi
     if [ -f "$candidate" ]; then
       LOCAL_JARS="${LOCAL_JARS:+$LOCAL_JARS:}$candidate"
     fi

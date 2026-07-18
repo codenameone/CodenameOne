@@ -621,8 +621,8 @@ public class CN1CSSCLI {
             System.out.println("                    The compile fails listing offending rules instead of falling back.");
             System.out.println("                    Used by the framework native-themes build.");
             System.out.println("\nSystem Properties:");
-            System.out.println(" cef.dir            The path to the CEF directory.");
-            System.out.println("                    Required for generation of image borders.");
+            System.out.println(" cn1.jcef.installDir  Optional JCEF Maven installation directory.");
+            System.out.println(" cn1.jcef.mirrors     Optional comma-separated JCEF download mirrors.");
             System.out.println(" parent.port        The port number to connect to the parent process for watch mode so that it knows ");
             System.out.println("                    to exit if the parent process ends.");
             return;

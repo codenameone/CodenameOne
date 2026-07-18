@@ -509,6 +509,14 @@ public final class LinuxNative {
 
     public static native String clipboardGetText();
 
+    public static native void clipboardSetImage(byte[] png);
+
+    public static native byte[] clipboardGetImage();
+
+    public static native void clipboardSetFiles(String[] paths);
+
+    public static native String[] clipboardGetFiles();
+
     /* ----------------------------------------------------- shell / launch */
 
     /**

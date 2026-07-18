@@ -192,28 +192,11 @@ public class Simulator {
         } catch (Throwable ex) {}
         boolean fxOnSystemPath = fxSupported;
         
-        File cef = System.getProperty("cef.dir") != null ? new File(System.getProperty("cef.dir")) : new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "cef");
-        if (cef.exists()) {
-            if (isUnix && !is64Bit) {
-                System.out.println("Found CEF, but not using because CEF is only supported on 64 bit platforms.  Try running inside a 64 bit JVM");
-            } else {
-                
-            
-                cefSupported = true;
-                System.out.println("Adding CEF to classpath");
-                String cn1LibPath = System.getProperty("cn1.library.path", ".");
-                String bitSuffix = is64Bit ? "64" : "32";
-                String nativeDir = isMac ? "macos64" : isWindows ? ("lib" + File.separator + "win"+bitSuffix) : ("lib" + File.separator + "linux"+bitSuffix);
-                System.setProperty("cn1.library.path", cn1LibPath + File.pathSeparator + cef.getAbsolutePath() + File.separator + nativeDir);
-
-                // Necessary to modify java.libary.path property on windows as it is used by CefApp to locate jcef_helper.exe
-                System.setProperty("java.library.path", cef.getAbsolutePath()+File.separator+nativeDir+File.pathSeparator+System.getProperty("java.library.path", "."));
-                for (File jar : cef.listFiles()) {
-                    if (jar.getName().endsWith(".jar") && !jar.getName().endsWith("-tests.jar")) {
-                        files.add(jar.getAbsoluteFile());
-                    }
-                }
-            }
+        try {
+            Class cefRuntime = Class.forName("org.cef.CN1JcefRuntime");
+            cefSupported = Boolean.TRUE.equals(cefRuntime.getMethod("isSupported").invoke(null));
+        } catch (Throwable ex) {
+            cefSupported = false;
         }
         
         File jmf = new File(System.getProperty("user.home") + File.separator + ".codenameone" + File.separator + "jmf-2.1.1e.jar");
@@ -227,7 +210,8 @@ public class Simulator {
         
         if (implementation.equalsIgnoreCase("cef") && !cefSupported) {
             // We will use CEF
-            System.err.println("cn1.javase.implementation=cef but CEF was not found.  Please update your Codename One libraries and try again.\nAlternatively, you can try using a different implementation.");
+            System.err.println("cn1.javase.implementation=cef but JCEF Maven does not support "
+                    + "this platform. Please try a different JavaSE implementation.");
             System.exit(1);
         }
         if (implementation.equalsIgnoreCase("fx") && !fxSupported) {
@@ -273,6 +257,7 @@ public class Simulator {
         }
         System.setProperty("cn1.classPathLoader.Path", filesPath.toString());
         ((ClassPathLoader)ldr).addExclude("org.cef.");
+        ((ClassPathLoader)ldr).addExclude("me.friwi.jcefmaven.");
         
         final ClassLoader fLdr = ldr;
         Thread.currentThread().setContextClassLoader(fLdr);
@@ -361,30 +346,6 @@ public class Simulator {
     private static boolean isWindows = (OS.indexOf("win") >= 0);
     
 
-    private static boolean isMac =  (OS.indexOf("mac") >= 0);
-    private static final String ARCH = System.getProperty("os.arch");
-
-    private static boolean isUnix = (OS.indexOf("nux") >= 0);
-    private static final boolean is64Bit = is64Bit();
-    private static final boolean is64Bit() {
-        
-        String model = System.getProperty("sun.arch.data.model",
-                                          System.getProperty("com.ibm.vm.bitmode"));
-        if (model != null) {
-            return "64".equals(model);
-        }
-        if ("x86-64".equals(ARCH)
-            || "ia64".equals(ARCH)
-            || "ppc64".equals(ARCH) || "ppc64le".equals(ARCH)
-            || "sparcv9".equals(ARCH)
-            || "mips64".equals(ARCH) || "mips64el".equals(ARCH)
-            || "amd64".equals(ARCH)
-            || "aarch64".equals(ARCH)) {
-            return true;
-        }
-        return false;
-    }
-    
     /**
      * Encapsulates the hotswap-agent.properties file that is used when running with HotswapAgent.
      * See https://github.com/HotswapProjects/HotswapAgent

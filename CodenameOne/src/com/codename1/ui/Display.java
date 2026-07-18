@@ -4428,6 +4428,12 @@ public final class Display extends CN1Constants {
         impl.copyToClipboard(obj);
     }
 
+    /// Copies a set of alternative clipboard representations. The first entry should normally be
+    /// `text/plain`; richer consumers can negotiate HTML, RTF, Markdown, AsciiDoc, or custom MIME data.
+    public void copyToClipboard(ClipboardContent content) {
+        impl.copyToClipboard(content);
+    }
+
     /// Returns the current content of the clipboard
     ///
     /// #### Returns
@@ -4435,6 +4441,11 @@ public final class Display extends CN1Constants {
     /// can be any object or null see copyToClipboard
     public Object getPasteDataFromClipboard() {
         return impl.getPasteDataFromClipboard();
+    }
+
+    /// Returns all clipboard representations exposed by the current port, or null if none are available.
+    public ClipboardContent getClipboardContent() {
+        return impl.getClipboardContent();
     }
 
     /// Returns true if the device is currently in portrait mode
