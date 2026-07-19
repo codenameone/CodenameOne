@@ -1,0 +1,93 @@
+name: Reproducible bug or regression
+description: Report behavior that can be reproduced in a small Codename One project.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Usage questions and feature ideas belong in [GitHub Discussions](https://github.com/codenameone/CodenameOne/discussions). A bug report needs enough evidence for a maintainer to reproduce it without access to your application.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What fails, and on which target?
+      placeholder: A one-paragraph description of the observable failure.
+    validations:
+      required: true
+  - type: textarea
+    id: reproducer
+    attributes:
+      label: Minimal reproducer
+      description: Link a public minimal project or paste the smallest code sample that still fails.
+      placeholder: Repository URL, code, and any required resource files.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Build or run ...
+        2. Open ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and observed behavior
+      description: State both results precisely.
+    validations:
+      required: true
+  - type: input
+    id: cn1_version
+    attributes:
+      label: Codename One version
+      placeholder: For example, 8.0.123
+    validations:
+      required: true
+  - type: input
+    id: jdk_version
+    attributes:
+      label: JDK version
+      placeholder: Output of java -version
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Target environment
+      description: Include the target, OS or SDK version, device or simulator, and host OS.
+      placeholder: iOS 26 simulator on macOS 15; build host JDK 17.
+    validations:
+      required: true
+  - type: input
+    id: last_working
+    attributes:
+      label: Last known working version
+      description: Required for regressions; write "unknown" if you could not establish it.
+      placeholder: 8.0.122 or unknown
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and diagnostics
+      description: Paste complete relevant logs as text. Remove credentials and private data.
+      render: shell
+  - type: textarea
+    id: visual_evidence
+    attributes:
+      label: Screenshots or recordings
+      description: Drag files here when the problem is visual or timing-dependent.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Report checks
+      options:
+        - label: I searched existing issues and discussions for this behavior.
+          required: true
+        - label: The reproducer contains no credentials, signing keys, or private customer data.
+          required: true
+        - label: I understand that triage is not a commitment to a fix date.
+          required: true

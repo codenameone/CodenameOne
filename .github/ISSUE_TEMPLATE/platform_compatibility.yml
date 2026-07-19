@@ -1,0 +1,63 @@
+name: OS, SDK, or toolchain compatibility
+description: Report a reproducible break caused by a platform, SDK, JDK, or build-tool version.
+title: "[Compatibility] "
+labels:
+  - bug
+body:
+  - type: dropdown
+    id: target
+    attributes:
+      label: Affected target
+      options:
+        - Android
+        - iOS or iPadOS
+        - JavaSE simulator or JVM desktop
+        - JavaScript or PWA
+        - macOS native
+        - Windows native
+        - Linux native
+        - watchOS or Wear OS
+        - tvOS or Android TV
+        - CarPlay or Android Auto
+        - Build tooling or Maven
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: versions
+    attributes:
+      label: Version boundary
+      description: Name the first failing OS, SDK, JDK, Xcode, Android Gradle Plugin, Maven, or other tool version and the last working version.
+    validations:
+      required: true
+  - type: textarea
+    id: reproducer
+    attributes:
+      label: Minimal reproducer and command
+      description: Link a small project and include the exact build or run command.
+    validations:
+      required: true
+  - type: textarea
+    id: failure
+    attributes:
+      label: Failure and expected result
+      description: Describe the observable failure and what the previous version did.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Complete relevant log
+      description: Remove credentials, provisioning files, signing keys, and private data.
+      render: shell
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Report checks
+      options:
+        - label: I verified the version boundary or explained why that was not possible.
+          required: true
+        - label: I searched existing issues and discussions for the platform change.
+          required: true

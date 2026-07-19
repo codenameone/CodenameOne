@@ -1,35 +1,71 @@
-![Conbributing](https://i.imgur.com/UrW2kEH.jpg)
+# Help Improve Codename One
 
-# Contributing
+Codename One accepts outside testing, issue reports, benchmark counterexamples,
+documentation feedback, and design discussion. External pull requests are
+disabled.
 
-Thank you for your interest in Codename One! We have always been community driven and contibuting a pull request is the highest form of that.
+A framework change can affect the JavaSE simulator, Android, iOS, JavaScript,
+desktop ports, bytecode translation, and screenshot baselines at the same time.
+The repository has a large CI matrix to keep those targets aligned. Reviewing
+and repairing outside patches across that matrix costs more maintainer time than
+implementing the confirmed change directly, so maintainers land the code.
 
-## Discussion
+That does not make the repository read-only. A small reproducer or a precise
+platform report often finds a problem no maintainer environment could expose.
 
-Before you start working on something we would suggest talking to us in the [discussion forum](https://www.codenameone.com/discussion-forum.html) or asking a question on [stack overflow with the codenameone tag](http://stackoverflow.com/tags/codenameone). You can also contact us via the chat widget on the [main Codename One website](https://www.codenameone.com).
+## Choose the Right Channel
 
-There are a lot of nuances and pitfalls when making a change or even with submitting an issue and it's worthwhile to ask first so the issue is clear.
+- Use [GitHub Discussions](https://github.com/codenameone/CodenameOne/discussions)
+  for usage questions, API design, feature ideas, and proposals that still need
+  their scope defined.
+- Use [GitHub Issues](https://github.com/codenameone/CodenameOne/issues/new/choose)
+  for a reproducible defect, performance counterexample, toolchain or OS
+  compatibility problem, and a specific documentation failure.
+- Use the [security policy](SECURITY.md) for vulnerabilities. Do not publish a
+  security report in an issue or discussion.
 
-Since Codename One is such a large project with so many different pieces contributing to each one of these pieces is a radically different process which is why discussion with the community is helpful.
+## Make a Report Actionable
 
-## Filing Issues
+Include the evidence another developer needs to reproduce the result:
 
-Once we have a sense of what needs doing we suggest filing an issue so we can track the process. Filing an issue is a contibution in its own right. When you write clear concise issues with good test cases & screenshots we can assign them to a specific milestone and move the product forward more easily.
+1. The smallest project or code sample that still fails.
+2. The Codename One version and JDK version.
+3. The affected target, OS or SDK version, and device or simulator.
+4. Exact steps, expected behavior, and observed behavior.
+5. Complete logs or stack traces as text. Remove credentials and private data.
+6. Screenshots or recordings when the problem is visual or timing-dependent.
+7. The last known working version when reporting a regression.
 
-## Documenting
+Do not attach a full proprietary application when a small project can reproduce
+the failure. If the problem cannot be shared publicly, describe the smallest
+observable case first and wait for a maintainer to suggest a private support
+path.
 
-This is probably one of the most important things you can do as a contributor and probably one of the easiest things you can do. There are two big pieces of documentation you can edit right here on github!
+## Performance Reports
 
-The first is the [JavaDoc](https://www.codenameone.com/javadoc/) which you can edit directly in the source code, if there is an ommission or a mistake you can just press the edit button on the file and make the change directly even without an IDE. These pull requests are highly appreciated and will help future generations of developers!
+A performance claim needs a workload and a baseline. Include warmup, run count,
+hardware, input data, timing method, and the raw results. When comparing two
+runtimes or ports, verify that both produce the same output.
 
-The [Codename One developer guide](https://www.codenameone.com/manual/) is generated from [the wiki pages of this project](https://github.com/codenameone/CodenameOne/wiki/). You can just [edit the wiki directly](https://www.codenameone.com/blog/wiki-parparvm-performance-actionevent-type.html), and your changes will reflect in the developers guide. Don't forget to edit the authors section and add some credit!
+Published Codename One benchmarks are open to challenge. A case that produces a
+different result is useful even when it disproves a claim.
 
-The wiki uses the asciidoc format to generate HTML & PDF versions. There are plenty of guides on the internet to asciidoc but the syntax is pretty simple. Please try to maintain the convention for the guide as we automate many pieces in the guide generation and conversion.
+## Documentation Reports
 
-## Working with the Source
+Link the page or source section and describe what you tried, what you understood
+it to mean, and where the instructions stopped matching the current toolchain.
+The failure path matters more than a proposed rewrite because it shows which
+assumption the documentation left unstated.
 
-We have a blog post that covers forking, running the simulator and submitting a pull request [here](http://www.codenameone.com/blog/how-to-use-the-codename-one-sources.html).  We have recently transitioned to Maven as our build tool.  There are instructions on building from source using Maven [here](https://www.codenameone.com/blog/building-codename-one-from-source-maven-edition.html). While it's pretty exhaustive it doesn't cover more esoteric features like ParparVM or the iKVM fork. For those our only reference is the source.
+## What Happens Next
 
-## Ownership
+Maintainers normally classify a new report within three business days. Triage
+confirms the channel, requests missing evidence, and assigns a category. It is
+not a commitment to a fix date.
 
-By contributing code you are granting Codename One shared ownership of your work. You still own it but Codename One will have the right to relicense your work based on our needs & treat this work as if it was developed by a Codename One engineer. This is important as we might need to provide proprietary licenses for commercial companies and we might want to change the general project license in the future to attract more developers.
+Once the behavior is reproducible, a maintainer decides whether it belongs in
+the framework, a port, tooling, documentation, or a separate library. The
+maintainer implements the change and runs the relevant CI and native test
+matrix. Reports that lead to a fix or documented decision receive credit in the
+issue and, when the story is useful to other developers, in the release notes or
+technical write-up.
