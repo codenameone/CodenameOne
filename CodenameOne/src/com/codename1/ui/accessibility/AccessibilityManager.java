@@ -37,7 +37,6 @@ import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.table.Table;
-import com.codename1.ui.util.WeakHashMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -63,9 +62,6 @@ public final class AccessibilityManager {
     public static final int CHANGE_ALL = 0x7fffffff;
 
     private static final AccessibilityManager INSTANCE = new AccessibilityManager();
-    private final Map<Component, Long> componentIds = new WeakHashMap<Component, Long>();
-    private final Map<Component, Map<String, Long>> virtualIds =
-            new WeakHashMap<Component, Map<String, Long>>();
     private long nextId = 1;
     private long generation;
     private boolean dirty = true;
@@ -142,8 +138,11 @@ public final class AccessibilityManager {
             return snapshot;
         }
         if (form == null) {
-            snapshot = new AccessibilityTreeSnapshot(++generation, Collections.<Long>emptyList(),
-                                                     Collections.<Long, AccessibilityNodeSnapshot>emptyMap());
+            generation++;
+            AccessibilityTreeSnapshot emptySnapshot = new AccessibilityTreeSnapshot(
+                    generation, Collections.<Long>emptyList(),
+                    Collections.<Long, AccessibilityNodeSnapshot>emptyMap());
+            snapshot = emptySnapshot;
             snapshotForm = null;
             dirty = false;
             pendingChanges = 0;
@@ -156,7 +155,9 @@ public final class AccessibilityManager {
         List<Long> rootIds = new ArrayList<Long>();
         LinkedHashMap<Long, AccessibilityNodeSnapshot> nodes = new LinkedHashMap<Long, AccessibilityNodeSnapshot>();
         freeze(roots, -1, rootIds, nodes);
-        snapshot = new AccessibilityTreeSnapshot(++generation, rootIds, nodes);
+        generation++;
+        AccessibilityTreeSnapshot updatedSnapshot = new AccessibilityTreeSnapshot(generation, rootIds, nodes);
+        snapshot = updatedSnapshot;
         snapshotForm = form;
         dirty = false;
         pendingChanges = 0;
@@ -188,24 +189,21 @@ public final class AccessibilityManager {
     }
 
     private long idFor(Component component) {
-        Long id = componentIds.get(component);
-        if (id == null) {
-            id = Long.valueOf(nextId++);
-            componentIds.put(component, id);
+        AccessibilityNode semantics = component.getSemantics();
+        long id = semantics.getInternalId();
+        if (id == 0) {
+            id = nextId++;
+            semantics.setInternalId(id);
         }
-        return id.longValue();
+        return id;
     }
 
     private long idForVirtual(Component host, String path) {
-        Map<String, Long> hostIds = virtualIds.get(host);
-        if (hostIds == null) {
-            hostIds = new LinkedHashMap<String, Long>();
-            virtualIds.put(host, hostIds);
-        }
-        Long id = hostIds.get(path);
+        AccessibilityNode semantics = host.getSemantics();
+        Long id = semantics.getInternalVirtualId(path);
         if (id == null) {
             id = Long.valueOf(nextId++);
-            hostIds.put(path, id);
+            semantics.putInternalVirtualId(path, id.longValue());
         }
         return id.longValue();
     }

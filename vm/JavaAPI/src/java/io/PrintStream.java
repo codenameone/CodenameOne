@@ -337,11 +337,17 @@ public class PrintStream extends FilterOutputStream implements Appendable {
         }
 
         try {
+            byte[] bytes;
             if (encoding == null) {
-                write(str.getBytes());
+                bytes = str.getBytes();
             } else {
-                write(str.getBytes(encoding));
+                bytes = str.getBytes(encoding);
             }
+            // Write directly to the wrapped stream.  Calling the inherited
+            // OutputStream.write(byte[]) re-enters virtual dispatch through
+            // this PrintStream and the JavaScript translator can lose the
+            // eventual FilterOutputStream.write(byte[], int, int) target.
+            out.write(bytes, 0, bytes.length);
         } catch (IOException e) {
             setError();
         }

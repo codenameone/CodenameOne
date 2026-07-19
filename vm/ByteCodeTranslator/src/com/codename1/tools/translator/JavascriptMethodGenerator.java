@@ -235,9 +235,12 @@ final class JavascriptMethodGenerator {
         // host-side dispatch lookup misses and the calling Java
         // thread deadlocks on the corresponding wait/notify pair.
         // Tag every method on a JSO bridge type as referenced so the
-        // entry survives.
+        // entry survives. TimerHandler is also host-dispatched even though it
+        // is a @JSFunctor rather than a JSObject subtype, so retain its SAM
+        // dispatch slot for setTimeout/setInterval callbacks too.
         for (ByteCodeClass c : allClasses) {
-            if (c == null || !isJsoBridgeType(c, index)) continue;
+            if (c == null || (!isJsoBridgeType(c, index)
+                    && !"com_codename1_html5_js_browser_TimerHandler".equals(c.getClsName()))) continue;
             for (BytecodeMethod m : c.getMethods()) {
                 if (m == null || m.isStatic()) continue;
                 String name = m.getMethodName();

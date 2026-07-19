@@ -50,6 +50,15 @@ public class JsLocaleTimeZoneApp {
             score |= 256;
         }
 
+        TimeZone west = TimeZone.getTimeZone("GMT-05:00");
+        if (west.getRawOffset() == -5 * 60 * 60 * 1000) {
+            score |= 512;
+        }
+        if (west.getOffset(1, 2024, 0, 15, 2, 12 * 60 * 60 * 1000)
+                == -5 * 60 * 60 * 1000) {
+            score |= 1024;
+        }
+
         result = score;
     }
 }

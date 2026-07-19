@@ -168,6 +168,13 @@ comment_rc=$?
 
 cp -f "$LOG_FILE" "$ARTIFACTS_DIR/javascript-device-runner.log" 2>/dev/null || true
 
+SUITE_FAILURE_LINES="$(cn1ss_collect_suite_failures "$LOG_FILE")"
+if [ -n "$SUITE_FAILURE_LINES" ]; then
+  rj_log "ERROR: JavaScript suite reported assertion/runtime failures:"
+  printf '%s\n' "$SUITE_FAILURE_LINES" | sed 's/^/[CN1SS failure] /'
+  comment_rc=18
+fi
+
 if [ "${#FAILED_TESTS[@]}" -gt 0 ]; then
   if [ "$meaningful_decoded_count" -gt 0 ] && [ "${#FAILED_TESTS[@]}" -lt "$meaningful_decoded_count" ]; then
     rj_log "WARN: CN1SS decode failures for tests: ${FAILED_TESTS[*]} (non-fatal: $meaningful_decoded_count tests succeeded)"

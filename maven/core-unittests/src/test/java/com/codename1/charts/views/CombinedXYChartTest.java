@@ -31,4 +31,31 @@ public class CombinedXYChartTest extends UITestBase {
 
         Assertions.assertEquals("Combined", chart.getChartType());
     }
+
+    @FormTest
+    public void testSupportedChildChartsAreConstructedWithInitializedState() {
+        String[] types = new String[] {
+            TimeChart.TYPE,
+            LineChart.TYPE,
+            CubicLineChart.TYPE,
+            BarChart.TYPE,
+            BubbleChart.TYPE,
+            ScatterChart.TYPE,
+            RangeBarChart.TYPE,
+            RangeStackedBarChart.TYPE
+        };
+
+        for (String type : types) {
+            XYChart chart = CombinedXYChart.createXYChart(type);
+            Assertions.assertNotNull(chart, "Missing child chart factory for " + type);
+            Assertions.assertEquals(type, chart.getChartType());
+
+            double[] range = new double[] {1, 2, 3, 4};
+            chart.setCalcRange(range, 0);
+            Assertions.assertSame(range, chart.getCalcRange(0),
+                    "Child chart constructor did not initialize XYChart state for " + type);
+        }
+
+        Assertions.assertNull(CombinedXYChart.createXYChart("unsupported"));
+    }
 }

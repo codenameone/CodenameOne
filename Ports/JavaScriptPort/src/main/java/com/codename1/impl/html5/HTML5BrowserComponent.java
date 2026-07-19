@@ -319,6 +319,32 @@ public class HTML5BrowserComponent extends HTML5Peer {
     
     private boolean listenersInstalled;
     private List<EventListener> frameListeners;
+    private ShouldLoadURLCallback navigationCallback;
+
+    private void installNavigationCallback() {
+        if (navigationCallback == null) {
+            navigationCallback = new ShouldLoadURLCallback() {
+
+                @Override
+                public boolean shouldLoadURL(final String url) {
+                    // The host bridge already invokes this callback
+                    // asynchronously on the worker. BrowserComponent will
+                    // marshal the registered result callback onto the EDT.
+                    parent.fireBrowserNavigationCallbacks(url);
+
+                    // The callback URL is only a transport from Javascript to Java.
+                    // It must never become a real iframe navigation.
+                    return false;
+                }
+            };
+        }
+        if (iframe == null) {
+            installShouldLoadURLCallbackShared(navigationCallback);
+        } else {
+            installShouldLoadURLCallback(iframe, navigationCallback);
+        }
+    }
+
     private void installFrameListeners() {
         if (listenersInstalled) {
             return;
@@ -362,23 +388,7 @@ public class HTML5BrowserComponent extends HTML5Peer {
                             HTML5Implementation._log("Failed to add event handlers to iframe, probably due to a CORS error");
                         }
 
-                        installShouldLoadURLCallback(iframe, new ShouldLoadURLCallback() {
-
-                            @Override
-                            public boolean shouldLoadURL(final JSObject url) {
-                                new Thread() {
-                                    public void run() {
-
-                                        parent.fireBrowserNavigationCallbacks(JS.unwrapString(url));
-                                    }
-                                }.start();
-
-                                // We always return false since this will only be used for 
-                                // the javascript bridge and we don't want it to try to 
-                                // do a window.location load.
-                                return false;
-                            }
-                        });
+                        installNavigationCallback();
                     } else {
                         HTML5Implementation._log("Is cors restricted");
                     }
@@ -446,23 +456,7 @@ public class HTML5BrowserComponent extends HTML5Peer {
                 parent = (BrowserComponent)p;
                 parent.fireWebEvent("onStart", new ActionEvent(CN.getProperty("browser.window.location.href", "")));
                 parent.fireWebEvent("onLoad", new ActionEvent(CN.getProperty("browser.window.location.href", "")));
-                installShouldLoadURLCallbackShared(new ShouldLoadURLCallback() {
-
-                    @Override
-                    public boolean shouldLoadURL(final JSObject url) {
-                        new Thread() {
-                                public void run() {
-
-                                    parent.fireBrowserNavigationCallbacks(JS.unwrapString(url));
-                                }
-                        }.start();
-
-                        // We always return false since this will only be used for 
-                        // the javascript bridge and we don't want it to try to 
-                        // do a window.location load.
-                        return false;
-                    }
-                });
+                installNavigationCallback();
             }
             
             return;
@@ -682,6 +676,7 @@ public class HTML5BrowserComponent extends HTML5Peer {
         }
         WindowExt win =  iframe == null ? ((WindowExt)Window.current()) : (WindowExt)iframe.getContentWindow();
 
+        installNavigationCallback();
         win.eval(javascript);
         //Window win = iframe.getContentWindow();
         //win.getLocation().assign("javascript:"+javascript);
@@ -697,6 +692,7 @@ public class HTML5BrowserComponent extends HTML5Peer {
         }
         //WindowExt win = (WindowExt)iframe.getContentWindow();
         Window win = iframe == null ? Window.current() : iframe.getContentWindow();
+        installNavigationCallback();
         return evalStr(win, javascript);
         //return win.eval(javascript);
     }
@@ -935,13 +931,16 @@ public class HTML5BrowserComponent extends HTML5Peer {
     
     @JSFunctor 
     interface ShouldLoadURLCallback extends JSObject {
-        boolean shouldLoadURL(JSObject url);
+        boolean shouldLoadURL(String url);
     }
     
-    @JSBody(params={"iframe","callback"}, script="try {var win=iframe.contentWindow||iframe; win.cn1application = win.cn1application || {}; win.cn1application.shouldNavigate=callback;} catch (e) { console.log('Failed to install shouldNavigate in iframe for browser component.');}")
+    // Implemented by port.js through a main-thread host call. This must not be
+    // an @JSBody: ParparVM executes @JSBody code in the worker, where iframe is
+    // only a host-ref proxy and has no live contentWindow.
     native static void installShouldLoadURLCallback(HTMLIFrameElement el, ShouldLoadURLCallback callback);
     
-    @JSBody(params={"callback"}, script="try {var win=window; win.cn1application = win.cn1application || {}; win.cn1application.shouldNavigate=callback;} catch (e) { console.log('Failed to install shouldNavigate in iframe for browser component.');}")
+    // See installShouldLoadURLCallback(). The shared-window variant uses the
+    // same host bridge and installs on the real browser window.
     native static void installShouldLoadURLCallbackShared(ShouldLoadURLCallback callback);
     
 }

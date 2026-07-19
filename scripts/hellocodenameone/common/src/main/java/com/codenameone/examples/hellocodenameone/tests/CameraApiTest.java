@@ -40,16 +40,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 /// End-to-end exercise of the low-level `com.codename1.camera.Camera` API
 /// against whichever per-port `CameraImpl` is in use.
 ///
-/// On the JavaSE simulator (where `JavaSECameraImpl` synthesises frames and
-/// never touches a real webcam) this runs the full assertion chain in CI
-/// without triggering any permission prompts. On iOS / Android / JavaScript
-/// the camera open call would surface an OS permission dialog that would
-/// hang the automated runner, so the test self-skips on those platforms.
+/// On the JavaSE simulator (where `JavaSECameraImpl` synthesises frames) and
+/// JavaScript (where the Playwright runner supplies Chromium's deterministic
+/// fake media device) this runs the full assertion chain in CI without a
+/// physical webcam or permission prompt. On iOS / Android the camera open call
+/// would still surface an OS permission dialog, so the test self-skips there.
 /// The native-port code paths are verified separately:
 ///   - iOS: device build sanity + XCTest screenshot suite
 ///   - Android: instrumentation tests against a granted-permissions
 ///     `--grant-runtime-permissions` install
-///   - JavaScript: manual browser smoke test
+///   - JavaScript: this test, through getUserMedia, MediaStream, video/canvas
+///     capture and JPEG encoding
 ///
 /// No `Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot` -- this is an
 /// assertion test, not a screenshot test.
@@ -66,16 +67,16 @@ public class CameraApiTest extends BaseTest {
     @Override
     public boolean runTest() {
         String platform = Display.getInstance().getPlatformName();
-        // Only the JavaSE simulator ships a synthetic JavaSECameraImpl, so only it
-        // can assert the Camera API end to end in CI. Real-camera ports (ios/and)
-        // need runtime permission, and native desktop ports that do not implement
-        // host webcam capture (win) honestly report Camera.isSupported() == false
-        // rather than fabricating frames -- both skip here.
-        boolean isSimulator = !"ios".equals(platform)
+        // JavaSE uses its synthetic CameraImpl. The JavaScript Playwright runner
+        // supplies Chromium's fake media device, which still exercises the real
+        // HTML5 getUserMedia/video/canvas/JPEG path. Native mobile ports need an
+        // OS permission dialog, and Windows does not implement host webcam
+        // capture yet, so those remain outside this cross-port headless test.
+        boolean isHeadlessCameraSupported = "HTML5".equals(platform)
+                || (!"ios".equals(platform)
                 && !"and".equals(platform)
-                && !"win".equals(platform)
-                && !"HTML5".equals(platform);
-        if (!isSimulator) {
+                && !"win".equals(platform));
+        if (!isHeadlessCameraSupported) {
             System.out.println("CN1SS:INFO:test=CameraApiTest status=SKIPPED reason=needs-runtime-permission-on-" + platform);
             done();
             return true;
@@ -225,27 +226,15 @@ public class CameraApiTest extends BaseTest {
     }
 
     private static CapturedPhoto awaitPhoto(AsyncResource<CapturedPhoto> resource, long timeoutMs) {
-        long deadline = System.currentTimeMillis() + timeoutMs;
-        final Object lock = new Object();
-        final CapturedPhoto[] out = new CapturedPhoto[1];
-        final Throwable[] err = new Throwable[1];
-        resource.ready(new com.codename1.util.SuccessCallback<CapturedPhoto>() {
-            @Override public void onSucess(CapturedPhoto value) {
-                synchronized (lock) { out[0] = value; lock.notifyAll(); }
-            }
-        });
-        resource.except(new com.codename1.util.SuccessCallback<Throwable>() {
-            @Override public void onSucess(Throwable t) {
-                synchronized (lock) { err[0] = t; lock.notifyAll(); }
-            }
-        });
-        synchronized (lock) {
-            while (out[0] == null && err[0] == null
-                    && System.currentTimeMillis() < deadline) {
-                try { lock.wait(50); } catch (InterruptedException ignored) { }
-            }
+        try {
+            // AsyncResource.get(timeout) uses invokeAndBlock when called on the
+            // EDT, so completion callbacks can still be dispatched. The old
+            // hand-written wait registered ready() on the EDT and then blocked
+            // that same EDT, guaranteeing a false timeout on asynchronous ports.
+            return resource.get((int) timeoutMs);
+        } catch (Throwable t) {
+            return null;
         }
-        return out[0];
     }
 
 }

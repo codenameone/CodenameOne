@@ -128,9 +128,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
 
     // Calling Display.getInstance() at static-init time was tripping the iOS
     // class loader (Cn1ssDeviceRunner failed to load before runSuite could
-    // log a single starting test=...). Keep the array as a plain literal -
-    // every test ends up in the jar regardless, and the platform-specific
-    // skipping is handled at runtime by shouldForceTimeoutInHtml5 below.
+    // log a single starting test=...). Keep the array as a plain literal so
+    // every test ends up in the jar without platform-dependent initialization.
     private static final BaseTest[] DEFAULT_TEST_CLASSES = new BaseTest[]{
             new MainScreenScreenshotTest(),
             // Advertising API: renders a banner + native-ad feed via the
@@ -512,11 +511,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         CN.callSerially(() -> {
             Cn1ssDeviceRunnerHelper.clearTransportFailure();
             log("CN1SS:INFO:suite starting test=" + testName);
-            if (shouldForceTimeoutInHtml5(testName)) {
-                log("CN1SS:ERR:suite test=" + testName + " forced timeout (HTML5 fallback)");
-                finalizeTest(index, testClass, testName, true);
-                return;
-            }
             try {
                 testClass.prepare();
                 testClass.runTest();
@@ -528,105 +522,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             }
             awaitTestCompletion(index, testClass, testName, System.currentTimeMillis() + testTimeoutMs(testClass));
         });
-    }
-
-    private boolean shouldForceTimeoutInHtml5(String testName) {
-        if (!"HTML5".equals(Display.getInstance().getPlatformName())) {
-            return false;
-        }
-        // This list mirrors the authoritative skip set maintained in
-        // Ports/JavaScriptPort/src/main/webapp/port.js
-        // (cn1ssForcedTimeoutTestClasses + cn1ssForcedTimeoutTestNames).
-        // The Java gate runs first: anything skipped here never reaches the
-        // port.js bridge, so keep the two lists in sync. When a test gets
-        // un-parked in port.js (e.g. after a runtime fix lands), remove it
-        // here too — otherwise the suite stays silent on tests that the
-        // JS-side comments believe should now run.
-        //
-        // The list is intentionally an inline `||` chain rather than a
-        // static HashSet/Set field. Earlier revisions of this file used a
-        // static collection initialised via a static method call (or a
-        // method-call initializer for DEFAULT_TEST_CLASSES); both broke iOS
-        // class loading - Cn1ssDeviceRunner failed to load before runSuite()
-        // could even log a single starting test=... entry, leaving the suite
-        // to time out at the 300s end-marker deadline. Keep all skip lookups
-        // inline to avoid triggering the same static-init failure path.
-        return isJsSkippedNativeTest(testName)
-                || isJsSkippedKnownRuntimeBug(testName);
-    }
-
-    private static boolean isJsSkippedNativeTest(String testName) {
-        // Native APIs / platform bridges that the JavaScript port doesn't
-        // implement. These would surface as exceptions or hangs the moment
-        // the test starts; coverage stays on iOS/Android/JavaSE.
-        return "MediaPlaybackScreenshotTest".equals(testName)
-                || "BytecodeTranslatorRegressionTest".equals(testName)
-                || "BackgroundThreadUiAccessTest".equals(testName)
-                || "VPNDetectionAPITest".equals(testName)
-                || "CallDetectionAPITest".equals(testName)
-                || "LocalNotificationOverrideTest".equals(testName)
-                || "Base64NativePerformanceTest".equals(testName)
-                || "AccessibilityTest".equals(testName)
-                // CryptoApiTest exercises AES/RSA/Signature/SecureRandom which
-                // route through CodenameOneImplementation overrides; the
-                // JavaScript port doesn't yet provide a crypto bridge.
-                || "CryptoApiTest".equals(testName)
-                // BrowserComponent's iframe ``load`` event isn't routed
-                // through the worker-callback transport, so the test waits on
-                // its own ``readyRunnable`` indefinitely. Tracked under
-                // ``browserComponentLoadEvent`` in port.js.
-                || "BrowserComponentScreenshotTest".equals(testName);
-    }
-
-    private static boolean isJsSkippedKnownRuntimeBug(String testName) {
-        // Tests parked because of specific JS-port runtime bugs. Each entry
-        // has a matching comment in port.js explaining the symptom and the
-        // working-name we track it under. When the underlying bug is fixed
-        // the matching entry is removed from BOTH lists.
-        return
-                // ``simdLargeAllocaCorrupt``: SimdLargeAllocaTest corrupts the
-                // HTML5Implementation instance state via its large-alloca
-                // pattern, propagating ``{}`` receivers into subsequent
-                // canvas / paintDirty calls. Needs its own investigation.
-                "SimdLargeAllocaTest".equals(testName)
-                // ``chatInputEmitHijack`` / ``chatViewEmitHijack``:
-                // emitChannel host-bridges to a capture of the visible
-                // browser canvas instead of the test-supplied off-screen
-                // Image, so the dual-appearance dark/light streams contain
-                // the previous test's pixels.
-                || "ChatInputScreenshotTest".equals(testName)
-                || "ChatViewScreenshotTest".equals(testName)
-                // ``canvasContextWipe``: a leftover Canvas2D state mutation
-                // from a prior test wipes the test's context once we hit
-                // the canvas-accumulation tail. The targeted no-op recovery
-                // covers most subjects but these four still hang their
-                // SCREENSHOT_DONE wait on half of CI runs.
-                || "ToastBarTopPositionScreenshotTest".equals(testName)
-                || "CssGradientsScreenshotTest".equals(testName)
-                || "SheetScreenshotTest".equals(testName)
-                // ``sheetTearDownLeak``: TextAreaAlignmentStates' form
-                // renders correctly, but the screenshot captures it under
-                // a leftover Sheet overlay because Sheet teardown doesn't
-                // complete before the next test starts.
-                || "TextAreaAlignmentScreenshotTest".equals(testName)
-                // ``chartCombinedXyCapture``: ChartCombinedXY hangs the
-                // SUITE in canvasToBlob retry loop after ~88 fallback-path
-                // captures. Transform + Rotated weren't reached on the
-                // unpark-all run because CombinedXY took down the suite
-                // first; parked under the same suspicion.
-                || "ChartCombinedXYScreenshotTest".equals(testName)
-                || "ChartTransformScreenshotTest".equals(testName)
-                || "ChartRotatedScreenshotTest".equals(testName)
-                // ``graphicsTransform3dCanvasHang``: the 3D perspective /
-                // camera transform tests render into a canvas the worker-side
-                // screenshot path can't resolve (SCREENSHOT_START reports
-                // canvasCandidates=0), so the suite re-dispatches the same
-                // index indefinitely and never reaches the per-test deadline.
-                // The 2D transform tests (rotation, translation, affine) are
-                // unaffected and keep running. Tracked in port.js under the
-                // same name.
-                || "TransformPerspective".equals(testName)
-                || "TransformCamera".equals(testName);
     }
 
     private void awaitTestCompletion(int index, BaseTest testClass, String testName, long deadline) {
@@ -720,9 +615,9 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     /// A retry is only safe when the timeout was truly silent. Gates:
     /// - one retry per test (retriedTestIndex);
     /// - native ports only: on HTML5 the suite advancement is co-driven by
-    ///   port.js (runCn1ssResolvedTest dispatches per index) and known-bad
-    ///   tests are parked via its forced-timeout lists, so a Java-side rerun
-    ///   would fight that machinery;
+    ///   port.js (runCn1ssResolvedTest dispatches per index), and its bridge
+    ///   owns transport recovery and the dispatch watchdog. A Java-side rerun
+    ///   would race that lifecycle and can emit stale pixels into the next test;
     /// - no failure was reported (a real failure should surface, not retry);
     /// - no capture was started (an in-flight capture could emit after the
     ///   rerun's form is up and ship the wrong pixels under this test's name);

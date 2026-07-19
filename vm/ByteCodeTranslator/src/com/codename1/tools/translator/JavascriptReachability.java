@@ -104,12 +104,21 @@ final class JavascriptReachability {
         }
     }
 
-    static int run(List<ByteCodeClass> classes, String[] nativeSources) {
+    static int run(List<ByteCodeClass> classes, List<ByteCodeClass> classPool,
+            String[] nativeSources) {
         JavascriptReachability rta = new JavascriptReachability();
-        rta.index(classes);
-        rta.seedRoots(classes, nativeSources);
+        // The conservative pass may have removed an entire class after
+        // eliminating the only method that instantiated it.  RTA can later
+        // resurrect that method through a runtime-only edge (JSO callback,
+        // Thread.run, native binding, etc.).  Index the original class pool so
+        // visiting the resurrected NEW instruction can restore its target too.
+        List<ByteCodeClass> candidates = classPool == null ? classes : classPool;
+        rta.index(candidates);
+        rta.seedRoots(candidates, nativeSources);
         rta.propagate();
-        return rta.eliminate(classes);
+        int eliminated = rta.eliminate(candidates);
+        rta.mergeInstantiatedClasses(classes, candidates);
+        return eliminated;
     }
 
     private void index(List<ByteCodeClass> classes) {
@@ -186,6 +195,11 @@ final class JavascriptReachability {
         // reachable via the INVOKEINTERFACE inside Thread.run()'s body.
         seedRuntimeDispatched("java_lang_Thread", "run", "()V");
         seedRuntimeDispatched("java_lang_Runnable", "run", "()V");
+        // Window.setTimeout/setInterval are replaced by port.js host bindings.
+        // The host posts the TimerHandler SAM back into the worker, so the
+        // callback edge is invisible to bytecode-only RTA. Keep concrete
+        // onTimer implementations on instantiated handlers reachable.
+        seedRuntimeDispatched("com_codename1_html5_js_browser_TimerHandler", "onTimer", "()V");
         // JSO bridge methods are reachable via hand-written port.js
         // dispatch sites that the bytecode-only RTA can't see (e.g.
         // ``__nativeEventListener`` in port.js calls
@@ -320,6 +334,7 @@ final class JavascriptReachability {
         if (cls == null) {
             return;
         }
+        cls.restoreEliminatedClass();
         // Static-initialiser fires implicitly on first touch.
         for (BytecodeMethod m : cls.getMethods()) {
             if ("__CLINIT__".equals(m.getMethodName())) {
@@ -711,5 +726,38 @@ final class JavascriptReachability {
             }
         }
         return eliminated;
+    }
+
+    private void mergeInstantiatedClasses(List<ByteCodeClass> classes,
+            List<ByteCodeClass> candidates) {
+        Set<String> keep = new HashSet<String>(instantiated);
+        for (ByteCodeClass cls : classes) {
+            keep.add(cls.getClsName());
+        }
+        classes.clear();
+        for (ByteCodeClass cls : candidates) {
+            if (!keep.contains(cls.getClsName())) {
+                continue;
+            }
+            if (instantiated.contains(cls.getClsName())) {
+                cls.restoreEliminatedClass();
+            }
+            classes.add(cls);
+        }
+
+        // clearUnmarked() infers finality from the temporarily pruned class
+        // list.  A restored subtype proves each of its ancestors non-final;
+        // clear those inferred flags before JavaScript direct-call emission.
+        for (ByteCodeClass cls : classes) {
+            String base = cls.getBaseClass();
+            while (base != null) {
+                ByteCodeClass parent = byName.get(JavascriptNameUtil.sanitizeClassName(base));
+                if (parent == null) {
+                    break;
+                }
+                parent.setFinalClass(false);
+                base = parent.getBaseClass();
+            }
+        }
     }
 }
