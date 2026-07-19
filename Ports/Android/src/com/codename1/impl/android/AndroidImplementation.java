@@ -8920,7 +8920,10 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             imageExt = "gif";
         }
         if (imageBytes != null) {
-            File imageFile = new File(getContext().getCacheDir(),
+            // AndroidGradleBuilder exposes cache/intent_files through the app's
+            // FileProvider. Keep generated clipboard payloads inside that root so
+            // FileProvider can safely create a content:// URI for paste targets.
+            File imageFile = new File(new File(getContext().getCacheDir(), "intent_files"),
                     "cn1-clip-image-" + System.currentTimeMillis() + "." + imageExt);
             imageFile.getParentFile().mkdirs();
             OutputStream os = new FileOutputStream(imageFile);
@@ -8954,10 +8957,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     continue;
                 }
                 Uri u;
-                if (pathOrUri.startsWith("content:") || pathOrUri.startsWith("file:")) {
+                if (pathOrUri.startsWith("content:")) {
                     u = Uri.parse(pathOrUri);
                 } else {
-                    u = Uri.fromFile(new File(pathOrUri));
+                    File file = pathOrUri.startsWith("file:")
+                            ? new File(Uri.parse(pathOrUri).getPath())
+                            : new File(pathOrUri);
+                    u = FileProvider.getUriForFile(getContext(), authority, file);
+                    getContext().grantUriPermission("android", u, Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 }
                 if (clip == null) {
                     clip = new ClipData("Codename One", new String[]{ "text/uri-list" }, new ClipData.Item(u));
