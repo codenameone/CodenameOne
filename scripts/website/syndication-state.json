@@ -1077,6 +1077,18 @@
         "source_slug": "widgets-live-activities-dynamic-island",
         "scheduled_at": "2026-07-19T09:00:00+00:00"
       }
+    },
+    "ar-vr-support-simulation": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmrrxegsc00000akl5z3t1hs3",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a5ce70d9e736d860ee36b73",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-19T15:03:49+00:00"
+      }
     }
   }
 }
