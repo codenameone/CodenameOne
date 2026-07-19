@@ -2805,6 +2805,42 @@
     if (op === 'audioWebCodecsAvailable') {
       return !!(global.AudioEncoder && global.AudioData);
     }
+    if (op === 'videoEncoderSupported') {
+      if (!global.VideoEncoder || typeof global.VideoEncoder.isConfigSupported !== 'function') {
+        return false;
+      }
+      var videoCodec = String(payload.codec || '');
+      var videoSupportConfig = {
+        codec: videoCodec,
+        width: 128,
+        height: 96,
+        bitrate: 800000,
+        framerate: 6
+      };
+      if (videoCodec.indexOf('avc1.') === 0) {
+        videoSupportConfig.avc = { format: 'avc' };
+      }
+      return global.VideoEncoder.isConfigSupported(videoSupportConfig).then(function(result) {
+        return !!(result && result.supported);
+      }, function() {
+        return false;
+      });
+    }
+    if (op === 'audioEncoderSupported') {
+      if (!global.AudioEncoder || typeof global.AudioEncoder.isConfigSupported !== 'function') {
+        return false;
+      }
+      return global.AudioEncoder.isConfigSupported({
+        codec: String(payload.codec || ''),
+        sampleRate: 48000,
+        numberOfChannels: 1,
+        bitrate: 128000
+      }).then(function(result) {
+        return !!(result && result.supported);
+      }, function() {
+        return false;
+      });
+    }
     if (op === 'videoBlobUrl') {
       var blobBytes = cn1VideoIoBase64Bytes(payload.b64);
       var blob = new global.Blob([blobBytes], {

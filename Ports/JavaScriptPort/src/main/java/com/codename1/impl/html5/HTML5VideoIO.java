@@ -62,10 +62,16 @@ class HTML5VideoIO extends VideoIO {
             return new VideoCodec[0];
         }
         List<VideoCodec> out = new ArrayList<VideoCodec>();
-        out.add(new VideoCodec(CODEC_H264, "H.264 (WebCodecs)", "video/avc", true, true, false, true, -1, -1, new String[]{CONTAINER_MP4}));
-        out.add(new VideoCodec(CODEC_VP9, "VP9 (WebCodecs)", "video/vp9", true, true, false, true, -1, -1, new String[]{CONTAINER_WEBM}));
-        if (cn1AudioWebCodecsAvailable()) {
+        if (cn1VideoEncoderSupported("avc1.42001f")) {
+            out.add(new VideoCodec(CODEC_H264, "H.264 (WebCodecs)", "video/avc", true, true, false, true, -1, -1, new String[]{CONTAINER_MP4}));
+        }
+        if (cn1VideoEncoderSupported("vp09.00.10.08")) {
+            out.add(new VideoCodec(CODEC_VP9, "VP9 (WebCodecs)", "video/vp9", true, true, false, true, -1, -1, new String[]{CONTAINER_WEBM}));
+        }
+        if (cn1AudioWebCodecsAvailable() && cn1AudioEncoderSupported("mp4a.40.2")) {
             out.add(new VideoCodec(CODEC_AAC, "AAC (WebCodecs)", "audio/mp4a-latm", false, true, false, false, -1, -1, new String[]{CONTAINER_MP4}));
+        }
+        if (cn1AudioWebCodecsAvailable() && cn1AudioEncoderSupported("opus")) {
             out.add(new VideoCodec(CODEC_OPUS, "Opus (WebCodecs)", "audio/opus", false, true, false, false, -1, -1, new String[]{CONTAINER_WEBM}));
         }
         return out.toArray(new VideoCodec[out.size()]);
@@ -340,6 +346,36 @@ class HTML5VideoIO extends VideoIO {
 
     @JSBody(params = {}, script = "return (typeof AudioEncoder !== 'undefined' && typeof AudioData !== 'undefined');")
     private static native boolean cn1AudioWebCodecsAvailable();
+
+    @JSBody(params = {"codec"}, script =
+            "if (typeof VideoEncoder === 'undefined') { return false; }"
+            + "var encoder = null;"
+            + "try {"
+            + "  encoder = new VideoEncoder({ output: function() {}, error: function() {} });"
+            + "  var config = { codec: codec, width: 128, height: 96, bitrate: 800000, framerate: 6 };"
+            + "  if (codec.indexOf('avc1.') === 0) { config.avc = { format: 'avc' }; }"
+            + "  encoder.configure(config);"
+            + "  encoder.close();"
+            + "  return true;"
+            + "} catch (e) {"
+            + "  try { if (encoder && encoder.state !== 'closed') { encoder.close(); } } catch (ignored) {}"
+            + "  return false;"
+            + "}")
+    private static native boolean cn1VideoEncoderSupported(String codec);
+
+    @JSBody(params = {"codec"}, script =
+            "if (typeof AudioEncoder === 'undefined') { return false; }"
+            + "var encoder = null;"
+            + "try {"
+            + "  encoder = new AudioEncoder({ output: function() {}, error: function() {} });"
+            + "  encoder.configure({ codec: codec, sampleRate: 48000, numberOfChannels: 1, bitrate: 128000 });"
+            + "  encoder.close();"
+            + "  return true;"
+            + "} catch (e) {"
+            + "  try { if (encoder && encoder.state !== 'closed') { encoder.close(); } } catch (ignored) {}"
+            + "  return false;"
+            + "}")
+    private static native boolean cn1AudioEncoderSupported(String codec);
 
     // ============================================================= JS: decoder
 

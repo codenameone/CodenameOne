@@ -2329,6 +2329,24 @@ bindNative([
 });
 
 bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoEncoderSupported_java_lang_String_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoEncoderSupported___java_lang_String_R_boolean"
+], function*(codec) {
+  return (yield* cn1VideoIoHost({
+    op: "videoEncoderSupported", codec: jvm.toNativeString(codec)
+  })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1AudioEncoderSupported_java_lang_String_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1AudioEncoderSupported___java_lang_String_R_boolean"
+], function*(codec) {
+  return (yield* cn1VideoIoHost({
+    op: "audioEncoderSupported", codec: jvm.toNativeString(codec)
+  })) ? 1 : 0;
+});
+
+bindNative([
   "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoOpen_java_lang_String_R_int"
 ], function*(url) {
   return (yield* cn1VideoIoHost({ op: "videoOpen", url: jvm.toNativeString(url) })) | 0;
