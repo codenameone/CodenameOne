@@ -5,18 +5,20 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import io
 import json
 import os
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 from pathlib import Path
 
 
 API_ROOT = "https://api.github.com"
 GRAPHQL_URL = "https://api.github.com/graphql"
-STAR_ACCEPT = "application/vnd.github.star+json"
+SNAPSHOT_ARTIFACT_NAME = "oss-traction-snapshot"
 
 
 class GitHubApiError(RuntimeError):
@@ -56,7 +58,31 @@ def api_request(
             return json.load(response)
     except urllib.error.HTTPError as error:
         detail = error.read().decode("utf-8", errors="replace")
-        raise GitHubApiError(f"GitHub returned HTTP {error.code} for {url}: {detail}") from error
+        raise GitHubApiError(
+            f"GitHub returned HTTP {error.code} for {url}: {detail}"
+        ) from error
+    except urllib.error.URLError as error:
+        raise GitHubApiError(f"Unable to reach GitHub for {url}: {error}") from error
+
+
+def api_request_bytes(url: str, token: str) -> bytes:
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "User-Agent": "codenameone-oss-traction",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return response.read()
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace")
+        raise GitHubApiError(
+            f"GitHub returned HTTP {error.code} for {url}: {detail}"
+        ) from error
     except urllib.error.URLError as error:
         raise GitHubApiError(f"Unable to reach GitHub for {url}: {error}") from error
 
@@ -76,14 +102,88 @@ def paged_rest(path: str, token: str, *, accept: str = "application/vnd.github+j
         page += 1
 
 
-def count_windows(
-    timestamps: list[dt.datetime], now: dt.datetime, windows: tuple[int, ...] = (7, 28, 90)
-) -> dict[str, int]:
+def load_artifact_snapshot(url: str, token: str) -> dict:
+    archive = api_request_bytes(url, token)
+    try:
+        with zipfile.ZipFile(io.BytesIO(archive)) as bundle:
+            names = [
+                name
+                for name in bundle.namelist()
+                if Path(name).name == "oss-traction.json"
+            ]
+            if not names:
+                raise GitHubApiError(f"Artifact from {url} has no oss-traction.json")
+            return json.loads(bundle.read(names[0]))
+    except (OSError, ValueError, zipfile.BadZipFile, json.JSONDecodeError) as error:
+        raise GitHubApiError(
+            f"Unable to read snapshot artifact from {url}: {error}"
+        ) from error
+
+
+def collect_snapshot_history(
+    repository: str, token: str, now: dt.datetime
+) -> tuple[list[dict], list[str]]:
+    encoded_name = urllib.parse.quote(SNAPSHOT_ARTIFACT_NAME)
+    result = api_request(
+        f"{API_ROOT}/repos/{repository}/actions/artifacts?name={encoded_name}&per_page=100",
+        token,
+    )
+    if not isinstance(result, dict) or not isinstance(result.get("artifacts"), list):
+        raise GitHubApiError("Expected an artifact list from GitHub")
+
+    earliest = now.astimezone(dt.timezone.utc) - dt.timedelta(days=100)
+    snapshots: list[dict] = []
+    errors: list[str] = []
+    for artifact in result["artifacts"]:
+        if artifact.get("expired"):
+            continue
+        created_at = artifact.get("created_at")
+        archive_url = artifact.get("archive_download_url")
+        if not created_at or not archive_url or parse_timestamp(created_at) < earliest:
+            continue
+        try:
+            snapshots.append(load_artifact_snapshot(archive_url, token))
+        except GitHubApiError as error:
+            errors.append(str(error))
+    return snapshots, errors
+
+
+def calculate_star_growth(
+    current_stars: int,
+    now: dt.datetime,
+    snapshots: list[dict],
+    windows: tuple[int, ...] = (7, 28, 90),
+) -> dict[str, dict]:
     now = now.astimezone(dt.timezone.utc)
-    return {
-        f"last_{days}_days": sum(now - timestamp <= dt.timedelta(days=days) for timestamp in timestamps)
-        for days in windows
-    }
+    baselines: list[tuple[dt.datetime, int]] = []
+    for snapshot in snapshots:
+        try:
+            captured_at = parse_timestamp(snapshot["captured_at"])
+            stars = int(snapshot["repository_metrics"]["stars"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if captured_at < now:
+            baselines.append((captured_at, stars))
+
+    growth: dict[str, dict] = {}
+    schedule_tolerance = dt.timedelta(hours=6)
+    for days in windows:
+        target = now - dt.timedelta(days=days)
+        eligible = [item for item in baselines if item[0] <= target + schedule_tolerance]
+        key = f"last_{days}_days"
+        if not eligible:
+            growth[key] = {"available": False}
+            continue
+        captured_at, baseline_stars = max(eligible, key=lambda item: item[0])
+        elapsed_days = (now - captured_at).total_seconds() / 86400
+        growth[key] = {
+            "available": True,
+            "change": current_stars - baseline_stars,
+            "baseline_stars": baseline_stars,
+            "baseline_at": captured_at.isoformat(timespec="seconds"),
+            "period_days": round(elapsed_days, 1),
+        }
+    return growth
 
 
 def unique_logins(items: list[dict], field: str) -> int:
@@ -156,6 +256,9 @@ def collect_snapshot(
     repository_token: str,
     now: dt.datetime,
     traffic_token: str | None = None,
+    history: list[dict] | None = None,
+    history_available: bool = True,
+    history_errors: list[str] | None = None,
 ) -> dict:
     try:
         owner, name = repository.split("/", 1)
@@ -163,15 +266,6 @@ def collect_snapshot(
         raise ValueError("repository must use owner/name format") from error
     cutoff = now - dt.timedelta(days=28)
     metadata = api_request(f"{API_ROOT}/repos/{repository}", repository_token)
-
-    stargazers = paged_rest(
-        f"/repos/{repository}/stargazers", repository_token, accept=STAR_ACCEPT
-    )
-    star_times = [
-        parse_timestamp(item["starred_at"])
-        for item in stargazers
-        if isinstance(item, dict) and item.get("starred_at")
-    ]
 
     issue_candidates = paged_rest(
         "/repos/"
@@ -189,7 +283,7 @@ def collect_snapshot(
     traffic = collect_traffic(repository, traffic_token or repository_token)
 
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "captured_at": now.astimezone(dt.timezone.utc).isoformat(timespec="seconds"),
         "repository": repository,
         "repository_metrics": {
@@ -199,7 +293,14 @@ def collect_snapshot(
             "open_issues": metadata["open_issues_count"],
             "pushed_at": metadata["pushed_at"],
         },
-        "star_velocity": count_windows(star_times, now),
+        "star_growth": {
+            "source": "aggregate_snapshots",
+            "history_available": history_available,
+            "history_errors": history_errors or [],
+            "windows": calculate_star_growth(
+                metadata["stargazers_count"], now, history or []
+            ),
+        },
         "engagement_last_28_days": {
             "issues_created": len(new_issues),
             "unique_issue_authors": unique_logins(new_issues, "user"),
@@ -212,7 +313,7 @@ def collect_snapshot(
 
 def render_summary(report: dict) -> str:
     repo = report["repository_metrics"]
-    stars = report["star_velocity"]
+    growth = report["star_growth"]
     engagement = report["engagement_last_28_days"]
     traffic = report["traffic_last_14_days"]
     lines = [
@@ -223,13 +324,35 @@ def render_summary(report: dict) -> str:
         "| Metric | Value |",
         "| --- | ---: |",
         f"| Total stars | {repo['stars']} |",
-        f"| Stars, last 7 days | {stars['last_7_days']} |",
-        f"| Stars, last 28 days | {stars['last_28_days']} |",
-        f"| Stars, last 90 days | {stars['last_90_days']} |",
-        f"| New issue authors, last 28 days | {engagement['unique_issue_authors']} |",
-        f"| New discussion authors, last 28 days | {engagement['unique_discussion_authors']} |",
-        "",
     ]
+    for days in (7, 28, 90):
+        window = growth["windows"][f"last_{days}_days"]
+        if window["available"]:
+            change = f"{window['change']:+d} over {window['period_days']:.1f} days"
+        else:
+            change = "N/A (baseline not available yet)"
+        lines.append(f"| Aggregate star growth, {days}-day target | {change} |")
+    lines.extend(
+        [
+            f"| New issue authors, last 28 days | {engagement['unique_issue_authors']} |",
+            f"| New discussion authors, last 28 days | {engagement['unique_discussion_authors']} |",
+            "",
+        ]
+    )
+    if not growth["history_available"]:
+        lines.extend(
+            [
+                "Prior snapshot artifacts were unavailable, so this run could not calculate star growth.",
+                "",
+            ]
+        )
+    elif not any(window["available"] for window in growth["windows"].values()):
+        lines.extend(
+            [
+                "This snapshot establishes the aggregate star baseline; growth appears after enough history accumulates.",
+                "",
+            ]
+        )
     views = traffic["views"]
     referrers = traffic["referrers"]
     if views["available"]:
@@ -273,9 +396,26 @@ def main(argv: list[str]) -> int:
         print("Set GH_TOKEN or GITHUB_TOKEN before capturing a snapshot.", file=sys.stderr)
         return 2
     now = parse_timestamp(args.now) if args.now else dt.datetime.now(dt.timezone.utc)
+    history: list[dict] = []
+    history_available = True
+    history_errors: list[str] = []
+    try:
+        history, history_errors = collect_snapshot_history(
+            args.repository, repository_token, now
+        )
+    except GitHubApiError as error:
+        history_available = False
+        history_errors = [str(error)]
+        print(f"Star history unavailable: {error}", file=sys.stderr)
     try:
         report = collect_snapshot(
-            args.repository, repository_token, now, traffic_token=traffic_token
+            args.repository,
+            repository_token,
+            now,
+            traffic_token=traffic_token,
+            history=history,
+            history_available=history_available,
+            history_errors=history_errors,
         )
     except (GitHubApiError, KeyError, TypeError, ValueError) as error:
         print(f"Unable to capture OSS traction: {error}", file=sys.stderr)
