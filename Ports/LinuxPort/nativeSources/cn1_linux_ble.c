@@ -39,6 +39,7 @@
 #include "cn1_linux.h"
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h> /* CN1_YIELD_THREAD expands to usleep on Linux */
 
 /*
  * libcn1ble is linked, and CN1_INCLUDE_BLUETOOTH defined, only when the app
