@@ -93,6 +93,8 @@ include::Push-Notifications.asciidoc[]
 
 include::Notifications-And-Background-Execution.asciidoc[]
 
+include::Calendar-Integration.asciidoc[]
+
 include::External-Surfaces.asciidoc[]
 
 include::Maps.asciidoc[]

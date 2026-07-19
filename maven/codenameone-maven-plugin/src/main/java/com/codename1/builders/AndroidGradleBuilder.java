@@ -307,6 +307,8 @@ public class AndroidGradleBuilder extends Executor {
     private boolean pushPermission;
     private boolean foregroundServicePermission;
     private boolean contactsReadPermission;
+    private boolean calendarReadPermission;
+    private boolean calendarWritePermission;
     private boolean contactsWritePermission;
     private boolean addRemoteControlService;
     /**
@@ -1450,6 +1452,13 @@ public class AndroidGradleBuilder extends Executor {
 
                 @Override
                 public void usesClassMethod(String cls, String method) {
+                    if (cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0) {
+                        // getInstance() is deliberately the builder signal.  Local
+                        // calendar access is runtime capability-gated, but Android
+                        // still requires both dangerous permissions in the manifest.
+                        calendarReadPermission = true;
+                        calendarWritePermission = true;
+                    }
                     if (cls.indexOf("com/codename1/ui/Display") == 0 && (method.indexOf("vibrate") > -1 || method.indexOf("notifyStatusBar") > -1)) {
                         vibratePermission = true;
                     }
@@ -3034,6 +3043,14 @@ public class AndroidGradleBuilder extends Executor {
         if (contactsWritePermission) {
             permissions += permissionAdd(request, "WRITE_CONTACTS",
                     "    <uses-permission android:name=\"android.permission.WRITE_CONTACTS\" android:required=\"false\" />\n");
+        }
+        if (calendarReadPermission) {
+            permissions += permissionAdd(request, "READ_CALENDAR",
+                    "    <uses-permission android:name=\"android.permission.READ_CALENDAR\" android:required=\"false\" />\n");
+        }
+        if (calendarWritePermission) {
+            permissions += permissionAdd(request, "WRITE_CALENDAR",
+                    "    <uses-permission android:name=\"android.permission.WRITE_CALENDAR\" android:required=\"false\" />\n");
         }
 
         if (accessWifiStatePermissions) {

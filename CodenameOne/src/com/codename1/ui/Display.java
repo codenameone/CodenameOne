@@ -4807,6 +4807,12 @@ public final class Display extends CN1Constants {
         return impl.getNfc();
     }
 
+    /// Returns the active port's local device-calendar source. Applications
+    /// should normally use `LocalCalendarSource#getInstance()`.
+    public com.codename1.calendar.LocalCalendarSource getLocalCalendarSource() {
+        return impl.getLocalCalendarSource();
+    }
+
     /// This method tries to invoke the device native camera to capture images.
     /// The method returns immediately and the response will be sent asynchronously
     /// to the given ActionListener Object

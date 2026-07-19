@@ -353,6 +353,12 @@ class MacNativeBuilder {
             if (micOptIn) {
                 sb.append("    <key>com.apple.security.device.microphone</key>\n    <true/>\n");
             }
+            boolean needsCalendar = request.getArg("ios.NSCalendarsUsageDescription", null) != null
+                    || request.getArg("ios.NSCalendarsFullAccessUsageDescription", null) != null;
+            if (parseEntitlementBool(request,
+                    "macNative.entitlements.personalInformation.calendars", needsCalendar)) {
+                sb.append("    <key>com.apple.security.personal-information.calendars</key>\n    <true/>\n");
+            }
         }
         if (extra != null && extra.trim().length() > 0) {
             sb.append(extra);

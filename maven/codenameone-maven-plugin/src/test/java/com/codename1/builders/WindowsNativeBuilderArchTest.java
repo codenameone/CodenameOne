@@ -24,7 +24,11 @@ package com.codename1.builders;
 
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Method;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Platform-independent unit tests for the architecture resolution in
@@ -61,5 +65,25 @@ class WindowsNativeBuilderArchTest {
         // Cross build (e.g. building x64 on an arm64 host): host_target form.
         assertEquals("arm64_x64", WindowsNativeBuilder.vcvarsArchArg("arm64", "x64"));
         assertEquals("x64_arm64", WindowsNativeBuilder.vcvarsArchArg("x64", "arm64"));
+    }
+
+    @Test
+    void restrictedCalendarCapabilityRequiresExplicitOptIn() throws Exception {
+        WindowsNativeBuilder builder = new WindowsNativeBuilder();
+        Method method = WindowsNativeBuilder.class.getDeclaredMethod("buildAppxManifest",
+                BuildRequest.class, String.class, String.class);
+        method.setAccessible(true);
+        BuildRequest request = new BuildRequest();
+        request.setPackageName("com.example.calendar");
+        request.setDisplayName("Calendar Test");
+        request.setVendor("Example");
+        request.setVersion("1.0");
+
+        String withoutOptIn = (String)method.invoke(builder, request, "x64", null);
+        assertFalse(withoutOptIn.contains("Name=\"appointments\""));
+
+        request.putArgument("windows.calendar.restrictedCapability", "true");
+        String withOptIn = (String)method.invoke(builder, request, "x64", null);
+        assertTrue(withOptIn.contains("<rescap:Capability Name=\"appointments\"/>"));
     }
 }

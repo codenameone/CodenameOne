@@ -145,6 +145,7 @@ public class IPhoneBuilder extends Executor {
     private boolean usesWifiInfo;
     private boolean usesWifiHotspotConfig;
     private boolean usesBonjour;
+    private boolean usesCalendarApi;
     private String firstBonjourType;
                                   // so we need to store the main class name for later here.
     // Map will be used for Xcode 8 privacy usage descriptions.  Don't need it yet
@@ -797,6 +798,9 @@ public class IPhoneBuilder extends Executor {
                 public void usesClass(String cls) {
                     if (cls == null) return;
                     aiAcc.consume(cls);
+                    if (cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0) {
+                        usesCalendarApi = true;
+                    }
                     if (!usesLocalNotifications && cls.indexOf("com/codename1/notifications/LocalNotification") == 0) {
                         usesLocalNotifications = true;
                     }
@@ -925,6 +929,30 @@ public class IPhoneBuilder extends Executor {
             throw new BuildException("Failed to scan project classes for permissions.", ex);
         }
         stopwatch.split("Scan Classes");
+
+        if (usesCalendarApi) {
+            String calendarDescription = request.getArg("ios.NSCalendarsFullAccessUsageDescription",
+                    "This app uses your calendars to read and schedule events.");
+            String calendarWriteDescription = request.getArg("ios.NSCalendarsWriteOnlyAccessUsageDescription",
+                    "This app uses your calendar to schedule events.");
+            String remindersDescription = request.getArg("ios.NSRemindersFullAccessUsageDescription",
+                    "This app uses your reminders to read and schedule tasks.");
+            privacyUsageDescriptions.put("NSCalendarsFullAccessUsageDescription", calendarDescription);
+            privacyUsageDescriptions.put("NSCalendarsWriteOnlyAccessUsageDescription", calendarWriteDescription);
+            privacyUsageDescriptions.put("NSRemindersFullAccessUsageDescription", remindersDescription);
+            // Retain the pre-iOS-17 keys when an app supports older releases.
+            privacyUsageDescriptions.put("NSCalendarsUsageDescription",
+                    request.getArg("ios.NSCalendarsUsageDescription", calendarDescription));
+            privacyUsageDescriptions.put("NSRemindersUsageDescription",
+                    request.getArg("ios.NSRemindersUsageDescription", remindersDescription));
+            request.putArgument("ios.NSCalendarsFullAccessUsageDescription", calendarDescription);
+            request.putArgument("ios.NSCalendarsWriteOnlyAccessUsageDescription", calendarWriteDescription);
+            request.putArgument("ios.NSRemindersFullAccessUsageDescription", remindersDescription);
+            request.putArgument("ios.NSCalendarsUsageDescription",
+                    request.getArg("ios.NSCalendarsUsageDescription", calendarDescription));
+            request.putArgument("ios.NSRemindersUsageDescription",
+                    request.getArg("ios.NSRemindersUsageDescription", remindersDescription));
+        }
 
         // External surfaces: parse the build-time kinds manifest (surfaces.json in the project
         // resources, delivered alongside .ios.appext archives in resDir) and resolve the app
@@ -2198,6 +2226,15 @@ public class IPhoneBuilder extends Executor {
                     addLibs = "LocalAuthentication.framework";
                 } else if (!addLibs.toLowerCase().contains("localauthentication")) {
                     addLibs = addLibs + ";LocalAuthentication.framework";
+                }
+            }
+            if (usesCalendarApi) {
+                replaceInFile(new File(buildinRes, "IOSNative.m"),
+                        "//#define CN1_USE_CALENDAR", "#define CN1_USE_CALENDAR");
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = "EventKit.framework";
+                } else if (!addLibs.toLowerCase().contains("eventkit")) {
+                    addLibs = addLibs + ";EventKit.framework";
                 }
             }
 

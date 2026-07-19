@@ -78,6 +78,12 @@
 #endif
 #import <MobileCoreServices/UTCoreTypes.h>
 #import <Foundation/Foundation.h>
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+//#define CN1_USE_CALENDAR
+#ifdef CN1_USE_CALENDAR
+#import <EventKit/EventKit.h>
+#endif
+#endif
 #import <CoreText/CoreText.h>
 #include <ifaddrs.h>
 #include <net/if.h>
@@ -93,7 +99,7 @@
 // Catalyst); on tvOS MessageUI ships only a link stub with no composer headers
 // and AddressBookUI is absent. The native methods that use them are guarded to
 // no-ops on those slices.
-#if !TARGET_OS_WATCH && !TARGET_OS_TV
+#if defined(CN1_USE_CALENDAR) && !TARGET_OS_WATCH && !TARGET_OS_TV
 #import <MessageUI/MFMailComposeViewController.h>
 #endif
 #if !TARGET_OS_MACCATALYST && !TARGET_OS_WATCH && !TARGET_OS_TV
@@ -566,6 +572,180 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isPainted__(CN1_THREAD_STATE_MULTI
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_isPainted__]
     return isPainted();
     //XMLVM_END_WRAPPER
+}
+
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
+static EKEventStore* cn1CalendarStore() {
+    static EKEventStore *store;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ store = [[EKEventStore alloc] init]; });
+    return store;
+}
+
+static NSString* cn1CalendarJson(id value) {
+    if (value == nil) return @"{}";
+    NSData *data = [NSJSONSerialization dataWithJSONObject:value options:0 error:nil];
+    return data == nil ? @"{}" : [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+}
+
+static NSDictionary* cn1CalendarDictionary(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT json) {
+    NSString *text = toNSString(CN1_THREAD_STATE_PASS_ARG json);
+    if (text == nil) return @{};
+    NSData *data = [text dataUsingEncoding:NSUTF8StringEncoding];
+    NSDictionary *out = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    return [out isKindOfClass:[NSDictionary class]] ? out : @{};
+}
+
+static NSDate* cn1CalendarDate(NSDictionary *json, NSString *key) {
+    NSNumber *milliseconds = json[key];
+    if ([milliseconds isKindOfClass:[NSNumber class]]) return [NSDate dateWithTimeIntervalSince1970:milliseconds.doubleValue / 1000.0];
+    NSString *dateText = json[[key stringByAppendingString:@"Date"]];
+    if (![dateText isKindOfClass:[NSString class]]) return nil;
+    NSDateFormatter *format = [[NSDateFormatter alloc] init];
+    format.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
+    format.timeZone = [NSTimeZone timeZoneForSecondsFromGMT:0];
+    format.dateFormat = @"yyyy-MM-dd";
+    return [format dateFromString:dateText];
+}
+
+static NSDictionary* cn1CalendarDateFields(NSDate *date, NSString *key, NSTimeZone *zone, BOOL allDay) {
+    if (date == nil) return @{};
+    if (allDay) {
+        NSDateFormatter *format = [[NSDateFormatter alloc] init];
+        format.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
+        format.timeZone = zone ?: [NSTimeZone timeZoneForSecondsFromGMT:0];
+        format.dateFormat = @"yyyy-MM-dd";
+        return @{[key stringByAppendingString:@"Date"]: [format stringFromDate:date], [key stringByAppendingString:@"AllDay"]: @YES};
+    }
+    return @{key: @([date timeIntervalSince1970] * 1000.0), [key stringByAppendingString:@"Zone"]: zone.name ?: @"UTC"};
+}
+
+static NSDictionary* cn1EventDictionary(EKEvent *event) {
+    NSMutableDictionary *out = [NSMutableDictionary dictionary];
+    if (event.eventIdentifier) out[@"id"] = event.eventIdentifier;
+    if (event.calendar.calendarIdentifier) out[@"calendarId"] = event.calendar.calendarIdentifier;
+    if (event.title) out[@"title"] = event.title;
+    if (event.notes) out[@"notes"] = event.notes;
+    if (event.location) out[@"location"] = event.location;
+    out[@"allDay"] = @(event.allDay);
+    [out addEntriesFromDictionary:cn1CalendarDateFields(event.startDate, @"start", event.timeZone, event.allDay)];
+    [out addEntriesFromDictionary:cn1CalendarDateFields(event.endDate, @"end", event.timeZone, event.allDay)];
+    out[@"available"] = @(event.availability == EKEventAvailabilityFree);
+    out[@"version"] = [NSString stringWithFormat:@"%.0f", event.lastModifiedDate.timeIntervalSince1970 * 1000.0];
+    NSMutableArray *alarms = [NSMutableArray array];
+    for (EKAlarm *alarm in event.alarms ?: @[]) {
+        if (alarm.absoluteDate) [alarms addObject:@{@"absolute": @([alarm.absoluteDate timeIntervalSince1970] * 1000.0)}];
+        else [alarms addObject:@{@"minutes": @((NSInteger)(-alarm.relativeOffset / 60.0))}];
+    }
+    out[@"alarms"] = alarms;
+    return out;
+}
+
+static NSDictionary* cn1ReminderDictionary(EKReminder *reminder) {
+    NSMutableDictionary *out = [NSMutableDictionary dictionary];
+    if (reminder.calendarItemIdentifier) out[@"id"] = reminder.calendarItemIdentifier;
+    if (reminder.calendar.calendarIdentifier) out[@"calendarId"] = reminder.calendar.calendarIdentifier;
+    if (reminder.title) out[@"title"] = reminder.title;
+    if (reminder.notes) out[@"notes"] = reminder.notes;
+    out[@"completed"] = @(reminder.completed);
+    out[@"version"] = [NSString stringWithFormat:@"%.0f", reminder.lastModifiedDate.timeIntervalSince1970 * 1000.0];
+    if (reminder.dueDateComponents) {
+        NSDate *due = [reminder.dueDateComponents.calendar dateFromComponents:reminder.dueDateComponents];
+        BOOL allDay = reminder.dueDateComponents.hour == NSDateComponentUndefined;
+        [out addEntriesFromDictionary:cn1CalendarDateFields(due, @"due", reminder.dueDateComponents.timeZone, allDay)];
+        out[@"dueAllDay"] = @(allDay);
+    }
+    return out;
+}
+#endif
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_calendarSupported___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+#if defined(CN1_USE_CALENDAR) && !TARGET_OS_WATCH && !TARGET_OS_TV
+    return JAVA_TRUE;
+#else
+    return JAVA_FALSE;
+#endif
+}
+
+JAVA_INT com_codename1_impl_ios_IOSNative_calendarAuthorizationStatus___int_R_int(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT entityType) {
+#if defined(CN1_USE_CALENDAR) && !TARGET_OS_WATCH && !TARGET_OS_TV
+    return (JAVA_INT)[EKEventStore authorizationStatusForEntityType:entityType == 1 ? EKEntityTypeReminder : EKEntityTypeEvent];
+#else
+    return 2;
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_calendarRequestAccess___int_boolean_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT entityType, JAVA_BOOLEAN writeOnly) {
+#if defined(CN1_USE_CALENDAR) && !TARGET_OS_WATCH && !TARGET_OS_TV
+    __block BOOL granted = NO; dispatch_semaphore_t semaphore = dispatch_semaphore_create(0); EKEventStore *store = cn1CalendarStore();
+    void (^completion)(BOOL,NSError*) = ^(BOOL value, NSError *error){ granted = value; dispatch_semaphore_signal(semaphore); };
+    if (@available(iOS 17.0, macCatalyst 17.0, *)) {
+        if (entityType == 1) [store requestFullAccessToRemindersWithCompletion:completion];
+        else if (writeOnly) [store requestWriteOnlyAccessToEventsWithCompletion:completion];
+        else [store requestFullAccessToEventsWithCompletion:completion];
+    } else [store requestAccessToEntityType:entityType == 1 ? EKEntityTypeReminder : EKEntityTypeEvent completion:completion];
+    dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER); return granted;
+#else
+    return 0;
+#endif
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_calendarList___int_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_INT entityType) {
+#if defined(CN1_USE_CALENDAR) && !TARGET_OS_WATCH && !TARGET_OS_TV
+    NSMutableArray *items=[NSMutableArray array]; for(EKCalendar *calendar in [cn1CalendarStore() calendarsForEntityType:entityType==1?EKEntityTypeReminder:EKEntityTypeEvent]) [items addObject:@{@"id":calendar.calendarIdentifier?:@"",@"title":calendar.title?:@"",@"allowsModify":@(calendar.allowsContentModifications),@"color":@0}];
+    return fromNSString(CN1_THREAD_STATE_PASS_ARG cn1CalendarJson(@{@"items":items}));
+#else
+    return fromNSString(CN1_THREAD_STATE_PASS_ARG @"{\"items\":[]}");
+#endif
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_calendarEvents___java_lang_String_long_long_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT calendarId, JAVA_LONG startTime, JAVA_LONG endTime) {
+#if defined(CN1_USE_CALENDAR) && !TARGET_OS_WATCH && !TARGET_OS_TV
+    EKEventStore *store=cn1CalendarStore();NSArray *calendars=nil;NSString *identifier=toNSString(CN1_THREAD_STATE_PASS_ARG calendarId);if(identifier){EKCalendar *calendar=[store calendarWithIdentifier:identifier];if(calendar)calendars=@[calendar];}
+    NSPredicate *predicate=[store predicateForEventsWithStartDate:[NSDate dateWithTimeIntervalSince1970:startTime/1000.0] endDate:[NSDate dateWithTimeIntervalSince1970:endTime/1000.0] calendars:calendars];NSMutableArray *items=[NSMutableArray array];for(EKEvent *event in [store eventsMatchingPredicate:predicate])[items addObject:cn1EventDictionary(event)];return fromNSString(CN1_THREAD_STATE_PASS_ARG cn1CalendarJson(@{@"items":items}));
+#else
+    return fromNSString(CN1_THREAD_STATE_PASS_ARG @"{\"items\":[]}");
+#endif
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_calendarSaveEvent___java_lang_String_int_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT eventJson, JAVA_INT mutationScope) {
+#if defined(CN1_USE_CALENDAR) && !TARGET_OS_WATCH && !TARGET_OS_TV
+    NSDictionary *json=cn1CalendarDictionary(CN1_THREAD_STATE_PASS_ARG eventJson);EKEventStore *store=cn1CalendarStore();NSString *identifier=json[@"id"];EKEvent *event=identifier?[store eventWithIdentifier:identifier]:nil;if(!event)event=[EKEvent eventWithEventStore:store];NSString *calendarId=json[@"calendarId"];event.calendar=calendarId?[store calendarWithIdentifier:calendarId]:[store defaultCalendarForNewEvents];event.title=json[@"title"]?:@"";event.notes=json[@"notes"];event.location=json[@"location"];event.startDate=cn1CalendarDate(json,@"start");event.endDate=cn1CalendarDate(json,@"end");event.allDay=[json[@"allDay"] boolValue];NSMutableArray *alarms=[NSMutableArray array];for(NSDictionary *alarm in json[@"alarms"]?:@[]){if(alarm[@"absolute"])[alarms addObject:[EKAlarm alarmWithAbsoluteDate:[NSDate dateWithTimeIntervalSince1970:[alarm[@"absolute"] doubleValue]/1000.0]]];else if(alarm[@"minutes"])[alarms addObject:[EKAlarm alarmWithRelativeOffset:-[alarm[@"minutes"] doubleValue]*60.0]];}event.alarms=alarms;NSError *error=nil;BOOL ok=[store saveEvent:event span:mutationScope==0?EKSpanThisEvent:EKSpanFutureEvents commit:YES error:&error];return fromNSString(CN1_THREAD_STATE_PASS_ARG cn1CalendarJson(ok?cn1EventDictionary(event):@{@"error":error.localizedDescription?:@"Unable to save event"}));
+#else
+    return fromNSString(CN1_THREAD_STATE_PASS_ARG @"{\"error\":\"Unsupported\"}");
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_calendarDeleteEvent___java_lang_String_int_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT eventId, JAVA_INT mutationScope) {
+#if defined(CN1_USE_CALENDAR) && !TARGET_OS_WATCH && !TARGET_OS_TV
+    EKEventStore *store=cn1CalendarStore();EKEvent *event=[store eventWithIdentifier:toNSString(CN1_THREAD_STATE_PASS_ARG eventId)];return event&&[store removeEvent:event span:mutationScope==0?EKSpanThisEvent:EKSpanFutureEvents commit:YES error:nil];
+#else
+    return 0;
+#endif
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_calendarTasks___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT calendarId) {
+#if defined(CN1_USE_CALENDAR) && !TARGET_OS_WATCH && !TARGET_OS_TV
+    EKEventStore *store=cn1CalendarStore();NSArray *calendars=nil;NSString *identifier=toNSString(CN1_THREAD_STATE_PASS_ARG calendarId);if(identifier){EKCalendar *calendar=[store calendarWithIdentifier:identifier];if(calendar)calendars=@[calendar];}__block NSArray *reminders=@[];dispatch_semaphore_t semaphore=dispatch_semaphore_create(0);[store fetchRemindersMatchingPredicate:[store predicateForRemindersInCalendars:calendars] completion:^(NSArray *value){reminders=value?:@[];dispatch_semaphore_signal(semaphore);}];dispatch_semaphore_wait(semaphore,DISPATCH_TIME_FOREVER);NSMutableArray *items=[NSMutableArray array];for(EKReminder *reminder in reminders)[items addObject:cn1ReminderDictionary(reminder)];return fromNSString(CN1_THREAD_STATE_PASS_ARG cn1CalendarJson(@{@"items":items}));
+#else
+    return fromNSString(CN1_THREAD_STATE_PASS_ARG @"{\"items\":[]}");
+#endif
+}
+
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_calendarSaveTask___java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT taskJson) {
+#if defined(CN1_USE_CALENDAR) && !TARGET_OS_WATCH && !TARGET_OS_TV
+    NSDictionary *json=cn1CalendarDictionary(CN1_THREAD_STATE_PASS_ARG taskJson);EKEventStore *store=cn1CalendarStore();NSString *identifier=json[@"id"];EKReminder *reminder=identifier?(EKReminder*)[store calendarItemWithIdentifier:identifier]:nil;if(!reminder)reminder=[EKReminder reminderWithEventStore:store];NSString *calendarId=json[@"calendarId"];reminder.calendar=calendarId?[store calendarWithIdentifier:calendarId]:[store defaultCalendarForNewReminders];reminder.title=json[@"title"]?:@"";reminder.notes=json[@"notes"];reminder.completed=[json[@"completed"] boolValue];NSDate *due=cn1CalendarDate(json,@"due");if(due){NSCalendar *calendar=[NSCalendar currentCalendar];NSUInteger units=NSCalendarUnitYear|NSCalendarUnitMonth|NSCalendarUnitDay;if(![json[@"dueAllDay"] boolValue])units|=NSCalendarUnitHour|NSCalendarUnitMinute|NSCalendarUnitSecond;reminder.dueDateComponents=[calendar components:units fromDate:due];}NSError *error=nil;BOOL ok=[store saveReminder:reminder commit:YES error:&error];return fromNSString(CN1_THREAD_STATE_PASS_ARG cn1CalendarJson(ok?cn1ReminderDictionary(reminder):@{@"error":error.localizedDescription?:@"Unable to save reminder"}));
+#else
+    return fromNSString(CN1_THREAD_STATE_PASS_ARG @"{\"error\":\"Unsupported\"}");
+#endif
+}
+
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_calendarDeleteTask___java_lang_String_R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT taskId) {
+#if defined(CN1_USE_CALENDAR) && !TARGET_OS_WATCH && !TARGET_OS_TV
+    EKEventStore *store=cn1CalendarStore();EKReminder *reminder=(EKReminder*)[store calendarItemWithIdentifier:toNSString(CN1_THREAD_STATE_PASS_ARG taskId)];return reminder&&[store removeReminder:reminder commit:YES error:nil];
+#else
+    return 0;
+#endif
 }
 
 JAVA_INT com_codename1_impl_ios_IOSNative_getDisplayWidth__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)

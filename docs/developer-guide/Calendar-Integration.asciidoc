@@ -1,0 +1,199 @@
+[[calendar-integration]]
+== Calendar integration
+
+The `com.codename1.calendar` package provides scheduling rather than just an
+"add event" shortcut. It represents calendars, events, task/reminders,
+recurrence, attendees, alarms, free/busy intervals, attachments, conference
+links, paging, incremental synchronization, and explicit edit conflicts.
+
+The API is capability based. Do not branch on the platform name. Ask the
+source what it can do:
+
+[source,java]
+----
+LocalCalendarSource local = LocalCalendarSource.getInstance();
+CalendarCapabilities capabilities = local.getCapabilities();
+
+if (capabilities.supports(CalendarCapability.READ_EVENTS)) {
+    local.requestAuthorization(CalendarAccess.EVENTS_READ_ONLY).ready(status -> {
+        if (status == CalendarAuthorizationStatus.FULL) {
+            local.queryEvents(new CalendarQuery()
+                    .setCalendarId("primary")
+                    .setStartTime(System.currentTimeMillis()))
+                 .ready(page -> page.getItems().forEach(System.out::println));
+        }
+    });
+}
+----
+
+`LocalCalendarSource` is implemented with Android's Calendar Provider and
+Apple EventKit on iOS and Mac Catalyst. The simulator supplies an isolated,
+in-memory source so tests never modify the developer's real calendar. A port
+that has no local calendar service returns an empty capability set. Online
+sources and `.ics` import/export remain available on every port, including
+JavaScript and Linux.
+
+[cols="1,2,2",options="header"]
+|===
+|Target |Built-in local source |Portable alternatives
+
+|Android
+|Calendar Provider events
+|Google, Microsoft, CalDAV, and `.ics`
+
+|iOS and Mac Catalyst
+|EventKit events and reminders
+|Google, Microsoft, CalDAV, and `.ics`
+
+|Codename One simulator
+|Isolated in-memory source
+|Google, Microsoft, CalDAV, and `.ics`
+
+|Win32, native macOS desktop, Linux, and JavaScript
+|No built-in local source; the capability set is empty
+|Google, Microsoft, CalDAV, and `.ics`
+|===
+
+This API is a clean replacement for the old `CN1Calendar` integration. New
+code shouldn't mix objects or identifiers from the two APIs.
+
+=== Creating an event
+
+All-day values use `CalendarDateTime.allDay()`. Timed values carry both an
+instant and an Olson time-zone identifier. Keeping those concepts separate
+avoids shifting an all-day event when it crosses a time-zone boundary.
+
+[source,java]
+----
+CalendarEvent event = new CalendarEvent()
+        .setCalendarId(calendarId)
+        .setTitle("Architecture review")
+        .setStart(CalendarDateTime.instant(startMillis, "Europe/Paris"))
+        .setEnd(CalendarDateTime.instant(endMillis, "Europe/Paris"))
+        .setRecurrence(new CalendarRecurrenceRule()
+                .setFrequency(CalendarRecurrenceRule.Frequency.WEEKLY)
+                .addDayOfWeek(2))
+        .addAttendee(new CalendarAttendee()
+                .setName("Ari")
+                .setEmail("ari@example.com"))
+        .addAlarm(new CalendarAlarm().setMinutesBefore(15));
+
+local.saveEvent(event, CalendarMutationScope.ALL).ready(saved -> {
+    Log.p("Created " + saved.getId());
+});
+----
+
+The `version` returned by a source is an optimistic-concurrency token. Pass
+the returned object back to `saveEvent()` or its version to a delete method.
+A stale token produces `CalendarError.CONFLICT` instead of overwriting a
+newer server edit.
+
+=== Online sources
+
+Online sources work on all ports and use the application's OAuth client. They
+never embed a client secret and never persist credentials implicitly.
+
+[source,java]
+----
+OidcClient.discover("https://accounts.google.com").ready(oidc -> {
+    oidc.setClientId(clientId)
+        .setRedirectUri(redirectUri)
+        .setScopes(GoogleCalendarSource.SCOPE_CALENDAR,
+                   GoogleCalendarSource.SCOPE_TASKS)
+        .authorize().ready(tokens -> {
+            CalendarSource google = new GoogleCalendarSource(
+                    new OidcCalendarTokenProvider(oidc, tokens));
+            CalendarManager.getInstance().registerSource(google);
+        });
+});
+----
+
+`GoogleCalendarSource` covers Google Calendar and Google Tasks.
+`MicrosoftCalendarSource` covers Microsoft Graph calendars and Microsoft To
+Do. Both expose provider paging and delta tokens through `CalendarPage` and
+retry once with a refreshed token after HTTP 401.
+
+For CalDAV, pass the account's calendar-home URL and an authentication
+strategy:
+
+[source,java]
+----
+CalendarSource caldav = new CalDavCalendarSource(
+        "work", "Work CalDAV", calendarHomeUrl,
+        CalDavAuthentication.digest(username, password));
+----
+
+`CalDavAuthentication.basic()`, `bearer()`, and `digest()` are supported.
+Prefer Bearer or Digest over Basic unless Basic is protected by HTTPS. Calendar
+discovery filters collections by their advertised `VEVENT` and `VTODO`
+component support. Check the result of each asynchronous operation as servers
+can restrict individual collections further.
+
+=== Import and export
+
+`ICalendarCodec` reads and writes RFC 5545 `VEVENT`, `VTODO`, `VALARM`,
+attendees, recurrence rules, URI attachments, conference URIs, all-day values,
+and time zones. Unknown `X-` properties are retained in provider data.
+
+[source,java]
+----
+String ics = ICalendarCodec.writeEvent(event);
+CalendarEvent imported = ICalendarCodec.readEvent(ics);
+----
+
+=== Change notifications and offline synchronization
+
+The cross-platform guarantee is intentionally pull based:
+
+* Local sources can emit `CalendarChange` through `addChangeListener()` when
+  the operating system reports a local store change.
+* Online providers return a sync/delta token. Store it and pass it in the next
+  `CalendarQuery`. The API doesn't register provider webhooks.
+
+Listeners run on the Codename One EDT. Treat a `RESET` change as an instruction
+to query again; it doesn't promise one callback per underlying OS edit.
+
+Offline mutation storage is opt-in. Supply a `CalendarCache` to
+`CalendarSyncEngine`, queue edits, and call `sync()` yourself or from the
+platform's background-work callback. `StorageCalendarCache` stores calendar
+data and pending mutations, never credentials. Conflicts remain paused until
+the application chooses `KEEP_LOCAL`, `KEEP_REMOTE`, or `MERGED`.
+
+[source,java]
+----
+CalendarSyncEngine sync = new CalendarSyncEngine(
+        google, new StorageCalendarCache("google-account-1"));
+sync.queueEventSave(event, CalendarMutationScope.ALL);
+sync.sync().ready(result -> {
+    for (CalendarConflict conflict : result.getConflicts()) {
+        // Present both versions, then call resolveConflict(...).
+    }
+});
+----
+
+=== Permissions and build hints
+
+Referencing `LocalCalendarSource` is the builder signal for local calendar
+integration. Android builds add `READ_CALENDAR` and `WRITE_CALENDAR`; iOS and
+Mac Catalyst builds add EventKit and calendar/reminder privacy strings. You
+can replace the default user-facing strings with:
+
+----
+ios.NSCalendarsFullAccessUsageDescription=Explain why events are needed
+ios.NSCalendarsWriteOnlyAccessUsageDescription=Explain why creating events is needed
+ios.NSRemindersFullAccessUsageDescription=Explain why reminders are needed
+----
+
+Windows calendar access is a restricted package capability and is never
+silently enabled. The built-in Win32 source currently reports unavailable,
+but an application-supplied native integration can request the MSIX capability
+after it has been approved. Opt in with:
+
+----
+windows.msix=true
+windows.calendar.restrictedCapability=true
+----
+
+Always check `getCapabilities()` and `getAuthorizationStatus()` at runtime.
+Manifest declarations make a request possible; they don't mean the user or
+provider granted it.

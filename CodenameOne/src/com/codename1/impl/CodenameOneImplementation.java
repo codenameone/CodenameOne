@@ -7336,6 +7336,12 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Returns the port-specific local calendar source, or null when the port
+    /// has no device calendar integration.
+    public com.codename1.calendar.LocalCalendarSource getLocalCalendarSource() {
+        return null;
+    }
+
     /// Allows buggy implementations (Android) to release image objects
     ///
     /// #### Parameters
