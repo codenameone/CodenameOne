@@ -5,20 +5,19 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import io
 import json
 import os
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-import zipfile
 from pathlib import Path
 
 
 API_ROOT = "https://api.github.com"
 GRAPHQL_URL = "https://api.github.com/graphql"
-SNAPSHOT_ARTIFACT_NAME = "oss-traction-snapshot"
+STATE_RELEASE_TAG = "oss-traction-state"
+STATE_RELEASE_NAME = "OSS traction aggregate state"
 
 
 class GitHubApiError(RuntimeError):
@@ -65,28 +64,6 @@ def api_request(
         raise GitHubApiError(f"Unable to reach GitHub for {url}: {error}") from error
 
 
-def api_request_bytes(url: str, token: str) -> bytes:
-    request = urllib.request.Request(
-        url,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {token}",
-            "User-Agent": "codenameone-oss-traction",
-            "X-GitHub-Api-Version": "2022-11-28",
-        },
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            return response.read()
-    except urllib.error.HTTPError as error:
-        detail = error.read().decode("utf-8", errors="replace")
-        raise GitHubApiError(
-            f"GitHub returned HTTP {error.code} for {url}: {detail}"
-        ) from error
-    except urllib.error.URLError as error:
-        raise GitHubApiError(f"Unable to reach GitHub for {url}: {error}") from error
-
-
 def paged_rest(path: str, token: str, *, accept: str = "application/vnd.github+json") -> list:
     separator = "&" if "?" in path else "?"
     page = 1
@@ -102,50 +79,95 @@ def paged_rest(path: str, token: str, *, accept: str = "application/vnd.github+j
         page += 1
 
 
-def load_artifact_snapshot(url: str, token: str) -> dict:
-    archive = api_request_bytes(url, token)
+def load_snapshot_history(repository: str, token: str) -> tuple[int | None, list[dict]]:
+    releases = paged_rest(f"/repos/{repository}/releases", token)
+    matches = [
+        release
+        for release in releases
+        if release.get("draft") and release.get("tag_name") == STATE_RELEASE_TAG
+    ]
+    if not matches:
+        return None, []
+    if len(matches) > 1:
+        raise GitHubApiError("Found multiple OSS traction state draft releases")
+
+    release = matches[0]
     try:
-        with zipfile.ZipFile(io.BytesIO(archive)) as bundle:
-            names = [
-                name
-                for name in bundle.namelist()
-                if Path(name).name == "oss-traction.json"
-            ]
-            if not names:
-                raise GitHubApiError(f"Artifact from {url} has no oss-traction.json")
-            return json.loads(bundle.read(names[0]))
-    except (OSError, ValueError, zipfile.BadZipFile, json.JSONDecodeError) as error:
+        state = json.loads(release.get("body") or "{}")
+        if state.get("schema_version") != 1:
+            raise ValueError("unsupported state schema")
+        snapshots = state["snapshots"]
+        release_id = int(release["id"])
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
         raise GitHubApiError(
-            f"Unable to read snapshot artifact from {url}: {error}"
+            f"Unable to read OSS traction draft state: {error}"
         ) from error
+    if not isinstance(snapshots, list):
+        raise GitHubApiError("OSS traction draft state snapshots must be a list")
+    return release_id, snapshots
 
 
-def collect_snapshot_history(
-    repository: str, token: str, now: dt.datetime
-) -> tuple[list[dict], list[str]]:
-    encoded_name = urllib.parse.quote(SNAPSHOT_ARTIFACT_NAME)
-    result = api_request(
-        f"{API_ROOT}/repos/{repository}/actions/artifacts?name={encoded_name}&per_page=100",
-        token,
-    )
-    if not isinstance(result, dict) or not isinstance(result.get("artifacts"), list):
-        raise GitHubApiError("Expected an artifact list from GitHub")
-
+def update_snapshot_history(
+    history: list[dict], report: dict, now: dt.datetime
+) -> list[dict]:
     earliest = now.astimezone(dt.timezone.utc) - dt.timedelta(days=100)
-    snapshots: list[dict] = []
-    errors: list[str] = []
-    for artifact in result["artifacts"]:
-        if artifact.get("expired"):
-            continue
-        created_at = artifact.get("created_at")
-        archive_url = artifact.get("archive_download_url")
-        if not created_at or not archive_url or parse_timestamp(created_at) < earliest:
-            continue
+    retained: dict[str, dict] = {}
+    for snapshot in history:
         try:
-            snapshots.append(load_artifact_snapshot(archive_url, token))
-        except GitHubApiError as error:
-            errors.append(str(error))
-    return snapshots, errors
+            captured_at = parse_timestamp(snapshot["captured_at"])
+            stars = int(snapshot["repository_metrics"]["stars"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if earliest <= captured_at < now:
+            timestamp = captured_at.isoformat(timespec="seconds")
+            retained[timestamp] = {
+                "captured_at": timestamp,
+                "repository_metrics": {"stars": stars},
+            }
+
+    current_timestamp = parse_timestamp(report["captured_at"]).isoformat(
+        timespec="seconds"
+    )
+    retained[current_timestamp] = {
+        "captured_at": current_timestamp,
+        "repository_metrics": {
+            "stars": int(report["repository_metrics"]["stars"])
+        },
+    }
+    return [retained[key] for key in sorted(retained)]
+
+
+def save_snapshot_history(
+    repository: str,
+    token: str,
+    release_id: int | None,
+    history: list[dict],
+) -> None:
+    body = json.dumps(
+        {"schema_version": 1, "snapshots": history},
+        indent=2,
+        sort_keys=True,
+    )
+    if release_id is None:
+        api_request(
+            f"{API_ROOT}/repos/{repository}/releases",
+            token,
+            method="POST",
+            payload={
+                "tag_name": STATE_RELEASE_TAG,
+                "name": STATE_RELEASE_NAME,
+                "body": body,
+                "draft": True,
+                "prerelease": False,
+            },
+        )
+        return
+    api_request(
+        f"{API_ROOT}/repos/{repository}/releases/{release_id}",
+        token,
+        method="PATCH",
+        payload={"body": body},
+    )
 
 
 def calculate_star_growth(
@@ -342,7 +364,7 @@ def render_summary(report: dict) -> str:
     if not growth["history_available"]:
         lines.extend(
             [
-                "Prior snapshot artifacts were unavailable, so this run could not calculate star growth.",
+                "Prior snapshot history was unavailable, so this run could not calculate star growth.",
                 "",
             ]
         )
@@ -396,26 +418,18 @@ def main(argv: list[str]) -> int:
         print("Set GH_TOKEN or GITHUB_TOKEN before capturing a snapshot.", file=sys.stderr)
         return 2
     now = parse_timestamp(args.now) if args.now else dt.datetime.now(dt.timezone.utc)
-    history: list[dict] = []
-    history_available = True
-    history_errors: list[str] = []
     try:
-        history, history_errors = collect_snapshot_history(
-            args.repository, repository_token, now
-        )
-    except GitHubApiError as error:
-        history_available = False
-        history_errors = [str(error)]
-        print(f"Star history unavailable: {error}", file=sys.stderr)
-    try:
+        release_id, history = load_snapshot_history(args.repository, repository_token)
         report = collect_snapshot(
             args.repository,
             repository_token,
             now,
             traffic_token=traffic_token,
             history=history,
-            history_available=history_available,
-            history_errors=history_errors,
+        )
+        updated_history = update_snapshot_history(history, report, now)
+        save_snapshot_history(
+            args.repository, repository_token, release_id, updated_history
         )
     except (GitHubApiError, KeyError, TypeError, ValueError) as error:
         print(f"Unable to capture OSS traction: {error}", file=sys.stderr)
