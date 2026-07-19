@@ -6,14 +6,22 @@
 ![GitHub top language](https://img.shields.io/github/languages/top/codenameone/CodenameOne?color=orange&style=flat-square)
 ![GitHub last commit](https://img.shields.io/github/last-commit/codenameone/CodenameOne?color=success&style=flat-square)
 ![GitHub license](https://img.shields.io/badge/license-GPL%20%2B%20CE-FFFF00?style=flat-square)
-[![Hacktoberfest](https://img.shields.io/badge/hacktoberfest-friendly-blueviolet?style=flat-square)](https://github.com/codenameone/CodenameOne/labels/Hacktoberfest)
 [![GitHub Stars](https://img.shields.io/github/stars/codenameone/CodenameOne?label=GitHub%20stars&style=social)](https://github.com/codenameone/CodenameOne/stargazers/)
 
-## Codename One - Native Cross-Platform Apps with Java or Kotlin
+## Native Apps From One Java Codebase. A UI You Control.
 
-[Codename One](https://www.codenameone.com/) is an open-source, cross-platform application framework for Java and Kotlin developers. A single project can target phones, tablets, desktops, browsers, TVs, watches, and in-vehicle displays while sharing the application logic and UI.
+[Codename One](https://www.codenameone.com/) is an open-source framework for building native applications in Java. One project can target phones, tablets, desktops, browsers, TVs, watches, and in-vehicle displays while sharing its application logic and UI.
 
-Codename One includes a portable UI toolkit, native compilers and ports, a fast desktop simulator, CSS and visual design tools, Maven and IDE integration, testing tools, and optional cloud builds. Applications can use the portable APIs for common functionality or call platform SDKs and third-party native libraries directly when necessary.
+Codename One custom-renders the UI that ships with your application. The platform cannot silently replace those components in an OS update. Native interfaces and peer components provide direct access to platform SDKs and platform views when an application needs them.
+
+| Build something | Explore the engineering and help improve it |
+| --- | --- |
+| [Run Codename One in the browser](https://www.codenameone.com/playground/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme) | [See how the ports and compilers work](#how-does-it-work) |
+| [Generate a Maven project](https://www.codenameone.com/initializr/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme) | [Read the ParparVM source](https://github.com/codenameone/CodenameOne/tree/master/vm) |
+| [Follow the current getting-started guide](https://www.codenameone.com/getting-started/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme) | [Test an idea in GitHub Discussions](https://github.com/codenameone/CodenameOne/discussions) |
+| [Browse the supported targets](https://www.codenameone.com/port-status/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme) | [Report a reproducible problem](https://github.com/codenameone/CodenameOne/issues/new/choose) |
+
+The repository includes the portable UI toolkit, native compilers and ports, desktop simulator, CSS and visual design tools, Maven integration, testing infrastructure, and optional cloud-build client.
 
 
 <!-- [![Build Status](https://travis-ci.org/codenameone/CodenameOne.svg?branch=master)](https://travis-ci.org/codenameone/CodenameOne)
@@ -251,15 +259,24 @@ You can open the generated native project and use the platform's debugger and pr
 
 Traditional compilers fall flat in these cases.
 
-## Getting Help & FAQ
+## Help Improve Codename One
 
 <img align="right" src="http://codenameone.com/github/new_icon.png" height="150">
 
-Ask usage questions and discuss the framework in [GitHub Discussions](https://github.com/codenameone/CodenameOne/discussions). Use [GitHub Issues](https://github.com/codenameone/CodenameOne/issues) for reproducible bugs and feature requests. The [`codenameone` tag on Stack Overflow](https://stackoverflow.com/tags/codenameone) also contains years of community questions and answers.
+Outside pull requests are disabled because even a small framework change can interact with the repository's cross-platform build and screenshot pipelines. The maintainers integrate code changes after running that matrix.
+
+You can still materially improve the project:
+
+- Ask usage and API-design questions in [GitHub Discussions](https://github.com/codenameone/CodenameOne/discussions).
+- File [GitHub Issues](https://github.com/codenameone/CodenameOne/issues/new/choose) for reproducible bugs, performance counterexamples, toolchain compatibility problems, and documentation gaps.
+- Include a minimal project, the affected target, Codename One and JDK versions, complete logs, and screenshots where they help.
+- Challenge the published benchmarks and architecture. A counterexample we can reproduce is more useful than a general feature request.
+
+Read [How to Help Improve Codename One](CONTRIBUTING.md) before opening a report. The [`codenameone` tag on Stack Overflow](https://stackoverflow.com/tags/codenameone) also contains years of community questions and answers.
 
 <br>
   
-## Contributors ✨
+## Project Contributors
 
 Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
 
@@ -335,4 +352,4 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
 
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
-This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind are welcome! ❤️
+This historical list recognizes people who contributed code and documentation before outside pull requests were disabled. Current participation happens through [issues and discussions](CONTRIBUTING.md).

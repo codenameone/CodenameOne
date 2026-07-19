@@ -1,0 +1,47 @@
+name: OSS Traction Snapshot
+
+on:
+  schedule:
+    # GitHub traffic is a rolling 14-day window. Weekly snapshots preserve it.
+    - cron: '41 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  discussions: read
+  issues: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out default branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Capture GitHub metrics
+        env:
+          # Repository traffic needs Administration read access. The ordinary
+          # workflow token still captures public stars and engagement if this
+          # optional fine-grained token has not been configured.
+          GH_TOKEN: ${{ secrets.OSS_TRACTION_TOKEN || github.token }}
+        run: |
+          python3 scripts/website/capture_oss_traction.py \
+            --output "${RUNNER_TEMP}/oss-traction.json" \
+            --summary "${RUNNER_TEMP}/oss-traction.md"
+          cat "${RUNNER_TEMP}/oss-traction.md" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Preserve snapshot
+        uses: actions/upload-artifact@v7
+        with:
+          name: oss-traction-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/oss-traction.json
+            ${{ runner.temp }}/oss-traction.md
+          retention-days: 120

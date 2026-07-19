@@ -126,14 +126,14 @@ Yes, via the *Crash Protection* service on Pro and Enterprise plans. Uncaught ex
 ## Support & Community
 
 ### Where should I ask questions?
-- [Stack Overflow (`codenameone` tag)](https://stackoverflow.com/questions/tagged/codenameone)
-- [GitHub Issues](https://github.com/codenameone/CodenameOne/issues)
-- [Community Forum/Help](/discussion-forum/)
+- [GitHub Discussions](https://github.com/codenameone/CodenameOne/discussions) for usage, API design, and feature ideas
+- [GitHub Issues](https://github.com/codenameone/CodenameOne/issues/new/choose) for reproducible defects, performance cases, compatibility problems, and documentation gaps
+- [Stack Overflow (`codenameone` tag)](https://stackoverflow.com/questions/tagged/codenameone) for focused programming questions
 
-### Can I contribute?
-Yes. Contributions are welcome via pull requests:
+### How can I help improve the open-source project?
+External pull requests are disabled because framework changes must be integrated with Codename One's cross-platform CI and screenshot-test matrix. You can help by opening a minimal reproduction, testing a platform or toolchain combination, challenging a benchmark, reporting a documentation failure, or working through an API idea in Discussions. Maintainers implement confirmed changes and run the complete test matrix.
 
-- [Codename One on GitHub](https://github.com/codenameone/CodenameOne)
+- [How to help improve Codename One](https://github.com/codenameone/CodenameOne/blob/master/CONTRIBUTING.md)
 
 ### Do you offer training resources?
 Yes:

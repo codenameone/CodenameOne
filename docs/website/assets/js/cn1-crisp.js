@@ -4,6 +4,8 @@
   const WEBSITE_ID = "e0201fca-1e59-4f30-9d00-8c37aa18293e";
   const CONSENT_TTL_DAYS = 365;
   const CONVERSION_ARRIVAL_KEY = "cn1-conversion-arrival-v1";
+  const OSS_ATTRIBUTION_KEY = "cn1-oss-attribution-v1";
+  const OSS_VALUE_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
   const readCookie = (name) => {
     const prefix = `${name}=`;
@@ -42,6 +44,64 @@
     } catch (e) {
       // no-op
     }
+  };
+
+  const readOssAttribution = () => {
+    if (getConsent() !== "accepted") {
+      return null;
+    }
+    try {
+      const raw = sessionStorage.getItem(OSS_ATTRIBUTION_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const captureOssAttribution = () => {
+    if (getConsent() !== "accepted") {
+      return null;
+    }
+    const params = new URLSearchParams(window.location.search || "");
+    if (params.get("utm_medium") !== "oss") {
+      return readOssAttribution();
+    }
+    const source = params.get("utm_source") || "";
+    const campaign = params.get("utm_campaign") || "";
+    const content = params.get("utm_content") || "";
+    if (!OSS_VALUE_PATTERN.test(source) || !OSS_VALUE_PATTERN.test(campaign) ||
+        (content && !OSS_VALUE_PATTERN.test(content))) {
+      return readOssAttribution();
+    }
+    const attribution = {
+      source,
+      campaign,
+      page: window.location.pathname || "/"
+    };
+    if (content) {
+      attribution.content = content;
+    }
+    try {
+      sessionStorage.setItem(OSS_ATTRIBUTION_KEY, JSON.stringify(attribution));
+    } catch (e) {
+      // Keep the attribution for this view even when sessionStorage is unavailable.
+    }
+    return attribution;
+  };
+
+  const withOssAttribution = (data) => {
+    const attribution = captureOssAttribution();
+    if (!attribution) {
+      return data;
+    }
+    const enriched = Object.assign({}, data || {}, {
+      oss_source: attribution.source,
+      oss_campaign: attribution.campaign
+    });
+    if (attribution.content) {
+      enriched.oss_content = attribution.content;
+    }
+    return enriched;
   };
 
   // --- Crisp trigger events -------------------------------------------------
@@ -122,7 +182,7 @@
   );
   crispEvents.buildError = (data) => requestCrispEvent("BuildError", data);
   crispEvents.conversionClick = (data) => requestCrispEvent(
-    "ConversionClick", data
+    "ConversionClick", withOssAttribution(data)
   );
   crispEvents.gettingStartedDwell = (data) => scheduleCrispEvent(
     "GettingStartedDwell", 20000, data
@@ -137,6 +197,22 @@
     });
   };
   window.cn1CrispEvents = crispEvents;
+
+  const reportOssArrival = () => {
+    const attribution = captureOssAttribution();
+    if (!attribution) {
+      return;
+    }
+    const data = {
+      source: attribution.source,
+      campaign: attribution.campaign,
+      page: attribution.page
+    };
+    if (attribution.content) {
+      data.content = attribution.content;
+    }
+    requestCrispEvent("OssArrival", data);
+  };
 
   const consumeConversionArrival = () => {
     let raw;
@@ -217,6 +293,7 @@
     setConsent("accepted");
     closeBanner();
     loadCrisp();
+    reportOssArrival();
     flushPendingEvents();
   };
 
@@ -231,6 +308,7 @@
   if (consent === "accepted") {
     loadCrisp();
     closeBanner();
+    reportOssArrival();
   } else if (consent === "declined") {
     hideCrisp();
     closeBanner();

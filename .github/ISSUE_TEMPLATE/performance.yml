@@ -1,0 +1,55 @@
+name: Performance counterexample
+description: Provide a reproducible workload that is slower or uses more resources than expected.
+title: "[Performance] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Published Codename One benchmarks are open to challenge. Include the workload and raw measurements so the result can be reproduced and compared.
+  - type: textarea
+    id: claim
+    attributes:
+      label: Result being challenged
+      description: Link the benchmark, documentation, or expected baseline and state the conflicting result.
+    validations:
+      required: true
+  - type: textarea
+    id: workload
+    attributes:
+      label: Reproducible workload
+      description: Link a minimal project or paste the complete benchmark code and input data.
+    validations:
+      required: true
+  - type: textarea
+    id: method
+    attributes:
+      label: Measurement method
+      description: Include warmup, run count, timing or profiling tool, comparison order, and output validation.
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: Raw results
+      description: Paste the individual observations, not only an average or ratio.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Versions and hardware
+      description: Include Codename One, JDK, target, OS or SDK, CPU, memory, and power mode where relevant.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Measurement checks
+      options:
+        - label: Compared implementations produce the same output for the supplied workload.
+          required: true
+        - label: The result can be reproduced without access to a private application or data set.
+          required: true
