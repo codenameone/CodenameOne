@@ -22,7 +22,7 @@
  */
 package com.codename1.calendar;
 
-/** Describes a local notification or delta-sync change. */
+/// Describes a local notification or delta-sync change.
 public final class CalendarChange {
     public enum EntityType { CALENDAR, EVENT, TASK }
     public enum ChangeType { CREATED, UPDATED, DELETED, RESET }

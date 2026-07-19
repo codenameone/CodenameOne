@@ -27,7 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Lossless map encoding used by the offline cache and provider fixtures. */
+/// Lossless map encoding used by the offline cache and provider fixtures.
 public final class CalendarModelCodec {
     private CalendarModelCodec() {}
     public static Map<String,Object> encodeEvent(CalendarEvent e) {

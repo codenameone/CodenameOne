@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** One provider page, including continuation and incremental-sync tokens. */
+/// One provider page, including continuation and incremental-sync tokens.
 public final class CalendarPage<T> {
     private final List<T> items;
     private final String nextPageToken, syncToken;

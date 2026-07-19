@@ -28,7 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** A task/reminder in a task collection. */
+/// A task/reminder in a task collection.
 public class CalendarTask {
     private String id, calendarId, sourceId, version, title, description, location;
     private CalendarDateTime start, due;

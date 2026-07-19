@@ -25,18 +25,13 @@ package com.codename1.calendar;
 import com.codename1.io.Util;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.SuccessCallback;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.TimeZone;
 
-/** Google Calendar and Google Tasks implementation. The application supplies */
-/** OAuth tokens and chooses the scopes granted to its own OAuth client. */
+/// Google Calendar and Google Tasks implementation. The application supplies
+/// OAuth tokens and chooses the scopes granted to its own OAuth client.
 public class GoogleCalendarSource extends OAuthCalendarSource {
     public static final String SCOPE_CALENDAR = "https://www.googleapis.com/auth/calendar";
     public static final String SCOPE_TASKS = "https://www.googleapis.com/auth/tasks";
@@ -178,10 +173,10 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
     private Map<String,Object>eventMap(CalendarEvent e){Map<String,Object>m=new HashMap<String,Object>();m.put("summary",e.getTitle());if(e.getRecurrence()!=null){List<String>r=new ArrayList<String>();r.add("RRULE:"+ICalendarCodec.writeRecurrenceRule(e.getRecurrence()));m.put("recurrence",r);}m.put("description",e.getDescription());m.put("location",e.getLocation());m.put("start",googleDate(e.getStart()));m.put("end",googleDate(e.getEnd()));m.put("status",e.getStatus().name().toLowerCase());m.put("transparency",e.getAvailability()==CalendarEvent.Availability.FREE?"transparent":"opaque");List<Map<String,Object>>attendees=new ArrayList<Map<String,Object>>();for(CalendarAttendee a:e.getAttendees()){Map<String,Object>x=new HashMap<String,Object>();x.put("email",a.getEmail());x.put("displayName",a.getName());x.put("optional",Boolean.valueOf(a.getRole()==CalendarAttendee.Role.OPTIONAL));x.put("responseStatus",lowerCamel(a.getResponse().name()));attendees.add(x);}m.put("attendees",attendees);if(!e.getAlarms().isEmpty()){Map<String,Object>r=new HashMap<String,Object>();r.put("useDefault",Boolean.FALSE);List<Map<String,Object>>overrides=new ArrayList<Map<String,Object>>();for(CalendarAlarm a:e.getAlarms())if(a.getMinutesBefore()!=null){Map<String,Object>x=new HashMap<String,Object>();x.put("minutes",a.getMinutesBefore());x.put("method",a.getMethod()==CalendarAlarm.Method.EMAIL?"email":a.getMethod()==CalendarAlarm.Method.AUDIO?"sms":"popup");overrides.add(x);}r.put("overrides",overrides);m.put("reminders",r);}if(e.getConference()!=null&&e.getConference().isCreateRequested()){Map<String,Object>c=new HashMap<String,Object>();Map<String,Object>create=new HashMap<String,Object>();create.put("requestId",String.valueOf(System.currentTimeMillis()));c.put("createRequest",create);m.put("conferenceData",c);}return m;}
     private CalendarTask task(Map<String,Object>m,String listId)throws CalendarException{CalendarTask out=new CalendarTask().setId(string(m,"id")).setCalendarId(listId).setSourceId(getId()).setVersion(string(m,"etag")).setTitle(string(m,"title")).setDescription(string(m,"notes")).setCompleted("completed".equals(string(m,"status")));String due=string(m,"due"),completed=string(m,"completed");if(due!=null)out.setDue(CalendarDateTime.instant(parseIso(due),"UTC"));if(completed!=null)out.setCompletionTime(Long.valueOf(parseIso(completed)));return out;}
     private Map<String,Object>taskMap(CalendarTask t){Map<String,Object>m=new HashMap<String,Object>();m.put("title",t.getTitle());m.put("notes",t.getDescription());m.put("status",t.isCompleted()?"completed":"needsAction");if(t.getDue()!=null&&!t.getDue().isAllDay())m.put("due",iso(t.getDue().getTimestamp()));if(t.isCompleted()&&t.getCompletionTime()!=null)m.put("completed",iso(t.getCompletionTime().longValue()));return m;}
-    private static CalendarDateTime googleDate(Map<String,Object>m)throws CalendarException{String date=string(m,"date"),dateTime=string(m,"dateTime"),zone=string(m,"timeZone");if(date!=null){String[]p=date.split("-");return CalendarDateTime.allDay(new CalendarDate(Integer.parseInt(p[0]),Integer.parseInt(p[1]),Integer.parseInt(p[2])));}if(dateTime!=null)return CalendarDateTime.instant(parseIso(dateTime),zone==null?"UTC":zone);return null;}
+    private static CalendarDateTime googleDate(Map<String,Object>m)throws CalendarException{String date=string(m,"date"),dateTime=string(m,"dateTime"),zone=string(m,"timeZone");if(date!=null){String[]p=CalendarDateUtil.split(date,'-');return CalendarDateTime.allDay(new CalendarDate(Integer.parseInt(p[0]),Integer.parseInt(p[1]),Integer.parseInt(p[2])));}if(dateTime!=null)return CalendarDateTime.instant(parseIso(dateTime),zone==null?"UTC":zone);return null;}
     private static Map<String,Object>googleDate(CalendarDateTime value){Map<String,Object>m=new HashMap<String,Object>();if(value==null)return m;if(value.isAllDay())m.put("date",value.getDate().toString());else{m.put("dateTime",iso(value.getTimestamp()));m.put("timeZone",value.getTimeZoneId());}return m;}
-    private static String iso(long time){SimpleDateFormat f=new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",Locale.US);f.setTimeZone(TimeZone.getTimeZone("UTC"));return f.format(new Date(time));}
-    private static long parseIso(String value)throws CalendarException{String normalized=value;if(value.length()>19&&value.charAt(19)=='.'){int zone=Math.max(value.indexOf('Z',19),Math.max(value.indexOf('+',19),value.indexOf('-',19)));if(zone>19)normalized=value.substring(0,19)+value.substring(zone);}String[]patterns={"yyyy-MM-dd'T'HH:mm:ssX","yyyy-MM-dd'T'HH:mm:ssZ","yyyy-MM-dd'T'HH:mm:ss'Z'"};for(String pattern:patterns)try{return new SimpleDateFormat(pattern,Locale.US).parse(normalized.replaceAll("([+-][0-9][0-9]):([0-9][0-9])$","$1$2")).getTime();}catch(ParseException ignored){}throw new CalendarException(CalendarError.MALFORMED_RESPONSE,"Invalid provider date: "+value);}
+    private static String iso(long time){return CalendarDateUtil.formatIso(time,"UTC",true)+"Z";}
+    private static long parseIso(String value)throws CalendarException{try{return CalendarDateUtil.parseDateTime(value,"UTC");}catch(IllegalArgumentException ex){throw new CalendarException(CalendarError.MALFORMED_RESPONSE,"Invalid provider date: "+value,ex);}}
     private static void param(StringBuilder b,String name,String value){if(value!=null)b.append('&').append(name).append('=').append(Util.encodeUrl(value));}
     private static String e(String v){return Util.encodeUrl(v==null?"":v);}
     private static Map<String,String>version(String v){if(v==null)return null;Map<String,String>m=new HashMap<String,String>();m.put("If-Match",v);return m;}

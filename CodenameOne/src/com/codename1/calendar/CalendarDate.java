@@ -22,7 +22,7 @@
  */
 package com.codename1.calendar;
 
-/** A date without a time zone, used for all-day events and date-only tasks. */
+/// A date without a time zone, used for all-day events and date-only tasks.
 public final class CalendarDate {
     private final int year, month, day;
     public CalendarDate(int year, int month, int day) {

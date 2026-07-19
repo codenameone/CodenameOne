@@ -26,7 +26,7 @@ import com.codename1.io.Storage;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Opt-in persistent cache backed by application `Storage`. */
+/// Opt-in persistent cache backed by application `Storage`.
 public class StorageCalendarCache implements CalendarCache {
     private final String prefix;
     public StorageCalendarCache(String namespace) {

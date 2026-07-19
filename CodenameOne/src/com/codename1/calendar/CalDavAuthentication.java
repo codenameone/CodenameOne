@@ -30,8 +30,8 @@ import com.codename1.util.SuccessCallback;
 import java.util.HashMap;
 import java.util.Map;
 
-/** App-owned CalDAV authentication strategy. Built-in strategies cover Basic, */
-/** OAuth Bearer, and RFC 7616 Digest authentication. */
+/// App-owned CalDAV authentication strategy. Built-in strategies cover Basic,
+/// OAuth Bearer, and RFC 7616 Digest authentication.
 public abstract class CalDavAuthentication {
     public abstract AsyncResource<String> authorization(String method, String uri, String challenge, boolean forceRefresh);
 
@@ -77,7 +77,7 @@ public abstract class CalDavAuthentication {
     }
 
     private static Map<String,String>parse(String value){Map<String,String>out=new HashMap<String,String>();int i=0;while(i<value.length()){while(i<value.length()&&(value.charAt(i)==' '||value.charAt(i)==','))i++;int eq=value.indexOf('=',i);if(eq<0)break;String key=value.substring(i,eq).trim().toLowerCase();i=eq+1;String data;if(i<value.length()&&value.charAt(i)=='"'){i++;StringBuilder b=new StringBuilder();while(i<value.length()){char c=value.charAt(i++);if(c=='"')break;if(c=='\\'&&i<value.length())c=value.charAt(i++);b.append(c);}data=b.toString();}else{int comma=value.indexOf(',',i);if(comma<0)comma=value.length();data=value.substring(i,comma).trim();i=comma;}out.put(key,data);}return out;}
-    private static String selectQop(String qop){if(qop==null)return null;for(String v:qop.split(","))if("auth".equalsIgnoreCase(v.trim()))return "auth";return null;}
+    private static String selectQop(String qop){if(qop==null)return null;for(String v:CalendarDateUtil.split(qop,','))if("auth".equalsIgnoreCase(v.trim()))return "auth";return null;}
     private static String md5(String value){Hash hash=Hash.create(Hash.MD5);hash.update(StringUtil.getBytes(value));byte[]bytes=hash.digest();StringBuilder out=new StringBuilder();for(byte b:bytes)out.append(hex(b&255,2));return out.toString();}
     private static String hex(int value,int width){String s=Integer.toHexString(value);while(s.length()<width)s="0"+s;return s;}
     private static String escape(String value){return value.replace("\\","\\\\").replace("\"","\\\"");}

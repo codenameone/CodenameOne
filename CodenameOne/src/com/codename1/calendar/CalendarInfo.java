@@ -26,7 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-/** A calendar or task-list collection exposed by a source. */
+/// A calendar or task-list collection exposed by a source.
 public class CalendarInfo {
     public enum ContentType { EVENTS, TASKS }
     private String id, sourceId, accountId, name, owner, timeZoneId;

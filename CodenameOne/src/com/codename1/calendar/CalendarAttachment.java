@@ -22,7 +22,7 @@
  */
 package com.codename1.calendar;
 
-/** Attachment metadata and optional content for providers that support upload. */
+/// Attachment metadata and optional content for providers that support upload.
 public class CalendarAttachment {
     private String id, name, mimeType, uri;
     private long size = -1;

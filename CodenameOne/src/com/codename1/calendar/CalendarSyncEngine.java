@@ -29,9 +29,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Opt-in local-first mutation queue. It deliberately does not own credentials */
-/** or silently schedule work; applications call `sync()` or connect it to a */
-/** platform background-work callback. */
+/// Opt-in local-first mutation queue. It deliberately does not own credentials
+/// or silently schedule work; applications call `sync()` or connect it to a
+/// platform background-work callback.
 public final class CalendarSyncEngine {
     private static final String MUTATIONS = "mutations";
     private final CalendarSource source;

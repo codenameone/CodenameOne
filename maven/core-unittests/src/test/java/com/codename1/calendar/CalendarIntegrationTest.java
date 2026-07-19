@@ -75,6 +75,14 @@ class CalendarIntegrationTest {
     }
 
     @Test
+    void portableDateCodecHandlesFractionsAndOffsets() {
+        assertEquals(123L, CalendarDateUtil.parseDateTime("1970-01-01T02:30:00.123+02:30", "UTC"));
+        assertEquals("19700101T000000", CalendarDateUtil.formatBasic(0L, "UTC"));
+        assertEquals("1970-01-01T00:00:00.000", CalendarDateUtil.formatIso(0L, "UTC", true));
+        assertEquals(new CalendarDate(1970, 1, 1), CalendarDateUtil.dateFor(0L, "UTC"));
+    }
+
+    @Test
     void googleSourceRefreshesOnceAfterUnauthorizedAndReturnsDeltaToken() {
         RecordingTokens tokens=new RecordingTokens();
         RecordingTransport transport=new RecordingTransport();

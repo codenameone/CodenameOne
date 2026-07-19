@@ -32,7 +32,7 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Default asynchronous transport backed by Codename One networking. */
+/// Default asynchronous transport backed by Codename One networking.
 public class DefaultCalendarHttpTransport implements CalendarHttpTransport {
     public AsyncResource<CalendarHttpResponse> execute(final CalendarHttpRequest spec) {
         final AsyncResource<CalendarHttpResponse> out = new AsyncResource<CalendarHttpResponse>();

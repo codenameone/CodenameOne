@@ -22,7 +22,7 @@
  */
 package com.codename1.calendar;
 
-/** Query options shared by event and task listing operations. */
+/// Query options shared by event and task listing operations.
 public class CalendarQuery {
     private String calendarId, text, pageToken, syncToken;
     private Long startTime, endTime;

@@ -38,7 +38,6 @@ import com.codename1.ui.Display
 import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunner
 import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunnerReporter
 import com.codenameone.examples.hellocodenameone.tests.KotlinUiTest
-import com.codenameone.examples.hellocodenameone.tests.CalendarApiTest
 
 open class HelloCodenameOne : Lifecycle() {
     override fun init(context: Any?) {
@@ -102,7 +101,6 @@ open class HelloCodenameOne : Lifecycle() {
             // Keep running so DeviceRunner can emit CN1SS markers and report swift_diag_status explicitly.
         }
         Cn1ssDeviceRunner.addTest(KotlinUiTest())
-        Cn1ssDeviceRunner.addTest(CalendarApiTest())
         // NOTE: the in-car API is exercised via Car.setApplication(...) above (which is what makes
         // the build compile the CarPlay / Android Auto natives) and validated by the dedicated
         // car-android.yml / car-ios.yml integration workflows + the JVM CarTest. It is deliberately

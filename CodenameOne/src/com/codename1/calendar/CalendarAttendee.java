@@ -22,7 +22,7 @@
  */
 package com.codename1.calendar;
 
-/** A person, group, or resource invited to an event. */
+/// A person, group, or resource invited to an event.
 public class CalendarAttendee {
     public enum Role { REQUIRED, OPTIONAL, RESOURCE }
     public enum Response { NONE, NEEDS_ACTION, ACCEPTED, DECLINED, TENTATIVE, DELEGATED }

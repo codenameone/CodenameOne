@@ -22,7 +22,7 @@
  */
 package com.codename1.calendar;
 
-/** Portable failure categories for calendar operations. */
+/// Portable failure categories for calendar operations.
 public enum CalendarError {
     NOT_AVAILABLE, NOT_SUPPORTED, PERMISSION_DENIED, AUTHENTICATION_REQUIRED,
     INVALID_ARGUMENT, NOT_FOUND, READ_ONLY, CONFLICT, RATE_LIMITED,

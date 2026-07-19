@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** Online meeting metadata associated with an event. */
+/// Online meeting metadata associated with an event.
 public class CalendarConference {
     private String provider, id, joinUrl;
     private boolean createRequested;

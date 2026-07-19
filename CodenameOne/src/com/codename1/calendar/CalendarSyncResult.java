@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** Outcome of a manual/background synchronization pass. */
+/// Outcome of a manual/background synchronization pass.
 public final class CalendarSyncResult {
     private int applied, remaining;
     private final List<CalendarConflict> conflicts = new ArrayList<CalendarConflict>();

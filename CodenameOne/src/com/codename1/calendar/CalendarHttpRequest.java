@@ -26,7 +26,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Provider HTTP request. Public so applications and tests may inject a transport. */
+/// Provider HTTP request. Public so applications and tests may inject a transport.
 public final class CalendarHttpRequest {
     private final String method, url;
     private String body;

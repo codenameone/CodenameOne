@@ -24,7 +24,7 @@ package com.codename1.calendar;
 
 import java.util.Map;
 
-/** A queued local mutation that conflicts with the provider version. */
+/// A queued local mutation that conflicts with the provider version.
 public final class CalendarConflict {
     public enum Resolution { KEEP_LOCAL, KEEP_REMOTE, MERGED }
     private final String mutationId;

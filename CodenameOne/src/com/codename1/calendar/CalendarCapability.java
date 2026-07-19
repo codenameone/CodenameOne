@@ -22,7 +22,7 @@
  */
 package com.codename1.calendar;
 
-/** A granular operation that a calendar source or collection may support. */
+/// A granular operation that a calendar source or collection may support.
 public enum CalendarCapability {
     READ_CALENDARS, MANAGE_CALENDARS,
     READ_EVENTS, WRITE_EVENTS, DELETE_EVENTS,

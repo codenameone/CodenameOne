@@ -24,8 +24,8 @@ package com.codename1.calendar;
 
 import com.codename1.ui.Display;
 
-/** Device calendar source. Referencing this class is the builder signal for */
-/** native calendar permissions; online-only apps should use provider sources. */
+/// Device calendar source. Referencing this class is the builder signal for
+/// native calendar permissions; online-only apps should use provider sources.
 public class LocalCalendarSource extends CalendarSource {
     private static final LocalCalendarSource FALLBACK = new LocalCalendarSource();
     protected LocalCalendarSource() { super("local", "Device calendar"); }

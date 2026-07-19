@@ -29,8 +29,8 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 
-/** Shared authenticated HTTP behavior for online calendar sources. Tokens and */
-/** credentials remain app-owned; the source only asks for a token when needed. */
+/// Shared authenticated HTTP behavior for online calendar sources. Tokens and
+/// credentials remain app-owned; the source only asks for a token when needed.
 public abstract class OAuthCalendarSource extends CalendarSource {
     private final CalendarTokenProvider tokenProvider;
     private final CalendarHttpTransport transport;

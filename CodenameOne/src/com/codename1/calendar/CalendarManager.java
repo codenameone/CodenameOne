@@ -28,7 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Registry and entry point for device and online calendar sources. */
+/// Registry and entry point for device and online calendar sources.
 public final class CalendarManager {
     private static final CalendarManager INSTANCE = new CalendarManager();
     private final Map<String,CalendarSource> sources = new LinkedHashMap<String,CalendarSource>();

@@ -29,9 +29,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Standards-based CalDAV source. Pass the account's calendar-home URL; the */
-/** source discovers collections below it and uses RFC 6578 sync tokens when */
-/** the server advertises them. */
+/// Standards-based CalDAV source. Pass the account's calendar-home URL; the
+/// source discovers collections below it and uses RFC 6578 sync tokens when
+/// the server advertises them.
 public class CalDavCalendarSource extends CalendarSource {
     private final String homeUrl;
     private final CalDavAuthentication authentication;
@@ -68,14 +68,14 @@ public class CalDavCalendarSource extends CalendarSource {
     private static String safe(String value){return value.replace(" ","%20").replace("/","%2F");}
     private static String calendarQuery(String component,CalendarQuery q){StringBuilder filter=new StringBuilder("<c:comp-filter name=\"VCALENDAR\"><c:comp-filter name=\"").append(component).append("\"");if(q.getStartTime()==null&&q.getEndTime()==null)filter.append("/>");else{filter.append('>');filter.append("<c:time-range");if(q.getStartTime()!=null)filter.append(" start=\"").append(icalTime(q.getStartTime().longValue())).append("\"");if(q.getEndTime()!=null)filter.append(" end=\"").append(icalTime(q.getEndTime().longValue())).append("\"");filter.append("/></c:comp-filter>");}filter.append("</c:comp-filter>");return "<?xml version=\"1.0\"?><c:calendar-query xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:prop><d:getetag/><c:calendar-data/></d:prop><c:filter>"+filter+"</c:filter></c:calendar-query>";}
     private static String syncQuery(String token){return "<?xml version=\"1.0\"?><d:sync-collection xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:sync-token>"+xml(token)+"</d:sync-token><d:sync-level>1</d:sync-level><d:prop><d:getetag/><c:calendar-data/></d:prop></d:sync-collection>";}
-    private static String icalTime(long value){java.text.SimpleDateFormat f=new java.text.SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'");f.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));return f.format(new java.util.Date(value));}
+    private static String icalTime(long value){return CalendarDateUtil.formatBasic(value,"UTC")+"Z";}
     private static Map<String,String>headers(String name,String value){Map<String,String>out=new HashMap<String,String>();out.put(name,value);return out;}
     private static Map<String,String>version(String value,boolean create){Map<String,String>out=new HashMap<String,String>();if(create)out.put("If-None-Match","*");else if(value!=null)out.put("If-Match",value);return out;}
     private static String xmlValue(String source,String local){String element=xmlElement(source,local);return element==null?null:unxml(stripTags(element).trim());}
     private static String xmlElement(String source,String local){if(source==null)return null;String lower=source.toLowerCase();int open=findElement(lower,local.toLowerCase(),0);if(open<0)return null;int gt=source.indexOf('>',open);if(gt<0)return null;String tag=source.substring(open+1,gt).trim();int space=tag.indexOf(' ');if(space>=0)tag=tag.substring(0,space);String close="</"+tag+">";int end=lower.indexOf(close.toLowerCase(),gt+1);return end<0?null:source.substring(gt+1,end);}
     private static List<String>elements(String source,String local){List<String>out=new ArrayList<String>();if(source==null)return out;String lower=source.toLowerCase();int from=0;while(true){int open=findElement(lower,local.toLowerCase(),from);if(open<0)break;int gt=source.indexOf('>',open);if(gt<0)break;String tag=source.substring(open+1,gt).trim();int space=tag.indexOf(' ');if(space>=0)tag=tag.substring(0,space);String close="</"+tag+">";int end=lower.indexOf(close.toLowerCase(),gt+1);if(end<0)break;out.add(source.substring(gt+1,end));from=end+close.length();}return out;}
     private static int findElement(String source,String local,int from){int plain=source.indexOf("<"+local,from),prefixed=source.indexOf(":"+local,from);if(prefixed>=0)prefixed=source.lastIndexOf('<',prefixed);if(plain<0)return prefixed;if(prefixed<0)return plain;return Math.min(plain,prefixed);}
-    private static String stripTags(String value){return value.replaceAll("<[^>]+>","");}
+    private static String stripTags(String value){StringBuilder out=new StringBuilder();boolean tag=false;for(int i=0;i<value.length();i++){char c=value.charAt(i);if(c=='<')tag=true;else if(c=='>')tag=false;else if(!tag)out.append(c);}return out.toString();}
     private static String xml(String value){return value==null?"":value.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;");}
     private static String unxml(String value){return value.replace("&lt;","<").replace("&gt;",">").replace("&quot;","\"").replace("&apos;","'").replace("&amp;","&");}
     private static <T>SuccessCallback<Throwable>error(final AsyncResource<T>out){return new SuccessCallback<Throwable>(){public void onSucess(Throwable error){out.error(error);}};}

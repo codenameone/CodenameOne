@@ -23,22 +23,24 @@
 package com.codename1.calendar;
 
 import java.util.Collections;
-import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.Set;
 
-/** Immutable set of capabilities advertised by a source or calendar. */
+/// Immutable set of capabilities advertised by a source or calendar.
 public final class CalendarCapabilities {
-    private static final CalendarCapabilities NONE = new CalendarCapabilities(EnumSet.noneOf(CalendarCapability.class));
+    private static final CalendarCapabilities NONE = new CalendarCapabilities(new HashSet<CalendarCapability>());
     private final Set<CalendarCapability> values;
 
     private CalendarCapabilities(Set<CalendarCapability> values) {
-        this.values = Collections.unmodifiableSet(EnumSet.copyOf(values));
+        HashSet<CalendarCapability> copy = new HashSet<CalendarCapability>();
+        copy.addAll(values);
+        this.values = Collections.unmodifiableSet(copy);
     }
 
     public static CalendarCapabilities none() { return NONE; }
 
     public static CalendarCapabilities of(CalendarCapability... values) {
-        EnumSet<CalendarCapability> out = EnumSet.noneOf(CalendarCapability.class);
+        HashSet<CalendarCapability> out = new HashSet<CalendarCapability>();
         if (values != null) {
             for (CalendarCapability value : values) if (value != null) out.add(value);
         }

@@ -22,20 +22,15 @@
  */
 package com.codename1.calendar;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.TimeZone;
 import com.codename1.util.StringUtil;
 
-/** Reads and writes the interoperable portion of RFC 5545 used by events, */
-/** tasks, CalDAV, and file import/export. Unknown X-properties are preserved */
-/** in provider data so a read/write cycle doesn't silently discard extensions. */
+/// Reads and writes the interoperable portion of RFC 5545 used by events,
+/// tasks, CalDAV, and file import/export. Unknown X-properties are preserved
+/// in provider data so a read/write cycle doesn't silently discard extensions.
 public final class ICalendarCodec {
     private static final String CRLF = "\r\n";
     private ICalendarCodec() {}
@@ -105,13 +100,15 @@ public final class ICalendarCodec {
         return out;
     }
 
-    /** Serializes a recurrence rule without the {@code RRULE:} prefix. */
+
+    /// Serializes a recurrence rule without the {@code RRULE:} prefix.
     public static String writeRecurrenceRule(CalendarRecurrenceRule rule) {
         if (rule == null || rule.getFrequency() == null) throw new IllegalArgumentException("frequency required");
         return recurrence(rule);
     }
 
-    /** Parses a recurrence rule with or without an {@code RRULE:} prefix. */
+
+    /// Parses a recurrence rule with or without an {@code RRULE:} prefix.
     public static CalendarRecurrenceRule readRecurrenceRule(String value) throws CalendarException {
         if (value != null && value.toUpperCase().startsWith("RRULE:")) value = value.substring(6);
         return parseRecurrence(value);
@@ -147,7 +144,7 @@ public final class ICalendarCodec {
     }
 
     private static String endName(StringBuilder out) {
-        return out.indexOf("BEGIN:VTODO") >= 0 ? "DUE" : "DTEND";
+        return out.toString().indexOf("BEGIN:VTODO") >= 0 ? "DUE" : "DTEND";
     }
 
     private static void writeDateTime(StringBuilder out, String name, CalendarDateTime value) {
@@ -175,7 +172,7 @@ public final class ICalendarCodec {
     private static CalendarRecurrenceRule parseRecurrence(String value) throws CalendarException {
         if (value == null) return null;
         CalendarRecurrenceRule out = new CalendarRecurrenceRule();
-        String[] parts = value.split(";");
+        String[] parts = CalendarDateUtil.split(value, ';');
         for (String part : parts) {
             int equals = part.indexOf('=');
             if (equals < 1) continue;
@@ -185,9 +182,9 @@ public final class ICalendarCodec {
                 else if ("INTERVAL".equals(key)) out.setInterval(Integer.parseInt(data));
                 else if ("COUNT".equals(key)) out.setCount(Integer.valueOf(data));
                 else if ("UNTIL".equals(key)) out.setUntil(parseDateTime(data, null));
-                else if ("BYDAY".equals(key)) for (String item : data.split(",")) out.addDayOfWeek(day(item));
-                else if ("BYMONTHDAY".equals(key)) for (String item : data.split(",")) out.addDayOfMonth(Integer.parseInt(item));
-                else if ("BYMONTH".equals(key)) for (String item : data.split(",")) out.addMonth(Integer.parseInt(item));
+                else if ("BYDAY".equals(key)) for (String item : CalendarDateUtil.split(data, ',')) out.addDayOfWeek(day(item));
+                else if ("BYMONTHDAY".equals(key)) for (String item : CalendarDateUtil.split(data, ',')) out.addDayOfMonth(Integer.parseInt(item));
+                else if ("BYMONTH".equals(key)) for (String item : CalendarDateUtil.split(data, ',')) out.addMonth(Integer.parseInt(item));
             } catch (IllegalArgumentException ex) {
                 throw new CalendarException(CalendarError.MALFORMED_RESPONSE, "Invalid recurrence rule: " + value, ex);
             }
@@ -265,7 +262,7 @@ public final class ICalendarCodec {
             } else {
                 int colon = colon(line); if (colon < 0) continue;
                 String left = line.substring(0, colon), data = line.substring(colon + 1);
-                String[] fields = left.split(";");
+                String[] fields = CalendarDateUtil.split(left, ';');
                 Property property = new Property(fields[0].toUpperCase(), data);
                 for (int i = 1; i < fields.length; i++) {
                     int equals = fields[i].indexOf('=');
@@ -289,20 +286,16 @@ public final class ICalendarCodec {
         try {
             if (value.length() == 8) return CalendarDateTime.allDay(new CalendarDate(Integer.parseInt(value.substring(0, 4)), Integer.parseInt(value.substring(4, 6)), Integer.parseInt(value.substring(6, 8))));
             boolean zulu = value.endsWith("Z");
-            String pattern = value.indexOf('-') >= 0 ? "yyyy-MM-dd'T'HH:mm:ss" : "yyyyMMdd'T'HHmmss";
-            String data = zulu ? value.substring(0, value.length() - 1) : value;
-            SimpleDateFormat format = new SimpleDateFormat(pattern, Locale.US);
             String timeZone = zulu || zone == null ? "UTC" : zone;
-            format.setTimeZone(TimeZone.getTimeZone(timeZone));
-            return CalendarDateTime.instant(format.parse(data).getTime(), timeZone);
-        } catch (ParseException ex) {
+            return CalendarDateTime.instant(CalendarDateUtil.parseDateTime(value, timeZone), timeZone);
+        } catch (IllegalArgumentException ex) {
             throw new CalendarException(CalendarError.MALFORMED_RESPONSE, "Invalid calendar date: " + value, ex);
         }
     }
 
     private static List<String> unfold(String input) {
         String normalized = input.replace("\r\n", "\n").replace('\r', '\n');
-        String[] raw = normalized.split("\n");
+        String[] raw = CalendarDateUtil.split(normalized, '\n');
         List<String> out = new ArrayList<String>();
         for (String line : raw) {
             if ((line.startsWith(" ") || line.startsWith("\t")) && !out.isEmpty()) {
@@ -353,7 +346,7 @@ public final class ICalendarCodec {
     private static String pad(int value, int count) { String s=String.valueOf(value);while(s.length()<count)s="0"+s;return s; }
     private static String utc(long value) { return format(value, "UTC") + "Z"; }
     private static String local(long value, String zone) { return format(value, zone); }
-    private static String format(long value, String zone) { SimpleDateFormat f=new SimpleDateFormat("yyyyMMdd'T'HHmmss",Locale.US);f.setTimeZone(TimeZone.getTimeZone(zone));return f.format(new Date(value)); }
+    private static String format(long value, String zone) { return CalendarDateUtil.formatBasic(value, zone); }
     private static String formatRecurrenceUntil(CalendarDateTime value) { return value.isAllDay() ? digits(value.getDate()) : utc(value.getTimestamp()); }
     private static int day(String value) { String v=value.length()>2?value.substring(value.length()-2):value;String[] days={"MO","TU","WE","TH","FR","SA","SU"};for(int i=0;i<days.length;i++)if(days[i].equals(v))return i+1;throw new IllegalArgumentException(value); }
     private static void appendNumbers(StringBuilder out, String name, List<Integer> values, boolean weekdays) { if(values.isEmpty())return;out.append(';').append(name).append('=');for(int i=0;i<values.size();i++){if(i>0)out.append(',');int v=values.get(i).intValue();out.append(weekdays?new String[]{"MO","TU","WE","TH","FR","SA","SU"}[v-1]:String.valueOf(v));} }

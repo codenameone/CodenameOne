@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** Portable RFC-5545-style recurrence rule. */
+/// Portable RFC-5545-style recurrence rule.
 public class CalendarRecurrenceRule {
     public enum Frequency { DAILY, WEEKLY, MONTHLY, YEARLY }
     private Frequency frequency;

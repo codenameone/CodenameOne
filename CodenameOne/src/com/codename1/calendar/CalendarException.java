@@ -22,7 +22,7 @@
  */
 package com.codename1.calendar;
 
-/** Exception returned by asynchronous calendar operations. */
+/// Exception returned by asynchronous calendar operations.
 public class CalendarException extends Exception {
     private final CalendarError error;
     private final int responseCode;

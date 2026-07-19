@@ -27,7 +27,7 @@ import com.codename1.util.AsyncResource;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Base contract shared by local stores and online providers. */
+/// Base contract shared by local stores and online providers.
 public abstract class CalendarSource {
     private final String id, displayName;
     private final List<CalendarChangeListener> listeners = new ArrayList<CalendarChangeListener>();

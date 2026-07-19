@@ -27,8 +27,8 @@ import com.codename1.io.oidc.OidcTokens;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.SuccessCallback;
 
-/** In-memory adapter around an application-configured `OidcClient`. Updated */
-/** tokens are reported to the app; this class never persists them itself. */
+/// In-memory adapter around an application-configured `OidcClient`. Updated
+/// tokens are reported to the app; this class never persists them itself.
 public final class OidcCalendarTokenProvider implements CalendarTokenProvider {
     public interface TokenListener { void tokensUpdated(OidcTokens tokens); }
     private final OidcClient client;

@@ -22,7 +22,7 @@
  */
 package com.codename1.calendar;
 
-/** App-owned OAuth bearer token returned to an online source. */
+/// App-owned OAuth bearer token returned to an online source.
 public final class CalendarAuthToken {
     private final String accessToken, scopes;
     private final Long expiresAt;

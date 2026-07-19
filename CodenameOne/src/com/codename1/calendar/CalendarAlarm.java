@@ -22,7 +22,7 @@
  */
 package com.codename1.calendar;
 
-/** An event/task alarm, either absolute or relative to its start/due time. */
+/// An event/task alarm, either absolute or relative to its start/due time.
 public class CalendarAlarm {
     public enum Method { DEFAULT, ALERT, EMAIL, AUDIO }
     private Integer minutesBefore;

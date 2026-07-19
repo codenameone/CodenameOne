@@ -25,7 +25,7 @@ package com.codename1.calendar;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Process-local cache, useful for tests or sessions that must leave no data on disk. */
+/// Process-local cache, useful for tests or sessions that must leave no data on disk.
 public class MemoryCalendarCache implements CalendarCache {
     private final Map<String,Map<String,Object>> states = new HashMap<String,Map<String,Object>>();
     public synchronized Map<String,Object> load(String sourceId) {

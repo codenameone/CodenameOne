@@ -22,7 +22,7 @@
  */
 package com.codename1.calendar;
 
-/** Current authorization status for an access level. */
+/// Current authorization status for an access level.
 public enum CalendarAuthorizationStatus {
     NOT_DETERMINED, RESTRICTED, DENIED, WRITE_ONLY, FULL
 }

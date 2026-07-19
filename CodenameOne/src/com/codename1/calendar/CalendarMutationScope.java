@@ -22,5 +22,5 @@
  */
 package com.codename1.calendar;
 
-/** Scope when modifying or deleting a recurring item. */
+/// Scope when modifying or deleting a recurring item.
 public enum CalendarMutationScope { THIS_INSTANCE, THIS_AND_FUTURE, ALL }

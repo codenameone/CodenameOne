@@ -11,19 +11,7 @@ source what it can do:
 
 [source,java]
 ----
-LocalCalendarSource local = LocalCalendarSource.getInstance();
-CalendarCapabilities capabilities = local.getCapabilities();
-
-if (capabilities.supports(CalendarCapability.READ_EVENTS)) {
-    local.requestAuthorization(CalendarAccess.EVENTS_READ_ONLY).ready(status -> {
-        if (status == CalendarAuthorizationStatus.FULL) {
-            local.queryEvents(new CalendarQuery()
-                    .setCalendarId("primary")
-                    .setStartTime(System.currentTimeMillis()))
-                 .ready(page -> page.getItems().forEach(System.out::println));
-        }
-    });
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/calendar/CalendarIntegrationSnippets.java[tag=calendar-capabilities,indent=0]
 ----
 
 `LocalCalendarSource` is implemented with Android's Calendar Provider and
@@ -65,22 +53,7 @@ avoids shifting an all-day event when it crosses a time-zone boundary.
 
 [source,java]
 ----
-CalendarEvent event = new CalendarEvent()
-        .setCalendarId(calendarId)
-        .setTitle("Architecture review")
-        .setStart(CalendarDateTime.instant(startMillis, "Europe/Paris"))
-        .setEnd(CalendarDateTime.instant(endMillis, "Europe/Paris"))
-        .setRecurrence(new CalendarRecurrenceRule()
-                .setFrequency(CalendarRecurrenceRule.Frequency.WEEKLY)
-                .addDayOfWeek(2))
-        .addAttendee(new CalendarAttendee()
-                .setName("Ari")
-                .setEmail("ari@example.com"))
-        .addAlarm(new CalendarAlarm().setMinutesBefore(15));
-
-local.saveEvent(event, CalendarMutationScope.ALL).ready(saved -> {
-    Log.p("Created " + saved.getId());
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/calendar/CalendarIntegrationSnippets.java[tag=calendar-create-event,indent=0]
 ----
 
 The `version` returned by a source is an optimistic-concurrency token. Pass
@@ -95,17 +68,7 @@ never embed a client secret and never persist credentials implicitly.
 
 [source,java]
 ----
-OidcClient.discover("https://accounts.google.com").ready(oidc -> {
-    oidc.setClientId(clientId)
-        .setRedirectUri(redirectUri)
-        .setScopes(GoogleCalendarSource.SCOPE_CALENDAR,
-                   GoogleCalendarSource.SCOPE_TASKS)
-        .authorize().ready(tokens -> {
-            CalendarSource google = new GoogleCalendarSource(
-                    new OidcCalendarTokenProvider(oidc, tokens));
-            CalendarManager.getInstance().registerSource(google);
-        });
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/calendar/CalendarIntegrationSnippets.java[tag=calendar-google-oidc,indent=0]
 ----
 
 `GoogleCalendarSource` covers Google Calendar and Google Tasks.
@@ -118,9 +81,7 @@ strategy:
 
 [source,java]
 ----
-CalendarSource caldav = new CalDavCalendarSource(
-        "work", "Work CalDAV", calendarHomeUrl,
-        CalDavAuthentication.digest(username, password));
+include::../demos/common/src/main/java/com/codenameone/developerguide/calendar/CalendarIntegrationSnippets.java[tag=calendar-caldav,indent=0]
 ----
 
 `CalDavAuthentication.basic()`, `bearer()`, and `digest()` are supported.
@@ -137,8 +98,7 @@ and time zones. Unknown `X-` properties are retained in provider data.
 
 [source,java]
 ----
-String ics = ICalendarCodec.writeEvent(event);
-CalendarEvent imported = ICalendarCodec.readEvent(ics);
+include::../demos/common/src/main/java/com/codenameone/developerguide/calendar/CalendarIntegrationSnippets.java[tag=calendar-import-export,indent=0]
 ----
 
 === Change notifications and offline synchronization
@@ -161,14 +121,7 @@ the application chooses `KEEP_LOCAL`, `KEEP_REMOTE`, or `MERGED`.
 
 [source,java]
 ----
-CalendarSyncEngine sync = new CalendarSyncEngine(
-        google, new StorageCalendarCache("google-account-1"));
-sync.queueEventSave(event, CalendarMutationScope.ALL);
-sync.sync().ready(result -> {
-    for (CalendarConflict conflict : result.getConflicts()) {
-        // Present both versions, then call resolveConflict(...).
-    }
-});
+include::../demos/common/src/main/java/com/codenameone/developerguide/calendar/CalendarIntegrationSnippets.java[tag=calendar-sync,indent=0]
 ----
 
 === Permissions and build hints

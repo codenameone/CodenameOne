@@ -22,7 +22,7 @@
  */
 package com.codename1.calendar;
 
-/** Busy interval returned by a scheduling/free-busy query. */
+/// Busy interval returned by a scheduling/free-busy query.
 public final class FreeBusyInterval {
     private final long startTime, endTime;
     private final CalendarEvent.Availability availability;

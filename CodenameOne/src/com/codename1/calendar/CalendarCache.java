@@ -24,7 +24,7 @@ package com.codename1.calendar;
 
 import java.util.Map;
 
-/** Persistence seam used by `CalendarSyncEngine`. Credentials must not be stored here. */
+/// Persistence seam used by `CalendarSyncEngine`. Credentials must not be stored here.
 public interface CalendarCache {
     Map<String,Object> load(String sourceId) throws CalendarException;
     void store(String sourceId, Map<String,Object> state) throws CalendarException;

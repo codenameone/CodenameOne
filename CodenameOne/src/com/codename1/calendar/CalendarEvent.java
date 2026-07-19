@@ -28,8 +28,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** A portable calendar event. Mutable setters make it convenient to create an */
-/** event, while sources return detached instances so callers may safely edit. */
+/// A portable calendar event. Mutable setters make it convenient to create an
+/// event, while sources return detached instances so callers may safely edit.
 public class CalendarEvent {
     public enum Status { CONFIRMED, TENTATIVE, CANCELED }
     public enum Availability { BUSY, FREE, TENTATIVE, OUT_OF_OFFICE, WORKING_ELSEWHERE }

@@ -22,7 +22,7 @@
  */
 package com.codename1.calendar;
 
-/** Either an instant with an Olson time-zone ID or an all-day date. */
+/// Either an instant with an Olson time-zone ID or an all-day date.
 public final class CalendarDateTime {
     private final long timestamp;
     private final String timeZoneId;
