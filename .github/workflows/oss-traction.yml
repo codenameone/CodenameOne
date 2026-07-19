@@ -8,9 +8,15 @@ on:
 
 permissions:
   actions: read
-  contents: read
+  # The scheduled job stores aggregate star history in an unpublished draft
+  # release. It does not push commits or publish a release.
+  contents: write
   discussions: read
   issues: read
+
+concurrency:
+  group: oss-traction-snapshot
+  cancel-in-progress: false
 
 jobs:
   snapshot:
@@ -41,10 +47,11 @@ jobs:
       - name: Preserve snapshot
         uses: actions/upload-artifact@v7
         with:
-          # A stable name lets later runs discover aggregate baselines without
-          # enumerating the people who starred the repository.
+          # Keep the human-readable output under the repository's intentionally
+          # short artifact-retention policy. Durable aggregate state lives in
+          # an unpublished draft release.
           name: oss-traction-snapshot
           path: |
             ${{ runner.temp }}/oss-traction.json
             ${{ runner.temp }}/oss-traction.md
-          retention-days: 120
+          retention-days: 2

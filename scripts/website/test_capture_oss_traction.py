@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 
 import datetime as dt
-import io
 import json
 import unittest
-import zipfile
 from unittest import mock
 
 import capture_oss_traction as traction
@@ -35,23 +33,103 @@ class CaptureOssTractionTest(unittest.TestCase):
         self.assertFalse(growth["last_28_days"]["available"])
         self.assertFalse(growth["last_90_days"]["available"])
 
-    def test_load_artifact_snapshot_reads_aggregate_report(self):
-        report = self.snapshot(
-            dt.datetime(2026, 7, 11, 12, tzinfo=dt.timezone.utc), 104
-        )
-        archive = io.BytesIO()
-        with zipfile.ZipFile(archive, "w") as bundle:
-            bundle.writestr("oss-traction.json", json.dumps(report))
-
-        with mock.patch.object(
-            traction, "api_request_bytes", return_value=archive.getvalue()
-        ):
+    def test_load_snapshot_history_reads_matching_draft_release(self):
+        expected = [
+            self.snapshot(dt.datetime(2026, 7, 11, 12, tzinfo=dt.timezone.utc), 104)
+        ]
+        releases = [
+            {"id": 1, "draft": False, "tag_name": traction.STATE_RELEASE_TAG},
+            {
+                "id": 42,
+                "draft": True,
+                "tag_name": traction.STATE_RELEASE_TAG,
+                "body": json.dumps({"schema_version": 1, "snapshots": expected}),
+            },
+        ]
+        with mock.patch.object(traction, "paged_rest", return_value=releases):
             self.assertEqual(
-                traction.load_artifact_snapshot(
-                    "https://example.invalid/artifact", "token"
-                ),
-                report,
+                traction.load_snapshot_history("owner/repository", "token"),
+                (42, expected),
             )
+
+    def test_load_snapshot_history_starts_empty_without_draft(self):
+        with mock.patch.object(traction, "paged_rest", return_value=[]):
+            self.assertEqual(
+                traction.load_snapshot_history("owner/repository", "token"),
+                (None, []),
+            )
+
+    def test_load_snapshot_history_rejects_unknown_schema(self):
+        releases = [
+            {
+                "id": 42,
+                "draft": True,
+                "tag_name": traction.STATE_RELEASE_TAG,
+                "body": json.dumps({"schema_version": 2, "snapshots": []}),
+            }
+        ]
+        with mock.patch.object(traction, "paged_rest", return_value=releases):
+            with self.assertRaisesRegex(
+                traction.GitHubApiError, "unsupported state schema"
+            ):
+                traction.load_snapshot_history("owner/repository", "token")
+
+    def test_update_snapshot_history_prunes_and_appends(self):
+        now = dt.datetime(2026, 7, 18, 12, tzinfo=dt.timezone.utc)
+        history = [
+            self.snapshot(now - dt.timedelta(days=101), 90),
+            self.snapshot(now - dt.timedelta(days=8), 104),
+        ]
+        report = self.snapshot(now, 110)
+
+        updated = traction.update_snapshot_history(history, report, now)
+
+        self.assertEqual(updated, [history[1], report])
+
+    def test_save_snapshot_history_creates_unpublished_draft(self):
+        history = [
+            self.snapshot(
+                dt.datetime(2026, 7, 18, 12, tzinfo=dt.timezone.utc), 110
+            )
+        ]
+        with mock.patch.object(traction, "api_request", return_value={}) as request:
+            traction.save_snapshot_history(
+                "owner/repository", "token", None, history
+            )
+
+        _, kwargs = request.call_args
+        self.assertEqual(kwargs["method"], "POST")
+        self.assertTrue(kwargs["payload"]["draft"])
+        self.assertFalse(kwargs["payload"]["prerelease"])
+        self.assertEqual(kwargs["payload"]["tag_name"], traction.STATE_RELEASE_TAG)
+        self.assertEqual(json.loads(kwargs["payload"]["body"])["snapshots"], history)
+
+    def test_save_snapshot_history_updates_existing_draft(self):
+        history = [
+            self.snapshot(
+                dt.datetime(2026, 7, 18, 12, tzinfo=dt.timezone.utc), 110
+            )
+        ]
+        with mock.patch.object(traction, "api_request", return_value={}) as request:
+            traction.save_snapshot_history(
+                "owner/repository", "token", 42, history
+            )
+
+        self.assertEqual(
+            request.call_args,
+            mock.call(
+                "https://api.github.com/repos/owner/repository/releases/42",
+                "token",
+                method="PATCH",
+                payload={
+                    "body": json.dumps(
+                        {"schema_version": 1, "snapshots": history},
+                        indent=2,
+                        sort_keys=True,
+                    )
+                },
+            ),
+        )
 
     def test_summary_marks_unavailable_traffic(self):
         report = {
