@@ -2794,6 +2794,122 @@
     return output;
   }
 
+  // isConfigSupported() only validates the shape of a WebCodecs configuration
+  // in some Chromium builds.  Linux headless Chromium can report H.264 as
+  // supported there and then deliver NotSupportedError through the encoder's
+  // asynchronous error callback.  Probe the operation we actually depend on:
+  // configure, encode one frame, and flush it successfully.
+  function cn1VideoIoProbeVideoEncoder(codec) {
+    if (!global.VideoEncoder || !global.VideoFrame) {
+      return Promise.resolve(false);
+    }
+    return new Promise(function(resolve) {
+      var encoder = null;
+      var frame = null;
+      var timer = null;
+      var settled = false;
+      var producedOutput = false;
+      var finish = function(supported) {
+        if (settled) { return; }
+        settled = true;
+        if (timer !== null) { global.clearTimeout(timer); }
+        try { if (frame) { frame.close(); } } catch (_frameCloseError) {}
+        try {
+          if (encoder && encoder.state !== 'closed') { encoder.close(); }
+        } catch (_encoderCloseError) {}
+        resolve(!!supported);
+      };
+      timer = global.setTimeout(function() { finish(false); }, 5000);
+      try {
+        encoder = new global.VideoEncoder({
+          output: function() { producedOutput = true; },
+          error: function() { finish(false); }
+        });
+        var config = {
+          codec: String(codec || ''),
+          width: 128,
+          height: 96,
+          bitrate: 800000,
+          framerate: 6
+        };
+        if (config.codec.indexOf('avc1.') === 0) {
+          config.avc = { format: 'avc' };
+        }
+        encoder.configure(config);
+        frame = new global.VideoFrame(new Uint8Array(128 * 96 * 4), {
+          format: 'RGBA',
+          codedWidth: 128,
+          codedHeight: 96,
+          timestamp: 0
+        });
+        encoder.encode(frame, { keyFrame: true });
+        frame.close();
+        frame = null;
+        encoder.flush().then(function() {
+          finish(producedOutput);
+        }, function() {
+          finish(false);
+        });
+      } catch (_probeError) {
+        finish(false);
+      }
+    });
+  }
+
+  function cn1VideoIoProbeAudioEncoder(codec) {
+    if (!global.AudioEncoder || !global.AudioData) {
+      return Promise.resolve(false);
+    }
+    return new Promise(function(resolve) {
+      var encoder = null;
+      var audio = null;
+      var timer = null;
+      var settled = false;
+      var producedOutput = false;
+      var finish = function(supported) {
+        if (settled) { return; }
+        settled = true;
+        if (timer !== null) { global.clearTimeout(timer); }
+        try { if (audio) { audio.close(); } } catch (_audioCloseError) {}
+        try {
+          if (encoder && encoder.state !== 'closed') { encoder.close(); }
+        } catch (_audioEncoderCloseError) {}
+        resolve(!!supported);
+      };
+      timer = global.setTimeout(function() { finish(false); }, 5000);
+      try {
+        encoder = new global.AudioEncoder({
+          output: function() { producedOutput = true; },
+          error: function() { finish(false); }
+        });
+        encoder.configure({
+          codec: String(codec || ''),
+          sampleRate: 48000,
+          numberOfChannels: 1,
+          bitrate: 128000
+        });
+        audio = new global.AudioData({
+          format: 's16',
+          sampleRate: 48000,
+          numberOfFrames: 4800,
+          numberOfChannels: 1,
+          timestamp: 0,
+          data: new Int16Array(4800)
+        });
+        encoder.encode(audio);
+        audio.close();
+        audio = null;
+        encoder.flush().then(function() {
+          finish(producedOutput);
+        }, function() {
+          finish(false);
+        });
+      } catch (_probeError) {
+        finish(false);
+      }
+    });
+  }
+
   hostBridge.register('__cn1_video_io__', function(request) {
     var payload = request || {};
     var op = String(payload.op || '');
@@ -2806,40 +2922,10 @@
       return !!(global.AudioEncoder && global.AudioData);
     }
     if (op === 'videoEncoderSupported') {
-      if (!global.VideoEncoder || typeof global.VideoEncoder.isConfigSupported !== 'function') {
-        return false;
-      }
-      var videoCodec = String(payload.codec || '');
-      var videoSupportConfig = {
-        codec: videoCodec,
-        width: 128,
-        height: 96,
-        bitrate: 800000,
-        framerate: 6
-      };
-      if (videoCodec.indexOf('avc1.') === 0) {
-        videoSupportConfig.avc = { format: 'avc' };
-      }
-      return global.VideoEncoder.isConfigSupported(videoSupportConfig).then(function(result) {
-        return !!(result && result.supported);
-      }, function() {
-        return false;
-      });
+      return cn1VideoIoProbeVideoEncoder(payload.codec);
     }
     if (op === 'audioEncoderSupported') {
-      if (!global.AudioEncoder || typeof global.AudioEncoder.isConfigSupported !== 'function') {
-        return false;
-      }
-      return global.AudioEncoder.isConfigSupported({
-        codec: String(payload.codec || ''),
-        sampleRate: 48000,
-        numberOfChannels: 1,
-        bitrate: 128000
-      }).then(function(result) {
-        return !!(result && result.supported);
-      }, function() {
-        return false;
-      });
+      return cn1VideoIoProbeAudioEncoder(payload.codec);
     }
     if (op === 'videoBlobUrl') {
       var blobBytes = cn1VideoIoBase64Bytes(payload.b64);

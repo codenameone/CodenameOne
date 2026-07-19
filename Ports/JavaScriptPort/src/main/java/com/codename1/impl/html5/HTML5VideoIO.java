@@ -49,7 +49,7 @@ import java.util.List;
 /// which lets the browser's asynchronous `seeked`/`loadedmetadata` events fire while a
 /// decode call appears synchronous to the caller.
 ///
-/// **Encoding** uses the WebCodecs `VideoEncoder`/`AudioEncoder` (H.264/VP9 + AAC/Opus)
+/// **Encoding** uses the WebCodecs `VideoEncoder`/`AudioEncoder` (H.264/VP8/VP9 + AAC/Opus)
 /// muxed into MP4/WebM with the standalone `mp4-muxer`/`webm-muxer` libraries (loaded
 /// from a CDN, the same mechanism the port uses for VideoJS). Frames are pushed as RGBA,
 /// the muxer's in-memory buffer is handed back to Java on `close()` and written to the
@@ -64,6 +64,9 @@ class HTML5VideoIO extends VideoIO {
         List<VideoCodec> out = new ArrayList<VideoCodec>();
         if (cn1VideoEncoderSupported("avc1.42001f")) {
             out.add(new VideoCodec(CODEC_H264, "H.264 (WebCodecs)", "video/avc", true, true, false, true, -1, -1, new String[]{CONTAINER_MP4}));
+        }
+        if (cn1VideoEncoderSupported("vp8")) {
+            out.add(new VideoCodec(CODEC_VP8, "VP8 (WebCodecs)", "video/vp8", true, true, false, true, -1, -1, new String[]{CONTAINER_WEBM}));
         }
         if (cn1VideoEncoderSupported("vp09.00.10.08")) {
             out.add(new VideoCodec(CODEC_VP9, "VP9 (WebCodecs)", "video/vp9", true, true, false, true, -1, -1, new String[]{CONTAINER_WEBM}));
@@ -229,8 +232,12 @@ class HTML5VideoIO extends VideoIO {
             if (br <= 0) {
                 br = (int) Math.max(800000L, Math.min((long) (width * (long) height * Math.max(1f, frameRate) * 0.10), 100000000L));
             }
+            int audioBr = cfg.getAudioBitRate();
+            if (hasAudio && audioBr <= 0) {
+                audioBr = 128000;
+            }
             this.peer = cn1EncOpen(cfg.getContainer(), cfg.getVideoCodec(), width, height, Math.round(frameRate), br,
-                    hasAudio, cfg.getAudioCodec(), cfg.getAudioBitRate(), cfg.getSampleRate(), cfg.getAudioChannels());
+                    hasAudio, cfg.getAudioCodec(), audioBr, cfg.getSampleRate(), cfg.getAudioChannels());
             if (peer == 0) {
                 throw new IOException("Failed to configure the WebCodecs encoder: " + safeError(0));
             }
