@@ -2794,6 +2794,24 @@
     return output;
   }
 
+  // Capability discovery is intentionally destructive: unlike
+  // isConfigSupported(), these probes create a real encoder and require it to
+  // produce output. Cache each Promise for the lifetime of the page so callers
+  // such as isEncoderSupported() don't repeatedly allocate codec sessions.
+  // Repeated create/close cycles can temporarily exhaust Chromium's Linux
+  // software codec factories and make the immediately following real writer
+  // fail with NotSupportedError even though the probe just succeeded.
+  var cn1VideoIoVideoEncoderSupport = Object.create(null);
+  var cn1VideoIoAudioEncoderSupport = Object.create(null);
+
+  function cn1VideoIoCachedEncoderSupport(cache, codec, probe) {
+    var key = String(codec || '');
+    if (!Object.prototype.hasOwnProperty.call(cache, key)) {
+      cache[key] = probe(key);
+    }
+    return cache[key];
+  }
+
   // isConfigSupported() only validates the shape of a WebCodecs configuration
   // in some Chromium builds.  Linux headless Chromium can report H.264 as
   // supported there and then deliver NotSupportedError through the encoder's
@@ -2817,7 +2835,10 @@
         try {
           if (encoder && encoder.state !== 'closed') { encoder.close(); }
         } catch (_encoderCloseError) {}
-        resolve(!!supported);
+        // WebCodecs close() initiates teardown of the platform encoder. Give
+        // Chromium a macrotask to release that session before discovery moves
+        // on to another codec or the application opens its real writer.
+        global.setTimeout(function() { resolve(!!supported); }, 0);
       };
       timer = global.setTimeout(function() { finish(false); }, 5000);
       try {
@@ -2874,7 +2895,7 @@
         try {
           if (encoder && encoder.state !== 'closed') { encoder.close(); }
         } catch (_audioEncoderCloseError) {}
-        resolve(!!supported);
+        global.setTimeout(function() { resolve(!!supported); }, 0);
       };
       timer = global.setTimeout(function() { finish(false); }, 5000);
       try {
@@ -2922,10 +2943,12 @@
       return !!(global.AudioEncoder && global.AudioData);
     }
     if (op === 'videoEncoderSupported') {
-      return cn1VideoIoProbeVideoEncoder(payload.codec);
+      return cn1VideoIoCachedEncoderSupport(cn1VideoIoVideoEncoderSupport,
+        payload.codec, cn1VideoIoProbeVideoEncoder);
     }
     if (op === 'audioEncoderSupported') {
-      return cn1VideoIoProbeAudioEncoder(payload.codec);
+      return cn1VideoIoCachedEncoderSupport(cn1VideoIoAudioEncoderSupport,
+        payload.codec, cn1VideoIoProbeAudioEncoder);
     }
     if (op === 'videoBlobUrl') {
       var blobBytes = cn1VideoIoBase64Bytes(payload.b64);
@@ -3066,9 +3089,9 @@
         encoderState.videoEncoder = new global.VideoEncoder({
           output: function(chunk, meta) {
             try { muxer.addVideoChunk(chunk, meta); }
-            catch (error) { encoderState.error = String(error); }
+            catch (error) { encoderState.error = 'video muxer: ' + String(error); }
           },
-          error: function(error) { encoderState.error = String(error); }
+          error: function(error) { encoderState.error = 'video encoder: ' + String(error); }
         });
         var videoConfig = {
           codec: videoConfigCodec,
@@ -3086,9 +3109,9 @@
           encoderState.audioEncoder = new global.AudioEncoder({
             output: function(chunk, meta) {
               try { muxer.addAudioChunk(chunk, meta); }
-              catch (error) { encoderState.error = String(error); }
+              catch (error) { encoderState.error = 'audio muxer: ' + String(error); }
             },
-            error: function(error) { encoderState.error = String(error); }
+            error: function(error) { encoderState.error = 'audio encoder: ' + String(error); }
           });
           encoderState.audioEncoder.configure({
             codec: audioConfigCodec,
@@ -3124,7 +3147,7 @@
         frameEncoder.videoEncoder.encode(frame);
         frame.close();
       } catch (error) {
-        frameEncoder.error = String(error);
+        frameEncoder.error = 'video frame: ' + String(error);
       }
       return null;
     }
@@ -3147,7 +3170,7 @@
         audioEncoder.audioEncoder.encode(audioData);
         audioData.close();
       } catch (error) {
-        audioEncoder.error = String(error);
+        audioEncoder.error = 'audio frame: ' + String(error);
       }
       return null;
     }
@@ -3165,7 +3188,7 @@
             flushEncoder.result = flushEncoder.target.buffer;
           })
           .catch(function(error) {
-            flushEncoder.error = String(error);
+            flushEncoder.error = 'encoder flush: ' + String(error);
           })
           .then(function() {
             flushEncoder.done = true;
