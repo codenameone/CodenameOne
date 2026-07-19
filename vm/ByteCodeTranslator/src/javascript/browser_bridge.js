@@ -2794,6 +2794,143 @@
     return output;
   }
 
+  // Capability discovery is intentionally destructive: unlike
+  // isConfigSupported(), these probes create a real encoder and require it to
+  // produce output. Cache each Promise for the lifetime of the page so callers
+  // such as isEncoderSupported() don't repeatedly allocate codec sessions.
+  // Repeated create/close cycles can temporarily exhaust Chromium's Linux
+  // software codec factories and make the immediately following real writer
+  // fail with NotSupportedError even though the probe just succeeded.
+  var cn1VideoIoVideoEncoderSupport = Object.create(null);
+  var cn1VideoIoAudioEncoderSupport = Object.create(null);
+
+  function cn1VideoIoCachedEncoderSupport(cache, codec, probe) {
+    var key = String(codec || '');
+    if (!Object.prototype.hasOwnProperty.call(cache, key)) {
+      cache[key] = probe(key);
+    }
+    return cache[key];
+  }
+
+  // isConfigSupported() only validates the shape of a WebCodecs configuration
+  // in some Chromium builds.  Linux headless Chromium can report H.264 as
+  // supported there and then deliver NotSupportedError through the encoder's
+  // asynchronous error callback.  Probe the operation we actually depend on:
+  // configure, encode one frame, and flush it successfully.
+  function cn1VideoIoProbeVideoEncoder(codec) {
+    if (!global.VideoEncoder || !global.VideoFrame) {
+      return Promise.resolve(false);
+    }
+    return new Promise(function(resolve) {
+      var encoder = null;
+      var frame = null;
+      var timer = null;
+      var settled = false;
+      var producedOutput = false;
+      var finish = function(supported) {
+        if (settled) { return; }
+        settled = true;
+        if (timer !== null) { global.clearTimeout(timer); }
+        try { if (frame) { frame.close(); } } catch (_frameCloseError) {}
+        try {
+          if (encoder && encoder.state !== 'closed') { encoder.close(); }
+        } catch (_encoderCloseError) {}
+        // WebCodecs close() initiates teardown of the platform encoder. Give
+        // Chromium a macrotask to release that session before discovery moves
+        // on to another codec or the application opens its real writer.
+        global.setTimeout(function() { resolve(!!supported); }, 0);
+      };
+      timer = global.setTimeout(function() { finish(false); }, 5000);
+      try {
+        encoder = new global.VideoEncoder({
+          output: function() { producedOutput = true; },
+          error: function() { finish(false); }
+        });
+        var config = {
+          codec: String(codec || ''),
+          width: 128,
+          height: 96,
+          bitrate: 800000,
+          framerate: 6
+        };
+        if (config.codec.indexOf('avc1.') === 0) {
+          config.avc = { format: 'avc' };
+        }
+        encoder.configure(config);
+        frame = new global.VideoFrame(new Uint8Array(128 * 96 * 4), {
+          format: 'RGBA',
+          codedWidth: 128,
+          codedHeight: 96,
+          timestamp: 0
+        });
+        encoder.encode(frame, { keyFrame: true });
+        frame.close();
+        frame = null;
+        encoder.flush().then(function() {
+          finish(producedOutput);
+        }, function() {
+          finish(false);
+        });
+      } catch (_probeError) {
+        finish(false);
+      }
+    });
+  }
+
+  function cn1VideoIoProbeAudioEncoder(codec) {
+    if (!global.AudioEncoder || !global.AudioData) {
+      return Promise.resolve(false);
+    }
+    return new Promise(function(resolve) {
+      var encoder = null;
+      var audio = null;
+      var timer = null;
+      var settled = false;
+      var producedOutput = false;
+      var finish = function(supported) {
+        if (settled) { return; }
+        settled = true;
+        if (timer !== null) { global.clearTimeout(timer); }
+        try { if (audio) { audio.close(); } } catch (_audioCloseError) {}
+        try {
+          if (encoder && encoder.state !== 'closed') { encoder.close(); }
+        } catch (_audioEncoderCloseError) {}
+        global.setTimeout(function() { resolve(!!supported); }, 0);
+      };
+      timer = global.setTimeout(function() { finish(false); }, 5000);
+      try {
+        encoder = new global.AudioEncoder({
+          output: function() { producedOutput = true; },
+          error: function() { finish(false); }
+        });
+        encoder.configure({
+          codec: String(codec || ''),
+          sampleRate: 48000,
+          numberOfChannels: 1,
+          bitrate: 128000
+        });
+        audio = new global.AudioData({
+          format: 's16',
+          sampleRate: 48000,
+          numberOfFrames: 4800,
+          numberOfChannels: 1,
+          timestamp: 0,
+          data: new Int16Array(4800)
+        });
+        encoder.encode(audio);
+        audio.close();
+        audio = null;
+        encoder.flush().then(function() {
+          finish(producedOutput);
+        }, function() {
+          finish(false);
+        });
+      } catch (_probeError) {
+        finish(false);
+      }
+    });
+  }
+
   hostBridge.register('__cn1_video_io__', function(request) {
     var payload = request || {};
     var op = String(payload.op || '');
@@ -2804,6 +2941,14 @@
     }
     if (op === 'audioWebCodecsAvailable') {
       return !!(global.AudioEncoder && global.AudioData);
+    }
+    if (op === 'videoEncoderSupported') {
+      return cn1VideoIoCachedEncoderSupport(cn1VideoIoVideoEncoderSupport,
+        payload.codec, cn1VideoIoProbeVideoEncoder);
+    }
+    if (op === 'audioEncoderSupported') {
+      return cn1VideoIoCachedEncoderSupport(cn1VideoIoAudioEncoderSupport,
+        payload.codec, cn1VideoIoProbeAudioEncoder);
     }
     if (op === 'videoBlobUrl') {
       var blobBytes = cn1VideoIoBase64Bytes(payload.b64);
@@ -2944,9 +3089,9 @@
         encoderState.videoEncoder = new global.VideoEncoder({
           output: function(chunk, meta) {
             try { muxer.addVideoChunk(chunk, meta); }
-            catch (error) { encoderState.error = String(error); }
+            catch (error) { encoderState.error = 'video muxer: ' + String(error); }
           },
-          error: function(error) { encoderState.error = String(error); }
+          error: function(error) { encoderState.error = 'video encoder: ' + String(error); }
         });
         var videoConfig = {
           codec: videoConfigCodec,
@@ -2964,9 +3109,9 @@
           encoderState.audioEncoder = new global.AudioEncoder({
             output: function(chunk, meta) {
               try { muxer.addAudioChunk(chunk, meta); }
-              catch (error) { encoderState.error = String(error); }
+              catch (error) { encoderState.error = 'audio muxer: ' + String(error); }
             },
-            error: function(error) { encoderState.error = String(error); }
+            error: function(error) { encoderState.error = 'audio encoder: ' + String(error); }
           });
           encoderState.audioEncoder.configure({
             codec: audioConfigCodec,
@@ -3002,7 +3147,7 @@
         frameEncoder.videoEncoder.encode(frame);
         frame.close();
       } catch (error) {
-        frameEncoder.error = String(error);
+        frameEncoder.error = 'video frame: ' + String(error);
       }
       return null;
     }
@@ -3025,7 +3170,7 @@
         audioEncoder.audioEncoder.encode(audioData);
         audioData.close();
       } catch (error) {
-        audioEncoder.error = String(error);
+        audioEncoder.error = 'audio frame: ' + String(error);
       }
       return null;
     }
@@ -3043,7 +3188,7 @@
             flushEncoder.result = flushEncoder.target.buffer;
           })
           .catch(function(error) {
-            flushEncoder.error = String(error);
+            flushEncoder.error = 'encoder flush: ' + String(error);
           })
           .then(function() {
             flushEncoder.done = true;
