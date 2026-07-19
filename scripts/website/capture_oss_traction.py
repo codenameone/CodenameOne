@@ -103,6 +103,16 @@ def optional_rest(path: str, token: str) -> dict:
         return {"available": False, "error": str(error)}
 
 
+def collect_traffic(repository: str, token: str) -> dict:
+    return {
+        "views": optional_rest(f"/repos/{repository}/traffic/views", token),
+        "clones": optional_rest(f"/repos/{repository}/traffic/clones", token),
+        "referrers": optional_rest(
+            f"/repos/{repository}/traffic/popular/referrers", token
+        ),
+    }
+
+
 def collect_discussions(owner: str, name: str, token: str, cutoff: dt.datetime) -> list[dict]:
     query = """
       query($owner: String!, $name: String!, $cursor: String) {
@@ -141,16 +151,21 @@ def collect_discussions(owner: str, name: str, token: str, cutoff: dt.datetime) 
         cursor = connection["pageInfo"]["endCursor"]
 
 
-def collect_snapshot(repository: str, token: str, now: dt.datetime) -> dict:
+def collect_snapshot(
+    repository: str,
+    repository_token: str,
+    now: dt.datetime,
+    traffic_token: str | None = None,
+) -> dict:
     try:
         owner, name = repository.split("/", 1)
     except ValueError as error:
         raise ValueError("repository must use owner/name format") from error
     cutoff = now - dt.timedelta(days=28)
-    metadata = api_request(f"{API_ROOT}/repos/{repository}", token)
+    metadata = api_request(f"{API_ROOT}/repos/{repository}", repository_token)
 
     stargazers = paged_rest(
-        f"/repos/{repository}/stargazers", token, accept=STAR_ACCEPT
+        f"/repos/{repository}/stargazers", repository_token, accept=STAR_ACCEPT
     )
     star_times = [
         parse_timestamp(item["starred_at"])
@@ -163,14 +178,15 @@ def collect_snapshot(repository: str, token: str, now: dt.datetime) -> dict:
         + repository
         + "/issues?state=all&since="
         + urllib.parse.quote(cutoff.isoformat()),
-        token,
+        repository_token,
     )
     new_issues = [
         item
         for item in issue_candidates
         if "pull_request" not in item and parse_timestamp(item["created_at"]) >= cutoff
     ]
-    discussions = collect_discussions(owner, name, token, cutoff)
+    discussions = collect_discussions(owner, name, repository_token, cutoff)
+    traffic = collect_traffic(repository, traffic_token or repository_token)
 
     return {
         "schema_version": 1,
@@ -190,13 +206,7 @@ def collect_snapshot(repository: str, token: str, now: dt.datetime) -> dict:
             "discussions_created": len(discussions),
             "unique_discussion_authors": unique_logins(discussions, "author"),
         },
-        "traffic_last_14_days": {
-            "views": optional_rest(f"/repos/{repository}/traffic/views", token),
-            "clones": optional_rest(f"/repos/{repository}/traffic/clones", token),
-            "referrers": optional_rest(
-                f"/repos/{repository}/traffic/popular/referrers", token
-            ),
-        },
+        "traffic_last_14_days": traffic,
     }
 
 
@@ -250,15 +260,23 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def resolve_tokens(environ: dict[str, str]) -> tuple[str | None, str | None]:
+    repository_token = environ.get("GITHUB_TOKEN") or environ.get("GH_TOKEN")
+    traffic_token = environ.get("OSS_TRACTION_TOKEN") or repository_token
+    return repository_token, traffic_token
+
+
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
-    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
-    if not token:
+    repository_token, traffic_token = resolve_tokens(os.environ)
+    if not repository_token:
         print("Set GH_TOKEN or GITHUB_TOKEN before capturing a snapshot.", file=sys.stderr)
         return 2
     now = parse_timestamp(args.now) if args.now else dt.datetime.now(dt.timezone.utc)
     try:
-        report = collect_snapshot(args.repository, token, now)
+        report = collect_snapshot(
+            args.repository, repository_token, now, traffic_token=traffic_token
+        )
     except (GitHubApiError, KeyError, TypeError, ValueError) as error:
         print(f"Unable to capture OSS traction: {error}", file=sys.stderr)
         return 1

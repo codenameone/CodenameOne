@@ -2,6 +2,7 @@
 
 import datetime as dt
 import unittest
+from unittest import mock
 
 import capture_oss_traction as traction
 
@@ -52,6 +53,43 @@ class CaptureOssTractionTest(unittest.TestCase):
             {},
         ]
         self.assertEqual(traction.unique_logins(items, "user"), 2)
+
+    def test_resolve_tokens_keeps_traffic_token_separate(self):
+        self.assertEqual(
+            traction.resolve_tokens(
+                {
+                    "GITHUB_TOKEN": "repository-token",
+                    "OSS_TRACTION_TOKEN": "traffic-token",
+                }
+            ),
+            ("repository-token", "traffic-token"),
+        )
+
+    def test_resolve_tokens_falls_back_to_repository_token(self):
+        self.assertEqual(
+            traction.resolve_tokens({"GH_TOKEN": "repository-token"}),
+            ("repository-token", "repository-token"),
+        )
+
+    def test_collect_traffic_uses_only_traffic_token(self):
+        with mock.patch.object(
+            traction,
+            "optional_rest",
+            return_value={"available": True, "data": {}},
+        ) as request:
+            traction.collect_traffic("owner/repository", "traffic-token")
+
+        self.assertEqual(
+            request.call_args_list,
+            [
+                mock.call("/repos/owner/repository/traffic/views", "traffic-token"),
+                mock.call("/repos/owner/repository/traffic/clones", "traffic-token"),
+                mock.call(
+                    "/repos/owner/repository/traffic/popular/referrers",
+                    "traffic-token",
+                ),
+            ],
+        )
 
 
 if __name__ == "__main__":
