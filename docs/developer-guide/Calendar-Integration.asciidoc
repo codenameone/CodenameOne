@@ -6,7 +6,7 @@ The `com.codename1.calendar` package provides scheduling rather than just an
 recurrence, attendees, alarms, free/busy intervals, attachments, conference
 links, paging, incremental synchronization, and explicit edit conflicts.
 
-The API is capability based. Do not branch on the platform name. Ask the
+The API is capability based. Don't branch on the platform name. Ask the
 source what it can do:
 
 [source,java]
@@ -137,9 +137,9 @@ ios.NSCalendarsWriteOnlyAccessUsageDescription=Explain why creating events is ne
 ios.NSRemindersFullAccessUsageDescription=Explain why reminders are needed
 ----
 
-Windows calendar access is a restricted package capability and is never
-silently enabled. The built-in Win32 source currently reports unavailable,
-but an application-supplied native integration can request the MSIX capability
+Windows calendar access is a restricted package capability that requires an
+explicit opt-in. The built-in Win32 source currently reports unavailable, but
+an application-supplied native integration can request the MSIX capability
 after it has been approved. Opt in with:
 
 ----
