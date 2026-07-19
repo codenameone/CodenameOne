@@ -23,4 +23,8 @@
 package com.codename1.calendar;
 
 import com.codename1.util.AsyncResource;
-public interface CalendarHttpTransport { AsyncResource<CalendarHttpResponse> execute(CalendarHttpRequest request); }
+
+public interface CalendarHttpTransport {
+
+    AsyncResource<CalendarHttpResponse> execute(CalendarHttpRequest request);
+}

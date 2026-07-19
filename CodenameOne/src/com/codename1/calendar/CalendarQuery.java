@@ -24,26 +24,106 @@ package com.codename1.calendar;
 
 /// Query options shared by event and task listing operations.
 public class CalendarQuery {
-    private String calendarId, text, pageToken, syncToken;
-    private Long startTime, endTime;
+
+    private String calendarId;
+
+    private String text;
+
+    private String pageToken;
+
+    private String syncToken;
+
+    private Long startTime;
+
+    private Long endTime;
+
     private int pageSize = 100;
-    private boolean expandRecurrences = true, includeDeleted;
-    public String getCalendarId() { return calendarId; }
-    public CalendarQuery setCalendarId(String v) { calendarId = v; return this; }
-    public String getText() { return text; }
-    public CalendarQuery setText(String v) { text = v; return this; }
-    public String getPageToken() { return pageToken; }
-    public CalendarQuery setPageToken(String v) { pageToken = v; return this; }
-    public String getSyncToken() { return syncToken; }
-    public CalendarQuery setSyncToken(String v) { syncToken = v; return this; }
-    public Long getStartTime() { return startTime; }
-    public CalendarQuery setStartTime(Long v) { startTime = v; return this; }
-    public Long getEndTime() { return endTime; }
-    public CalendarQuery setEndTime(Long v) { endTime = v; return this; }
-    public int getPageSize() { return pageSize; }
-    public CalendarQuery setPageSize(int v) { if (v < 1) throw new IllegalArgumentException("pageSize"); pageSize = v; return this; }
-    public boolean isExpandRecurrences() { return expandRecurrences; }
-    public CalendarQuery setExpandRecurrences(boolean v) { expandRecurrences = v; return this; }
-    public boolean isIncludeDeleted() { return includeDeleted; }
-    public CalendarQuery setIncludeDeleted(boolean v) { includeDeleted = v; return this; }
+
+    private boolean expandRecurrences = true;
+
+    private boolean includeDeleted;
+
+    public String getCalendarId() {
+        return calendarId;
+    }
+
+    public CalendarQuery setCalendarId(String v) {
+        calendarId = v;
+        return this;
+    }
+
+    public String getText() {
+        return text;
+    }
+
+    public CalendarQuery setText(String v) {
+        text = v;
+        return this;
+    }
+
+    public String getPageToken() {
+        return pageToken;
+    }
+
+    public CalendarQuery setPageToken(String v) {
+        pageToken = v;
+        return this;
+    }
+
+    public String getSyncToken() {
+        return syncToken;
+    }
+
+    public CalendarQuery setSyncToken(String v) {
+        syncToken = v;
+        return this;
+    }
+
+    public Long getStartTime() {
+        return startTime;
+    }
+
+    public CalendarQuery setStartTime(Long v) {
+        startTime = v;
+        return this;
+    }
+
+    public Long getEndTime() {
+        return endTime;
+    }
+
+    public CalendarQuery setEndTime(Long v) {
+        endTime = v;
+        return this;
+    }
+
+    public int getPageSize() {
+        return pageSize;
+    }
+
+    public CalendarQuery setPageSize(int v) {
+        if (v < 1) {
+            throw new IllegalArgumentException("pageSize");
+        }
+        pageSize = v;
+        return this;
+    }
+
+    public boolean isExpandRecurrences() {
+        return expandRecurrences;
+    }
+
+    public CalendarQuery setExpandRecurrences(boolean v) {
+        expandRecurrences = v;
+        return this;
+    }
+
+    public boolean isIncludeDeleted() {
+        return includeDeleted;
+    }
+
+    public CalendarQuery setIncludeDeleted(boolean v) {
+        includeDeleted = v;
+        return this;
+    }
 }

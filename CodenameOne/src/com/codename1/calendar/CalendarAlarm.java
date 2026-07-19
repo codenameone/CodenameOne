@@ -24,14 +24,44 @@ package com.codename1.calendar;
 
 /// An event/task alarm, either absolute or relative to its start/due time.
 public class CalendarAlarm {
-    public enum Method { DEFAULT, ALERT, EMAIL, AUDIO }
+
+    public enum Method {
+
+        DEFAULT, ALERT, EMAIL, AUDIO
+    }
+
     private Integer minutesBefore;
+
     private Long absoluteTime;
+
     private Method method = Method.DEFAULT;
-    public Integer getMinutesBefore() { return minutesBefore; }
-    public CalendarAlarm setMinutesBefore(Integer v) { minutesBefore = v; absoluteTime = null; return this; }
-    public Long getAbsoluteTime() { return absoluteTime; }
-    public CalendarAlarm setAbsoluteTime(Long v) { absoluteTime = v; minutesBefore = null; return this; }
-    public Method getMethod() { return method; }
-    public CalendarAlarm setMethod(Method v) { method = v == null ? Method.DEFAULT : v; return this; }
+
+    public Integer getMinutesBefore() {
+        return minutesBefore;
+    }
+
+    public CalendarAlarm setMinutesBefore(Integer v) {
+        minutesBefore = v;
+        absoluteTime = null;
+        return this;
+    }
+
+    public Long getAbsoluteTime() {
+        return absoluteTime;
+    }
+
+    public CalendarAlarm setAbsoluteTime(Long v) {
+        absoluteTime = v;
+        minutesBefore = null;
+        return this;
+    }
+
+    public Method getMethod() {
+        return method;
+    }
+
+    public CalendarAlarm setMethod(Method v) {
+        method = v == null ? Method.DEFAULT : v;
+        return this;
+    }
 }

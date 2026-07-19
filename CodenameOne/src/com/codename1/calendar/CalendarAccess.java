@@ -24,5 +24,6 @@ package com.codename1.calendar;
 
 /// Permission level requested from a local or online calendar source.
 public enum CalendarAccess {
+
     EVENTS_READ_ONLY, EVENTS_WRITE_ONLY, EVENTS_FULL, TASKS_FULL
 }

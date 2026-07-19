@@ -28,13 +28,28 @@ import java.util.List;
 
 /// One provider page, including continuation and incremental-sync tokens.
 public final class CalendarPage<T> {
+
     private final List<T> items;
-    private final String nextPageToken, syncToken;
+
+    private final String nextPageToken;
+
+    private final String syncToken;
+
     public CalendarPage(List<T> items, String nextPageToken, String syncToken) {
         this.items = Collections.unmodifiableList(items == null ? new ArrayList<T>() : new ArrayList<T>(items));
-        this.nextPageToken = nextPageToken; this.syncToken = syncToken;
+        this.nextPageToken = nextPageToken;
+        this.syncToken = syncToken;
     }
-    public List<T> getItems() { return items; }
-    public String getNextPageToken() { return nextPageToken; }
-    public String getSyncToken() { return syncToken; }
+
+    public List<T> getItems() {
+        return items;
+    }
+
+    public String getNextPageToken() {
+        return nextPageToken;
+    }
+
+    public String getSyncToken() {
+        return syncToken;
+    }
 }

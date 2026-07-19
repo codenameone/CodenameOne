@@ -28,7 +28,32 @@ import java.util.Map;
 
 /// Provider HTTP response body and selected concurrency/authentication headers.
 public final class CalendarHttpResponse {
-    private final int statusCode; private final String body; private final Map<String,String> headers;
-    public CalendarHttpResponse(int statusCode,String body,Map<String,String>headers){this.statusCode=statusCode;this.body=body;this.headers=Collections.unmodifiableMap(headers==null?new HashMap<String,String>():new HashMap<String,String>(headers));}
-    public int getStatusCode(){return statusCode;} public String getBody(){return body;} public String getHeader(String name){return headers.get(name);} public Map<String,String>getHeaders(){return headers;}
+
+    private final int statusCode;
+
+    private final String body;
+
+    private final Map<String, String> headers;
+
+    public CalendarHttpResponse(int statusCode, String body, Map<String, String> headers) {
+        this.statusCode = statusCode;
+        this.body = body;
+        this.headers = Collections.unmodifiableMap(headers == null ? new HashMap<String, String>() : new HashMap<String, String>(headers));
+    }
+
+    public int getStatusCode() {
+        return statusCode;
+    }
+
+    public String getBody() {
+        return body;
+    }
+
+    public String getHeader(String name) {
+        return headers.get(name);
+    }
+
+    public Map<String, String> getHeaders() {
+        return headers;
+    }
 }

@@ -28,26 +28,98 @@ import java.util.List;
 
 /// Portable RFC-5545-style recurrence rule.
 public class CalendarRecurrenceRule {
-    public enum Frequency { DAILY, WEEKLY, MONTHLY, YEARLY }
+
+    public enum Frequency {
+
+        DAILY, WEEKLY, MONTHLY, YEARLY
+    }
+
     private Frequency frequency;
+
     private int interval = 1;
+
     private Integer count;
+
     private CalendarDateTime until;
+
     private final List<Integer> daysOfWeek = new ArrayList<Integer>();
+
     private final List<Integer> daysOfMonth = new ArrayList<Integer>();
+
     private final List<Integer> months = new ArrayList<Integer>();
-    public Frequency getFrequency() { return frequency; }
-    public CalendarRecurrenceRule setFrequency(Frequency v) { frequency = v; return this; }
-    public int getInterval() { return interval; }
-    public CalendarRecurrenceRule setInterval(int v) { if (v < 1) throw new IllegalArgumentException("interval"); interval = v; return this; }
-    public Integer getCount() { return count; }
-    public CalendarRecurrenceRule setCount(Integer v) { count = v; return this; }
-    public CalendarDateTime getUntil() { return until; }
-    public CalendarRecurrenceRule setUntil(CalendarDateTime v) { until = v; return this; }
-    public CalendarRecurrenceRule addDayOfWeek(int v) { if (v < 1 || v > 7) throw new IllegalArgumentException("dayOfWeek"); daysOfWeek.add(v); return this; }
-    public CalendarRecurrenceRule addDayOfMonth(int v) { if (v == 0 || v < -31 || v > 31) throw new IllegalArgumentException("dayOfMonth"); daysOfMonth.add(v); return this; }
-    public CalendarRecurrenceRule addMonth(int v) { if (v < 1 || v > 12) throw new IllegalArgumentException("month"); months.add(v); return this; }
-    public List<Integer> getDaysOfWeek() { return Collections.unmodifiableList(daysOfWeek); }
-    public List<Integer> getDaysOfMonth() { return Collections.unmodifiableList(daysOfMonth); }
-    public List<Integer> getMonths() { return Collections.unmodifiableList(months); }
+
+    public Frequency getFrequency() {
+        return frequency;
+    }
+
+    public CalendarRecurrenceRule setFrequency(Frequency v) {
+        frequency = v;
+        return this;
+    }
+
+    public int getInterval() {
+        return interval;
+    }
+
+    public CalendarRecurrenceRule setInterval(int v) {
+        if (v < 1) {
+            throw new IllegalArgumentException("interval");
+        }
+        interval = v;
+        return this;
+    }
+
+    public Integer getCount() {
+        return count;
+    }
+
+    public CalendarRecurrenceRule setCount(Integer v) {
+        count = v;
+        return this;
+    }
+
+    public CalendarDateTime getUntil() {
+        return until;
+    }
+
+    public CalendarRecurrenceRule setUntil(CalendarDateTime v) {
+        until = v;
+        return this;
+    }
+
+    public CalendarRecurrenceRule addDayOfWeek(int v) {
+        if (v < 1 || v > 7) {
+            throw new IllegalArgumentException("dayOfWeek");
+        }
+        daysOfWeek.add(v);
+        return this;
+    }
+
+    public CalendarRecurrenceRule addDayOfMonth(int v) {
+        if (v == 0 || v < -31 || v > 31) {
+            throw new IllegalArgumentException("dayOfMonth");
+        }
+        daysOfMonth.add(v);
+        return this;
+    }
+
+    public CalendarRecurrenceRule addMonth(int v) {
+        if (v < 1 || v > 12) {
+            throw new IllegalArgumentException("month");
+        }
+        months.add(v);
+        return this;
+    }
+
+    public List<Integer> getDaysOfWeek() {
+        return Collections.unmodifiableList(daysOfWeek);
+    }
+
+    public List<Integer> getDaysOfMonth() {
+        return Collections.unmodifiableList(daysOfMonth);
+    }
+
+    public List<Integer> getMonths() {
+        return Collections.unmodifiableList(months);
+    }
 }

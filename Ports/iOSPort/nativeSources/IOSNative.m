@@ -574,7 +574,7 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isPainted__(CN1_THREAD_STATE_MULTI
     //XMLVM_END_WRAPPER
 }
 
-#if !TARGET_OS_WATCH && !TARGET_OS_TV
+#if defined(CN1_USE_CALENDAR) && !TARGET_OS_WATCH && !TARGET_OS_TV
 static EKEventStore* cn1CalendarStore() {
     static EKEventStore *store;
     static dispatch_once_t once;

@@ -27,11 +27,22 @@ import java.util.Map;
 
 /// Process-local cache, useful for tests or sessions that must leave no data on disk.
 public class MemoryCalendarCache implements CalendarCache {
-    private final Map<String,Map<String,Object>> states = new HashMap<String,Map<String,Object>>();
-    public synchronized Map<String,Object> load(String sourceId) {
-        Map<String,Object> state = states.get(sourceId);
-        return state == null ? new HashMap<String,Object>() : new HashMap<String,Object>(state);
+
+    private final Map<String, Map<String, Object>> states = new HashMap<String, Map<String, Object>>();
+
+    @Override
+    public synchronized Map<String, Object> load(String sourceId) {
+        Map<String, Object> state = states.get(sourceId);
+        return state == null ? new HashMap<String, Object>() : new HashMap<String, Object>(state);
     }
-    public synchronized void store(String sourceId, Map<String,Object> state) { states.put(sourceId, new HashMap<String,Object>(state)); }
-    public synchronized void clear(String sourceId) { states.remove(sourceId); }
+
+    @Override
+    public synchronized void store(String sourceId, Map<String, Object> state) {
+        states.put(sourceId, new HashMap<String, Object>(state));
+    }
+
+    @Override
+    public synchronized void clear(String sourceId) {
+        states.remove(sourceId);
+    }
 }

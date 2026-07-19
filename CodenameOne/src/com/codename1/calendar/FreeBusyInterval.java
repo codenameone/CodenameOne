@@ -24,14 +24,31 @@ package com.codename1.calendar;
 
 /// Busy interval returned by a scheduling/free-busy query.
 public final class FreeBusyInterval {
-    private final long startTime, endTime;
+
+    private final long startTime;
+
+    private final long endTime;
+
     private final CalendarEvent.Availability availability;
+
     public FreeBusyInterval(long startTime, long endTime, CalendarEvent.Availability availability) {
-        if (endTime < startTime) throw new IllegalArgumentException("endTime");
-        this.startTime = startTime; this.endTime = endTime;
+        if (endTime < startTime) {
+            throw new IllegalArgumentException("endTime");
+        }
+        this.startTime = startTime;
+        this.endTime = endTime;
         this.availability = availability == null ? CalendarEvent.Availability.BUSY : availability;
     }
-    public long getStartTime() { return startTime; }
-    public long getEndTime() { return endTime; }
-    public CalendarEvent.Availability getAvailability() { return availability; }
+
+    public long getStartTime() {
+        return startTime;
+    }
+
+    public long getEndTime() {
+        return endTime;
+    }
+
+    public CalendarEvent.Availability getAvailability() {
+        return availability;
+    }
 }

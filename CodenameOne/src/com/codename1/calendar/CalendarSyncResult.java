@@ -28,12 +28,34 @@ import java.util.List;
 
 /// Outcome of a manual/background synchronization pass.
 public final class CalendarSyncResult {
-    private int applied, remaining;
+
+    private int applied;
+
+    private int remaining;
+
     private final List<CalendarConflict> conflicts = new ArrayList<CalendarConflict>();
-    void applied() { applied++; }
-    void setRemaining(int v) { remaining = v; }
-    void addConflict(CalendarConflict v) { conflicts.add(v); }
-    public int getAppliedCount() { return applied; }
-    public int getRemainingCount() { return remaining; }
-    public List<CalendarConflict> getConflicts() { return Collections.unmodifiableList(conflicts); }
+
+    void applied() {
+        applied++;
+    }
+
+    void setRemaining(int v) {
+        remaining = v;
+    }
+
+    void addConflict(CalendarConflict v) {
+        conflicts.add(v);
+    }
+
+    public int getAppliedCount() {
+        return applied;
+    }
+
+    public int getRemainingCount() {
+        return remaining;
+    }
+
+    public List<CalendarConflict> getConflicts() {
+        return Collections.unmodifiableList(conflicts);
+    }
 }

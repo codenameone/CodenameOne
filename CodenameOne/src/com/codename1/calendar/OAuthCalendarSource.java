@@ -32,114 +32,159 @@ import java.util.Map;
 /// Shared authenticated HTTP behavior for online calendar sources. Tokens and
 /// credentials remain app-owned; the source only asks for a token when needed.
 public abstract class OAuthCalendarSource extends CalendarSource {
-    private final CalendarTokenProvider tokenProvider;
-    private final CalendarHttpTransport transport;
-    private final String[] scopes;
-    private volatile CalendarAuthorizationStatus authorizationStatus = CalendarAuthorizationStatus.NOT_DETERMINED;
 
-    protected OAuthCalendarSource(String id, String displayName, CalendarTokenProvider tokenProvider,
-            CalendarHttpTransport transport, String[] scopes) {
+    private final CalendarTokenProvider tokenProvider;
+
+    private final CalendarHttpTransport transport;
+
+    private final String[] scopes;
+
+    private CalendarAuthorizationStatus authorizationStatus = CalendarAuthorizationStatus.NOT_DETERMINED;
+
+    protected OAuthCalendarSource(String id, String displayName, CalendarTokenProvider tokenProvider, CalendarHttpTransport transport, String[] scopes) {
         super(id, displayName);
-        if (tokenProvider == null) throw new IllegalArgumentException("tokenProvider required");
+        if (tokenProvider == null) {
+            throw new IllegalArgumentException("tokenProvider required");
+        }
         this.tokenProvider = tokenProvider;
         this.transport = transport == null ? new DefaultCalendarHttpTransport() : transport;
-        this.scopes = scopes == null ? new String[0] : (String[])scopes.clone();
+        this.scopes = scopes == null ? new String[0] : (String[]) scopes.clone();
     }
 
-    public CalendarAuthorizationStatus getAuthorizationStatus(CalendarAccess access) {
+    @Override
+    public synchronized CalendarAuthorizationStatus getAuthorizationStatus(CalendarAccess access) {
         return authorizationStatus;
     }
 
+    private synchronized CalendarAuthorizationStatus setAuthorizationStatus(CalendarAuthorizationStatus status) {
+        authorizationStatus = status;
+        return status;
+    }
+
+    @Override
     public AsyncResource<CalendarAuthorizationStatus> requestAuthorization(CalendarAccess access) {
         final AsyncResource<CalendarAuthorizationStatus> out = new AsyncResource<CalendarAuthorizationStatus>();
         tokenProvider.getToken(scopes, false).ready(new SuccessCallback<CalendarAuthToken>() {
+
+            @Override
             public void onSucess(CalendarAuthToken token) {
-                authorizationStatus = CalendarAuthorizationStatus.FULL;
-                out.complete(authorizationStatus);
+                out.complete(setAuthorizationStatus(CalendarAuthorizationStatus.FULL));
             }
         }).except(new SuccessCallback<Throwable>() {
+
+            @Override
             public void onSucess(Throwable error) {
-                authorizationStatus = CalendarAuthorizationStatus.DENIED;
+                setAuthorizationStatus(CalendarAuthorizationStatus.DENIED);
                 out.error(authentication(error));
             }
         });
         return out;
     }
 
-    protected final AsyncResource<Map<String,Object>> json(String method, String url, Map<String,Object> body,
-            Map<String,String> headers) {
-        final AsyncResource<Map<String,Object>> out = new AsyncResource<Map<String,Object>>();
-        send(method, url, body == null ? null : JSONParser.toJson(body), "application/json", headers, false,
-                new ResponseCallback() {
-                    public void complete(CalendarHttpResponse response) {
-                        if (response.getBody() == null || response.getBody().length() == 0) {
-                            out.complete(Collections.<String,Object>emptyMap());
-                            return;
-                        }
-                        try { out.complete(JSONParser.parseJSON(response.getBody())); }
-                        catch (IOException ex) { out.error(new CalendarException(CalendarError.MALFORMED_RESPONSE, "Invalid provider JSON", response.getStatusCode(), ex)); }
-                    }
-                    public void error(Throwable error) { out.error(error); }
-                });
-        return out;
-    }
+    protected final AsyncResource<Map<String, Object>> json(String method, String url, Map<String, Object> body, Map<String, String> headers) {
+        final AsyncResource<Map<String, Object>> out = new AsyncResource<Map<String, Object>>();
+        send(method, url, body == null ? null : JSONParser.toJson(body), "application/json", headers, false, new ResponseCallback() {
 
-    protected final AsyncResource<CalendarHttpResponse> raw(String method, String url, String body,
-            String contentType, Map<String,String> headers) {
-        final AsyncResource<CalendarHttpResponse> out = new AsyncResource<CalendarHttpResponse>();
-        send(method, url, body, contentType, headers, false, new ResponseCallback() {
-            public void complete(CalendarHttpResponse response) { out.complete(response); }
-            public void error(Throwable error) { out.error(error); }
+            @Override
+            public void complete(CalendarHttpResponse response) {
+                if (response.getBody() == null || response.getBody().length() == 0) {
+                    out.complete(Collections.<String, Object>emptyMap());
+                    return;
+                }
+                try {
+                    out.complete(JSONParser.parseJSON(response.getBody()));
+                } catch (IOException ex) {
+                    out.error(new CalendarException(CalendarError.MALFORMED_RESPONSE, "Invalid provider JSON", response.getStatusCode(), ex));
+                }
+            }
+
+            @Override
+            public void error(Throwable error) {
+                out.error(error);
+            }
         });
         return out;
     }
 
-    private void send(final String method, final String url, final String body, final String contentType,
-            final Map<String,String> headers, final boolean refreshed, final ResponseCallback callback) {
+    protected final AsyncResource<CalendarHttpResponse> raw(String method, String url, String body, String contentType, Map<String, String> headers) {
+        final AsyncResource<CalendarHttpResponse> out = new AsyncResource<CalendarHttpResponse>();
+        send(method, url, body, contentType, headers, false, new ResponseCallback() {
+
+            @Override
+            public void complete(CalendarHttpResponse response) {
+                out.complete(response);
+            }
+
+            @Override
+            public void error(Throwable error) {
+                out.error(error);
+            }
+        });
+        return out;
+    }
+
+    private void send(final String method, final String url, final String body, final String contentType, final Map<String, String> headers, final boolean refreshed, final ResponseCallback callback) {
         tokenProvider.getToken(scopes, refreshed).ready(new SuccessCallback<CalendarAuthToken>() {
+
+            @Override
             public void onSucess(CalendarAuthToken token) {
-                CalendarHttpRequest request = new CalendarHttpRequest(method, url).setBody(body)
-                        .header("Authorization", "Bearer " + token.getAccessToken()).header("Accept", "application/json");
-                if (body != null && contentType != null) request.header("Content-Type", contentType);
-                if (headers != null) for (Map.Entry<String,String> entry : headers.entrySet()) request.header(entry.getKey(), entry.getValue());
+                CalendarHttpRequest request = new CalendarHttpRequest(method, url).setBody(body).header("Authorization", "Bearer " + token.getAccessToken()).header("Accept", "application/json");
+                if (body != null && contentType != null) {
+                    request.header("Content-Type", contentType);
+                }
+                if (headers != null) {
+                    for (Map.Entry<String, String> entry : headers.entrySet()) {
+                        request.header(entry.getKey(), entry.getValue());
+                    }
+                }
                 transport.execute(request).ready(new SuccessCallback<CalendarHttpResponse>() {
+
                     public void onSucess(CalendarHttpResponse response) {
                         if (response.getStatusCode() == 401 && !refreshed) {
                             send(method, url, body, contentType, headers, true, callback);
                         } else if (response.getStatusCode() >= 200 && response.getStatusCode() < 300) {
                             callback.complete(response);
-                        } else callback.error(httpError(response));
+                        } else {
+                            callback.error(httpError(response));
+                        }
                     }
                 }).except(new SuccessCallback<Throwable>() {
-                    public void onSucess(Throwable error) { callback.error(error); }
+
+                    public void onSucess(Throwable error) {
+                        callback.error(error);
+                    }
                 });
             }
         }).except(new SuccessCallback<Throwable>() {
-            public void onSucess(Throwable error) { callback.error(authentication(error)); }
+
+            @Override
+            public void onSucess(Throwable error) {
+                callback.error(authentication(error));
+            }
         });
     }
 
     private CalendarException httpError(CalendarHttpResponse response) {
         int code = response.getStatusCode();
-        CalendarError type = code == 401 ? CalendarError.AUTHENTICATION_REQUIRED
-                : code == 403 ? CalendarError.PERMISSION_DENIED
-                : code == 404 ? CalendarError.NOT_FOUND
-                : code == 409 || code == 412 ? CalendarError.CONFLICT
-                : code == 429 ? CalendarError.RATE_LIMITED
-                : code >= 500 ? CalendarError.NETWORK : CalendarError.INVALID_ARGUMENT;
+        CalendarError type = code == 401 ? CalendarError.AUTHENTICATION_REQUIRED : code == 403 ? CalendarError.PERMISSION_DENIED : code == 404 ? CalendarError.NOT_FOUND : code == 409 || code == 412 ? CalendarError.CONFLICT : code == 429 ? CalendarError.RATE_LIMITED : code >= 500 ? CalendarError.NETWORK : CalendarError.INVALID_ARGUMENT;
         String message = "Calendar provider returned HTTP " + code;
-        if (response.getBody() != null && response.getBody().length() > 0) message += ": " + response.getBody();
+        if (response.getBody() != null && response.getBody().length() > 0) {
+            message += ": " + response.getBody();
+        }
         return new CalendarException(type, message, code, null);
     }
 
     private CalendarException authentication(Throwable error) {
-        if (error instanceof CalendarException) return (CalendarException)error;
-        return new CalendarException(CalendarError.AUTHENTICATION_REQUIRED,
-                error == null ? "Calendar authentication failed" : error.getMessage(), error);
+        if (error instanceof CalendarException) {
+            return (CalendarException) error;
+        }
+        return new CalendarException(CalendarError.AUTHENTICATION_REQUIRED, error == null ? "Calendar authentication failed" : error.getMessage(), error);
     }
 
     private interface ResponseCallback {
+
         void complete(CalendarHttpResponse response);
+
         void error(Throwable error);
     }
 }

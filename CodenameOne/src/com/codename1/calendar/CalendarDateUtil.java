@@ -27,13 +27,20 @@ import java.util.Date;
 import java.util.TimeZone;
 
 final class CalendarDateUtil {
-    private CalendarDateUtil() {}
+
+    private CalendarDateUtil() {
+    }
 
     static String[] split(String value, char delimiter) {
         int count = 1;
-        for (int i = 0; i < value.length(); i++) if (value.charAt(i) == delimiter) count++;
+        for (int i = 0; i < value.length(); i++) {
+            if (value.charAt(i) == delimiter) {
+                count++;
+            }
+        }
         String[] out = new String[count];
-        int start = 0, index = 0;
+        int start = 0;
+        int index = 0;
         for (int i = 0; i <= value.length(); i++) {
             if (i == value.length() || value.charAt(i) == delimiter) {
                 out[index++] = value.substring(start, i);
@@ -45,22 +52,12 @@ final class CalendarDateUtil {
 
     static String formatBasic(long value, String zone) {
         Calendar calendar = calendar(value, zone);
-        return pad(calendar.get(Calendar.YEAR), 4)
-                + pad(calendar.get(Calendar.MONTH) + 1, 2)
-                + pad(calendar.get(Calendar.DAY_OF_MONTH), 2) + "T"
-                + pad(calendar.get(Calendar.HOUR_OF_DAY), 2)
-                + pad(calendar.get(Calendar.MINUTE), 2)
-                + pad(calendar.get(Calendar.SECOND), 2);
+        return pad(calendar.get(Calendar.YEAR), 4) + pad(calendar.get(Calendar.MONTH) + 1, 2) + pad(calendar.get(Calendar.DAY_OF_MONTH), 2) + "T" + pad(calendar.get(Calendar.HOUR_OF_DAY), 2) + pad(calendar.get(Calendar.MINUTE), 2) + pad(calendar.get(Calendar.SECOND), 2);
     }
 
     static String formatIso(long value, String zone, boolean milliseconds) {
         Calendar calendar = calendar(value, zone);
-        String out = pad(calendar.get(Calendar.YEAR), 4) + "-"
-                + pad(calendar.get(Calendar.MONTH) + 1, 2) + "-"
-                + pad(calendar.get(Calendar.DAY_OF_MONTH), 2) + "T"
-                + pad(calendar.get(Calendar.HOUR_OF_DAY), 2) + ":"
-                + pad(calendar.get(Calendar.MINUTE), 2) + ":"
-                + pad(calendar.get(Calendar.SECOND), 2);
+        String out = pad(calendar.get(Calendar.YEAR), 4) + "-" + pad(calendar.get(Calendar.MONTH) + 1, 2) + "-" + pad(calendar.get(Calendar.DAY_OF_MONTH), 2) + "T" + pad(calendar.get(Calendar.HOUR_OF_DAY), 2) + ":" + pad(calendar.get(Calendar.MINUTE), 2) + ":" + pad(calendar.get(Calendar.SECOND), 2);
         return milliseconds ? out + "." + pad(calendar.get(Calendar.MILLISECOND), 3) : out;
     }
 
@@ -75,12 +72,20 @@ final class CalendarDateUtil {
         int position = compact ? 15 : 19;
         int millis = 0;
         if (position < value.length() && value.charAt(position) == '.') {
-            int start = ++position, end = start;
-            while (end < value.length() && Character.isDigit(value.charAt(end))) end++;
+            int start = ++position;
+            int end = start;
+            while (end < value.length() && Character.isDigit(value.charAt(end))) {
+                end++;
+            }
             int digits = Math.min(3, end - start);
-            for (int i = 0; i < digits; i++) millis = millis * 10 + value.charAt(start + i) - '0';
-            if (digits == 1) millis *= 100;
-            else if (digits == 2) millis *= 10;
+            for (int i = 0; i < digits; i++) {
+                millis = millis * 10 + value.charAt(start + i) - '0';
+            }
+            if (digits == 1) {
+                millis *= 100;
+            } else if (digits == 2) {
+                millis *= 10;
+            }
             position = end;
         }
         String zone = defaultZone == null ? "UTC" : defaultZone;
@@ -90,7 +95,9 @@ final class CalendarDateUtil {
                 zone = "UTC";
             } else if (suffix == '+' || suffix == '-') {
                 String offset = value.substring(position);
-                if (offset.length() == 5) offset = offset.substring(0, 3) + ":" + offset.substring(3);
+                if (offset.length() == 5) {
+                    offset = offset.substring(0, 3) + ":" + offset.substring(3);
+                }
                 zone = "GMT" + offset;
             }
         }
@@ -107,8 +114,7 @@ final class CalendarDateUtil {
 
     static CalendarDate dateFor(long value, String zone) {
         Calendar calendar = calendar(value, zone);
-        return new CalendarDate(calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH) + 1,
-                calendar.get(Calendar.DAY_OF_MONTH));
+        return new CalendarDate(calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH) + 1, calendar.get(Calendar.DAY_OF_MONTH));
     }
 
     static long allDayMillis(CalendarDate date) {
@@ -130,13 +136,17 @@ final class CalendarDateUtil {
     }
 
     private static int number(String value, int start, int end) {
-        if (start < 0 || end > value.length() || start >= end) throw new IllegalArgumentException("Invalid date: " + value);
+        if (start < 0 || end > value.length() || start >= end) {
+            throw new IllegalArgumentException("Invalid date: " + value);
+        }
         return Integer.parseInt(value.substring(start, end));
     }
 
     private static String pad(int value, int width) {
         String out = String.valueOf(value);
-        while (out.length() < width) out = "0" + out;
+        while (out.length() < width) {
+            out = "0" + out;
+        }
         return out;
     }
 }

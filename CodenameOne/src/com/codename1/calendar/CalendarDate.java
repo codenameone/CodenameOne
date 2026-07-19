@@ -24,27 +24,59 @@ package com.codename1.calendar;
 
 /// A date without a time zone, used for all-day events and date-only tasks.
 public final class CalendarDate {
-    private final int year, month, day;
+
+    private final int year;
+
+    private final int month;
+
+    private final int day;
+
     public CalendarDate(int year, int month, int day) {
-        if (month < 1 || month > 12 || day < 1 || day > 31) throw new IllegalArgumentException("Invalid date");
-        this.year = year; this.month = month; this.day = day;
+        if (month < 1 || month > 12 || day < 1 || day > 31) {
+            throw new IllegalArgumentException("Invalid date");
+        }
+        this.year = year;
+        this.month = month;
+        this.day = day;
     }
-    public int getYear() { return year; }
-    public int getMonth() { return month; }
-    public int getDay() { return day; }
+
+    public int getYear() {
+        return year;
+    }
+
+    public int getMonth() {
+        return month;
+    }
+
+    public int getDay() {
+        return day;
+    }
+
+    @Override
     public String toString() {
         return pad(year, 4) + "-" + pad(month, 2) + "-" + pad(day, 2);
     }
+
     private static String pad(int value, int size) {
         String s = String.valueOf(value);
         StringBuilder out = new StringBuilder(size);
-        for (int i = s.length(); i < size; i++) out.append('0');
+        for (int i = s.length(); i < size; i++) {
+            out.append('0');
+        }
         return out.append(s).toString();
     }
+
+    @Override
     public boolean equals(Object o) {
-        if (!(o instanceof CalendarDate)) return false;
-        CalendarDate d = (CalendarDate)o;
+        if (!(o instanceof CalendarDate)) {
+            return false;
+        }
+        CalendarDate d = (CalendarDate) o;
         return year == d.year && month == d.month && day == d.day;
     }
-    public int hashCode() { return ((year * 31) + month) * 31 + day; }
+
+    @Override
+    public int hashCode() {
+        return ((year * 31) + month) * 31 + day;
+    }
 }

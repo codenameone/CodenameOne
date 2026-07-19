@@ -28,17 +28,61 @@ import java.util.List;
 
 /// Online meeting metadata associated with an event.
 public class CalendarConference {
-    private String provider, id, joinUrl;
+
+    private String provider;
+
+    private String id;
+
+    private String joinUrl;
+
     private boolean createRequested;
+
     private final List<String> phoneNumbers = new ArrayList<String>();
-    public String getProvider() { return provider; }
-    public CalendarConference setProvider(String v) { provider = v; return this; }
-    public String getId() { return id; }
-    public CalendarConference setId(String v) { id = v; return this; }
-    public String getJoinUrl() { return joinUrl; }
-    public CalendarConference setJoinUrl(String v) { joinUrl = v; return this; }
-    public boolean isCreateRequested() { return createRequested; }
-    public CalendarConference setCreateRequested(boolean v) { createRequested = v; return this; }
-    public CalendarConference addPhoneNumber(String v) { if (v != null) phoneNumbers.add(v); return this; }
-    public List<String> getPhoneNumbers() { return Collections.unmodifiableList(phoneNumbers); }
+
+    public String getProvider() {
+        return provider;
+    }
+
+    public CalendarConference setProvider(String v) {
+        provider = v;
+        return this;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public CalendarConference setId(String v) {
+        id = v;
+        return this;
+    }
+
+    public String getJoinUrl() {
+        return joinUrl;
+    }
+
+    public CalendarConference setJoinUrl(String v) {
+        joinUrl = v;
+        return this;
+    }
+
+    public boolean isCreateRequested() {
+        return createRequested;
+    }
+
+    public CalendarConference setCreateRequested(boolean v) {
+        createRequested = v;
+        return this;
+    }
+
+    public CalendarConference addPhoneNumber(String v) {
+        if (v != null) {
+            phoneNumbers.add(v);
+        }
+        return this;
+    }
+
+    public List<String> getPhoneNumbers() {
+        return Collections.unmodifiableList(phoneNumbers);
+    }
 }

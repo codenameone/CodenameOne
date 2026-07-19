@@ -23,4 +23,7 @@
 package com.codename1.calendar;
 
 /// Listener for source changes. Implementations dispatch on the Codename One EDT.
-public interface CalendarChangeListener { void calendarChanged(CalendarChange change); }
+public interface CalendarChangeListener {
+
+    void calendarChanged(CalendarChange change);
+}

@@ -26,5 +26,6 @@ import com.codename1.util.AsyncResource;
 
 /// Supplies app-owned OAuth tokens. `forceRefresh` is true after a 401 response.
 public interface CalendarTokenProvider {
+
     AsyncResource<CalendarAuthToken> getToken(String[] requiredScopes, boolean forceRefresh);
 }

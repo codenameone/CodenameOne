@@ -28,7 +28,9 @@ import java.util.Set;
 
 /// Immutable set of capabilities advertised by a source or calendar.
 public final class CalendarCapabilities {
+
     private static final CalendarCapabilities NONE = new CalendarCapabilities(new HashSet<CalendarCapability>());
+
     private final Set<CalendarCapability> values;
 
     private CalendarCapabilities(Set<CalendarCapability> values) {
@@ -37,16 +39,27 @@ public final class CalendarCapabilities {
         this.values = Collections.unmodifiableSet(copy);
     }
 
-    public static CalendarCapabilities none() { return NONE; }
+    public static CalendarCapabilities none() {
+        return NONE;
+    }
 
     public static CalendarCapabilities of(CalendarCapability... values) {
         HashSet<CalendarCapability> out = new HashSet<CalendarCapability>();
         if (values != null) {
-            for (CalendarCapability value : values) if (value != null) out.add(value);
+            for (CalendarCapability value : values) {
+                if (value != null) {
+                    out.add(value);
+                }
+            }
         }
         return out.isEmpty() ? NONE : new CalendarCapabilities(out);
     }
 
-    public boolean supports(CalendarCapability capability) { return values.contains(capability); }
-    public Set<CalendarCapability> asSet() { return values; }
+    public boolean supports(CalendarCapability capability) {
+        return values.contains(capability);
+    }
+
+    public Set<CalendarCapability> asSet() {
+        return values;
+    }
 }

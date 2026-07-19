@@ -24,16 +24,30 @@ package com.codename1.calendar;
 
 /// Exception returned by asynchronous calendar operations.
 public class CalendarException extends Exception {
+
     private final CalendarError error;
+
     private final int responseCode;
 
-    public CalendarException(CalendarError error, String message) { this(error, message, 0, null); }
-    public CalendarException(CalendarError error, String message, Throwable cause) { this(error, message, 0, cause); }
+    public CalendarException(CalendarError error, String message) {
+        this(error, message, 0, null);
+    }
+
+    public CalendarException(CalendarError error, String message, Throwable cause) {
+        this(error, message, 0, cause);
+    }
+
     public CalendarException(CalendarError error, String message, int responseCode, Throwable cause) {
         super(message, cause);
         this.error = error == null ? CalendarError.UNKNOWN : error;
         this.responseCode = responseCode;
     }
-    public CalendarError getError() { return error; }
-    public int getResponseCode() { return responseCode; }
+
+    public CalendarError getError() {
+        return error;
+    }
+
+    public int getResponseCode() {
+        return responseCode;
+    }
 }

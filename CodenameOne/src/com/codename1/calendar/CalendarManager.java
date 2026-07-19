@@ -30,19 +30,38 @@ import java.util.Map;
 
 /// Registry and entry point for device and online calendar sources.
 public final class CalendarManager {
+
     private static final CalendarManager INSTANCE = new CalendarManager();
-    private final Map<String,CalendarSource> sources = new LinkedHashMap<String,CalendarSource>();
-    private CalendarManager() {}
-    public static CalendarManager getInstance() { return INSTANCE; }
-    public synchronized CalendarManager registerSource(CalendarSource source) {
-        if (source == null) throw new IllegalArgumentException("source required");
-        sources.put(source.getId(), source); return this;
+
+    private final Map<String, CalendarSource> sources = new LinkedHashMap<String, CalendarSource>();
+
+    private CalendarManager() {
     }
-    public synchronized CalendarSource removeSource(String id) { return sources.remove(id); }
-    public synchronized CalendarSource getSource(String id) { return sources.get(id); }
+
+    public static CalendarManager getInstance() {
+        return INSTANCE;
+    }
+
+    public synchronized CalendarManager registerSource(CalendarSource source) {
+        if (source == null) {
+            throw new IllegalArgumentException("source required");
+        }
+        sources.put(source.getId(), source);
+        return this;
+    }
+
+    public synchronized CalendarSource removeSource(String id) {
+        return sources.remove(id);
+    }
+
+    public synchronized CalendarSource getSource(String id) {
+        return sources.get(id);
+    }
+
     public synchronized List<CalendarSource> getSources() {
         return Collections.unmodifiableList(new ArrayList<CalendarSource>(sources.values()));
     }
+
     public synchronized LocalCalendarSource getLocalSource() {
         LocalCalendarSource local = LocalCalendarSource.getInstance();
         sources.put(local.getId(), local);

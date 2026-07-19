@@ -24,19 +24,70 @@ package com.codename1.calendar;
 
 /// Attachment metadata and optional content for providers that support upload.
 public class CalendarAttachment {
-    private String id, name, mimeType, uri;
+
+    private String id;
+
+    private String name;
+
+    private String mimeType;
+
+    private String uri;
+
     private long size = -1;
+
     private byte[] content;
-    public String getId() { return id; }
-    public CalendarAttachment setId(String v) { id = v; return this; }
-    public String getName() { return name; }
-    public CalendarAttachment setName(String v) { name = v; return this; }
-    public String getMimeType() { return mimeType; }
-    public CalendarAttachment setMimeType(String v) { mimeType = v; return this; }
-    public String getUri() { return uri; }
-    public CalendarAttachment setUri(String v) { uri = v; return this; }
-    public long getSize() { return size; }
-    public CalendarAttachment setSize(long v) { size = v; return this; }
-    public byte[] getContent() { return content == null ? null : (byte[])content.clone(); }
-    public CalendarAttachment setContent(byte[] v) { content = v == null ? null : (byte[])v.clone(); return this; }
+
+    public String getId() {
+        return id;
+    }
+
+    public CalendarAttachment setId(String v) {
+        id = v;
+        return this;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public CalendarAttachment setName(String v) {
+        name = v;
+        return this;
+    }
+
+    public String getMimeType() {
+        return mimeType;
+    }
+
+    public CalendarAttachment setMimeType(String v) {
+        mimeType = v;
+        return this;
+    }
+
+    public String getUri() {
+        return uri;
+    }
+
+    public CalendarAttachment setUri(String v) {
+        uri = v;
+        return this;
+    }
+
+    public long getSize() {
+        return size;
+    }
+
+    public CalendarAttachment setSize(long v) {
+        size = v;
+        return this;
+    }
+
+    public byte[] getContent() {
+        return content == null ? null : (byte[]) content.clone();
+    }
+
+    public CalendarAttachment setContent(byte[] v) {
+        content = v == null ? null : (byte[]) v.clone();
+        return this;
+    }
 }

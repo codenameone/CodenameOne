@@ -33,51 +33,478 @@ import java.util.Map;
 /// source discovers collections below it and uses RFC 6578 sync tokens when
 /// the server advertises them.
 public class CalDavCalendarSource extends CalendarSource {
+
     private final String homeUrl;
+
     private final CalDavAuthentication authentication;
+
     private final CalendarHttpTransport transport;
 
     public CalDavCalendarSource(String id, String displayName, String calendarHomeUrl, CalDavAuthentication authentication) {
-        this(id,displayName,calendarHomeUrl,authentication,null);
-    }
-    public CalDavCalendarSource(String id,String displayName,String calendarHomeUrl,CalDavAuthentication authentication,CalendarHttpTransport transport){
-        super(id,displayName);if(calendarHomeUrl==null||authentication==null)throw new IllegalArgumentException("calendar home URL and authentication required");this.homeUrl=calendarHomeUrl.endsWith("/")?calendarHomeUrl:calendarHomeUrl+"/";this.authentication=authentication;this.transport=transport==null?new DefaultCalendarHttpTransport():transport;
+        this(id, displayName, calendarHomeUrl, authentication, null);
     }
 
-    public CalendarCapabilities getCapabilities(){return CalendarCapabilities.of(CalendarCapability.READ_CALENDARS,CalendarCapability.READ_EVENTS,CalendarCapability.WRITE_EVENTS,CalendarCapability.DELETE_EVENTS,CalendarCapability.READ_TASKS,CalendarCapability.WRITE_TASKS,CalendarCapability.DELETE_TASKS,CalendarCapability.RECURRENCE,CalendarCapability.ATTENDEES_READ,CalendarCapability.ATTENDEES_WRITE,CalendarCapability.ALARMS,CalendarCapability.ATTACHMENTS,CalendarCapability.CONFERENCING,CalendarCapability.DELTA_SYNC,CalendarCapability.OFFLINE_MUTATIONS);}
-    public CalendarAuthorizationStatus getAuthorizationStatus(CalendarAccess access){return CalendarAuthorizationStatus.NOT_DETERMINED;}
-    public AsyncResource<CalendarAuthorizationStatus>requestAuthorization(CalendarAccess access){final AsyncResource<CalendarAuthorizationStatus>out=new AsyncResource<CalendarAuthorizationStatus>();request("PROPFIND",homeUrl,"<?xml version=\"1.0\"?><propfind xmlns=\"DAV:\"><prop><current-user-principal/></prop></propfind>","application/xml",headers("Depth","0")).ready(new SuccessCallback<CalendarHttpResponse>(){public void onSucess(CalendarHttpResponse r){out.complete(CalendarAuthorizationStatus.FULL);}}).except(error(out));return out;}
+    public CalDavCalendarSource(String id, String displayName, String calendarHomeUrl, CalDavAuthentication authentication, CalendarHttpTransport transport) {
+        super(id, displayName);
+        if (calendarHomeUrl == null || authentication == null) {
+            throw new IllegalArgumentException("calendar home URL and authentication required");
+        }
+        this.homeUrl = calendarHomeUrl.endsWith("/") ? calendarHomeUrl : calendarHomeUrl + "/";
+        this.authentication = authentication;
+        this.transport = transport == null ? new DefaultCalendarHttpTransport() : transport;
+    }
 
-    public AsyncResource<CalendarPage<CalendarInfo>>listCalendars(final CalendarInfo.ContentType type,String pageToken){final AsyncResource<CalendarPage<CalendarInfo>>out=new AsyncResource<CalendarPage<CalendarInfo>>();String body="<?xml version=\"1.0\"?><propfind xmlns=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" xmlns:cs=\"http://calendarserver.org/ns/\"><prop><displayname/><resourcetype/><c:supported-calendar-component-set/><cs:getctag/><sync-token/></prop></propfind>";request("PROPFIND",homeUrl,body,"application/xml",headers("Depth","1")).ready(new SuccessCallback<CalendarHttpResponse>(){public void onSucess(CalendarHttpResponse r){List<CalendarInfo>items=new ArrayList<CalendarInfo>();for(String response:elements(r.getBody(),"response")){String href=xmlValue(response,"href"),components=xmlElement(response,"supported-calendar-component-set");if(href==null||xmlElement(response,"calendar")==null)continue;boolean events=components==null||components.toUpperCase().indexOf("VEVENT")>=0, tasks=components!=null&&components.toUpperCase().indexOf("VTODO")>=0;if((type==CalendarInfo.ContentType.EVENTS&&!events)||(type==CalendarInfo.ContentType.TASKS&&!tasks))continue;items.add(new CalendarInfo().setId(resolve(href)).setSourceId(getId()).setName(xmlValue(response,"displayname")).setContentType(type).setCapabilities(getCapabilities()).putProviderData("ctag",xmlValue(response,"getctag")).putProviderData("syncToken",xmlValue(response,"sync-token")));}out.complete(new CalendarPage<CalendarInfo>(items,null,null));}}).except(error(out));return out;}
+    @Override
+    public CalendarCapabilities getCapabilities() {
+        return CalendarCapabilities.of(CalendarCapability.READ_CALENDARS, CalendarCapability.READ_EVENTS, CalendarCapability.WRITE_EVENTS, CalendarCapability.DELETE_EVENTS, CalendarCapability.READ_TASKS, CalendarCapability.WRITE_TASKS, CalendarCapability.DELETE_TASKS, CalendarCapability.RECURRENCE, CalendarCapability.ATTENDEES_READ, CalendarCapability.ATTENDEES_WRITE, CalendarCapability.ALARMS, CalendarCapability.ATTACHMENTS, CalendarCapability.CONFERENCING, CalendarCapability.DELTA_SYNC, CalendarCapability.OFFLINE_MUTATIONS);
+    }
 
-    public AsyncResource<CalendarPage<CalendarEvent>>queryEvents(final CalendarQuery query){final AsyncResource<CalendarPage<CalendarEvent>>out=new AsyncResource<CalendarPage<CalendarEvent>>();if(query==null||query.getCalendarId()==null)return fail(out,"calendarId required");String body=query.getSyncToken()==null?calendarQuery("VEVENT",query):syncQuery(query.getSyncToken());request("REPORT",query.getCalendarId(),body,"application/xml",headers("Depth","1")).ready(new SuccessCallback<CalendarHttpResponse>(){public void onSucess(CalendarHttpResponse r){List<CalendarEvent>items=new ArrayList<CalendarEvent>();try{for(String response:elements(r.getBody(),"response")){String data=xmlValue(response,"calendar-data");if(data==null)continue;CalendarEvent event=ICalendarCodec.readEvent(data).setCalendarId(query.getCalendarId()).setSourceId(getId()).setVersion(xmlValue(response,"getetag"));if(event.getId()==null)event.setId(xmlValue(response,"href"));items.add(event);}}catch(CalendarException ex){out.error(ex);return;}out.complete(new CalendarPage<CalendarEvent>(items,null,xmlValue(r.getBody(),"sync-token")));}}).except(error(out));return out;}
-    public AsyncResource<CalendarEvent>getEvent(final String calendarId,String eventId){final AsyncResource<CalendarEvent>out=new AsyncResource<CalendarEvent>();request("GET",resource(calendarId,eventId),null,null,null).ready(new SuccessCallback<CalendarHttpResponse>(){public void onSucess(CalendarHttpResponse r){try{CalendarEvent event=ICalendarCodec.readEvent(r.getBody()).setCalendarId(calendarId).setSourceId(getId()).setVersion(r.getHeader("ETag"));out.complete(event);}catch(CalendarException ex){out.error(ex);}}}).except(error(out));return out;}
-    public AsyncResource<CalendarEvent>saveEvent(final CalendarEvent event,CalendarMutationScope scope){final AsyncResource<CalendarEvent>out=new AsyncResource<CalendarEvent>();if(event==null||event.getCalendarId()==null)return fail(out,"event and calendarId required");final boolean create=event.getId()==null;if(create)event.setId(String.valueOf(System.currentTimeMillis())+"@codenameone");Map<String,String>h=version(event.getVersion(),create);request("PUT",resource(event.getCalendarId(),event.getId()),ICalendarCodec.writeEvent(event),"text/calendar; charset=utf-8",h).ready(new SuccessCallback<CalendarHttpResponse>(){public void onSucess(CalendarHttpResponse r){event.setVersion(r.getHeader("ETag"));out.complete(event);fireChange(new CalendarChange(getId(),event.getCalendarId(),event.getId(),CalendarChange.EntityType.EVENT,create?CalendarChange.ChangeType.CREATED:CalendarChange.ChangeType.UPDATED));}}).except(error(out));return out;}
-    public AsyncResource<Boolean>deleteEvent(final String calendarId,final String eventId,CalendarMutationScope scope,String version){final AsyncResource<Boolean>out=new AsyncResource<Boolean>();request("DELETE",resource(calendarId,eventId),null,null,version(version,false)).ready(new SuccessCallback<CalendarHttpResponse>(){public void onSucess(CalendarHttpResponse r){out.complete(Boolean.TRUE);fireChange(new CalendarChange(getId(),calendarId,eventId,CalendarChange.EntityType.EVENT,CalendarChange.ChangeType.DELETED));}}).except(error(out));return out;}
+    @Override
+    public CalendarAuthorizationStatus getAuthorizationStatus(CalendarAccess access) {
+        return CalendarAuthorizationStatus.NOT_DETERMINED;
+    }
 
-    public AsyncResource<CalendarPage<CalendarTask>>queryTasks(final CalendarQuery query){final AsyncResource<CalendarPage<CalendarTask>>out=new AsyncResource<CalendarPage<CalendarTask>>();if(query==null||query.getCalendarId()==null)return fail(out,"calendarId required");String body=query.getSyncToken()==null?calendarQuery("VTODO",query):syncQuery(query.getSyncToken());request("REPORT",query.getCalendarId(),body,"application/xml",headers("Depth","1")).ready(new SuccessCallback<CalendarHttpResponse>(){public void onSucess(CalendarHttpResponse r){List<CalendarTask>items=new ArrayList<CalendarTask>();try{for(String response:elements(r.getBody(),"response")){String data=xmlValue(response,"calendar-data");if(data==null)continue;CalendarTask task=ICalendarCodec.readTask(data).setCalendarId(query.getCalendarId()).setSourceId(getId()).setVersion(xmlValue(response,"getetag"));if(task.getId()==null)task.setId(xmlValue(response,"href"));items.add(task);}}catch(CalendarException ex){out.error(ex);return;}out.complete(new CalendarPage<CalendarTask>(items,null,xmlValue(r.getBody(),"sync-token")));}}).except(error(out));return out;}
-    public AsyncResource<CalendarTask>getTask(final String calendarId,String taskId){final AsyncResource<CalendarTask>out=new AsyncResource<CalendarTask>();request("GET",resource(calendarId,taskId),null,null,null).ready(new SuccessCallback<CalendarHttpResponse>(){public void onSucess(CalendarHttpResponse r){try{out.complete(ICalendarCodec.readTask(r.getBody()).setCalendarId(calendarId).setSourceId(getId()).setVersion(r.getHeader("ETag")));}catch(CalendarException ex){out.error(ex);}}}).except(error(out));return out;}
-    public AsyncResource<CalendarTask>saveTask(final CalendarTask task,CalendarMutationScope scope){final AsyncResource<CalendarTask>out=new AsyncResource<CalendarTask>();if(task==null||task.getCalendarId()==null)return fail(out,"task and calendarId required");final boolean create=task.getId()==null;if(create)task.setId(String.valueOf(System.currentTimeMillis())+"@codenameone");request("PUT",resource(task.getCalendarId(),task.getId()),ICalendarCodec.writeTask(task),"text/calendar; charset=utf-8",version(task.getVersion(),create)).ready(new SuccessCallback<CalendarHttpResponse>(){public void onSucess(CalendarHttpResponse r){task.setVersion(r.getHeader("ETag"));out.complete(task);fireChange(new CalendarChange(getId(),task.getCalendarId(),task.getId(),CalendarChange.EntityType.TASK,create?CalendarChange.ChangeType.CREATED:CalendarChange.ChangeType.UPDATED));}}).except(error(out));return out;}
-    public AsyncResource<Boolean>deleteTask(final String calendarId,final String taskId,CalendarMutationScope scope,String version){final AsyncResource<Boolean>out=new AsyncResource<Boolean>();request("DELETE",resource(calendarId,taskId),null,null,version(version,false)).ready(new SuccessCallback<CalendarHttpResponse>(){public void onSucess(CalendarHttpResponse r){out.complete(Boolean.TRUE);fireChange(new CalendarChange(getId(),calendarId,taskId,CalendarChange.EntityType.TASK,CalendarChange.ChangeType.DELETED));}}).except(error(out));return out;}
+    @Override
+    public AsyncResource<CalendarAuthorizationStatus> requestAuthorization(CalendarAccess access) {
+        final AsyncResource<CalendarAuthorizationStatus> out = new AsyncResource<CalendarAuthorizationStatus>();
+        request("PROPFIND", homeUrl, "<?xml version=\"1.0\"?><propfind xmlns=\"DAV:\"><prop><current-user-principal/></prop></propfind>", "application/xml", headers("Depth", "0")).ready(new SuccessCallback<CalendarHttpResponse>() {
 
-    private AsyncResource<CalendarHttpResponse>request(final String method,final String url,final String body,final String contentType,final Map<String,String>headers){final AsyncResource<CalendarHttpResponse>out=new AsyncResource<CalendarHttpResponse>();authorizeAndSend(method,url,body,contentType,headers,null,false,out);return out;}
-    private void authorizeAndSend(final String method,final String url,final String body,final String contentType,final Map<String,String>headers,final String challenge,final boolean retried,final AsyncResource<CalendarHttpResponse>out){authentication.authorization(method,url,challenge,retried).ready(new SuccessCallback<String>(){public void onSucess(String authorization){CalendarHttpRequest request=new CalendarHttpRequest(method,url).setBody(body).header("Accept","application/xml, text/calendar");if(authorization!=null)request.header("Authorization",authorization);if(contentType!=null)request.header("Content-Type",contentType);if(headers!=null)for(Map.Entry<String,String>h:headers.entrySet())request.header(h.getKey(),h.getValue());transport.execute(request).ready(new SuccessCallback<CalendarHttpResponse>(){public void onSucess(CalendarHttpResponse response){if(response.getStatusCode()==401&&!retried){authorizeAndSend(method,url,body,contentType,headers,response.getHeader("WWW-Authenticate"),true,out);return;}if(response.getStatusCode()>=200&&response.getStatusCode()<300)out.complete(response);else out.error(httpError(response));}}).except(error(out));}}).except(error(out));}
-    private static CalendarException httpError(CalendarHttpResponse r){int code=r.getStatusCode();CalendarError type=code==401?CalendarError.AUTHENTICATION_REQUIRED:code==403?CalendarError.PERMISSION_DENIED:code==404?CalendarError.NOT_FOUND:code==409||code==412?CalendarError.CONFLICT:code==429?CalendarError.RATE_LIMITED:code>=500?CalendarError.NETWORK:CalendarError.INVALID_ARGUMENT;return new CalendarException(type,"CalDAV server returned HTTP "+code+(r.getBody()==null?"":": "+r.getBody()),code,null);}
-    private String resolve(String href){if(href.startsWith("http://")||href.startsWith("https://"))return href;int scheme=homeUrl.indexOf("://"),slash=homeUrl.indexOf('/',scheme+3);String origin=slash<0?homeUrl:homeUrl.substring(0,slash);return href.startsWith("/")?origin+href:homeUrl+href;}
-    private static String resource(String calendarId,String id){if(id.startsWith("http://")||id.startsWith("https://"))return id;String base=calendarId.endsWith("/")?calendarId:calendarId+"/";return base+safe(id)+(id.toLowerCase().endsWith(".ics")?"":".ics");}
-    private static String safe(String value){return value.replace(" ","%20").replace("/","%2F");}
-    private static String calendarQuery(String component,CalendarQuery q){StringBuilder filter=new StringBuilder("<c:comp-filter name=\"VCALENDAR\"><c:comp-filter name=\"").append(component).append("\"");if(q.getStartTime()==null&&q.getEndTime()==null)filter.append("/>");else{filter.append('>');filter.append("<c:time-range");if(q.getStartTime()!=null)filter.append(" start=\"").append(icalTime(q.getStartTime().longValue())).append("\"");if(q.getEndTime()!=null)filter.append(" end=\"").append(icalTime(q.getEndTime().longValue())).append("\"");filter.append("/></c:comp-filter>");}filter.append("</c:comp-filter>");return "<?xml version=\"1.0\"?><c:calendar-query xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:prop><d:getetag/><c:calendar-data/></d:prop><c:filter>"+filter+"</c:filter></c:calendar-query>";}
-    private static String syncQuery(String token){return "<?xml version=\"1.0\"?><d:sync-collection xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:sync-token>"+xml(token)+"</d:sync-token><d:sync-level>1</d:sync-level><d:prop><d:getetag/><c:calendar-data/></d:prop></d:sync-collection>";}
-    private static String icalTime(long value){return CalendarDateUtil.formatBasic(value,"UTC")+"Z";}
-    private static Map<String,String>headers(String name,String value){Map<String,String>out=new HashMap<String,String>();out.put(name,value);return out;}
-    private static Map<String,String>version(String value,boolean create){Map<String,String>out=new HashMap<String,String>();if(create)out.put("If-None-Match","*");else if(value!=null)out.put("If-Match",value);return out;}
-    private static String xmlValue(String source,String local){String element=xmlElement(source,local);return element==null?null:unxml(stripTags(element).trim());}
-    private static String xmlElement(String source,String local){if(source==null)return null;String lower=source.toLowerCase();int open=findElement(lower,local.toLowerCase(),0);if(open<0)return null;int gt=source.indexOf('>',open);if(gt<0)return null;String tag=source.substring(open+1,gt).trim();int space=tag.indexOf(' ');if(space>=0)tag=tag.substring(0,space);String close="</"+tag+">";int end=lower.indexOf(close.toLowerCase(),gt+1);return end<0?null:source.substring(gt+1,end);}
-    private static List<String>elements(String source,String local){List<String>out=new ArrayList<String>();if(source==null)return out;String lower=source.toLowerCase();int from=0;while(true){int open=findElement(lower,local.toLowerCase(),from);if(open<0)break;int gt=source.indexOf('>',open);if(gt<0)break;String tag=source.substring(open+1,gt).trim();int space=tag.indexOf(' ');if(space>=0)tag=tag.substring(0,space);String close="</"+tag+">";int end=lower.indexOf(close.toLowerCase(),gt+1);if(end<0)break;out.add(source.substring(gt+1,end));from=end+close.length();}return out;}
-    private static int findElement(String source,String local,int from){int plain=source.indexOf("<"+local,from),prefixed=source.indexOf(":"+local,from);if(prefixed>=0)prefixed=source.lastIndexOf('<',prefixed);if(plain<0)return prefixed;if(prefixed<0)return plain;return Math.min(plain,prefixed);}
-    private static String stripTags(String value){StringBuilder out=new StringBuilder();boolean tag=false;for(int i=0;i<value.length();i++){char c=value.charAt(i);if(c=='<')tag=true;else if(c=='>')tag=false;else if(!tag)out.append(c);}return out.toString();}
-    private static String xml(String value){return value==null?"":value.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;");}
-    private static String unxml(String value){return value.replace("&lt;","<").replace("&gt;",">").replace("&quot;","\"").replace("&apos;","'").replace("&amp;","&");}
-    private static <T>SuccessCallback<Throwable>error(final AsyncResource<T>out){return new SuccessCallback<Throwable>(){public void onSucess(Throwable error){out.error(error);}};}
-    private static <T>AsyncResource<T>fail(AsyncResource<T>out,String message){out.error(new CalendarException(CalendarError.INVALID_ARGUMENT,message));return out;}
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+                out.complete(CalendarAuthorizationStatus.FULL);
+            }
+        }).except(error(out));
+        return out;
+    }
+
+    @Override
+    public AsyncResource<CalendarPage<CalendarInfo>> listCalendars(final CalendarInfo.ContentType type, String pageToken) {
+        final AsyncResource<CalendarPage<CalendarInfo>> out = new AsyncResource<CalendarPage<CalendarInfo>>();
+        String body = "<?xml version=\"1.0\"?><propfind xmlns=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" " + "xmlns:cs=\"http://calendarserver.org/ns/\"><prop><displayname/><resourcetype/" + "><c:supported-calendar-component-set/><cs:getctag/><sync-token/></prop></propfind>";
+        request("PROPFIND", homeUrl, body, "application/xml", headers("Depth", "1")).ready(new SuccessCallback<CalendarHttpResponse>() {
+
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+                List<CalendarInfo> items = new ArrayList<CalendarInfo>();
+                for (String response : elements(r.getBody(), "response")) {
+                    String href = xmlValue(response, "href");
+                    String components = xmlElement(response, "supported-calendar-component-set");
+                    if (href == null || xmlElement(response, "calendar") == null) {
+                        continue;
+                    }
+                    boolean events = components == null || components.toUpperCase().indexOf("VEVENT") >= 0;
+                    boolean tasks = components != null && components.toUpperCase().indexOf("VTODO") >= 0;
+                    if ((type == CalendarInfo.ContentType.EVENTS && !events) || (type == CalendarInfo.ContentType.TASKS && !tasks)) {
+                        continue;
+                    }
+                    items.add(new CalendarInfo().setId(resolve(href)).setSourceId(getId()).setName(xmlValue(response, "displayname")).setContentType(type).setCapabilities(getCapabilities()).putProviderData("ctag", xmlValue(response, "getctag")).putProviderData("syncToken", xmlValue(response, "sync-token")));
+                }
+                out.complete(new CalendarPage<CalendarInfo>(items, null, null));
+            }
+        }).except(error(out));
+        return out;
+    }
+
+    @Override
+    public AsyncResource<CalendarPage<CalendarEvent>> queryEvents(final CalendarQuery query) {
+        final AsyncResource<CalendarPage<CalendarEvent>> out = new AsyncResource<CalendarPage<CalendarEvent>>();
+        if (query == null || query.getCalendarId() == null) {
+            return fail(out, "calendarId required");
+        }
+        String body = query.getSyncToken() == null ? calendarQuery("VEVENT", query) : syncQuery(query.getSyncToken());
+        request("REPORT", query.getCalendarId(), body, "application/xml", headers("Depth", "1")).ready(new SuccessCallback<CalendarHttpResponse>() {
+
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+                List<CalendarEvent> items = new ArrayList<CalendarEvent>();
+                try {
+                    for (String response : elements(r.getBody(), "response")) {
+                        String data = xmlValue(response, "calendar-data");
+                        if (data == null) {
+                            continue;
+                        }
+                        CalendarEvent event = ICalendarCodec.readEvent(data).setCalendarId(query.getCalendarId()).setSourceId(getId()).setVersion(xmlValue(response, "getetag"));
+                        if (event.getId() == null) {
+                            event.setId(xmlValue(response, "href"));
+                        }
+                        items.add(event);
+                    }
+                } catch (CalendarException ex) {
+                    out.error(ex);
+                    return;
+                }
+                out.complete(new CalendarPage<CalendarEvent>(items, null, xmlValue(r.getBody(), "sync-token")));
+            }
+        }).except(error(out));
+        return out;
+    }
+
+    @Override
+    public AsyncResource<CalendarEvent> getEvent(final String calendarId, String eventId) {
+        final AsyncResource<CalendarEvent> out = new AsyncResource<CalendarEvent>();
+        request("GET", resource(calendarId, eventId), null, null, null).ready(new SuccessCallback<CalendarHttpResponse>() {
+
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+                try {
+                    CalendarEvent event = ICalendarCodec.readEvent(r.getBody()).setCalendarId(calendarId).setSourceId(getId()).setVersion(r.getHeader("ETag"));
+                    out.complete(event);
+                } catch (CalendarException ex) {
+                    out.error(ex);
+                }
+            }
+        }).except(error(out));
+        return out;
+    }
+
+    @Override
+    public AsyncResource<CalendarEvent> saveEvent(final CalendarEvent event, CalendarMutationScope scope) {
+        final AsyncResource<CalendarEvent> out = new AsyncResource<CalendarEvent>();
+        if (event == null || event.getCalendarId() == null) {
+            return fail(out, "event and calendarId required");
+        }
+        final boolean create = event.getId() == null;
+        if (create) {
+            event.setId(String.valueOf(System.currentTimeMillis()) + "@codenameone");
+        }
+        Map<String, String> h = version(event.getVersion(), create);
+        request("PUT", resource(event.getCalendarId(), event.getId()), ICalendarCodec.writeEvent(event), "text/calendar; charset=utf-8", h).ready(new SuccessCallback<CalendarHttpResponse>() {
+
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+                event.setVersion(r.getHeader("ETag"));
+                out.complete(event);
+                fireChange(new CalendarChange(getId(), event.getCalendarId(), event.getId(), CalendarChange.EntityType.EVENT, create ? CalendarChange.ChangeType.CREATED : CalendarChange.ChangeType.UPDATED));
+            }
+        }).except(error(out));
+        return out;
+    }
+
+    @Override
+    public AsyncResource<Boolean> deleteEvent(final String calendarId, final String eventId, CalendarMutationScope scope, String version) {
+        final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        request("DELETE", resource(calendarId, eventId), null, null, version(version, false)).ready(new SuccessCallback<CalendarHttpResponse>() {
+
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+                out.complete(Boolean.TRUE);
+                fireChange(new CalendarChange(getId(), calendarId, eventId, CalendarChange.EntityType.EVENT, CalendarChange.ChangeType.DELETED));
+            }
+        }).except(error(out));
+        return out;
+    }
+
+    @Override
+    public AsyncResource<CalendarPage<CalendarTask>> queryTasks(final CalendarQuery query) {
+        final AsyncResource<CalendarPage<CalendarTask>> out = new AsyncResource<CalendarPage<CalendarTask>>();
+        if (query == null || query.getCalendarId() == null) {
+            return fail(out, "calendarId required");
+        }
+        String body = query.getSyncToken() == null ? calendarQuery("VTODO", query) : syncQuery(query.getSyncToken());
+        request("REPORT", query.getCalendarId(), body, "application/xml", headers("Depth", "1")).ready(new SuccessCallback<CalendarHttpResponse>() {
+
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+                List<CalendarTask> items = new ArrayList<CalendarTask>();
+                try {
+                    for (String response : elements(r.getBody(), "response")) {
+                        String data = xmlValue(response, "calendar-data");
+                        if (data == null) {
+                            continue;
+                        }
+                        CalendarTask task = ICalendarCodec.readTask(data).setCalendarId(query.getCalendarId()).setSourceId(getId()).setVersion(xmlValue(response, "getetag"));
+                        if (task.getId() == null) {
+                            task.setId(xmlValue(response, "href"));
+                        }
+                        items.add(task);
+                    }
+                } catch (CalendarException ex) {
+                    out.error(ex);
+                    return;
+                }
+                out.complete(new CalendarPage<CalendarTask>(items, null, xmlValue(r.getBody(), "sync-token")));
+            }
+        }).except(error(out));
+        return out;
+    }
+
+    @Override
+    public AsyncResource<CalendarTask> getTask(final String calendarId, String taskId) {
+        final AsyncResource<CalendarTask> out = new AsyncResource<CalendarTask>();
+        request("GET", resource(calendarId, taskId), null, null, null).ready(new SuccessCallback<CalendarHttpResponse>() {
+
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+                try {
+                    out.complete(ICalendarCodec.readTask(r.getBody()).setCalendarId(calendarId).setSourceId(getId()).setVersion(r.getHeader("ETag")));
+                } catch (CalendarException ex) {
+                    out.error(ex);
+                }
+            }
+        }).except(error(out));
+        return out;
+    }
+
+    @Override
+    public AsyncResource<CalendarTask> saveTask(final CalendarTask task, CalendarMutationScope scope) {
+        final AsyncResource<CalendarTask> out = new AsyncResource<CalendarTask>();
+        if (task == null || task.getCalendarId() == null) {
+            return fail(out, "task and calendarId required");
+        }
+        final boolean create = task.getId() == null;
+        if (create) {
+            task.setId(String.valueOf(System.currentTimeMillis()) + "@codenameone");
+        }
+        request("PUT", resource(task.getCalendarId(), task.getId()), ICalendarCodec.writeTask(task), "text/calendar; charset=utf-8", version(task.getVersion(), create)).ready(new SuccessCallback<CalendarHttpResponse>() {
+
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+                task.setVersion(r.getHeader("ETag"));
+                out.complete(task);
+                fireChange(new CalendarChange(getId(), task.getCalendarId(), task.getId(), CalendarChange.EntityType.TASK, create ? CalendarChange.ChangeType.CREATED : CalendarChange.ChangeType.UPDATED));
+            }
+        }).except(error(out));
+        return out;
+    }
+
+    @Override
+    public AsyncResource<Boolean> deleteTask(final String calendarId, final String taskId, CalendarMutationScope scope, String version) {
+        final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        request("DELETE", resource(calendarId, taskId), null, null, version(version, false)).ready(new SuccessCallback<CalendarHttpResponse>() {
+
+            @Override
+            public void onSucess(CalendarHttpResponse r) {
+                out.complete(Boolean.TRUE);
+                fireChange(new CalendarChange(getId(), calendarId, taskId, CalendarChange.EntityType.TASK, CalendarChange.ChangeType.DELETED));
+            }
+        }).except(error(out));
+        return out;
+    }
+
+    private AsyncResource<CalendarHttpResponse> request(final String method, final String url, final String body, final String contentType, final Map<String, String> headers) {
+        final AsyncResource<CalendarHttpResponse> out = new AsyncResource<CalendarHttpResponse>();
+        authorizeAndSend(method, url, body, contentType, headers, null, false, out);
+        return out;
+    }
+
+    private void authorizeAndSend(final String method, final String url, final String body, final String contentType, final Map<String, String> headers, final String challenge, final boolean retried, final AsyncResource<CalendarHttpResponse> out) {
+        authentication.authorization(method, url, challenge, retried).ready(new SuccessCallback<String>() {
+
+            @Override
+            public void onSucess(String authorization) {
+                CalendarHttpRequest request = new CalendarHttpRequest(method, url).setBody(body).header("Accept", "application/xml, text/calendar");
+                if (authorization != null) {
+                    request.header("Authorization", authorization);
+                }
+                if (contentType != null) {
+                    request.header("Content-Type", contentType);
+                }
+                if (headers != null) {
+                    for (Map.Entry<String, String> h : headers.entrySet()) {
+                        request.header(h.getKey(), h.getValue());
+                    }
+                }
+                transport.execute(request).ready(new SuccessCallback<CalendarHttpResponse>() {
+
+                    @Override
+                    public void onSucess(CalendarHttpResponse response) {
+                        if (response.getStatusCode() == 401 && !retried) {
+                            authorizeAndSend(method, url, body, contentType, headers, response.getHeader("WWW-Authenticate"), true, out);
+                            return;
+                        }
+                        if (response.getStatusCode() >= 200 && response.getStatusCode() < 300) {
+                            out.complete(response);
+                        } else {
+                            out.error(httpError(response));
+                        }
+                    }
+                }).except(error(out));
+            }
+        }).except(error(out));
+    }
+
+    private static CalendarException httpError(CalendarHttpResponse r) {
+        int code = r.getStatusCode();
+        CalendarError type = code == 401 ? CalendarError.AUTHENTICATION_REQUIRED : code == 403 ? CalendarError.PERMISSION_DENIED : code == 404 ? CalendarError.NOT_FOUND : code == 409 || code == 412 ? CalendarError.CONFLICT : code == 429 ? CalendarError.RATE_LIMITED : code >= 500 ? CalendarError.NETWORK : CalendarError.INVALID_ARGUMENT;
+        return new CalendarException(type, "CalDAV server returned HTTP " + code + (r.getBody() == null ? "" : ": " + r.getBody()), code, null);
+    }
+
+    private String resolve(String href) {
+        if (href.startsWith("http://") || href.startsWith("https://")) {
+            return href;
+        }
+        int scheme = homeUrl.indexOf("://");
+        int slash = homeUrl.indexOf('/', scheme + 3);
+        String origin = slash < 0 ? homeUrl : homeUrl.substring(0, slash);
+        return href.startsWith("/") ? origin + href : homeUrl + href;
+    }
+
+    private static String resource(String calendarId, String id) {
+        if (id.startsWith("http://") || id.startsWith("https://")) {
+            return id;
+        }
+        String base = calendarId.endsWith("/") ? calendarId : calendarId + "/";
+        return base + safe(id) + (id.toLowerCase().endsWith(".ics") ? "" : ".ics");
+    }
+
+    private static String safe(String value) {
+        return value.replace(" ", "%20").replace("/", "%2F");
+    }
+
+    private static String calendarQuery(String component, CalendarQuery q) {
+        StringBuilder filter = new StringBuilder("<c:comp-filter name=\"VCALENDAR\"><c:comp-filter name=\"").append(component).append("\"");
+        if (q.getStartTime() == null && q.getEndTime() == null) {
+            filter.append("/>");
+        } else {
+            filter.append('>');
+            filter.append("<c:time-range");
+            if (q.getStartTime() != null) {
+                filter.append(" start=\"").append(icalTime(q.getStartTime().longValue())).append("\"");
+            }
+            if (q.getEndTime() != null) {
+                filter.append(" end=\"").append(icalTime(q.getEndTime().longValue())).append("\"");
+            }
+            filter.append("/></c:comp-filter>");
+        }
+        filter.append("</c:comp-filter>");
+        return "<?xml version=\"1.0\"?><c:calendar-query xmlns:d=\"DAV:\" " + "xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:prop><d:getetag/><c:calendar-data/></d:prop><c:filter>" + filter + "</c:filter></c:calendar-query>";
+    }
+
+    private static String syncQuery(String token) {
+        return "<?xml version=\"1.0\"?><d:sync-collection xmlns:d=\"DAV:\" " + "xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:sync-token>" + xml(token) + ("</d:sync-token><d:sync-level>1</d:sync-level><d:prop><d:getetag/><c:calendar-data/></d:prop></" + "d:sync-collection>");
+    }
+
+    private static String icalTime(long value) {
+        return CalendarDateUtil.formatBasic(value, "UTC") + "Z";
+    }
+
+    private static Map<String, String> headers(String name, String value) {
+        Map<String, String> out = new HashMap<String, String>();
+        out.put(name, value);
+        return out;
+    }
+
+    private static Map<String, String> version(String value, boolean create) {
+        Map<String, String> out = new HashMap<String, String>();
+        if (create) {
+            out.put("If-None-Match", "*");
+        } else if (value != null) {
+            out.put("If-Match", value);
+        }
+        return out;
+    }
+
+    private static String xmlValue(String source, String local) {
+        String element = xmlElement(source, local);
+        return element == null ? null : unxml(stripTags(element).trim());
+    }
+
+    private static String xmlElement(String source, String local) {
+        if (source == null) {
+            return null;
+        }
+        String lower = source.toLowerCase();
+        int open = findElement(lower, local.toLowerCase(), 0);
+        if (open < 0) {
+            return null;
+        }
+        int gt = source.indexOf('>', open);
+        if (gt < 0) {
+            return null;
+        }
+        String tag = source.substring(open + 1, gt).trim();
+        int space = tag.indexOf(' ');
+        if (space >= 0) {
+            tag = tag.substring(0, space);
+        }
+        String close = "</" + tag + ">";
+        int end = lower.indexOf(close.toLowerCase(), gt + 1);
+        return end < 0 ? null : source.substring(gt + 1, end);
+    }
+
+    private static List<String> elements(String source, String local) {
+        List<String> out = new ArrayList<String>();
+        if (source == null) {
+            return out;
+        }
+        String lower = source.toLowerCase();
+        int from = 0;
+        while (true) {
+            int open = findElement(lower, local.toLowerCase(), from);
+            if (open < 0) {
+                break;
+            }
+            int gt = source.indexOf('>', open);
+            if (gt < 0) {
+                break;
+            }
+            String tag = source.substring(open + 1, gt).trim();
+            int space = tag.indexOf(' ');
+            if (space >= 0) {
+                tag = tag.substring(0, space);
+            }
+            String close = "</" + tag + ">";
+            int end = lower.indexOf(close.toLowerCase(), gt + 1);
+            if (end < 0) {
+                break;
+            }
+            out.add(source.substring(gt + 1, end));
+            from = end + close.length();
+        }
+        return out;
+    }
+
+    private static int findElement(String source, String local, int from) {
+        int plain = source.indexOf("<" + local, from);
+        int prefixed = source.indexOf(":" + local, from);
+        if (prefixed >= 0) {
+            prefixed = source.lastIndexOf('<', prefixed);
+        }
+        if (plain < 0) {
+            return prefixed;
+        }
+        if (prefixed < 0) {
+            return plain;
+        }
+        return Math.min(plain, prefixed);
+    }
+
+    private static String stripTags(String value) {
+        StringBuilder out = new StringBuilder();
+        boolean tag = false;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '<') {
+                tag = true;
+            } else if (c == '>') {
+                tag = false;
+            } else if (!tag) {
+                out.append(c);
+            }
+        }
+        return out.toString();
+    }
+
+    private static String xml(String value) {
+        return value == null ? "" : value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
+    }
+
+    private static String unxml(String value) {
+        return value.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'").replace("&amp;", "&");
+    }
+
+    private static <T> SuccessCallback<Throwable> error(final AsyncResource<T> out) {
+        return new SuccessCallback<Throwable>() {
+
+            @Override
+            public void onSucess(Throwable error) {
+                out.error(error);
+            }
+        };
+    }
+
+    private static <T> AsyncResource<T> fail(AsyncResource<T> out, String message) {
+        out.error(new CalendarException(CalendarError.INVALID_ARGUMENT, message));
+        return out;
+    }
 }

@@ -28,19 +28,37 @@ import java.util.Map;
 
 /// Opt-in persistent cache backed by application `Storage`.
 public class StorageCalendarCache implements CalendarCache {
+
     private final String prefix;
+
     public StorageCalendarCache(String namespace) {
-        if (namespace == null || namespace.length() == 0) throw new IllegalArgumentException("namespace required");
+        if (namespace == null || namespace.length() == 0) {
+            throw new IllegalArgumentException("namespace required");
+        }
         prefix = "cn1-calendar-" + namespace + "-";
     }
-    public Map<String,Object> load(String sourceId) throws CalendarException {
+
+    @Override
+    public Map<String, Object> load(String sourceId) throws CalendarException {
         Object value = Storage.getInstance().readObject(prefix + sourceId);
-        if (value == null) return new HashMap<String,Object>();
-        if (!(value instanceof Map)) throw new CalendarException(CalendarError.STORAGE, "Invalid calendar cache data");
-        return new HashMap<String,Object>((Map)value);
+        if (value == null) {
+            return new HashMap<String, Object>();
+        }
+        if (!(value instanceof Map)) {
+            throw new CalendarException(CalendarError.STORAGE, "Invalid calendar cache data");
+        }
+        return new HashMap<String, Object>((Map) value);
     }
-    public void store(String sourceId, Map<String,Object> state) throws CalendarException {
-        if (!Storage.getInstance().writeObject(prefix + sourceId, state)) throw new CalendarException(CalendarError.STORAGE, "Unable to write calendar cache");
+
+    @Override
+    public void store(String sourceId, Map<String, Object> state) throws CalendarException {
+        if (!Storage.getInstance().writeObject(prefix + sourceId, state)) {
+            throw new CalendarException(CalendarError.STORAGE, "Unable to write calendar cache");
+        }
     }
-    public void clear(String sourceId) { Storage.getInstance().deleteStorageFile(prefix + sourceId); }
+
+    @Override
+    public void clear(String sourceId) {
+        Storage.getInstance().deleteStorageFile(prefix + sourceId);
+    }
 }

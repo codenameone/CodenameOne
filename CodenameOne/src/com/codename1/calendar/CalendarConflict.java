@@ -26,13 +26,33 @@ import java.util.Map;
 
 /// A queued local mutation that conflicts with the provider version.
 public final class CalendarConflict {
-    public enum Resolution { KEEP_LOCAL, KEEP_REMOTE, MERGED }
-    private final String mutationId;
-    private final Map<String,Object> local, remote;
-    CalendarConflict(String mutationId, Map<String,Object> local, Map<String,Object> remote) {
-        this.mutationId = mutationId; this.local = local; this.remote = remote;
+
+    public enum Resolution {
+
+        KEEP_LOCAL, KEEP_REMOTE, MERGED
     }
-    public String getMutationId() { return mutationId; }
-    public Map<String,Object> getLocal() { return local; }
-    public Map<String,Object> getRemote() { return remote; }
+
+    private final String mutationId;
+
+    private final Map<String, Object> local;
+
+    private final Map<String, Object> remote;
+
+    CalendarConflict(String mutationId, Map<String, Object> local, Map<String, Object> remote) {
+        this.mutationId = mutationId;
+        this.local = local;
+        this.remote = remote;
+    }
+
+    public String getMutationId() {
+        return mutationId;
+    }
+
+    public Map<String, Object> getLocal() {
+        return local;
+    }
+
+    public Map<String, Object> getRemote() {
+        return remote;
+    }
 }

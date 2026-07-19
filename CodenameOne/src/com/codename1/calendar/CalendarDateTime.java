@@ -24,22 +24,46 @@ package com.codename1.calendar;
 
 /// Either an instant with an Olson time-zone ID or an all-day date.
 public final class CalendarDateTime {
+
     private final long timestamp;
+
     private final String timeZoneId;
+
     private final CalendarDate date;
+
     private CalendarDateTime(long timestamp, String timeZoneId, CalendarDate date) {
-        this.timestamp = timestamp; this.timeZoneId = timeZoneId; this.date = date;
+        this.timestamp = timestamp;
+        this.timeZoneId = timeZoneId;
+        this.date = date;
     }
+
     public static CalendarDateTime instant(long timestamp, String timeZoneId) {
-        if (timeZoneId == null || timeZoneId.length() == 0) throw new IllegalArgumentException("timeZoneId required");
+        if (timeZoneId == null || timeZoneId.length() == 0) {
+            throw new IllegalArgumentException("timeZoneId required");
+        }
         return new CalendarDateTime(timestamp, timeZoneId, null);
     }
+
     public static CalendarDateTime allDay(CalendarDate date) {
-        if (date == null) throw new IllegalArgumentException("date required");
+        if (date == null) {
+            throw new IllegalArgumentException("date required");
+        }
         return new CalendarDateTime(0L, null, date);
     }
-    public boolean isAllDay() { return date != null; }
-    public long getTimestamp() { return timestamp; }
-    public String getTimeZoneId() { return timeZoneId; }
-    public CalendarDate getDate() { return date; }
+
+    public boolean isAllDay() {
+        return date != null;
+    }
+
+    public long getTimestamp() {
+        return timestamp;
+    }
+
+    public String getTimeZoneId() {
+        return timeZoneId;
+    }
+
+    public CalendarDate getDate() {
+        return date;
+    }
 }

@@ -24,14 +24,35 @@ package com.codename1.calendar;
 
 /// App-owned OAuth bearer token returned to an online source.
 public final class CalendarAuthToken {
-    private final String accessToken, scopes;
+
+    private final String accessToken;
+
+    private final String scopes;
+
     private final Long expiresAt;
+
     public CalendarAuthToken(String accessToken, Long expiresAt, String scopes) {
-        if (accessToken == null) throw new IllegalArgumentException("accessToken required");
-        this.accessToken = accessToken; this.expiresAt = expiresAt; this.scopes = scopes;
+        if (accessToken == null) {
+            throw new IllegalArgumentException("accessToken required");
+        }
+        this.accessToken = accessToken;
+        this.expiresAt = expiresAt;
+        this.scopes = scopes;
     }
-    public String getAccessToken() { return accessToken; }
-    public Long getExpiresAt() { return expiresAt; }
-    public String getScopes() { return scopes; }
-    public boolean isExpiringWithin(int seconds) { return expiresAt != null && expiresAt.longValue() - System.currentTimeMillis() < seconds * 1000L; }
+
+    public String getAccessToken() {
+        return accessToken;
+    }
+
+    public Long getExpiresAt() {
+        return expiresAt;
+    }
+
+    public String getScopes() {
+        return scopes;
+    }
+
+    public boolean isExpiringWithin(int seconds) {
+        return expiresAt != null && expiresAt.longValue() - System.currentTimeMillis() < seconds * 1000L;
+    }
 }

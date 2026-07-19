@@ -28,14 +28,43 @@ import java.util.Map;
 
 /// Provider HTTP request. Public so applications and tests may inject a transport.
 public final class CalendarHttpRequest {
-    private final String method, url;
+
+    private final String method;
+
+    private final String url;
+
     private String body;
-    private final Map<String,String> headers = new LinkedHashMap<String,String>();
-    public CalendarHttpRequest(String method, String url) { this.method = method; this.url = url; }
-    public String getMethod() { return method; }
-    public String getUrl() { return url; }
-    public String getBody() { return body; }
-    public CalendarHttpRequest setBody(String v) { body = v; return this; }
-    public CalendarHttpRequest header(String k,String v) { headers.put(k,v); return this; }
-    public Map<String,String> getHeaders() { return Collections.unmodifiableMap(headers); }
+
+    private final Map<String, String> headers = new LinkedHashMap<String, String>();
+
+    public CalendarHttpRequest(String method, String url) {
+        this.method = method;
+        this.url = url;
+    }
+
+    public String getMethod() {
+        return method;
+    }
+
+    public String getUrl() {
+        return url;
+    }
+
+    public String getBody() {
+        return body;
+    }
+
+    public CalendarHttpRequest setBody(String v) {
+        body = v;
+        return this;
+    }
+
+    public CalendarHttpRequest header(String k, String v) {
+        headers.put(k, v);
+        return this;
+    }
+
+    public Map<String, String> getHeaders() {
+        return Collections.unmodifiableMap(headers);
+    }
 }

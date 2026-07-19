@@ -24,18 +24,52 @@ package com.codename1.calendar;
 
 /// Describes a local notification or delta-sync change.
 public final class CalendarChange {
-    public enum EntityType { CALENDAR, EVENT, TASK }
-    public enum ChangeType { CREATED, UPDATED, DELETED, RESET }
-    private final String sourceId, calendarId, itemId;
-    private final EntityType entityType;
-    private final ChangeType changeType;
-    public CalendarChange(String sourceId, String calendarId, String itemId, EntityType entityType, ChangeType changeType) {
-        this.sourceId = sourceId; this.calendarId = calendarId; this.itemId = itemId;
-        this.entityType = entityType; this.changeType = changeType;
+
+    public enum EntityType {
+
+        CALENDAR, EVENT, TASK
     }
-    public String getSourceId() { return sourceId; }
-    public String getCalendarId() { return calendarId; }
-    public String getItemId() { return itemId; }
-    public EntityType getEntityType() { return entityType; }
-    public ChangeType getChangeType() { return changeType; }
+
+    public enum ChangeType {
+
+        CREATED, UPDATED, DELETED, RESET
+    }
+
+    private final String sourceId;
+
+    private final String calendarId;
+
+    private final String itemId;
+
+    private final EntityType entityType;
+
+    private final ChangeType changeType;
+
+    public CalendarChange(String sourceId, String calendarId, String itemId, EntityType entityType, ChangeType changeType) {
+        this.sourceId = sourceId;
+        this.calendarId = calendarId;
+        this.itemId = itemId;
+        this.entityType = entityType;
+        this.changeType = changeType;
+    }
+
+    public String getSourceId() {
+        return sourceId;
+    }
+
+    public String getCalendarId() {
+        return calendarId;
+    }
+
+    public String getItemId() {
+        return itemId;
+    }
+
+    public EntityType getEntityType() {
+        return entityType;
+    }
+
+    public ChangeType getChangeType() {
+        return changeType;
+    }
 }

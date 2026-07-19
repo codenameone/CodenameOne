@@ -30,45 +30,186 @@ import java.util.Map;
 
 /// A task/reminder in a task collection.
 public class CalendarTask {
-    private String id, calendarId, sourceId, version, title, description, location;
-    private CalendarDateTime start, due;
+
+    private String id;
+
+    private String calendarId;
+
+    private String sourceId;
+
+    private String version;
+
+    private String title;
+
+    private String description;
+
+    private String location;
+
+    private CalendarDateTime start;
+
+    private CalendarDateTime due;
+
     private CalendarRecurrenceRule recurrence;
+
     private boolean completed;
+
     private Long completionTime;
+
     private int priority;
+
     private final List<CalendarAlarm> alarms = new ArrayList<CalendarAlarm>();
+
     private final List<CalendarAttachment> attachments = new ArrayList<CalendarAttachment>();
-    private final Map<String,String> providerData = new HashMap<String,String>();
-    public String getId() { return id; }
-    public CalendarTask setId(String v) { id = v; return this; }
-    public String getCalendarId() { return calendarId; }
-    public CalendarTask setCalendarId(String v) { calendarId = v; return this; }
-    public String getSourceId() { return sourceId; }
-    public CalendarTask setSourceId(String v) { sourceId = v; return this; }
-    public String getVersion() { return version; }
-    public CalendarTask setVersion(String v) { version = v; return this; }
-    public String getTitle() { return title; }
-    public CalendarTask setTitle(String v) { title = v; return this; }
-    public String getDescription() { return description; }
-    public CalendarTask setDescription(String v) { description = v; return this; }
-    public String getLocation() { return location; }
-    public CalendarTask setLocation(String v) { location = v; return this; }
-    public CalendarDateTime getStart() { return start; }
-    public CalendarTask setStart(CalendarDateTime v) { start = v; return this; }
-    public CalendarDateTime getDue() { return due; }
-    public CalendarTask setDue(CalendarDateTime v) { due = v; return this; }
-    public CalendarRecurrenceRule getRecurrence() { return recurrence; }
-    public CalendarTask setRecurrence(CalendarRecurrenceRule v) { recurrence = v; return this; }
-    public boolean isCompleted() { return completed; }
-    public CalendarTask setCompleted(boolean v) { completed = v; return this; }
-    public Long getCompletionTime() { return completionTime; }
-    public CalendarTask setCompletionTime(Long v) { completionTime = v; return this; }
-    public int getPriority() { return priority; }
-    public CalendarTask setPriority(int v) { priority = v; return this; }
-    public CalendarTask addAlarm(CalendarAlarm v) { if (v != null) alarms.add(v); return this; }
-    public List<CalendarAlarm> getAlarms() { return Collections.unmodifiableList(alarms); }
-    public CalendarTask addAttachment(CalendarAttachment v) { if (v != null) attachments.add(v); return this; }
-    public List<CalendarAttachment> getAttachments() { return Collections.unmodifiableList(attachments); }
-    public CalendarTask putProviderData(String k, String v) { if (k != null) providerData.put(k, v); return this; }
-    public Map<String,String> getProviderData() { return Collections.unmodifiableMap(providerData); }
+
+    private final Map<String, String> providerData = new HashMap<String, String>();
+
+    public String getId() {
+        return id;
+    }
+
+    public CalendarTask setId(String v) {
+        id = v;
+        return this;
+    }
+
+    public String getCalendarId() {
+        return calendarId;
+    }
+
+    public CalendarTask setCalendarId(String v) {
+        calendarId = v;
+        return this;
+    }
+
+    public String getSourceId() {
+        return sourceId;
+    }
+
+    public CalendarTask setSourceId(String v) {
+        sourceId = v;
+        return this;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public CalendarTask setVersion(String v) {
+        version = v;
+        return this;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public CalendarTask setTitle(String v) {
+        title = v;
+        return this;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public CalendarTask setDescription(String v) {
+        description = v;
+        return this;
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public CalendarTask setLocation(String v) {
+        location = v;
+        return this;
+    }
+
+    public CalendarDateTime getStart() {
+        return start;
+    }
+
+    public CalendarTask setStart(CalendarDateTime v) {
+        start = v;
+        return this;
+    }
+
+    public CalendarDateTime getDue() {
+        return due;
+    }
+
+    public CalendarTask setDue(CalendarDateTime v) {
+        due = v;
+        return this;
+    }
+
+    public CalendarRecurrenceRule getRecurrence() {
+        return recurrence;
+    }
+
+    public CalendarTask setRecurrence(CalendarRecurrenceRule v) {
+        recurrence = v;
+        return this;
+    }
+
+    public boolean isCompleted() {
+        return completed;
+    }
+
+    public CalendarTask setCompleted(boolean v) {
+        completed = v;
+        return this;
+    }
+
+    public Long getCompletionTime() {
+        return completionTime;
+    }
+
+    public CalendarTask setCompletionTime(Long v) {
+        completionTime = v;
+        return this;
+    }
+
+    public int getPriority() {
+        return priority;
+    }
+
+    public CalendarTask setPriority(int v) {
+        priority = v;
+        return this;
+    }
+
+    public CalendarTask addAlarm(CalendarAlarm v) {
+        if (v != null) {
+            alarms.add(v);
+        }
+        return this;
+    }
+
+    public List<CalendarAlarm> getAlarms() {
+        return Collections.unmodifiableList(alarms);
+    }
+
+    public CalendarTask addAttachment(CalendarAttachment v) {
+        if (v != null) {
+            attachments.add(v);
+        }
+        return this;
+    }
+
+    public List<CalendarAttachment> getAttachments() {
+        return Collections.unmodifiableList(attachments);
+    }
+
+    public CalendarTask putProviderData(String k, String v) {
+        if (k != null) {
+            providerData.put(k, v);
+        }
+        return this;
+    }
+
+    public Map<String, String> getProviderData() {
+        return Collections.unmodifiableMap(providerData);
+    }
 }
