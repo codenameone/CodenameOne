@@ -29,7 +29,7 @@ import com.codename1.bluetooth.BluetoothUuid;
 import com.codename1.bluetooth.gatt.GattCharacteristic;
 import com.codename1.bluetooth.gatt.GattDescriptor;
 import com.codename1.bluetooth.gatt.GattService;
-import com.codename1.bluetooth.helper.BleBackend;
+import com.codename1.impl.bluetooth.BleBackend;
 import com.codename1.bluetooth.le.AdvertisementData;
 import com.codename1.bluetooth.le.BlePeripheral;
 import com.codename1.bluetooth.le.ScanResult;
@@ -48,10 +48,10 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Records a {@link BluetoothFixture} from a live {@link BleBackend} --
- * normally the {@link NativeBleBackend} driving this machine's real radio
- * through the {@code cn1-ble-helper} subprocess. Capture is entirely
- * Java-side over the existing helper protocol; nothing native is needed
- * beyond the helper binary itself.
+ * normally the native backend driving this machine's real radio
+ * in-process through the bundled {@code libcn1ble} library. Capture is
+ * entirely Java-side over the backend seam; nothing beyond the library
+ * itself is required.
  *
  * <p>{@link #record(long, List, boolean)} scans for the requested
  * duration, folding every sighting into per-device records (RSSI
@@ -96,20 +96,21 @@ public final class FixtureRecorder {
     }
 
     /**
-     * Creates a recorder over a fresh {@link NativeBleBackend} (the real
-     * radio); {@link #close()} shuts it down. Throws a typed exception
-     * with the resolution trace when no helper binary exists for this
-     * host.
+     * Creates a recorder over a fresh native backend (the real radio);
+     * {@link #close()} shuts it down. Throws a typed exception with the
+     * resolution trace when the {@code libcn1ble} library cannot be loaded on
+     * this host.
      */
     public static FixtureRecorder forNativeBackend()
             throws BluetoothException {
-        NativeBleBackend nativeBackend = new NativeBleBackend();
-        if (!nativeBackend.isAvailable()) {
+        if (!JniBleBridge.isLibraryAvailable()) {
             throw new BluetoothException(BluetoothError.NOT_SUPPORTED,
-                    "The cn1-ble-helper binary was not found; tried: "
-                            + nativeBackend.describeResolution());
+                    "The libcn1ble library could not be loaded; tried: "
+                            + JniBleBridge.describeResolution());
         }
-        return new FixtureRecorder(nativeBackend, true);
+        return new FixtureRecorder(
+                new com.codename1.impl.bluetooth.NativeBleBackend(
+                        new JniBleBridge()), true);
     }
 
     /** Releases the backend when this recorder created it. */

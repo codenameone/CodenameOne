@@ -24,8 +24,8 @@ package com.codename1.impl.javase.bluetooth;
 
 import com.codename1.bluetooth.BluetoothUuid;
 import com.codename1.bluetooth.gatt.GattCharacteristic;
-import com.codename1.bluetooth.helper.HelperBlePeripheral;
-import com.codename1.bluetooth.helper.Wire;
+import com.codename1.impl.bluetooth.NativeBlePeripheral;
+import com.codename1.impl.bluetooth.Json;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -52,7 +52,7 @@ import java.util.Map;
  * <p>Serialization is plain JSON without external libraries:
  * {@link #toJson()} hand-rolls the writer (indented, deterministic field
  * order) and {@link #fromJson(InputStream)} parses with the core
- * {@code com.codename1.io.JSONParser} through {@link Wire}. Format
+ * {@code com.codename1.io.JSONParser} through {@link Json}. Format
  * (version {@value #FORMAT_VERSION}):</p>
  *
  * <pre>
@@ -283,7 +283,7 @@ public final class BluetoothFixture {
         sb.append("  \"version\": ").append(version);
         if (platform != null) {
             sb.append(",\n  \"platform\": \"")
-                    .append(Wire.escape(platform)).append('"');
+                    .append(Json.escape(platform)).append('"');
         }
         sb.append(",\n  \"devices\": [");
         int size = devices.size();
@@ -299,9 +299,9 @@ public final class BluetoothFixture {
     }
 
     private static void writeDevice(StringBuilder sb, Device d) {
-        sb.append("    {\"id\": \"").append(Wire.escape(d.id)).append('"');
+        sb.append("    {\"id\": \"").append(Json.escape(d.id)).append('"');
         if (d.name != null) {
-            sb.append(",\n     \"name\": \"").append(Wire.escape(d.name))
+            sb.append(",\n     \"name\": \"").append(Json.escape(d.name))
                     .append('"');
         }
         sb.append(",\n     \"connectable\": ").append(d.connectable);
@@ -336,7 +336,7 @@ public final class BluetoothFixture {
             }
             first = false;
             sb.append('"').append(e.getKey()).append("\": \"")
-                    .append(Wire.encodeBase64(e.getValue())).append('"');
+                    .append(Json.encodeBase64(e.getValue())).append('"');
         }
         sb.append('}');
         sb.append(",\n     \"serviceData\": {");
@@ -347,7 +347,7 @@ public final class BluetoothFixture {
             }
             first = false;
             sb.append('"').append(e.getKey()).append("\": \"")
-                    .append(Wire.encodeBase64(e.getValue())).append('"');
+                    .append(Json.encodeBase64(e.getValue())).append('"');
         }
         sb.append('}');
         if (!d.gatt.isEmpty()) {
@@ -393,7 +393,7 @@ public final class BluetoothFixture {
         }
         sb.append(']');
         if (c.value != null) {
-            sb.append(", \"value\": \"").append(Wire.encodeBase64(c.value))
+            sb.append(", \"value\": \"").append(Json.encodeBase64(c.value))
                     .append('"');
         }
         sb.append(", \"descriptors\": [");
@@ -411,7 +411,7 @@ public final class BluetoothFixture {
     /**
      * The wire names (see {@code PROTOCOL.md}) of a
      * {@link GattCharacteristic}{@code .PROPERTY_*} bitmask; the inverse
-     * of {@link HelperBlePeripheral#propertiesMask(List)}.
+     * of {@link NativeBlePeripheral#propertiesMask(List)}.
      */
     static String[] propertyNames(int mask) {
         ArrayList<String> out = new ArrayList<String>();
@@ -464,67 +464,67 @@ public final class BluetoothFixture {
 
     /** Parses a fixture from its JSON form. */
     public static BluetoothFixture fromJson(String json) throws IOException {
-        Map<String, Object> root = Wire.parse(json);
-        long version = Wire.longVal(root, "version", -1);
+        Map<String, Object> root = Json.parse(json);
+        long version = Json.longVal(root, "version", -1);
         if (version != FORMAT_VERSION) {
             throw new IOException("Unsupported fixture version " + version
                     + " (this build reads version " + FORMAT_VERSION + ")");
         }
         BluetoothFixture fixture = new BluetoothFixture();
-        fixture.platform = Wire.str(root, "platform", null);
-        List<Object> deviceArr = Wire.list(root, "devices");
+        fixture.platform = Json.str(root, "platform", null);
+        List<Object> deviceArr = Json.list(root, "devices");
         int size = deviceArr.size();
         for (int i = 0; i < size; i++) {
-            fixture.addDevice(parseDevice(Wire.map(deviceArr.get(i))));
+            fixture.addDevice(parseDevice(Json.map(deviceArr.get(i))));
         }
         return fixture;
     }
 
     private static Device parseDevice(Map<String, Object> obj)
             throws IOException {
-        String id = Wire.str(obj, "id", "");
+        String id = Json.str(obj, "id", "");
         if (id.length() == 0) {
             throw new IOException("Fixture device without an id");
         }
         Device d = new Device(id);
-        d.name = Wire.str(obj, "name", null);
-        d.connectable = Wire.boolVal(obj, "connectable", true);
+        d.name = Json.str(obj, "name", null);
+        d.connectable = Json.boolVal(obj, "connectable", true);
         if (obj.containsKey("txPower")) {
-            d.txPower = Integer.valueOf(Wire.intVal(obj, "txPower", 0));
+            d.txPower = Integer.valueOf(Json.intVal(obj, "txPower", 0));
         }
-        List<Object> timeline = Wire.list(obj, "rssiTimeline");
+        List<Object> timeline = Json.list(obj, "rssiTimeline");
         int size = timeline.size();
         for (int i = 0; i < size; i++) {
-            Map<String, Object> s = Wire.map(timeline.get(i));
+            Map<String, Object> s = Json.map(timeline.get(i));
             d.rssiTimeline.add(new RssiSample(
-                    Wire.longVal(s, "relTimeMs", 0),
-                    Wire.intVal(s, "rssi", -127)));
+                    Json.longVal(s, "relTimeMs", 0),
+                    Json.intVal(s, "rssi", -127)));
         }
-        List<Object> uuids = Wire.list(obj, "serviceUuids");
+        List<Object> uuids = Json.list(obj, "serviceUuids");
         size = uuids.size();
         for (int i = 0; i < size; i++) {
             d.serviceUuids.add(parseUuid(String.valueOf(uuids.get(i))));
         }
         Map<String, Object> manufacturer =
-                Wire.map(obj.get("manufacturerData"));
+                Json.map(obj.get("manufacturerData"));
         for (Map.Entry<String, Object> e : manufacturer.entrySet()) {
             try {
                 d.manufacturerData.put(Integer.valueOf(e.getKey()),
-                        Wire.decodeBase64(String.valueOf(e.getValue())));
+                        Json.decodeBase64(String.valueOf(e.getValue())));
             } catch (NumberFormatException ex) {
                 throw new IOException("Bad manufacturer company id: "
                         + e.getKey());
             }
         }
-        Map<String, Object> serviceData = Wire.map(obj.get("serviceData"));
+        Map<String, Object> serviceData = Json.map(obj.get("serviceData"));
         for (Map.Entry<String, Object> e : serviceData.entrySet()) {
             d.serviceData.put(parseUuid(e.getKey()),
-                    Wire.decodeBase64(String.valueOf(e.getValue())));
+                    Json.decodeBase64(String.valueOf(e.getValue())));
         }
-        List<Object> gatt = Wire.list(obj, "gatt");
+        List<Object> gatt = Json.list(obj, "gatt");
         size = gatt.size();
         for (int i = 0; i < size; i++) {
-            d.gatt.add(parseService(Wire.map(gatt.get(i))));
+            d.gatt.add(parseService(Json.map(gatt.get(i))));
         }
         return d;
     }
@@ -532,24 +532,24 @@ public final class BluetoothFixture {
     private static ServiceRecord parseService(Map<String, Object> obj)
             throws IOException {
         ServiceRecord s = new ServiceRecord(
-                parseUuid(Wire.str(obj, "uuid", "")));
-        s.primary = Wire.boolVal(obj, "primary", true);
-        List<Object> chars = Wire.list(obj, "characteristics");
+                parseUuid(Json.str(obj, "uuid", "")));
+        s.primary = Json.boolVal(obj, "primary", true);
+        List<Object> chars = Json.list(obj, "characteristics");
         int size = chars.size();
         for (int i = 0; i < size; i++) {
-            Map<String, Object> ch = Wire.map(chars.get(i));
+            Map<String, Object> ch = Json.map(chars.get(i));
             CharacteristicRecord c = new CharacteristicRecord(
-                    parseUuid(Wire.str(ch, "uuid", "")),
-                    HelperBlePeripheral.propertiesMask(
-                            Wire.list(ch, "properties")));
+                    parseUuid(Json.str(ch, "uuid", "")),
+                    NativeBlePeripheral.propertiesMask(
+                            Json.list(ch, "properties")));
             if (ch.containsKey("value")) {
-                c.value = Wire.decodeBase64(Wire.str(ch, "value", ""));
+                c.value = Json.decodeBase64(Json.str(ch, "value", ""));
             }
-            List<Object> descriptors = Wire.list(ch, "descriptors");
+            List<Object> descriptors = Json.list(ch, "descriptors");
             int ds = descriptors.size();
             for (int j = 0; j < ds; j++) {
-                c.descriptors.add(new DescriptorRecord(parseUuid(Wire.str(
-                        Wire.map(descriptors.get(j)), "uuid", ""))));
+                c.descriptors.add(new DescriptorRecord(parseUuid(Json.str(
+                        Json.map(descriptors.get(j)), "uuid", ""))));
             }
             s.characteristics.add(c);
         }

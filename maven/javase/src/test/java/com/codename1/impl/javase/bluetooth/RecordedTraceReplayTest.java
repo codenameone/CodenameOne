@@ -24,7 +24,7 @@ package com.codename1.impl.javase.bluetooth;
 
 import com.codename1.bluetooth.BluetoothException;
 import com.codename1.bluetooth.BluetoothUuid;
-import com.codename1.bluetooth.helper.BleBackend;
+import com.codename1.impl.bluetooth.BleBackend;
 import com.codename1.bluetooth.gatt.GattCharacteristic;
 import com.codename1.bluetooth.gatt.GattService;
 import com.codename1.bluetooth.le.AdvertisementData;

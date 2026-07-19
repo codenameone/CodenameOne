@@ -473,36 +473,6 @@ public final class LinuxNative {
     /** The local host name (used by Socket.getHostOrIP). */
     public static native String getHostOrIP();
 
-    /* ----------------------------------------------------- subprocess */
-
-    /**
-     * Spawns {@code argv[0]} with {@code argv} as its argument vector, wiring the
-     * child's stdin and stdout to pipes owned by this process (stderr is
-     * inherited). Returns an opaque native handle, or 0 on failure.
-     */
-    public static native long procSpawn(String[] argv);
-
-    /**
-     * Blocking read of up to {@code len} bytes from the child's stdout into
-     * {@code buf} at {@code off}; returns bytes read, 0 on EOF, -1 on error.
-     */
-    public static native int procRead(long handle, byte[] buf, int off, int len);
-
-    /**
-     * Writes {@code len} bytes from {@code buf} at {@code off} to the child's
-     * stdin; returns bytes written, or -1 on error.
-     */
-    public static native int procWrite(long handle, byte[] buf, int off, int len);
-
-    /** Closes the child's stdin (signals EOF to the helper) without killing it. */
-    public static native void procCloseStdin(long handle);
-
-    /** Terminates the child (if running), closes the pipes, and frees the handle. */
-    public static native void procClose(long handle);
-
-    /** Returns 1 if the child is still running, 0 if it has exited. */
-    public static native int procIsAlive(long handle);
-
     /* ------------------------------------------------------- clipboard */
 
     public static native void clipboardSetText(String text);

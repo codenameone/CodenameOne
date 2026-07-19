@@ -20,17 +20,19 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.bluetooth.helper;
+package com.codename1.impl.bluetooth;
 
 import com.codename1.bluetooth.AdapterState;
 import com.codename1.bluetooth.BluetoothError;
 import com.codename1.bluetooth.BluetoothException;
 import com.codename1.bluetooth.BluetoothUuid;
 import com.codename1.bluetooth.gatt.GattCharacteristic;
+import com.codename1.bluetooth.gatt.GattNotificationListener;
 import com.codename1.bluetooth.gatt.GattService;
 import com.codename1.bluetooth.le.BlePeripheral;
 import com.codename1.bluetooth.le.ConnectionState;
 import com.codename1.bluetooth.le.ScanResult;
+import com.codename1.junit.UITestBase;
 import com.codename1.util.AsyncResource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -42,13 +44,18 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Drives the transport-agnostic {@link HelperBleBackend} end to end through a
- * scripted {@link MockHelperTransport} -- exercising the reader thread, the
+ * Drives {@link NativeBleBackend} end to end through a scripted
+ * {@link FakeNativeBleBridge} -- exercising the reader thread, the
  * request/terminal-event correlation, the capabilities handshake, scanning,
- * the GATT client lifecycle, crash-mid-flight handling and shutdown, all
- * without launching the real cn1-ble-helper subprocess.
+ * the GATT client lifecycle (connect, discover, read, write, subscribe,
+ * notify), crash-mid-flight handling and shutdown, all in-process with no
+ * native {@code libcn1ble} engine.
+ *
+ * <p>Extends {@link UITestBase} so {@link com.codename1.ui.Display} is
+ * initialised: connection-state and notification callbacks are dispatched on
+ * the EDT, so the state transitions this suite awaits are delivered there.</p>
  */
-public class HelperBleBackendMockTransportTest {
+public class NativeBleBackendFakeBridgeTest extends UITestBase {
 
     private static final long TIMEOUT_MS = 10000;
     private static final String HR_SERVICE =
@@ -60,11 +67,11 @@ public class HelperBleBackendMockTransportTest {
     private static final String CCCD =
             "00002902-0000-1000-8000-00805f9b34fb";
 
-    private HelperBleBackend backend;
-    private MockHelperTransport mock;
+    private NativeBleBackend backend;
+    private FakeNativeBleBridge bridge;
 
     @AfterEach
-    void tearDown() {
+    void tearDownBackend() {
         if (backend != null) {
             backend.shutdown();
             backend = null;
@@ -91,16 +98,21 @@ public class HelperBleBackendMockTransportTest {
         Assertions.fail("timed out waiting for " + what);
     }
 
-    private HelperBleBackend newBackend() {
-        mock = new MockHelperTransport();
-        backend = new HelperBleBackend(new MockHelperTransportFactory(mock));
+    private NativeBleBackend newBackend() {
+        bridge = new FakeNativeBleBridge();
+        backend = new NativeBleBackend(bridge);
         return backend;
     }
 
-    private List<AdapterState> attachStateSink(final HelperBleBackend b) {
+    private long awaitCommand(String cmd) {
+        return bridge.awaitCommandId(cmd, TIMEOUT_MS);
+    }
+
+    private List<AdapterState> attachStateSink(final NativeBleBackend b) {
         final List<AdapterState> states =
                 new CopyOnWriteArrayList<AdapterState>();
         b.setAdapterStateSink(new BleBackend.AdapterStateSink() {
+            @Override
             public void adapterStateChanged(AdapterState newState) {
                 states.add(newState);
             }
@@ -109,11 +121,12 @@ public class HelperBleBackendMockTransportTest {
     }
 
     /** Feeds the capabilities + poweredOn handshake and waits for it. */
-    private void handshake(final HelperBleBackend b) {
-        mock.feedLine("{\"event\":\"capabilities\",\"version\":1,"
+    private void handshake(final NativeBleBackend b) {
+        bridge.feed("{\"event\":\"capabilities\",\"version\":1,"
                 + "\"descriptors\":true,\"bonding\":false}");
-        mock.feedLine("{\"event\":\"stateChanged\",\"state\":\"poweredOn\"}");
+        bridge.feed("{\"event\":\"stateChanged\",\"state\":\"poweredOn\"}");
         await("poweredOn handshake", new Cond() {
+            @Override
             public boolean met() {
                 return b.getAdapterState() == AdapterState.POWERED_ON;
             }
@@ -122,26 +135,41 @@ public class HelperBleBackendMockTransportTest {
 
     private static final class RecordingScanSink
             implements BleBackend.ScanSink {
-        final List<ScanResult> results =
+        private final List<ScanResult> results =
                 new CopyOnWriteArrayList<ScanResult>();
-        volatile BluetoothException failure;
+        private final AtomicReference<BluetoothException> failure =
+                new AtomicReference<BluetoothException>();
 
+        @Override
         public void onResult(ScanResult result) {
             results.add(result);
         }
 
+        @Override
         public void onFailed(BluetoothException reason) {
-            failure = reason;
+            failure.set(reason);
+        }
+    }
+
+    private static final class RecordingNotifyListener
+            implements GattNotificationListener {
+        private final List<byte[]> values = new CopyOnWriteArrayList<byte[]>();
+
+        @Override
+        public void valueChanged(GattCharacteristic characteristic,
+                byte[] value) {
+            values.add(value);
         }
     }
 
     /** Boots, handshakes, scans and delivers one aa:01 sighting. */
-    private RecordingScanSink bootAndSight(HelperBleBackend b) {
+    private RecordingScanSink bootAndSight(NativeBleBackend b) {
         attachStateSink(b);
         handshake(b);
         RecordingScanSink sink = new RecordingScanSink();
         b.startScan(sink);
-        mock.feedLine("{\"event\":\"scanResult\",\"address\":\"aa:01\","
+        awaitCommand("scanStart");
+        bridge.feed("{\"event\":\"scanResult\",\"address\":\"aa:01\","
                 + "\"name\":\"Heart Monitor\",\"rssi\":-42,"
                 + "\"serviceUuids\":[\"" + HR_SERVICE + "\"],"
                 + "\"manufacturerData\":{\"76\":\"AQI=\"},"
@@ -150,29 +178,8 @@ public class HelperBleBackendMockTransportTest {
         return sink;
     }
 
-    /** Polls the backend's written commands until one matches {@code cmd}. */
-    private Map<String, Object> awaitCommand(String cmd) {
-        long deadline = System.currentTimeMillis() + TIMEOUT_MS;
-        while (System.currentTimeMillis() < deadline) {
-            String line = mock.takeWritten(200);
-            if (line == null) {
-                continue;
-            }
-            Map<String, Object> parsed;
-            try {
-                parsed = Wire.parse(line);
-            } catch (Exception ex) {
-                throw new AssertionError("bad command line: " + line, ex);
-            }
-            if (cmd.equals(Wire.str(parsed, "cmd", ""))) {
-                return parsed;
-            }
-        }
-        throw new AssertionError("timed out waiting for command " + cmd);
-    }
-
     private static Throwable errorOf(AsyncResource<?> res) {
-        final AtomicReference<Throwable> out = new AtomicReference<>();
+        final AtomicReference<Throwable> out = new AtomicReference<Throwable>();
         res.except(t -> out.set(t));
         return out.get();
     }
@@ -183,12 +190,13 @@ public class HelperBleBackendMockTransportTest {
 
     @Test
     public void handshakeReportsAdapterStateAndCapabilities() {
-        HelperBleBackend b = newBackend();
+        NativeBleBackend b = newBackend();
         List<AdapterState> states = attachStateSink(b);
         handshake(b);
         Assertions.assertTrue(states.contains(AdapterState.POWERED_ON));
-        Assertions.assertTrue(b.helperSupports("descriptors"));
-        Assertions.assertFalse(b.helperSupports("bonding"));
+        Assertions.assertTrue(b.engineSupports("descriptors"));
+        Assertions.assertFalse(b.engineSupports("bonding"));
+        Assertions.assertEquals(NativeBleBackend.NAME, b.getName());
         Assertions.assertTrue(b.isLeSupported());
         Assertions.assertFalse(b.isPeripheralModeSupported());
         Assertions.assertFalse(b.isClassicSupported());
@@ -200,9 +208,9 @@ public class HelperBleBackendMockTransportTest {
 
     @Test
     public void scanDeliversResultsAndCachesCanonicalPeripherals() {
-        HelperBleBackend b = newBackend();
+        NativeBleBackend b = newBackend();
         RecordingScanSink sink = bootAndSight(b);
-        Assertions.assertNull(sink.failure);
+        Assertions.assertNull(sink.failure.get());
         ScanResult first = sink.results.get(0);
         BlePeripheral p1 = first.getPeripheral();
         Assertions.assertEquals("aa:01", p1.getAddress());
@@ -221,28 +229,29 @@ public class HelperBleBackendMockTransportTest {
     }
 
     @Test
-    public void gattLifecycleOverTheMockTransport() {
-        HelperBleBackend b = newBackend();
+    public void gattLifecycleOverTheNativeBridge() {
+        NativeBleBackend b = newBackend();
         bootAndSight(b);
         final BlePeripheral p = b.getPeripheral("aa:01");
 
         final AsyncResource<BlePeripheral> connect = p.connect();
-        long connectId = Wire.longVal(awaitCommand("connect"), "id", -1);
-        mock.feedLine("{\"event\":\"connected\",\"requestId\":" + connectId
+        long connectId = awaitCommand("connect");
+        bridge.feed("{\"event\":\"connected\",\"requestId\":" + connectId
                 + ",\"address\":\"aa:01\",\"name\":\"Heart Monitor\"}");
         await("connect completion", connect::isDone);
         Assertions.assertNull(errorOf(connect));
-        // getConnectionState() flips to CONNECTED on the EDT (via the
-        // connect future's completion callback), after isDone() is already
-        // true -- await it rather than reading it synchronously.
+        // getConnectionState() flips to CONNECTED on the EDT (via the connect
+        // future's completion callback), after isDone() is already true --
+        // await it rather than reading it synchronously.
         await("peripheral reports connected",
                 () -> p.getConnectionState() == ConnectionState.CONNECTED);
-        Assertions.assertEquals(1, b.getConnectedPeripherals(null).size());
+        await("connected registry populated",
+                () -> b.getConnectedPeripherals(null).size() == 1);
 
         final AsyncResource<List<GattService>> discover =
                 p.discoverServices();
-        long discoverId = Wire.longVal(awaitCommand("discover"), "id", -1);
-        mock.feedLine("{\"event\":\"discovered\",\"requestId\":" + discoverId
+        long discoverId = awaitCommand("discover");
+        bridge.feed("{\"event\":\"discovered\",\"requestId\":" + discoverId
                 + ",\"services\":[{\"uuid\":\"" + HR_SERVICE
                 + "\",\"primary\":true,\"characteristics\":["
                 + "{\"uuid\":\"" + HR_MEASUREMENT
@@ -265,25 +274,38 @@ public class HelperBleBackendMockTransportTest {
                 b.getConnectedPeripherals(uuid(HR_SERVICE)).size());
 
         final AsyncResource<byte[]> read = measurement.read();
-        long readId = Wire.longVal(awaitCommand("read"), "id", -1);
-        mock.feedLine("{\"event\":\"readResult\",\"requestId\":" + readId
+        long readId = awaitCommand("read");
+        bridge.feed("{\"event\":\"readResult\",\"requestId\":" + readId
                 + ",\"value\":\"AQI=\"}");
         await("characteristic read", read::isDone);
         Assertions.assertArrayEquals(new byte[] {1, 2}, read.get(null));
 
-        GattCharacteristic control =
-                hr.getCharacteristic(uuid(HR_CONTROL));
+        GattCharacteristic control = hr.getCharacteristic(uuid(HR_CONTROL));
         final AsyncResource<Boolean> write = control.write(new byte[] {9});
-        long writeId = Wire.longVal(awaitCommand("write"), "id", -1);
-        mock.feedLine("{\"event\":\"writeResult\",\"requestId\":" + writeId
+        long writeId = awaitCommand("write");
+        bridge.feed("{\"event\":\"writeResult\",\"requestId\":" + writeId
                 + "}");
         await("characteristic write", write::isDone);
         Assertions.assertEquals(Boolean.TRUE, write.get(null));
 
+        // subscribe -> notification: arms the CCCD then delivers a value
+        final RecordingNotifyListener listener = new RecordingNotifyListener();
+        final AsyncResource<Boolean> subscribe = measurement.subscribe(listener);
+        long subscribeId = awaitCommand("subscribe");
+        bridge.feed("{\"event\":\"subscribed\",\"requestId\":" + subscribeId
+                + ",\"address\":\"aa:01\"}");
+        await("subscribe", subscribe::isDone);
+        Assertions.assertNull(errorOf(subscribe));
+        bridge.feed("{\"event\":\"notification\",\"address\":\"aa:01\","
+                + "\"service\":\"" + HR_SERVICE + "\",\"characteristic\":\""
+                + HR_MEASUREMENT + "\",\"value\":\"AQI=\"}");
+        await("notification delivered", () -> !listener.values.isEmpty());
+        Assertions.assertArrayEquals(new byte[] {1, 2},
+                listener.values.get(0));
+
         p.disconnect();
-        long disconnectId =
-                Wire.longVal(awaitCommand("disconnect"), "id", -1);
-        mock.feedLine("{\"event\":\"disconnected\",\"requestId\":"
+        long disconnectId = awaitCommand("disconnect");
+        bridge.feed("{\"event\":\"disconnected\",\"requestId\":"
                 + disconnectId + ",\"address\":\"aa:01\",\"reason\":\"\"}");
         await("disconnect", () -> p.getConnectionState()
                 == ConnectionState.DISCONNECTED);
@@ -292,38 +314,37 @@ public class HelperBleBackendMockTransportTest {
     }
 
     @Test
-    public void helperCrashFailsInFlightOpsTypedAndKillsTheBackend() {
-        HelperBleBackend b = newBackend();
+    public void engineCrashFailsInFlightOpsTypedAndKillsTheBackend() {
+        NativeBleBackend b = newBackend();
         List<AdapterState> states = attachStateSink(b);
         handshake(b);
         // cache aa:01 via a sighting so we can connect
         b.startScan(new RecordingScanSink());
-        mock.feedLine("{\"event\":\"scanResult\",\"address\":\"aa:01\","
+        awaitCommand("scanStart");
+        bridge.feed("{\"event\":\"scanResult\",\"address\":\"aa:01\","
                 + "\"name\":\"HR\",\"rssi\":-42}");
         await("sighting", () -> b.getPeripheral("aa:01") != null);
         final BlePeripheral p = b.getPeripheral("aa:01");
 
         final AsyncResource<BlePeripheral> connect = p.connect();
         awaitCommand("connect");
-        // the helper dies mid-flight without answering
-        mock.end();
+        // the engine dies mid-flight without answering
+        bridge.crash();
         await("connect failure after crash", connect::isDone);
         Throwable failure = errorOf(connect);
         Assertions.assertTrue(failure instanceof BluetoothException,
                 "expected a typed BluetoothException, got " + failure);
         Assertions.assertEquals(BluetoothError.IO_ERROR,
                 ((BluetoothException) failure).getError());
-        // The connect future errors synchronously, but the CONNECTING ->
-        // DISCONNECTED transition is delivered on the EDT (as it is for a
-        // real app's own connect callback), so await it rather than reading
-        // it straight off the reader thread -- matching the adapter/state
-        // awaits elsewhere in this suite.
+        // The connect future errors from the reader thread, but the CONNECTING
+        // -> DISCONNECTED transition is delivered on the EDT, so await it
+        // rather than reading it synchronously.
         await("peripheral disconnects after crash",
                 () -> p.getConnectionState() == ConnectionState.DISCONNECTED);
         await("adapter reports UNSUPPORTED",
                 () -> b.getAdapterState() == AdapterState.UNSUPPORTED);
         Assertions.assertTrue(states.contains(AdapterState.UNSUPPORTED));
-        // a crashed helper stays dead: follow-up ops fail typed, no restart
+        // a crashed engine stays dead: follow-up ops fail typed, no restart
         final AsyncResource<BlePeripheral> again = p.connect();
         await("post-crash connect failure", again::isDone);
         Assertions.assertTrue(errorOf(again) instanceof BluetoothException);
@@ -331,11 +352,12 @@ public class HelperBleBackendMockTransportTest {
 
     @Test
     public void shutdownFailsInFlightOpsInsteadOfHanging() {
-        HelperBleBackend b = newBackend();
+        NativeBleBackend b = newBackend();
         attachStateSink(b);
         handshake(b);
         b.startScan(new RecordingScanSink());
-        mock.feedLine("{\"event\":\"scanResult\",\"address\":\"aa:01\","
+        awaitCommand("scanStart");
+        bridge.feed("{\"event\":\"scanResult\",\"address\":\"aa:01\","
                 + "\"name\":\"HR\",\"rssi\":-42}");
         await("sighting", () -> b.getPeripheral("aa:01") != null);
         final BlePeripheral p = b.getPeripheral("aa:01");
@@ -352,22 +374,24 @@ public class HelperBleBackendMockTransportTest {
 
     @Test
     public void rssiUnsupportedFallsBackToLastScanSighting() {
-        HelperBleBackend b = newBackend();
+        NativeBleBackend b = newBackend();
         bootAndSight(b);
         final BlePeripheral p = b.getPeripheral("aa:01");
         final AsyncResource<BlePeripheral> connect = p.connect();
-        long connectId = Wire.longVal(awaitCommand("connect"), "id", -1);
-        mock.feedLine("{\"event\":\"connected\",\"requestId\":" + connectId
+        long connectId = awaitCommand("connect");
+        bridge.feed("{\"event\":\"connected\",\"requestId\":" + connectId
                 + ",\"address\":\"aa:01\"}");
         await("connect", connect::isDone);
+        await("connected", () -> p.getConnectionState()
+                == ConnectionState.CONNECTED);
 
         final AsyncResource<Integer> rssi = p.readRssi();
-        long rssiId = Wire.longVal(awaitCommand("readRssi"), "id", -1);
-        mock.feedLine("{\"event\":\"error\",\"requestId\":" + rssiId
+        long rssiId = awaitCommand("readRssi");
+        bridge.feed("{\"event\":\"error\",\"requestId\":" + rssiId
                 + ",\"code\":\"notSupported\",\"message\":\"no rssi\"}");
         await("rssi fallback", rssi::isDone);
-        // the helper answered notSupported; the backend falls back to the
-        // -42 sighting recorded during the scan
+        // the engine answered notSupported; the backend falls back to the -42
+        // sighting recorded during the scan
         Assertions.assertEquals(Integer.valueOf(-42), rssi.get(null));
     }
 }

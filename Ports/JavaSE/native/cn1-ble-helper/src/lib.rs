@@ -1,26 +1,29 @@
 // cn1-ble-helper — cross-platform BLE bridge for the Codename One JavaSE
-// port's native Bluetooth backend. See PROTOCOL.md (next to Cargo.toml) for
-// the exact JSON-line command/event format shared with the Java side
-// (com.codename1.impl.javase.bluetooth.NativeBleBackend).
+// port's native Bluetooth backend, built as an in-process shared library
+// (cdylib `libcn1ble`). See PROTOCOL.md (next to Cargo.toml) for the exact
+// event JSON shapes shared with the Java side
+// (com.codename1.impl.javase.bluetooth.*).
 //
 // Architecture
 // ------------
-// One tokio runtime, several concurrent tasks:
-//   * stdin reader   -> parses JSON-lines into commands and spawns one task
-//                       per command so slow BLE operations never block the
-//                       command stream;
-//   * central events -> translates btleplug's CentralEvent stream into
-//                       stateChanged / scanResult / connected / disconnected
-//                       wire events;
-//   * per-peripheral notification pumps (one per connected peripheral) ->
-//                       translate ValueNotification streams into
-//                       "notification" events;
-//   * writer         -> drains a single mpsc channel so every line is
-//                       written atomically without locking stdout.
+// Instead of the old stdin/stdout subprocess, this crate keeps a *single*
+// global engine (one process = one adapter):
+//   * one multi-threaded tokio runtime that owns all BLE work;
+//   * a btleplug adapter + a shared peripheral/notification-pump state;
+//   * an internal std MPSC channel of already-serialized outbound event
+//     JSON strings. Background tasks (central-event listener, per-peripheral
+//     notification pumps, per-command operations) push event JSON onto that
+//     channel; the host drains it by calling `poll_event`.
 //
-// Every command carries a numeric "id"; the helper answers with exactly one
-// terminal event echoing it as "requestId" (either the success event for
-// that command or an "error" event with a typed "code").
+// Two ABIs sit over the same engine and internal operations:
+//   1. a C ABI (`cn1ble_*`) for the ParparVM Windows/Linux ports;
+//   2. a JNI ABI (`Java_com_codename1_impl_javase_bluetooth_JniBleBridge_*`)
+//      for the JavaSE port, which just System.load()s this library.
+//
+// Every operation carries a numeric request id; the engine answers with
+// exactly one terminal event echoing it as "requestId" (either the success
+// event or an "error" event with a typed "code"). The event JSON is
+// byte-for-byte identical to the old stdout protocol.
 
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
@@ -32,24 +35,37 @@ use btleplug::platform::{Adapter, Manager, Peripheral, PeripheralId};
 use futures::stream::StreamExt;
 use serde_json::{json, Map as JsonMap, Value};
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::sync::{mpsc, Mutex};
+use std::ffi::{CStr, CString};
+use std::os::raw::{c_char, c_int, c_long, c_uchar};
+use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender};
+use std::sync::{Arc, Mutex as StdMutex, OnceLock};
+use std::time::Duration;
+use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use uuid::Uuid;
+
+use jni::objects::{JByteArray, JClass, JString};
+use jni::sys::{jboolean, jlong, jstring, JNI_FALSE, JNI_TRUE};
+use jni::JNIEnv;
 
 const PROTOCOL_VERSION: u64 = 1;
 
 // ---------------- wire helpers ----------------
 
-/// Single sink for everything the helper writes. Wire writes happen through
-/// the corresponding receiver task so no two events ever interleave.
-type EventSink = mpsc::UnboundedSender<Value>;
+/// Single sink for everything the engine emits: already-serialized event
+/// JSON strings destined for `poll_event`. Cloneable and handed to every
+/// background task.
+type EventSink = Sender<String>;
 
 fn emit(sink: &EventSink, event: Value) {
-    // If the channel is closed the writer task has exited and we're tearing
-    // down; dropping a stray event is harmless.
-    let _ = sink.send(event);
+    // Serialize here so the receiver side (poll_event) never touches serde.
+    // If the channel is closed the engine has been torn down; dropping a
+    // stray event is harmless.
+    if let Ok(line) = serde_json::to_string(&event) {
+        let _ = sink.send(line);
+    }
 }
 
 fn emit_event(sink: &EventSink, name: &str, payload: Value) {
@@ -154,7 +170,7 @@ fn host_platform() -> &'static str {
     }
 }
 
-/// The very first line the helper writes: what this build can do, so the
+/// The very first event the engine emits: what this build can do, so the
 /// Java side gates features without trial-and-error round trips.
 fn emit_capabilities(sink: &EventSink) {
     emit_event(
@@ -213,9 +229,11 @@ async fn handle_command(state: SharedState, sink: EventSink, cmd: Value) {
         "readDescriptor" => cmd_descriptor(&state, &sink, id, &cmd, false).await,
         "writeDescriptor" => cmd_descriptor(&state, &sink, id, &cmd, true).await,
         "readRssi" => cmd_read_rssi(&state, &sink, id, &cmd).await,
-        "shutdown" => std::process::exit(0),
+        // In-process teardown happens via cn1ble_close / JniBleBridge.close,
+        // which drop the runtime; a "shutdown" command is a no-op here.
+        "shutdown" => {}
         other => {
-            eprintln!("cn1-ble-helper: unknown command '{}'", other);
+            eprintln!("[Cn1BleHelper] unknown command '{}'", other);
             emit_error(
                 &sink,
                 id,
@@ -641,7 +659,11 @@ async fn cmd_descriptor(
     cmd: &Value,
     write: bool,
 ) {
-    let command = if write { "writeDescriptor" } else { "readDescriptor" };
+    let command = if write {
+        "writeDescriptor"
+    } else {
+        "readDescriptor"
+    };
     let Some((p, ch, address, svc, chr)) =
         resolve_characteristic(state, sink, id, command, cmd).await
     else {
@@ -788,7 +810,7 @@ async fn ensure_notification_pump(
             Ok(stream) => stream,
             Err(e) => {
                 eprintln!(
-                    "cn1-ble-helper: notification stream failed for {}: {}",
+                    "[Cn1BleHelper] notification stream failed for {}: {}",
                     addr, e
                 );
                 return;
@@ -937,122 +959,753 @@ async fn central_event_loop(state: SharedState, sink: EventSink, adapter: Adapte
     }
 }
 
-// ---------------- stdin reader ----------------
+// ---------------- global engine ----------------
 
-async fn stdin_loop(state: SharedState, sink: EventSink) {
-    let stdin = tokio::io::stdin();
-    let mut reader = BufReader::new(stdin).lines();
-    loop {
-        match reader.next_line().await {
-            Ok(Some(line)) => {
-                if line.trim().is_empty() {
-                    continue;
-                }
-                match serde_json::from_str::<Value>(&line) {
-                    Ok(cmd) => {
-                        let state = state.clone();
-                        let sink = sink.clone();
-                        tokio::spawn(async move {
-                            handle_command(state, sink, cmd).await;
-                        });
-                    }
-                    Err(e) => eprintln!("cn1-ble-helper: malformed JSON: {} ({})", line, e),
-                }
-            }
-            Ok(None) => {
-                // stdin EOF — the JVM is gone; exit cleanly.
-                std::process::exit(0);
-            }
-            Err(e) => {
-                eprintln!("cn1-ble-helper: stdin read error: {}", e);
-                std::process::exit(0);
-            }
-        }
-    }
+/// Everything the C/JNI command entry points need to dispatch an operation.
+/// Cloneable pieces (handle, state, sink) are pulled out under a short lock so
+/// spawning a command never blocks concurrent poll_event calls.
+struct BleEngine {
+    /// Kept alive so its worker threads and spawned tasks keep running.
+    _runtime: tokio::runtime::Runtime,
+    handle: tokio::runtime::Handle,
+    /// `None` when no BLE adapter is available (engine still delivers the
+    /// capabilities + stateChanged=unsupported events, then idles).
+    state: Option<SharedState>,
+    sink: EventSink,
 }
 
-// ---------------- stdout writer ----------------
-
-async fn writer_loop(mut rx: mpsc::UnboundedReceiver<Value>) {
-    let mut stdout = tokio::io::stdout();
-    while let Some(value) = rx.recv().await {
-        let mut line = match serde_json::to_string(&value) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("cn1-ble-helper: failed to serialize event: {}", e);
-                continue;
-            }
-        };
-        line.push('\n');
-        if let Err(e) = stdout.write_all(line.as_bytes()).await {
-            eprintln!("cn1-ble-helper: stdout write failed: {}", e);
-            return;
-        }
-        if let Err(e) = stdout.flush().await {
-            eprintln!("cn1-ble-helper: stdout flush failed: {}", e);
-            return;
-        }
-    }
+fn engine_slot() -> &'static StdMutex<Option<BleEngine>> {
+    static SLOT: OnceLock<StdMutex<Option<BleEngine>>> = OnceLock::new();
+    SLOT.get_or_init(|| StdMutex::new(None))
 }
 
-// ---------------- entry point ----------------
+/// The receive end of the event channel lives in its own lock so that a
+/// blocking `poll_event` never holds the engine lock the command entry
+/// points contend on.
+fn rx_slot() -> &'static StdMutex<Option<Receiver<String>>> {
+    static SLOT: OnceLock<StdMutex<Option<Receiver<String>>>> = OnceLock::new();
+    SLOT.get_or_init(|| StdMutex::new(None))
+}
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let (tx, rx) = mpsc::unbounded_channel::<Value>();
-    tokio::spawn(writer_loop(rx));
-    emit_capabilities(&tx);
+static ALIVE: AtomicBool = AtomicBool::new(false);
 
-    // Every "we can't get a working adapter" branch — no BlueZ on the host,
-    // permission denied, zero adapters — produces a stateChanged=unsupported
-    // event and idles instead of crashing; CI runners without BT hardware
-    // hit this all the time.
-    let adapter_result: Result<Adapter, Box<dyn std::error::Error>> = async {
-        let manager = Manager::new().await?;
-        let adapters = manager.adapters().await?;
-        adapters
-            .into_iter()
-            .next()
-            .ok_or_else(|| "no adapters returned by btleplug".into())
+enum Poll {
+    Event(String),
+    /// Channel closed / engine torn down — host should treat as end of stream.
+    Empty,
+    /// No event within the timeout.
+    Timeout,
+}
+
+/// Initialize the global engine. Returns true iff a BLE adapter is available.
+/// Idempotent: a second call just reports the current adapter-available flag.
+fn engine_start() -> bool {
+    let mut guard = match engine_slot().lock() {
+        Ok(g) => g,
+        Err(_) => return false,
+    };
+    if guard.is_some() {
+        // Already started: report whether an adapter was found.
+        return guard.as_ref().map(|e| e.state.is_some()).unwrap_or(false);
     }
-    .await;
 
-    let adapter = match adapter_result {
-        Ok(a) => a,
+    let runtime = match tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(r) => r,
         Err(e) => {
-            // Surface the underlying reason on stderr for diagnostics; the
-            // wire-side stateChanged is the only thing the Java side reads.
-            eprintln!(
-                "cn1-ble-helper: no usable adapter ({}); reporting unsupported",
-                e
-            );
-            emit_event(&tx, "stateChanged", json!({"state": "unsupported"}));
-            // Drain stdin so a shutdown command or EOF still terminates
-            // us cleanly.
-            let stdin = tokio::io::stdin();
-            let mut reader = BufReader::new(stdin).lines();
-            loop {
-                match reader.next_line().await {
-                    Ok(Some(_)) => continue,
-                    _ => return Ok(()),
-                }
-            }
+            eprintln!("[Cn1BleHelper] failed to build tokio runtime: {}", e);
+            return false;
         }
     };
 
-    let state = Arc::new(Mutex::new(State {
-        adapter: adapter.clone(),
-        peripherals: HashMap::new(),
-        notif_pumps: HashMap::new(),
-        scanning: false,
+    let (tx, rx) = std::sync::mpsc::channel::<String>();
+    let sink: EventSink = tx;
+    if let Ok(mut r) = rx_slot().lock() {
+        *r = Some(rx);
+    }
+
+    // capabilities is always the first event on the channel.
+    emit_capabilities(&sink);
+
+    // Acquire the first adapter, mirroring the old subprocess startup. Any
+    // "can't get a working adapter" branch reports stateChanged=unsupported
+    // and idles instead of failing hard (CI runners have no BT hardware).
+    let adapter_result: Result<Adapter, String> = runtime.block_on(async {
+        let manager = Manager::new().await.map_err(|e| e.to_string())?;
+        let adapters = manager.adapters().await.map_err(|e| e.to_string())?;
+        adapters
+            .into_iter()
+            .next()
+            .ok_or_else(|| "no adapters returned by btleplug".to_string())
+    });
+
+    let has_adapter = match adapter_result {
+        Ok(adapter) => {
+            let state = Arc::new(Mutex::new(State {
+                adapter: adapter.clone(),
+                peripherals: HashMap::new(),
+                notif_pumps: HashMap::new(),
+                scanning: false,
+            }));
+            runtime.spawn(central_event_loop(state.clone(), sink.clone(), adapter));
+            // Having an adapter at all is our "ready" signal; platforms that
+            // stream true transitions keep updating via StateUpdate.
+            emit_event(&sink, "stateChanged", json!({"state": "poweredOn"}));
+            let handle = runtime.handle().clone();
+            *guard = Some(BleEngine {
+                _runtime: runtime,
+                handle,
+                state: Some(state),
+                sink,
+            });
+            true
+        }
+        Err(e) => {
+            eprintln!(
+                "[Cn1BleHelper] no usable adapter ({}); reporting unsupported",
+                e
+            );
+            emit_event(&sink, "stateChanged", json!({"state": "unsupported"}));
+            let handle = runtime.handle().clone();
+            // Keep the engine alive (adapter-less) so the two startup events
+            // remain drainable via poll_event; commands become no-ops.
+            *guard = Some(BleEngine {
+                _runtime: runtime,
+                handle,
+                state: None,
+                sink,
+            });
+            false
+        }
+    };
+
+    ALIVE.store(true, Ordering::SeqCst);
+    has_adapter
+}
+
+fn engine_is_alive() -> bool {
+    ALIVE.load(Ordering::SeqCst)
+}
+
+/// Block up to `timeout_ms` for the next event JSON.
+fn engine_poll(timeout_ms: i64) -> Poll {
+    let guard = match rx_slot().lock() {
+        Ok(g) => g,
+        Err(_) => return Poll::Empty,
+    };
+    let Some(rx) = guard.as_ref() else {
+        return Poll::Empty;
+    };
+    let dur = Duration::from_millis(timeout_ms.max(0) as u64);
+    match rx.recv_timeout(dur) {
+        Ok(line) => Poll::Event(line),
+        Err(RecvTimeoutError::Timeout) => Poll::Timeout,
+        Err(RecvTimeoutError::Disconnected) => Poll::Empty,
+    }
+}
+
+/// Tear the engine down: drop the runtime (aborting all tasks) and the
+/// receiver. Subsequent poll_event calls report Empty (closed).
+fn engine_close() {
+    ALIVE.store(false, Ordering::SeqCst);
+    if let Ok(mut g) = engine_slot().lock() {
+        *g = None;
+    }
+    if let Ok(mut r) = rx_slot().lock() {
+        *r = None;
+    }
+}
+
+/// Spawn one BLE command on the runtime. No-op when the engine is absent or
+/// adapter-less (matching the old subprocess's idle behavior).
+fn dispatch(cmd: Value) {
+    let guard = match engine_slot().lock() {
+        Ok(g) => g,
+        Err(_) => return,
+    };
+    if let Some(engine) = guard.as_ref() {
+        if let Some(state) = &engine.state {
+            let state = state.clone();
+            let sink = engine.sink.clone();
+            engine.handle.spawn(handle_command(state, sink, cmd));
+        }
+    }
+}
+
+// ---------------- shared operation builders ----------------
+//
+// Both ABIs convert their native inputs to Rust types, then call one of
+// these to build the exact command JSON the dispatcher understands.
+
+fn op_scan_start(id: i64, service_csv: &str) {
+    let services: Vec<String> = service_csv
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect();
+    dispatch(json!({"cmd": "scanStart", "id": id, "services": services}));
+}
+
+fn op_scan_stop(id: i64) {
+    dispatch(json!({"cmd": "scanStop", "id": id}));
+}
+
+fn op_connect(id: i64, address: &str) {
+    dispatch(json!({"cmd": "connect", "id": id, "address": address}));
+}
+
+fn op_disconnect(id: i64, address: &str) {
+    dispatch(json!({"cmd": "disconnect", "id": id, "address": address}));
+}
+
+fn op_discover(id: i64, address: &str) {
+    dispatch(json!({"cmd": "discover", "id": id, "address": address}));
+}
+
+fn op_read(id: i64, address: &str, service: &str, characteristic: &str) {
+    dispatch(json!({
+        "cmd": "read", "id": id, "address": address,
+        "service": service, "characteristic": characteristic
     }));
+}
 
-    tokio::spawn(central_event_loop(state.clone(), tx.clone(), adapter));
+fn op_write(
+    id: i64,
+    address: &str,
+    service: &str,
+    characteristic: &str,
+    value: &[u8],
+    no_response: bool,
+) {
+    dispatch(json!({
+        "cmd": "write", "id": id, "address": address,
+        "service": service, "characteristic": characteristic,
+        "value": B64.encode(value), "noResponse": no_response
+    }));
+}
 
-    // Having an adapter at all is our "ready" signal; platforms that stream
-    // true state transitions keep updating via CentralEvent::StateUpdate.
-    emit_event(&tx, "stateChanged", json!({"state": "poweredOn"}));
+fn op_subscribe(id: i64, address: &str, service: &str, characteristic: &str, enable: bool) {
+    let cmd = if enable { "subscribe" } else { "unsubscribe" };
+    dispatch(json!({
+        "cmd": cmd, "id": id, "address": address,
+        "service": service, "characteristic": characteristic
+    }));
+}
 
-    stdin_loop(state, tx).await;
-    Ok(())
+fn op_read_descriptor(
+    id: i64,
+    address: &str,
+    service: &str,
+    characteristic: &str,
+    descriptor: &str,
+) {
+    dispatch(json!({
+        "cmd": "readDescriptor", "id": id, "address": address,
+        "service": service, "characteristic": characteristic, "descriptor": descriptor
+    }));
+}
+
+fn op_write_descriptor(
+    id: i64,
+    address: &str,
+    service: &str,
+    characteristic: &str,
+    descriptor: &str,
+    value: &[u8],
+) {
+    dispatch(json!({
+        "cmd": "writeDescriptor", "id": id, "address": address,
+        "service": service, "characteristic": characteristic,
+        "descriptor": descriptor, "value": B64.encode(value)
+    }));
+}
+
+fn op_read_rssi(id: i64, address: &str) {
+    dispatch(json!({"cmd": "readRssi", "id": id, "address": address}));
+}
+
+// ======================================================================
+//  C ABI — for the ParparVM Windows/Linux ports.
+//  Every export is null-pointer-safe and never unwinds across the boundary.
+//  Strings returned by cn1ble_poll_event are owned by the caller and MUST be
+//  released with cn1ble_free (they are Rust CString allocations — do NOT call
+//  libc free() on them).
+// ======================================================================
+
+/// SAFETY: reads a NUL-terminated C string; null yields an empty String.
+unsafe fn cstr_to_string(p: *const c_char) -> String {
+    if p.is_null() {
+        String::new()
+    } else {
+        CStr::from_ptr(p).to_string_lossy().into_owned()
+    }
+}
+
+/// SAFETY: reads `len` bytes at `p`; null/negative yields an empty slice.
+unsafe fn cbytes_to_vec(p: *const c_uchar, len: c_int) -> Vec<u8> {
+    if p.is_null() || len <= 0 {
+        Vec::new()
+    } else {
+        std::slice::from_raw_parts(p, len as usize).to_vec()
+    }
+}
+
+fn into_c_string(s: String) -> *mut c_char {
+    match CString::new(s) {
+        Ok(c) => c.into_raw(),
+        // Interior NUL should never happen for our JSON; fall back to "".
+        Err(_) => CString::new("").unwrap().into_raw(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn cn1ble_start() -> c_int {
+    catch_unwind(|| if engine_start() { 1 } else { 0 }).unwrap_or(0)
+}
+
+#[no_mangle]
+pub extern "C" fn cn1ble_is_alive() -> c_int {
+    catch_unwind(|| if engine_is_alive() { 1 } else { 0 }).unwrap_or(0)
+}
+
+#[no_mangle]
+pub extern "C" fn cn1ble_poll_event(timeout_ms: c_long) -> *mut c_char {
+    catch_unwind(|| match engine_poll(timeout_ms as i64) {
+        Poll::Event(s) => into_c_string(s),
+        Poll::Empty => into_c_string(String::new()),
+        Poll::Timeout => std::ptr::null_mut(),
+    })
+    .unwrap_or(std::ptr::null_mut())
+}
+
+#[no_mangle]
+pub extern "C" fn cn1ble_free(p: *mut c_char) {
+    if p.is_null() {
+        return;
+    }
+    let _ = catch_unwind(AssertUnwindSafe(|| unsafe {
+        drop(CString::from_raw(p));
+    }));
+}
+
+#[no_mangle]
+pub extern "C" fn cn1ble_scan_start(id: c_long, service_csv: *const c_char) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let csv = unsafe { cstr_to_string(service_csv) };
+        op_scan_start(id as i64, &csv);
+    }));
+}
+
+#[no_mangle]
+pub extern "C" fn cn1ble_scan_stop(id: c_long) {
+    let _ = catch_unwind(AssertUnwindSafe(|| op_scan_stop(id as i64)));
+}
+
+#[no_mangle]
+pub extern "C" fn cn1ble_connect(id: c_long, address: *const c_char) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let address = unsafe { cstr_to_string(address) };
+        op_connect(id as i64, &address);
+    }));
+}
+
+#[no_mangle]
+pub extern "C" fn cn1ble_disconnect(id: c_long, address: *const c_char) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let address = unsafe { cstr_to_string(address) };
+        op_disconnect(id as i64, &address);
+    }));
+}
+
+#[no_mangle]
+pub extern "C" fn cn1ble_discover(id: c_long, address: *const c_char) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let address = unsafe { cstr_to_string(address) };
+        op_discover(id as i64, &address);
+    }));
+}
+
+#[no_mangle]
+pub extern "C" fn cn1ble_read(
+    id: c_long,
+    address: *const c_char,
+    service: *const c_char,
+    characteristic: *const c_char,
+) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let address = unsafe { cstr_to_string(address) };
+        let service = unsafe { cstr_to_string(service) };
+        let characteristic = unsafe { cstr_to_string(characteristic) };
+        op_read(id as i64, &address, &service, &characteristic);
+    }));
+}
+
+#[no_mangle]
+pub extern "C" fn cn1ble_write(
+    id: c_long,
+    address: *const c_char,
+    service: *const c_char,
+    characteristic: *const c_char,
+    value: *const c_uchar,
+    value_len: c_int,
+    no_response: c_int,
+) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let address = unsafe { cstr_to_string(address) };
+        let service = unsafe { cstr_to_string(service) };
+        let characteristic = unsafe { cstr_to_string(characteristic) };
+        let bytes = unsafe { cbytes_to_vec(value, value_len) };
+        op_write(
+            id as i64,
+            &address,
+            &service,
+            &characteristic,
+            &bytes,
+            no_response != 0,
+        );
+    }));
+}
+
+#[no_mangle]
+pub extern "C" fn cn1ble_subscribe(
+    id: c_long,
+    address: *const c_char,
+    service: *const c_char,
+    characteristic: *const c_char,
+    enable: c_int,
+) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let address = unsafe { cstr_to_string(address) };
+        let service = unsafe { cstr_to_string(service) };
+        let characteristic = unsafe { cstr_to_string(characteristic) };
+        op_subscribe(id as i64, &address, &service, &characteristic, enable != 0);
+    }));
+}
+
+#[no_mangle]
+pub extern "C" fn cn1ble_read_descriptor(
+    id: c_long,
+    address: *const c_char,
+    service: *const c_char,
+    characteristic: *const c_char,
+    descriptor: *const c_char,
+) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let address = unsafe { cstr_to_string(address) };
+        let service = unsafe { cstr_to_string(service) };
+        let characteristic = unsafe { cstr_to_string(characteristic) };
+        let descriptor = unsafe { cstr_to_string(descriptor) };
+        op_read_descriptor(id as i64, &address, &service, &characteristic, &descriptor);
+    }));
+}
+
+#[no_mangle]
+pub extern "C" fn cn1ble_write_descriptor(
+    id: c_long,
+    address: *const c_char,
+    service: *const c_char,
+    characteristic: *const c_char,
+    descriptor: *const c_char,
+    value: *const c_uchar,
+    value_len: c_int,
+) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let address = unsafe { cstr_to_string(address) };
+        let service = unsafe { cstr_to_string(service) };
+        let characteristic = unsafe { cstr_to_string(characteristic) };
+        let descriptor = unsafe { cstr_to_string(descriptor) };
+        let bytes = unsafe { cbytes_to_vec(value, value_len) };
+        op_write_descriptor(
+            id as i64,
+            &address,
+            &service,
+            &characteristic,
+            &descriptor,
+            &bytes,
+        );
+    }));
+}
+
+#[no_mangle]
+pub extern "C" fn cn1ble_read_rssi(id: c_long, address: *const c_char) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let address = unsafe { cstr_to_string(address) };
+        op_read_rssi(id as i64, &address);
+    }));
+}
+
+#[no_mangle]
+pub extern "C" fn cn1ble_close() {
+    let _ = catch_unwind(AssertUnwindSafe(engine_close));
+}
+
+// ======================================================================
+//  JNI ABI — for the JavaSE port (class
+//  com.codename1.impl.javase.bluetooth.JniBleBridge). Delegates to the same
+//  internals as the C ABI. pollEvent returns Java null on timeout and "" once
+//  closed.
+// ======================================================================
+
+fn jstr(env: &mut JNIEnv, s: &JString) -> String {
+    if s.is_null() {
+        return String::new();
+    }
+    match env.get_string(s) {
+        Ok(js) => js.into(),
+        Err(_) => String::new(),
+    }
+}
+
+fn jbytes(env: &mut JNIEnv, a: &JByteArray) -> Vec<u8> {
+    if a.is_null() {
+        return Vec::new();
+    }
+    env.convert_byte_array(a).unwrap_or_default()
+}
+
+fn jbool(b: bool) -> jboolean {
+    if b {
+        JNI_TRUE
+    } else {
+        JNI_FALSE
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_codename1_impl_javase_bluetooth_JniBleBridge_start(
+    _env: JNIEnv,
+    _class: JClass,
+) -> jboolean {
+    catch_unwind(|| jbool(engine_start())).unwrap_or(JNI_FALSE)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_codename1_impl_javase_bluetooth_JniBleBridge_isAlive(
+    _env: JNIEnv,
+    _class: JClass,
+) -> jboolean {
+    catch_unwind(|| jbool(engine_is_alive())).unwrap_or(JNI_FALSE)
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_codename1_impl_javase_bluetooth_JniBleBridge_pollEvent(
+    env: JNIEnv,
+    _class: JClass,
+    timeout_millis: jlong,
+) -> jstring {
+    catch_unwind(AssertUnwindSafe(|| {
+        match engine_poll(timeout_millis as i64) {
+            Poll::Event(s) => env
+                .new_string(s)
+                .map(|o| o.into_raw())
+                .unwrap_or(std::ptr::null_mut()),
+            // Closed: hand back the empty string (distinct from timeout's null).
+            Poll::Empty => env
+                .new_string("")
+                .map(|o| o.into_raw())
+                .unwrap_or(std::ptr::null_mut()),
+            Poll::Timeout => std::ptr::null_mut(),
+        }
+    }))
+    .unwrap_or(std::ptr::null_mut())
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_codename1_impl_javase_bluetooth_JniBleBridge_scanStart(
+    mut env: JNIEnv,
+    _class: JClass,
+    id: jlong,
+    service_csv: JString,
+) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let csv = jstr(&mut env, &service_csv);
+        op_scan_start(id as i64, &csv);
+    }));
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_codename1_impl_javase_bluetooth_JniBleBridge_scanStop(
+    _env: JNIEnv,
+    _class: JClass,
+    id: jlong,
+) {
+    let _ = catch_unwind(AssertUnwindSafe(|| op_scan_stop(id as i64)));
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_codename1_impl_javase_bluetooth_JniBleBridge_connect(
+    mut env: JNIEnv,
+    _class: JClass,
+    id: jlong,
+    address: JString,
+) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let address = jstr(&mut env, &address);
+        op_connect(id as i64, &address);
+    }));
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_codename1_impl_javase_bluetooth_JniBleBridge_disconnect(
+    mut env: JNIEnv,
+    _class: JClass,
+    id: jlong,
+    address: JString,
+) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let address = jstr(&mut env, &address);
+        op_disconnect(id as i64, &address);
+    }));
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_codename1_impl_javase_bluetooth_JniBleBridge_discover(
+    mut env: JNIEnv,
+    _class: JClass,
+    id: jlong,
+    address: JString,
+) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let address = jstr(&mut env, &address);
+        op_discover(id as i64, &address);
+    }));
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_codename1_impl_javase_bluetooth_JniBleBridge_read(
+    mut env: JNIEnv,
+    _class: JClass,
+    id: jlong,
+    address: JString,
+    service: JString,
+    characteristic: JString,
+) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let address = jstr(&mut env, &address);
+        let service = jstr(&mut env, &service);
+        let characteristic = jstr(&mut env, &characteristic);
+        op_read(id as i64, &address, &service, &characteristic);
+    }));
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_codename1_impl_javase_bluetooth_JniBleBridge_write(
+    mut env: JNIEnv,
+    _class: JClass,
+    id: jlong,
+    address: JString,
+    service: JString,
+    characteristic: JString,
+    value: JByteArray,
+    no_response: jboolean,
+) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let address = jstr(&mut env, &address);
+        let service = jstr(&mut env, &service);
+        let characteristic = jstr(&mut env, &characteristic);
+        let bytes = jbytes(&mut env, &value);
+        op_write(
+            id as i64,
+            &address,
+            &service,
+            &characteristic,
+            &bytes,
+            no_response != JNI_FALSE,
+        );
+    }));
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_codename1_impl_javase_bluetooth_JniBleBridge_subscribe(
+    mut env: JNIEnv,
+    _class: JClass,
+    id: jlong,
+    address: JString,
+    service: JString,
+    characteristic: JString,
+    enable: jboolean,
+) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let address = jstr(&mut env, &address);
+        let service = jstr(&mut env, &service);
+        let characteristic = jstr(&mut env, &characteristic);
+        op_subscribe(
+            id as i64,
+            &address,
+            &service,
+            &characteristic,
+            enable != JNI_FALSE,
+        );
+    }));
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_codename1_impl_javase_bluetooth_JniBleBridge_readDescriptor(
+    mut env: JNIEnv,
+    _class: JClass,
+    id: jlong,
+    address: JString,
+    service: JString,
+    characteristic: JString,
+    descriptor: JString,
+) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let address = jstr(&mut env, &address);
+        let service = jstr(&mut env, &service);
+        let characteristic = jstr(&mut env, &characteristic);
+        let descriptor = jstr(&mut env, &descriptor);
+        op_read_descriptor(id as i64, &address, &service, &characteristic, &descriptor);
+    }));
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_codename1_impl_javase_bluetooth_JniBleBridge_writeDescriptor(
+    mut env: JNIEnv,
+    _class: JClass,
+    id: jlong,
+    address: JString,
+    service: JString,
+    characteristic: JString,
+    descriptor: JString,
+    value: JByteArray,
+) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let address = jstr(&mut env, &address);
+        let service = jstr(&mut env, &service);
+        let characteristic = jstr(&mut env, &characteristic);
+        let descriptor = jstr(&mut env, &descriptor);
+        let bytes = jbytes(&mut env, &value);
+        op_write_descriptor(
+            id as i64,
+            &address,
+            &service,
+            &characteristic,
+            &descriptor,
+            &bytes,
+        );
+    }));
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_codename1_impl_javase_bluetooth_JniBleBridge_readRssi(
+    mut env: JNIEnv,
+    _class: JClass,
+    id: jlong,
+    address: JString,
+) {
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let address = jstr(&mut env, &address);
+        op_read_rssi(id as i64, &address);
+    }));
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_codename1_impl_javase_bluetooth_JniBleBridge_close(
+    _env: JNIEnv,
+    _class: JClass,
+) {
+    let _ = catch_unwind(AssertUnwindSafe(engine_close));
 }

@@ -41,7 +41,7 @@ import java.util.List;
  * <pre>
  * java com.codename1.impl.javase.bluetooth.FixtureCaptureMain \
  *     --seconds 12 --seed 42 --out ambient-scan.json \
- *     [--gatt &lt;address&gt; ...] [--gatt-strongest] [--helper &lt;path&gt;]
+ *     [--gatt &lt;address&gt; ...] [--gatt-strongest] [--library &lt;path&gt;]
  * </pre>
  *
  * <ul>
@@ -53,8 +53,8 @@ import java.util.List;
  *   </li>
  *   <li>{@code --gatt-strongest} -- attempt a GATT capture on the
  *       connectable device with the strongest sighting</li>
- *   <li>{@code --helper path} -- explicit cn1-ble-helper binary (sets
- *       {@code cn1.bluetooth.helperPath})</li>
+ *   <li>{@code --library path} -- explicit libcn1ble library (sets
+ *       {@code cn1.bluetooth.libraryPath})</li>
  * </ul>
  *
  * <p>The written fixture is ALWAYS scrambled, and the scrambler's no-PII
@@ -87,9 +87,9 @@ public final class FixtureCaptureMain {
                     gattAddresses.add(args[++i]);
                 } else if ("--gatt-strongest".equals(a)) {
                     gattStrongest = true;
-                } else if ("--helper".equals(a)) {
+                } else if ("--library".equals(a)) {
                     System.setProperty(
-                            HelperBinaryResolver.HELPER_PATH_PROPERTY,
+                            BleLibraryResolver.LIBRARY_PATH_PROPERTY,
                             args[++i]);
                 } else {
                     throw new IllegalArgumentException(
@@ -102,7 +102,7 @@ public final class FixtureCaptureMain {
         } catch (RuntimeException ex) {
             System.err.println("Usage: FixtureCaptureMain --out file.json "
                     + "[--seconds N] [--seed S] [--gatt address ...] "
-                    + "[--gatt-strongest] [--helper path]");
+                    + "[--gatt-strongest] [--library path]");
             System.err.println(ex.getMessage());
             System.exit(1);
             return;

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
 # capture-fixture.sh -- record a scrambled Bluetooth fixture from THIS
-# machine's real radio via the cn1-ble-helper subprocess, for replay in
+# machine's real radio via the in-process libcn1ble library, for replay in
 # the JavaSE simulator's virtual Bluetooth stack.
 #
 # Usage:
 #   scripts/bluetooth/capture-fixture.sh --out fixture.json \
 #       [--seconds 12] [--seed 42] [--gatt <address> ...] \
-#       [--gatt-strongest] [--helper /path/to/cn1-ble-helper]
+#       [--gatt-strongest] [--library /path/to/libcn1ble.dylib]
 #
 # All arguments are forwarded to
 # com.codename1.impl.javase.bluetooth.FixtureCaptureMain (see its javadoc).
@@ -18,10 +18,10 @@
 # Prerequisites:
 #   * the javase module compiled:  cd maven && mvn install -pl javase \
 #         -Plocal-dev-javase -DskipTests   (or any full build)
-#   * a cn1-ble-helper binary; by default the local cargo build at
-#     Ports/JavaSE/native/cn1-ble-helper/target/release/cn1-ble-helper
-#     is used (build it with: cargo build --release). Pass --helper to
-#     override, or export CN1_BLE_HELPER.
+#   * the libcn1ble shared library; by default the local cargo build at
+#     Ports/JavaSE/native/cn1-ble-helper/target/release/libcn1ble.dylib
+#     is used (build it with: cargo build --release). Pass --library to
+#     override, or export CN1_BLE_LIBRARY.
 #   * OS Bluetooth permission for the terminal (macOS: System Settings >
 #     Privacy & Security > Bluetooth).
 #
@@ -35,7 +35,7 @@ set -euo pipefail
 
 CN1_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CLASSES="$CN1_ROOT/maven/javase/target/classes"
-HELPER="${CN1_BLE_HELPER:-$CN1_ROOT/Ports/JavaSE/native/cn1-ble-helper/target/release/cn1-ble-helper}"
+LIBRARY="${CN1_BLE_LIBRARY:-$CN1_ROOT/Ports/JavaSE/native/cn1-ble-helper/target/release/libcn1ble.dylib}"
 
 if [ ! -d "$CLASSES" ]; then
     echo "error: $CLASSES not found -- build first:" >&2
@@ -55,10 +55,10 @@ if [ -z "$CORE_CP" ]; then
     exit 1
 fi
 
-HELPER_ARGS=()
-if [ -f "$HELPER" ]; then
-    HELPER_ARGS=(-Dcn1.bluetooth.helperPath="$HELPER")
+LIB_ARGS=()
+if [ -f "$LIBRARY" ]; then
+    LIB_ARGS=(-Dcn1.bluetooth.libraryPath="$LIBRARY")
 fi
 
-exec java -cp "$CLASSES:$CORE_CP" "${HELPER_ARGS[@]}" \
+exec java -cp "$CLASSES:$CORE_CP" "${LIB_ARGS[@]}" \
     com.codename1.impl.javase.bluetooth.FixtureCaptureMain "$@"

@@ -125,7 +125,7 @@ The JavaSE simulator implements the whole API against a scriptable virtual Bluet
 
 image::img/bluetooth-simulator-devices.png[The Bluetooth Simulation window with the device tree and a characteristic editor,scaledwidth=80%]
 
-The window's backend selector switches the simulator between the virtual stack and a native backend that drives the host machine's real Bluetooth radio through a bundled btleplug helper process (CoreBluetooth on macOS, BlueZ on Linux, WinRT on Windows). The native backend is central-only -- real scanning, connections and GATT operations against physical devices, without leaving the simulator. The initial backend comes from the `cn1.bluetooth.backend` system property (default `simulator`).
+The window's backend selector switches the simulator between the virtual stack and a native backend that drives the host machine's real Bluetooth radio through a bundled btleplug library (`libcn1ble`) loaded in-process (CoreBluetooth on macOS, BlueZ on Linux, WinRT on Windows). The native backend is central-only -- real scanning, connections and GATT operations against physical devices, without leaving the simulator. The initial backend comes from the `cn1.bluetooth.backend` system property (default `simulator`); point `cn1.bluetooth.libraryPath` at a locally built `libcn1ble` to override the bundled one.
 
 image::img/bluetooth-simulator-log.png[The Bluetooth Simulation event log while a scan and connect run,scaledwidth=80%]
 
@@ -183,7 +183,7 @@ For fully deterministic unit tests the JavaSE port also allows constructing a pr
 | Android | Real MAC address | `requestMtu(...)` negotiates, default 23 | `createBond()` prompts the user | Background scanning is throttled by the OS; use filtered scans and expect slower sightings
 | iOS / Mac Catalyst | Per-app CoreBluetooth identifier UUID | Negotiated by the OS; `requestMtu(...)` resolves with the current value | OS-managed, triggered by encrypted characteristics; `getBondedPeripherals()` is empty | Background operation needs `ios.bluetooth.background` plus service-UUID scan filters; advertisements carry only name and service UUIDs
 | Simulator (mock) | Synthetic (`AA:BB:CC:DD:EE:01`) | Simulated negotiation | Simulated | Timestamps come from a monotonic counter -- treat them as ordered, not as wall-clock times
-| Simulator (native backend) | Host-OS device identifier | Real negotiation | Not supported | Central role only; requires the bundled helper binary and OS Bluetooth permission for the terminal/IDE
+| Simulator (native backend) | Host-OS device identifier | Real negotiation | Not supported | Central role only; requires the bundled `libcn1ble` library and OS Bluetooth permission for the terminal/IDE
 | JavaScript | Per-origin Web Bluetooth identifier | Fixed at 512 | Browser-managed | One user-picked device per chooser; `startScan` requires a user gesture (call it from a button handler); RSSI unavailable
 |===
 

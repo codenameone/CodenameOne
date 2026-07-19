@@ -25,7 +25,8 @@ package com.codename1.impl.javase.bluetooth;
 import com.codename1.bluetooth.AdapterState;
 import com.codename1.bluetooth.Bluetooth;
 import com.codename1.bluetooth.BluetoothPermission;
-import com.codename1.bluetooth.helper.BleBackend;
+import com.codename1.impl.bluetooth.BleBackend;
+import com.codename1.impl.bluetooth.NativeBleBackend;
 import com.codename1.util.AsyncResource;
 
 /**
@@ -83,11 +84,10 @@ public class JavaSEBluetooth extends Bluetooth {
     /**
      * Switches the BLE engine. {@code "simulator"} activates the shared
      * virtual stack; {@code "native"} activates the host machine's real
-     * radio through the bundled {@code cn1-ble-helper} process and throws
-     * {@code IllegalStateException} when no helper binary could be located
-     * (see the cn1.bluetooth.helperPath system property).
-     * Unknown names
-     * throw {@code IllegalArgumentException}.
+     * radio in-process through the bundled {@code libcn1ble} library and
+     * throws {@code IllegalStateException} when that library could not be
+     * loaded (see the cn1.bluetooth.libraryPath system property). Unknown
+     * names throw {@code IllegalArgumentException}.
      */
     public synchronized void switchBackend(String name) {
         if (BACKEND_SIMULATOR.equals(name)) {
@@ -96,14 +96,13 @@ public class JavaSEBluetooth extends Bluetooth {
             return;
         }
         if (BACKEND_NATIVE.equals(name)) {
-            NativeBleBackend nativeBackend = new NativeBleBackend();
-            if (!nativeBackend.isAvailable()) {
+            if (!JniBleBridge.isLibraryAvailable()) {
                 throw new IllegalStateException(
-                        "The native Bluetooth backend is not available: no "
-                                + "cn1-ble-helper binary was found. Tried: "
-                                + nativeBackend.describeResolution());
+                        "The native Bluetooth backend is not available: the "
+                                + "libcn1ble library could not be loaded. "
+                                + "Tried: " + JniBleBridge.describeResolution());
             }
-            installBackend(nativeBackend);
+            installBackend(new NativeBleBackend(new JniBleBridge()));
             return;
         }
         throw new IllegalArgumentException("Unknown Bluetooth backend: "

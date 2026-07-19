@@ -415,16 +415,16 @@ public class LinuxImplementation extends CodenameOneImplementation {
         return biometrics;
     }
 
-    // Real BLE central via the shared cn1-ble-helper subprocess (btleplug ->
-    // BlueZ), spawned through the native posix_spawn bridge. Peripheral /
-    // L2CAP / classic report unsupported (btleplug is central-only).
+    // Real BLE central via the in-process libcn1ble engine (btleplug -> BlueZ),
+    // reached through the native LinuxBleBridge. Peripheral / L2CAP / classic
+    // report unsupported (btleplug is central-only).
     private com.codename1.bluetooth.Bluetooth bluetooth;
 
     @Override
     public com.codename1.bluetooth.Bluetooth getBluetooth() {
         if (bluetooth == null) {
-            bluetooth = new com.codename1.bluetooth.helper.HelperBluetooth(
-                    new LinuxBluetoothTransport.Factory());
+            bluetooth = new com.codename1.impl.bluetooth.NativeBluetooth(
+                    new LinuxBleBridge());
         }
         return bluetooth;
     }

@@ -78,6 +78,15 @@
                 </dependency>
             </dependencies>
         </profile>
+        <!--
+            Opt-in dev convenience: rebuild the libcn1ble shared library from
+            source (needs a Rust toolchain) and stage it for THIS host so the
+            simulator's native Bluetooth backend loads the just-built library.
+            Normal builds consume the prebuilt libraries from cn1-binaries
+            (the ${cn1.binaries}/ble resource mapping) instead. The library
+            layout mirrors BleLibraryResolver: macos/libcn1ble.dylib (any
+            arch), {linux,windows}/{x64,arm64}/ per-arch.
+        -->
         <profile>
             <id>build-ble-helper</id>
             <build>
@@ -86,29 +95,33 @@
                         <artifactId>maven-antrun-plugin</artifactId>
                         <executions>
                             <execution>
-                                <id>build-ble-helper</id>
+                                <id>build-ble-lib</id>
                                 <phase>generate-resources</phase>
                                 <goals>
                                     <goal>run</goal>
                                 </goals>
                                 <configuration>
                                     <target>
-                                        <property name="ble.helper.dir" location="${project.basedir}/../../Ports/JavaSE/native/cn1-ble-helper"/>
-                                        <exec executable="cargo" dir="${ble.helper.dir}" failonerror="true">
+                                        <property name="ble.lib.dir" location="${project.basedir}/../../Ports/JavaSE/native/cn1-ble-helper"/>
+                                        <exec executable="cargo" dir="${ble.lib.dir}" failonerror="true">
                                             <arg value="build"/>
                                             <arg value="--release"/>
                                         </exec>
-                                        <condition property="ble.os" value="macos">
-                                            <os family="mac"/>
+                                        <condition property="ble.arch" value="arm64" else="x64">
+                                            <os arch="aarch64"/>
                                         </condition>
-                                        <condition property="ble.os" value="windows">
-                                            <os family="windows"/>
-                                        </condition>
-                                        <property name="ble.os" value="linux"/>
-                                        <condition property="ble.exe" value="cn1-ble-helper.exe" else="cn1-ble-helper">
-                                            <os family="windows"/>
-                                        </condition>
-                                        <copy file="${ble.helper.dir}/target/release/${ble.exe}" tofile="${project.build.outputDirectory}/com/codename1/impl/javase/bluetooth/native/${ble.os}/${ble.exe}" overwrite="true"/>
+                                        <!-- macOS: one universal-capable dylib, no arch subdir -->
+                                        <condition property="ble.mac"><os family="mac"/></condition>
+                                        <condition property="ble.win"><os family="windows"/></condition>
+                                        <copy file="${ble.lib.dir}/target/release/libcn1ble.dylib" tofile="${project.build.outputDirectory}/com/codename1/impl/javase/bluetooth/native/macos/libcn1ble.dylib" overwrite="true" failonerror="false">
+                                            <fileset file="${ble.lib.dir}/target/release/libcn1ble.dylib"/>
+                                        </copy>
+                                        <copy file="${ble.lib.dir}/target/release/cn1ble.dll" tofile="${project.build.outputDirectory}/com/codename1/impl/javase/bluetooth/native/windows/${ble.arch}/cn1ble.dll" overwrite="true" failonerror="false">
+                                            <fileset file="${ble.lib.dir}/target/release/cn1ble.dll"/>
+                                        </copy>
+                                        <copy file="${ble.lib.dir}/target/release/libcn1ble.so" tofile="${project.build.outputDirectory}/com/codename1/impl/javase/bluetooth/native/linux/${ble.arch}/libcn1ble.so" overwrite="true" failonerror="false">
+                                            <fileset file="${ble.lib.dir}/target/release/libcn1ble.so"/>
+                                        </copy>
                                     </target>
                                 </configuration>
                             </execution>

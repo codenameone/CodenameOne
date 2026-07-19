@@ -20,14 +20,11 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.impl.javase.bluetooth;
+package com.codename1.impl.bluetooth;
 
 import com.codename1.bluetooth.AdapterState;
 import com.codename1.bluetooth.BluetoothError;
 import com.codename1.bluetooth.gatt.GattCharacteristic;
-import com.codename1.bluetooth.helper.HelperBleBackend;
-import com.codename1.bluetooth.helper.HelperBlePeripheral;
-import com.codename1.bluetooth.helper.Wire;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -36,42 +33,16 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Deterministic codec tests of the cn1-ble-helper wire protocol: command
- * serialization (including escaping), event-line parsing and the typed
- * error / adapter-state mappings. No subprocess, no hardware.
+ * Deterministic codec tests of the native BLE engine's event decoder: JSON
+ * event-line parsing (including nested scan-result structures), the base64
+ * round trip and the typed error / adapter-state / property-mask mappings. No
+ * native engine, no hardware.
  */
-public class NativeBleWireProtocolTest {
-
-    @Test
-    public void commandSerializationIsStable() {
-        String line = Wire.obj().put("cmd", "connect").put("id", 7L)
-                .put("address", "aa:bb:cc").line();
-        Assertions.assertEquals(
-                "{\"cmd\":\"connect\",\"id\":7,\"address\":\"aa:bb:cc\"}",
-                line);
-        String write = Wire.obj().put("cmd", "write").put("id", 12L)
-                .put("value", "AQI=").put("noResponse", true).line();
-        Assertions.assertEquals("{\"cmd\":\"write\",\"id\":12,"
-                + "\"value\":\"AQI=\",\"noResponse\":true}", write);
-    }
-
-    @Test
-    public void escapingCoversQuotesBackslashesAndControlChars() {
-        Assertions.assertEquals("a\\\"b\\\\c\\nd\\re\\tf",
-                Wire.escape("a\"b\\c\nd\re\tf"));
-        Assertions.assertEquals("x\\u0001y", Wire.escape("x" + (char) 1 + "y"));
-        Assertions.assertEquals("", Wire.escape(null));
-        // escaped output must survive a JSON parse round trip
-        String line = Wire.obj().put("cmd", "write")
-                .put("value", "we\"ird\\pay\nload").line();
-        Map<String, Object> parsed = parse(line);
-        Assertions.assertEquals("we\"ird\\pay\nload",
-                Wire.str(parsed, "value", null));
-    }
+public class JsonTest {
 
     private static Map<String, Object> parse(String line) {
         try {
-            return Wire.parse(line);
+            return Json.parse(line);
         } catch (Exception ex) {
             throw new AssertionError("parse failed: " + line, ex);
         }
@@ -82,13 +53,13 @@ public class NativeBleWireProtocolTest {
         Map<String, Object> ev = parse("{\"event\":\"readResult\","
                 + "\"requestId\":42,\"address\":\"aa:01\","
                 + "\"rssi\":-63,\"value\":\"AQI=\",\"primary\":true}");
-        Assertions.assertEquals("readResult", Wire.str(ev, "event", null));
-        Assertions.assertEquals(42, Wire.longVal(ev, "requestId", -1));
-        Assertions.assertEquals(-63, Wire.intVal(ev, "rssi", 0));
-        Assertions.assertTrue(Wire.boolVal(ev, "primary", false));
-        Assertions.assertEquals(-1, Wire.longVal(ev, "missing", -1));
+        Assertions.assertEquals("readResult", Json.str(ev, "event", null));
+        Assertions.assertEquals(42, Json.longVal(ev, "requestId", -1));
+        Assertions.assertEquals(-63, Json.intVal(ev, "rssi", 0));
+        Assertions.assertTrue(Json.boolVal(ev, "primary", false));
+        Assertions.assertEquals(-1, Json.longVal(ev, "missing", -1));
         Assertions.assertArrayEquals(new byte[] {1, 2},
-                Wire.decodeBase64(Wire.str(ev, "value", "")));
+                Json.decodeBase64(Json.str(ev, "value", "")));
     }
 
     @Test
@@ -98,79 +69,80 @@ public class NativeBleWireProtocolTest {
                 + "\"serviceUuids\":[\"0000180d-0000-1000-8000-00805f9b34fb\"],"
                 + "\"manufacturerData\":{\"76\":\"AQI=\"},"
                 + "\"serviceData\":{}}");
-        List<Object> uuids = Wire.list(ev, "serviceUuids");
+        List<Object> uuids = Json.list(ev, "serviceUuids");
         Assertions.assertEquals(1, uuids.size());
         Assertions.assertEquals("0000180d-0000-1000-8000-00805f9b34fb",
                 String.valueOf(uuids.get(0)));
         Map<String, Object> manufacturer =
-                Wire.map(ev.get("manufacturerData"));
+                Json.map(ev.get("manufacturerData"));
         Assertions.assertArrayEquals(new byte[] {1, 2},
-                Wire.decodeBase64(String.valueOf(manufacturer.get("76"))));
-        Assertions.assertTrue(Wire.map(ev.get("serviceData")).isEmpty());
-        Assertions.assertTrue(Wire.list(ev, "absent").isEmpty());
+                Json.decodeBase64(String.valueOf(manufacturer.get("76"))));
+        Assertions.assertTrue(Json.map(ev.get("serviceData")).isEmpty());
+        Assertions.assertTrue(Json.list(ev, "absent").isEmpty());
     }
 
     @Test
     public void base64RoundTrips() {
         byte[] data = new byte[] {0, 1, 2, (byte) 0xFF, 42};
         Assertions.assertArrayEquals(data,
-                Wire.decodeBase64(Wire.encodeBase64(data)));
-        Assertions.assertArrayEquals(new byte[0], Wire.decodeBase64(""));
-        Assertions.assertArrayEquals(new byte[0], Wire.decodeBase64(null));
-        Assertions.assertEquals("", Wire.encodeBase64(null));
+                Json.decodeBase64(Json.encodeBase64(data)));
+        Assertions.assertArrayEquals(new byte[0], Json.decodeBase64(""));
+        Assertions.assertArrayEquals(new byte[0], Json.decodeBase64(null));
+        Assertions.assertEquals("", Json.encodeBase64(null));
+        Assertions.assertEquals("", Json.encodeBase64(new byte[0]));
     }
 
     @Test
     public void errorCodesMapToTypedBluetoothErrors() {
         Assertions.assertEquals(BluetoothError.NOT_SUPPORTED,
-                HelperBleBackend.mapErrorCode("notSupported"));
+                NativeBleBackend.mapErrorCode("notSupported"));
         Assertions.assertEquals(BluetoothError.UNAUTHORIZED,
-                HelperBleBackend.mapErrorCode("unauthorized"));
+                NativeBleBackend.mapErrorCode("unauthorized"));
         Assertions.assertEquals(BluetoothError.POWERED_OFF,
-                HelperBleBackend.mapErrorCode("poweredOff"));
+                NativeBleBackend.mapErrorCode("poweredOff"));
         Assertions.assertEquals(BluetoothError.SCAN_FAILED,
-                HelperBleBackend.mapErrorCode("scanFailed"));
+                NativeBleBackend.mapErrorCode("scanFailed"));
         Assertions.assertEquals(BluetoothError.CONNECTION_FAILED,
-                HelperBleBackend.mapErrorCode("connectFailed"));
+                NativeBleBackend.mapErrorCode("connectFailed"));
         Assertions.assertEquals(BluetoothError.CONNECTION_FAILED,
-                HelperBleBackend.mapErrorCode("unknownPeripheral"));
+                NativeBleBackend.mapErrorCode("unknownPeripheral"));
         Assertions.assertEquals(BluetoothError.NOT_CONNECTED,
-                HelperBleBackend.mapErrorCode("notConnected"));
+                NativeBleBackend.mapErrorCode("notConnected"));
         Assertions.assertEquals(BluetoothError.GATT_ERROR,
-                HelperBleBackend.mapErrorCode("unknownCharacteristic"));
+                NativeBleBackend.mapErrorCode("unknownCharacteristic"));
         Assertions.assertEquals(BluetoothError.GATT_ERROR,
-                HelperBleBackend.mapErrorCode("unknownDescriptor"));
+                NativeBleBackend.mapErrorCode("unknownDescriptor"));
         Assertions.assertEquals(BluetoothError.TIMEOUT,
-                HelperBleBackend.mapErrorCode("timeout"));
+                NativeBleBackend.mapErrorCode("timeout"));
         Assertions.assertEquals(BluetoothError.IO_ERROR,
-                HelperBleBackend.mapErrorCode("ioError"));
+                NativeBleBackend.mapErrorCode("ioError"));
         Assertions.assertEquals(BluetoothError.UNKNOWN,
-                HelperBleBackend.mapErrorCode("badRequest"));
+                NativeBleBackend.mapErrorCode("badRequest"));
         Assertions.assertEquals(BluetoothError.UNKNOWN,
-                HelperBleBackend.mapErrorCode("somethingNew"));
+                NativeBleBackend.mapErrorCode("somethingNew"));
     }
 
     @Test
     public void adapterStatesMap() {
         Assertions.assertEquals(AdapterState.POWERED_ON,
-                HelperBleBackend.mapAdapterState("poweredOn"));
+                NativeBleBackend.mapAdapterState("poweredOn"));
         Assertions.assertEquals(AdapterState.POWERED_OFF,
-                HelperBleBackend.mapAdapterState("poweredOff"));
+                NativeBleBackend.mapAdapterState("poweredOff"));
         Assertions.assertEquals(AdapterState.UNSUPPORTED,
-                HelperBleBackend.mapAdapterState("unsupported"));
+                NativeBleBackend.mapAdapterState("unsupported"));
         Assertions.assertEquals(AdapterState.UNAUTHORIZED,
-                HelperBleBackend.mapAdapterState("unauthorized"));
+                NativeBleBackend.mapAdapterState("unauthorized"));
         Assertions.assertEquals(AdapterState.UNKNOWN,
-                HelperBleBackend.mapAdapterState("whatever"));
+                NativeBleBackend.mapAdapterState("whatever"));
     }
 
     @Test
     public void characteristicPropertyNamesMapToBits() {
-        int mask = HelperBlePeripheral.propertiesMask(Arrays.asList(
+        int mask = NativeBlePeripheral.propertiesMask(Arrays.asList(
                 (Object) "read", "notify"));
         Assertions.assertEquals(GattCharacteristic.PROPERTY_READ
                 | GattCharacteristic.PROPERTY_NOTIFY, mask);
-        int all = HelperBlePeripheral.propertiesMask(Arrays.asList(
+        int all = NativeBlePeripheral.propertiesMask(Arrays.asList(
                 (Object) "broadcast", "read", "writeWithoutResponse",
                 "write", "notify", "indicate", "signedWrite",
                 "extendedProps", "unknownFutureFlag"));
