@@ -220,6 +220,24 @@ class HTML5VideoIO extends VideoIO {
             this.hasAudio = cfg.isHasAudio();
             this.outPath = cfg.getPath();
 
+            boolean webm = CONTAINER_WEBM.equals(cfg.getContainer());
+            boolean mp4 = CONTAINER_MP4.equals(cfg.getContainer());
+            if (!webm && !mp4) {
+                throw new IOException("Unsupported JavaScript video container: " + cfg.getContainer());
+            }
+            if (webm && !CODEC_VP8.equals(cfg.getVideoCodec()) && !CODEC_VP9.equals(cfg.getVideoCodec())) {
+                throw new IOException("WebM requires VP8 or VP9 video, not " + cfg.getVideoCodec());
+            }
+            if (mp4 && !CODEC_H264.equals(cfg.getVideoCodec())) {
+                throw new IOException("MP4 requires H.264 video, not " + cfg.getVideoCodec());
+            }
+            if (hasAudio && webm && !CODEC_OPUS.equals(cfg.getAudioCodec())) {
+                throw new IOException("WebM requires Opus audio, not " + cfg.getAudioCodec());
+            }
+            if (hasAudio && mp4 && !CODEC_AAC.equals(cfg.getAudioCodec())) {
+                throw new IOException("MP4 requires AAC audio, not " + cfg.getAudioCodec());
+            }
+
             cn1EncEnsureLibs();
             long start = System.currentTimeMillis();
             while (!cn1EncLibsReady(cfg.getContainer())) {
