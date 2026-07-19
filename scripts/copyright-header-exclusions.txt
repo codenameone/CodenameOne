@@ -3,6 +3,7 @@
 # Format: repository-relative path | provenance/license rationale
 
 Ports/Android/src/com/codename1/impl/android/AndroidGraphics.java | Original Android port file, Pader-Sync GPL2 + Classpath-exception header that must not be altered
+CodenameOne/src/com/codename1/charts/views/CombinedXYChart.java | AChartEngine-derived SC 4ViewSoft source retaining its original Apache-2.0 notice
 Ports/JavaScriptPort/src/main/webapp/css/bootstrap-theme.min.css | Bootstrap 3.3.4, Copyright Twitter, MIT license
 Ports/JavaScriptPort/src/main/webapp/css/bootstrap.min.css | Bootstrap 3.3.4 and normalize.css 3.0.2, MIT licenses
 Ports/JavaScriptPort/src/main/webapp/js/bootstrap.min.js | Bootstrap 3.3.4, Copyright Twitter, MIT license
