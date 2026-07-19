@@ -1,48 +1,48 @@
 {
-  "commit": "2bec3059a841391467f7217c83ec492b756d67ef",
-  "generated_at": "2026-07-19T14:44:03Z",
+  "commit": "37b4a91ccda112b29bc12f15dff411f47837d0f7",
+  "generated_at": "2026-07-19T15:56:49Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 383127786
+        "duration_ns": 247052602
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 34202183
+        "duration_ns": 28919877
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 321011639
+        "duration_ns": 284860229
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 157299047
+        "duration_ns": 194882708
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 114421315
+        "duration_ns": 95737814
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 4810297978
+        "duration_ns": 2794783717
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 155973432
+        "duration_ns": 134939292
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 151889950
+        "duration_ns": 157738214
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 743557995
+        "duration_ns": 595170410
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 309839822
+        "duration_ns": 248681970
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -51,13 +51,13 @@
     "suite_checksum": 0
   },
   "port": "android",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29690771115",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29693313205",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "fail": 1,
+    "fail": 0,
     "not-run": 0,
-    "pass": 164,
+    "pass": 165,
     "skip": 1
   },
   "tests": {
@@ -218,10 +218,7 @@
     },
     "ClipboardRoundTripTest": {
       "feature": "clipboard",
-      "reasons": [
-        "failed: clipboard round-trip failed: java.lang.RuntimeException: image paste returned no ClipboardContent"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "CodeEditorScreenshotTest": {
       "feature": "pure-text-editing",
