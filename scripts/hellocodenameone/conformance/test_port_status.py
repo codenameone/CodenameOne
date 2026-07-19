@@ -15,7 +15,7 @@ class PortStatusTest(unittest.TestCase):
 
     def test_contract_covers_registered_tests_and_goldens(self):
         counts = port_status.validate(self.manifest)
-        self.assertEqual(166, counts["tests"])
+        self.assertEqual(167, counts["tests"])
         self.assertEqual(1, counts["performance_tests"])
         self.assertGreaterEqual(counts["features"], 51)
         self.assertEqual(11, counts["ports"])
@@ -26,6 +26,7 @@ class PortStatusTest(unittest.TestCase):
         features = {feature["id"]: feature["tests"] for feature in self.manifest["features"]}
         self.assertEqual(["ARApiTest", "MotionSensorDeviceTest"], features["ar-motion-sensors"])
         self.assertEqual(["CameraApiTest"], features["camera-access"])
+        self.assertEqual(["CalendarApiTest"], features["calendar-integration"])
         self.assertEqual(["VideoIODecodedFramesScreenshotTest"], features["video-decoding"])
         self.assertEqual(["VideoIORoundTripTest"], features["video-round-trip"])
 

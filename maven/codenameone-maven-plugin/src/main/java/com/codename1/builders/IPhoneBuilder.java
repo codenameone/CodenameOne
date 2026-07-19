@@ -2229,8 +2229,13 @@ public class IPhoneBuilder extends Executor {
                 }
             }
             if (usesCalendarApi) {
-                replaceInFile(new File(buildinRes, "IOSNative.m"),
-                        "//#define CN1_USE_CALENDAR", "#define CN1_USE_CALENDAR");
+                try {
+                    replaceInFile(new File(buildinRes, "IOSNative.m"),
+                            "//#define CN1_USE_CALENDAR", "#define CN1_USE_CALENDAR");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable CN1_USE_CALENDAR", ex);
+                }
                 if (addLibs == null || addLibs.length() == 0) {
                     addLibs = "EventKit.framework";
                 } else if (!addLibs.toLowerCase().contains("eventkit")) {

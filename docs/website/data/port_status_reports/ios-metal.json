@@ -678,6 +678,10 @@
       ],
       "status": "skip"
     },
+    "CalendarApiTest": {
+      "feature": "calendar-integration",
+      "status": "not-run"
+    },
     "ClipboardRoundTripTest": {
       "feature": "clipboard",
       "status": "not-run"
