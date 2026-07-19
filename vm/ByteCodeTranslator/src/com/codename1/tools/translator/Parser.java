@@ -714,6 +714,9 @@ public class Parser extends ClassVisitor {
 			System.exit(1);
 		}
         String file = "Unknown File";
+        List<ByteCodeClass> javascriptClassPool = ByteCodeTranslator.output
+                == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT
+                ? new ArrayList<ByteCodeClass>(classes) : null;
         try {
             for(ByteCodeClass bc : classes) {
                 // special case for an object
@@ -791,7 +794,8 @@ public class Parser extends ClassVisitor {
                     && ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT
                     && System.getProperty("parparvm.js.rta.off") == null) {
                 Date rtaStart = new Date();
-                int rtaEliminated = JavascriptReachability.run(classes, nativeSources);
+                int rtaEliminated = JavascriptReachability.run(
+                        classes, javascriptClassPool, nativeSources);
                 Date rtaEnd = new Date();
                 long rtaDif = rtaEnd.getTime() - rtaStart.getTime();
                 if (ByteCodeTranslator.verbose) {

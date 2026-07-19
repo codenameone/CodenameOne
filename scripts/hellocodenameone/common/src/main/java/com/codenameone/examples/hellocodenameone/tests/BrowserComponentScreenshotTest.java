@@ -1,7 +1,30 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.CN;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.UITimer;
@@ -35,8 +58,21 @@ public class BrowserComponentScreenshotTest extends BaseTest {
 
     @Override
     protected void registerReadyCallback(Form parent, final Runnable run) {
-        this.readyRunnable = run;
+        // BrowserComponent is a DOM peer on HTML5, outside the CN1 canvas that
+        // Display.screenshot() captures. Exercise the real peer and callback
+        // path there, but finish as an assertion test instead of recording a
+        // misleading black canvas rectangle as a visual baseline.
+        this.readyRunnable = isHtml5() ? this::done : run;
         checkReady();
+    }
+
+    @Override
+    public boolean shouldTakeScreenshot() {
+        return !isHtml5();
+    }
+
+    private static boolean isHtml5() {
+        return "HTML5".equals(Display.getInstance().getPlatformName());
     }
 
     private void checkReady() {
@@ -49,6 +85,13 @@ public class BrowserComponentScreenshotTest extends BaseTest {
                 // Verify content is actually present in the DOM
                 browser.execute("callback.onSuccess(document.body.innerText)", new SuccessCallback<BrowserComponent.JSRef>() {
                     public void onSucess(BrowserComponent.JSRef result) {
+                        String text = result == null ? null : result.getValue();
+                        if (text == null
+                                || text.indexOf("Codename One") < 0
+                                || text.indexOf("BrowserComponent instrumentation test content.") < 0) {
+                            fail("BrowserComponent DOM content was not available through execute(): " + text);
+                            return;
+                        }
                         jsReady = true;
                         checkReady();
                     }

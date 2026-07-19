@@ -26,7 +26,9 @@ import com.codename1.ui.Component;
 import com.codename1.ui.geom.Rectangle;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /// Mutable semantic configuration for a lightweight component or virtual child.
 ///
@@ -35,6 +37,12 @@ import java.util.List;
 /// virtual nodes must have a stable {@link #setVirtualKey(java.lang.String) virtual key}.
 public class AccessibilityNode {
     private Component owner;
+    // Stable runtime IDs belong to the component-owned semantic node. Keeping
+    // them here gives them exactly the component's lifetime without relying on
+    // the weak-value UI cache, whose boxed Long values may be collected while
+    // the component is still alive.
+    private long internalId;
+    private Map<String, Long> internalVirtualIds;
     private String virtualKey;
     private String identifier;
     private String label;
@@ -93,6 +101,25 @@ public class AccessibilityNode {
 
     public Component getOwner() {
         return owner;
+    }
+
+    long getInternalId() {
+        return internalId;
+    }
+
+    void setInternalId(long internalId) {
+        this.internalId = internalId;
+    }
+
+    Long getInternalVirtualId(String path) {
+        return internalVirtualIds == null ? null : internalVirtualIds.get(path);
+    }
+
+    void putInternalVirtualId(String path, long id) {
+        if (internalVirtualIds == null) {
+            internalVirtualIds = new LinkedHashMap<String, Long>();
+        }
+        internalVirtualIds.put(path, Long.valueOf(id));
     }
     public String getVirtualKey() {
         return virtualKey;

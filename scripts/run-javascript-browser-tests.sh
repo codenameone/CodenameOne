@@ -184,17 +184,10 @@ if [ "$PARPAR_DIAG_ENABLED" != "0" ]; then
   fi
 fi
 
-# Screenshot baselines were captured against the earlier JS port
-# behaviour where worker-side addEventListener calls silently became
-# no-ops (functions were dropped at the worker->host boundary). The new
-# worker-callback round-trip would legitimately fire events from the
-# BrowserComponent iframe, MediaPlayback, etc., but those tests are
-# intentionally time-limited and their recorded placeholder frames
-# assume no listeners run. Keep them stable by disabling event
-# forwarding here; production apps do not set this flag and get real
-# input/resize/focus events routed to Java handlers. Set
-# ``CN1_JS_ENABLE_EVENT_FORWARDING=1`` to opt a suite run back in.
-if [ "${CN1_JS_ENABLE_EVENT_FORWARDING:-0}" != "1" ]; then
+# Exercise the same event-forwarding path production applications use.  An
+# explicit opt-out remains available for bridge diagnostics, but CI must not
+# make BrowserComponent and input tests stable by disabling their events.
+if [ "${CN1_JS_DISABLE_EVENT_FORWARDING:-0}" = "1" ]; then
   if [[ "$URL" == *\?* ]]; then
     URL="${URL}&cn1DisableEventForwarding=1"
   else

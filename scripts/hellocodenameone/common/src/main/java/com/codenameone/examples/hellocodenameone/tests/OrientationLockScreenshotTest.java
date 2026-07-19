@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.ui.CN;
@@ -41,33 +63,40 @@ public class OrientationLockScreenshotTest extends BaseTest {
             @Override
             protected void onShowCompleted() {
                 CN.lockOrientation(false);
-                waitForOrientation(this, false, () -> {
-                    // The simulator rotation animation can land in slightly
-                    // different sub-pixel positions if we capture the form too
-                    // early after CN.isPortrait() flips. Mirror BaseTest's
-                    // 1500ms readiness timer so the screenshot waits for the
-                    // post-rotation layout pass to settle and revalidate the
-                    // form layout once before snapping; otherwise this test
-                    // produces 4-7% AA-only diffs run-over-run.
-                    revalidate();
-                    UITimer.timer(1500, false, this, () -> {
-                        revalidate();
-                        markCaptureStarted();
-                        Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("landscape", () -> {
-                            CN.lockOrientation(true);
-                            restorePortrait(this, RESTORE_POLL_ATTEMPTS, () -> {
-                                revalidate();
-                                UITimer.timer(POST_PORTRAIT_SETTLE_MS, false, this,
-                                        OrientationLockScreenshotTest.this::done);
-                            });
-                        });
-                    });
-                });
+                if (CN.canForceOrientation()) {
+                    waitForOrientation(this, false, () -> captureSettledForm(this));
+                } else {
+                    // Fixed-orientation platforms cannot ever satisfy the
+                    // requested landscape predicate. Exercise lockOrientation,
+                    // but proceed with the current form instead of burning the
+                    // poll budget and racing the test watchdog.
+                    captureSettledForm(this);
+                }
             }
         };
         hi.add(new Label("Testing orientation lock..."));
         hi.show();
         return true;
+    }
+
+    private void captureSettledForm(Form form) {
+        // The simulator rotation animation can land in slightly different
+        // sub-pixel positions if we capture the form too early after
+        // CN.isPortrait() flips. Mirror BaseTest's readiness timer so the
+        // post-rotation layout pass settles before capture.
+        form.revalidate();
+        UITimer.timer(1500, false, form, () -> {
+            form.revalidate();
+            markCaptureStarted();
+            Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("landscape", () -> {
+                CN.lockOrientation(true);
+                restorePortrait(form, RESTORE_POLL_ATTEMPTS, () -> {
+                    form.revalidate();
+                    UITimer.timer(POST_PORTRAIT_SETTLE_MS, false, form,
+                            OrientationLockScreenshotTest.this::done);
+                });
+            });
+        });
     }
     
     private void waitForOrientation(Form form, boolean portrait, Runnable onDone) {

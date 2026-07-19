@@ -158,6 +158,17 @@ public class ByteCodeClass {
         return nfound;
 
     }
+
+    /**
+     * Restores a class definition for the JavaScript RTA pass without
+     * resurrecting all of its methods.  The conservative pass can remove a
+     * class after eliminating the only method that instantiates it; RTA may
+     * subsequently prove that method reachable through a runtime dispatch
+     * edge.  RTA then restores only the methods it actually reaches.
+     */
+    void restoreEliminatedClass() {
+        eliminated = false;
+    }
     
     /**
      * Class name in original JVM format:  e.g. java/lang/String

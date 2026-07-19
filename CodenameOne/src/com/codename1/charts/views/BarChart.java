@@ -26,6 +26,7 @@ import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
 import com.codename1.charts.renderers.XYSeriesRenderer;
 import com.codename1.charts.util.ColorUtil;
 
+import java.util.Collections;
 import java.util.List;
 
 
@@ -58,7 +59,7 @@ public class BarChart extends XYChart {
     /// The chart type.
     protected Type mType = Type.DEFAULT;
     /// The previous series Y axis point limits to be used for HEAP type bar charts.
-    private List<Float> mPreviousSeriesPoints;
+    private List<Float> mPreviousSeriesPoints = Collections.emptyList();
 
     BarChart() {
     }
@@ -133,6 +134,9 @@ public class BarChart extends XYChart {
             float y = points.get(i + 1);
 
             if (mType == Type.HEAPED && seriesIndex > 0) {
+                if (mPreviousSeriesPoints.size() <= i + 1) {
+                    throw new IllegalStateException("HEAPED bar series must be drawn in order with matching points");
+                }
                 float lastY = mPreviousSeriesPoints.get(i + 1);
                 y = y + (lastY - yAxisValue);
                 points.set(i + 1, y);

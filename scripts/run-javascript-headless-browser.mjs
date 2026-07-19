@@ -44,6 +44,13 @@ let finalizeProfile = async () => {};
 
 const launchArgs = [
   '--autoplay-policy=no-user-gesture-required',
+  // Exercise the real browser camera path deterministically in CI. Chromium's
+  // fake device still flows through getUserMedia, MediaStream, <video>, canvas
+  // capture and JPEG encoding; only the physical sensor and permission prompt
+  // are replaced. This lets CameraApiTest validate the HTML5 implementation
+  // instead of skipping it or depending on runner hardware.
+  '--use-fake-device-for-media-stream',
+  '--use-fake-ui-for-media-stream',
   '--disable-web-security',
   '--allow-file-access-from-files',
   // Headless pages count as hidden, so Chromium's background-timer machinery

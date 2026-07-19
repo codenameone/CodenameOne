@@ -64,8 +64,10 @@ class HTML5VideoIO extends VideoIO {
         List<VideoCodec> out = new ArrayList<VideoCodec>();
         out.add(new VideoCodec(CODEC_H264, "H.264 (WebCodecs)", "video/avc", true, true, false, true, -1, -1, new String[]{CONTAINER_MP4}));
         out.add(new VideoCodec(CODEC_VP9, "VP9 (WebCodecs)", "video/vp9", true, true, false, true, -1, -1, new String[]{CONTAINER_WEBM}));
-        out.add(new VideoCodec(CODEC_AAC, "AAC (WebCodecs)", "audio/mp4a-latm", false, true, false, false, -1, -1, new String[]{CONTAINER_MP4}));
-        out.add(new VideoCodec(CODEC_OPUS, "Opus (WebCodecs)", "audio/opus", false, true, false, false, -1, -1, new String[]{CONTAINER_WEBM}));
+        if (cn1AudioWebCodecsAvailable()) {
+            out.add(new VideoCodec(CODEC_AAC, "AAC (WebCodecs)", "audio/mp4a-latm", false, true, false, false, -1, -1, new String[]{CONTAINER_MP4}));
+            out.add(new VideoCodec(CODEC_OPUS, "Opus (WebCodecs)", "audio/opus", false, true, false, false, -1, -1, new String[]{CONTAINER_WEBM}));
+        }
         return out.toArray(new VideoCodec[out.size()]);
     }
 
@@ -335,6 +337,9 @@ class HTML5VideoIO extends VideoIO {
 
     @JSBody(params = {}, script = "return (typeof VideoEncoder !== 'undefined' && typeof VideoDecoder !== 'undefined');")
     private static native boolean cn1WebCodecsAvailable();
+
+    @JSBody(params = {}, script = "return (typeof AudioEncoder !== 'undefined' && typeof AudioData !== 'undefined');")
+    private static native boolean cn1AudioWebCodecsAvailable();
 
     // ============================================================= JS: decoder
 

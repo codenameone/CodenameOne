@@ -38,7 +38,6 @@ import com.codename1.html5.js.dom.HTMLVideoElement;
 import com.codename1.impl.CameraImpl;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
-import com.codename1.ui.Display;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.util.AsyncResource;
@@ -132,25 +131,23 @@ public class HTML5CameraImpl extends CameraImpl {
             return;
         }
         final PhotoCaptureOptions o = opts == null ? new PhotoCaptureOptions() : opts;
-        try {
-            CapturedPhoto cp = grab(o.getWidth(), o.getHeight(), o.getJpegQuality(), o.getFilePath());
-            final CapturedPhoto fcp = cp;
-            final AsyncResource<CapturedPhoto> r = result;
-            Display.getInstance().callSerially(new Runnable() {
-                @Override public void run() { r.complete(fcp); }
-            });
-        } catch (Throwable t) {
-            final Throwable e = t;
-            final AsyncResource<CapturedPhoto> r = result;
-            Display.getInstance().callSerially(new Runnable() {
-                @Override public void run() { r.error(e); }
-            });
-        }
+        final AsyncResource<CapturedPhoto> out = result;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                try {
+                    out.complete(grab(o.getWidth(), o.getHeight(), o.getJpegQuality(),
+                            o.getFilePath(), true));
+                } catch (Throwable t) {
+                    out.error(t);
+                }
+            }
+        }, "cn1-html5-camera-photo").start();
     }
 
     /// Grab a single JPEG still from the live video on the main thread. Returns a
     /// CapturedPhoto (and optionally persists it to {@code filePath}).
-    private CapturedPhoto grab(int reqW, int reqH, int quality, String filePath) throws IOException {
+    private CapturedPhoto grab(int reqW, int reqH, int quality, String filePath,
+            boolean persist) throws IOException {
         String packed = nativeCameraGrab(video, reqW, reqH,
                 (quality > 0 ? quality : 90) / 100.0);
         if (packed == null) {
@@ -164,8 +161,11 @@ public class HTML5CameraImpl extends CameraImpl {
         int w = parseInt(packed.substring(0, c1), DEFAULT_W);
         int h = parseInt(packed.substring(c1 + 1, c2), DEFAULT_H);
         byte[] jpeg = Base64.decode(packed.substring(c2 + 1).getBytes());
-        String path = filePath != null ? filePath : tempPath();
-        writeBytes(path, jpeg);
+        String path = filePath;
+        if (persist) {
+            path = path != null ? path : tempPath();
+            writeBytes(path, jpeg);
+        }
         return new CapturedPhoto(jpeg, path, w, h);
     }
 
@@ -220,7 +220,10 @@ public class HTML5CameraImpl extends CameraImpl {
             return;
         }
         try {
-            CapturedPhoto cp = grab(0, 0, 80, null);
+            // Preview frames are transient. Persisting every interval frame
+            // filled browser storage and made camera delivery progressively
+            // slower; only takePhoto() writes a file.
+            CapturedPhoto cp = grab(0, 0, 80, null, false);
             l.onFrame(new CameraFrame(cp.getJpegBytes(), null, cp.getWidth(), cp.getHeight(), 0,
                     System.nanoTime(), frameFormat));
         } catch (Throwable t) {

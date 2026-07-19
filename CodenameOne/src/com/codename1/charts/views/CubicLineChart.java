@@ -40,7 +40,7 @@ public class CubicLineChart extends LineChart {
 
     private final float mSecondMultiplier;
     /// A path measure for retrieving the points on the path.
-    private PathMeasure mPathMeasure;
+    private PathMeasure mPathMeasure = new PathMeasure(null, false);
 
     public CubicLineChart() {
         // default is to have first control point at about 33% of the distance,

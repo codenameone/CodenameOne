@@ -255,6 +255,123 @@
     return cn1InvokeNativeInterface(iface, method, args);
   });
 
+  // Web Crypto lives on the browser main thread.  The translated application
+  // runs in a Worker, so CodenameOneImplementation's crypto methods use this
+  // single async host bridge instead of pretending that secureRandom/AES/RSA
+  // are unavailable on the JavaScript port.
+  function cn1CryptoApi() {
+    var cryptoApi = global.crypto || (global.window && global.window.crypto);
+    if (!cryptoApi || !cryptoApi.subtle || typeof cryptoApi.getRandomValues !== 'function') {
+      throw new Error('Web Crypto API is unavailable in this browser context');
+    }
+    return cryptoApi;
+  }
+
+  function cn1CryptoBytes(value) {
+    if (value == null) {
+      return null;
+    }
+    return value instanceof Uint8Array ? value : new Uint8Array(value);
+  }
+
+  function cn1CryptoResult(value) {
+    return Array.prototype.slice.call(new Uint8Array(value));
+  }
+
+  function cn1CryptoHash(name) {
+    var normalized = String(name || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (normalized.indexOf('SHA512') >= 0) return 'SHA-512';
+    if (normalized.indexOf('SHA384') >= 0) return 'SHA-384';
+    if (normalized.indexOf('SHA256') >= 0) return 'SHA-256';
+    if (normalized.indexOf('SHA1') >= 0) return 'SHA-1';
+    throw new Error('Unsupported Web Crypto hash algorithm: ' + name);
+  }
+
+  function cn1RsaOaepAlgorithm(transformation) {
+    var normalized = String(transformation || '').toUpperCase();
+    if (normalized.indexOf('OAEP') < 0) {
+      throw new Error('Web Crypto only supports RSA OAEP encryption; requested ' + transformation);
+    }
+    return { name: 'RSA-OAEP', hash: cn1CryptoHash(normalized) };
+  }
+
+  function cn1RsaSignatureAlgorithm(algorithm, keyAlgorithm) {
+    if (String(keyAlgorithm || '').toUpperCase() !== 'RSA') {
+      throw new Error('Web Crypto bridge currently supports RSA signatures; requested ' + keyAlgorithm);
+    }
+    return { name: 'RSASSA-PKCS1-v1_5', hash: cn1CryptoHash(algorithm) };
+  }
+
+  hostBridge.register('__cn1_crypto__', function(request) {
+    var cryptoApi = cn1CryptoApi();
+    var subtle = cryptoApi.subtle;
+    var op = request && request.op;
+    if (op === 'random') {
+      var random = new Uint8Array(request.length | 0);
+      cryptoApi.getRandomValues(random);
+      return Array.prototype.slice.call(random);
+    }
+    if (op === 'aesEncrypt' || op === 'aesDecrypt') {
+      var transformation = String(request.transformation || '').toUpperCase();
+      var algorithm;
+      if (transformation.indexOf('/GCM/') >= 0) {
+        algorithm = { name: 'AES-GCM', iv: cn1CryptoBytes(request.iv), tagLength: 128 };
+        if (request.aad != null) algorithm.additionalData = cn1CryptoBytes(request.aad);
+      } else if (transformation.indexOf('/CBC/') >= 0) {
+        algorithm = { name: 'AES-CBC', iv: cn1CryptoBytes(request.iv) };
+      } else {
+        throw new Error('Unsupported Web Crypto AES transformation: ' + request.transformation);
+      }
+      var aesUsage = op === 'aesEncrypt' ? 'encrypt' : 'decrypt';
+      return subtle.importKey('raw', cn1CryptoBytes(request.key), { name: algorithm.name }, false, [aesUsage])
+        .then(function(key) {
+          return subtle[aesUsage](algorithm, key, cn1CryptoBytes(request.data));
+        })
+        .then(cn1CryptoResult);
+    }
+    if (op === 'rsaEncrypt' || op === 'rsaDecrypt') {
+      var rsaAlgorithm = cn1RsaOaepAlgorithm(request.transformation);
+      var rsaUsage = op === 'rsaEncrypt' ? 'encrypt' : 'decrypt';
+      var keyFormat = op === 'rsaEncrypt' ? 'spki' : 'pkcs8';
+      return subtle.importKey(keyFormat, cn1CryptoBytes(request.key), rsaAlgorithm, false, [rsaUsage])
+        .then(function(key) {
+          return subtle[rsaUsage](rsaAlgorithm, key, cn1CryptoBytes(request.data));
+        })
+        .then(cn1CryptoResult);
+    }
+    if (op === 'sign' || op === 'verify') {
+      var signatureAlgorithm = cn1RsaSignatureAlgorithm(request.algorithm, request.keyAlgorithm);
+      var signatureUsage = op === 'sign' ? 'sign' : 'verify';
+      var signatureKeyFormat = op === 'sign' ? 'pkcs8' : 'spki';
+      return subtle.importKey(signatureKeyFormat, cn1CryptoBytes(request.key), signatureAlgorithm, false, [signatureUsage])
+        .then(function(key) {
+          if (op === 'sign') {
+            return subtle.sign(signatureAlgorithm, key, cn1CryptoBytes(request.data)).then(cn1CryptoResult);
+          }
+          return subtle.verify(signatureAlgorithm, key, cn1CryptoBytes(request.signature), cn1CryptoBytes(request.data));
+        });
+    }
+    if (op === 'generateRsaKeyPair') {
+      var generationAlgorithm = {
+        name: 'RSA-OAEP',
+        modulusLength: request.bits | 0,
+        publicExponent: new Uint8Array([1, 0, 1]),
+        hash: 'SHA-256'
+      };
+      return subtle.generateKey(generationAlgorithm, true, ['encrypt', 'decrypt'])
+        .then(function(pair) {
+          return Promise.all([
+            subtle.exportKey('spki', pair.publicKey),
+            subtle.exportKey('pkcs8', pair.privateKey)
+          ]);
+        })
+        .then(function(encoded) {
+          return [cn1CryptoResult(encoded[0]), cn1CryptoResult(encoded[1])];
+        });
+    }
+    throw new Error('Unsupported Web Crypto bridge operation: ' + op);
+  });
+
   var hostRefNextId = 1;
   var hostRefById = {};
   var hostRefByObject = (typeof WeakMap === 'function') ? new WeakMap() : null;
@@ -825,6 +942,61 @@
       return hostResult(global.window);
     }
     return null;
+  });
+
+  function cn1TimerCallback(callback) {
+    if (callback && typeof callback === 'object'
+            && typeof callback.__cn1WorkerCallback === 'number') {
+      callback = makeWorkerCallback(callback.__cn1WorkerCallback);
+    }
+    if (typeof callback !== 'function') {
+      throw new Error('Browser timer callback is not callable');
+    }
+    return callback;
+  }
+
+  hostBridge.register('__cn1_timer_set_timeout__', function(callback, delay) {
+    return global.setTimeout(cn1TimerCallback(callback), Math.max(0, delay | 0));
+  });
+
+  hostBridge.register('__cn1_timer_clear_timeout__', function(id) {
+    global.clearTimeout(id | 0);
+    return true;
+  });
+
+  hostBridge.register('__cn1_timer_set_interval__', function(callback, delay) {
+    return global.setInterval(cn1TimerCallback(callback), Math.max(1, delay | 0));
+  });
+
+  hostBridge.register('__cn1_timer_clear_interval__', function(id) {
+    global.clearInterval(id | 0);
+    return true;
+  });
+
+  // BrowserComponent JavaScript callbacks use a synthetic navigation URL to
+  // return values to Java. The iframe and its contentWindow live on the main
+  // thread, so the worker cannot install this hook with @JSBody code against
+  // its host-ref proxy. Resolve both host refs here and materialise the Java
+  // SAM callback into a worker-callback proxy.
+  hostBridge.register('__cn1_install_browser_navigation_callback__', function(iframeArg, callbackArg) {
+    var iframe = resolveHostRef(iframeArg);
+    var callback = callbackArg;
+    if (callback && typeof callback === 'object'
+            && typeof callback.__cn1WorkerCallback === 'number') {
+      callback = makeWorkerCallback(callback.__cn1WorkerCallback);
+    }
+    if (typeof callback !== 'function') {
+      throw new Error('Browser navigation callback is not callable');
+    }
+    var win = iframe && iframe.contentWindow
+            ? iframe.contentWindow
+            : (global.window || global);
+    win.cn1application = win.cn1application || {};
+    win.cn1application.shouldNavigate = function(url) {
+      callback(String(url));
+      return false;
+    };
+    return true;
   });
 
   // Install a `writeBuffer(arr)` method on `ImageData.prototype` so the
@@ -2485,6 +2657,428 @@
     try { if (v.parentNode) { v.parentNode.removeChild(v); } } catch (e) {}
     try { v.srcObject = null; } catch (e) {}
     return 1;
+  });
+
+  // VideoIO lives entirely on the browser host.  The translated application
+  // runs in a Worker, where document, HTMLVideoElement and (on some browsers)
+  // WebCodecs are absent.  A single host-owned session table prevents the
+  // previous mixed worker/window state and lets asynchronous loads and flushes
+  // complete through the host bridge Promise protocol.
+  var cn1VideoIoVideos = Object.create(null);
+  var cn1VideoIoEncoders = Object.create(null);
+  var cn1VideoIoVideoSeq = 0;
+  var cn1VideoIoEncoderSeq = 0;
+  var cn1VideoIoMuxerPromise = null;
+  var cn1VideoIoLastEncoderError = null;
+
+  function cn1VideoIoDocument() {
+    return global.document || (global.window && global.window.document) || null;
+  }
+
+  function cn1VideoIoBase64Bytes(value) {
+    var binary = global.atob(String(value || ''));
+    var bytes = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i) & 0xff;
+    }
+    return bytes;
+  }
+
+  function cn1VideoIoBytesBase64(value) {
+    var bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
+    var output = '';
+    var chunkSize = 0x8000;
+    for (var i = 0; i < bytes.length; i += chunkSize) {
+      output += String.fromCharCode.apply(null,
+        bytes.subarray(i, Math.min(i + chunkSize, bytes.length)));
+    }
+    return global.btoa(output);
+  }
+
+  function cn1VideoIoLoadScript(symbol, urls) {
+    if (global[symbol]) {
+      return Promise.resolve();
+    }
+    var doc = cn1VideoIoDocument();
+    if (!doc || !doc.head) {
+      return Promise.reject(new Error('VideoIO requires a browser document'));
+    }
+    var attempt = function(index) {
+      if (global[symbol]) {
+        return Promise.resolve();
+      }
+      if (index >= urls.length) {
+        return Promise.reject(new Error('Unable to load VideoIO dependency ' + symbol));
+      }
+      return new Promise(function(resolve, reject) {
+        var script = doc.createElement('script');
+        var settled = false;
+        var timer = global.setTimeout(function() {
+          if (settled) { return; }
+          settled = true;
+          try { if (script.parentNode) { script.parentNode.removeChild(script); } } catch (_removeError) {}
+          reject(new Error('Timed out loading ' + urls[index]));
+        }, 8000);
+        var finish = function(error) {
+          if (settled) { return; }
+          settled = true;
+          global.clearTimeout(timer);
+          if (!error && global[symbol]) {
+            resolve();
+          } else {
+            try { if (script.parentNode) { script.parentNode.removeChild(script); } } catch (_removeError) {}
+            reject(error || new Error(urls[index] + ' did not define ' + symbol));
+          }
+        };
+        script.src = urls[index];
+        script.async = true;
+        script.onload = function() { finish(null); };
+        script.onerror = function() { finish(new Error('Failed to load ' + urls[index])); };
+        doc.head.appendChild(script);
+      }).catch(function() {
+        return attempt(index + 1);
+      });
+    };
+    return attempt(0);
+  }
+
+  function cn1VideoIoEnsureMuxers() {
+    if (global.Mp4Muxer && global.WebMMuxer) {
+      return Promise.resolve();
+    }
+    if (!cn1VideoIoMuxerPromise) {
+      cn1VideoIoMuxerPromise = Promise.all([
+        cn1VideoIoLoadScript('Mp4Muxer', [
+          'https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.5/build/mp4-muxer.min.js',
+          'https://unpkg.com/mp4-muxer@5.1.5/build/mp4-muxer.min.js'
+        ]),
+        cn1VideoIoLoadScript('WebMMuxer', [
+          'https://cdn.jsdelivr.net/npm/webm-muxer@5.0.3/build/webm-muxer.min.js',
+          'https://unpkg.com/webm-muxer@5.0.3/build/webm-muxer.min.js'
+        ])
+      ]).catch(function(error) {
+        // A later VideoIO request may retry after a transient network failure.
+        cn1VideoIoMuxerPromise = null;
+        throw error;
+      });
+    }
+    return cn1VideoIoMuxerPromise;
+  }
+
+  function cn1VideoIoVideo(id) {
+    return cn1VideoIoVideos[id | 0] || null;
+  }
+
+  function cn1VideoIoEncoder(id) {
+    return cn1VideoIoEncoders[id | 0] || null;
+  }
+
+  function cn1VideoIoResamplePcm(samples, inputRate, outputRate, channels) {
+    if (inputRate === outputRate || inputRate <= 0 || outputRate <= 0 || channels <= 0) {
+      return samples;
+    }
+    var inputFrames = (samples.length / channels) | 0;
+    var outputFrames = Math.max(1, Math.round(inputFrames * outputRate / inputRate));
+    var output = new Int16Array(outputFrames * channels);
+    for (var frame = 0; frame < outputFrames; frame++) {
+      var sourcePosition = frame * inputRate / outputRate;
+      var leftFrame = Math.min(inputFrames - 1, Math.floor(sourcePosition));
+      var rightFrame = Math.min(inputFrames - 1, leftFrame + 1);
+      var fraction = sourcePosition - leftFrame;
+      for (var channel = 0; channel < channels; channel++) {
+        var left = samples[leftFrame * channels + channel];
+        var right = samples[rightFrame * channels + channel];
+        output[frame * channels + channel] = Math.round(left + (right - left) * fraction);
+      }
+    }
+    return output;
+  }
+
+  hostBridge.register('__cn1_video_io__', function(request) {
+    var payload = request || {};
+    var op = String(payload.op || '');
+    var doc = cn1VideoIoDocument();
+
+    if (op === 'webCodecsAvailable') {
+      return !!(doc && global.VideoEncoder && global.VideoDecoder && global.VideoFrame);
+    }
+    if (op === 'audioWebCodecsAvailable') {
+      return !!(global.AudioEncoder && global.AudioData);
+    }
+    if (op === 'videoBlobUrl') {
+      var blobBytes = cn1VideoIoBase64Bytes(payload.b64);
+      var blob = new global.Blob([blobBytes], {
+        type: payload.mime == null ? 'video/mp4' : String(payload.mime)
+      });
+      return global.URL.createObjectURL(blob);
+    }
+    if (op === 'videoOpen') {
+      if (!doc) { return 0; }
+      var video = doc.createElement('video');
+      video.muted = true;
+      video.crossOrigin = 'anonymous';
+      video.preload = 'auto';
+      video.src = String(payload.url || '');
+      var videoId = ++cn1VideoIoVideoSeq;
+      var videoState = { el: video, ready: false, seeked: false, sameTime: false, error: null };
+      cn1VideoIoVideos[videoId] = videoState;
+      video.addEventListener('loadedmetadata', function() { videoState.ready = true; });
+      video.addEventListener('seeked', function() { videoState.seeked = true; });
+      video.addEventListener('error', function() {
+        videoState.error = video.error ? ('MediaError ' + video.error.code) : 'Video load failed';
+      });
+      video.load();
+      return videoId;
+    }
+    if (op === 'videoReady') {
+      var readyVideo = cn1VideoIoVideo(payload.id);
+      if (readyVideo && readyVideo.error) { throw new Error(readyVideo.error); }
+      return !!(readyVideo && readyVideo.ready);
+    }
+    if (op === 'videoWidth') {
+      var widthVideo = cn1VideoIoVideo(payload.id);
+      return widthVideo ? (widthVideo.el.videoWidth | 0) : 0;
+    }
+    if (op === 'videoHeight') {
+      var heightVideo = cn1VideoIoVideo(payload.id);
+      return heightVideo ? (heightVideo.el.videoHeight | 0) : 0;
+    }
+    if (op === 'videoDuration') {
+      var durationVideo = cn1VideoIoVideo(payload.id);
+      return durationVideo ? Math.round((durationVideo.el.duration || 0) * 1000) : 0;
+    }
+    if (op === 'videoSeek') {
+      var seekVideo = cn1VideoIoVideo(payload.id);
+      if (!seekVideo) { return null; }
+      var time = (payload.ms | 0) / 1000;
+      if (Math.abs((seekVideo.el.currentTime || 0) - time) < 0.001) {
+        seekVideo.sameTime = true;
+        seekVideo.seeked = seekVideo.el.readyState >= 2;
+      } else {
+        seekVideo.sameTime = false;
+        seekVideo.seeked = false;
+        seekVideo.el.currentTime = time;
+      }
+      return null;
+    }
+    if (op === 'videoSeeked') {
+      var seekedVideo = cn1VideoIoVideo(payload.id);
+      if (!seekedVideo) { return false; }
+      if (seekedVideo.error) { throw new Error(seekedVideo.error); }
+      if (!seekedVideo.seeked && seekedVideo.sameTime && seekedVideo.el.readyState >= 2) {
+        seekedVideo.seeked = true;
+      }
+      return !!seekedVideo.seeked;
+    }
+    if (op === 'videoCapture') {
+      var captureVideo = cn1VideoIoVideo(payload.id);
+      if (!captureVideo || !doc) { return null; }
+      var canvas = doc.createElement('canvas');
+      canvas.width = payload.w | 0;
+      canvas.height = payload.h | 0;
+      var context = canvas.getContext('2d');
+      context.drawImage(captureVideo.el, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL('image/png');
+    }
+    if (op === 'videoClose') {
+      var closeVideoId = payload.id | 0;
+      var closeVideo = cn1VideoIoVideo(closeVideoId);
+      if (closeVideo) {
+        try { closeVideo.el.removeAttribute('src'); closeVideo.el.load(); } catch (_videoCloseError) {}
+        delete cn1VideoIoVideos[closeVideoId];
+      }
+      return null;
+    }
+    if (op === 'encEnsureLibs') {
+      return cn1VideoIoEnsureMuxers();
+    }
+    if (op === 'encLibsReady') {
+      return String(payload.container) === 'webm' ? !!global.WebMMuxer : !!global.Mp4Muxer;
+    }
+    if (op === 'encOpen') {
+      try {
+        var webm = String(payload.container) === 'webm';
+        var muxApi = webm ? global.WebMMuxer : global.Mp4Muxer;
+        if (!muxApi) { throw new Error('VideoIO muxer library is not loaded'); }
+        var videoMuxCodec = webm
+          ? (String(payload.videoCodec) === 'vp8' ? 'V_VP8' : 'V_VP9')
+          : (String(payload.videoCodec) === 'hevc' ? 'hevc' : 'avc');
+        var videoConfigCodec = webm
+          ? (String(payload.videoCodec) === 'vp8' ? 'vp8' : 'vp09.00.10.08')
+          : (String(payload.videoCodec) === 'hevc' ? 'hev1.1.6.L93.B0' : 'avc1.42001f');
+        var audioMuxCodec = webm ? 'A_OPUS' : 'aac';
+        var audioConfigCodec = webm ? 'opus' : 'mp4a.40.2';
+        var audioSampleRate = payload.sampleRate | 0;
+        // Chromium's WebCodecs AAC/Opus encoders accept the standard media
+        // rates. VideoWriter accepts arbitrary PCM rates, so resample other
+        // inputs on the host instead of advertising a codec and then failing
+        // at configure() (the round-trip suite intentionally exercises 8 kHz).
+        if (audioSampleRate !== 44100 && audioSampleRate !== 48000) {
+          audioSampleRate = 48000;
+        }
+        var target = new muxApi.ArrayBufferTarget();
+        var muxOptions = {
+          target: target,
+          video: { codec: videoMuxCodec, width: payload.w | 0, height: payload.h | 0 },
+          firstTimestampBehavior: 'offset'
+        };
+        if (!webm) { muxOptions.fastStart = 'in-memory'; }
+        if (payload.hasAudio) {
+          muxOptions.audio = {
+            codec: audioMuxCodec,
+            sampleRate: audioSampleRate,
+            numberOfChannels: payload.channels | 0
+          };
+        }
+        var muxer = new muxApi.Muxer(muxOptions);
+        var encoderState = {
+          muxer: muxer,
+          target: target,
+          error: null,
+          done: false,
+          result: null,
+          flushPromise: null,
+          audioSampleRate: audioSampleRate,
+          audioChannels: payload.channels | 0
+        };
+        encoderState.videoEncoder = new global.VideoEncoder({
+          output: function(chunk, meta) {
+            try { muxer.addVideoChunk(chunk, meta); }
+            catch (error) { encoderState.error = String(error); }
+          },
+          error: function(error) { encoderState.error = String(error); }
+        });
+        var videoConfig = {
+          codec: videoConfigCodec,
+          width: payload.w | 0,
+          height: payload.h | 0,
+          bitrate: payload.videoBitRate | 0,
+          framerate: payload.fps | 0
+        };
+        if (!webm) { videoConfig.avc = { format: 'avc' }; }
+        encoderState.videoEncoder.configure(videoConfig);
+        if (payload.hasAudio) {
+          if (!global.AudioEncoder || !global.AudioData) {
+            throw new Error('Audio WebCodecs are unavailable');
+          }
+          encoderState.audioEncoder = new global.AudioEncoder({
+            output: function(chunk, meta) {
+              try { muxer.addAudioChunk(chunk, meta); }
+              catch (error) { encoderState.error = String(error); }
+            },
+            error: function(error) { encoderState.error = String(error); }
+          });
+          encoderState.audioEncoder.configure({
+            codec: audioConfigCodec,
+            sampleRate: audioSampleRate,
+            numberOfChannels: payload.channels | 0,
+            bitrate: payload.audioBitRate | 0
+          });
+        }
+        var encoderId = ++cn1VideoIoEncoderSeq;
+        cn1VideoIoEncoders[encoderId] = encoderState;
+        cn1VideoIoLastEncoderError = null;
+        return encoderId;
+      } catch (error) {
+        cn1VideoIoLastEncoderError = String(error);
+        return 0;
+      }
+    }
+    if (op === 'encError') {
+      var errorEncoder = cn1VideoIoEncoder(payload.peer);
+      return errorEncoder ? errorEncoder.error : cn1VideoIoLastEncoderError;
+    }
+    if (op === 'encFrame') {
+      var frameEncoder = cn1VideoIoEncoder(payload.peer);
+      if (!frameEncoder || !frameEncoder.videoEncoder) { return null; }
+      try {
+        var rgba = cn1VideoIoBase64Bytes(payload.b64);
+        var frame = new global.VideoFrame(rgba, {
+          format: 'RGBA',
+          codedWidth: payload.w | 0,
+          codedHeight: payload.h | 0,
+          timestamp: +payload.ptsUs
+        });
+        frameEncoder.videoEncoder.encode(frame);
+        frame.close();
+      } catch (error) {
+        frameEncoder.error = String(error);
+      }
+      return null;
+    }
+    if (op === 'encAudio') {
+      var audioEncoder = cn1VideoIoEncoder(payload.peer);
+      if (!audioEncoder || !audioEncoder.audioEncoder) { return null; }
+      try {
+        var pcmBytes = cn1VideoIoBase64Bytes(payload.b64);
+        var samples = new Int16Array(pcmBytes.buffer);
+        samples = cn1VideoIoResamplePcm(samples, payload.sampleRate | 0,
+          audioEncoder.audioSampleRate, payload.channels | 0);
+        var audioData = new global.AudioData({
+          format: 's16',
+          sampleRate: audioEncoder.audioSampleRate,
+          numberOfFrames: (samples.length / (payload.channels | 0)) | 0,
+          numberOfChannels: payload.channels | 0,
+          timestamp: +payload.ptsUs,
+          data: samples
+        });
+        audioEncoder.audioEncoder.encode(audioData);
+        audioData.close();
+      } catch (error) {
+        audioEncoder.error = String(error);
+      }
+      return null;
+    }
+    if (op === 'encFlush') {
+      var flushEncoder = cn1VideoIoEncoder(payload.peer);
+      if (!flushEncoder) { return null; }
+      if (!flushEncoder.flushPromise) {
+        flushEncoder.done = false;
+        flushEncoder.flushPromise = flushEncoder.videoEncoder.flush()
+          .then(function() {
+            return flushEncoder.audioEncoder ? flushEncoder.audioEncoder.flush() : null;
+          })
+          .then(function() {
+            flushEncoder.muxer.finalize();
+            flushEncoder.result = flushEncoder.target.buffer;
+          })
+          .catch(function(error) {
+            flushEncoder.error = String(error);
+          })
+          .then(function() {
+            flushEncoder.done = true;
+          });
+      }
+      return flushEncoder.flushPromise;
+    }
+    if (op === 'encDone') {
+      var doneEncoder = cn1VideoIoEncoder(payload.peer);
+      return !doneEncoder || !!doneEncoder.done;
+    }
+    if (op === 'encResult') {
+      var resultEncoder = cn1VideoIoEncoder(payload.peer);
+      return resultEncoder && resultEncoder.result
+        ? cn1VideoIoBytesBase64(resultEncoder.result) : null;
+    }
+    if (op === 'encClose') {
+      var closeEncoderId = payload.peer | 0;
+      var closeEncoder = cn1VideoIoEncoder(closeEncoderId);
+      if (closeEncoder) {
+        try {
+          if (closeEncoder.videoEncoder && closeEncoder.videoEncoder.state !== 'closed') {
+            closeEncoder.videoEncoder.close();
+          }
+        } catch (_videoEncoderCloseError) {}
+        try {
+          if (closeEncoder.audioEncoder && closeEncoder.audioEncoder.state !== 'closed') {
+            closeEncoder.audioEncoder.close();
+          }
+        } catch (_audioEncoderCloseError) {}
+        delete cn1VideoIoEncoders[closeEncoderId];
+      }
+      return null;
+    }
+    throw new Error('Unknown VideoIO host operation: ' + op);
   });
 
   hostBridge.register('__cn1_print_data__', function(request) {
