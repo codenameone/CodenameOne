@@ -57,7 +57,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/calendar/C
 ----
 
 The `version` returned by a source is an optimistic-concurrency token. Pass
-the returned object back to `saveEvent()` or its version to a delete method.
+the returned object to `saveEvent()` or its version to a delete method.
 A stale token produces `CalendarError.CONFLICT` instead of overwriting a
 newer server edit.
 
