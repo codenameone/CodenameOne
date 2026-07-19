@@ -1063,6 +1063,15 @@
         "url": "https://medium.com/p/98a439a59e9c/edit",
         "syndicated_at": "2026-07-18T19:09:42+00:00"
       }
+    },
+    "2026-07-19-1200-shai-widgets-live-activities-dynamic-island": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/feed/",
+        "syndicated_at": "2026-07-19T09:01:03+00:00",
+        "account": "shai",
+        "source_slug": "widgets-live-activities-dynamic-island",
+        "scheduled_at": "2026-07-19T09:00:00+00:00"
+      }
     }
   }
 }
