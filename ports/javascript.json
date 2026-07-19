@@ -1,48 +1,48 @@
 {
-  "commit": "98fa4258e0a0cf7c6db655bbe55b573cc523ca2c",
-  "generated_at": "2026-07-18T18:28:36Z",
+  "commit": "42bdcdae5b6ef53f7329456a8a3179343cfb97f8",
+  "generated_at": "2026-07-19T04:57:30Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 1175600001
+        "duration_ns": 1472300001
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 681500000
+        "duration_ns": 953800001
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 12845800000
+        "duration_ns": 16152599999
       },
       "intArithmetic": {
         "checksum": "1313580095284",
-        "duration_ns": 593400001
+        "duration_ns": 679099999
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 3301000000
+        "duration_ns": 3740700000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 231000000
+        "duration_ns": 300900000
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 2555700000
+        "duration_ns": 3523300001
       },
       "quicksort": {
         "checksum": "786886890168670967",
-        "duration_ns": 462800001
+        "duration_ns": 610600000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 892500000
+        "duration_ns": 1054099999
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 995500000
+        "duration_ns": 1298300000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -51,13 +51,13 @@
     "suite_checksum": 0
   },
   "port": "javascript",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29654800963",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29672771801",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
-    "fail": 17,
+    "fail": 0,
     "not-run": 0,
-    "pass": 148,
+    "pass": 165,
     "skip": 1
   },
   "tests": {
@@ -67,10 +67,7 @@
     },
     "AccessibilityTest": {
       "feature": "accessibility",
-      "reasons": [
-        "failed due to timeout waiting for DONE stage=created"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "AdsScreenshotTest": {
       "feature": "ads",
@@ -102,17 +99,11 @@
     },
     "BackgroundThreadUiAccessTest": {
       "feature": "threading",
-      "reasons": [
-        "failed due to timeout waiting for DONE stage=created"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "Base64NativePerformanceTest": {
       "feature": "native-base64",
-      "reasons": [
-        "failed due to timeout waiting for DONE stage=created"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "BridgeBulkTransferGuardTest": {
       "feature": "bytecode-runtime",
@@ -120,10 +111,7 @@
     },
     "BrowserComponentScreenshotTest": {
       "feature": "embedded-web-content",
-      "reasons": [
-        "failed due to timeout waiting for DONE stage=created"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "ButtonThemeScreenshotTest": {
       "feature": "native-theme-controls",
@@ -131,24 +119,15 @@
     },
     "BytecodeTranslatorRegressionTest": {
       "feature": "bytecode-runtime",
-      "reasons": [
-        "failed due to timeout waiting for DONE stage=created"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "CallDetectionAPITest": {
       "feature": "device-security-signals",
-      "reasons": [
-        "failed due to timeout waiting for DONE stage=created"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "CameraApiTest": {
       "feature": "camera-access",
-      "reasons": [
-        "needs-runtime-permission-on-HTML5"
-      ],
-      "status": "skip"
+      "status": "pass"
     },
     "CenteredDialogTitleScreenshotTest": {
       "feature": "dialogs-and-labels",
@@ -168,10 +147,7 @@
     },
     "ChartCombinedXYScreenshotTest": {
       "feature": "charts",
-      "reasons": [
-        "failed due to timeout waiting for DONE stage=created"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "ChartCubicLineScreenshotTest": {
       "feature": "charts",
@@ -263,10 +239,7 @@
     },
     "CryptoApiTest": {
       "feature": "secure-storage-crypto",
-      "reasons": [
-        "failed: Crypto API test failed: com.codename1.security.CryptoException: Crypto operation secureRandomBytes is not supported on this platform. If you are running in a fresh CodenameOneImplementation subclass, override the matching method."
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "CssFilterBlurScreenshotTest": {
       "feature": "theme-palette-css",
@@ -342,10 +315,7 @@
     },
     "FileSystemStorageOpenInputStreamMissingTest": {
       "feature": "filesystem-storage",
-      "reasons": [
-        "failed due to timeout waiting for DONE stage=created"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "FillArc": {
       "feature": "graphics-primitives",
@@ -381,10 +351,7 @@
     },
     "FloatingToStringTest": {
       "feature": "java-standard-apis",
-      "reasons": [
-        "failed: Floating toString test failed: java.lang.RuntimeException: double-min-scientific expected=[1.0E7] actual=[10000000] len=8; Expected [1.0E7], Actual [10000000]"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "GaussianBlur": {
       "feature": "graphics-gradients-filters",
@@ -404,10 +371,7 @@
     },
     "Gpu3DModelScreenshotTest": {
       "feature": "gpu-3d",
-      "reasons": [
-        "failed due to timeout waiting for DONE stage=created"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "Gpu3DTexturedCubeScreenshotTest": {
       "feature": "gpu-3d",
@@ -439,10 +403,7 @@
     },
     "LightweightPickerButtonsScreenshotTest": {
       "feature": "pickers-validation",
-      "reasons": [
-        "failed due to timeout waiting for DONE stage=created"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "ListThemeScreenshotTest": {
       "feature": "native-theme-controls",
@@ -450,10 +411,7 @@
     },
     "LocalNotificationOverrideTest": {
       "feature": "notifications",
-      "reasons": [
-        "failed due to timeout waiting for DONE stage=created"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "LottieAnimatedScreenshotTest": {
       "feature": "svg-lottie",
@@ -593,10 +551,7 @@
     },
     "SimdLargeAllocaTest": {
       "feature": "simd",
-      "reasons": [
-        "failed due to timeout waiting for DONE stage=created"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "SlideFadeTitleTransitionTest": {
       "feature": "slide-cover-transitions",
@@ -708,10 +663,7 @@
     },
     "TimeApiTest": {
       "feature": "java-standard-apis",
-      "reasons": [
-        "failed: Time API test failed: java.lang.RuntimeException: Invalid time zone specified: GMT-05:00"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "ToastBarTopPositionScreenshotTest": {
       "feature": "toast-notifications",
@@ -743,10 +695,7 @@
     },
     "VPNDetectionAPITest": {
       "feature": "device-security-signals",
-      "reasons": [
-        "failed due to timeout waiting for DONE stage=created"
-      ],
-      "status": "fail"
+      "status": "pass"
     },
     "VRStereoSceneScreenshotTest": {
       "feature": "immersive-media",
@@ -775,9 +724,9 @@
     "VideoIORoundTripTest": {
       "feature": "video-round-trip",
       "reasons": [
-        "failed due to timeout waiting for DONE stage=created"
+        "encode-unavailable-on-HTML5:WebCodecs"
       ],
-      "status": "fail"
+      "status": "skip"
     }
   }
 }
