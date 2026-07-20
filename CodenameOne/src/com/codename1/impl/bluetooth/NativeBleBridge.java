@@ -39,9 +39,13 @@ package com.codename1.impl.bluetooth;
 /// Internal to the native-backend implementation -- not a public API.
 public interface NativeBleBridge {
 
-    /// Loads and initializes the engine (opens the shared library and the OS
-    /// adapter manager). Returns {@code false} if BLE is unavailable on this
-    /// host (library missing, no adapter). Called once before any command.
+    /// Brings the engine up (opens the shared library and the OS adapter
+    /// manager) and returns an adapter-availability hint: {@code true} when a
+    /// radio is present, {@code false} otherwise. Either way the engine is
+    /// pollable and emits its capabilities + adapter-state handshake, so the
+    /// backend always drains {@link #pollEvent} afterwards -- a radioless host
+    /// reports {@code UNSUPPORTED} rather than a start failure. Called once
+    /// before any command.
     boolean start();
 
     /// True while the engine is running and able to accept commands.

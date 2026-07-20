@@ -155,10 +155,15 @@ public class NativeBleBackend implements BleBackend {
             if (shutdownRequested.get() || engineFailed.get()) {
                 return false;
             }
-            if (!bridge.start()) {
-                engineFailed.set(true);
-                return false;
-            }
+            // start() brings the engine up and returns an adapter-availability
+            // hint. The engine emits its capabilities + adapter-state handshake
+            // (POWERED_ON when a radio is present, otherwise UNSUPPORTED /
+            // UNAUTHORIZED / POWERED_OFF) either way, so always run the reader
+            // to drain it -- a radioless host is a valid, observable state, not
+            // a start failure. If the engine cannot run at all (e.g. the native
+            // dlopen stub with no library) pollEvent reports it closed and the
+            // reader exits at once, flipping the backend to UNSUPPORTED.
+            bridge.start();
             started = true;
             startReader();
             return true;
