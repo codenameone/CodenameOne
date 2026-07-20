@@ -1092,6 +1092,11 @@
       "medium": {
         "url": "https://medium.com/p/49f089c3ab2b/edit",
         "syndicated_at": "2026-07-19T18:45:48+00:00"
+      },
+      "devto": {
+        "id": 4188945,
+        "url": "https://dev.to/codenameone/ar-and-vr-in-java-arkit-arcore-and-a-virtual-room-you-can-debug-851",
+        "syndicated_at": "2026-07-20T15:05:14+00:00"
       }
     },
     "2026-07-20-1200-shai-accessibility-semantics": {
