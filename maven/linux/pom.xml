@@ -102,8 +102,16 @@
                         <configuration>
                             <target>
                                 <mkdir dir="${project.build.directory}/codenameone/linuxport-bundle"/>
+                                <!-- Stage the prebuilt libcn1ble shared
+                                     libraries (from cn1-binaries) into the
+                                     native bundle under ble/{arch}/, so the
+                                     LinuxNativeBuilder can ship the arch-correct
+                                     one next to a Bluetooth app's executable
+                                     for the runtime dlopen in cn1_linux_ble.c.
+                                     Tolerant of an absent ble/ dir. -->
                                 <zip destfile="${project.build.directory}/codenameone/linuxport-bundle/nativelinux.jar">
                                     <fileset dir="${codename1.nativelinux.dir}"/>
+                                    <zipfileset dir="${cn1.binaries}/ble/linux" prefix="ble" erroronmissingdir="false"/>
                                 </zip>
                                 <!--
                                   LinuxPort.jar inside the bundle is the
