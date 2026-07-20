@@ -46,19 +46,141 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     };
     
     private static ArrayList<String> str = new ArrayList<String>();
-    
-    private final char[] value;
+
+    // Compact-string storage: ONE backing reference holding EITHER a char[] (general UTF-16, the
+    // original 2-byte representation -- a Unicode charAt is a direct 16-bit read, NO decode) OR a
+    // byte[] (pure Latin-1, code units 0..255 -- the common ASCII case, 1 byte/char). The element
+    // kind IS the coder: `value instanceof byte[]` means Latin-1. No second field, no length flag,
+    // so the C String struct is unchanged (value was already a JAVA_OBJECT). @Fused fuses either
+    // array kind for String.value (see FusedConstructor.stringCompactValueMatch); natives pick
+    // byte vs char by a single array-class compare, hoisted out of character loops.
+    private Object value;
 
     private final int offset;
 
     private final int count;
 
     private int hashCode;
-    
+
     // cached native string
     private long nsString;
     private static final char[] ZERO_CHAR = new char[0];
+
+    /** Returns a Latin-1 byte[] for c[off..off+len) if every unit is <= 0xFF, else null. */
+    private static byte[] toLatin1(char[] c, int off, int len) {
+        for (int i = 0; i < len; i++) {
+            if (c[off + i] > 0xFF) {
+                return null;
+            }
+        }
+        byte[] b = new byte[len];
+        for (int i = 0; i < len; i++) {
+            b[i] = (byte) c[off + i];
+        }
+        return b;
+    }
+
+    /** Character at logical index i (0-based); offset is applied here. */
+    private char charInternal(int i) {
+        Object v = value;
+        return v instanceof byte[] ? (char) (((byte[]) v)[offset + i] & 0xff) : ((char[]) v)[offset + i];
+    }
+
+    /**
+     * VM-INTERNAL fast path: wrap a freshly-built Latin-1 {@code byte[]} directly as a compact
+     * String WITHOUT copying or a code-unit scan. Callers must guarantee every byte is a Latin-1
+     * code unit (0..255) that IS the character, and must not retain {@code latin1Bytes} elsewhere
+     * (ownership transfers). Number/format code that knows its output is ASCII (Long.toString,
+     * Integer.toString, digit formatting) uses this to skip the char[] intermediate. Straight-line
+     * NEWARRAY [B at the call site -> @Fused packs the bytes inline (stringCompactValueMatch).
+     */
+    static String latin1(byte[] latin1Bytes, int count) {
+        return new String(count, latin1Bytes);
+    }
+
+    /** Aliasing ctor for {@link #latin1} -- distinct signature (int,byte[]) so it never collides
+     *  with the UTF-8-decoding public String(byte[],...) ctors. Takes ownership, no copy. */
+    private String(int count, byte[] latin1Bytes) {
+        this.offset = 0;
+        this.count = count;
+        this.value = latin1Bytes;
+    }
     
+    // VM-INTERNAL compact string concatenation. The translator rewrites an all-String
+    // makeConcat(WithConstants) (the common String interpolation / a+b+c shape once every
+    // argument is already String-typed) into a cn1Concat call instead of the generic
+    // StringBuilder helper. StringBuilder is char[]-backed, so concatenating compact byte[]
+    // strings costs a byte->char DECODE on every append plus a char->byte RE-ENCODE in
+    // toString, over a 2-byte-per-char scratch buffer. These build the result in a SINGLE
+    // pass into ONE array: a compact byte[] when every part is Latin-1 (the overwhelming
+    // common case -- digits, ASCII), a char[] only if some part carries a code unit > 0xFF.
+    // Two allocations (array + String) and no conversion, vs the builder's four + two casts.
+    private static String cn1c(String s) { return s != null ? s : "null"; }
+
+    // When every part is a compact Latin-1 String (the overwhelming common case), the native
+    // cn1FusedConcatN builds the whole result in ONE fused allocation (byte[] inline in the String)
+    // with no byte<->char conversion. Only if some part carries a code unit > 0xFF do we fall to the
+    // char[] path here (rare). null args map to "null" like makeConcat. See nativeMethods.m.
+    private static native String cn1FusedConcat2(String a, String b);
+    private static native String cn1FusedConcat3(String a, String b, String c);
+    private static native String cn1FusedConcat4(String a, String b, String c, String d);
+    private static native String cn1FusedConcat5(String a, String b, String c, String d, String e);
+
+    static String cn1Concat2(String a, String b) {
+        a = cn1c(a); b = cn1c(b);
+        if (a.value instanceof byte[] && b.value instanceof byte[]) {
+            return cn1FusedConcat2(a, b);
+        }
+        char[] r = new char[a.count + b.count];
+        a.getChars(0, a.count, r, 0);
+        b.getChars(0, b.count, r, a.count);
+        return new String(r);
+    }
+
+    static String cn1Concat3(String a, String b, String c) {
+        a = cn1c(a); b = cn1c(b); c = cn1c(c);
+        if (a.value instanceof byte[] && b.value instanceof byte[] && c.value instanceof byte[]) {
+            return cn1FusedConcat3(a, b, c);
+        }
+        int ca = a.count, cb = b.count;
+        char[] r = new char[ca + cb + c.count];
+        a.getChars(0, ca, r, 0);
+        b.getChars(0, cb, r, ca);
+        c.getChars(0, c.count, r, ca + cb);
+        return new String(r);
+    }
+
+    static String cn1Concat4(String a, String b, String c, String d) {
+        a = cn1c(a); b = cn1c(b); c = cn1c(c); d = cn1c(d);
+        if (a.value instanceof byte[] && b.value instanceof byte[]
+                && c.value instanceof byte[] && d.value instanceof byte[]) {
+            return cn1FusedConcat4(a, b, c, d);
+        }
+        int ca = a.count, cb = b.count, cc = c.count;
+        char[] r = new char[ca + cb + cc + d.count];
+        a.getChars(0, ca, r, 0);
+        b.getChars(0, cb, r, ca);
+        c.getChars(0, cc, r, ca + cb);
+        d.getChars(0, d.count, r, ca + cb + cc);
+        return new String(r);
+    }
+
+    static String cn1Concat5(String a, String b, String c, String d, String e) {
+        a = cn1c(a); b = cn1c(b); c = cn1c(c); d = cn1c(d); e = cn1c(e);
+        if (a.value instanceof byte[] && b.value instanceof byte[] && c.value instanceof byte[]
+                && d.value instanceof byte[] && e.value instanceof byte[]) {
+            return cn1FusedConcat5(a, b, c, d, e);
+        }
+        int ca = a.count, cb = b.count, cc = c.count, cd = d.count;
+        char[] r = new char[ca + cb + cc + cd + e.count];
+        a.getChars(0, ca, r, 0);
+        b.getChars(0, cb, r, ca);
+        c.getChars(0, cc, r, ca + cb);
+        d.getChars(0, cd, r, ca + cb + cc);
+        e.getChars(0, e.count, r, ca + cb + cc + cd);
+        return new String(r);
+    }
+
     /**
      * Initializes a newly created String object so that it represents an empty character sequence.
      */
@@ -169,7 +291,18 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         this.value = data;
         this.count = charCount;
     }
-    
+
+    /**
+     * Parent-sharing constructor: the new String shares the parent's backing
+     * {@code value} (either kind) with a new logical window. Used by substring/trim
+     * so slicing never forces a decode or a copy and preserves the compact kind.
+     */
+    private String(String parent, int newOffset, int newCount) {
+        this.offset = newOffset;
+        this.count = newCount;
+        this.value = parent.value;
+    }
+
     /**
      * Initializes a newly created String object so that it represents the same sequence of characters as the argument; in other words, the newly created string is a copy of the argument string.
      * value - a String.
@@ -191,15 +324,17 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     public String(java.lang.StringBuffer buffer){
         this.offset = 0;
         this.count = buffer.length();
-        this.value = new char[count];
-        buffer.getChars(0, count, value, 0);
+        char[] v = new char[count];
+        buffer.getChars(0, count, v, 0);
+        this.value = v;
     }
-    
+
     public String(java.lang.StringBuilder buffer) {
         this.offset = 0;
         this.count = buffer.length();
-        this.value = new char[count];
-        buffer.getChars(0, count, value, 0);
+        char[] v = new char[count];
+        buffer.getChars(0, count, v, 0);
+        this.value = v;
     }
 
     /**
@@ -250,8 +385,12 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      */
     public java.lang.String concat(java.lang.String str){
         char[] n = new char[length() + str.length()];
-        System.arraycopy(value, offset, n, 0, count);
-        System.arraycopy(str.value, str.offset, n, count, str.count);
+        for (int i = 0; i < count; i++) {
+            n[i] = charInternal(i);
+        }
+        for (int i = 0; i < str.count; i++) {
+            n[count + i] = str.charInternal(i);
+        }
         return new String(n, n.length); // n is fresh + private: alias, no copy
     }
 
@@ -264,7 +403,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         }
         int offset = suffix.length() - 1;
         for(int iter = length() - 1 ; offset >= 0 ; iter--) {
-            if(value[this.offset + iter] != suffix.value[suffix.offset + offset]) {
+            if(charInternal(iter) != suffix.charInternal(offset)) {
                 return false;
             }
             offset--;
@@ -319,9 +458,9 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * Convert this String into bytes according to the specified character encoding, storing the result into a new byte array.
      */
     public byte[] getBytes(java.lang.String enc) throws java.io.UnsupportedEncodingException{
-        if(offset == 0 && value.length == count) {
+        if(value instanceof char[] && offset == 0 && ((char[])value).length == count) {
             if(enc == null) {
-                return charsToBytes(toCharNoCopy(), null); 
+                return charsToBytes(toCharNoCopy(), null);
             }
             return charsToBytes(toCharNoCopy(), enc.toCharNoCopy()); 
         } 
@@ -392,21 +531,18 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
             if (subCount > _count) {
                 return -1;
             }
-            char[] target = string.value;
-            int subOffset = string.offset;
-            char firstChar = target[subOffset];
-            int end = subOffset + subCount;
+            char firstChar = string.charInternal(0);
             while (true) {
                 int i = indexOf(firstChar, start);
                 if (i == -1 || subCount + i > _count) {
                     return -1; // handles subCount > count || start >= count
                 }
-                int o1 = offset + i, o2 = subOffset;
-                char[] _value = value;
-                while (++o2 < end && _value[++o1] == target[o2]) {
+                int k = 1;
+                while (k < subCount && charInternal(i + k) == string.charInternal(k)) {
                     // Intentionally empty
+                    k++;
                 }
-                if (o2 == end) {
+                if (k == subCount) {
                     return i;
                 }
                 start = i + 1;
@@ -432,21 +568,18 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
             if (subCount + start > _count) {
                 return -1;
             }
-            char[] target = subString.value;
-            int subOffset = subString.offset;
-            char firstChar = target[subOffset];
-            int end = subOffset + subCount;
+            char firstChar = subString.charInternal(0);
             while (true) {
                 int i = indexOf(firstChar, start);
                 if (i == -1 || subCount + i > _count) {
                     return -1; // handles subCount > count || start >= count
                 }
-                int o1 = offset + i, o2 = subOffset;
-                char[] _value = value;
-                while (++o2 < end && _value[++o1] == target[o2]) {
+                int k = 1;
+                while (k < subCount && charInternal(i + k) == subString.charInternal(k)) {
                     // Intentionally empty
+                    k++;
                 }
-                if (o2 == end) {
+                if (k == subCount) {
                     return i;
                 }
                 start = i + 1;
@@ -477,12 +610,12 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * ) == ch is true. The String is searched backwards starting at the last character.
      */
     public int lastIndexOf(int ch){
-        for(int iter = count + offset - 1 ; iter >= offset ; iter--) {
-            if(value[iter] == ch) {
-                return iter - offset;
+        for(int iter = count - 1 ; iter >= 0 ; iter--) {
+            if(charInternal(iter) == ch) {
+                return iter;
             }
         }
-        return -1; 
+        return -1;
     }
 
     /**
@@ -491,15 +624,13 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      */
     public int lastIndexOf(int ch, int start){
         int _count = count;
-        int _offset = offset;
-        char[] _value = value;
         if (start >= 0) {
             if (start >= _count) {
                 start = _count - 1;
             }
-            for (int i = _offset + start; i >= _offset; --i) {
-                if (_value[i] == ch) {
-                    return i - _offset;
+            for (int i = start; i >= 0; --i) {
+                if (charInternal(i) == ch) {
+                    return i;
                 }
             }
         }
@@ -555,7 +686,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
                         return -1;
                     }
                     int o1 = i, o2 = subOffset;
-                    while (++o2 < end && value[offset + (++o1)] == target[o2]) {
+                    while (++o2 < end && charInternal(++o1) == target[o2]) {
                         // Intentionally empty
                     }
                     if (o2 == end) {
@@ -607,11 +738,8 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         if (length <= 0) {
             return true;
         }
-        int o1 = offset + thisStart, o2 = string.offset + start;
-        char[] value1 = value;
-        char[] value2 = string.value;
         for (int i = 0; i < length; ++i) {
-            if (value1[o1 + i] != value2[o2 + i]) {
+            if (charInternal(thisStart + i) != string.charInternal(start + i)) {
                 return false;
             }
         }
@@ -637,13 +765,10 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         if (start < 0 || length > string.count - start) {
             return false;
         }
-        thisStart += offset;
-        start += string.offset;
         int end = thisStart + length;
-        char[] target = string.value;
         while (thisStart < end) {
-            char c1 = value[thisStart++];
-            char c2 = target[start++];
+            char c1 = charInternal(thisStart++);
+            char c2 = string.charInternal(start++);
             if (c1 != c2 && foldCase(c1) != foldCase(c2)) {
                 return false;
             }
@@ -672,29 +797,18 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * "mesquite in your cellar".replace('e', 'o') returns "mosquito in your collar" "the war of baronets".replace('r', 'y') returns "the way of bayonets" "sparring with a purple porpoise".replace('p', 't') returns "starring with a turtle tortoise" "JonL".replace('q', 'x') returns "JonL" (no change)
      */
     public java.lang.String replace(char oldChar, char newChar){
-        char[] buffer = value;
-        int _offset = offset;
         int _count = count;
-
-        int idx = _offset;
-        int last = _offset + _count;
-        boolean copied = false;
-        while (idx < last) {
-            if (buffer[idx] == oldChar) {
-                if (!copied) {
-                    char[] newBuffer = new char[_count];
-                    System.arraycopy(buffer, _offset, newBuffer, 0, _count);
-                    buffer = newBuffer;
-                    idx -= _offset;
-                    last -= _offset;
-                    copied = true;
+        char[] newBuffer = null;
+        for (int k = 0; k < _count; k++) {
+            if (charInternal(k) == oldChar) {
+                if (newBuffer == null) {
+                    newBuffer = toCharArray();
                 }
-                buffer[idx] = newChar;
+                newBuffer[k] = newChar;
             }
-            idx++;
         }
 
-        return copied ? new String(buffer) : this;
+        return newBuffer != null ? new String(newBuffer) : this;
     }
 
     /**
@@ -716,7 +830,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
             StringBuilder sb = new StringBuilder(len + (len + 1) * replacementStr.length());
             sb.append(replacementStr);
             for (int i = 0; i < len; i++) {
-                sb.append(value[offset + i]);
+                sb.append(charInternal(i));
                 sb.append(replacementStr);
             }
             return sb.toString();
@@ -725,15 +839,16 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         if (idx < 0) {
             return this;
         }
+        char[] chars = toCharArray();
         StringBuilder sb = new StringBuilder(count);
         int prev = 0;
         while (idx >= 0) {
-            sb.append(value, offset + prev, idx - prev);
+            sb.append(chars, prev, idx - prev);
             sb.append(replacementStr);
             prev = idx + targetLen;
             idx = indexOf(targetStr, prev);
         }
-        sb.append(value, offset + prev, count - prev);
+        sb.append(chars, prev, count - prev);
         return sb.toString();
     }
 
@@ -752,7 +867,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
             return false;
         }
         for(int iter = 0 ; iter < prefix.count ; iter++) {
-            if(prefix.value[iter+prefix.offset] != value[iter + toffset + offset]) {
+            if(prefix.charInternal(iter) != charInternal(iter + toffset)) {
                 return false;
             }
         }
@@ -769,8 +884,7 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
             return this;
         }
         if (start >= 0 && start <= count) {
-            //return new String(offset + start, count - start, value);
-            return new String(value, offset + start, count - start);
+            return new String(this, offset + start, count - start);
         }
         throw new ArrayIndexOutOfBoundsException(start);
     }
@@ -787,15 +901,14 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
         // NOTE last character not copied!
         // Fast range check.
         if (start >= 0 && start <= end && end <= count) {
-            //return new String(offset + start, end - start, value);
-            return new String(value, offset + start, end - start);
+            return new String(this, offset + start, end - start);
         }
         throw new ArrayIndexOutOfBoundsException(start);
     }
 
     private char[] toCharNoCopy() {
-        if(offset == 0 && value.length == count) {
-            return value;
+        if(value instanceof char[] && offset == 0 && ((char[])value).length == count) {
+            return (char[])value;
         }
         return toCharArray();
     }
@@ -805,7 +918,14 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      */
     public char[] toCharArray(){
         char[] buffer = new char[count];
-        System.arraycopy(value, offset, buffer, 0, count);
+        if (value instanceof byte[]) {
+            byte[] b = (byte[]) value;
+            for (int i = 0; i < count; i++) {
+                buffer[i] = (char) (b[offset + i] & 0xff);
+            }
+        } else {
+            System.arraycopy((char[]) value, offset, buffer, 0, count);
+        }
         return buffer;
     }
 
@@ -852,19 +972,18 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
      * This method may be used to trim whitespace from the beginning and end of a string; in fact, it trims all ASCII control characters as well.
      */
     public java.lang.String trim(){
-        int start = offset, last = offset + count - 1;
-        int end = last;
-        while ((start <= end) && (value[start] <= ' ')) {
-            start++;
+        int lstart = 0, llast = count - 1;
+        int lend = llast;
+        while ((lstart <= lend) && (charInternal(lstart) <= ' ')) {
+            lstart++;
         }
-        while ((end >= start) && (value[end] <= ' ')) {
-            end--;
+        while ((lend >= lstart) && (charInternal(lend) <= ' ')) {
+            lend--;
         }
-        if (start == offset && end == last) {
+        if (lstart == 0 && lend == llast) {
             return this;
         }
-        //return new String(start, end - start + 1, value);
-        return new String(value, start, end - start + 1);
+        return new String(this, offset + lstart, lend - lstart + 1);
     }
 
     /**

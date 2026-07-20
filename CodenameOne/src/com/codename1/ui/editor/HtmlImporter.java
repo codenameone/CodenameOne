@@ -325,9 +325,15 @@ public final class HtmlImporter {
                 if ("italic".equals(fs)) {
                     s = s.withItalic(true);
                 }
-                int level = fontSizeLevel(cssValue(styleAttr, "font-size"));
-                if (level > 0) {
-                    s = s.withFontSizeLevel(level);
+                String fontSizeCss = cssValue(styleAttr, "font-size");
+                int px = fontSizePx(fontSizeCss);
+                if (px > 0) {
+                    s = s.withFontSizePx(px);
+                } else {
+                    int level = fontSizeLevel(fontSizeCss);
+                    if (level > 0) {
+                        s = s.withFontSizeLevel(level);
+                    }
                 }
             }
             String colorAttr = attrs.get("color");
@@ -515,6 +521,33 @@ public final class HtmlImporter {
                     }
                 }
             }
+        }
+        return -1;
+    }
+
+    /// Parses an absolute CSS font-size (px, pt, em/rem) into pixels, or -1 when the value is
+    /// relative (%, keyword) or absent. pt is converted at 96dpi (1pt = 1.333px); em/rem use a
+    /// 16px reference so imported content matches typical browser defaults.
+    private static int fontSizePx(String v) {
+        if (v == null) {
+            return -1;
+        }
+        v = v.trim().toLowerCase();
+        try {
+            if (v.endsWith("px")) {
+                return Math.round(Float.parseFloat(v.substring(0, v.length() - 2).trim()));
+            }
+            if (v.endsWith("pt")) {
+                return Math.round(Float.parseFloat(v.substring(0, v.length() - 2).trim()) * 96f / 72f);
+            }
+            if (v.endsWith("rem")) {
+                return Math.round(Float.parseFloat(v.substring(0, v.length() - 3).trim()) * 16f);
+            }
+            if (v.endsWith("em")) {
+                return Math.round(Float.parseFloat(v.substring(0, v.length() - 2).trim()) * 16f);
+            }
+        } catch (NumberFormatException err) {
+            return -1;
         }
         return -1;
     }

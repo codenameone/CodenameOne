@@ -2293,6 +2293,19 @@ public abstract class CodenameOneImplementation {
     public void fillShape(Object graphics, Shape shape) {
     }
 
+    /// Fills a shape and casts a blurred drop shadow behind it on the GPU where supported (no retained
+    /// bitmap). The default is a no-op; ports that can render a shape shadow cheaply override this
+    /// together with `#isShapeShadowSupported(Object)`.
+    public void fillShapeShadow(Object graphics, Shape shape, int fillColor, int fillAlpha,
+            int shadowColor, float shadowOpacity, int blurRadius, int offsetX, int offsetY) {
+    }
+
+    /// Whether `#fillShapeShadow` renders a GPU shape shadow on this platform. Defaults to false so
+    /// callers fall back to their own shadow rendering.
+    public boolean isShapeShadowSupported(Object graphics) {
+        return false;
+    }
+
     /// Draws a drop shadow for an image onto the given graphics context.
     ///
     /// This is used for the elevation feature.

@@ -1427,6 +1427,73 @@ public class Parser extends ClassVisitor {
                 BytecodeMethod helper = new BytecodeMethod(clsName, Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC, helperName, desc, null, null);
                 cls.addMethod(helper);
 
+                // FAST PATH: when every argument is already String-typed (the common interpolation /
+                // a + b + c shape), build the result compactly in one pass via String.cn1ConcatN
+                // instead of the char[]-backed StringBuilder -- which decodes each compact byte[] arg
+                // to char on append and re-encodes to byte in toString, over a 2-byte/char scratch
+                // buffer (4 allocations + 2 conversions per concat). cn1ConcatN is 2 allocations and
+                // no conversion. Only for 2..5 total parts (constants + args); anything else, or a
+                // non-String arg, falls through to the general StringBuilder helper below.
+                boolean cn1AllStringArgs = invokedType.getArgumentTypes().length > 0;
+                for (Type at : invokedType.getArgumentTypes()) {
+                    if (at.getSort() != Type.OBJECT || !"java/lang/String".equals(at.getInternalName())) {
+                        cn1AllStringArgs = false;
+                        break;
+                    }
+                }
+                if (cn1AllStringArgs) {
+                    // Ordered parts: a String means "literal/constant -> LDC", an Integer means
+                    // "arg at that local -> ALOAD". Empty literals are dropped.
+                    List<Object> cn1Parts = new ArrayList<>();
+                    Type[] cn1Ats = invokedType.getArgumentTypes();
+                    if ("makeConcat".equals(bsm.getName())) {
+                        int li = 0;
+                        for (Type at : cn1Ats) { cn1Parts.add(Integer.valueOf(li)); li += at.getSize(); }
+                    } else {
+                        String rcp = bsmArgs != null && bsmArgs.length > 0 ? String.valueOf(bsmArgs[0]) : "";
+                        List<String> csts = new ArrayList<>();
+                        if (bsmArgs != null) {
+                            for (int i = 1; i < bsmArgs.length; i++) csts.add(String.valueOf(bsmArgs[i]));
+                        }
+                        int ci = 0, li = 0, ai = 0;
+                        StringBuilder lit = new StringBuilder();
+                        for (int i = 0; i < rcp.length(); i++) {
+                            char ch = rcp.charAt(i);
+                            if (ch == '\u0001') {
+                                if (lit.length() > 0) { cn1Parts.add(lit.toString()); lit.setLength(0); }
+                                if (ai < cn1Ats.length) { cn1Parts.add(Integer.valueOf(li)); li += cn1Ats[ai++].getSize(); }
+                            } else if (ch == '\u0002') {
+                                if (lit.length() > 0) { cn1Parts.add(lit.toString()); lit.setLength(0); }
+                                if (ci < csts.size()) cn1Parts.add(csts.get(ci++));
+                            } else {
+                                lit.append(ch);
+                            }
+                        }
+                        if (lit.length() > 0) cn1Parts.add(lit.toString());
+                        while (ai < cn1Ats.length) { cn1Parts.add(Integer.valueOf(li)); li += cn1Ats[ai++].getSize(); }
+                    }
+                    int cn1N = cn1Parts.size();
+                    if (cn1N >= 2 && cn1N <= 5) {
+                        for (Object p : cn1Parts) {
+                            if (p instanceof String) {
+                                helper.addLdc((String) p);
+                            } else {
+                                helper.addVariableOperation(Opcodes.ALOAD, ((Integer) p).intValue());
+                            }
+                        }
+                        StringBuilder cn1Sig = new StringBuilder("(");
+                        for (int k = 0; k < cn1N; k++) cn1Sig.append("Ljava/lang/String;");
+                        cn1Sig.append(")Ljava/lang/String;");
+                        helper.addInvoke(Opcodes.INVOKESTATIC, "java/lang/String", "cn1Concat" + cn1N, cn1Sig.toString(), false);
+                        helper.addInstruction(Opcodes.ARETURN);
+                        int cn1MaxLocal = 0;
+                        for (Type t : cn1Ats) cn1MaxLocal += t.getSize();
+                        helper.setMaxes(cn1N + 1, cn1MaxLocal + 2);
+                        mtd.addInvoke(Opcodes.INVOKESTATIC, clsName, helperName, desc, false);
+                        return;
+                    }
+                }
+
                 // Pre-size the StringBuilder from the recipe literals + per-argument length
                 // estimates so the common-case concat never grows its char[] (each growth is
                 // a fresh array + arraycopy). Over-estimates are harmless; under-estimates

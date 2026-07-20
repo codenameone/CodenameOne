@@ -911,6 +911,40 @@ public final class RoundRectBorder extends Border {
                     }
                 }
             }
+            // GPU shadow path: when the platform can render a blurred shape shadow directly (no
+            // retained per-component bitmap), fill the rounded rect and cast its blurred drop shadow
+            // in one GPU draw every frame instead of caching an image. Memory-free, GPU-accelerated.
+            if (shadowOpacity > 0 && w > 0 && h > 0 && g.isShapeShadowSupported()) {
+                Style s = c.getStyle();
+                byte bgt = s.getBgTransparency();
+                if (s.getBgImage() == null && (bgt & 0xff) != 0) {
+                    byte type = s.getBackgroundType();
+                    if (type == Style.BACKGROUND_IMAGE_SCALED || type == Style.BACKGROUND_NONE) {
+                        int blurPx = Math.max(2, Math.round(shadowBlur / 2f));
+                        // leave room inside the component bounds for the blur halo + offset
+                        int inset = blurPx + 1;
+                        int shapeW = w - inset * 2;
+                        int shapeH = h - inset * 2;
+                        if (shapeW > 0 && shapeH > 0) {
+                            GeneralPath gp = createShape(shapeW, shapeH);
+                            int dx = Math.round((shadowX - 0.5f) * blurPx);
+                            int dy = Math.max(1, Math.round((shadowY * 0.5f + 0.25f) * blurPx));
+                            g.translate(x + inset, y + inset);
+                            g.fillShapeShadow(gp, s.getBgColor(), bgt & 0xff, shadowColor,
+                                    shadowOpacity / 255f, blurPx, dx, dy);
+                            if (this.stroke != null && strokeOpacity > 0 && strokeThickness > 0) {
+                                int a = g.getAlpha();
+                                g.setAlpha(strokeOpacity);
+                                g.setColor(strokeColor);
+                                g.drawShape(gp, this.stroke);
+                                g.setAlpha(a);
+                            }
+                            g.translate(-(x + inset), -(y + inset));
+                            return;
+                        }
+                    }
+                }
+            }
             if (w > 0 && h > 0) {
                 Image background = (Image) c.getClientProperty(CACHE_KEY + instanceVal);
                 if (!dirty && background != null && background.getWidth() == w && background.getHeight() == h) {

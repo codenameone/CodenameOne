@@ -139,6 +139,27 @@ public final class CommonWorkloads {
         return checksum;
     }
 
+    // A pure value class (all-primitive fields, accessor methods) used strictly non-escaping -- the
+    // exact shape an escape-analysing compiler scalar-replaces so it NEVER allocates. ParparVM's
+    // per-usage escape analysis now does the same: the `new Vec` is proven non-escaping (used only via its trivial
+    // getters) so it becomes registers, not a heap object. HotSpot also elides it, so a ratio ~1
+    // means we match; disable via CN1_DISABLE_SCALAR_REPLACE to see the un-elided (allocating) cost.
+    static final class Vec {
+        private final long x;
+        private final long y;
+        Vec(long x, long y) { this.x = x; this.y = y; }
+        long getX() { return x; }
+        long getY() { return y; }
+    }
+    public static long valueEscape() {
+        long sum = 0;
+        for (int i = 0; i < 8000000; i++) {
+            Vec v = new Vec(i, (long) i * 2);
+            sum = (sum + v.getX() + v.getY()) & 0x3fffffff;
+        }
+        return sum;
+    }
+
     // ---- 7. HashMap put/get churn (implementation differs per platform) ----
     public static long hashMapChurn() {
         HashMap<Integer, Integer> map = new HashMap<Integer, Integer>();

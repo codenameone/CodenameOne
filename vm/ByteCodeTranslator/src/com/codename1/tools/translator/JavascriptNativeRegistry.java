@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.tools.translator;
 
 import java.util.Arrays;
@@ -82,6 +104,10 @@ final class JavascriptNativeRegistry {
             "cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY",
             "cn1_java_lang_String_charAt_int_R_char",
             "cn1_java_lang_String_charsToBytes_char_1ARRAY_char_1ARRAY_R_byte_1ARRAY",
+            "cn1_java_lang_String_cn1FusedConcat2_java_lang_String_java_lang_String_R_java_lang_String",
+            "cn1_java_lang_String_cn1FusedConcat3_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String",
+            "cn1_java_lang_String_cn1FusedConcat4_java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String",
+            "cn1_java_lang_String_cn1FusedConcat5_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String",
             "cn1_java_lang_String_equalsIgnoreCase_java_lang_String_R_boolean",
             "cn1_java_lang_String_equals_java_lang_Object_R_boolean",
             "cn1_java_lang_String_format_java_lang_String_java_lang_Object_1ARRAY_R_java_lang_String",

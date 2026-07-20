@@ -2566,6 +2566,24 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
             });
         }
 
+        @Override
+        public void fillPathShadow(final Path p, final int fillColor, final int fillAlpha,
+                final int shadowColor, final float shadowOpacity, final int blurRadius,
+                final int offsetX, final int offsetY) {
+            final Path path = new Path();
+            path.set(p);
+            pendingRenderingOperations.add(new AsyncOp(clip, clipP, clipIsPath) {
+                @Override
+                public void execute(AndroidGraphics underlying) {
+                    underlying.fillPathShadow(path, fillColor, fillAlpha, shadowColor, shadowOpacity,
+                            blurRadius, offsetX, offsetY);
+                }
+                public String toString() {
+                    return "fillPathShadow";
+                }
+            });
+        }
+
         public void setTransform(final Transform transform) {
             getTransform().setTransform(transform);
             transformDirty = true;
