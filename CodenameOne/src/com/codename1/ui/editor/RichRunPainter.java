@@ -48,10 +48,6 @@ public final class RichRunPainter {
     private int textColor = 0x000000;
     private final Map<Long, Font> fontCache = new HashMap<Long, Font>();
 
-    /// Creates a painter. Call {@link #setBaseFont(Font)} before use.
-    public RichRunPainter() {
-    }
-
     /// Sets the base font from which sized/weighted run fonts are derived. The
     /// base size defaults to the font height.
     ///

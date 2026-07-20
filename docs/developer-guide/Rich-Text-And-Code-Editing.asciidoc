@@ -221,22 +221,7 @@ programmatically from styled runs:
 
 [source,java]
 ----
-RichTextComponent view = new RichTextComponent();
-
-// From Markdown, HTML, or any RichTextFormat:
-view.setMarkdown("# Trip summary\n\n"
-        + "Departs **09:40**, arrives *11:15*. See the [itinerary](app://itinerary) for details.\n\n"
-        + "- Window seat\n"
-        + "- Carry-on only");
-// view.setHtml("<h1>Trip summary</h1><p>Departs <b>09:40</b> ...</p>");
-// view.setContent(source, RichTextFormat.ASCIIDOC);
-
-// Or assembled run by run with editor TextStyle values:
-RichTextComponent built = new RichTextComponent();
-built.append("Status: ", TextStyle.DEFAULT)
-     .append("confirmed", TextStyle.DEFAULT.withBold(true).withForeColor(0x1a7f37));
-
-form.add(view);
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/RichTextAndCodeEditingJavaSnippet.java[tag=rich-text-and-code-editing-java-read-only,indent=0]
 ----
 
 Hyperlinks in the content fire an `ActionListener` whose event source is the link target string, so the
@@ -244,7 +229,7 @@ application decides what a link means:
 
 [source,java]
 ----
-view.addLinkListener(e -> Display.getInstance().execute((String) e.getSource()));
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/RichTextAndCodeEditingJavaSnippet.java[tag=rich-text-and-code-editing-java-links,indent=0]
 ----
 
 Inline images are resolved lazily through an `ImageResolver`, keeping image loading and caching policy
@@ -252,7 +237,7 @@ in the application rather than the component. Return `null` to render a placehol
 
 [source,java]
 ----
-view.setImageResolver(src -> myImageCache.get(src));
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/RichTextAndCodeEditingJavaSnippet.java[tag=rich-text-and-code-editing-java-images,indent=0]
 ----
 
 By default (`SizeMode.SHRINK`) the component is exactly as tall as its wrapped content at the width it

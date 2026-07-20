@@ -2074,8 +2074,9 @@ extern struct clazz class_array3__JAVA_DOUBLE;
 extern JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR data[]);
 extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str);
 extern JAVA_OBJECT newStringFromAsciiLen(CODENAME_ONE_THREAD_STATE, const char *src, int len);
-// Single-allocation fused compact-String builder (see cn1_globals.m). Returns an UNPUBLISHED
-// String + inline byte buffer; fill then cn1PublishFused. NULL => use the 2-object fallback.
+// Single-allocation fused compact-String builder (see cn1_globals.m). Returns a valid empty
+// String + inline byte buffer; fill it, then publish the real length with cn1FusedLatin1End().
+// NULL => use the 2-object fallback.
 extern JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_ARRAY_BYTE** dst);
 // Publish the finished length: the fused String was created empty (count=0, a valid intermediate);
 // set the real count LAST, after every byte is written, so a concurrent GC never sees count>0 over

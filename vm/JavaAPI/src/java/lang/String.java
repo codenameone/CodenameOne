@@ -293,14 +293,24 @@ public final class String implements java.lang.CharSequence, Comparable<String> 
     }
 
     /**
-     * Parent-sharing constructor: the new String shares the parent's backing
-     * {@code value} (either kind) with a new logical window. Used by substring/trim
-     * so slicing never forces a decode or a copy and preserves the compact kind.
+     * Slice constructor. A String may be fused with its backing primitive array,
+     * so a slice must own its backing storage instead of pointing into the
+     * parent's allocation block. Preserve the parent's compact representation
+     * while copying the requested logical window.
      */
     private String(String parent, int newOffset, int newCount) {
-        this.offset = newOffset;
+        Object parentValue = parent.value;
+        if (parentValue instanceof byte[]) {
+            byte[] copy = new byte[newCount];
+            System.arraycopy((byte[]) parentValue, newOffset, copy, 0, newCount);
+            this.value = copy;
+        } else {
+            char[] copy = new char[newCount];
+            System.arraycopy((char[]) parentValue, newOffset, copy, 0, newCount);
+            this.value = copy;
+        }
+        this.offset = 0;
         this.count = newCount;
-        this.value = parent.value;
     }
 
     /**

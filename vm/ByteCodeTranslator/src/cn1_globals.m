@@ -3180,51 +3180,6 @@ static void cn1GcSignalHandler(int sig, siginfo_t* info, void* ucv) {
 }
 #endif // !_WIN32 (signal-stop unavailable; Windows uses the cooperative path)
 
-#if !defined(_WIN32)
-#if defined(__GLIBC__) || defined(__APPLE__)
-#include <execinfo.h>
-#define CN1_HAVE_BACKTRACE 1
-#endif
-// TEMP DIAGNOSTIC (remove before merge): resolve the native fault site for a hard
-// SIGSEGV/SIGABRT. The VM otherwise installs no fatal-signal handler, so a wild-pointer
-// crash dies with 128+signal and no output. backtrace_symbols_fd is async-signal-safe
-// (writes to the fd, no malloc). Restores default disposition and re-raises so the exit
-// code is unchanged. Guarded off musl (no execinfo.h) -- glibc x64/arm64 is enough.
-static void cn1CrashDiagHandler(int sig, siginfo_t* info, void* uc) {
-    char line[192];
-    int n = snprintf(line, sizeof(line),
-            "\nCN1SS:CRASHDIAG signal=%d addr=%p ===\n", sig, info ? info->si_addr : (void*)0);
-    // Write to BOTH stdout (fd 1, captured by the CN1SS harness protocol) and stderr.
-    if(n > 0) { write(1, line, (size_t)n); write(2, line, (size_t)n); }
-#ifdef CN1_HAVE_BACKTRACE
-    void* bt[64];
-    int k = backtrace(bt, 64);
-    backtrace_symbols_fd(bt, k, 1);
-    backtrace_symbols_fd(bt, k, 2);
-#endif
-    // flush any buffered stdio too, best-effort
-    fsync(1);
-    signal(sig, SIG_DFL);
-    raise(sig);
-}
-// TEMP DIAGNOSTIC (remove before merge): install at process load, UNCONDITIONALLY --
-// cn1GcInstallSignalHandler is gated on CN1_CONSERVATIVE_GC_ROOTS + the first GC, which
-// did not fire the marker on the desktop suite build, so use a constructor instead.
-__attribute__((constructor))
-static void cn1InstallCrashDiag(void) {
-    struct sigaction ca;
-    memset(&ca, 0, sizeof(ca));
-    ca.sa_sigaction = cn1CrashDiagHandler;
-    ca.sa_flags = SA_SIGINFO;
-    sigemptyset(&ca.sa_mask);
-    sigaction(SIGSEGV, &ca, 0);
-    sigaction(SIGABRT, &ca, 0);
-    sigaction(SIGBUS, &ca, 0);
-    const char* m = "CN1SS:CRASHDIAG installed(ctor)\n";
-    write(1, m, strlen(m));
-}
-#endif
-
 void cn1GcInstallSignalHandler(void) {
     if(cn1GcSignalHandlerInstalled) return;
     if(cn1GcSignalStopMode < 0) {
@@ -4987,15 +4942,14 @@ JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
 // the caller, so it is one alloc + one copy into a byte[]-backed String. This is
 // the internal ASCII fast path for generators like Long/Integer.toString.
 // Begin a SINGLE-allocation fused compact Latin-1 String: its byte[] lives INLINE in the String's
-// own BiBOP block. Returns the UNPUBLISHED String (parentCls==0) with *dst pointing at the inline
-// byte buffer; the caller fills dst[0..len) with straight-line stores (NO call / safepoint) and then
-// cn1PublishFused(so). Until publish, parentCls==0 keeps a signal-stopped GC scan from tracing the
-// half-built body (same init-before-publish discipline as cn1InlSbToString). Returns NULL when a
-// fused block is unavailable (oversize / BiBOP off) -- caller then does the ordinary 2-object build.
+// own BiBOP block. Returns a valid empty String (count=0) with *dst pointing at the inline byte
+// buffer; the caller fills dst[0..len) and then publishes the real length with
+// cn1FusedLatin1End(). Returns NULL when a fused block is unavailable (oversize / BiBOP off), in
+// which case the caller performs the ordinary 2-object build.
 // This is the "1 alloc instead of byte[]+String" fast path shared by Long/Integer.toString and the
 // String.cn1Concat helpers -- the bulk of a string-building workload's GC garbage.
 JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_ARRAY_BYTE** dst) {
-#if !defined(CN1_DISABLE_BIBOP) && !defined(DEBUG_GC_OBJECTS_IN_HEAP) && defined(CN1_ENABLE_FUSED_STRINGS)
+#if !defined(CN1_DISABLE_BIBOP) && !defined(DEBUG_GC_OBJECTS_IN_HEAP)
     if(__builtin_expect(class__java_lang_String.initialized, 1)) {
         int off = (int)((sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7);
         int total = off + CN1_FUSED_ARR_BYTES(len, sizeof(JAVA_ARRAY_BYTE));

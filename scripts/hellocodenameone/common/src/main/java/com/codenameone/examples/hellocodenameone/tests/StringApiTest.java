@@ -38,12 +38,36 @@ public class StringApiTest extends BaseTest {
                     "replaceFirst literal token failed");
             assertEqual("nochange", "nochange".replaceFirst("zzz", "X"),
                     "replaceFirst with no match should return original");
+
+            // A ParparVM String can be fused with its backing array. A slice must
+            // therefore own its backing storage: sharing the parent's inline array
+            // leaves a dangling pointer after the parent is collected.
+            String latin1Slice = makeSlice("prefix-LATIN1-suffix", 7, 13);
+            String utf16Slice = makeSlice("prefix-\u20acuro-suffix", 7, 11);
+            for (int round = 0; round < 4; round++) {
+                for (int i = 0; i < 5000; i++) {
+                    new StringBuilder(24).append("gc-churn-").append(i).toString();
+                }
+                System.gc();
+                Thread.sleep(10);
+            }
+            assertEqual("LATIN1", latin1Slice, "Latin-1 substring lost its fused parent backing");
+            assertEqual("\u20acuro", utf16Slice, "UTF-16 substring lost its fused parent backing");
+            assertEqual("[LATIN1][\u20acuro]",
+                    new StringBuilder().append('[').append(latin1Slice).append("][")
+                            .append(utf16Slice).append(']').toString(),
+                    "StringBuilder append should consume surviving slices safely");
         } catch (Throwable t) {
             fail("String API test failed: " + t);
             return false;
         }
         done();
         return true;
+    }
+
+    private String makeSlice(String text, int start, int end) {
+        String parent = new StringBuilder(text.length()).append(text).toString();
+        return parent.substring(start, end);
     }
 
     @Override
