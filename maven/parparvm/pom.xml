@@ -168,6 +168,25 @@
                         </configuration>
                     </execution>
                     <execution>
+                        <id>make-proxy-test-resources</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <!-- Downstream builder tests run before the package phase,
+                                     so expose the generated proxy classes as test resources
+                                     without moving the complete bundle assembly earlier. -->
+                                <mkdir dir="${project.build.directory}/bundle"/>
+                                <jar destfile="${project.build.directory}/bundle/javascript-proxy-javax.jar"
+                                     basedir="${project.build.directory}/proxy-classes/javax"/>
+                                <jar destfile="${project.build.directory}/bundle/javascript-proxy-jakarta.jar"
+                                     basedir="${project.build.directory}/proxy-classes/jakarta"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                    <execution>
                         <id>make-bundle</id>
                         <phase>package</phase>
                         <goals>
@@ -182,10 +201,6 @@
                                 <copy tofile="${project.build.directory}/bundle/parparvm-compiler.jar" file="${project.build.directory}/${project.build.finalName}-jar-with-dependencies.jar"/>
                                 <jar destfile="${project.build.directory}/bundle/JavaScriptPort.jar"
                                      basedir="${project.build.directory}/javascript-port-classes"/>
-                                <jar destfile="${project.build.directory}/bundle/javascript-proxy-javax.jar"
-                                     basedir="${project.build.directory}/proxy-classes/javax"/>
-                                <jar destfile="${project.build.directory}/bundle/javascript-proxy-jakarta.jar"
-                                     basedir="${project.build.directory}/proxy-classes/jakarta"/>
                                 <zip destfile="${project.build.directory}/${project.build.finalName}-bundle.jar">
                                     <fileset dir="${project.build.directory}/bundle"/>
                                 </zip>

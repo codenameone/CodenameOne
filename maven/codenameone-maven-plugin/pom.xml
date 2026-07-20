@@ -365,6 +365,21 @@
                         </configuration>
 
                     </execution>
+                    <execution>
+                        <id>add-javascript-proxy-test-resources</id>
+                        <phase>generate-test-resources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <copy file="${maven.multiModuleProjectDirectory}/parparvm/target/bundle/javascript-proxy-javax.jar"
+                                      todir="${project.build.testOutputDirectory}"/>
+                                <copy file="${maven.multiModuleProjectDirectory}/parparvm/target/bundle/javascript-proxy-jakarta.jar"
+                                      todir="${project.build.testOutputDirectory}"/>
+                            </target>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
             <plugin>
