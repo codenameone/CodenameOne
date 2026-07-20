@@ -3180,6 +3180,31 @@ static void cn1GcSignalHandler(int sig, siginfo_t* info, void* ucv) {
 }
 #endif // !_WIN32 (signal-stop unavailable; Windows uses the cooperative path)
 
+#if !defined(_WIN32)
+#if defined(__GLIBC__) || defined(__APPLE__)
+#include <execinfo.h>
+#define CN1_HAVE_BACKTRACE 1
+#endif
+// TEMP DIAGNOSTIC (remove before merge): resolve the native fault site for a hard
+// SIGSEGV/SIGABRT. The VM otherwise installs no fatal-signal handler, so a wild-pointer
+// crash dies with 128+signal and no output. backtrace_symbols_fd is async-signal-safe
+// (writes to the fd, no malloc). Restores default disposition and re-raises so the exit
+// code is unchanged. Guarded off musl (no execinfo.h) -- glibc x64/arm64 is enough.
+static void cn1CrashDiagHandler(int sig, siginfo_t* info, void* uc) {
+    char line[192];
+    int n = snprintf(line, sizeof(line),
+            "\n=== CN1 CRASH DIAG signal=%d addr=%p ===\n", sig, info ? info->si_addr : (void*)0);
+    if(n > 0) { write(2, line, (size_t)n); }
+#ifdef CN1_HAVE_BACKTRACE
+    void* bt[64];
+    int k = backtrace(bt, 64);
+    backtrace_symbols_fd(bt, k, 2);
+#endif
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+#endif
+
 void cn1GcInstallSignalHandler(void) {
     if(cn1GcSignalHandlerInstalled) return;
     if(cn1GcSignalStopMode < 0) {
@@ -3193,6 +3218,16 @@ void cn1GcInstallSignalHandler(void) {
     sa.sa_flags = SA_SIGINFO | SA_RESTART;
     sigemptyset(&sa.sa_mask);
     sigaction(CN1_GC_STOP_SIGNAL, &sa, 0);
+
+    // TEMP DIAGNOSTIC (remove before merge): symbolize a fatal SIGSEGV/SIGABRT.
+    struct sigaction ca;
+    memset(&ca, 0, sizeof(ca));
+    ca.sa_sigaction = cn1CrashDiagHandler;
+    ca.sa_flags = SA_SIGINFO;
+    sigemptyset(&ca.sa_mask);
+    sigaction(SIGSEGV, &ca, 0);
+    sigaction(SIGABRT, &ca, 0);
+    sigaction(SIGBUS, &ca, 0);
 #endif
     cn1GcSignalHandlerInstalled = 1;
 }

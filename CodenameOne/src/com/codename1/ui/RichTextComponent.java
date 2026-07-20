@@ -565,7 +565,7 @@ public class RichTextComponent extends Component {
             Font f = painter.runFont(blockType, st);
             // extend the current piece if the style/font is unchanged, else start a new piece
             Piece last = word.pieces.isEmpty() ? null : word.pieces.get(word.pieces.size() - 1);
-            if (last != null && last.font == f && eq(last.link, link) && last.style.equals(st)) {
+            if (last != null && f.equals(last.font) && eq(last.link, link) && last.style.equals(st)) {
                 last.text += c;
             } else {
                 Piece p = new Piece();
