@@ -210,7 +210,7 @@ block quotes, preformatted blocks, inline images, and tappable hyperlinks — wi
 machinery. It sits between a single-style `SpanLabel` (one style for the whole component) and a full
 `BrowserComponent` (a native web view): a lightweight native component that keeps a distinct style per
 character, measures and paints text directly, and reports an accurate height-for-width preferred size,
-so it embeds cleanly inside ordinary layouts. It is the modern replacement for the deprecated
+so it embeds cleanly inside ordinary layouts. It's the modern replacement for the deprecated
 `HTMLComponent`.
 
 It shares the editor's document model and the `RichRunPainter` styling primitive, so styled text
@@ -232,7 +232,7 @@ application decides what a link means:
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/RichTextAndCodeEditingJavaSnippet.java[tag=rich-text-and-code-editing-java-links,indent=0]
 ----
 
-Inline images are resolved lazily through an `ImageResolver`, keeping image loading and caching policy
+The component resolves inline images through an `ImageResolver`, keeping image loading and caching policy
 in the application rather than the component. Return `null` to render a placeholder:
 
 [source,java]
