@@ -7,7 +7,9 @@ license = "GPL-2.0-only WITH Classpath-exception-2.0"
 
 [lib]
 name = "cn1ble"
-crate-type = ["cdylib"]
+# cdylib is the shipped artifact; rlib lets `cargo test` build a unit-test
+# harness against the crate (it does not change the cdylib output).
+crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]

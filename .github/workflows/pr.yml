@@ -127,6 +127,14 @@ jobs:
             -Dcodename1.platform=javase \
             -Dcn1.binaries="${CN1_BINARIES}" \
             -pl codenameone-maven-plugin -am -Plocal-dev-javase test
+      - name: Install native BLE runtime dependency (libdbus)
+        if: ${{ matrix.java-version == 8 }}
+        # libcn1ble.so (the JavaSE native Bluetooth backend) links libdbus-1
+        # for BlueZ, so it must be present for the native-engine integration
+        # tests to load the library. Also baked into the pr-ci-container image
+        # (.ci/container/Dockerfile); this step covers running against the
+        # previously published container before the rebuild propagates.
+        run: apt-get update -qq && apt-get install -y -qq libdbus-1-3
       - name: Run JavaSE port unit tests
         if: ${{ matrix.java-version == 8 }}
         # Surface regressions in the simulator-side helpers (CSSWatcher

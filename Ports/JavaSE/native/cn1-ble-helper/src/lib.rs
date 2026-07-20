@@ -206,6 +206,258 @@ async fn lookup_peripheral(state: &SharedState, address: &str) -> Option<Periphe
     state.lock().await.peripherals.get(address).cloned()
 }
 
+// ---------------- scripted test responder ----------------
+//
+// A deterministic, radio-free responder used by the JavaSE port's Bluetooth
+// integration test and by anyone who wants to exercise the whole native path
+// (JNI/C ABI → event channel → JSON → Java backend) with no BLE hardware.
+//
+// Enable it *before* cn1ble_start() via `cn1ble_test_enable` (C ABI) or
+// `JniBleBridge.enableTestMode` (JNI). When set, the engine never touches
+// btleplug/BlueZ/CoreBluetooth: `engine_start` emits the normal
+// `capabilities` event followed by `stateChanged=poweredOn`, and every
+// command is answered synchronously by `handle_test_command` with the exact
+// event JSON below (one terminal event per command echoing its requestId;
+// unsolicited scanResult/notification carry no requestId). All values match
+// PROTOCOL.md.
+
+/// The single fixed virtual peripheral the responder models.
+const TEST_ADDRESS: &str = "aa:bb:cc:dd:ee:01";
+const TEST_NAME: &str = "CN1 Test HRM";
+const TEST_SERVICE_HRM: &str = "0000180d-0000-1000-8000-00805f9b34fb";
+
+/// The fixed GATT database reported by `discover` in test mode.
+fn test_discovered_services() -> Value {
+    json!([
+        {
+            "uuid": TEST_SERVICE_HRM,
+            "primary": true,
+            "characteristics": [
+                {
+                    "uuid": "00002a37-0000-1000-8000-00805f9b34fb",
+                    "properties": ["read", "notify"],
+                    "descriptors": [
+                        {"uuid": "00002902-0000-1000-8000-00805f9b34fb"}
+                    ]
+                },
+                {
+                    "uuid": "00002a39-0000-1000-8000-00805f9b34fb",
+                    "properties": ["write"],
+                    "descriptors": []
+                }
+            ]
+        }
+    ])
+}
+
+/// Answers a single command in test mode by pushing the scripted event(s)
+/// onto the same channel `poll_event` drains. Runs synchronously on the
+/// caller's thread — every emit is a non-blocking channel send.
+fn handle_test_command(sink: &EventSink, cmd: Value) {
+    let name = cmd.get("cmd").and_then(|v| v.as_str()).unwrap_or("");
+    let id = cmd.get("id").and_then(|v| v.as_u64());
+    let addr = cmd
+        .get("address")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let svc = cmd
+        .get("service")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let chr = cmd
+        .get("characteristic")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let desc = cmd
+        .get("descriptor")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    match name {
+        "scanStart" => {
+            if let Some(id) = id {
+                emit_terminal(sink, "scanStarted", id, json!({}));
+            }
+            emit_event(
+                sink,
+                "scanResult",
+                json!({
+                    "address": TEST_ADDRESS,
+                    "name": TEST_NAME,
+                    "rssi": -55,
+                    "serviceUuids": [TEST_SERVICE_HRM],
+                    "manufacturerData": {"76": B64.encode([1u8, 2, 3])},
+                }),
+            );
+        }
+        "scanStop" => {
+            if let Some(id) = id {
+                emit_terminal(sink, "scanStopped", id, json!({}));
+            }
+        }
+        "connect" => {
+            if let Some(id) = id {
+                emit_terminal(
+                    sink,
+                    "connected",
+                    id,
+                    json!({"address": addr, "name": TEST_NAME}),
+                );
+            }
+        }
+        "disconnect" => {
+            if let Some(id) = id {
+                emit_terminal(
+                    sink,
+                    "disconnected",
+                    id,
+                    json!({"address": addr, "reason": ""}),
+                );
+            }
+        }
+        "discover" => {
+            if let Some(id) = id {
+                emit_terminal(
+                    sink,
+                    "discovered",
+                    id,
+                    json!({
+                        "address": addr,
+                        "name": TEST_NAME,
+                        "services": test_discovered_services(),
+                    }),
+                );
+            }
+        }
+        "read" => {
+            if let Some(id) = id {
+                emit_terminal(
+                    sink,
+                    "readResult",
+                    id,
+                    json!({
+                        "address": addr,
+                        "service": svc,
+                        "characteristic": chr,
+                        "value": B64.encode([6u8, 72]),
+                    }),
+                );
+            }
+        }
+        "write" => {
+            if let Some(id) = id {
+                emit_terminal(
+                    sink,
+                    "writeResult",
+                    id,
+                    json!({
+                        "address": addr,
+                        "service": svc,
+                        "characteristic": chr,
+                    }),
+                );
+            }
+        }
+        "subscribe" => {
+            if let Some(id) = id {
+                emit_terminal(
+                    sink,
+                    "subscribed",
+                    id,
+                    json!({
+                        "address": addr,
+                        "service": svc,
+                        "characteristic": chr,
+                    }),
+                );
+            }
+            // enable != 0 (a "subscribe" command): follow with one notification.
+            emit_event(
+                sink,
+                "notification",
+                json!({
+                    "address": addr,
+                    "service": svc,
+                    "characteristic": chr,
+                    "value": B64.encode([6u8, 80]),
+                }),
+            );
+        }
+        "unsubscribe" => {
+            if let Some(id) = id {
+                emit_terminal(
+                    sink,
+                    "unsubscribed",
+                    id,
+                    json!({
+                        "address": addr,
+                        "service": svc,
+                        "characteristic": chr,
+                    }),
+                );
+            }
+        }
+        "readDescriptor" => {
+            if let Some(id) = id {
+                emit_terminal(
+                    sink,
+                    "descriptorReadResult",
+                    id,
+                    json!({
+                        "address": addr,
+                        "service": svc,
+                        "characteristic": chr,
+                        "descriptor": desc,
+                        "value": "",
+                    }),
+                );
+            }
+        }
+        "writeDescriptor" => {
+            if let Some(id) = id {
+                emit_terminal(
+                    sink,
+                    "descriptorWriteResult",
+                    id,
+                    json!({
+                        "address": addr,
+                        "service": svc,
+                        "characteristic": chr,
+                        "descriptor": desc,
+                    }),
+                );
+            }
+        }
+        "readRssi" => {
+            if let Some(id) = id {
+                emit_terminal(
+                    sink,
+                    "rssiResult",
+                    id,
+                    json!({"address": addr, "rssi": -55, "source": "lastSeen"}),
+                );
+            }
+        }
+        // teardown is handled by engine_close (cn1ble_close / JniBleBridge.close);
+        // a "shutdown" command is a no-op here, matching the real dispatcher.
+        "shutdown" => {}
+        other => {
+            emit_error(
+                sink,
+                id,
+                other,
+                None,
+                "badRequest",
+                &format!("unknown command '{}'", other),
+            );
+        }
+    }
+}
+
 // ---------------- command dispatch ----------------
 
 async fn handle_command(state: SharedState, sink: EventSink, cmd: Value) {
@@ -972,6 +1224,9 @@ struct BleEngine {
     /// capabilities + stateChanged=unsupported events, then idles).
     state: Option<SharedState>,
     sink: EventSink,
+    /// When true this engine is the scripted test responder: commands are
+    /// answered by `handle_test_command`, never btleplug.
+    test_mode: bool,
 }
 
 fn engine_slot() -> &'static StdMutex<Option<BleEngine>> {
@@ -988,6 +1243,15 @@ fn rx_slot() -> &'static StdMutex<Option<Receiver<String>>> {
 }
 
 static ALIVE: AtomicBool = AtomicBool::new(false);
+
+/// Set by `cn1ble_test_enable` / `JniBleBridge.enableTestMode` before
+/// `engine_start`; routes the engine to the scripted responder with no radio.
+static TEST_MODE: AtomicBool = AtomicBool::new(false);
+
+/// Turn on the scripted test responder. Must be called before `engine_start`.
+fn engine_enable_test_mode() {
+    TEST_MODE.store(true, Ordering::SeqCst);
+}
 
 enum Poll {
     Event(String),
@@ -1029,16 +1293,47 @@ fn engine_start() -> bool {
     // capabilities is always the first event on the channel.
     emit_capabilities(&sink);
 
+    // Scripted test responder: never touch btleplug/BlueZ/CoreBluetooth. Emit
+    // the ready state and hand back an adapter-less engine whose commands are
+    // routed to `handle_test_command`.
+    if TEST_MODE.load(Ordering::SeqCst) {
+        emit_event(&sink, "stateChanged", json!({"state": "poweredOn"}));
+        let handle = runtime.handle().clone();
+        *guard = Some(BleEngine {
+            _runtime: runtime,
+            handle,
+            state: None,
+            sink,
+            test_mode: true,
+        });
+        ALIVE.store(true, Ordering::SeqCst);
+        return true;
+    }
+
     // Acquire the first adapter, mirroring the old subprocess startup. Any
     // "can't get a working adapter" branch reports stateChanged=unsupported
     // and idles instead of failing hard (CI runners have no BT hardware).
+    //
+    // Wrapped in a timeout: on Linux the btleplug BlueZ backend connects to
+    // the D-Bus session bus and enumerates adapters, which can block when
+    // there is no adapter, no BlueZ, or no D-Bus session (exactly a CI
+    // runner). A bounded wait guarantees start() always emits its two startup
+    // events promptly and never wedges the caller; on timeout we fall through
+    // to the same stateChanged=unsupported branch as "no adapter".
     let adapter_result: Result<Adapter, String> = runtime.block_on(async {
-        let manager = Manager::new().await.map_err(|e| e.to_string())?;
-        let adapters = manager.adapters().await.map_err(|e| e.to_string())?;
-        adapters
-            .into_iter()
-            .next()
-            .ok_or_else(|| "no adapters returned by btleplug".to_string())
+        match tokio::time::timeout(Duration::from_secs(2), async {
+            let manager = Manager::new().await.map_err(|e| e.to_string())?;
+            let adapters = manager.adapters().await.map_err(|e| e.to_string())?;
+            adapters
+                .into_iter()
+                .next()
+                .ok_or_else(|| "no adapters returned by btleplug".to_string())
+        })
+        .await
+        {
+            Ok(r) => r,
+            Err(_) => Err("timed out acquiring a BLE adapter".to_string()),
+        }
     });
 
     let has_adapter = match adapter_result {
@@ -1059,6 +1354,7 @@ fn engine_start() -> bool {
                 handle,
                 state: Some(state),
                 sink,
+                test_mode: false,
             });
             true
         }
@@ -1076,6 +1372,7 @@ fn engine_start() -> bool {
                 handle,
                 state: None,
                 sink,
+                test_mode: false,
             });
             false
         }
@@ -1126,7 +1423,11 @@ fn dispatch(cmd: Value) {
         Err(_) => return,
     };
     if let Some(engine) = guard.as_ref() {
-        if let Some(state) = &engine.state {
+        if engine.test_mode {
+            // Scripted responder: answer synchronously on this thread (each
+            // emit is a non-blocking channel send; no re-entry into the lock).
+            handle_test_command(&engine.sink, cmd);
+        } else if let Some(state) = &engine.state {
             let state = state.clone();
             let sink = engine.sink.clone();
             engine.handle.spawn(handle_command(state, sink, cmd));
@@ -1259,6 +1560,14 @@ fn into_c_string(s: String) -> *mut c_char {
         // Interior NUL should never happen for our JSON; fall back to "".
         Err(_) => CString::new("").unwrap().into_raw(),
     }
+}
+
+/// Enable the deterministic scripted test responder. Must be called before
+/// `cn1ble_start`; afterwards the engine answers commands from a fixed
+/// virtual peripheral with no radio access. See `handle_test_command`.
+#[no_mangle]
+pub extern "C" fn cn1ble_test_enable() {
+    let _ = catch_unwind(engine_enable_test_mode);
 }
 
 #[no_mangle]
@@ -1472,6 +1781,14 @@ fn jbool(b: bool) -> jboolean {
     } else {
         JNI_FALSE
     }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_codename1_impl_javase_bluetooth_JniBleBridge_enableTestMode(
+    _env: JNIEnv,
+    _class: JClass,
+) {
+    let _ = catch_unwind(engine_enable_test_mode);
 }
 
 #[no_mangle]
@@ -1708,4 +2025,169 @@ pub extern "system" fn Java_com_codename1_impl_javase_bluetooth_JniBleBridge_clo
     _class: JClass,
 ) {
     let _ = catch_unwind(AssertUnwindSafe(engine_close));
+}
+
+// ======================================================================
+//  Unit tests — pure, hardware-independent logic only (no radio, no globals):
+//  base64 vectors, UUID normalization, and the scripted responder's terminal
+//  event for each command id.
+// ======================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::mpsc::channel;
+
+    #[test]
+    fn base64_vectors() {
+        assert_eq!(B64.encode([1u8, 2, 3]), "AQID");
+        assert_eq!(B64.encode([6u8, 72]), "Bkg=");
+        assert_eq!(B64.encode([6u8, 80]), "BlA=");
+    }
+
+    #[test]
+    fn uuid_normalization() {
+        let dashed = "0000180d-0000-1000-8000-00805f9b34fb";
+        // Bare 16-bit assigned number expands via the Bluetooth base UUID.
+        assert_eq!(parse_uuid("180d").map(|u| fmt_uuid(&u)).unwrap(), dashed);
+        // Upper-case dashed form normalizes to lower-case.
+        assert_eq!(
+            parse_uuid("0000180D-0000-1000-8000-00805F9B34FB")
+                .map(|u| fmt_uuid(&u))
+                .unwrap(),
+            dashed
+        );
+        assert_eq!(
+            parse_uuid("2a37").map(|u| fmt_uuid(&u)).unwrap(),
+            "00002a37-0000-1000-8000-00805f9b34fb"
+        );
+        // Garbage yields nothing rather than panicking.
+        assert!(parse_uuid("not-a-uuid-!!").is_none());
+    }
+
+    fn drain(rx: &Receiver<String>) -> Vec<Value> {
+        let mut out = Vec::new();
+        while let Ok(s) = rx.try_recv() {
+            out.push(serde_json::from_str::<Value>(&s).expect("valid event JSON"));
+        }
+        out
+    }
+
+    fn name_of(v: &Value) -> &str {
+        v.get("event").and_then(|x| x.as_str()).unwrap_or("")
+    }
+
+    #[test]
+    fn responder_scan_start_emits_scan_result() {
+        let (tx, rx) = channel::<String>();
+        handle_test_command(&tx, json!({"cmd": "scanStart", "id": 1, "services": []}));
+        let evs = drain(&rx);
+        assert_eq!(name_of(&evs[0]), "scanStarted");
+        assert_eq!(evs[0]["requestId"], 1);
+        assert_eq!(name_of(&evs[1]), "scanResult");
+        assert!(evs[1].get("requestId").is_none(), "scanResult is unsolicited");
+        assert_eq!(evs[1]["address"], TEST_ADDRESS);
+        assert_eq!(evs[1]["name"], TEST_NAME);
+        assert_eq!(evs[1]["rssi"], -55);
+        assert_eq!(evs[1]["manufacturerData"]["76"], "AQID");
+    }
+
+    #[test]
+    fn responder_terminal_event_per_command() {
+        let cases: &[(Value, &str)] = &[
+            (json!({"cmd": "scanStop", "id": 2}), "scanStopped"),
+            (
+                json!({"cmd": "connect", "id": 3, "address": TEST_ADDRESS}),
+                "connected",
+            ),
+            (
+                json!({"cmd": "discover", "id": 5, "address": TEST_ADDRESS}),
+                "discovered",
+            ),
+            (
+                json!({"cmd": "unsubscribe", "id": 9, "address": TEST_ADDRESS,
+                       "service": TEST_SERVICE_HRM, "characteristic": "00002a37-0000-1000-8000-00805f9b34fb"}),
+                "unsubscribed",
+            ),
+            (
+                json!({"cmd": "readRssi", "id": 12, "address": TEST_ADDRESS}),
+                "rssiResult",
+            ),
+            (
+                json!({"cmd": "disconnect", "id": 4, "address": TEST_ADDRESS}),
+                "disconnected",
+            ),
+        ];
+        for (cmd, expected) in cases {
+            let (tx, rx) = channel::<String>();
+            let id = cmd["id"].as_u64().unwrap();
+            handle_test_command(&tx, cmd.clone());
+            let evs = drain(&rx);
+            assert_eq!(evs.len(), 1, "one terminal event for {}", expected);
+            assert_eq!(name_of(&evs[0]), *expected);
+            assert_eq!(evs[0]["requestId"], id);
+        }
+    }
+
+    #[test]
+    fn responder_read_returns_fixed_value() {
+        let (tx, rx) = channel::<String>();
+        handle_test_command(
+            &tx,
+            json!({"cmd": "read", "id": 6, "address": TEST_ADDRESS,
+                   "service": TEST_SERVICE_HRM,
+                   "characteristic": "00002a37-0000-1000-8000-00805f9b34fb"}),
+        );
+        let evs = drain(&rx);
+        assert_eq!(name_of(&evs[0]), "readResult");
+        assert_eq!(evs[0]["requestId"], 6);
+        assert_eq!(evs[0]["value"], "Bkg=");
+    }
+
+    #[test]
+    fn responder_subscribe_follows_with_notification() {
+        let (tx, rx) = channel::<String>();
+        handle_test_command(
+            &tx,
+            json!({"cmd": "subscribe", "id": 8, "address": TEST_ADDRESS,
+                   "service": TEST_SERVICE_HRM,
+                   "characteristic": "00002a37-0000-1000-8000-00805f9b34fb"}),
+        );
+        let evs = drain(&rx);
+        assert_eq!(name_of(&evs[0]), "subscribed");
+        assert_eq!(evs[0]["requestId"], 8);
+        assert_eq!(name_of(&evs[1]), "notification");
+        assert!(
+            evs[1].get("requestId").is_none(),
+            "notification is unsolicited"
+        );
+        assert_eq!(evs[1]["value"], "BlA=");
+    }
+
+    #[test]
+    fn responder_descriptor_ops() {
+        let (tx, rx) = channel::<String>();
+        handle_test_command(
+            &tx,
+            json!({"cmd": "readDescriptor", "id": 10, "address": TEST_ADDRESS,
+                   "service": TEST_SERVICE_HRM,
+                   "characteristic": "00002a37-0000-1000-8000-00805f9b34fb",
+                   "descriptor": "00002902-0000-1000-8000-00805f9b34fb"}),
+        );
+        let evs = drain(&rx);
+        assert_eq!(name_of(&evs[0]), "descriptorReadResult");
+        assert_eq!(evs[0]["value"], "");
+
+        let (tx, rx) = channel::<String>();
+        handle_test_command(
+            &tx,
+            json!({"cmd": "writeDescriptor", "id": 11, "address": TEST_ADDRESS,
+                   "service": TEST_SERVICE_HRM,
+                   "characteristic": "00002a37-0000-1000-8000-00805f9b34fb",
+                   "descriptor": "00002902-0000-1000-8000-00805f9b34fb"}),
+        );
+        let evs = drain(&rx);
+        assert_eq!(name_of(&evs[0]), "descriptorWriteResult");
+        assert_eq!(evs[0]["requestId"], 11);
+    }
 }

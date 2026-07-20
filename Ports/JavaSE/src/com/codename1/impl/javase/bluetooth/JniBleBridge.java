@@ -49,6 +49,18 @@ final class JniBleBridge implements NativeBleBridge {
         return BleLibraryResolver.describeResolution();
     }
 
+    /**
+     * Test-only: switches the loaded engine into a deterministic scripted
+     * responder that services one virtual peripheral entirely in-library --
+     * no real radio, no BlueZ/D-Bus, no CoreBluetooth. It lets an integration
+     * test drive the WHOLE native stack (JNI marshalling, the engine's event
+     * channel, the JSON event shapes) through scan / connect / discover /
+     * read / write / subscribe / notify deterministically on any host. Must
+     * be called before {@link #start()}. Inert in production -- nothing in the
+     * shipped framework calls it.
+     */
+    static native void enableTestMode();
+
     @Override
     public native boolean start();
 
