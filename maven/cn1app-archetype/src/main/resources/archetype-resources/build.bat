@@ -34,6 +34,10 @@ goto :EOF
 
 goto :EOF
 :javascript
+!MVNW! package -DskipTests -Dcodename1.platform^=javascript -Dcodename1.buildTarget^=local-javascript -U -e
+
+goto :EOF
+:javascript_cloud
 !MVNW! package -DskipTests -Dcodename1.platform^=javascript -Dcodename1.buildTarget^=javascript -U -e
 
 goto :EOF
@@ -82,6 +86,8 @@ echo     *Requires either GRADLE_HOME environment variable^, or for gradle to be
 echo   ios_source
 echo     Generates an Xcode Project that you can open and build using Apple^'s development tools
 echo     *Requires a Mac with Xcode installed
+echo   javascript
+echo     Builds the web app locally.
 echo 
 echo Build Server Commands:
 echo   The following commands will build the app using the Codename One build server^, and require
@@ -105,9 +111,8 @@ echo   windows_device
 echo     Builds a native Windows app ^(no JVM^).
 echo   linux_device
 echo     Builds a native Linux app ^(ELF^, no JVM^).
-echo   javascript
-echo     Builds as a web app.
-echo     *JavaScript builds are available to all users.
+echo   javascript_cloud
+echo     Builds the web app using the build server.
 
 goto :EOF
 :settings

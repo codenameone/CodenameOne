@@ -25,6 +25,23 @@ class Cn1AppArchetypeCertificateWizardTest {
         assertContains("README.adoc", "mvn cn1:certificatewizard");
     }
 
+    @Test
+    void localJavaScriptBindingsAreIncludedInPackagedProjectTemplates() throws Exception {
+        assertContains("javascript/pom.xml", "<codename1.defaultBuildTarget>local-javascript</codename1.defaultBuildTarget>");
+        assertContains("mvnconfig.toml", "[javascript_local]");
+        assertContains("mvnconfig.toml", "-Dcodename1.buildTarget=local-javascript");
+        assertContains("build.sh", "function javascript_cloud");
+        assertContains("build.sh", "-Dcodename1.buildTarget=local-javascript");
+        assertContains("build.bat", ":javascript_cloud");
+        assertContains("build.bat", "-Dcodename1.buildTarget^=local-javascript");
+        assertContains("tools/netbeans/nb-configuration.xml", "<configuration id=\"Local JavaScript App\"");
+        assertContains("tools/netbeans/nb-configuration.xml", "<property name=\"codename1.buildTarget\">local-javascript</property>");
+        assertContains("tools/eclipse/__mainName__ - Build Javascript Locally.launch", "codename1.buildTarget=local-javascript");
+        assertContains(".idea/runConfigurations/CN1_JavaScript_Local_Build.xml", "value=\"local-javascript\"");
+        assertContains(".vscode/settings.json", "Local > JavaScript Build");
+        assertContains(".vscode/settings.json", "-Dcodename1.buildTarget=local-javascript");
+    }
+
     private static void assertContains(String path, String expected) throws Exception {
         String content = archetypeResource("archetype-resources/" + path);
         assertTrue(content.contains(expected), path + " should contain " + expected);

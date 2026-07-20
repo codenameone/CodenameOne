@@ -25,8 +25,13 @@ group="Cloud"
 
 [javascript]
 command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=javascript", "-Dcodename1.buildTarget=javascript", "-U", "-e"]
-label="Javascript Build"
+label="JavaScript Build"
 group="Cloud"
+
+[javascript_local]
+command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=javascript", "-Dcodename1.buildTarget=local-javascript", "-U", "-e"]
+label="JavaScript Build"
+group="Local"
 
 [mac_desktop]
 command=["$MVNW", "package", "-DskipTests", "-Dcodename1.platform=javase", "-Dcodename1.buildTarget=mac-os-x-desktop", "-U", "-e"]

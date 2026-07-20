@@ -30,6 +30,10 @@ function javascript {
   
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javascript" "-Dcodename1.buildTarget=local-javascript" "-U" "-e"
 }
+function javascript_cloud {
+
+  "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=javascript" "-Dcodename1.buildTarget=javascript" "-U" "-e"
+}
 function android {
   
   "$MVNW" "package" "-DskipTests" "-Dcodename1.platform=android" "-Dcodename1.buildTarget=android-device" "-U" "-e"
@@ -72,6 +76,8 @@ function help {
   "echo" "-e" "  ios_source"
   "echo" "-e" "    Generates an Xcode Project that you can open and build using Apple's development tools"
   "echo" "-e" "    *Requires a Mac with Xcode installed"
+  "echo" "-e" "  javascript"
+  "echo" "-e" "    Builds the web app locally."
   "echo" "-e" ""
   "echo" "-e" "Build Server Commands:"
   "echo" "-e" "  The following commands will build the app using the Codename One build server, and require"
@@ -95,9 +101,8 @@ function help {
   "echo" "-e" "    Builds UWP Windows app."
   "echo" "-e" "  linux_device"
   "echo" "-e" "    Builds a native Linux app (ELF, no JVM)."
-  "echo" "-e" "  javascript"
-  "echo" "-e" "    Builds as a web app."
-  "echo" "-e" "    *JavaScript builds are available to all users."
+  "echo" "-e" "  javascript_cloud"
+  "echo" "-e" "    Builds the web app using the build server."
 }
 function settings {
   

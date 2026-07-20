@@ -21,61 +21,14 @@ Cloud builds retain the original TeaVM port as a public fallback. Select the com
 
 For example, add `javascript.port=teavm` to `codenameone_settings.properties` to diagnose a ParparVM-specific regression. An unknown value fails the build instead of selecting a different compiler.
 
-[id="limitations", reftext="Limitations of the JavaScript Port"]
-=== Limitations of the JavaScript port
-
-[id="static_initializers",reftext="Static Initializers"]
-==== No multithreaded code inside static initializers
-
-NOTE: This section pertains to Codename One 3.6 and older. Newer versions of Codename One support multithreaded code inside static initializers now.
-
-This historical limitation applies to the legacy TeaVM builder selected with `javascript.port=teavm`. TeaVM compiles the application directly to JavaScript so that it can run inside modern web browsers without plugins. Older TeaVM-based Codename One releases couldn't use threading primitives inside static initializers. The workaround for those releases is lazy initialization.
-
-**Example**
-
-The following code will result in a build error when deploying a JavaScript build:
-
-Class1.java
-
-[source,java]
-----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptJava001Snippet.java[tag=working-with-javascript-java-001,indent=0]
-----
-
-Class2.java
-
-
-This fails because `Class2` calls Class1.getValue() in its static initializer, and `getValue()` calls `Log.p()`, which, underneath the covers, writes to Storage - which involves some synchronous network access in the JavaScript port (that is, it uses `wait()` and `notify()` under the hood.
-
-If you remove the call to `Log.p()` from `getValue()`, as follows:
-
-[source,java]
-----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptJava003Snippet.java[tag=working-with-javascript-java-003,indent=0]
-----
-
-Then everything would be fine.
-
-**But How do you Know if A method includes `wait()`/`notify` somewhere along the line?**
-
-When you try to build your app as a JavaScript app, it will fail (if code in your static initializers uses `wait()`/`notify()` somewhere along the line).
-
-**How to Work Around this Issue**
-
-Use lazy initialization wherever you can. You don't need to worry about this for setting static variables to literal values. E.g.: `static int someVal = 20;` will always be fine. But `static int someVal = OtherClass.calculateSomeVal();` may or may not be fine, because you don't know whether `calculateSomeVal()` uses a `wait/notify`. Instead of initializing `someVal` in the static initializer, create a static accessor that initializes it. Or initialize it inside your app's `init()` method. Or initialize it inside the class constructor.
-
 [id="troubleshooting", reftext="Troubleshooting Build Errors"]
 === Troubleshooting build errors
 
-If your JavaScript build fails, download the error log and inspect the first compiler error. The following errors apply specifically to the fallback TeaVM builder:
+If your JavaScript build fails, download the error log and inspect the first compiler error. The following error applies specifically to the fallback TeaVM builder:
 
 // vale-skip: proselint.Annotations: 'XXX' is a placeholder for the actual method name inside a verbatim quote of a TeaVM error log message.
-1. "[ERROR] Method XXX.<clinit>()V is claimed to be synchronous, but it's has invocations of asynchronous methods"
-+
-This error will occur if you've static initializers that use multithreaded code (for example, wait/tell/sleep, etc.). See <<static_initializers>> for information about troubleshooting this error. Sometimes TeaVM may give a false-positive here (that is, it *thinks* you're doing some multithreaded stuff, but you're not), then you can force the build to "succeed" by adding the `javascript.stopOnErrors=false` build hint.
-// vale-skip: proselint.Annotations: 'XXX' is a placeholder for the actual method name inside a verbatim quote of a TeaVM error log message.
-2. "Method XXX wasn't found"
-+
+"Method XXX wasn't found"
+
 TeaVM uses its own Java runtime library. It's complete, but you may occasionally run into methods that haven't been implemented. If you run into errors saying that certain classes or methods weren't found, please post them to the https://github.com/codenameone/CodenameOne/issues[Codename One issue tracker]. You can also work around these by changing your own code to not use such functions. If this missing method doesn't fall on a critical path on your app, you can also force the app to still build despite this error by adding the `javascript.stopOnErrors=false` build hint.
 
 [id="zip_war_preview", reftext="Deployment Formats"]
@@ -566,22 +519,7 @@ For example: `MacIntel`, `Win32`, `FreeBSD i386`, "WebTV OS"
 [id="native_theme", reftext="Changing the Native Theme"]
 === Changing the native theme
 
-Since a web application could be run on any platform, bundling all possible themes into the application isn't feasible (at least it wouldn't be efficient for most use cases). By default you've bundled the iOS7 theme for JavaScript applications. This means that the app will look like iOS7 on all devices: desktop, iOS, Android, WinPhone, etc.
-
-You can override this behavior dynamically by setting the `javascript.native.theme` https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] property to a theme that you've included in your app. All the native themes are available on GitHub, so you can copy these into your application. The best place to add the theme is in your `native/javascript` directory, which excludes them from other platforms.
-
-==== Example: Using Android theme on Android
-
-NOTE: As of Codename One 6.0, apps will automatically use the Android theme when run on an Android device, so this example isn't necessary. However the technique of changing the native theme at runtime is still applicable.
-
-First, download https://github.com/codenameone/CodenameOne/raw/master/Ports/Android/src/androidTheme.res[`androidTheme.res`] from the Android port on GitHub, and copy it into your app's `native/javascript` directory.
-
-Then in your app's `init()` method, add the following:
-
-[source,java]
-----
-include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/WorkingWithJavascriptJava005Snippet.java[tag=working-with-javascript-java-005,indent=0]
-----
+The JavaScript port selects a bundled native theme from the detected browser platform. You can override this behavior by setting the `javascript.native.theme` https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] property to the path of a theme included with your app. Place additional JavaScript-only themes in the `native/javascript` directory so they aren't bundled into other platforms.
 
 === Disabling the 'OnBeforeUnload' handler
 

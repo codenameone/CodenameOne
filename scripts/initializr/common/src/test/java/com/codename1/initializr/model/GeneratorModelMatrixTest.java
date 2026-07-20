@@ -349,12 +349,32 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(readme, "mvn cn1:certificatewizard",
                 "Generated README should document the Certificate Wizard");
 
+        String buildSh = getText(entries, "build.sh");
+        assertContains(buildSh, "-Dcodename1.buildTarget=local-javascript",
+                "Generated shell build launcher should build JavaScript locally");
+        assertContains(buildSh, "function javascript_cloud",
+                "Generated shell build launcher should retain the cloud JavaScript target");
+
+        String buildBat = getText(entries, "build.bat");
+        assertContains(buildBat, "-Dcodename1.buildTarget^=local-javascript",
+                "Generated Windows build launcher should build JavaScript locally");
+        assertContains(buildBat, ":javascript_cloud",
+                "Generated Windows build launcher should retain the cloud JavaScript target");
+
+        String javascriptPom = getText(entries, "javascript/pom.xml");
+        assertContains(javascriptPom, "<codename1.defaultBuildTarget>local-javascript</codename1.defaultBuildTarget>",
+                "Generated JavaScript module should default to a local build");
+
         if (ide == IDE.INTELLIJ) {
             String workspaceXml = getText(entries, ".idea/workspace.xml");
             assertContains(workspaceXml, "<configuration name=\"Certificate Wizard\"",
                     "IntelliJ workspace should include Certificate Wizard run configuration");
             assertContains(workspaceXml, "<option value=\"cn1:certificatewizard\"",
                     "IntelliJ Certificate Wizard run configuration should launch cn1:certificatewizard");
+            assertContains(workspaceXml, "<configuration name=\"JavaScript Local Build\"",
+                    "IntelliJ workspace should include a local JavaScript build configuration");
+            assertContains(workspaceXml, "value=\"local-javascript\"",
+                    "IntelliJ local JavaScript configuration should use the local builder");
             return;
         }
         if (ide == IDE.ECLIPSE) {
@@ -362,6 +382,9 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             String launchXml = getText(entries, mainClassName + " - Certificate Wizard.launch");
             assertContains(launchXml, "cn1:certificatewizard",
                     "Eclipse launch files should include Certificate Wizard");
+            String localJavaScriptLaunch = getText(entries, mainClassName + " - Build Javascript Locally.launch");
+            assertContains(localJavaScriptLaunch, "codename1.buildTarget=local-javascript",
+                    "Eclipse launch files should include a local JavaScript build");
             return;
         }
         if (ide == IDE.NETBEANS) {
@@ -370,6 +393,11 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                     "NetBeans actions should include Certificate Wizard");
             assertContains(nbActions, "<goal>cn1:certificatewizard</goal>",
                     "NetBeans Certificate Wizard action should launch cn1:certificatewizard");
+            String nbConfiguration = getText(entries, "nb-configuration.xml");
+            assertContains(nbConfiguration, "<configuration id=\"Local JavaScript App\"",
+                    "NetBeans configurations should include a local JavaScript build");
+            assertContains(nbConfiguration, "<property name=\"codename1.buildTarget\">local-javascript</property>",
+                    "NetBeans local JavaScript configuration should use the local builder");
             return;
         }
         if (ide == IDE.VS_CODE) {
@@ -378,6 +406,10 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                     "VS Code Maven favorites should include Certificate Wizard");
             assertContains(settingsJson, "cn1:certificatewizard",
                     "VS Code Certificate Wizard favorite should launch cn1:certificatewizard");
+            assertContains(settingsJson, "Local > JavaScript Build",
+                    "VS Code Maven favorites should include a local JavaScript build");
+            assertContains(settingsJson, "-Dcodename1.buildTarget=local-javascript",
+                    "VS Code local JavaScript favorite should use the local builder");
         }
     }
 
