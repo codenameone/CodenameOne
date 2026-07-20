@@ -3207,6 +3207,22 @@ static void cn1CrashDiagHandler(int sig, siginfo_t* info, void* uc) {
     signal(sig, SIG_DFL);
     raise(sig);
 }
+// TEMP DIAGNOSTIC (remove before merge): install at process load, UNCONDITIONALLY --
+// cn1GcInstallSignalHandler is gated on CN1_CONSERVATIVE_GC_ROOTS + the first GC, which
+// did not fire the marker on the desktop suite build, so use a constructor instead.
+__attribute__((constructor))
+static void cn1InstallCrashDiag(void) {
+    struct sigaction ca;
+    memset(&ca, 0, sizeof(ca));
+    ca.sa_sigaction = cn1CrashDiagHandler;
+    ca.sa_flags = SA_SIGINFO;
+    sigemptyset(&ca.sa_mask);
+    sigaction(SIGSEGV, &ca, 0);
+    sigaction(SIGABRT, &ca, 0);
+    sigaction(SIGBUS, &ca, 0);
+    const char* m = "CN1SS:CRASHDIAG installed(ctor)\n";
+    write(1, m, strlen(m));
+}
 #endif
 
 void cn1GcInstallSignalHandler(void) {
@@ -3222,17 +3238,6 @@ void cn1GcInstallSignalHandler(void) {
     sa.sa_flags = SA_SIGINFO | SA_RESTART;
     sigemptyset(&sa.sa_mask);
     sigaction(CN1_GC_STOP_SIGNAL, &sa, 0);
-
-    // TEMP DIAGNOSTIC (remove before merge): symbolize a fatal SIGSEGV/SIGABRT.
-    struct sigaction ca;
-    memset(&ca, 0, sizeof(ca));
-    ca.sa_sigaction = cn1CrashDiagHandler;
-    ca.sa_flags = SA_SIGINFO;
-    sigemptyset(&ca.sa_mask);
-    sigaction(SIGSEGV, &ca, 0);
-    sigaction(SIGABRT, &ca, 0);
-    sigaction(SIGBUS, &ca, 0);
-    { const char* m = "CN1SS:CRASHDIAG installed\n"; write(1, m, strlen(m)); }
 #endif
     cn1GcSignalHandlerInstalled = 1;
 }
