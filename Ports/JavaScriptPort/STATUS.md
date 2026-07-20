@@ -5,12 +5,14 @@ The JavaScript port compiles Java bytecode to JavaScript via ParparVM
 (`vm/ByteCodeTranslator/`) and runs the app in a Web Worker against a host
 bridge on the main thread for DOM / Canvas access.
 
-**Current production status:** Initializr and the website use the legacy
-TeaVM cloud build (`scripts/initializr/build.sh javascript`,
-`scripts/website/build.sh build_initializr_for_site`). The ParparVM JS port
-is shipped in tree for screenshot CI and as an opt-in
-`javascript_parparvm` build, but is not the default until the
-`canvasContextWipe` Heisenbug below is resolved.
+**Current production status:** ParparVM/JavaScriptPort is the default for
+local and cloud JavaScript builds. Cloud builds can select the legacy TeaVM
+builder with the public `javascript.port=teavm` build hint; the default is
+`javascript.port=parparvm`. Neither builder is restricted by account level.
+
+The detailed debugging record below predates the default switch. It is kept
+as historical implementation context, not as a description of current build
+routing.
 
 This document is the handoff for whoever picks up the branch next. Read it
 before you re-attempt switching initializr over.

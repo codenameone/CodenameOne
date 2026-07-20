@@ -2,6 +2,25 @@
 
 This section covers the Codename One JavaScript port, which allows you to compile your app as native JavaScript and run it inside a browser. This is different from the https://www.codenameone.com/javadoc/com/codename1/ui/BrowserComponent.html[BrowserComponent] and other methods of displaying HTML/JavaScript inside a Codename One app.
 
+=== Choosing the JavaScript compiler
+
+JavaScript builds use the ParparVM-based JavaScript port by default. The same builder is available to all Codename One accounts and is also used by the local `local-javascript` Maven target.
+
+Cloud builds retain the original TeaVM port as a public fallback. Select the compiler with the `javascript.port` build hint:
+
+[cols="1,3",options="header"]
+|===
+|Value |Behavior
+
+|`parparvm`
+|Use the current ParparVM/JavaScriptPort builder. This is the default.
+
+|`teavm`
+|Use the legacy TeaVM builder.
+|===
+
+For example, add `javascript.port=teavm` to `codenameone_settings.properties` to diagnose a ParparVM-specific regression. An unknown value fails the build instead of selecting a different compiler.
+
 [id="limitations", reftext="Limitations of the JavaScript Port"]
 === Limitations of the JavaScript port
 
@@ -10,7 +29,7 @@ This section covers the Codename One JavaScript port, which allows you to compil
 
 NOTE: This section pertains to Codename One 3.6 and older. Newer versions of Codename One support multithreaded code inside static initializers now.
 
-Codename One's JavaScript port uses http://teavm.org/[TeaVM] to compile your application directly to JavaScript so that it can run inside modern web browsers without the need for any plugins (that is, NOT as an applet). One of the revolutionary features that TeaVM provides is the ability to run multi-threaded code (that is, it has full support for Object.wait(), Object.tell(), Object.notifyAll(), and the `synchronized` keyword). The one caveat to be aware of is that **you can't use any threading primitives inside static initializers**. This is due to technical limitations in the browser environment and the way that TeaVM compiles class definitions into JavaScript. The workaround for this issue is to do lazy initialization in cases where you need to use multithreaded code.
+This historical limitation applies to the legacy TeaVM builder selected with `javascript.port=teavm`. TeaVM compiles the application directly to JavaScript so that it can run inside modern web browsers without plugins. Older TeaVM-based Codename One releases couldn't use threading primitives inside static initializers. The workaround for those releases is lazy initialization.
 
 **Example**
 
@@ -48,7 +67,7 @@ Use lazy initialization wherever you can. You don't need to worry about this for
 [id="troubleshooting", reftext="Troubleshooting Build Errors"]
 === Troubleshooting build errors
 
-If your JavaScript build fails, you should download the error log and see what the problem is. The most common errors are:
+If your JavaScript build fails, download the error log and inspect the first compiler error. The following errors apply specifically to the fallback TeaVM builder:
 
 // vale-skip: proselint.Annotations: 'XXX' is a placeholder for the actual method name inside a verbatim quote of a TeaVM error log message.
 1. "[ERROR] Method XXX.<clinit>()V is claimed to be synchronous, but it's has invocations of asynchronous methods"
@@ -62,13 +81,15 @@ TeaVM uses its own Java runtime library. It's complete, but you may occasionally
 [id="zip_war_preview", reftext="Deployment Formats"]
 === ZIP, WAR, or preview: What's the difference
 
-The *JavaScript* build target will result in up to three different bundles being generated:
+The default ParparVM builder produces a static browser ZIP and, unless proxy packaging is disabled or an external proxy is configured, a deployable proxy bundle. The deployable bundle is a Jakarta Servlet WAR by default. Use `javascript.proxy.target` to select another deployment platform as described in <<javascript-proxy-settings>>.
+
+The legacy TeaVM builder can result in up to three different bundles:
 
 1. YourApp-1.0.war
 2. YourApp-1.0.zip
 3. YourApp-1.0-Preview.html
 
-**YourApp-1.0.war** is a self-contained application bundle that can be installed in any JavaEE servlet container. If you haven't customized any <<javascript-proxy-settings,proxy settings>>, then the application will be configured to use a proxy servlet that's embedded into the `.war` file.
+**YourApp-1.0.war** is the legacy TeaVM self-contained application bundle. It can be installed in a Java EE servlet container and includes the old `javax.servlet` proxy implementation. New ParparVM builds use the current proxy profiles below and default to Jakarta Servlet.
 
 As an example, the `PropertyCross.war` file contains the following files:
 
@@ -161,15 +182,57 @@ For example, If your application is hosted at http://example.com/myapp/index.htm
 
 NOTE: The HTTP standard does support cross-origin requests in the browser via the `Access-Control-Allow-Origin` HTTP header. Some web services supply this header when serving resources, but not all. The way to be make network requests to arbitrary resources is to do it through a proxy.
 
-A solution exists. The `.war` JavaScript distribution includes an embedded proxy servlet, and your application is configured, by default, to use this servlet. If you intend to use the `.war` distribution, then it **should work**. You shouldn't need to do anything to configure the proxy.
+A ParparVM JavaScript build generates a same-origin proxy wrapper by default and configures the application to use `/cn1-cors-proxy?_target=`. Select its platform with the `javascript.proxy.target` build hint:
 
-If, but, you're using the `.zip` distribution or the single-file preview, you will need to set up a Proxy servlet and configure your application to use it for its network requests.
+[cols="1,3",options="header"]
+|===
+|Value |Generated deployment bundle
+
+|`jakarta-servlet`
+|A Jakarta Servlet WAR for current containers such as Tomcat 10.1 or newer. This is the default.
+
+|`javax-servlet`
+|A Servlet 4 WAR for older containers such as Tomcat 9.
+
+|`node`
+|A Node.js 20 application ZIP that serves both the static app and the proxy.
+
+|`php`
+|A PHP 8 application ZIP containing the static app, proxy endpoint, and Apache rewrite configuration.
+
+|`aws-lambda`
+|An AWS SAM/Node.js 20 proxy ZIP. Static assets are included under `public/` for deployment to your static host.
+
+|`google-cloud-functions`
+|A Google Cloud Functions/Node.js 20 proxy ZIP. Static assets are included under `public/`.
+
+|`cloudflare-workers`
+|A Cloudflare Worker ZIP with a static-assets binding.
+
+|`none`
+|Don't generate a proxy deployment bundle.
+|===
+
+Restrict a generated proxy before deploying it publicly. Set `javascript.proxy.allowedTargets` to a comma-separated list of allowed origins, host names, or wildcard subdomains. For example:
+
+----
+javascript.proxy.allowedTargets=https://api.example.com,*.services.example.org
+----
+
+If this hint is omitted, the generated proxy accepts any HTTP or HTTPS target and the build emits a warning.
+
+Proxy hint precedence is explicit:
+
+1. `javascript.inject_proxy=false` disables proxy generation and URL injection.
+2. `javascript.proxy.url` configures an existing external proxy and suppresses generated proxy packaging unless `javascript.proxy.target` is also set.
+3. `javascript.proxy.target=none` disables generated proxy packaging.
+4. Otherwise, `javascript.proxy.target` selects the bundle, defaulting to `jakarta-servlet`.
 
 ==== Step 1: Setting up a proxy
 
-TIP: This section is relevant if you're using the `.zip` or single-file distributions of your app. You shouldn't need to set up a proxy for the `.war` distribution since it includes a proxy built-in.
+TIP: You can skip this step when deploying one of the generated ParparVM wrappers. Use it when you host only the static ZIP or want to operate the proxy independently.
 
-The easiest way to set up a proxy is to use the Codename One *https://github.com/shannah/cors-proxy[cors-proxy]* project. This is the open-source project from which the proxy in the `.war` distribution is derived. Download and install the `cors-proxy.war` file in your JavaEE compatible servlet container.
+For a ParparVM build, select the matching generated wrapper with `javascript.proxy.target`. The old https://github.com/shannah/cors-proxy[cors-proxy] project remains relevant only to legacy TeaVM WARs and older Java EE deployments.
 
 If you don't want to install the `.war` file, but would rather copy the proxy servlet into an existing web project, you can do that also. https://github.com/shannah/cors-proxy/wiki/Embedding-Servlet-into-Existing-Project[See the cors-proxy wiki for more information about this].
 
@@ -670,4 +733,3 @@ With `removeOnDeinitialize=false`:
 . Dialog is dismissed
 . Parent `Form`'s `initComponent()` is called
 . `BrowserComponent` reconnects to the existing iframe - JavaScript state preserved
-

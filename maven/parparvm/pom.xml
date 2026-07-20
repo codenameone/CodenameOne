@@ -14,6 +14,27 @@
 
     <name>ParparVM</name>
     <dependencies>
+        <dependency>
+            <groupId>com.codenameone</groupId>
+            <artifactId>codenameone-core</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <version>4.0.1</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <!-- Compile to Java 8 bytecode so the main Maven reactor remains on
+                 its CI toolchain. Servlet 5's signatures used here are binary
+                 compatible with the Servlet 6/6.1 containers we target. -->
+            <version>5.0.0</version>
+            <scope>provided</scope>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/org.ow2.asm/asm -->
         <dependency>
             <groupId>org.ow2.asm</groupId>
@@ -52,6 +73,7 @@
         <src.dir>../../vm/ByteCodeTranslator/src</src.dir>
 
         <codename1.javaapi.src.dir>../../vm/JavaAPI/src</codename1.javaapi.src.dir>
+        <codename1.javascriptport.src.dir>../../Ports/JavaScriptPort/src/main/java</codename1.javascriptport.src.dir>
         <javaapi.compiler.source>1.8</javaapi.compiler.source>
         <javaapi.compiler.target>1.8</javaapi.compiler.target>
 
@@ -112,6 +134,32 @@
                                        destdir="${project.build.directory}/api-classes"
                                        failonerror="true"
                                 />
+                                <mkdir dir="${project.build.directory}/javascript-port-classes"/>
+                                <javac srcdir="${codename1.javascriptport.src.dir}"
+                                       source="1.8" target="1.8"
+                                       destdir="${project.build.directory}/javascript-port-classes"
+                                       classpathref="maven.compile.classpath"
+                                       excludes="**/Stub.java"
+                                       includeantruntime="false"
+                                       failonerror="true"/>
+                                <mkdir dir="${project.build.directory}/generated-proxy-src/javax/com/codename1/corsproxy"/>
+                                <mkdir dir="${project.build.directory}/generated-proxy-src/jakarta/com/codename1/corsproxy"/>
+                                <copy file="${project.basedir}/src/proxy/CORSProxy.java.template"
+                                      tofile="${project.build.directory}/generated-proxy-src/javax/com/codename1/corsproxy/CORSProxy.java"/>
+                                <copy file="${project.basedir}/src/proxy/CORSProxy.java.template"
+                                      tofile="${project.build.directory}/generated-proxy-src/jakarta/com/codename1/corsproxy/CORSProxy.java"/>
+                                <replace file="${project.build.directory}/generated-proxy-src/javax/com/codename1/corsproxy/CORSProxy.java"
+                                         token="@SERVLET@" value="javax.servlet"/>
+                                <replace file="${project.build.directory}/generated-proxy-src/jakarta/com/codename1/corsproxy/CORSProxy.java"
+                                         token="@SERVLET@" value="jakarta.servlet"/>
+                                <mkdir dir="${project.build.directory}/proxy-classes/javax"/>
+                                <mkdir dir="${project.build.directory}/proxy-classes/jakarta"/>
+                                <javac srcdir="${project.build.directory}/generated-proxy-src/javax"
+                                       source="1.8" target="1.8" destdir="${project.build.directory}/proxy-classes/javax"
+                                       classpathref="maven.compile.classpath" includeantruntime="false" failonerror="true"/>
+                                <javac srcdir="${project.build.directory}/generated-proxy-src/jakarta"
+                                       source="1.8" target="1.8" destdir="${project.build.directory}/proxy-classes/jakarta"
+                                       classpathref="maven.compile.classpath" includeantruntime="false" failonerror="true"/>
                             </target>
                         </configuration>
                     </execution>
@@ -128,6 +176,12 @@
                                     <fileset dir="${project.build.directory}/api-classes"/>
                                 </zip>
                                 <copy tofile="${project.build.directory}/bundle/parparvm-compiler.jar" file="${project.build.directory}/${project.build.finalName}-jar-with-dependencies.jar"/>
+                                <jar destfile="${project.build.directory}/bundle/JavaScriptPort.jar"
+                                     basedir="${project.build.directory}/javascript-port-classes"/>
+                                <jar destfile="${project.build.directory}/bundle/javascript-proxy-javax.jar"
+                                     basedir="${project.build.directory}/proxy-classes/javax"/>
+                                <jar destfile="${project.build.directory}/bundle/javascript-proxy-jakarta.jar"
+                                     basedir="${project.build.directory}/proxy-classes/jakarta"/>
                                 <zip destfile="${project.build.directory}/${project.build.finalName}-bundle.jar">
                                     <fileset dir="${project.build.directory}/bundle"/>
                                 </zip>

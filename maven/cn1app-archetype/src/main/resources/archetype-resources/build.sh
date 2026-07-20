@@ -93,7 +93,7 @@ function help {
   "echo" "-e" "    Builds a native Linux app (ELF, no JVM)."
   "echo" "-e" "  javascript"
   "echo" "-e" "    Builds as a web app."
-  "echo" "-e" "    *Javascript builds are an Enterprise user feature"
+  "echo" "-e" "    *JavaScript builds are available to all users."
 }
 function settings {
   
@@ -104,4 +104,4 @@ CMD="$1"
 if [ "$CMD" == "" ]; then
   CMD="jar"
 fi
-"$CMD" 
+"$CMD"
