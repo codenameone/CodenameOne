@@ -24,9 +24,10 @@
 /*
  * Windows port BLE bridge: the C side of
  * com.codename1.impl.windows.WindowsBleBridge. Each ParparVM-translated native
- * method forwards to the in-process libcn1ble shared library (btleplug -> WinRT)
- * declared in cn1ble.h. All engine state lives in the library, so the bridge is
- * stateless and ignores __cn1ThisObject.
+ * method forwards to the in-process libcn1ble shared library (btleplug -> WinRT),
+ * which is loaded at runtime via LoadLibraryA (see the cn1ble_* provider section
+ * below). All engine state lives in the library, so the bridge is stateless and
+ * ignores __cn1ThisObject.
  *
  * pollEvent is the only blocking call; like the socket/subprocess bridges it is
  * bracketed with CN1_YIELD_THREAD / CN1_RESUME_THREAD so a thread parked waiting
@@ -44,13 +45,131 @@
 #include <string.h>
 
 /*
- * libcn1ble is linked, and CN1_INCLUDE_BLUETOOTH defined, only when the app
- * actually uses com.codename1.bluetooth (the builder injects both, like the
- * iOS CoreBluetooth path). Otherwise the calls resolve to local no-op
- * definitions so the port links standalone and Bluetooth reports unavailable.
+ * CN1_INCLUDE_BLUETOOTH is defined only when the app actually uses
+ * com.codename1.bluetooth (the builder injects it, like the iOS CoreBluetooth
+ * path). When set, the cn1ble_* ABI below is provided by local wrappers that
+ * load cn1ble.dll at RUNTIME via LoadLibraryA/GetProcAddress rather than
+ * linking it at build time -- this mirrors the Linux port's dlopen idiom for
+ * optional libraries and avoids needing a Windows import library. When unset,
+ * the calls resolve to the local no-op definitions in the #else branch, so the
+ * port links standalone and Bluetooth reports unavailable. If the DLL cannot be
+ * loaded, or any entry point is missing, the runtime wrappers degrade to
+ * exactly the same behaviour as those stubs.
  */
 #ifdef CN1_INCLUDE_BLUETOOTH
-#include "cn1ble.h"
+#include <windows.h>
+
+typedef int   (*cn1ble_start_fn)(void);
+typedef int   (*cn1ble_is_alive_fn)(void);
+typedef char* (*cn1ble_poll_event_fn)(long);
+typedef void  (*cn1ble_free_fn)(char*);
+typedef void  (*cn1ble_scan_start_fn)(long, const char*);
+typedef void  (*cn1ble_scan_stop_fn)(long);
+typedef void  (*cn1ble_connect_fn)(long, const char*);
+typedef void  (*cn1ble_disconnect_fn)(long, const char*);
+typedef void  (*cn1ble_discover_fn)(long, const char*);
+typedef void  (*cn1ble_read_fn)(long, const char*, const char*, const char*);
+typedef void  (*cn1ble_write_fn)(long, const char*, const char*, const char*, const unsigned char*, int, int);
+typedef void  (*cn1ble_subscribe_fn)(long, const char*, const char*, const char*, int);
+typedef void  (*cn1ble_read_descriptor_fn)(long, const char*, const char*, const char*, const char*);
+typedef void  (*cn1ble_write_descriptor_fn)(long, const char*, const char*, const char*, const char*, const unsigned char*, int);
+typedef void  (*cn1ble_read_rssi_fn)(long, const char*);
+typedef void  (*cn1ble_close_fn)(void);
+
+static HMODULE g_lib = 0;
+static int     g_state = 0; /* 0 untried, 1 loaded, -1 failed */
+
+static cn1ble_start_fn            p_start;
+static cn1ble_is_alive_fn         p_is_alive;
+static cn1ble_poll_event_fn       p_poll_event;
+static cn1ble_free_fn             p_free;
+static cn1ble_scan_start_fn       p_scan_start;
+static cn1ble_scan_stop_fn        p_scan_stop;
+static cn1ble_connect_fn          p_connect;
+static cn1ble_disconnect_fn       p_disconnect;
+static cn1ble_discover_fn         p_discover;
+static cn1ble_read_fn             p_read;
+static cn1ble_write_fn            p_write;
+static cn1ble_subscribe_fn        p_subscribe;
+static cn1ble_read_descriptor_fn  p_read_descriptor;
+static cn1ble_write_descriptor_fn p_write_descriptor;
+static cn1ble_read_rssi_fn        p_read_rssi;
+static cn1ble_close_fn            p_close;
+
+/* Loads cn1ble.dll and resolves every entry point exactly once. Prefers the
+ * copy sitting next to the executable, then falls back to the standard DLL
+ * search path. On the first failure -- DLL missing or any symbol absent --
+ * g_state latches to -1 and every wrapper degrades to its no-op behaviour.
+ * Single-guarded (the reader thread calls first); no locking. Returns nonzero
+ * once the DLL is loaded and all pointers are non-NULL. */
+static int cn1ble_ensure(void) {
+    char path[MAX_PATH];
+    DWORD n;
+    HMODULE lib = 0;
+    if (g_state != 0) {
+        return g_state == 1;
+    }
+    n = GetModuleFileNameA(NULL, path, sizeof(path));
+    if (n > 0 && n < sizeof(path)) {
+        char* slash = strrchr(path, '\\');
+        if (slash != 0 && (size_t) (slash - path) + sizeof("\\cn1ble.dll") <= sizeof(path)) {
+            strcpy(slash, "\\cn1ble.dll");
+            lib = LoadLibraryA(path);
+        }
+    }
+    if (lib == 0) {
+        lib = LoadLibraryA("cn1ble.dll");
+    }
+    if (lib == 0) {
+        g_state = -1;
+        return 0;
+    }
+    p_start            = (cn1ble_start_fn)            GetProcAddress(lib, "cn1ble_start");
+    p_is_alive         = (cn1ble_is_alive_fn)         GetProcAddress(lib, "cn1ble_is_alive");
+    p_poll_event       = (cn1ble_poll_event_fn)       GetProcAddress(lib, "cn1ble_poll_event");
+    p_free             = (cn1ble_free_fn)             GetProcAddress(lib, "cn1ble_free");
+    p_scan_start       = (cn1ble_scan_start_fn)       GetProcAddress(lib, "cn1ble_scan_start");
+    p_scan_stop        = (cn1ble_scan_stop_fn)        GetProcAddress(lib, "cn1ble_scan_stop");
+    p_connect          = (cn1ble_connect_fn)          GetProcAddress(lib, "cn1ble_connect");
+    p_disconnect       = (cn1ble_disconnect_fn)       GetProcAddress(lib, "cn1ble_disconnect");
+    p_discover         = (cn1ble_discover_fn)         GetProcAddress(lib, "cn1ble_discover");
+    p_read             = (cn1ble_read_fn)             GetProcAddress(lib, "cn1ble_read");
+    p_write            = (cn1ble_write_fn)            GetProcAddress(lib, "cn1ble_write");
+    p_subscribe        = (cn1ble_subscribe_fn)        GetProcAddress(lib, "cn1ble_subscribe");
+    p_read_descriptor  = (cn1ble_read_descriptor_fn)  GetProcAddress(lib, "cn1ble_read_descriptor");
+    p_write_descriptor = (cn1ble_write_descriptor_fn) GetProcAddress(lib, "cn1ble_write_descriptor");
+    p_read_rssi        = (cn1ble_read_rssi_fn)        GetProcAddress(lib, "cn1ble_read_rssi");
+    p_close            = (cn1ble_close_fn)            GetProcAddress(lib, "cn1ble_close");
+    if (p_start == 0 || p_is_alive == 0 || p_poll_event == 0 || p_free == 0 ||
+        p_scan_start == 0 || p_scan_stop == 0 || p_connect == 0 || p_disconnect == 0 ||
+        p_discover == 0 || p_read == 0 || p_write == 0 || p_subscribe == 0 ||
+        p_read_descriptor == 0 || p_write_descriptor == 0 || p_read_rssi == 0 ||
+        p_close == 0) {
+        FreeLibrary(lib);
+        g_state = -1;
+        return 0;
+    }
+    g_lib = lib;
+    g_state = 1;
+    return 1;
+}
+
+int cn1ble_start(void) { return cn1ble_ensure() ? p_start() : 0; }
+int cn1ble_is_alive(void) { return cn1ble_ensure() ? p_is_alive() : 0; }
+char* cn1ble_poll_event(long timeoutMs) { return cn1ble_ensure() ? p_poll_event(timeoutMs) : strdup(""); }
+void cn1ble_free(char* p) { if (cn1ble_ensure()) { p_free(p); } else { free(p); } }
+void cn1ble_scan_start(long id, const char* csv) { if (cn1ble_ensure()) { p_scan_start(id, csv); } }
+void cn1ble_scan_stop(long id) { if (cn1ble_ensure()) { p_scan_stop(id); } }
+void cn1ble_connect(long id, const char* a) { if (cn1ble_ensure()) { p_connect(id, a); } }
+void cn1ble_disconnect(long id, const char* a) { if (cn1ble_ensure()) { p_disconnect(id, a); } }
+void cn1ble_discover(long id, const char* a) { if (cn1ble_ensure()) { p_discover(id, a); } }
+void cn1ble_read(long id, const char* a, const char* s, const char* c) { if (cn1ble_ensure()) { p_read(id, a, s, c); } }
+void cn1ble_write(long id, const char* a, const char* s, const char* c, const unsigned char* v, int n, int nr) { if (cn1ble_ensure()) { p_write(id, a, s, c, v, n, nr); } }
+void cn1ble_subscribe(long id, const char* a, const char* s, const char* c, int e) { if (cn1ble_ensure()) { p_subscribe(id, a, s, c, e); } }
+void cn1ble_read_descriptor(long id, const char* a, const char* s, const char* c, const char* d) { if (cn1ble_ensure()) { p_read_descriptor(id, a, s, c, d); } }
+void cn1ble_write_descriptor(long id, const char* a, const char* s, const char* c, const char* d, const unsigned char* v, int n) { if (cn1ble_ensure()) { p_write_descriptor(id, a, s, c, d, v, n); } }
+void cn1ble_read_rssi(long id, const char* a) { if (cn1ble_ensure()) { p_read_rssi(id, a); } }
+void cn1ble_close(void) { if (cn1ble_ensure()) { p_close(); } }
 #else
 int cn1ble_start(void) { return 0; }
 int cn1ble_is_alive(void) { return 0; }
