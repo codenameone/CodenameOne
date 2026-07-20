@@ -4995,7 +4995,7 @@ JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
 // This is the "1 alloc instead of byte[]+String" fast path shared by Long/Integer.toString and the
 // String.cn1Concat helpers -- the bulk of a string-building workload's GC garbage.
 JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_ARRAY_BYTE** dst) {
-#if !defined(CN1_DISABLE_BIBOP) && !defined(DEBUG_GC_OBJECTS_IN_HEAP)
+#if !defined(CN1_DISABLE_BIBOP) && !defined(DEBUG_GC_OBJECTS_IN_HEAP) && defined(CN1_ENABLE_FUSED_STRINGS)
     if(__builtin_expect(class__java_lang_String.initialized, 1)) {
         int off = (int)((sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7);
         int total = off + CN1_FUSED_ARR_BYTES(len, sizeof(JAVA_ARRAY_BYTE));

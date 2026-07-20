@@ -2889,6 +2889,12 @@ JAVA_OBJECT java_lang_StringBuilder_append___java_lang_String_R_java_lang_String
 // allocator declines (oversize for BiBOP).
 JAVA_OBJECT java_lang_StringBuilder_toString___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject) {
     if(__builtin_expect(!class__java_lang_String.initialized, 0)) __STATIC_INITIALIZER_java_lang_String(threadStateData);
+#ifndef CN1_ENABLE_FUSED_STRINGS
+    // FUSED single-alloc toString disabled (see cn1InlSbToString): route to the non-fused twin,
+    // which allocates a normal published String + separate array. Removes the NoZero
+    // parentCls==0 window implicated in the concurrent-GC theme-phase crash.
+    return java_lang_StringBuilder_toStringImpl___R_java_lang_String(threadStateData, __cn1ThisObject);
+#endif
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)__cn1ThisObject;
     int count = t->java_lang_StringBuilder_count;
     enteringNativeAllocations();

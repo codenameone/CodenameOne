@@ -107,7 +107,12 @@ static inline JAVA_OBJECT cn1InlSbAppendStr(CODENAME_ONE_THREAD_STATE, JAVA_OBJE
 // parentCls==0 guard keeps a signal-stopped scan from tracing the body).
 // Mirrors the out-of-line native, which stays the fallback + source of truth.
 static inline JAVA_OBJECT cn1InlSbToString(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT sb) {
-#if !defined(CN1_DISABLE_BIBOP) && !defined(DEBUG_GC_OBJECTS_IN_HEAP)
+#if !defined(CN1_DISABLE_BIBOP) && !defined(DEBUG_GC_OBJECTS_IN_HEAP) && defined(CN1_ENABLE_FUSED_STRINGS)
+    // FUSED single-alloc StringBuilder.toString is disabled: the NoZero fast path leaves the
+    // slot GC-invisible (parentCls==0) with garbage fields during the fill, and the non-Latin-1
+    // abandon branch (heavily exercised by theme-icon codepoints >0xFF) is implicated in a
+    // concurrent-GC crash in the native theme phase. The out-of-line native below still produces
+    // a compact byte[]/char[] String -- only the single-allocation fusion is dropped.
     struct obj__java_lang_StringBuilder* t = (struct obj__java_lang_StringBuilder*)sb;
     if(__builtin_expect(class__java_lang_String.initialized, 1)) {
         int count = t->java_lang_StringBuilder_count;
