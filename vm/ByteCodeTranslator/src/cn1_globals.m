@@ -3193,13 +3193,17 @@ static void cn1GcSignalHandler(int sig, siginfo_t* info, void* ucv) {
 static void cn1CrashDiagHandler(int sig, siginfo_t* info, void* uc) {
     char line[192];
     int n = snprintf(line, sizeof(line),
-            "\n=== CN1 CRASH DIAG signal=%d addr=%p ===\n", sig, info ? info->si_addr : (void*)0);
-    if(n > 0) { write(2, line, (size_t)n); }
+            "\nCN1SS:CRASHDIAG signal=%d addr=%p ===\n", sig, info ? info->si_addr : (void*)0);
+    // Write to BOTH stdout (fd 1, captured by the CN1SS harness protocol) and stderr.
+    if(n > 0) { write(1, line, (size_t)n); write(2, line, (size_t)n); }
 #ifdef CN1_HAVE_BACKTRACE
     void* bt[64];
     int k = backtrace(bt, 64);
+    backtrace_symbols_fd(bt, k, 1);
     backtrace_symbols_fd(bt, k, 2);
 #endif
+    // flush any buffered stdio too, best-effort
+    fsync(1);
     signal(sig, SIG_DFL);
     raise(sig);
 }
@@ -3228,6 +3232,7 @@ void cn1GcInstallSignalHandler(void) {
     sigaction(SIGSEGV, &ca, 0);
     sigaction(SIGABRT, &ca, 0);
     sigaction(SIGBUS, &ca, 0);
+    { const char* m = "CN1SS:CRASHDIAG installed\n"; write(1, m, strlen(m)); }
 #endif
     cn1GcSignalHandlerInstalled = 1;
 }
