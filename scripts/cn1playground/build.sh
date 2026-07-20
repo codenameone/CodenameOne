@@ -121,7 +121,7 @@ function help {
   "echo" "-e" "    Builds a native Linux app (ELF, no JVM)."
   "echo" "-e" "  javascript"
   "echo" "-e" "    Builds as a web app."
-  "echo" "-e" "    *Javascript builds are an Enterprise user feature"
+  "echo" "-e" "    *JavaScript builds are available to all users."
   "echo" "-e" "  javascript_compare"
   "echo" "-e" "    Builds the legacy Playground JavaScript bundle and compares it against PLAYGROUND_PARPARVM_BUNDLE."
 }

@@ -43,6 +43,10 @@ goto :EOF
 !MVNW! package -DskipTests -Dcodename1.platform^=javascript -Dcodename1.buildTarget^=local-javascript -U -e
 
 goto :EOF
+:javascript_cloud
+!MVNW! package -DskipTests -Dcodename1.platform^=javascript -Dcodename1.buildTarget^=javascript -U -e
+
+goto :EOF
 :android
 !MVNW! package -DskipTests -Dcodename1.platform^=android -Dcodename1.buildTarget^=android-device -U -e
 
@@ -88,6 +92,8 @@ echo     *Requires either GRADLE_HOME environment variable^, or for gradle to be
 echo   ios_source
 echo     Generates an Xcode Project that you can open and build using Apple^'s development tools
 echo     *Requires a Mac with Xcode installed
+echo   javascript
+echo     Builds the web app locally.
 echo 
 echo Build Server Commands:
 echo   The following commands will build the app using the Codename One build server^, and require
@@ -111,9 +117,8 @@ echo   windows_device
 echo     Builds UWP Windows app.
 echo   linux_device
 echo     Builds a native Linux app ^(ELF^, no JVM^).
-echo   javascript
-echo     Builds as a web app.
-echo     *Javascript builds are an Enterprise user feature
+echo   javascript_cloud
+echo     Builds the web app using the build server.
 
 goto :EOF
 :settings

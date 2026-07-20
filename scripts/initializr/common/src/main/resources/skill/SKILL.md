@@ -260,8 +260,9 @@ mvn -pl common cn1:test
 mvn -pl android package -Dcodename1.platform=android -Dcodename1.buildTarget=android-device
 mvn -pl ios     package -Dcodename1.platform=ios     -Dcodename1.buildTarget=ios-device
 
-# JavaScript / web bundle, built locally via the ParparVM → JS translator (Enterprise-gated).
-# Use -Dcodename1.buildTarget=javascript instead for the cloud builder.
+# JavaScript / web bundle, built locally via the ParparVM to JavaScript translator.
+# Use -Dcodename1.buildTarget=javascript instead for the cloud builder; set
+# javascript.port=teavm only when the legacy compatibility fallback is needed.
 mvn -pl javascript package -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript
 ```
 

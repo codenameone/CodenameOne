@@ -107,6 +107,11 @@ This is an advanced, issuer-only feature — most apps never need it. The compil
 
 | Hint | Effect |
 | --- | --- |
+| `codename1.arg.javascript.port=parparvm\|teavm` | Select the cloud compiler. ParparVM is the default; TeaVM is the public compatibility fallback. |
+| `codename1.arg.javascript.proxy.target=...` | Generate a proxy wrapper for `jakarta-servlet` (default), `javax-servlet`, `node`, `php`, `aws-lambda`, `google-cloud-functions`, `cloudflare-workers`, or `none`. |
+| `codename1.arg.javascript.proxy.allowedTargets=...` | Restrict the generated proxy to comma-separated origins, hosts, or wildcard subdomains. |
+| `codename1.arg.javascript.proxy.url=...` | Use an externally hosted proxy URL. This suppresses generated packaging unless `javascript.proxy.target` is also explicit. |
+| `codename1.arg.javascript.inject_proxy=false` | Disable proxy generation and proxy URL injection. |
 | `codename1.arg.javascript.html5=true` | Emit modern ES output. |
 | `codename1.arg.javascript.bundleResources=true` | Inline `theme.res` into the bundle (faster cold start). |
 

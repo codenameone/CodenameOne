@@ -47,24 +47,14 @@ import java.util.zip.ZipOutputStream;
 /**
  * Local JavaScript builder backed by ParparVM's bytecode-to-JS translator.
  *
- * Status: Enterprise-tier preview. The build server still owns the canonical
- * TeaVM-based pipeline (see BuildDaemon's JavascriptBuilder). This builder
- * is the local-machine counterpart for the new ParparVM JS port and is
- * deliberately undocumented while we iterate on parity.
+ * This is the default ParparVM-backed JavaScript pipeline used by local and
+ * cloud builds.
  */
 public class JavaScriptBuilder extends Executor {
 
-    // Mirrors the CodenameOneBuildDaemon user-rank tiers:
-    //   <  9000  trial
-    //   >= 9000  free
-    //   >= 11000 pro
-    //   >= 12000 enterprise
-    //   >= 13000 large-enterprise
-    // Local JS builds gate at the enterprise threshold.
-    private static final int ENTERPRISE_THRESHOLD = 12000;
-
     private File jsDistDir;
     private File jsOutputZip;
+    private File jsDeployableArtifact;
 
     @Override
     protected String getDeviceIdCode() {
@@ -89,12 +79,12 @@ public class JavaScriptBuilder extends Executor {
         return jsOutputZip;
     }
 
+    public File getJavaScriptDeployableArtifact() {
+        return jsDeployableArtifact;
+    }
+
     @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
-        if (!checkUserLevel(request)) {
-            return false;
-        }
-
         debug("Request Args: ");
         debug("-----------------");
         for (String arg : request.getArgs()) {
@@ -165,6 +155,12 @@ public class JavaScriptBuilder extends Executor {
             }
             jsDistDir = distDir;
 
+            jsDeployableArtifact = JavaScriptProxyPackager.packageProxy(distDir, buildDir,
+                    request.getMainClass(), request, new JavaScriptProxyPackager.Logger() {
+                        public void log(String message) {
+                            JavaScriptBuilder.this.log(message);
+                        }
+                    });
             jsOutputZip = new File(buildDir, request.getMainClass() + "-js.zip");
             zipDirectory(distDir, jsOutputZip, distDir.getName());
             log("Wrote browser bundle to " + jsOutputZip);
@@ -175,83 +171,6 @@ public class JavaScriptBuilder extends Executor {
             error("JavaScript build failed", ex);
             throw new BuildException("JavaScript build failed: " + ex.getMessage(), ex);
         }
-    }
-
-    private boolean checkUserLevel(BuildRequest request) {
-        // A logged-in Codename One account is the authorization for the local JS
-        // build, the same way it authorizes the cloud build. The credentials are
-        // written to the /com/codename1/ui preferences node by `cn1:set-user-token`
-        // (SetUserTokenMojo) -- e.g. set_cn1_user_token in the website build. Honor
-        // that login directly so the local target "just works" once you're logged in.
-        if (hasCodenameOneLogin()) {
-            log("Local JavaScript builder: authorized via logged-in Codename One account.");
-            return true;
-        }
-        // Fallback for direct CLI invocations that aren't logged in: an explicit
-        // Enterprise-or-higher user level still unlocks the build.
-        String raw = firstNonEmpty(
-                request.getArg("javascript.userLevel", null),
-                request.getArg("userLevel", null),
-                request.getArg("user.level", null),
-                System.getProperty("codename1.userLevel"),
-                System.getenv("CN1_USER_LEVEL"));
-        int rank = parseUserRank(raw);
-        log("Local JavaScript builder: user-level=" + (raw == null ? "<unset>" : raw)
-                + " (rank=" + rank + ", required>=" + ENTERPRISE_THRESHOLD + ")");
-        if (rank >= ENTERPRISE_THRESHOLD) {
-            return true;
-        }
-        log("ERROR: The local JavaScript build is licensed only to Enterprise and higher tier users. "
-                + "Log in with `cn1:set-user-token -Duser=<email> -Dtoken=<token>`, "
-                + "set codename1.arg.javascript.userLevel=Enterprise (or a higher tier) in codenameone_settings.properties, "
-                + "or define the CN1_USER_LEVEL environment variable, to enable this preview. "
-                + "See https://www.codenameone.com/pricing.html for tier details.");
-        return false;
-    }
-
-    private boolean hasCodenameOneLogin() {
-        try {
-            java.util.prefs.Preferences prefs = java.util.prefs.Preferences.userRoot().node("/com/codename1/ui");
-            String user = prefs.get("user", null);
-            String token = prefs.get("token", null);
-            return user != null && user.trim().length() > 0
-                    && token != null && token.trim().length() > 0;
-        } catch (Exception ex) {
-            // Preferences backing store unavailable -- fall through to the userLevel path.
-            return false;
-        }
-    }
-
-    private static int parseUserRank(String raw) {
-        if (raw == null) {
-            return 0;
-        }
-        String s = raw.trim().toLowerCase();
-        if (s.isEmpty()) {
-            return 0;
-        }
-        try {
-            return Integer.parseInt(s);
-        } catch (NumberFormatException ignore) {
-            // Symbolic tier names. The naming mirrors what the build server uses internally.
-        }
-        if (s.equals("trial")) return 1000;
-        if (s.equals("free") || s.equals("basic")) return 9000;
-        if (s.equals("pro") || s.equals("professional")) return 11000;
-        if (s.equals("enterprise")) return 12000;
-        if (s.equals("midsizeenterprise") || s.equals("midsize") || s.equals("midsize-enterprise")) return 13000;
-        if (s.equals("bigcorp") || s.equals("big-corp") || s.equals("large") || s.equals("largeenterprise")) return 14000;
-        return 0;
-    }
-
-    private static String firstNonEmpty(String... values) {
-        if (values == null) return null;
-        for (String v : values) {
-            if (v != null && v.trim().length() > 0) {
-                return v;
-            }
-        }
-        return null;
     }
 
     private void stageJavaApi(File stageClasses) throws IOException {

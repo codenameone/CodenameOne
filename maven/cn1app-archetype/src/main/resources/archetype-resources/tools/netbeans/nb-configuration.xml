@@ -23,6 +23,10 @@ Without this configuration present, some functionality in the IDE may be limited
                 <property name="codename1.buildTarget">javascript</property>
                 <property name="codename1.platform">javascript</property>
             </configuration>
+            <configuration id="Local JavaScript App" profiles="">
+                <property name="codename1.buildTarget">local-javascript</property>
+                <property name="codename1.platform">javascript</property>
+            </configuration>
             <configuration id="Mac Desktop App" profiles="">
                 <property name="codename1.buildTarget">mac-os-x-desktop</property>
                 <property name="codename1.platform">javase</property>

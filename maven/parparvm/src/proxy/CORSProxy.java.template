@@ -1,0 +1,180 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.corsproxy;
+
+import @SERVLET@.ServletException;
+import @SERVLET@.http.HttpServlet;
+import @SERVLET@.http.HttpServletRequest;
+import @SERVLET@.http.HttpServletResponse;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/** Same-origin proxy used by generated Codename One JavaScript WARs. */
+public final class CORSProxy extends HttpServlet {
+    private static final Set<String> BLOCKED = new HashSet<String>(Arrays.asList(
+            "host", "origin", "referer", "connection", "keep-alive", "proxy-authenticate",
+            "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade"));
+    private volatile List<String> allowedTargets;
+
+    @Override
+    protected void service(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        String target = request.getParameter("_target");
+        URI uri;
+        try {
+            uri = URI.create(target == null ? "" : target);
+        } catch (IllegalArgumentException ex) {
+            response.sendError(400, "Invalid _target");
+            return;
+        }
+        if (!("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))
+                || uri.getHost() == null) {
+            response.sendError(400, "Invalid _target");
+            return;
+        }
+        if (!isAllowed(uri)) {
+            response.sendError(403, "Target is not allowed");
+            return;
+        }
+
+        HttpURLConnection upstream = (HttpURLConnection) new URL(uri.toASCIIString()).openConnection();
+        upstream.setInstanceFollowRedirects(false);
+        upstream.setRequestMethod(request.getMethod());
+        copyRequestHeaders(request, upstream);
+        if (hasRequestBody(request.getMethod())) {
+            upstream.setDoOutput(true);
+            copy(request.getInputStream(), upstream.getOutputStream());
+        }
+
+        int status = upstream.getResponseCode();
+        copyResponseHeaders(upstream, response);
+        if ((status < 200 || status >= 300) && status != 304) {
+            response.setHeader("X-CN1-Status", Integer.toString(status));
+            response.setStatus(200);
+        } else {
+            response.setStatus(status);
+        }
+        InputStream body = status >= 400 ? upstream.getErrorStream() : upstream.getInputStream();
+        if (body != null) {
+            copy(body, response.getOutputStream());
+        }
+    }
+
+    private boolean isAllowed(URI target) throws IOException {
+        List<String> patterns = allowedTargets;
+        if (patterns == null) {
+            patterns = loadAllowedTargets();
+            allowedTargets = patterns;
+        }
+        if (patterns.isEmpty()) return true;
+        String host = target.getHost().toLowerCase();
+        String origin = target.getScheme().toLowerCase() + "://" + host
+                + (target.getPort() < 0 ? "" : ":" + target.getPort());
+        for (String pattern : patterns) {
+            if (pattern.startsWith("*.") && host.endsWith(pattern.substring(1).toLowerCase())) return true;
+            if (pattern.indexOf("://") > 0 && origin.equalsIgnoreCase(trimSlash(pattern))) return true;
+            if (host.equalsIgnoreCase(pattern)) return true;
+        }
+        return false;
+    }
+
+    private List<String> loadAllowedTargets() throws IOException {
+        List<String> out = new ArrayList<String>();
+        InputStream in = CORSProxy.class.getResourceAsStream("/cn1-proxy-allowed-targets.txt");
+        if (in == null) return out;
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+        try {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                for (String value : line.split(",")) {
+                    value = value.trim();
+                    if (value.length() > 0) out.add(value);
+                }
+            }
+        } finally {
+            reader.close();
+        }
+        return out;
+    }
+
+    private static void copyRequestHeaders(HttpServletRequest request, HttpURLConnection upstream) {
+        Enumeration<String> names = request.getHeaderNames();
+        while (names != null && names.hasMoreElements()) {
+            String name = names.nextElement();
+            String lower = name.toLowerCase();
+            if (BLOCKED.contains(lower) || "content-length".equals(lower)) continue;
+            String outputName = "x-cn1-cookie".equals(lower) ? "Cookie" : name;
+            Enumeration<String> values = request.getHeaders(name);
+            while (values != null && values.hasMoreElements()) {
+                upstream.addRequestProperty(outputName, values.nextElement());
+            }
+        }
+    }
+
+    private static void copyResponseHeaders(HttpURLConnection upstream, HttpServletResponse response) {
+        for (Map.Entry<String, List<String>> entry : upstream.getHeaderFields().entrySet()) {
+            String name = entry.getKey();
+            if (name == null) continue;
+            String lower = name.toLowerCase();
+            if (BLOCKED.contains(lower) || "content-length".equals(lower)
+                    || "content-security-policy".equals(lower)) continue;
+            String outputName = "set-cookie".equals(lower) ? "X-CN1-Set-Cookie"
+                    : "location".equals(lower) ? "X-CN1-Location" : name;
+            for (String value : entry.getValue()) response.addHeader(outputName, value);
+        }
+    }
+
+    private static boolean hasRequestBody(String method) {
+        return !("GET".equalsIgnoreCase(method) || "HEAD".equalsIgnoreCase(method));
+    }
+
+    private static String trimSlash(String value) {
+        while (value.endsWith("/")) value = value.substring(0, value.length() - 1);
+        return value;
+    }
+
+    private static void copy(InputStream in, OutputStream out) throws IOException {
+        try {
+            byte[] buffer = new byte[16384];
+            int count;
+            while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+            out.flush();
+        } finally {
+            in.close();
+        }
+    }
+}

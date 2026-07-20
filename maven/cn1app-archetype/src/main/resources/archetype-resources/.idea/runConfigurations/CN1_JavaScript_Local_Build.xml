@@ -1,0 +1,40 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="CN1 JavaScript Local Build" type="MavenRunConfiguration" folderName="Local Builds">
+    <MavenSettings>
+      <option name="myGeneralSettings" />
+      <option name="myRunnerSettings">
+        <MavenRunnerSettings>
+          <option name="mavenProperties">
+            <map>
+              <entry key="codename1.buildTarget" value="local-javascript" />
+              <entry key="codename1.platform" value="javascript" />
+            </map>
+          </option>
+          <option name="skipTests" value="true" />
+        </MavenRunnerSettings>
+      </option>
+      <option name="myRunnerParameters">
+        <MavenRunnerParameters>
+          <option name="profiles">
+            <set />
+          </option>
+          <option name="goals">
+            <list>
+              <option value="package" />
+              <option value="-U" />
+              <option value="-e" />
+            </list>
+          </option>
+          <option name="pomFileName" value="pom.xml" />
+          <option name="profilesMap">
+            <map />
+          </option>
+          <option name="resolveToWorkspace" value="false" />
+          <option name="resolveModules" value="false" />
+          <option name="workingDirPath" value="$PROJECT_DIR$" />
+        </MavenRunnerParameters>
+      </option>
+    </MavenSettings>
+    <method v="2" />
+  </configuration>
+</component>

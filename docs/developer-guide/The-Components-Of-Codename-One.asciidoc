@@ -143,8 +143,6 @@ NOTE: It's important to notice that a layered pane is on top of the `ContentPane
 
 The `GlassPane` allows developers to overlay UI on top of existing UI and paint as they see fit. This is useful for things that provide notification but don't want to intrude with application functionality.
 
-NOTE: In earlier versions of Codename One (pre-3.6), `LayeredPane` & `GlassPane` didn't work with "native" peer components such as media, browser, native maps etc, because peer components were always rendered "in front" of the Codename One UI canvas. For example, current versions now allow for proper layering of peer components and light-weight components so that LayeredPane and GlassPane can be used seamlessly with peer components.
-
 === Dialog
 
 A https://www.codenameone.com/javadoc/com/codename1/ui/Dialog.html[Dialog] is a special kind of `Form` that can occupy a portion of the screen. It also has the more functionality of the modal `show` method.
@@ -463,7 +461,7 @@ For example, this behavior might not be desired so to block that you can do:
 
 This will hide the toolbar for that given field.
 
-NOTE: You can customize the color of the #Done# button in the toolbar by setting the `ios.doneButtonColor` display property. For example: To change the color to red, you could do `Display.getInstance().setProperty("ios.doneButtonColor", String.valueOf(0xff0000))`. `@since 5.0`
+NOTE: You can customize the color of the #Done# button in the toolbar by setting the `ios.doneButtonColor` display property. For example: To change the color to red, you could do `Display.getInstance().setProperty("ios.doneButtonColor", String.valueOf(0xff0000))`.
 
 ==== Clearable text field
 
@@ -1787,7 +1785,7 @@ NOTE: The JavaScript Bridge is implemented on top of the `BrowserNavigationCallb
 TIP: The JavaScript bridge is sometimes confused with the JavaScript Port. The JavaScript bridge allows you to communicate with JavaScript from Java (and vice versa). The JavaScript port allows you to compile the Codename One application into a JavaScript application that runs in a standard web browser without code changes (think GWT without source changes and with thread support).+
 You discuss the JavaScript port further later in the guide.
 
-Codename One 4.0 introduced a new API for interacting with JavaScript in Codename One. This API is part of the `BrowserComponent` class, and effectively replaces the https://www.codenameone.com/javadoc/com/codename1/JavaScript/package-summary.html[com.codename1.JavaScript package], which is now deprecated.
+Use the `BrowserComponent` API to interact with JavaScript. It replaces the deprecated https://www.codenameone.com/javadoc/com/codename1/JavaScript/package-summary.html[com.codename1.JavaScript package].
 
 ===== What was wrong with the old API
 

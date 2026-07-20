@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.initializr.model;
 
 import com.codename1.io.Util;
@@ -349,12 +371,32 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(readme, "mvn cn1:certificatewizard",
                 "Generated README should document the Certificate Wizard");
 
+        String buildSh = getText(entries, "build.sh");
+        assertContains(buildSh, "-Dcodename1.buildTarget=local-javascript",
+                "Generated shell build launcher should build JavaScript locally");
+        assertContains(buildSh, "function javascript_cloud",
+                "Generated shell build launcher should retain the cloud JavaScript target");
+
+        String buildBat = getText(entries, "build.bat");
+        assertContains(buildBat, "-Dcodename1.buildTarget^=local-javascript",
+                "Generated Windows build launcher should build JavaScript locally");
+        assertContains(buildBat, ":javascript_cloud",
+                "Generated Windows build launcher should retain the cloud JavaScript target");
+
+        String javascriptPom = getText(entries, "javascript/pom.xml");
+        assertContains(javascriptPom, "<codename1.defaultBuildTarget>local-javascript</codename1.defaultBuildTarget>",
+                "Generated JavaScript module should default to a local build");
+
         if (ide == IDE.INTELLIJ) {
             String workspaceXml = getText(entries, ".idea/workspace.xml");
             assertContains(workspaceXml, "<configuration name=\"Certificate Wizard\"",
                     "IntelliJ workspace should include Certificate Wizard run configuration");
             assertContains(workspaceXml, "<option value=\"cn1:certificatewizard\"",
                     "IntelliJ Certificate Wizard run configuration should launch cn1:certificatewizard");
+            assertContains(workspaceXml, "<configuration name=\"JavaScript Local Build\"",
+                    "IntelliJ workspace should include a local JavaScript build configuration");
+            assertContains(workspaceXml, "value=\"local-javascript\"",
+                    "IntelliJ local JavaScript configuration should use the local builder");
             return;
         }
         if (ide == IDE.ECLIPSE) {
@@ -362,6 +404,9 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             String launchXml = getText(entries, mainClassName + " - Certificate Wizard.launch");
             assertContains(launchXml, "cn1:certificatewizard",
                     "Eclipse launch files should include Certificate Wizard");
+            String localJavaScriptLaunch = getText(entries, mainClassName + " - Build Javascript Locally.launch");
+            assertContains(localJavaScriptLaunch, "codename1.buildTarget=local-javascript",
+                    "Eclipse launch files should include a local JavaScript build");
             return;
         }
         if (ide == IDE.NETBEANS) {
@@ -370,6 +415,11 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                     "NetBeans actions should include Certificate Wizard");
             assertContains(nbActions, "<goal>cn1:certificatewizard</goal>",
                     "NetBeans Certificate Wizard action should launch cn1:certificatewizard");
+            String nbConfiguration = getText(entries, "nb-configuration.xml");
+            assertContains(nbConfiguration, "<configuration id=\"Local JavaScript App\"",
+                    "NetBeans configurations should include a local JavaScript build");
+            assertContains(nbConfiguration, "<property name=\"codename1.buildTarget\">local-javascript</property>",
+                    "NetBeans local JavaScript configuration should use the local builder");
             return;
         }
         if (ide == IDE.VS_CODE) {
@@ -378,6 +428,10 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                     "VS Code Maven favorites should include Certificate Wizard");
             assertContains(settingsJson, "cn1:certificatewizard",
                     "VS Code Certificate Wizard favorite should launch cn1:certificatewizard");
+            assertContains(settingsJson, "Local > JavaScript Build",
+                    "VS Code Maven favorites should include a local JavaScript build");
+            assertContains(settingsJson, "-Dcodename1.buildTarget=local-javascript",
+                    "VS Code local JavaScript favorite should use the local builder");
         }
     }
 
