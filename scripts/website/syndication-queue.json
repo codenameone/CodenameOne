@@ -2,25 +2,6 @@
   "_comment": "Queue of browser-only syndication tasks (Medium, DZone, Hashnode) drained by a local syndication tool that runs on the maintainer's machine inside an already-signed-in browser session. Tasks are appended by scripts/website/queue_browser_syndication.py which is invoked by the daily blog-syndication workflow, and the local tool writes the resulting URLs back into syndication-state.json.",
   "tasks": [
     {
-      "id": "linkedin:2026-07-20-1200-shai-accessibility-semantics",
-      "site": "linkedin",
-      "kind": "social",
-      "slug": "2026-07-20-1200-shai-accessibility-semantics",
-      "source_slug": "accessibility-semantics",
-      "account": "shai",
-      "title": "Shai: accessibility became personal",
-      "canonical": "https://www.codenameone.com/blog/accessibility-semantics/",
-      "cover_image_url": "https://www.codenameone.com/blog/accessibility-semantics.jpg",
-      "body_text": "Accessibility has become personal for me. I am getting older, and large type is how I read a phone comfortably now.\n\nI also remember working with accessibility experts at Sun and seeing the real complexity. A label is easy. Roles, actions, virtual children, collection position, focus recovery, live announcements, and platform behavior are not.\n\nOur old `setAccessibilityText()` API was the poor man's version. The new semantics tree is a parallel, testable hierarchy with mappings for every current Codename One UI port. Automated audits help, but the final pass still belongs to a person using the actual screen reader.\n\nFull write-up: https://www.codenameone.com/blog/accessibility-semantics/",
-      "scheduled_at": "2026-07-20T09:00:00+00:00",
-      "scheduled_local": "2026-07-20T12:00+03:00",
-      "timezone": "Asia/Jerusalem",
-      "review_by": "2026-07-17",
-      "approved_by": null,
-      "approved_at": null,
-      "queued_at": "2026-07-17T16:43:06+00:00"
-    },
-    {
       "id": "linkedin:2026-07-21-1200-shai-codename-one-mcp-server",
       "site": "linkedin",
       "kind": "social",
