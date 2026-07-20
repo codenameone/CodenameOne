@@ -131,12 +131,14 @@
                                 <javac srcdir="${codename1.javaapi.src.dir}"
                                        source="${javaapi.compiler.source}"
                                        target="${javaapi.compiler.target}"
+                                       encoding="${project.build.sourceEncoding}"
                                        destdir="${project.build.directory}/api-classes"
                                        failonerror="true"
                                 />
                                 <mkdir dir="${project.build.directory}/javascript-port-classes"/>
                                 <javac srcdir="${codename1.javascriptport.src.dir}"
                                        source="1.8" target="1.8"
+                                       encoding="${project.build.sourceEncoding}"
                                        destdir="${project.build.directory}/javascript-port-classes"
                                        classpathref="maven.compile.classpath"
                                        excludes="**/Stub.java"
@@ -156,9 +158,11 @@
                                 <mkdir dir="${project.build.directory}/proxy-classes/jakarta"/>
                                 <javac srcdir="${project.build.directory}/generated-proxy-src/javax"
                                        source="1.8" target="1.8" destdir="${project.build.directory}/proxy-classes/javax"
+                                       encoding="${project.build.sourceEncoding}"
                                        classpathref="maven.compile.classpath" includeantruntime="false" failonerror="true"/>
                                 <javac srcdir="${project.build.directory}/generated-proxy-src/jakarta"
                                        source="1.8" target="1.8" destdir="${project.build.directory}/proxy-classes/jakarta"
+                                       encoding="${project.build.sourceEncoding}"
                                        classpathref="maven.compile.classpath" includeantruntime="false" failonerror="true"/>
                             </target>
                         </configuration>

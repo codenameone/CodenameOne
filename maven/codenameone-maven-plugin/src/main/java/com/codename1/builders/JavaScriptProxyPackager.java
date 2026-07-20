@@ -32,6 +32,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -290,14 +291,19 @@ public final class JavaScriptProxyPackager {
         Files.write(file.toPath(), value.getBytes(StandardCharsets.UTF_8));
     }
 
-    private static void unzipClasses(InputStream input, File output) throws IOException {
+    static void unzipClasses(InputStream input, File output) throws IOException {
+        Path outputPath = output.toPath().toAbsolutePath().normalize();
         ZipInputStream zin = new ZipInputStream(new BufferedInputStream(input));
         try {
             ZipEntry entry;
             byte[] buffer = new byte[8192];
             while ((entry = zin.getNextEntry()) != null) {
                 if (entry.isDirectory() || entry.getName().startsWith("META-INF/")) continue;
-                File dest = new File(output, entry.getName());
+                Path destinationPath = outputPath.resolve(entry.getName()).normalize();
+                if (!destinationPath.startsWith(outputPath)) {
+                    throw new IOException("Archive entry escapes target directory: " + entry.getName());
+                }
+                File dest = destinationPath.toFile();
                 dest.getParentFile().mkdirs();
                 OutputStream out = new BufferedOutputStream(new FileOutputStream(dest));
                 try {

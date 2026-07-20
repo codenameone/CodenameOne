@@ -22,14 +22,18 @@
  */
 package com.codename1.builders;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 import org.apache.commons.io.FileUtils;
 import org.junit.After;
 import org.junit.Before;
@@ -138,6 +142,26 @@ public class JavaScriptProxyPackagerTest {
         packageProxy(request);
     }
 
+    @Test
+    public void rejectsArchiveEntriesOutsideDestination() throws Exception {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        ZipOutputStream zip = new ZipOutputStream(bytes);
+        zip.putNextEntry(new ZipEntry("../escaped.class"));
+        zip.write(1);
+        zip.closeEntry();
+        zip.close();
+
+        File classes = new File(app, "classes");
+        try {
+            JavaScriptProxyPackager.unzipClasses(
+                    new ByteArrayInputStream(bytes.toByteArray()), classes);
+            fail("Archive entries must not escape the destination directory");
+        } catch (IOException expected) {
+            // Expected.
+        }
+        assertFalse(new File(app, "escaped.class").exists());
+    }
+
     private File packageProxy(BuildRequest request) throws Exception {
         return JavaScriptProxyPackager.packageProxy(app, work, "TestApp", request,
                 new JavaScriptProxyPackager.Logger() {
@@ -167,7 +191,7 @@ public class JavaScriptProxyPackagerTest {
             ZipEntry entry;
             while ((entry = in.getNextEntry()) != null) {
                 if (!name.equals(entry.getName())) continue;
-                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
                 byte[] buffer = new byte[4096];
                 int count;
                 while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
