@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 #ifndef __CN1GLOBALS__
 #define __CN1GLOBALS__
 
@@ -2050,6 +2073,15 @@ extern struct clazz class_array3__JAVA_DOUBLE;
 
 extern JAVA_OBJECT newString(CODENAME_ONE_THREAD_STATE, int length, JAVA_CHAR data[]);
 extern JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str);
+extern JAVA_OBJECT newStringFromAsciiLen(CODENAME_ONE_THREAD_STATE, const char *src, int len);
+// Single-allocation fused compact-String builder (see cn1_globals.m). Returns a valid empty
+// String + inline byte buffer; fill it, then publish the real length with cn1FusedLatin1End().
+// NULL => use the 2-object fallback.
+extern JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_ARRAY_BYTE** dst);
+// Publish the finished length: the fused String was created empty (count=0, a valid intermediate);
+// set the real count LAST, after every byte is written, so a concurrent GC never sees count>0 over
+// an unfinished value. Single word store.
+#define cn1FusedLatin1End(so, n) (((struct obj__java_lang_String*)(so))->java_lang_String_count = (n))
 extern void initConstantPool();
 
 extern void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, int classNameId, int methodNameId);

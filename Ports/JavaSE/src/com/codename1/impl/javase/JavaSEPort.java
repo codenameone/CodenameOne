@@ -9000,6 +9000,21 @@ public class JavaSEPort extends CodenameOneImplementation {
         MCPStdioTransport.register();
         MCPSocketTransport.register();
 
+        // Optional headless auto-start of the loopback MCP socket server so an
+        // agent (or CI) can drive and screenshot a running simulator without a
+        // human clicking the MCP menu. Enabled only when -Dcn1.mcp.port=<port>
+        // is passed; default behavior is unchanged.
+        String mcpPort = System.getProperty("cn1.mcp.port");
+        if (mcpPort != null) {
+            try {
+                com.codename1.mcp.MCP.startSocketServer(Integer.parseInt(mcpPort.trim()));
+                System.out.println("[cn1.mcp] MCP socket server listening on 127.0.0.1:" + mcpPort.trim());
+            } catch (Throwable mcpErr) {
+                System.err.println("[cn1.mcp] could not auto-start MCP socket server on port "
+                        + mcpPort + ": " + mcpErr);
+            }
+        }
+
         // Fire-and-forget probe so LlmClient.simulatorRedirect=auto
         // can detect a local Ollama install without blocking startup.
         probeOllamaAsync();
@@ -17463,15 +17478,43 @@ public class JavaSEPort extends CodenameOneImplementation {
         return gpuImpl;
     }
 
+    /// Cached availability of the optional jhlabs image-filter library. When the
+    /// filters jar is missing from the simulator classpath, referencing the filter
+    /// classes throws NoClassDefFoundError; a missing optional blur must degrade to
+    /// an unblurred image rather than crash the whole simulator (a single component
+    /// such as Switch's shadowed thumb otherwise takes the app down on first paint).
+    private static Boolean gaussianBlurAvailable;
+
+    private static boolean isGaussianBlurAvailable() {
+        if (gaussianBlurAvailable == null) {
+            try {
+                Class.forName("com.jhlabs.image.GaussianFilter");
+                gaussianBlurAvailable = Boolean.TRUE;
+            } catch (Throwable t) {
+                gaussianBlurAvailable = Boolean.FALSE;
+                System.err.println("[cn1] jhlabs image filters unavailable; blur effects disabled: " + t);
+            }
+        }
+        return gaussianBlurAvailable.booleanValue();
+    }
+
     public Image gaussianBlurImage(Image image, float radius) {
-        GaussianFilter gf = new GaussianFilter(radius);
-        Image bim = Image.createImage(image.getWidth(), image.getHeight());
-        BufferedImage blurredImage = gf.filter((BufferedImage)image.getImage(), (BufferedImage)bim.getImage());
-        return new NativeImage(blurredImage);
+        if (!isGaussianBlurAvailable()) {
+            return image;
+        }
+        try {
+            GaussianFilter gf = new GaussianFilter(radius);
+            Image bim = Image.createImage(image.getWidth(), image.getHeight());
+            BufferedImage blurredImage = gf.filter((BufferedImage) image.getImage(), (BufferedImage) bim.getImage());
+            return new NativeImage(blurredImage);
+        } catch (Throwable t) {
+            gaussianBlurAvailable = Boolean.FALSE;
+            return image;
+        }
     }
 
     public boolean isGaussianBlurSupported() {
-        return true;
+        return isGaussianBlurAvailable();
     }
 
     @Override

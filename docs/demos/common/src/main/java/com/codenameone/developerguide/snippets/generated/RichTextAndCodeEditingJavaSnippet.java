@@ -26,16 +26,22 @@ package com.codenameone.developerguide.snippets.generated;
 import com.codename1.ui.CodeCompletion;
 import com.codename1.ui.CodeDiagnostic;
 import com.codename1.ui.CodeEditor;
+import com.codename1.ui.Display;
 import com.codename1.ui.EditField;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.RichTextComponent;
 import com.codename1.ui.RichTextArea;
 import com.codename1.ui.RichTextFormat;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.editor.SyntaxHighlighter;
 import com.codename1.ui.editor.SyntaxHighlightResult;
 import com.codename1.ui.editor.SyntaxToken;
+import com.codename1.ui.editor.TextStyle;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 class RichTextAndCodeEditingJavaSnippet {
     void richFormats() {
@@ -101,5 +107,34 @@ class RichTextAndCodeEditingJavaSnippet {
                         .setSeverity(CodeDiagnostic.WARNING)
         ));
         // end::rich-text-and-code-editing-java-diagnostics[]
+    }
+
+    void readOnlyRichText(Form form, Map<String, Image> myImageCache) {
+        // tag::rich-text-and-code-editing-java-read-only[]
+        RichTextComponent view = new RichTextComponent();
+
+        // From Markdown, HTML, or any RichTextFormat:
+        view.setMarkdown("# Trip summary\n\n"
+                + "Departs **09:40**, arrives *11:15*. See the [itinerary](app://itinerary) for details.\n\n"
+                + "- Window seat\n"
+                + "- Carry-on only");
+        // view.setHtml("<h1>Trip summary</h1><p>Departs <b>09:40</b> ...</p>");
+        // view.setContent(source, RichTextFormat.ASCIIDOC);
+
+        // Or assembled run by run with editor TextStyle values:
+        RichTextComponent built = new RichTextComponent();
+        built.append("Status: ", TextStyle.DEFAULT)
+                .append("confirmed", TextStyle.DEFAULT.withBold(true).withForeColor(0x1a7f37));
+
+        form.add(view);
+        // end::rich-text-and-code-editing-java-read-only[]
+
+        // tag::rich-text-and-code-editing-java-links[]
+        view.addLinkListener(e -> Display.getInstance().execute((String) e.getSource()));
+        // end::rich-text-and-code-editing-java-links[]
+
+        // tag::rich-text-and-code-editing-java-images[]
+        view.setImageResolver(src -> myImageCache.get(src));
+        // end::rich-text-and-code-editing-java-images[]
     }
 }

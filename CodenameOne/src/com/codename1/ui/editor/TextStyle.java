@@ -29,7 +29,7 @@ package com.codename1.ui.editor;
 /// to share across runs.
 public final class TextStyle {
     /// The default (unstyled) text style.
-    public static final TextStyle DEFAULT = new TextStyle(false, false, false, false, false, -1, -1, 0);
+    public static final TextStyle DEFAULT = new TextStyle(false, false, false, false, false, -1, -1, 0, -1);
 
     private final boolean bold;
     private final boolean italic;
@@ -39,9 +39,10 @@ public final class TextStyle {
     private final int foreColor;
     private final int highlight;
     private final int fontSizeLevel;
+    private final int fontSizePx;
 
     private TextStyle(boolean bold, boolean italic, boolean underline, boolean strike, boolean monospace,
-                      int foreColor, int highlight, int fontSizeLevel) {
+                      int foreColor, int highlight, int fontSizeLevel, int fontSizePx) {
         this.bold = bold;
         this.italic = italic;
         this.underline = underline;
@@ -50,6 +51,7 @@ public final class TextStyle {
         this.foreColor = foreColor;
         this.highlight = highlight;
         this.fontSizeLevel = fontSizeLevel;
+        this.fontSizePx = fontSizePx;
     }
 
     /// True when bold.
@@ -92,44 +94,55 @@ public final class TextStyle {
         return fontSizeLevel;
     }
 
+    /// The absolute font size in pixels, or -1 to inherit / use {@link #getFontSizeLevel()}.
+    /// When set (&gt; 0) it takes precedence over the relative level.
+    public int getFontSizePx() {
+        return fontSizePx;
+    }
+
     /// Returns a style with bold set to the given value.
     public TextStyle withBold(boolean v) {
-        return new TextStyle(v, italic, underline, strike, monospace, foreColor, highlight, fontSizeLevel);
+        return new TextStyle(v, italic, underline, strike, monospace, foreColor, highlight, fontSizeLevel, fontSizePx);
     }
 
     /// Returns a style with italic set to the given value.
     public TextStyle withItalic(boolean v) {
-        return new TextStyle(bold, v, underline, strike, monospace, foreColor, highlight, fontSizeLevel);
+        return new TextStyle(bold, v, underline, strike, monospace, foreColor, highlight, fontSizeLevel, fontSizePx);
     }
 
     /// Returns a style with underline set to the given value.
     public TextStyle withUnderline(boolean v) {
-        return new TextStyle(bold, italic, v, strike, monospace, foreColor, highlight, fontSizeLevel);
+        return new TextStyle(bold, italic, v, strike, monospace, foreColor, highlight, fontSizeLevel, fontSizePx);
     }
 
     /// Returns a style with strike-through set to the given value.
     public TextStyle withStrike(boolean v) {
-        return new TextStyle(bold, italic, underline, v, monospace, foreColor, highlight, fontSizeLevel);
+        return new TextStyle(bold, italic, underline, v, monospace, foreColor, highlight, fontSizeLevel, fontSizePx);
     }
 
     /// Returns a style with inline-code / monospaced rendering enabled or disabled.
     public TextStyle withMonospace(boolean v) {
-        return new TextStyle(bold, italic, underline, strike, v, foreColor, highlight, fontSizeLevel);
+        return new TextStyle(bold, italic, underline, strike, v, foreColor, highlight, fontSizeLevel, fontSizePx);
     }
 
     /// Returns a style with the given foreground color (or -1 to inherit).
     public TextStyle withForeColor(int v) {
-        return new TextStyle(bold, italic, underline, strike, monospace, v, highlight, fontSizeLevel);
+        return new TextStyle(bold, italic, underline, strike, monospace, v, highlight, fontSizeLevel, fontSizePx);
     }
 
     /// Returns a style with the given highlight color (or -1 for none).
     public TextStyle withHighlight(int v) {
-        return new TextStyle(bold, italic, underline, strike, monospace, foreColor, v, fontSizeLevel);
+        return new TextStyle(bold, italic, underline, strike, monospace, foreColor, v, fontSizeLevel, fontSizePx);
     }
 
     /// Returns a style with the given font size level (1..7, or 0 for default).
     public TextStyle withFontSizeLevel(int v) {
-        return new TextStyle(bold, italic, underline, strike, monospace, foreColor, highlight, v);
+        return new TextStyle(bold, italic, underline, strike, monospace, foreColor, highlight, v, fontSizePx);
+    }
+
+    /// Returns a style with the given absolute font size in pixels (or -1 to inherit / use the level).
+    public TextStyle withFontSizePx(int v) {
+        return new TextStyle(bold, italic, underline, strike, monospace, foreColor, highlight, fontSizeLevel, v);
     }
 
     @Override
@@ -143,7 +156,8 @@ public final class TextStyle {
         TextStyle t = (TextStyle) o;
         return bold == t.bold && italic == t.italic && underline == t.underline && strike == t.strike
                 && monospace == t.monospace
-                && foreColor == t.foreColor && highlight == t.highlight && fontSizeLevel == t.fontSizeLevel;
+                && foreColor == t.foreColor && highlight == t.highlight && fontSizeLevel == t.fontSizeLevel
+                && fontSizePx == t.fontSizePx;
     }
 
     @Override
@@ -157,6 +171,7 @@ public final class TextStyle {
         h = h * 31 + foreColor;
         h = h * 31 + highlight;
         h = h * 31 + fontSizeLevel;
+        h = h * 31 + fontSizePx;
         return h;
     }
 }

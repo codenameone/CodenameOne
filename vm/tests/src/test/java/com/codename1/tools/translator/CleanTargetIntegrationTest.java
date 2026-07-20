@@ -1751,6 +1751,20 @@ class CleanTargetIntegrationTest {
                 "        ps.print('|');\n" +
                 "        ps.print(12500000.0f);\n" +
                 "        failures += check(\"printstream\", out.toString(), \"1.25E7|1.25E7\");\n" +
+                "        String latin1Slice = makeSlice(\"prefix-LATIN1-suffix\", 7, 13);\n" +
+                "        String utf16Slice = makeSlice(\"prefix-\\u20acuro-suffix\", 7, 11);\n" +
+                "        for (int round = 0; round < 4; round++) {\n" +
+                "            for (int i = 0; i < 5000; i++) {\n" +
+                "                new StringBuilder(24).append(\"gc-churn-\").append(i).toString();\n" +
+                "            }\n" +
+                "            System.gc();\n" +
+                "            try { Thread.sleep(10); } catch (InterruptedException ex) { throw new RuntimeException(ex); }\n" +
+                "        }\n" +
+                "        failures += check(\"fused-latin1-substring\", latin1Slice, \"LATIN1\");\n" +
+                "        failures += check(\"fused-utf16-substring\", utf16Slice, \"\\u20acuro\");\n" +
+                "        failures += check(\"fused-substring-builder\",\n" +
+                "                new StringBuilder().append('[').append(latin1Slice).append(\"][\")\n" +
+                "                        .append(utf16Slice).append(']').toString(), \"[LATIN1][\\u20acuro]\");\n" +
                 "        if (failures == 0) {\n" +
                 "            System.out.println(\"FLOATING_TO_STRING_PASS\");\n" +
                 "        }\n" +
@@ -1762,6 +1776,11 @@ class CleanTargetIntegrationTest {
                 "            return 1;\n" +
                 "        }\n" +
                 "        return 0;\n" +
+                "    }\n" +
+                "\n" +
+                "    private static String makeSlice(String text, int start, int end) {\n" +
+                "        String parent = new StringBuilder(text.length()).append(text).toString();\n" +
+                "        return parent.substring(start, end);\n" +
                 "    }\n" +
                 "}\n";
     }

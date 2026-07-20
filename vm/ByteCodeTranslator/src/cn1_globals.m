@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 // glibc/musl hide pthread_getattr_np and the ucontext REG_* gregs indices
 // behind _GNU_SOURCE; must be defined before the first libc include.
 #if defined(__linux__) && !defined(_GNU_SOURCE)
@@ -2419,6 +2442,14 @@ void* cn1MonitorDataRemove(JAVA_OBJECT o) {
 // the slot is recycled into the page free-list by the caller). Mirrors
 // freeAndFinalize / codenameOneGcFree minus the free().
 static void cn1BibopReclaimSlot(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
+    // An unpublished (parentCls==0) NoZero slot has garbage in every field (nsString,
+    // monitor, ...) -- reclaiming it would deref NULL->finalizerFunction and CFRelease
+    // a garbage peer. It holds no finalizer/peer/monitor by construction, so there is
+    // nothing to release: skip. (Fixed at the source too -- see cn1InlSbToString -- so
+    // this is defense in depth for any future memset-elided allocator.)
+    if(o->__codenameOneParentClsReference == 0) {
+        return;
+    }
     finalizerFunctionPointer ptr = (finalizerFunctionPointer)o->__codenameOneParentClsReference->finalizerFunction;
     if(ptr != 0) {
         ptr(threadStateData, o);
@@ -2598,7 +2629,13 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
             } else {
                 liveCount++;
 #ifndef CN1_BIBOP_NO_FASTSWEEP
-                if(o->__codenameOneParentClsReference->finalizerFunction != 0) needsReclaim = JAVA_TRUE;
+                // parentCls==0 guard mirrors the mark==-1 grace branch above: a
+                // memset-elided object can be published only once every field is
+                // written, and an abandoned NoZero slot (never published) can reach
+                // here after grace-aging -- dereferencing NULL->finalizerFunction
+                // would crash at offset 0x10.
+                if(o->__codenameOneParentClsReference != 0 &&
+                   o->__codenameOneParentClsReference->finalizerFunction != 0) needsReclaim = JAVA_TRUE;
 #endif
             }
         }
@@ -4842,12 +4879,21 @@ JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
     }
     enteringNativeAllocations();
     int length = (int)strlen(str);
-    JAVA_ARRAY dat = (JAVA_ARRAY)allocArray(threadStateData, length, &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), 1);
-    JAVA_ARRAY_CHAR* arr = (JAVA_ARRAY_CHAR*) (*dat).data;
-    JAVA_BOOLEAN slash = JAVA_FALSE;
+    // Compact strings: decode into a temporary char buffer first so we can detect
+    // whether the fully-decoded string is Latin-1 (every code unit <= 0xFF) and,
+    // if so, store it as a compact byte[] instead of a char[]. The ~~uXXXX escape
+    // can inject any UTF-16 code unit, so a blind byte[] copy would be wrong for a
+    // literal carrying a code unit above 0xFF -- those still get a char[].
+    // NOTE: the char produced per source char is (JAVA_ARRAY_CHAR)str[iter], the
+    // SAME implicit char->uint16 widening the old code performed, so a source byte
+    // with the high bit set (only possible for a raw, non-escaped byte) widens to
+    // 0xFFxx and therefore stays on the char[] path -- bit-identical to before.
+    JAVA_ARRAY_CHAR stackBuf[256];
+    JAVA_ARRAY_CHAR* tmp = length <= 256 ? stackBuf : (JAVA_ARRAY_CHAR*)malloc((size_t)length * sizeof(JAVA_ARRAY_CHAR));
     int offset = 0;
+    JAVA_BOOLEAN latin1 = JAVA_TRUE;
     for(int iter = 0 ; iter < length ; iter++) {
-        arr[offset] = str[iter];
+        JAVA_ARRAY_CHAR c = (JAVA_ARRAY_CHAR)str[iter];
         if(str[iter] == '~' && iter + 6 < length && str[iter+1] == '~' && str[iter+2] == 'u') {
             char constructB[5];
             constructB[0] = str[iter + 3];
@@ -4855,10 +4901,29 @@ JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
             constructB[2] = str[iter + 5];
             constructB[3] = str[iter + 6];
             constructB[4] = 0;
-            arr[offset] = strtol(constructB, NULL, 16);
+            c = (JAVA_ARRAY_CHAR)strtol(constructB, NULL, 16);
             iter += 6;
         }
-        offset++;
+        if(c > 0xff) latin1 = JAVA_FALSE;
+        tmp[offset++] = c;
+    }
+    JAVA_ARRAY dat;
+    if(latin1) {
+        // compact Latin-1: one byte per code unit, (byte & 0xff) IS the char.
+        dat = (JAVA_ARRAY)allocArray(threadStateData, offset, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
+        JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*) (*dat).data;
+        for(int i = 0 ; i < offset ; i++) {
+            b[i] = (JAVA_ARRAY_BYTE)tmp[i];
+        }
+    } else {
+        dat = (JAVA_ARRAY)allocArray(threadStateData, offset, &class_array1__JAVA_CHAR, sizeof(JAVA_ARRAY_CHAR), 1);
+        JAVA_ARRAY_CHAR* a = (JAVA_ARRAY_CHAR*) (*dat).data;
+        for(int i = 0 ; i < offset ; i++) {
+            a[i] = tmp[i];
+        }
+    }
+    if(tmp != stackBuf) {
+        free(tmp);
     }
     JAVA_OBJECT o = __NEW_java_lang_String(threadStateData);
     //java_lang_String___INIT_____char_1ARRAY(threadStateData, o, (JAVA_OBJECT)dat);
@@ -4867,6 +4932,72 @@ JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
     struct obj__java_lang_String* ss = (struct obj__java_lang_String*)o;
     ss->java_lang_String_value = (JAVA_OBJECT)dat;
     ss->java_lang_String_count = offset;
+    finishedNativeAllocations();
+    return o;
+}
+
+// Build a compact Latin-1 String directly from a known-ASCII byte range (decimal
+// digits, hex, boolean literals, ...). Unlike newStringFromCString it skips the
+// strlen + char[] decode + Latin-1 detection: every byte is guaranteed <= 0x7F by
+// the caller, so it is one alloc + one copy into a byte[]-backed String. This is
+// the internal ASCII fast path for generators like Long/Integer.toString.
+// Begin a SINGLE-allocation fused compact Latin-1 String: its byte[] lives INLINE in the String's
+// own BiBOP block. Returns a valid empty String (count=0) with *dst pointing at the inline byte
+// buffer; the caller fills dst[0..len) and then publishes the real length with
+// cn1FusedLatin1End(). Returns NULL when a fused block is unavailable (oversize / BiBOP off), in
+// which case the caller performs the ordinary 2-object build.
+// This is the "1 alloc instead of byte[]+String" fast path shared by Long/Integer.toString and the
+// String.cn1Concat helpers -- the bulk of a string-building workload's GC garbage.
+JAVA_OBJECT cn1FusedLatin1Begin(CODENAME_ONE_THREAD_STATE, int len, JAVA_ARRAY_BYTE** dst) {
+#if !defined(CN1_DISABLE_BIBOP) && !defined(DEBUG_GC_OBJECTS_IN_HEAP)
+    if(__builtin_expect(class__java_lang_String.initialized, 1)) {
+        int off = (int)((sizeof(struct obj__java_lang_String) + 7) & ~(size_t)7);
+        int total = off + CN1_FUSED_ARR_BYTES(len, sizeof(JAVA_ARRAY_BYTE));
+        // Full BiBOP alloc (handles freeList / bump / page-acquire) so the fused path stays effective
+        // for the WHOLE run. The no-zero fast path only bump-allocates FRESH pages and degrades to the
+        // 2-object fallback once pages go partial -- which made an earlier version REGRESS (try-fused-
+        // fail + fallback). The slot here is ZEROED and PUBLISHED, i.e. a valid EMPTY String (count=0):
+        // a concurrent GC that traces it during the caller's fill sees an empty string (value marked, no
+        // garbage), so there is no init-before-publish race. Caller fills *dst[0..len) then
+        // cn1FusedLatin1End(so, len) sets the count LAST (count>0 always implies a fully-written value).
+        if(total <= CN1_BIBOP_MAX_OBJECT) {
+            JAVA_OBJECT so = cn1BibopAlloc(threadStateData, total, &class__java_lang_String);
+            if(so != JAVA_NULL) {
+                JAVA_OBJECT arr = cn1FusedInstallPrimArray(so, off, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), len);
+                ((struct obj__java_lang_String*)so)->java_lang_String_value = arr; // count stays 0 until End
+                *dst = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)arr)->data;
+                return so;
+            }
+        }
+    }
+#endif
+    (void)dst;
+    return JAVA_NULL;
+}
+
+JAVA_OBJECT newStringFromAsciiLen(CODENAME_ONE_THREAD_STATE, const char *src, int len) {
+    // Fused single-alloc fast path (byte[] inline in the String block).
+    JAVA_ARRAY_BYTE* fdst;
+    JAVA_OBJECT fso = cn1FusedLatin1Begin(threadStateData, len, &fdst);
+    if(fso != JAVA_NULL) {
+        for(int i = 0 ; i < len ; i++) {
+            fdst[i] = (JAVA_ARRAY_BYTE)src[i];
+        }
+        cn1FusedLatin1End(fso, len);
+        return fso;
+    }
+    // Fallback: separate byte[] + String (oversize / BiBOP unavailable).
+    enteringNativeAllocations();
+    JAVA_ARRAY dat = (JAVA_ARRAY)allocArray(threadStateData, len, &class_array1__JAVA_BYTE, sizeof(JAVA_ARRAY_BYTE), 1);
+    JAVA_ARRAY_BYTE* b = (JAVA_ARRAY_BYTE*) (*dat).data;
+    for(int i = 0 ; i < len ; i++) {
+        b[i] = (JAVA_ARRAY_BYTE)src[i];
+    }
+    JAVA_OBJECT o = __NEW_java_lang_String(threadStateData);
+    java_lang_String___INIT____(threadStateData, o);
+    struct obj__java_lang_String* ss = (struct obj__java_lang_String*)o;
+    ss->java_lang_String_value = (JAVA_OBJECT)dat;
+    ss->java_lang_String_count = len;
     finishedNativeAllocations();
     return o;
 }

@@ -1781,6 +1781,28 @@ class AndroidGraphics {
         }
     }
 
+    public void fillPathShadow(Path p, int fillColor, int fillAlpha, int shadowColor,
+            float shadowOpacity, int blurRadius, int offsetX, int offsetY) {
+        if (canvas == null) {
+            return;
+        }
+        Paint sp = new Paint(Paint.ANTI_ALIAS_FLAG);
+        sp.setStyle(Paint.Style.FILL);
+        sp.setColor(0xff000000 | fillColor);
+        sp.setAlpha(Math.max(0, Math.min(255, fillAlpha)));
+        int sa = Math.max(0, Math.min(255, (int) (shadowOpacity * 255)));
+        if (blurRadius > 0 && sa > 0) {
+            // setShadowLayer is hardware-accelerated for drawPath on modern Android: the GPU casts a
+            // blurred drop shadow behind the filled shape in one draw, with no retained bitmap.
+            sp.setShadowLayer(blurRadius, offsetX, offsetY, (sa << 24) | (shadowColor & 0xffffff));
+        }
+        canvas.save();
+        applyTransform();
+        canvas.drawPath(p, sp);
+        unapplyTransform();
+        canvas.restore();
+    }
+
     public void fillPath(Path p) {
         paint.setStyle(Paint.Style.FILL);
 
