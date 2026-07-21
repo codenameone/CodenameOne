@@ -85,12 +85,18 @@ public class JavaSEPortGlassPaneMenuTest {
             public void run() {
                 try {
                     Fixture fixture = new Fixture();
-                    JPopupMenu popup = new JPopupMenu();
+                    JPopupMenu popup = new JPopupMenu() {
+                        @Override
+                        public boolean isVisible() {
+                            // Keep this synthetic popup in the root layered pane instead of
+                            // invoking the platform PopupFactory for an unattached hierarchy.
+                            return true;
+                        }
+                    };
                     JMenuItem item = new JMenuItem("Rotate");
                     popup.add(item);
                     fixture.rootPane.getLayeredPane().add(
                             popup, JLayeredPane.POPUP_LAYER);
-                    popup.setVisible(true);
                     fixture.applyBounds();
                     popup.setBounds(0, 24, 140, 30);
                     item.setBounds(1, 1, 138, 28);
