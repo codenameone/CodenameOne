@@ -88,11 +88,12 @@ public class JavaSEPortGlassPaneMenuTest {
                     JPopupMenu popup = new JPopupMenu();
                     JMenuItem item = new JMenuItem("Rotate");
                     popup.add(item);
-                    popup.setBounds(0, 24, 140, 30);
-                    item.setBounds(1, 1, 138, 28);
                     fixture.rootPane.getLayeredPane().add(
                             popup, JLayeredPane.POPUP_LAYER);
                     popup.setVisible(true);
+                    fixture.applyBounds();
+                    popup.setBounds(0, 24, 140, 30);
+                    item.setBounds(1, 1, 138, 28);
 
                     Point point = SwingUtilities.convertPoint(
                             item, 10, 10, fixture.glassPane);
@@ -164,29 +165,32 @@ public class JavaSEPortGlassPaneMenuTest {
                 return new Rectangle(0, 0, getWidth(), getHeight());
             }
         };
+        private final JPanel contentPane = new JPanel(null);
         private final JComponent glassPane = new JComponent() {
         };
         private final JMenu deviceMenu = new JMenu("Device");
+        private final JMenuBar menuBar = new JMenuBar();
 
         private Fixture() {
-            rootPane.setSize(400, 400);
-            rootPane.getLayeredPane().setSize(400, 400);
-
-            JPanel contentPane = new JPanel(null);
-            contentPane.setBounds(0, 24, 400, 376);
-            canvas.setBounds(0, 0, 400, 376);
             contentPane.add(canvas);
             rootPane.setContentPane(contentPane);
 
-            JMenuBar menuBar = new JMenuBar();
-            menuBar.setBounds(0, 0, 400, 24);
-            deviceMenu.setBounds(0, 0, 80, 24);
             menuBar.add(deviceMenu);
             rootPane.setJMenuBar(menuBar);
 
             rootPane.setGlassPane(glassPane);
-            glassPane.setBounds(0, 0, 400, 400);
             glassPane.setVisible(true);
+            applyBounds();
+        }
+
+        private void applyBounds() {
+            rootPane.setSize(400, 400);
+            rootPane.getLayeredPane().setBounds(0, 0, 400, 400);
+            contentPane.setBounds(0, 24, 400, 376);
+            canvas.setBounds(0, 0, 400, 376);
+            menuBar.setBounds(0, 0, 400, 24);
+            deviceMenu.setBounds(0, 0, 80, 24);
+            glassPane.setBounds(0, 0, 400, 400);
         }
     }
 }
