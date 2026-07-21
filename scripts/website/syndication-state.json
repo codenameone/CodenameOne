@@ -1123,6 +1123,15 @@
         "canonical_set": true,
         "syndicated_at": "2026-07-21T08:38:52+00:00"
       }
+    },
+    "2026-07-21-1200-shai-codename-one-mcp-server": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/feed/",
+        "syndicated_at": "2026-07-21T09:01:05+00:00",
+        "account": "shai",
+        "source_slug": "codename-one-mcp-server",
+        "scheduled_at": "2026-07-21T09:00:00+00:00"
+      }
     }
   }
 }

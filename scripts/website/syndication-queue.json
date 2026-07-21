@@ -2,25 +2,6 @@
   "_comment": "Queue of browser-only syndication tasks (Medium, DZone, Hashnode) drained by a local syndication tool that runs on the maintainer's machine inside an already-signed-in browser session. Tasks are appended by scripts/website/queue_browser_syndication.py which is invoked by the daily blog-syndication workflow, and the local tool writes the resulting URLs back into syndication-state.json.",
   "tasks": [
     {
-      "id": "linkedin:2026-07-21-1200-shai-codename-one-mcp-server",
-      "site": "linkedin",
-      "kind": "social",
-      "slug": "2026-07-21-1200-shai-codename-one-mcp-server",
-      "source_slug": "codename-one-mcp-server",
-      "account": "shai",
-      "title": "Shai: accessibility led to MCP",
-      "canonical": "https://www.codenameone.com/blog/codename-one-mcp-server/",
-      "cover_image_url": "https://www.codenameone.com/blog/codename-one-mcp-server.jpg",
-      "body_text": "Accessibility led to something I did not expect.\n\nOnce a Codename One screen had an immutable tree of roles, labels, values, and actions, an agent could read that tree too. The JavaSE port can now expose the running simulator or a desktop tool as an MCP server.\n\nThe agent finds `profile-save` and invokes its activate action. It does not guess yesterday's screen coordinates. Application tools can expose domain operations directly, and a PNG resource remains available when the issue is genuinely visual.\n\nThis is JavaSE-only today. Native desktop packages and mobile targets still need transport and launcher work.\n\nFull write-up: https://www.codenameone.com/blog/codename-one-mcp-server/",
-      "scheduled_at": "2026-07-21T09:00:00+00:00",
-      "scheduled_local": "2026-07-21T12:00+03:00",
-      "timezone": "Asia/Jerusalem",
-      "review_by": "2026-07-17",
-      "approved_by": null,
-      "approved_at": null,
-      "queued_at": "2026-07-17T16:43:06+00:00"
-    },
-    {
       "id": "linkedin:2026-07-22-1200-codenameone-tested-port-support",
       "site": "linkedin",
       "kind": "social",
