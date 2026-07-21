@@ -24,6 +24,8 @@ package com.codename1.calendar;
 
 import com.codename1.util.AsyncResource;
 import com.codename1.util.SuccessCallback;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -359,10 +361,10 @@ public class CalDavCalendarSource extends CalendarSource {
             filter.append('>');
             filter.append("<c:time-range");
             if (q.getStartTime() != null) {
-                filter.append(" start=\"").append(icalTime(q.getStartTime().longValue())).append("\"");
+                filter.append(" start=\"").append(icalTime(q.getStartTime())).append("\"");
             }
             if (q.getEndTime() != null) {
-                filter.append(" end=\"").append(icalTime(q.getEndTime().longValue())).append("\"");
+                filter.append(" end=\"").append(icalTime(q.getEndTime())).append("\"");
             }
             filter.append("/></c:comp-filter>");
         }
@@ -374,8 +376,8 @@ public class CalDavCalendarSource extends CalendarSource {
         return "<?xml version=\"1.0\"?><d:sync-collection xmlns:d=\"DAV:\" " + "xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:sync-token>" + xml(token) + ("</d:sync-token><d:sync-level>1</d:sync-level><d:prop><d:getetag/><c:calendar-data/></d:prop></" + "d:sync-collection>");
     }
 
-    private static String icalTime(long value) {
-        return CalendarDateUtil.formatBasic(value, "UTC") + "Z";
+    private static String icalTime(Instant value) {
+        return CalendarDateUtil.formatBasic(value, ZoneId.of("UTC")) + "Z";
     }
 
     private static Map<String, String> headers(String name, String value) {

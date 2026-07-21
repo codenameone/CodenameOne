@@ -24,6 +24,7 @@ package com.codename1.calendar;
 
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -100,7 +101,7 @@ public abstract class CalendarSource {
         return unsupported("Responding to events");
     }
 
-    public AsyncResource<List<FreeBusyInterval>> queryFreeBusy(List<String> calendarIds, long startTime, long endTime) {
+    public AsyncResource<List<FreeBusyInterval>> queryFreeBusy(List<String> calendarIds, Instant startTime, Instant endTime) {
         return unsupported("Free/busy");
     }
 

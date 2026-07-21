@@ -25,6 +25,10 @@ package com.codename1.calendar;
 import com.codename1.io.Util;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.SuccessCallback;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -82,8 +86,8 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
         boolean task = calendar.getContentType() == CalendarInfo.ContentType.TASKS;
         Map<String, Object> body = new HashMap<String, Object>();
         body.put(task ? "title" : "summary", calendar.getName());
-        if (!task && calendar.getTimeZoneId() != null) {
-            body.put("timeZone", calendar.getTimeZoneId());
+        if (!task && calendar.getTimeZone() != null) {
+            body.put("timeZone", calendar.getTimeZone().getId());
         }
         String base = task ? TASKS_API + "/users/@me/lists" : CALENDAR_API + "/calendars";
         String method = calendar.getId() == null ? "POST" : "PUT";
@@ -123,10 +127,10 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
         param(url, "syncToken", query.getSyncToken());
         param(url, "q", query.getText());
         if (query.getStartTime() != null) {
-            param(url, "timeMin", iso(query.getStartTime().longValue()));
+            param(url, "timeMin", iso(query.getStartTime()));
         }
         if (query.getEndTime() != null) {
-            param(url, "timeMax", iso(query.getEndTime().longValue()));
+            param(url, "timeMax", iso(query.getEndTime()));
         }
         param(url, "singleEvents", String.valueOf(query.isExpandRecurrences()));
         param(url, "showDeleted", String.valueOf(query.isIncludeDeleted()));
@@ -223,7 +227,7 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
     }
 
     @Override
-    public AsyncResource<List<FreeBusyInterval>> queryFreeBusy(List<String> calendarIds, long startTime, long endTime) {
+    public AsyncResource<List<FreeBusyInterval>> queryFreeBusy(List<String> calendarIds, Instant startTime, Instant endTime) {
         final AsyncResource<List<FreeBusyInterval>> out = new AsyncResource<List<FreeBusyInterval>>();
         Map<String, Object> body = new HashMap<String, Object>();
         body.put("timeMin", iso(startTime));
@@ -344,7 +348,8 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
 
     private CalendarInfo calendar(Map<String, Object> m, CalendarInfo.ContentType type) {
         String name = string(m, type == CalendarInfo.ContentType.TASKS ? "title" : "summary");
-        return new CalendarInfo().setId(string(m, "id")).setSourceId(getId()).setName(name).setOwner(string(m, "summaryOverride")).setTimeZoneId(string(m, "timeZone")).setPrimary(bool(m, "primary")).setReadOnly("reader".equals(string(m, "accessRole"))).setContentType(type).setCapabilities(getCapabilities());
+        String zone = string(m, "timeZone");
+        return new CalendarInfo().setId(string(m, "id")).setSourceId(getId()).setName(name).setOwner(string(m, "summaryOverride")).setTimeZone(zone == null ? null : ZoneId.of(zone)).setPrimary(bool(m, "primary")).setReadOnly("reader".equals(string(m, "accessRole"))).setContentType(type).setCapabilities(getCapabilities());
     }
 
     private CalendarEvent event(Map<String, Object> m, String calendarId) throws CalendarException {
@@ -369,7 +374,11 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
         }
         Map<String, Object> reminders = map(m.get("reminders"));
         for (Map<String, Object> a : maps(reminders.get("overrides"))) {
-            CalendarAlarm alarm = new CalendarAlarm().setMinutesBefore(integer(a, "minutes"));
+            Integer minutes = integer(a, "minutes");
+            if (minutes == null) {
+                continue;
+            }
+            CalendarAlarm alarm = new CalendarAlarm().setTimeBefore(Duration.ofMinutes(minutes.intValue()));
             String method = string(a, "method");
             if ("email".equals(method)) {
                 alarm.setMethod(CalendarAlarm.Method.EMAIL);
@@ -419,9 +428,9 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
             r.put("useDefault", Boolean.FALSE);
             List<Map<String, Object>> overrides = new ArrayList<Map<String, Object>>();
             for (CalendarAlarm a : e.getAlarms()) {
-                if (a.getMinutesBefore() != null) {
+                if (a.getTimeBefore() != null && a.getTimeBefore().toMillis() % 60000L == 0L) {
                     Map<String, Object> x = new HashMap<String, Object>();
-                    x.put("minutes", a.getMinutesBefore());
+                    x.put("minutes", Long.valueOf(a.getTimeBefore().toMillis() / 60000L));
                     x.put("method", a.getMethod() == CalendarAlarm.Method.EMAIL ? "email" : a.getMethod() == CalendarAlarm.Method.AUDIO ? "sms" : "popup");
                     overrides.add(x);
                 }
@@ -444,10 +453,10 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
         String due = string(m, "due");
         String completed = string(m, "completed");
         if (due != null) {
-            out.setDue(CalendarDateTime.instant(parseIso(due), "UTC"));
+            out.setDue(CalendarDateTime.instant(parseIso(due), ZoneId.of("UTC")));
         }
         if (completed != null) {
-            out.setCompletionTime(Long.valueOf(parseIso(completed)));
+            out.setCompletionTime(parseIso(completed));
         }
         return out;
     }
@@ -458,10 +467,10 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
         m.put("notes", t.getDescription());
         m.put("status", t.isCompleted() ? "completed" : "needsAction");
         if (t.getDue() != null && !t.getDue().isAllDay()) {
-            m.put("due", iso(t.getDue().getTimestamp()));
+            m.put("due", iso(t.getDue().getDateTime().toInstant()));
         }
         if (t.isCompleted() && t.getCompletionTime() != null) {
-            m.put("completed", iso(t.getCompletionTime().longValue()));
+            m.put("completed", iso(t.getCompletionTime()));
         }
         return m;
     }
@@ -471,11 +480,10 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
         String dateTime = string(m, "dateTime");
         String zone = string(m, "timeZone");
         if (date != null) {
-            String[] p = CalendarDateUtil.split(date, '-');
-            return CalendarDateTime.allDay(new CalendarDate(Integer.parseInt(p[0]), Integer.parseInt(p[1]), Integer.parseInt(p[2])));
+            return CalendarDateTime.allDay(LocalDate.parse(date));
         }
         if (dateTime != null) {
-            return CalendarDateTime.instant(parseIso(dateTime), zone == null ? "UTC" : zone);
+            return CalendarDateTime.instant(parseIso(dateTime), ZoneId.of(zone == null ? "UTC" : zone));
         }
         return null;
     }
@@ -488,19 +496,19 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
         if (value.isAllDay()) {
             m.put("date", value.getDate().toString());
         } else {
-            m.put("dateTime", iso(value.getTimestamp()));
-            m.put("timeZone", value.getTimeZoneId());
+            m.put("dateTime", iso(value.getDateTime().toInstant()));
+            m.put("timeZone", value.getDateTime().getZone().getId());
         }
         return m;
     }
 
-    private static String iso(long time) {
-        return CalendarDateUtil.formatIso(time, "UTC", true) + "Z";
+    private static String iso(Instant time) {
+        return CalendarDateUtil.formatIso(time, ZoneId.of("UTC"), true) + "Z";
     }
 
-    private static long parseIso(String value) throws CalendarException {
+    private static Instant parseIso(String value) throws CalendarException {
         try {
-            return CalendarDateUtil.parseDateTime(value, "UTC");
+            return CalendarDateUtil.parseDateTime(value, ZoneId.of("UTC"));
         } catch (IllegalArgumentException ex) {
             throw new CalendarException(CalendarError.MALFORMED_RESPONSE, "Invalid provider date: " + value, ex);
         }

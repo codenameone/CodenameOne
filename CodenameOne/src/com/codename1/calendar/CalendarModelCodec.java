@@ -22,6 +22,11 @@
  */
 package com.codename1.calendar;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -95,7 +100,7 @@ public final class CalendarModelCodec {
         put(m, "due", encodeDateTime(t.getDue()));
         put(m, "recurrence", encodeRecurrence(t.getRecurrence()));
         m.put("completed", Boolean.valueOf(t.isCompleted()));
-        put(m, "completionTime", t.getCompletionTime());
+        put(m, "completionTime", epochMillis(t.getCompletionTime()));
         m.put("priority", Integer.valueOf(t.getPriority()));
         List<Object> alarms = new ArrayList<Object>();
         for (CalendarAlarm a : t.getAlarms()) {
@@ -112,7 +117,7 @@ public final class CalendarModelCodec {
     }
 
     public static CalendarTask decodeTask(Map m) {
-        CalendarTask t = new CalendarTask().setId(s(m, "id")).setCalendarId(s(m, "calendarId")).setSourceId(s(m, "sourceId")).setVersion(s(m, "version")).setTitle(s(m, "title")).setDescription(s(m, "description")).setLocation(s(m, "location")).setStart(decodeDateTime(map(m, "start"))).setDue(decodeDateTime(map(m, "due"))).setRecurrence(decodeRecurrence(map(m, "recurrence"))).setCompleted(bool(m, "completed")).setCompletionTime(lngObj(m, "completionTime")).setPriority(integer(m, "priority", 0));
+        CalendarTask t = new CalendarTask().setId(s(m, "id")).setCalendarId(s(m, "calendarId")).setSourceId(s(m, "sourceId")).setVersion(s(m, "version")).setTitle(s(m, "title")).setDescription(s(m, "description")).setLocation(s(m, "location")).setStart(decodeDateTime(map(m, "start"))).setDue(decodeDateTime(map(m, "due"))).setRecurrence(decodeRecurrence(map(m, "recurrence"))).setCompleted(bool(m, "completed")).setCompletionTime(instantObj(m, "completionTime")).setPriority(integer(m, "priority", 0));
         for (Object v : list(m, "alarms")) {
             if (v instanceof Map) {
                 t.addAlarm(decodeAlarm((Map) v));
@@ -135,11 +140,11 @@ public final class CalendarModelCodec {
         m.put("allDay", Boolean.valueOf(d.isAllDay()));
         if (d.isAllDay()) {
             m.put("year", d.getDate().getYear());
-            m.put("month", d.getDate().getMonth());
-            m.put("day", d.getDate().getDay());
+            m.put("month", d.getDate().getMonthValue());
+            m.put("day", d.getDate().getDayOfMonth());
         } else {
-            m.put("timestamp", Long.valueOf(d.getTimestamp()));
-            m.put("timeZoneId", d.getTimeZoneId());
+            m.put("timestamp", Long.valueOf(d.getDateTime().toInstant().toEpochMilli()));
+            m.put("timeZoneId", d.getDateTime().getZone().getId());
         }
         return m;
     }
@@ -149,9 +154,10 @@ public final class CalendarModelCodec {
             return null;
         }
         if (bool(m, "allDay")) {
-            return CalendarDateTime.allDay(new CalendarDate(integer(m, "year", 1970), integer(m, "month", 1), integer(m, "day", 1)));
+            return CalendarDateTime.allDay(LocalDate.of(integer(m, "year", 1970), integer(m, "month", 1), integer(m, "day", 1)));
         }
-        return CalendarDateTime.instant(lng(m, "timestamp", 0L), s(m, "timeZoneId") == null ? "UTC" : s(m, "timeZoneId"));
+        String zone = s(m, "timeZoneId") == null ? "UTC" : s(m, "timeZoneId");
+        return CalendarDateTime.timed(ZonedDateTime.ofInstant(Instant.ofEpochMilli(lng(m, "timestamp", 0L)), ZoneId.of(zone)));
     }
 
     private static Map<String, Object> common(String id, String cal, String src, String ver, String title, String desc, String loc) {
@@ -217,18 +223,18 @@ public final class CalendarModelCodec {
 
     private static Map<String, Object> encodeAlarm(CalendarAlarm a) {
         Map<String, Object> m = new HashMap<String, Object>();
-        put(m, "minutesBefore", a.getMinutesBefore());
-        put(m, "absoluteTime", a.getAbsoluteTime());
+        put(m, "timeBeforeMillis", a.getTimeBefore() == null ? null : Long.valueOf(a.getTimeBefore().toMillis()));
+        put(m, "absoluteTime", epochMillis(a.getAbsoluteTime()));
         m.put("method", a.getMethod().name());
         return m;
     }
 
     private static CalendarAlarm decodeAlarm(Map m) {
         CalendarAlarm a = new CalendarAlarm();
-        if (m.get("minutesBefore") != null) {
-            a.setMinutesBefore(intObj(m, "minutesBefore"));
+        if (m.get("timeBeforeMillis") != null) {
+            a.setTimeBefore(Duration.ofMillis(lng(m, "timeBeforeMillis", 0L)));
         } else {
-            a.setAbsoluteTime(lngObj(m, "absoluteTime"));
+            a.setAbsoluteTime(instantObj(m, "absoluteTime"));
         }
         a.setMethod(alarmMethod(s(m, "method")));
         return a;
@@ -396,5 +402,14 @@ public final class CalendarModelCodec {
     private static Long lngObj(Map m, String k) {
         Object v = m.get(k);
         return v instanceof Number ? Long.valueOf(((Number) v).longValue()) : null;
+    }
+
+    private static Long epochMillis(Instant value) {
+        return value == null ? null : Long.valueOf(value.toEpochMilli());
+    }
+
+    private static Instant instantObj(Map m, String k) {
+        Long value = lngObj(m, k);
+        return value == null ? null : Instant.ofEpochMilli(value.longValue());
     }
 }

@@ -47,9 +47,12 @@ code shouldn't mix objects or identifiers from the two APIs.
 
 === Creating an event
 
-All-day values use `CalendarDateTime.allDay()`. Timed values carry both an
-instant and an Olson time-zone identifier. Keeping those concepts separate
-avoids shifting an all-day event when it crosses a time-zone boundary.
+All-day values use `CalendarDateTime.allDay(LocalDate)`. Timed values use
+`ZonedDateTime` (or the `Instant` and `ZoneId` convenience factory). Alarms use
+`Duration`, and query ranges and absolute timestamps use `Instant`. The API
+uses `java.time` instead of defining parallel date, time-zone, or duration
+types. Keeping all-day and timed values separate avoids shifting an
+all-day event when it crosses a time-zone boundary.
 
 [source,java]
 ----

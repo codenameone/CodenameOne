@@ -22,6 +22,7 @@
  */
 package com.codename1.calendar;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -53,7 +54,7 @@ public class CalendarTask {
 
     private boolean completed;
 
-    private Long completionTime;
+    private Instant completionTime;
 
     private int priority;
 
@@ -162,11 +163,11 @@ public class CalendarTask {
         return this;
     }
 
-    public Long getCompletionTime() {
+    public Instant getCompletionTime() {
         return completionTime;
     }
 
-    public CalendarTask setCompletionTime(Long v) {
+    public CalendarTask setCompletionTime(Instant v) {
         completionTime = v;
         return this;
     }

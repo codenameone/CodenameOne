@@ -22,17 +22,22 @@
  */
 package com.codename1.calendar;
 
+import java.time.Instant;
+
 /// Busy interval returned by a scheduling/free-busy query.
 public final class FreeBusyInterval {
 
-    private final long startTime;
+    private final Instant startTime;
 
-    private final long endTime;
+    private final Instant endTime;
 
     private final CalendarEvent.Availability availability;
 
-    public FreeBusyInterval(long startTime, long endTime, CalendarEvent.Availability availability) {
-        if (endTime < startTime) {
+    public FreeBusyInterval(Instant startTime, Instant endTime, CalendarEvent.Availability availability) {
+        if (startTime == null || endTime == null) {
+            throw new IllegalArgumentException("startTime and endTime required");
+        }
+        if (endTime.compareTo(startTime) < 0) {
             throw new IllegalArgumentException("endTime");
         }
         this.startTime = startTime;
@@ -40,11 +45,11 @@ public final class FreeBusyInterval {
         this.availability = availability == null ? CalendarEvent.Availability.BUSY : availability;
     }
 
-    public long getStartTime() {
+    public Instant getStartTime() {
         return startTime;
     }
 
-    public long getEndTime() {
+    public Instant getEndTime() {
         return endTime;
     }
 

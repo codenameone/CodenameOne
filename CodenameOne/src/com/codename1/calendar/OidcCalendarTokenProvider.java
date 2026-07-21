@@ -26,6 +26,7 @@ import com.codename1.io.oidc.OidcClient;
 import com.codename1.io.oidc.OidcTokens;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.SuccessCallback;
+import java.time.Instant;
 
 /// In-memory adapter around an application-configured `OidcClient`. Updated
 /// tokens are reported to the app; this class never persists them itself.
@@ -101,6 +102,6 @@ public final class OidcCalendarTokenProvider implements CalendarTokenProvider {
     }
 
     private static CalendarAuthToken convert(OidcTokens t) {
-        return new CalendarAuthToken(t.getAccessToken(), t.getExpiresAt() == null ? null : Long.valueOf(t.getExpiresAt().getTime()), t.getScope());
+        return new CalendarAuthToken(t.getAccessToken(), t.getExpiresAt() == null ? null : Instant.ofEpochMilli(t.getExpiresAt().getTime()), t.getScope());
     }
 }

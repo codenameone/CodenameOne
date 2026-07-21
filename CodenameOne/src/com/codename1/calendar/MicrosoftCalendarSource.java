@@ -25,6 +25,10 @@ package com.codename1.calendar;
 import com.codename1.io.Util;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.SuccessCallback;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -111,10 +115,10 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
         } else {
             StringBuilder b = new StringBuilder(GRAPH).append("/me/calendars/").append(e(query.getCalendarId())).append("/events/delta?$top=").append(query.getPageSize());
             if (query.getStartTime() != null) {
-                b.append("&startDateTime=").append(e(iso(query.getStartTime().longValue())));
+                b.append("&startDateTime=").append(e(iso(query.getStartTime())));
             }
             if (query.getEndTime() != null) {
-                b.append("&endDateTime=").append(e(iso(query.getEndTime().longValue())));
+                b.append("&endDateTime=").append(e(iso(query.getEndTime())));
             }
             url = b.toString();
         }
@@ -217,12 +221,12 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
     }
 
     @Override
-    public AsyncResource<List<FreeBusyInterval>> queryFreeBusy(List<String> ids, long start, long end) {
+    public AsyncResource<List<FreeBusyInterval>> queryFreeBusy(List<String> ids, Instant start, Instant end) {
         final AsyncResource<List<FreeBusyInterval>> out = new AsyncResource<List<FreeBusyInterval>>();
         Map<String, Object> body = new HashMap<String, Object>();
         body.put("schedules", ids);
-        body.put("startTime", dateMap(CalendarDateTime.instant(start, "UTC")));
-        body.put("endTime", dateMap(CalendarDateTime.instant(end, "UTC")));
+        body.put("startTime", dateMap(CalendarDateTime.instant(start, ZoneId.of("UTC"))));
+        body.put("endTime", dateMap(CalendarDateTime.instant(end, ZoneId.of("UTC"))));
         body.put("availabilityViewInterval", Integer.valueOf(30));
         json("POST", GRAPH + "/me/calendar/getSchedule", body, null).ready(new SuccessCallback<Map<String, Object>>() {
 
@@ -233,7 +237,7 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
                     for (Map<String, Object> s : maps(root.get("value"))) {
                         for (Map<String, Object> i : maps(s.get("scheduleItems"))) {
                             CalendarEvent.Availability a = "free".equals(string(i, "status")) ? CalendarEvent.Availability.FREE : CalendarEvent.Availability.BUSY;
-                            items.add(new FreeBusyInterval(graphDate(map(i.get("start"))).getTimestamp(), graphDate(map(i.get("end"))).getTimestamp(), a));
+                            items.add(new FreeBusyInterval(graphDate(map(i.get("start"))).getDateTime().toInstant(), graphDate(map(i.get("end"))).getDateTime().toInstant(), a));
                         }
                     }
                 } catch (CalendarException ex) {
@@ -363,7 +367,10 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
             out.addAttendee(attendee);
         }
         if (bool(m, "isReminderOn")) {
-            out.addAlarm(new CalendarAlarm().setMinutesBefore(integer(m, "reminderMinutesBeforeStart")));
+            Integer minutes = integer(m, "reminderMinutesBeforeStart");
+            if (minutes != null) {
+                out.addAlarm(new CalendarAlarm().setTimeBefore(Duration.ofMinutes(minutes.intValue())));
+            }
         }
         Map<String, Object> meeting = map(m.get("onlineMeeting"));
         if (!meeting.isEmpty()) {
@@ -400,9 +407,9 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
             attendees.add(x);
         }
         m.put("attendees", attendees);
-        if (!e.getAlarms().isEmpty() && e.getAlarms().get(0).getMinutesBefore() != null) {
+        if (!e.getAlarms().isEmpty() && e.getAlarms().get(0).getTimeBefore() != null && e.getAlarms().get(0).getTimeBefore().toMillis() % 60000L == 0L) {
             m.put("isReminderOn", Boolean.TRUE);
-            m.put("reminderMinutesBeforeStart", e.getAlarms().get(0).getMinutesBefore());
+            m.put("reminderMinutesBeforeStart", Long.valueOf(e.getAlarms().get(0).getTimeBefore().toMillis() / 60000L));
         }
         if (e.getConference() != null && e.getConference().isCreateRequested()) {
             m.put("isOnlineMeeting", Boolean.TRUE);
@@ -420,10 +427,10 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
             out.setDue(graphDate(map(m.get("dueDateTime"))));
         }
         if (m.get("completedDateTime") instanceof Map) {
-            out.setCompletionTime(Long.valueOf(graphDate(map(m.get("completedDateTime"))).getTimestamp()));
+            out.setCompletionTime(graphDate(map(m.get("completedDateTime"))).getDateTime().toInstant());
         }
         if (bool(m, "isReminderOn") && m.get("reminderDateTime") instanceof Map) {
-            out.addAlarm(new CalendarAlarm().setAbsoluteTime(Long.valueOf(graphDate(map(m.get("reminderDateTime"))).getTimestamp())));
+            out.addAlarm(new CalendarAlarm().setAbsoluteTime(graphDate(map(m.get("reminderDateTime"))).getDateTime().toInstant()));
         }
         return out;
     }
@@ -445,7 +452,7 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
         }
         if (!t.getAlarms().isEmpty() && t.getAlarms().get(0).getAbsoluteTime() != null) {
             m.put("isReminderOn", Boolean.TRUE);
-            m.put("reminderDateTime", dateMap(CalendarDateTime.instant(t.getAlarms().get(0).getAbsoluteTime().longValue(), "UTC")));
+            m.put("reminderDateTime", dateMap(CalendarDateTime.instant(t.getAlarms().get(0).getAbsoluteTime(), ZoneId.of("UTC"))));
         }
         return m;
     }
@@ -458,7 +465,8 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
         }
         String timeZone = zone == null ? "UTC" : zone;
         try {
-            return CalendarDateTime.instant(CalendarDateUtil.parseDateTime(date, timeZone), timeZone);
+            ZoneId zoneId = ZoneId.of(timeZone);
+            return CalendarDateTime.instant(CalendarDateUtil.parseDateTime(date, zoneId), zoneId);
         } catch (IllegalArgumentException ex) {
             throw new CalendarException(CalendarError.MALFORMED_RESPONSE, "Invalid Graph date: " + date, ex);
         }
@@ -469,10 +477,10 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
         if (d == null) {
             return m;
         }
-        long time = d.isAllDay() ? CalendarDateUtil.allDayMillis(d.getDate()) : d.getTimestamp();
-        String zone = d.isAllDay() ? "UTC" : d.getTimeZoneId();
+        Instant time = d.isAllDay() ? CalendarDateUtil.allDayInstant(d.getDate()) : d.getDateTime().toInstant();
+        ZoneId zone = d.isAllDay() ? ZoneId.of("UTC") : d.getDateTime().getZone();
         m.put("dateTime", CalendarDateUtil.formatIso(time, zone, false));
-        m.put("timeZone", zone);
+        m.put("timeZone", zone.getId());
         return m;
     }
 
@@ -480,11 +488,11 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
         if (d == null) {
             return null;
         }
-        return CalendarDateTime.allDay(CalendarDateUtil.dateFor(d.getTimestamp(), d.getTimeZoneId()));
+        return CalendarDateTime.allDay(d.getDateTime().toLocalDateTime().toLocalDate());
     }
 
-    private static String iso(long time) {
-        return CalendarDateUtil.formatIso(time, "UTC", false) + "Z";
+    private static String iso(Instant time) {
+        return CalendarDateUtil.formatIso(time, ZoneId.of("UTC"), false) + "Z";
     }
 
     private static String e(String value) {
@@ -635,7 +643,7 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
         if (!rule.getMonths().isEmpty()) {
             pattern.put("month", rule.getMonths().get(0));
         }
-        CalendarDate start = event.getStart() != null && event.getStart().isAllDay() ? event.getStart().getDate() : dateFor(event.getStart());
+        LocalDate start = event.getStart() != null && event.getStart().isAllDay() ? event.getStart().getDate() : dateFor(event.getStart());
         range.put("startDate", start == null ? "1970-01-01" : start.toString());
         if (rule.getCount() != null) {
             range.put("type", "numbered");
@@ -651,13 +659,12 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
         return out;
     }
 
-    private static CalendarDate dateFor(CalendarDateTime value) {
-        return value == null ? null : CalendarDateUtil.dateFor(value.getTimestamp(), value.getTimeZoneId());
+    private static LocalDate dateFor(CalendarDateTime value) {
+        return value == null ? null : value.getDateTime().toLocalDateTime().toLocalDate();
     }
 
-    private static CalendarDate parseDate(String value) {
-        String[] p = CalendarDateUtil.split(value, '-');
-        return new CalendarDate(Integer.parseInt(p[0]), Integer.parseInt(p[1]), Integer.parseInt(p[2]));
+    private static LocalDate parseDate(String value) {
+        return LocalDate.parse(value);
     }
 
     private static int graphDay(String value) {

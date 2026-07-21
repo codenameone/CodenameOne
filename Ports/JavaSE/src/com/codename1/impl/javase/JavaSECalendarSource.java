@@ -37,6 +37,7 @@ import com.codename1.calendar.CalendarTask;
 import com.codename1.calendar.FreeBusyInterval;
 import com.codename1.calendar.LocalCalendarSource;
 import com.codename1.util.AsyncResource;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -91,8 +92,10 @@ final class JavaSECalendarSource extends LocalCalendarSource {
         List<CalendarEvent> out = new ArrayList<CalendarEvent>();
         for (CalendarEvent e : events.values()) {
             if (query != null && query.getCalendarId() != null && !query.getCalendarId().equals(e.getCalendarId())) continue;
-            if (query != null && query.getStartTime() != null && e.getEnd() != null && !e.getEnd().isAllDay() && e.getEnd().getTimestamp() < query.getStartTime().longValue()) continue;
-            if (query != null && query.getEndTime() != null && e.getStart() != null && !e.getStart().isAllDay() && e.getStart().getTimestamp() > query.getEndTime().longValue()) continue;
+            if (query != null && query.getStartTime() != null && e.getEnd() != null && !e.getEnd().isAllDay()
+                    && e.getEnd().getDateTime().toInstant().compareTo(query.getStartTime()) < 0) continue;
+            if (query != null && query.getEndTime() != null && e.getStart() != null && !e.getStart().isAllDay()
+                    && e.getStart().getDateTime().toInstant().compareTo(query.getEndTime()) > 0) continue;
             out.add(e);
         }
         return completed(new CalendarPage<CalendarEvent>(out, null, String.valueOf(nextId)));
@@ -118,12 +121,14 @@ final class JavaSECalendarSource extends LocalCalendarSource {
         if (event != null) for (CalendarAttendee a : event.getAttendees()) if (a.isSelf()) a.setResponse(response);
         return completed(event);
     }
-    public synchronized AsyncResource<List<FreeBusyInterval>> queryFreeBusy(List<String> ids, long start, long end) {
+    public synchronized AsyncResource<List<FreeBusyInterval>> queryFreeBusy(List<String> ids, Instant start, Instant end) {
         List<FreeBusyInterval> out = new ArrayList<FreeBusyInterval>();
         for (CalendarEvent event : events.values()) if (event.getAvailability() != CalendarEvent.Availability.FREE
                 && event.getStart() != null && event.getEnd() != null && !event.getStart().isAllDay() && !event.getEnd().isAllDay()
-                && event.getEnd().getTimestamp() >= start && event.getStart().getTimestamp() <= end)
-            out.add(new FreeBusyInterval(event.getStart().getTimestamp(), event.getEnd().getTimestamp(), event.getAvailability()));
+                && event.getEnd().getDateTime().toInstant().compareTo(start) >= 0
+                && event.getStart().getDateTime().toInstant().compareTo(end) <= 0)
+            out.add(new FreeBusyInterval(event.getStart().getDateTime().toInstant(),
+                    event.getEnd().getDateTime().toInstant(), event.getAvailability()));
         return completed(out);
     }
     public synchronized AsyncResource<CalendarPage<CalendarTask>> queryTasks(CalendarQuery query) {

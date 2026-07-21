@@ -47,6 +47,9 @@ import com.codename1.calendar.OidcCalendarTokenProvider;
 import com.codename1.calendar.StorageCalendarCache;
 import com.codename1.io.Log;
 import com.codename1.io.oidc.OidcClient;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
 
 public class CalendarIntegrationSnippets {
     public void discoverCapabilities() {
@@ -59,7 +62,7 @@ public class CalendarIntegrationSnippets {
                 if (status == CalendarAuthorizationStatus.FULL) {
                     local.queryEvents(new CalendarQuery()
                             .setCalendarId("primary")
-                            .setStartTime(System.currentTimeMillis()))
+                            .setStartTime(Instant.now()))
                          .ready(page -> page.getItems().forEach(System.out::println));
                 }
             });
@@ -67,20 +70,20 @@ public class CalendarIntegrationSnippets {
         // end::calendar-capabilities[]
     }
 
-    public void createEvent(LocalCalendarSource local, String calendarId, long startMillis, long endMillis) {
+    public void createEvent(LocalCalendarSource local, String calendarId, Instant start, Instant end) {
         // tag::calendar-create-event[]
         CalendarEvent event = new CalendarEvent()
                 .setCalendarId(calendarId)
                 .setTitle("Architecture review")
-                .setStart(CalendarDateTime.instant(startMillis, "Europe/Paris"))
-                .setEnd(CalendarDateTime.instant(endMillis, "Europe/Paris"))
+                .setStart(CalendarDateTime.instant(start, ZoneId.of("Europe/Paris")))
+                .setEnd(CalendarDateTime.instant(end, ZoneId.of("Europe/Paris")))
                 .setRecurrence(new CalendarRecurrenceRule()
                         .setFrequency(CalendarRecurrenceRule.Frequency.WEEKLY)
                         .addDayOfWeek(2))
                 .addAttendee(new CalendarAttendee()
                         .setName("Ari")
                         .setEmail("ari@example.com"))
-                .addAlarm(new CalendarAlarm().setMinutesBefore(15));
+                .addAlarm(new CalendarAlarm().setTimeBefore(Duration.ofMinutes(15)));
 
         local.saveEvent(event, CalendarMutationScope.ALL).ready(saved -> {
             Log.p("Created " + saved.getId());

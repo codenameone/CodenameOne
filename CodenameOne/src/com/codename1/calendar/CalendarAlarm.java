@@ -22,6 +22,9 @@
  */
 package com.codename1.calendar;
 
+import java.time.Duration;
+import java.time.Instant;
+
 /// An event/task alarm, either absolute or relative to its start/due time.
 public class CalendarAlarm {
 
@@ -30,29 +33,32 @@ public class CalendarAlarm {
         DEFAULT, ALERT, EMAIL, AUDIO
     }
 
-    private Integer minutesBefore;
+    private Duration timeBefore;
 
-    private Long absoluteTime;
+    private Instant absoluteTime;
 
     private Method method = Method.DEFAULT;
 
-    public Integer getMinutesBefore() {
-        return minutesBefore;
+    public Duration getTimeBefore() {
+        return timeBefore;
     }
 
-    public CalendarAlarm setMinutesBefore(Integer v) {
-        minutesBefore = v;
+    public CalendarAlarm setTimeBefore(Duration v) {
+        if (v != null && v.compareTo(Duration.ofSeconds(0)) < 0) {
+            throw new IllegalArgumentException("timeBefore must not be negative");
+        }
+        timeBefore = v;
         absoluteTime = null;
         return this;
     }
 
-    public Long getAbsoluteTime() {
+    public Instant getAbsoluteTime() {
         return absoluteTime;
     }
 
-    public CalendarAlarm setAbsoluteTime(Long v) {
+    public CalendarAlarm setAbsoluteTime(Instant v) {
         absoluteTime = v;
-        minutesBefore = null;
+        timeBefore = null;
         return this;
     }
 

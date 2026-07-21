@@ -22,6 +22,9 @@
  */
 package com.codename1.calendar;
 
+import java.time.Duration;
+import java.time.Instant;
+
 /// App-owned OAuth bearer token returned to an online source.
 public final class CalendarAuthToken {
 
@@ -29,9 +32,9 @@ public final class CalendarAuthToken {
 
     private final String scopes;
 
-    private final Long expiresAt;
+    private final Instant expiresAt;
 
-    public CalendarAuthToken(String accessToken, Long expiresAt, String scopes) {
+    public CalendarAuthToken(String accessToken, Instant expiresAt, String scopes) {
         if (accessToken == null) {
             throw new IllegalArgumentException("accessToken required");
         }
@@ -44,7 +47,7 @@ public final class CalendarAuthToken {
         return accessToken;
     }
 
-    public Long getExpiresAt() {
+    public Instant getExpiresAt() {
         return expiresAt;
     }
 
@@ -52,7 +55,10 @@ public final class CalendarAuthToken {
         return scopes;
     }
 
-    public boolean isExpiringWithin(int seconds) {
-        return expiresAt != null && expiresAt.longValue() - System.currentTimeMillis() < seconds * 1000L;
+    public boolean isExpiringWithin(Duration duration) {
+        if (duration == null) {
+            throw new IllegalArgumentException("duration required");
+        }
+        return expiresAt != null && expiresAt.toEpochMilli() - Instant.now().toEpochMilli() < duration.toMillis();
     }
 }

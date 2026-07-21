@@ -22,6 +22,8 @@
  */
 package com.codename1.calendar;
 
+import java.time.Instant;
+
 /// Query options shared by event and task listing operations.
 public class CalendarQuery {
 
@@ -33,9 +35,9 @@ public class CalendarQuery {
 
     private String syncToken;
 
-    private Long startTime;
+    private Instant startTime;
 
-    private Long endTime;
+    private Instant endTime;
 
     private int pageSize = 100;
 
@@ -79,20 +81,20 @@ public class CalendarQuery {
         return this;
     }
 
-    public Long getStartTime() {
+    public Instant getStartTime() {
         return startTime;
     }
 
-    public CalendarQuery setStartTime(Long v) {
+    public CalendarQuery setStartTime(Instant v) {
         startTime = v;
         return this;
     }
 
-    public Long getEndTime() {
+    public Instant getEndTime() {
         return endTime;
     }
 
-    public CalendarQuery setEndTime(Long v) {
+    public CalendarQuery setEndTime(Instant v) {
         endTime = v;
         return this;
     }

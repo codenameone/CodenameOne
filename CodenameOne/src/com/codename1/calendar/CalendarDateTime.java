@@ -22,48 +22,53 @@
  */
 package com.codename1.calendar;
 
-/// Either an instant with an Olson time-zone ID or an all-day date.
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+
+/// Either a zoned date-time or an all-day date.
 public final class CalendarDateTime {
 
-    private final long timestamp;
+    private final ZonedDateTime dateTime;
 
-    private final String timeZoneId;
+    private final LocalDate date;
 
-    private final CalendarDate date;
-
-    private CalendarDateTime(long timestamp, String timeZoneId, CalendarDate date) {
-        this.timestamp = timestamp;
-        this.timeZoneId = timeZoneId;
+    private CalendarDateTime(ZonedDateTime dateTime, LocalDate date) {
+        this.dateTime = dateTime;
         this.date = date;
     }
 
-    public static CalendarDateTime instant(long timestamp, String timeZoneId) {
-        if (timeZoneId == null || timeZoneId.length() == 0) {
-            throw new IllegalArgumentException("timeZoneId required");
+    public static CalendarDateTime timed(ZonedDateTime dateTime) {
+        if (dateTime == null) {
+            throw new IllegalArgumentException("dateTime required");
         }
-        return new CalendarDateTime(timestamp, timeZoneId, null);
+        return new CalendarDateTime(dateTime, null);
     }
 
-    public static CalendarDateTime allDay(CalendarDate date) {
+    public static CalendarDateTime instant(Instant instant, ZoneId zone) {
+        if (instant == null || zone == null) {
+            throw new IllegalArgumentException("instant and zone required");
+        }
+        return timed(ZonedDateTime.ofInstant(instant, zone));
+    }
+
+    public static CalendarDateTime allDay(LocalDate date) {
         if (date == null) {
             throw new IllegalArgumentException("date required");
         }
-        return new CalendarDateTime(0L, null, date);
+        return new CalendarDateTime(null, date);
     }
 
     public boolean isAllDay() {
         return date != null;
     }
 
-    public long getTimestamp() {
-        return timestamp;
+    public ZonedDateTime getDateTime() {
+        return dateTime;
     }
 
-    public String getTimeZoneId() {
-        return timeZoneId;
-    }
-
-    public CalendarDate getDate() {
+    public LocalDate getDate() {
         return date;
     }
 }

@@ -24,6 +24,11 @@ package com.codename1.calendar;
 
 import com.codename1.util.AsyncResource;
 import com.codename1.ui.Display;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -33,16 +38,41 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CalendarIntegrationTest {
     @Test
+    void calendarModelUsesJavaTimeValuesEndToEnd() {
+        Instant completion = Instant.ofEpochMilli(1784458800123L);
+        ZoneId zone = ZoneId.of("Asia/Jerusalem");
+        ZonedDateTime timed = ZonedDateTime.ofInstant(completion, zone);
+        Duration reminder = Duration.ofMinutes(30);
+        CalendarTask source = new CalendarTask()
+                .setStart(CalendarDateTime.timed(timed))
+                .setDue(CalendarDateTime.allDay(LocalDate.of(2026, 7, 31)))
+                .setCompletionTime(completion)
+                .addAlarm(new CalendarAlarm().setTimeBefore(reminder));
+
+        CalendarTask decoded = CalendarModelCodec.decodeTask(CalendarModelCodec.encodeTask(source));
+
+        assertEquals(timed, decoded.getStart().getDateTime());
+        assertEquals(LocalDate.of(2026, 7, 31), decoded.getDue().getDate());
+        assertEquals(completion, decoded.getCompletionTime());
+        assertEquals(reminder, decoded.getAlarms().get(0).getTimeBefore());
+        assertEquals(zone, new CalendarInfo().setTimeZone(zone).getTimeZone());
+        assertEquals(completion, new CalendarQuery().setStartTime(completion).getStartTime());
+        assertEquals(completion, new FreeBusyInterval(completion, completion, null).getStartTime());
+        assertThrows(IllegalArgumentException.class,
+                () -> new CalendarAlarm().setTimeBefore(Duration.ofSeconds(-1)));
+    }
+
+    @Test
     void iCalendarRoundTripPreservesPortableEventData() throws Exception {
         CalendarRecurrenceRule recurrence = new CalendarRecurrenceRule().setFrequency(CalendarRecurrenceRule.Frequency.WEEKLY)
                 .setInterval(2).setCount(Integer.valueOf(8)).addDayOfWeek(1).addDayOfWeek(3);
         CalendarEvent event = new CalendarEvent().setId("event-1").setTitle("Planning, review")
                 .setDescription("Line one\nLine two").setLocation("Room; 4")
-                .setStart(CalendarDateTime.instant(1784455200000L,"Asia/Jerusalem"))
-                .setEnd(CalendarDateTime.instant(1784458800000L,"Asia/Jerusalem"))
+                .setStart(CalendarDateTime.instant(Instant.ofEpochMilli(1784455200000L),ZoneId.of("Asia/Jerusalem")))
+                .setEnd(CalendarDateTime.instant(Instant.ofEpochMilli(1784458800000L),ZoneId.of("Asia/Jerusalem")))
                 .setRecurrence(recurrence).setPrivacy(CalendarEvent.Privacy.PRIVATE)
                 .addAttendee(new CalendarAttendee().setName("Ada Lovelace").setEmail("ada@example.com").setRole(CalendarAttendee.Role.OPTIONAL).setResponse(CalendarAttendee.Response.ACCEPTED))
-                .addAlarm(new CalendarAlarm().setMinutesBefore(Integer.valueOf(15)))
+                .addAlarm(new CalendarAlarm().setTimeBefore(Duration.ofMinutes(15)))
                 .addAttachment(new CalendarAttachment().setUri("https://example.com/spec.pdf").setMimeType("application/pdf"))
                 .setConference(new CalendarConference().setJoinUrl("https://meet.example.com/abc"))
                 .putProviderData("X-CN1-TEST","preserved");
@@ -53,12 +83,12 @@ class CalendarIntegrationTest {
         assertEquals("event-1",decoded.getId());
         assertEquals("Planning, review",decoded.getTitle());
         assertEquals("Line one\nLine two",decoded.getDescription());
-        assertEquals("Asia/Jerusalem",decoded.getStart().getTimeZoneId());
+        assertEquals("Asia/Jerusalem",decoded.getStart().getDateTime().getZone().getId());
         assertEquals(CalendarEvent.Privacy.PRIVATE,decoded.getPrivacy());
         assertEquals(2,decoded.getRecurrence().getInterval());
         assertEquals(2,decoded.getRecurrence().getDaysOfWeek().size());
         assertEquals(CalendarAttendee.Role.OPTIONAL,decoded.getAttendees().get(0).getRole());
-        assertEquals(Integer.valueOf(15),decoded.getAlarms().get(0).getMinutesBefore());
+        assertEquals(Duration.ofMinutes(15),decoded.getAlarms().get(0).getTimeBefore());
         assertEquals("https://meet.example.com/abc",decoded.getConference().getJoinUrl());
         assertEquals("preserved",decoded.getProviderData().get("X-CN1-TEST"));
         assertTrue(encoded.contains("\r\n ") || encoded.contains("Planning\\, review"));
@@ -66,20 +96,19 @@ class CalendarIntegrationTest {
 
     @Test
     void allDayTaskRoundTripDoesNotInventATimeZone() throws Exception {
-        CalendarTask task=new CalendarTask().setId("todo-1").setTitle("Ship").setDue(CalendarDateTime.allDay(new CalendarDate(2026,7,31))).setCompleted(true).setPriority(3);
+        CalendarTask task=new CalendarTask().setId("todo-1").setTitle("Ship").setDue(CalendarDateTime.allDay(LocalDate.of(2026,7,31))).setCompleted(true).setPriority(3);
         CalendarTask decoded=ICalendarCodec.readTask(ICalendarCodec.writeTask(task));
         assertTrue(decoded.getDue().isAllDay());
-        assertEquals(new CalendarDate(2026,7,31),decoded.getDue().getDate());
+        assertEquals(LocalDate.of(2026,7,31),decoded.getDue().getDate());
         assertTrue(decoded.isCompleted());
         assertEquals(3,decoded.getPriority());
     }
 
     @Test
     void portableDateCodecHandlesFractionsAndOffsets() {
-        assertEquals(123L, CalendarDateUtil.parseDateTime("1970-01-01T02:30:00.123+02:30", "UTC"));
-        assertEquals("19700101T000000", CalendarDateUtil.formatBasic(0L, "UTC"));
-        assertEquals("1970-01-01T00:00:00.000", CalendarDateUtil.formatIso(0L, "UTC", true));
-        assertEquals(new CalendarDate(1970, 1, 1), CalendarDateUtil.dateFor(0L, "UTC"));
+        assertEquals(Instant.ofEpochMilli(123L), CalendarDateUtil.parseDateTime("1970-01-01T02:30:00.123+02:30", ZoneId.of("UTC")));
+        assertEquals("19700101T000000", CalendarDateUtil.formatBasic(Instant.ofEpochMilli(0L), ZoneId.of("UTC")));
+        assertEquals("1970-01-01T00:00:00.000", CalendarDateUtil.formatIso(Instant.ofEpochMilli(0L), ZoneId.of("UTC"), true));
     }
 
     @Test

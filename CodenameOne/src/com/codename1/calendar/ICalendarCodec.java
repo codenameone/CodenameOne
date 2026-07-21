@@ -23,6 +23,13 @@
 package com.codename1.calendar;
 
 import com.codename1.util.StringUtil;
+import java.time.DateTimeException;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -70,7 +77,7 @@ public final class ICalendarCodec {
         writeCommon(out, task.getId(), task.getTitle(), task.getDescription(), task.getLocation(), task.getStart(), task.getDue(), task.getRecurrence(), task.getProviderData());
         append(out, "STATUS:" + (task.isCompleted() ? "COMPLETED" : "NEEDS-ACTION"));
         if (task.getCompletionTime() != null) {
-            append(out, "COMPLETED:" + utc(task.getCompletionTime().longValue()));
+            append(out, "COMPLETED:" + utc(task.getCompletionTime()));
         }
         if (task.getPriority() > 0) {
             append(out, "PRIORITY:" + task.getPriority());
@@ -125,7 +132,7 @@ public final class ICalendarCodec {
         out.setCompleted("COMPLETED".equalsIgnoreCase(value(component, "STATUS")));
         String completed = value(component, "COMPLETED");
         if (completed != null) {
-            out.setCompletionTime(Long.valueOf(parseDateTime(completed, null).getTimestamp()));
+            out.setCompletionTime(parseDateTime(completed, null).getDateTime().toInstant());
         }
         String priority = value(component, "PRIORITY");
         if (priority != null) {
@@ -185,7 +192,7 @@ public final class ICalendarCodec {
 
     private static void writeCommon(StringBuilder out, String id, String title, String description, String location, CalendarDateTime start, CalendarDateTime end, CalendarRecurrenceRule recurrence, Map<String, String> extensions) {
         append(out, "UID:" + escape(id == null ? String.valueOf(System.currentTimeMillis()) + "@codenameone" : id));
-        append(out, "DTSTAMP:" + utc(System.currentTimeMillis()));
+        append(out, "DTSTAMP:" + utc(Instant.now()));
         if (title != null) {
             append(out, "SUMMARY:" + escape(title));
         }
@@ -217,12 +224,16 @@ public final class ICalendarCodec {
 
     private static void writeDateTime(StringBuilder out, String name, CalendarDateTime value) {
         if (value.isAllDay()) {
-            CalendarDate date = value.getDate();
+            LocalDate date = value.getDate();
             append(out, name + ";VALUE=DATE:" + digits(date));
-        } else if ("UTC".equals(value.getTimeZoneId()) || "GMT".equals(value.getTimeZoneId())) {
-            append(out, name + ":" + utc(value.getTimestamp()));
         } else {
-            append(out, name + ";TZID=" + value.getTimeZoneId() + ":" + local(value.getTimestamp(), value.getTimeZoneId()));
+            ZonedDateTime dateTime = value.getDateTime();
+            String zone = dateTime.getZone().getId();
+            if (ZoneOffset.UTC.equals(dateTime.getZone())) {
+                append(out, name + ":" + utc(dateTime.toInstant()));
+            } else {
+                append(out, name + ";TZID=" + zone + ":" + local(dateTime.toInstant(), dateTime.getZone()));
+            }
         }
     }
 
@@ -330,10 +341,14 @@ public final class ICalendarCodec {
     private static void writeAlarm(StringBuilder out, CalendarAlarm alarm) {
         append(out, "BEGIN:VALARM");
         append(out, "ACTION:" + (alarm.getMethod() == CalendarAlarm.Method.EMAIL ? "EMAIL" : alarm.getMethod() == CalendarAlarm.Method.AUDIO ? "AUDIO" : "DISPLAY"));
-        if (alarm.getMinutesBefore() != null) {
-            append(out, "TRIGGER:-PT" + alarm.getMinutesBefore() + "M");
+        if (alarm.getTimeBefore() != null) {
+            long seconds = alarm.getTimeBefore().getSeconds();
+            if (alarm.getTimeBefore().getNano() != 0 || seconds < 0) {
+                throw new IllegalArgumentException("timeBefore must be a non-negative whole-second duration");
+            }
+            append(out, "TRIGGER:-" + alarm.getTimeBefore());
         } else if (alarm.getAbsoluteTime() != null) {
-            append(out, "TRIGGER;VALUE=DATE-TIME:" + utc(alarm.getAbsoluteTime().longValue()));
+            append(out, "TRIGGER;VALUE=DATE-TIME:" + utc(alarm.getAbsoluteTime()));
         }
         append(out, "END:VALARM");
     }
@@ -347,13 +362,13 @@ public final class ICalendarCodec {
         } else if ("AUDIO".equals(action)) {
             out.setMethod(CalendarAlarm.Method.AUDIO);
         }
-        if (trigger != null && trigger.startsWith("-PT") && trigger.endsWith("M")) {
+        if (trigger != null && trigger.startsWith("-P")) {
             try {
-                out.setMinutesBefore(Integer.valueOf(trigger.substring(3, trigger.length() - 1)));
-            } catch (NumberFormatException ignored) {
+                out.setTimeBefore(Duration.parse(trigger.substring(1)));
+            } catch (DateTimeException ignored) {
             }
         } else if (trigger != null) {
-            out.setAbsoluteTime(Long.valueOf(parseDateTime(trigger, null).getTimestamp()));
+            out.setAbsoluteTime(parseDateTime(trigger, null).getDateTime().toInstant());
         }
         return out;
     }
@@ -433,11 +448,12 @@ public final class ICalendarCodec {
     private static CalendarDateTime parseDateTime(String value, String zone) throws CalendarException {
         try {
             if (value.length() == 8) {
-                return CalendarDateTime.allDay(new CalendarDate(Integer.parseInt(value.substring(0, 4)), Integer.parseInt(value.substring(4, 6)), Integer.parseInt(value.substring(6, 8))));
+                return CalendarDateTime.allDay(LocalDate.of(Integer.parseInt(value.substring(0, 4)), Integer.parseInt(value.substring(4, 6)), Integer.parseInt(value.substring(6, 8))));
             }
             boolean zulu = value.endsWith("Z");
             String timeZone = zulu || zone == null ? "UTC" : zone;
-            return CalendarDateTime.instant(CalendarDateUtil.parseDateTime(value, timeZone), timeZone);
+            ZoneId zoneId = ZoneId.of(timeZone);
+            return CalendarDateTime.instant(CalendarDateUtil.parseDateTime(value, zoneId), zoneId);
         } catch (IllegalArgumentException ex) {
             throw new CalendarException(CalendarError.MALFORMED_RESPONSE, "Invalid calendar date: " + value, ex);
         }
@@ -543,8 +559,8 @@ public final class ICalendarCodec {
         return property == null ? null : unescape(property.value);
     }
 
-    private static String digits(CalendarDate date) {
-        return pad(date.getYear(), 4) + pad(date.getMonth(), 2) + pad(date.getDay(), 2);
+    private static String digits(LocalDate date) {
+        return pad(date.getYear(), 4) + pad(date.getMonthValue(), 2) + pad(date.getDayOfMonth(), 2);
     }
 
     private static String pad(int value, int count) {
@@ -555,20 +571,20 @@ public final class ICalendarCodec {
         return s;
     }
 
-    private static String utc(long value) {
-        return format(value, "UTC") + "Z";
+    private static String utc(Instant value) {
+        return format(value, ZoneOffset.UTC) + "Z";
     }
 
-    private static String local(long value, String zone) {
+    private static String local(Instant value, ZoneId zone) {
         return format(value, zone);
     }
 
-    private static String format(long value, String zone) {
+    private static String format(Instant value, ZoneId zone) {
         return CalendarDateUtil.formatBasic(value, zone);
     }
 
     private static String formatRecurrenceUntil(CalendarDateTime value) {
-        return value.isAllDay() ? digits(value.getDate()) : utc(value.getTimestamp());
+        return value.isAllDay() ? digits(value.getDate()) : utc(value.getDateTime().toInstant());
     }
 
     private static int day(String value) {

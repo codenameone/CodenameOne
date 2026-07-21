@@ -22,6 +22,7 @@
  */
 package com.codename1.calendar;
 
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -44,7 +45,7 @@ public class CalendarInfo {
 
     private String owner;
 
-    private String timeZoneId;
+    private ZoneId timeZone;
 
     private int color;
 
@@ -103,12 +104,12 @@ public class CalendarInfo {
         return this;
     }
 
-    public String getTimeZoneId() {
-        return timeZoneId;
+    public ZoneId getTimeZone() {
+        return timeZone;
     }
 
-    public CalendarInfo setTimeZoneId(String v) {
-        timeZoneId = v;
+    public CalendarInfo setTimeZone(ZoneId v) {
+        timeZone = v;
         return this;
     }
 
