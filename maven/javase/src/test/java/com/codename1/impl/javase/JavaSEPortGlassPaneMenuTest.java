@@ -23,6 +23,7 @@
 package com.codename1.impl.javase;
 
 import java.awt.Point;
+import java.awt.Rectangle;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.swing.JComponent;
@@ -154,7 +155,15 @@ public class JavaSEPortGlassPaneMenuTest {
 
     private static final class Fixture {
         private final JRootPane rootPane = new JRootPane();
-        private final JPanel canvas = new JPanel();
+        private final JPanel canvas = new JPanel() {
+            @Override
+            public Rectangle getVisibleRect() {
+                // The production canvas is showing when the glass pane is active. This
+                // fixture is intentionally not attached to a native window so it remains
+                // headless; model the production visibility explicitly and consistently.
+                return new Rectangle(0, 0, getWidth(), getHeight());
+            }
+        };
         private final JComponent glassPane = new JComponent() {
         };
         private final JMenu deviceMenu = new JMenu("Device");
