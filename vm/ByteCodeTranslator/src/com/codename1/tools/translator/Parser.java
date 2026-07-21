@@ -265,7 +265,7 @@ public class Parser extends ClassVisitor {
      * The uncompressed payload is the same line-based ASCII the proxy's
      * SymbolTable parses:
      *   version &lt;n&gt;
-     *   class   &lt;classId&gt; &lt;clsName&gt; &lt;sourceFile&gt; &lt;superId&gt;
+     *   class   &lt;classId&gt; &lt;clsName&gt; &lt;sourceFile&gt; &lt;superId&gt; &lt;jvmName&gt;
      *   method  &lt;methodId&gt; &lt;classId&gt; &lt;methodName&gt; &lt;desc&gt; &lt;isStatic&gt;
      *   line    &lt;methodId&gt; &lt;sourceLine&gt;
      *   var     &lt;methodId&gt; &lt;slot&gt; &lt;name&gt; &lt;desc&gt;
@@ -280,15 +280,7 @@ public class Parser extends ClassVisitor {
                 if (src == null) {
                     src = "";
                 }
-                // Extended class row: id, name, sourceFile, superId.
-                // Older proxies (4-column form) ignore the trailing
-                // column since the parser tolerates extras.
-                int superId = -1;
-                if (bc.getBaseClassObject() != null) {
-                    superId = bc.getBaseClassObject().getClassOffset();
-                }
-                w.write("class\t" + bc.getClassOffset() + "\t" + bc.getClsName()
-                        + "\t" + src + "\t" + superId + "\n");
+                w.write(classSymbolRow(bc, src));
             }
             // Emit instance-field metadata so the proxy can answer JDWP
             // ClassType.Fields / FieldsWithGeneric without a device round-trip,
@@ -391,6 +383,28 @@ public class Parser extends ClassVisitor {
             System.out.println("Wrote on-device-debug symbol blob: " + f.getAbsolutePath()
                     + " (" + gz.length + " gz bytes, " + raw.size() + " raw)");
         }
+    }
+
+    /**
+     * Builds a symbol-table class row while retaining both ParparVM's mangled
+     * identifier and the original JVM internal name. The latter is required
+     * for JDWP signatures because mangling maps both {@code '/'} and
+     * {@code '$'} to {@code '_'}, making anonymous and inner classes
+     * impossible to reconstruct reliably in the debugger proxy.
+     */
+    static String classSymbolRow(ByteCodeClass bc, String sourceFile) {
+        int superId = -1;
+        if (bc.getBaseClassObject() != null) {
+            superId = bc.getBaseClassObject().getClassOffset();
+        }
+        String jvmName = bc.getOriginalClassName();
+        if (jvmName == null || jvmName.isEmpty()) {
+            // Defensive compatibility for synthetic ByteCodeClass instances
+            // that predate original-name tracking.
+            jvmName = bc.getClsName().replace('_', '/');
+        }
+        return "class\t" + bc.getClassOffset() + "\t" + bc.getClsName()
+                + "\t" + sourceFile + "\t" + superId + "\t" + jvmName + "\n";
     }
     
     private static void appendClassOffset(ByteCodeClass bc, List<Integer> clsIds) {

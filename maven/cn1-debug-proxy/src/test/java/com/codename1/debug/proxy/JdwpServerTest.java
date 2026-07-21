@@ -63,7 +63,7 @@ public class JdwpServerTest {
             assertEquals("JDWP-Handshake", new String(handshakeReply, StandardCharsets.US_ASCII));
 
             int requestId = 41;
-            byte[] signature = "Lcom/example/Test;".getBytes(StandardCharsets.UTF_8);
+            byte[] signature = "Lcom/example/Test$1;".getBytes(StandardCharsets.UTF_8);
             out.writeInt(11 + 4 + signature.length);
             out.writeInt(requestId);
             out.writeByte(0);
@@ -81,7 +81,8 @@ public class JdwpServerTest {
                 // Expected: the request remains queued instead of throwing.
             }
 
-            String table = "version\t1\nclass\t0\tcom_example_Test\tTest.java\t-1\n";
+            String table = "version\t1\n"
+                    + "class\t0\tcom_example_Test_1\tTest.java\t-1\tcom/example/Test$1\n";
             server.onSymbols(SymbolTable.load(new ByteArrayInputStream(
                     table.getBytes(StandardCharsets.UTF_8))));
             server.onHello(1);
