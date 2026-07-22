@@ -708,6 +708,18 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_calendarEvents___java_lang_String_l
 #endif
 }
 
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_calendarEvent___java_lang_String_java_lang_String_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT calendarId, JAVA_OBJECT eventId) {
+#if defined(CN1_USE_CALENDAR) && !TARGET_OS_WATCH && !TARGET_OS_TV
+    EKEventStore *store = cn1CalendarStore();
+    EKEvent *event = [store eventWithIdentifier:toNSString(CN1_THREAD_STATE_PASS_ARG eventId)];
+    NSString *requestedCalendar = toNSString(CN1_THREAD_STATE_PASS_ARG calendarId);
+    if (event && requestedCalendar && ![event.calendar.calendarIdentifier isEqualToString:requestedCalendar]) event = nil;
+    return fromNSString(CN1_THREAD_STATE_PASS_ARG cn1CalendarJson(event ? cn1EventDictionary(event) : @{}));
+#else
+    return fromNSString(CN1_THREAD_STATE_PASS_ARG @"{}");
+#endif
+}
+
 JAVA_OBJECT com_codename1_impl_ios_IOSNative_calendarSaveEvent___java_lang_String_int_R_java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_OBJECT eventJson, JAVA_INT mutationScope) {
 #if defined(CN1_USE_CALENDAR) && !TARGET_OS_WATCH && !TARGET_OS_TV
     NSDictionary *json=cn1CalendarDictionary(CN1_THREAD_STATE_PASS_ARG eventJson);EKEventStore *store=cn1CalendarStore();NSString *identifier=json[@"id"];EKEvent *event=identifier?[store eventWithIdentifier:identifier]:nil;if(!event)event=[EKEvent eventWithEventStore:store];NSString *calendarId=json[@"calendarId"];event.calendar=calendarId?[store calendarWithIdentifier:calendarId]:[store defaultCalendarForNewEvents];event.title=json[@"title"]?:@"";event.notes=json[@"notes"];event.location=json[@"location"];event.startDate=cn1CalendarDate(json,@"start");event.endDate=cn1CalendarDate(json,@"end");event.allDay=[json[@"allDay"] boolValue];NSMutableArray *alarms=[NSMutableArray array];for(NSDictionary *alarm in json[@"alarms"]?:@[]){if(alarm[@"absolute"])[alarms addObject:[EKAlarm alarmWithAbsoluteDate:[NSDate dateWithTimeIntervalSince1970:[alarm[@"absolute"] doubleValue]/1000.0]]];else if(alarm[@"minutes"])[alarms addObject:[EKAlarm alarmWithRelativeOffset:-[alarm[@"minutes"] doubleValue]*60.0]];}event.alarms=alarms;NSError *error=nil;BOOL ok=[store saveEvent:event span:mutationScope==0?EKSpanThisEvent:EKSpanFutureEvents commit:YES error:&error];return fromNSString(CN1_THREAD_STATE_PASS_ARG cn1CalendarJson(ok?cn1EventDictionary(event):@{@"error":error.localizedDescription?:@"Unable to save event"}));

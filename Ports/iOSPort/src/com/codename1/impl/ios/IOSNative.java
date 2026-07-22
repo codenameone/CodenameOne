@@ -59,6 +59,7 @@ public final class IOSNative {
     native boolean calendarRequestAccess(int entityType, boolean writeOnly);
     native String calendarList(int entityType);
     native String calendarEvents(String calendarId, long startTime, long endTime);
+    native String calendarEvent(String calendarId, String eventId);
     native String calendarSaveEvent(String eventJson, int mutationScope);
     native boolean calendarDeleteEvent(String eventId, int mutationScope);
     native String calendarTasks(String calendarId);
