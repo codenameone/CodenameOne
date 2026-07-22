@@ -43,7 +43,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Deterministic in-memory calendar used by the simulator and desktop run. */
+/** Deterministic in-memory calendar used by the simulator. */
 final class JavaSECalendarSource extends LocalCalendarSource {
     private final Map<String,CalendarInfo> calendars = new LinkedHashMap<String,CalendarInfo>();
     private final Map<String,CalendarEvent> events = new LinkedHashMap<String,CalendarEvent>();

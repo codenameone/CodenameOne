@@ -99,7 +99,7 @@
 // Catalyst); on tvOS MessageUI ships only a link stub with no composer headers
 // and AddressBookUI is absent. The native methods that use them are guarded to
 // no-ops on those slices.
-#if defined(CN1_USE_CALENDAR) && !TARGET_OS_WATCH && !TARGET_OS_TV
+#if !TARGET_OS_WATCH && !TARGET_OS_TV
 #import <MessageUI/MFMailComposeViewController.h>
 #endif
 #if !TARGET_OS_MACCATALYST && !TARGET_OS_WATCH && !TARGET_OS_TV
