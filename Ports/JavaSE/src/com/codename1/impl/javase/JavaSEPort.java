@@ -19142,10 +19142,29 @@ public class JavaSEPort extends CodenameOneImplementation {
             // would go to Canvas.  If we don't do this, then the glasspane will 
             // intercept all events, even those destined for the menu items - and
             // that causes all hell to break loose on Windows.
-            Point p = SwingUtilities.convertPoint(this, new Point(x, y), instance.canvas);
-            return instance.canvas.getVisibleRect().contains(p);
+            return shouldGlassPaneInterceptMouseEvent(this, instance.canvas, x, y);
 
         }
+   }
+
+   /**
+    * Returns whether the glass pane should handle a mouse event at the given point.
+    * Swing popup menus are placed above the content pane in the root layered pane,
+    * so testing only whether the point overlaps the canvas would steal their events.
+    */
+   static boolean shouldGlassPaneInterceptMouseEvent(JComponent glassPane,
+           java.awt.Component canvas, int x, int y) {
+        JRootPane rootPane = SwingUtilities.getRootPane(glassPane);
+        if (rootPane == null) {
+            return false;
+        }
+        JLayeredPane layeredPane = rootPane.getLayeredPane();
+        Point layeredPoint = SwingUtilities.convertPoint(
+                glassPane, new Point(x, y), layeredPane);
+        java.awt.Component component = SwingUtilities.getDeepestComponentAt(
+                layeredPane, layeredPoint.x, layeredPoint.y);
+        return component != null
+                && (canvas == component || containsInHierarchy(canvas, component));
    }
    
    private static boolean containsInHierarchy(java.awt.Component parent, java.awt.Component cmp) {
