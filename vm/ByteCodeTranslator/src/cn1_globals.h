@@ -1024,6 +1024,11 @@ extern const char* volatile cn1LastNamSetter; // diagnosis: last bracket toucher
 #define finishedNativeAllocations() do { threadStateData->nativeAllocationMode = JAVA_FALSE; cn1LastNamSetter = 0; } while(0)
 #endif
 
+// Shared by ThreadLocalData's adaptive state and the page allocator below.
+#ifndef CN1_BIBOP_NUM_CLASSES
+#define CN1_BIBOP_NUM_CLASSES 15
+#endif
+
 // handles the stack used for print stack trace and GC
 struct ThreadLocalData {
     JAVA_LONG threadId;
@@ -1089,7 +1094,6 @@ struct ThreadLocalData {
     // 0 == not yet computed (lazily initialized once per thread on first use).
     JAVA_LONG nativeStackLimit;
 
-#ifndef CN1_DISABLE_DEATOMIC_BYTES
     // LEVER A (perf-tier1): per-thread, plain-add accumulator for BiBOP allocation
     // volume. Replaces the per-object atomic_fetch_add on the global bibopBytesSinceGc
     // (which an uncontended single thread still pays as an arm64 exclusive-monitor RMW,
@@ -1098,7 +1102,13 @@ struct ThreadLocalData {
     // within (nthreads * page) -- negligible vs the 24MB trigger, and the trigger is a
     // pure heuristic with NO correctness role (see CN1_BIBOP_FLUSH_BYTES).
     JAVA_LONG bibopBytesLocal;
-#endif
+    // Runtime policy state. These are part of the one production collector; the
+    // compile-time collector variants are QA baselines only.
+    JAVA_LONG bibopEpochBytes;
+    int bibopObservedGcEpoch;
+    int bibopHighThroughputUntilEpoch;
+    int bibopBypassSeen[CN1_BIBOP_NUM_CLASSES];
+    int bibopBypassRemaining[CN1_BIBOP_NUM_CLASSES];
 
 #ifdef CN1_ON_DEVICE_DEBUG
     // Per-frame pointer to a stack-allocated array of void* addresses, one per
@@ -1270,7 +1280,6 @@ const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 #define CN1_BIBOP_ADOPTED (-4)
 #endif
 // Slot sizes (16-aligned); a size maps to the smallest class >= size.
-#define CN1_BIBOP_NUM_CLASSES 15
 // Compile-time size -> class-index. With a constant `sz` (sizeof(...)) clang
 // folds the whole chain to an int literal (or -1 for oversized => fast path
 // dead-code-eliminated, slow path only).
@@ -1281,6 +1290,7 @@ const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 
 typedef struct CN1BibopPage {
     struct CN1BibopPage* _Atomic nextAll; // append-only global registry chain
+    struct CN1BibopPage* nextFresh[2];    // alternating per-GC fresh-page stack links
     struct CN1BibopPage* nextPool;        // FREE/PARTIAL pool / SWEEP stack link
     int classIndex;
     int slotSize;
@@ -1325,12 +1335,31 @@ typedef struct CN1BibopPage {
                                           //  idempotent across parallel markers)
     int gcGraceEpoch;                     // upper bound on survivor epochs as of the last
                                           //  full walk (GC-thread only)
+    _Atomic int gcFreshEpoch[2];          // queued once on each alternating epoch stack
 } CN1BibopPage;
 
 // Per-thread current page per size class; defined in cn1_globals.m. Touched only
 // by the owning thread (alloc) and by that same thread on death.
 extern __thread CN1BibopPage* bibopCurrent[CN1_BIBOP_NUM_CLASSES];
 extern _Atomic long bibopBytesSinceGc;
+extern _Atomic long bibopGcTriggerBytes;
+// Atomic mirror of currentGcMarkValue for mutator-side adaptive/fresh-page
+// decisions. currentGcMarkValue itself remains owned by the GC/mark threads.
+extern _Atomic int bibopGcEpoch;
+extern _Atomic int bibopBypassGeneration[CN1_BIBOP_NUM_CLASSES];
+extern CN1BibopPage* _Atomic bibopFreshPages[2];
+#if defined(CN1_GC_INSTRUMENT) && !defined(CN1_DISABLE_BIBOP)
+// QA-only diagnostics. Production builds contain neither the counters nor
+// their atomic updates.
+extern _Atomic long cn1BibopHighThroughputPromotions;
+extern _Atomic long cn1BibopBypassActivations;
+extern _Atomic long cn1BibopBypassAllocations;
+extern _Atomic long cn1BibopFreshPagesScanned;
+extern _Atomic long cn1BibopBeltRuns;
+extern _Atomic long cn1BibopAdoptedRescanSkips;
+#endif
+extern int currentGcMarkValue;
+extern void cn1BibopNoteFreshAllocation(CN1BibopPage* page, int epoch);
 #ifndef CN1_BIBOP_NO_FASTSWEEP
 // Called from monitorEnter (any thread) when a monitor (CN1ThreadData) is freshly
 // attached to a heap object. If the object is a BiBOP slot it bumps a global live-monitor
@@ -1345,17 +1374,21 @@ extern void* cn1MonitorDataRemove(JAVA_OBJECT o);
 extern long long allocationsSinceLastGC;
 extern long long totalAllocations;
 
-// LEVER A (perf-tier1, -DCN1_DEATOMIC_BYTES): per-object BiBOP byte accounting.
+// LEVER A (perf-tier1, enabled unless -DCN1_DISABLE_DEATOMIC_BYTES): per-object
+// BiBOP byte accounting.
 // CN1_BIBOP_ACCOUNT_BYTES is called once per allocation (inline fast path AND the
 // .m slow path); CN1_BIBOP_FLUSH_BYTES is called once per page-acquire (slow path)
 // and at thread death. The global bibopBytesSinceGc is read only by the GC-trigger
-// heuristic (cn1BibopMaybeGc) and reset to 0 by the sweep -- it has NO liveness/
+// heuristic (cn1BibopMaybeGc) and exchanged to 0 at GC start -- it has NO liveness/
 // correctness role -- so deferring the per-thread total into it via plain adds and
 // flushing it in bulk is safe; only the trigger cadence shifts (by < nthreads*page,
 // negligible vs the 24MB trigger, and already racy today). The bump cursor / mark
 // publication ordering is UNCHANGED (those are the GC-visible fields; see report).
 #ifndef CN1_DISABLE_DEATOMIC_BYTES
-#define CN1_BIBOP_ACCOUNT_BYTES(ts, n) do { (ts)->bibopBytesLocal += (JAVA_LONG)(n); } while(0)
+#define CN1_BIBOP_ACCOUNT_BYTES(ts, n) do { \
+    (ts)->bibopBytesLocal += (JAVA_LONG)(n); \
+    (ts)->bibopEpochBytes += (JAVA_LONG)(n); \
+} while(0)
 // Flush the per-thread byte accumulator AND, in the same bulk step, the
 // isHighFrequencyGC heuristic counters (allocationsSinceLastGC/totalAllocations) --
 // which used to be two global stores per object on the hot path. Coarsening them to
@@ -1369,6 +1402,7 @@ extern long long totalAllocations;
         (ts)->bibopBytesLocal = 0; } } while(0)
 #else
 #define CN1_BIBOP_ACCOUNT_BYTES(ts, n) do { \
+    (ts)->bibopEpochBytes += (JAVA_LONG)(n); \
     atomic_fetch_add_explicit(&bibopBytesSinceGc, (n), memory_order_relaxed); \
     allocationsSinceLastGC += (n); totalAllocations += (n); } while(0)
 #define CN1_BIBOP_FLUSH_BYTES(ts) do {} while(0)
@@ -1378,6 +1412,9 @@ extern long long totalAllocations;
 // ineligible / oversized) -> caller falls back to __NEW_X / codenameOneGcMalloc.
 static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
     if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
+    if(__builtin_expect(threadStateData->bibopBypassRemaining[ci] > 0, 0)) {
+        return (JAVA_OBJECT)0; // cn1BibopAlloc consumes the legacy-bypass budget
+    }
     // EVERY allocation path must register the class BEFORE the object publishes --
     // including this inline bump. That completes the invariant the GC mark guard
     // depends on: a resolved (current) slot whose class pointer is NOT in the
@@ -1434,6 +1471,11 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
 #endif
             __atomic_store_n(&o->__codenameOneGcMark, -1, __ATOMIC_RELEASE);
             atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
+            int __cn1FreshEpoch = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
+            if(__builtin_expect(atomic_load_explicit(&p->gcFreshEpoch[__cn1FreshEpoch & 1], memory_order_relaxed)
+                                != __cn1FreshEpoch, 0)) {
+                cn1BibopNoteFreshAllocation(p, __cn1FreshEpoch);
+            }
 #ifndef CN1_BIBOP_NO_FASTSWEEP
             // Mark the page dirty so the O(1) sweep never treats a page that still has
             // fresh mark==-1 (grace-candidate) slots as homogeneous. Single plain store
@@ -1471,6 +1513,9 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
 // body zero is elided.
 static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent, int ci) {
     if(ci < 0) return (JAVA_OBJECT)0; // oversized: folded away for big types
+    if(__builtin_expect(threadStateData->bibopBypassRemaining[ci] > 0, 0)) {
+        return (JAVA_OBJECT)0; // cn1BibopAlloc consumes the legacy-bypass budget
+    }
     CN1_CLAZZ_REGISTER(parent); // see cn1BibopFastAlloc: every alloc path registers
     CN1BibopPage* p = bibopCurrent[ci];
     if(__builtin_expect(p != (CN1BibopPage*)0 && p->freeList == (void*)0 &&
@@ -1514,6 +1559,11 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
 #endif
             __atomic_store_n(&o->__codenameOneGcMark, -1, __ATOMIC_RELEASE);
             atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
+            int __cn1FreshEpoch = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
+            if(__builtin_expect(atomic_load_explicit(&p->gcFreshEpoch[__cn1FreshEpoch & 1], memory_order_relaxed)
+                                != __cn1FreshEpoch, 0)) {
+                cn1BibopNoteFreshAllocation(p, __cn1FreshEpoch);
+            }
 #ifndef CN1_BIBOP_NO_FASTSWEEP
             p->gcAllocedSinceSweep = JAVA_TRUE;
 #endif
@@ -1528,7 +1578,7 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
 // X. The static initializer is invoked only when the class isn't initialised yet
 // (the bump fast path can be reached for a class whose <clinit> hasn't run,
 // because bibopCurrent[] is shared across all classes of the same size class).
-#ifndef CN1_DISABLE_INLINE_ALLOC
+#if !defined(CN1_DISABLE_INLINE_ALLOC) && !defined(CN1_DISABLE_BIBOP)
 #define CN1_FAST_NEW(X) ({ \
     if(__builtin_expect(!class__##X.initialized, 0)) __STATIC_INITIALIZER_##X(threadStateData); \
     JAVA_OBJECT __cn1fo = cn1BibopFastAlloc(threadStateData, sizeof(struct obj__##X), &class__##X, CN1_BIBOP_CIDX(sizeof(struct obj__##X))); \

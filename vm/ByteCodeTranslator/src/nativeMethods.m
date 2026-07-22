@@ -1643,6 +1643,23 @@ struct ThreadLocalData* getThreadLocalData() {
         // read by the inlined alloc fast path (cn1BibopFastAlloc) before any setter
         // runs -- garbage-nonzero silently disables the fast path for the thread.
         i->bibopBytesLocal = 0;
+        i->bibopEpochBytes = 0;
+#ifndef CN1_DISABLE_BIBOP
+        i->bibopObservedGcEpoch = atomic_load_explicit(&bibopGcEpoch,
+                                                        memory_order_relaxed);
+#else
+        i->bibopObservedGcEpoch = 0;
+#endif
+        i->bibopHighThroughputUntilEpoch = 0;
+        for(int __bi = 0 ; __bi < CN1_BIBOP_NUM_CLASSES ; __bi++) {
+#ifndef CN1_DISABLE_BIBOP
+            i->bibopBypassSeen[__bi] = atomic_load_explicit(&bibopBypassGeneration[__bi],
+                                                            memory_order_relaxed);
+#else
+            i->bibopBypassSeen[__bi] = 0;
+#endif
+            i->bibopBypassRemaining[__bi] = 0;
+        }
         i->nativeAllocationMode = JAVA_FALSE;
         // dead-thread pending-migration queue state (single-writer allObjectsInHeap)
         i->gcDeadNext = 0;
