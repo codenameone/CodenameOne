@@ -1,28 +1,28 @@
 {
-  "commit": "18d0489bd278844f8ec00dd0800075b0a3dbc829",
-  "generated_at": "2026-07-22T15:35:37Z",
+  "commit": "181ac95b819f26618f686e33da1674233be5df5b",
+  "generated_at": "2026-07-22T16:18:35Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 1508400000
+        "duration_ns": 1513400000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 832700000
+        "duration_ns": 839200000
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 16479600001
+        "duration_ns": 16733599999
       },
       "intArithmetic": {
         "checksum": "1313580095284",
-        "duration_ns": 710200001
+        "duration_ns": 711800000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 3953500000
+        "duration_ns": 3988700000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
@@ -30,19 +30,19 @@
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 3306700000
+        "duration_ns": 3252100000
       },
       "quicksort": {
         "checksum": "786886890168670967",
-        "duration_ns": 598500000
+        "duration_ns": 603200001
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 1112000000
+        "duration_ns": 1118399999
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 1268700000
+        "duration_ns": 1319800001
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -51,7 +51,7 @@
     "suite_checksum": 0
   },
   "port": "javascript",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29931086036",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/29933606098",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
