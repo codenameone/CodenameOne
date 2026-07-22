@@ -1291,8 +1291,10 @@ void codenameOneGCMark() {
                                                          (CN1BibopPage*)0,
                                                          memory_order_acquire);
             while(gp != 0) {
+#ifdef CN1_GC_INSTRUMENT
                 atomic_fetch_add_explicit(&cn1BibopFreshPagesScanned, 1,
                                           memory_order_relaxed);
+#endif
                 int gn = atomic_load_explicit(&gp->bumpIndex, memory_order_acquire);
                 for(int gi = 0 ; gi < gn ; gi++) {
                     JAVA_OBJECT go = cn1BibopSlot(gp, gi);
@@ -1319,7 +1321,7 @@ void codenameOneGCMark() {
         // this phase, so a "mark nothing new" fixpoint can livelock against ongoing
         // allocation (observed hanging/breaking FusedTest). A single pass is bounded and
         // safe; residual incompleteness is handled by the drain-gap fix, not by looping.
-#ifndef CN1_DISABLE_BIBOP
+#if defined(CN1_GC_INSTRUMENT) && !defined(CN1_DISABLE_BIBOP)
         atomic_fetch_add_explicit(&cn1BibopBeltRuns, 1, memory_order_relaxed);
 #endif
         gcMarkWorklistOverflow = JAVA_TRUE;   // force the BiBOP page-rescan path on
@@ -1902,13 +1904,16 @@ static long bibopLastCycleLiveBytes = 0;
 static long bibopLastCycleReclaimedBytes = 0;
 static int bibopHighSurvivalStreak[CN1_BIBOP_NUM_CLASSES];
 
-// QA instrumentation only. The adaptive policy itself is always enabled.
+// QA instrumentation only. The adaptive policy itself is always enabled;
+// production builds contain neither these counters nor their atomic RMWs.
+#ifdef CN1_GC_INSTRUMENT
 _Atomic long cn1BibopHighThroughputPromotions = 0;
 _Atomic long cn1BibopBypassActivations = 0;
 _Atomic long cn1BibopBypassAllocations = 0;
 _Atomic long cn1BibopFreshPagesScanned = 0;
 _Atomic long cn1BibopBeltRuns = 0;
 _Atomic long cn1BibopAdoptedRescanSkips = 0;
+#endif
 static int bibopTriggerHighSurvivalStreak = 0;
 
 // (The old global BiBOP-monitor count that suppressed the O(1) all-dead reclaim
@@ -2117,8 +2122,10 @@ static void cn1BibopUpdateThreadPolicy(CODENAME_ONE_THREAD_STATE) {
     if(threadStateData->bibopEpochBytes >= CN1_BIBOP_HIGH_THROUGHPUT_BYTES &&
        threadStateData->bibopHighThroughputUntilEpoch < epoch + 2) {
         threadStateData->bibopHighThroughputUntilEpoch = epoch + 2;
+#ifdef CN1_GC_INSTRUMENT
         atomic_fetch_add_explicit(&cn1BibopHighThroughputPromotions, 1,
                                   memory_order_relaxed);
+#endif
     }
     // Survivor-heavy size classes publish a new generation at sweep. Threads
     // consume that signal only on their rare page-acquire path, then route a
@@ -2701,8 +2708,10 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
             if(++bibopHighSurvivalStreak[ci] >= 2) {
                 atomic_fetch_add_explicit(&bibopBypassGeneration[ci], 1,
                                           memory_order_relaxed);
+#ifdef CN1_GC_INSTRUMENT
                 atomic_fetch_add_explicit(&cn1BibopBypassActivations, 1,
                                           memory_order_relaxed);
+#endif
                 bibopHighSurvivalStreak[ci] = 0;
             }
         } else if(survival <= 20) {
@@ -4656,8 +4665,10 @@ static JAVA_BOOLEAN cn1BibopRescanStep() {
             if(m == currentGcMarkValue && o->__heapPosition == CN1_BIBOP_ADOPTED) {
                 // Overflow setup drains the adoption buffer into allObjectsInHeap;
                 // the legacy half of this same rescan owns this object now.
+#ifdef CN1_GC_INSTRUMENT
                 atomic_fetch_add_explicit(&cn1BibopAdoptedRescanSkips, 1,
                                           memory_order_relaxed);
+#endif
                 continue;
             }
             if(m == currentGcMarkValue && o->__codenameOneParentClsReference->markFunction != 0) {

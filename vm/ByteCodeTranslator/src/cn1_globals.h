@@ -1348,12 +1348,16 @@ extern _Atomic long bibopGcTriggerBytes;
 extern _Atomic int bibopGcEpoch;
 extern _Atomic int bibopBypassGeneration[CN1_BIBOP_NUM_CLASSES];
 extern CN1BibopPage* _Atomic bibopFreshPages[2];
+#if defined(CN1_GC_INSTRUMENT) && !defined(CN1_DISABLE_BIBOP)
+// QA-only diagnostics. Production builds contain neither the counters nor
+// their atomic updates.
 extern _Atomic long cn1BibopHighThroughputPromotions;
 extern _Atomic long cn1BibopBypassActivations;
 extern _Atomic long cn1BibopBypassAllocations;
 extern _Atomic long cn1BibopFreshPagesScanned;
 extern _Atomic long cn1BibopBeltRuns;
 extern _Atomic long cn1BibopAdoptedRescanSkips;
+#endif
 extern int currentGcMarkValue;
 extern void cn1BibopNoteFreshAllocation(CN1BibopPage* page, int epoch);
 #ifndef CN1_BIBOP_NO_FASTSWEEP
