@@ -20,25 +20,15 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package java.time.format;
+package java.time;
 
-import java.time.DateTimeException;
+public class DateTimeException extends RuntimeException {
 
-public class DateTimeParseException extends DateTimeException {
-    private final String parsedData;
-    private final int errorIndex;
-
-    public DateTimeParseException(String message, CharSequence parsedData, int errorIndex) {
+    public DateTimeException(String message) {
         super(message);
-        this.parsedData = parsedData == null ? null : parsedData.toString();
-        this.errorIndex = errorIndex;
     }
 
-    public String getParsedString() {
-        return parsedData;
-    }
-
-    public int getErrorIndex() {
-        return errorIndex;
+    public DateTimeException(String message, Throwable cause) {
+        super(message, cause);
     }
 }

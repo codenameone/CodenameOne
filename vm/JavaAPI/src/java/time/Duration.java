@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package java.time;
 
 public final class Duration implements Comparable<Duration> {
@@ -33,6 +55,108 @@ public final class Duration implements Comparable<Duration> {
 
     public static Duration ofMillis(long millis) {
         return ofSeconds(DateTimeSupport.floorDiv(millis, 1000L), DateTimeSupport.floorMod(millis, 1000L) * 1000000L);
+    }
+
+    public static Duration parse(CharSequence text) {
+        if (text == null) {
+            throw new NullPointerException();
+        }
+        String value = text.toString().toUpperCase();
+        int length = value.length();
+        int position = 0;
+        int overallSign = 1;
+        if (position < length && (value.charAt(position) == '+' || value.charAt(position) == '-')) {
+            if (value.charAt(position++) == '-') {
+                overallSign = -1;
+            }
+        }
+        if (position >= length || value.charAt(position++) != 'P') {
+            throw invalidDuration(value);
+        }
+        boolean time = false;
+        boolean found = false;
+        boolean foundTime = false;
+        boolean foundDays = false;
+        int lastTimeUnit = 0;
+        long seconds = 0L;
+        int nanos = 0;
+        while (position < length) {
+            if (value.charAt(position) == 'T') {
+                if (time) {
+                    throw invalidDuration(value);
+                }
+                time = true;
+                position++;
+                continue;
+            }
+            int numberStart = position;
+            if (value.charAt(position) == '+' || value.charAt(position) == '-') {
+                position++;
+            }
+            int digitStart = position;
+            while (position < length && Character.isDigit(value.charAt(position))) {
+                position++;
+            }
+            boolean hasWholeDigits = position > digitStart;
+            int fractionStart = -1;
+            if (position < length && (value.charAt(position) == '.' || value.charAt(position) == ',')) {
+                fractionStart = ++position;
+                while (position < length && Character.isDigit(value.charAt(position))) {
+                    position++;
+                }
+            }
+            if (!hasWholeDigits || position >= length) {
+                throw invalidDuration(value);
+            }
+            char unit = value.charAt(position++);
+            String wholeText = value.substring(numberStart, fractionStart < 0 ? position - 1 : fractionStart - 1);
+            long amount;
+            try {
+                amount = Long.parseLong(wholeText);
+            } catch (NumberFormatException ex) {
+                throw invalidDuration(value);
+            }
+            if (unit == 'D' && !time && !foundDays && fractionStart < 0) {
+                seconds += amount * 86400L;
+                foundDays = true;
+            } else if (unit == 'H' && time && lastTimeUnit < 1 && fractionStart < 0) {
+                seconds += amount * 3600L;
+                lastTimeUnit = 1;
+                foundTime = true;
+            } else if (unit == 'M' && time && lastTimeUnit < 2 && fractionStart < 0) {
+                seconds += amount * 60L;
+                lastTimeUnit = 2;
+                foundTime = true;
+            } else if (unit == 'S' && time && lastTimeUnit < 3) {
+                seconds += amount;
+                lastTimeUnit = 3;
+                foundTime = true;
+                if (fractionStart >= 0) {
+                    String fraction = value.substring(fractionStart, position - 1);
+                    if (fraction.length() == 0 || fraction.length() > 9) {
+                        throw invalidDuration(value);
+                    }
+                    while (fraction.length() < 9) {
+                        fraction += "0";
+                    }
+                    nanos = Integer.parseInt(fraction);
+                    if (amount < 0 || wholeText.startsWith("-")) {
+                        nanos = -nanos;
+                    }
+                }
+            } else {
+                throw invalidDuration(value);
+            }
+            found = true;
+        }
+        if (!found || (time && !foundTime)) {
+            throw invalidDuration(value);
+        }
+        return ofSeconds(overallSign * seconds, overallSign * (long) nanos);
+    }
+
+    private static DateTimeException invalidDuration(String value) {
+        return new DateTimeException("Invalid duration: " + value);
     }
 
     public long getSeconds() {
