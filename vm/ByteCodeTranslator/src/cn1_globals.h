@@ -1374,7 +1374,8 @@ extern void* cn1MonitorDataRemove(JAVA_OBJECT o);
 extern long long allocationsSinceLastGC;
 extern long long totalAllocations;
 
-// LEVER A (perf-tier1, -DCN1_DEATOMIC_BYTES): per-object BiBOP byte accounting.
+// LEVER A (perf-tier1, enabled unless -DCN1_DISABLE_DEATOMIC_BYTES): per-object
+// BiBOP byte accounting.
 // CN1_BIBOP_ACCOUNT_BYTES is called once per allocation (inline fast path AND the
 // .m slow path); CN1_BIBOP_FLUSH_BYTES is called once per page-acquire (slow path)
 // and at thread death. The global bibopBytesSinceGc is read only by the GC-trigger

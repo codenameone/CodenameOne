@@ -2164,7 +2164,7 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
 
 static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
     // LEVER A: flush this thread's plain-add byte accumulator into the global atomic
-    // (once per page-acquire). No-op unless -DCN1_DEATOMIC_BYTES.
+    // (once per page-acquire). No-op only with -DCN1_DISABLE_DEATOMIC_BYTES.
     CN1_BIBOP_FLUSH_BYTES(threadStateData);
     cn1BibopUpdateThreadPolicy(threadStateData);
     if(constantPoolObjects == 0) {
