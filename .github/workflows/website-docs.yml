@@ -141,8 +141,8 @@ jobs:
         env:
           WEBSITE_INCLUDE_JAVADOCS: "true"
           WEBSITE_INCLUDE_DEVGUIDE: "true"
-          WEBSITE_INCLUDE_INITIALIZR: "auto"
-          WEBSITE_INCLUDE_PLAYGROUND: "auto"
+          WEBSITE_INCLUDE_INITIALIZR: "true"
+          WEBSITE_INCLUDE_PLAYGROUND: "true"
           # The Initializr's JavaScript app is built with the local ParparVM
           # target, whose builder lives in the repo (8.0-SNAPSHOT) plugin rather
           # than the pinned release. Bootstrap the local snapshot artifacts so
@@ -157,8 +157,6 @@ jobs:
           # (push to master) keep the default so future posts only appear
           # on their actual date.
           HUGO_BUILD_FUTURE: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
-          CN1_USER: ${{ secrets.CN1_USER }}
-          CN1_TOKEN: ${{ secrets.CN1_TOKEN }}
 
       - name: Validate Port Status page output
         run: |
@@ -181,28 +179,10 @@ jobs:
           test -f docs/website/public/playground/index.html
 
       - name: Validate Initializr JS bundle output
-        run: |
-          set -euo pipefail
-          if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
-            test -f docs/website/public/initializr-app/index.html
-          else
-            echo "CN1 credentials not configured; skipping Initializr JS bundle output validation."
-          fi
-        env:
-          CN1_USER: ${{ secrets.CN1_USER }}
-          CN1_TOKEN: ${{ secrets.CN1_TOKEN }}
+        run: test -f docs/website/public/initializr-app/index.html
 
       - name: Validate Playground JS bundle output
-        run: |
-          set -euo pipefail
-          if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
-            test -f docs/website/public/playground-app/index.html
-          else
-            echo "CN1 credentials not configured; skipping Playground JS bundle output validation."
-          fi
-        env:
-          CN1_USER: ${{ secrets.CN1_USER }}
-          CN1_TOKEN: ${{ secrets.CN1_TOKEN }}
+        run: test -f docs/website/public/playground-app/index.html
 
       - name: Validate redirects against local Pages runtime
         run: |
