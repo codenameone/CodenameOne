@@ -1343,6 +1343,9 @@ typedef struct CN1BibopPage {
 extern __thread CN1BibopPage* bibopCurrent[CN1_BIBOP_NUM_CLASSES];
 extern _Atomic long bibopBytesSinceGc;
 extern _Atomic long bibopGcTriggerBytes;
+// Atomic mirror of currentGcMarkValue for mutator-side adaptive/fresh-page
+// decisions. currentGcMarkValue itself remains owned by the GC/mark threads.
+extern _Atomic int bibopGcEpoch;
 extern _Atomic int bibopBypassGeneration[CN1_BIBOP_NUM_CLASSES];
 extern CN1BibopPage* _Atomic bibopFreshPages[2];
 extern _Atomic long cn1BibopHighThroughputPromotions;
@@ -1352,7 +1355,7 @@ extern _Atomic long cn1BibopFreshPagesScanned;
 extern _Atomic long cn1BibopBeltRuns;
 extern _Atomic long cn1BibopAdoptedRescanSkips;
 extern int currentGcMarkValue;
-extern void cn1BibopNoteFreshAllocation(CN1BibopPage* page);
+extern void cn1BibopNoteFreshAllocation(CN1BibopPage* page, int epoch);
 #ifndef CN1_BIBOP_NO_FASTSWEEP
 // Called from monitorEnter (any thread) when a monitor (CN1ThreadData) is freshly
 // attached to a heap object. If the object is a BiBOP slot it bumps a global live-monitor
@@ -1463,9 +1466,10 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
 #endif
             __atomic_store_n(&o->__codenameOneGcMark, -1, __ATOMIC_RELEASE);
             atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
-            if(__builtin_expect(atomic_load_explicit(&p->gcFreshEpoch[currentGcMarkValue & 1], memory_order_relaxed)
-                                != currentGcMarkValue, 0)) {
-                cn1BibopNoteFreshAllocation(p);
+            int __cn1FreshEpoch = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
+            if(__builtin_expect(atomic_load_explicit(&p->gcFreshEpoch[__cn1FreshEpoch & 1], memory_order_relaxed)
+                                != __cn1FreshEpoch, 0)) {
+                cn1BibopNoteFreshAllocation(p, __cn1FreshEpoch);
             }
 #ifndef CN1_BIBOP_NO_FASTSWEEP
             // Mark the page dirty so the O(1) sweep never treats a page that still has
@@ -1550,9 +1554,10 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
 #endif
             __atomic_store_n(&o->__codenameOneGcMark, -1, __ATOMIC_RELEASE);
             atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
-            if(__builtin_expect(atomic_load_explicit(&p->gcFreshEpoch[currentGcMarkValue & 1], memory_order_relaxed)
-                                != currentGcMarkValue, 0)) {
-                cn1BibopNoteFreshAllocation(p);
+            int __cn1FreshEpoch = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
+            if(__builtin_expect(atomic_load_explicit(&p->gcFreshEpoch[__cn1FreshEpoch & 1], memory_order_relaxed)
+                                != __cn1FreshEpoch, 0)) {
+                cn1BibopNoteFreshAllocation(p, __cn1FreshEpoch);
             }
 #ifndef CN1_BIBOP_NO_FASTSWEEP
             p->gcAllocedSinceSweep = JAVA_TRUE;

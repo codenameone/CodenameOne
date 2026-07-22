@@ -1644,7 +1644,12 @@ struct ThreadLocalData* getThreadLocalData() {
         // runs -- garbage-nonzero silently disables the fast path for the thread.
         i->bibopBytesLocal = 0;
         i->bibopEpochBytes = 0;
-        i->bibopObservedGcEpoch = currentGcMarkValue;
+#ifndef CN1_DISABLE_BIBOP
+        i->bibopObservedGcEpoch = atomic_load_explicit(&bibopGcEpoch,
+                                                        memory_order_relaxed);
+#else
+        i->bibopObservedGcEpoch = 0;
+#endif
         i->bibopHighThroughputUntilEpoch = 0;
         for(int __bi = 0 ; __bi < CN1_BIBOP_NUM_CLASSES ; __bi++) {
 #ifndef CN1_DISABLE_BIBOP

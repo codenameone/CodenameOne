@@ -940,7 +940,7 @@ static __thread JAVA_BOOLEAN gcCurrentlyMaturing = JAVA_FALSE;
 // Forward (tentative) declaration -- the real definition is below near the worklist;
 // the belt pass in codenameOneGCMark forces it to trigger the full BiBOP rescan.
 static JAVA_BOOLEAN gcMarkWorklistOverflow;
-static JAVA_BOOLEAN gcMarkOverflowSeen = JAVA_FALSE;
+static _Atomic JAVA_BOOLEAN gcMarkOverflowSeen = JAVA_FALSE;
 #ifndef CN1_DISABLE_BIBOP
 // Forward declarations -- defined below; the grace-subtree pass in codenameOneGCMark
 // walks the page registry and its slots before their definitions.
@@ -1002,7 +1002,7 @@ static JAVA_BOOLEAN cn1SweepRemoving;
 
 void codenameOneGCMark() {
     currentGcMarkValue++;
-    gcMarkOverflowSeen = JAVA_FALSE;
+    atomic_store_explicit(&gcMarkOverflowSeen, JAVA_FALSE, memory_order_relaxed);
 #ifndef CN1_DISABLE_BIBOP
     cn1BibopBeginGcCycle();
 #endif
@@ -1309,7 +1309,7 @@ void codenameOneGCMark() {
     }
 #endif
 
-    if(gcMarkOverflowSeen) {
+    if(atomic_load_explicit(&gcMarkOverflowSeen, memory_order_acquire)) {
         long __beltBefore = gcMarkNewObjectCount;
 #ifdef CN1_BIBOP_VALIDATE
         gcBeltDiagActive = 1;
@@ -1894,6 +1894,7 @@ static pthread_once_t  bibopOnce  = PTHREAD_ONCE_INIT;
 // Non-static: also read/written by the inlined bump fast path (cn1_globals.h).
 _Atomic long bibopBytesSinceGc = 0;
 _Atomic long bibopGcTriggerBytes = CN1_BIBOP_GC_TRIGGER_BYTES;
+_Atomic int bibopGcEpoch = 1;
 _Atomic int bibopBypassGeneration[CN1_BIBOP_NUM_CLASSES];
 static long bibopCycleAllocatedBytes = 0;
 static long bibopLastCycleOccupiedBytes = 0;
@@ -1972,8 +1973,7 @@ static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
 // Queue a page only on its first allocation in a GC epoch. The grace pass can
 // now walk pages that actually received fresh objects instead of rescanning the
 // grow-only registry on every collection.
-void cn1BibopNoteFreshAllocation(CN1BibopPage* page) {
-    int epoch = currentGcMarkValue;
+void cn1BibopNoteFreshAllocation(CN1BibopPage* page, int epoch) {
     int lane = epoch & 1;
     int seen = atomic_load_explicit(&page->gcFreshEpoch[lane], memory_order_relaxed);
     while(seen != epoch) {
@@ -1992,6 +1992,9 @@ void cn1BibopNoteFreshAllocation(CN1BibopPage* page) {
 }
 
 void cn1BibopBeginGcCycle(void) {
+    // Publish the new GC-owned epoch separately for mutators. They must never
+    // read currentGcMarkValue while the collector increments it concurrently.
+    atomic_store_explicit(&bibopGcEpoch, currentGcMarkValue, memory_order_relaxed);
     // Charge allocations racing this mark to the NEXT cycle. The old sweep-end
     // store lost those bytes and could delay a collection indefinitely under a
     // sustained allocator.
@@ -2106,7 +2109,7 @@ void cn1RefreshFreeMemCache(void) {
 // unless memory is genuinely tight. Never returns LESS than the old static cap, so no workload
 // gets a tighter bound than before. -DCN1_BIBOP_NO_PACING still disables pacing entirely for A/B.
 static void cn1BibopUpdateThreadPolicy(CODENAME_ONE_THREAD_STATE) {
-    int epoch = currentGcMarkValue;
+    int epoch = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
     if(threadStateData->bibopObservedGcEpoch != epoch) {
         threadStateData->bibopObservedGcEpoch = epoch;
         threadStateData->bibopEpochBytes = 0;
@@ -2144,7 +2147,7 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
     // bounded by real available memory (get_free_memory now reports reclaimable pages), so RSS
     // stays safe and the collector reclaims the transient churn.
     if(isEdt(threadStateData->threadId)
-       || threadStateData->bibopHighThroughputUntilEpoch >= currentGcMarkValue
+       || threadStateData->bibopHighThroughputUntilEpoch >= threadStateData->bibopObservedGcEpoch
        || threadStateData->heapAllocationSize > CN1_BIBOP_HIGH_THROUGHPUT_ALLOCS) {
         long hi = fm / 2;
         if(hi > cap) cap = hi;
@@ -2483,9 +2486,10 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
                 // publish the new cursor with release AFTER the slot (incl. its
                 // mark) is fully initialized.
                 atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
-                if(atomic_load_explicit(&p->gcFreshEpoch[currentGcMarkValue & 1], memory_order_relaxed)
-                   != currentGcMarkValue) {
-                    cn1BibopNoteFreshAllocation(p);
+                int epoch = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
+                if(atomic_load_explicit(&p->gcFreshEpoch[epoch & 1], memory_order_relaxed)
+                   != epoch) {
+                    cn1BibopNoteFreshAllocation(p, epoch);
                 }
 #ifndef CN1_BIBOP_NO_FASTSWEEP
                 p->gcAllocedSinceSweep = JAVA_TRUE;
@@ -2504,9 +2508,10 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
     }
     // free-list slot path
     cn1BibopInitSlot(threadStateData, o, size, parent);
-    if(atomic_load_explicit(&p->gcFreshEpoch[currentGcMarkValue & 1], memory_order_relaxed)
-       != currentGcMarkValue) {
-        cn1BibopNoteFreshAllocation(p);
+    int epoch = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
+    if(atomic_load_explicit(&p->gcFreshEpoch[epoch & 1], memory_order_relaxed)
+       != epoch) {
+        cn1BibopNoteFreshAllocation(p, epoch);
     }
 #ifndef CN1_BIBOP_NO_FASTSWEEP
     p->gcAllocedSinceSweep = JAVA_TRUE;
@@ -4014,7 +4019,7 @@ static void gcMarkFlushLocal(struct gcMarkLocalBuffer* lb) {
     for(int i = 0 ; i < lb->count ; i++) {
         if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE) {
             gcMarkWorklistOverflow = JAVA_TRUE;
-            gcMarkOverflowSeen = JAVA_TRUE;
+            atomic_store_explicit(&gcMarkOverflowSeen, JAVA_TRUE, memory_order_release);
             break;
         }
         gcMarkWorklist[gcMarkWorklistTop] = lb->entries[i];
@@ -4043,7 +4048,7 @@ static inline void gcMarkWorklistPush(JAVA_OBJECT obj, JAVA_BOOLEAN force) {
     // Serial path: identical to the original single-threaded push.
     if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE) {
         gcMarkWorklistOverflow = JAVA_TRUE;
-        gcMarkOverflowSeen = JAVA_TRUE;
+        atomic_store_explicit(&gcMarkOverflowSeen, JAVA_TRUE, memory_order_release);
         return;
     }
     gcMarkWorklist[gcMarkWorklistTop].obj = obj;
