@@ -1,24 +1,4 @@
 {
   "_comment": "Queue of browser-only syndication tasks (Medium, DZone, Hashnode) drained by a local syndication tool that runs on the maintainer's machine inside an already-signed-in browser session. Tasks are appended by scripts/website/queue_browser_syndication.py which is invoked by the daily blog-syndication workflow, and the local tool writes the resulting URLs back into syndication-state.json.",
-  "tasks": [
-    {
-      "id": "linkedin:2026-07-22-1200-codenameone-tested-port-support",
-      "site": "linkedin",
-      "kind": "social",
-      "slug": "2026-07-22-1200-codenameone-tested-port-support",
-      "source_slug": "tested-port-support",
-      "account": "codenameone",
-      "title": "Codename One: support should be evidence",
-      "canonical": "https://www.codenameone.com/blog/tested-port-support/",
-      "cover_image_url": "https://www.codenameone.com/blog/tested-port-support.jpg",
-      "body_text": "A support matrix should not be a collection of promises somebody remembers to update.\n\nWe wanted the Codename One matrix to be an output of the test system. Each result points back to a commit, environment, run date, and the tests behind it. A skipped test needs an explanation instead of silently turning into a green checkmark.\n\nThat also means publishing the gaps. A green cell says a specific test passed in a specific environment. It does not pretend we exercised every device or OS release. Binary-size and memory comparisons are missing because the current numbers would compare different things across platforms.\n\nThe page will change as CI changes. That is the point. Support claims should move with evidence, not with marketing copy.\n\nFull write-up: https://www.codenameone.com/blog/tested-port-support/",
-      "scheduled_at": "2026-07-22T09:00:00+00:00",
-      "scheduled_local": "2026-07-22T12:00+03:00",
-      "timezone": "Asia/Jerusalem",
-      "review_by": "2026-07-17",
-      "approved_by": null,
-      "approved_at": null,
-      "queued_at": "2026-07-17T16:43:06+00:00"
-    }
-  ]
+  "tasks": []
 }

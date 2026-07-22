@@ -1137,6 +1137,15 @@
         "source_slug": "codename-one-mcp-server",
         "scheduled_at": "2026-07-21T09:00:00+00:00"
       }
+    },
+    "2026-07-22-1200-codenameone-tested-port-support": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/company/5041007/admin/page-posts/published/",
+        "syndicated_at": "2026-07-22T09:01:31+00:00",
+        "account": "codenameone",
+        "source_slug": "tested-port-support",
+        "scheduled_at": "2026-07-22T09:00:00+00:00"
+      }
     }
   }
 }
