@@ -940,6 +940,7 @@ static __thread JAVA_BOOLEAN gcCurrentlyMaturing = JAVA_FALSE;
 // Forward (tentative) declaration -- the real definition is below near the worklist;
 // the belt pass in codenameOneGCMark forces it to trigger the full BiBOP rescan.
 static JAVA_BOOLEAN gcMarkWorklistOverflow;
+static JAVA_BOOLEAN gcMarkOverflowSeen = JAVA_FALSE;
 #ifndef CN1_DISABLE_BIBOP
 // Forward declarations -- defined below; the grace-subtree pass in codenameOneGCMark
 // walks the page registry and its slots before their definitions.
@@ -985,6 +986,9 @@ static long cn1SatbTake(JAVA_OBJECT** out) {
 }
 
 void cn1RefreshFreeMemCache(void);   // defined near cn1BibopMaybeGc; drives the dynamic pacing cap
+#ifndef CN1_DISABLE_BIBOP
+void cn1BibopBeginGcCycle(void);
+#endif
 
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
 // Immortal object registry (defined near the clazz registry below): objects removed
@@ -998,6 +1002,10 @@ static JAVA_BOOLEAN cn1SweepRemoving;
 
 void codenameOneGCMark() {
     currentGcMarkValue++;
+    gcMarkOverflowSeen = JAVA_FALSE;
+#ifndef CN1_DISABLE_BIBOP
+    cn1BibopBeginGcCycle();
+#endif
     cn1RefreshFreeMemCache();   // snapshot free RAM once per cycle for the dynamic pacing cap
     // Bump the force-mark pass epoch so the force-visited side table's prior-cycle entries
     // read as not-visited (relocated from the old per-object __codenameOneReferenceCount).
@@ -1251,19 +1259,21 @@ void codenameOneGCMark() {
     // through reference fields, so we need an explicit drain pass before sweep runs.
     gcMarkDrain(d);
 
+#if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
+    // Make already-matured slots visible in the legacy table before any safety
+    // rescan. The page rescan can then skip them instead of invoking every adopted
+    // object's mark function twice.
+    cn1DrainAdoptBuffer();
+#endif
+
     // NOTE: the SATB log is drained + gcSatbActive cleared AFTER the grace pass and belt
     // below, so the insertion/deletion barriers stay armed through them -- a mutator that
     // links an object into a fresh grace object DURING those phases still gets it logged
     // and marked, closing the residual window.
 
-    // Belt pass -- guaranteed drain completeness before sweep. gcMarkDrain triggers the
-    // BiBOP page rescan only on a worklist OVERFLOW; if a marked object ever had its mark
-    // function skipped, its reachable children go untraversed and are swept while live --
-    // the intermittent Linux crash (a marked Component.BGPainter whose owning Component,
-    // reached only through this$0, was freed). Force one full rescan + drain to a fixpoint
-    // unconditionally so EVERY marked object's mark function runs and all reachable children
-    // are marked. gcMarkDrain re-pushes each marked slot and loops until a pass marks nothing
-    // new -> O(reachable) and idempotent; recovers any marked-but-untraversed subtree.
+    // The overflow belt is retained as a correctness backstop, but runs only when a
+    // worklist push was actually dropped. Normal cycles already drain every pushed
+    // object and must not pay a second O(reachable) traversal.
 #ifndef CN1_DISABLE_BIBOP
     // Grace-subtree marking (CORRECTNESS): a fresh BiBOP object (gcMark==-1) survives this
     // cycle via grace, and the sweep promotes it to live (gcMark=V, cn1BibopSweep) or pools
@@ -1271,27 +1281,35 @@ void codenameOneGCMark() {
     // fresh, not-yet-linked object is left unmarked and swept. When a mutator later links
     // that fresh object into the live graph, next cycle it is drained and marks the now
     // dangling child -> the intermittent Property->Double / container->content crash. Drain
-    // every grace object here so a surviving grace object's subtree survives WITH it.
-    // parentCls==0 skips a mid-construction memset-elided slot (its class isn't published
-    // yet); such an object is reached again next cycle once fully built.
+    // every fresh NON-LEAF object here so a surviving grace object's subtree survives
+    // WITH it. Primitive arrays and other leaf classes have no subtree and are left to
+    // the sweep's normal one-cycle grace. The alternating dirty-page stacks prevent a
+    // page allocated into during this mark from corrupting the stack being consumed.
     {
-        CN1BibopPage* gp = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
-        while(gp != 0) {
-            int gn = atomic_load_explicit(&gp->bumpIndex, memory_order_acquire);
-            for(int gi = 0 ; gi < gn ; gi++) {
-                JAVA_OBJECT go = cn1BibopSlot(gp, gi);
-                if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_ACQUIRE) == -1
-                   && go->__codenameOneParentClsReference != 0) {
-                    gcMarkObject(d, go, JAVA_FALSE);
+        for(int lane = 0 ; lane < 2 ; lane++) {
+            CN1BibopPage* gp = atomic_exchange_explicit(&bibopFreshPages[lane],
+                                                         (CN1BibopPage*)0,
+                                                         memory_order_acquire);
+            while(gp != 0) {
+                atomic_fetch_add_explicit(&cn1BibopFreshPagesScanned, 1,
+                                          memory_order_relaxed);
+                int gn = atomic_load_explicit(&gp->bumpIndex, memory_order_acquire);
+                for(int gi = 0 ; gi < gn ; gi++) {
+                    JAVA_OBJECT go = cn1BibopSlot(gp, gi);
+                    if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_ACQUIRE) == -1
+                       && go->__codenameOneParentClsReference != 0
+                       && go->__codenameOneParentClsReference->markFunction != 0) {
+                        gcMarkObject(d, go, JAVA_FALSE);
+                    }
                 }
+                gp = gp->nextFresh[lane];
             }
-            gp = atomic_load_explicit(&gp->nextAll, memory_order_acquire);
         }
         gcMarkDrain(d);
     }
 #endif
 
-    {
+    if(gcMarkOverflowSeen) {
         long __beltBefore = gcMarkNewObjectCount;
 #ifdef CN1_BIBOP_VALIDATE
         gcBeltDiagActive = 1;
@@ -1301,6 +1319,9 @@ void codenameOneGCMark() {
         // this phase, so a "mark nothing new" fixpoint can livelock against ongoing
         // allocation (observed hanging/breaking FusedTest). A single pass is bounded and
         // safe; residual incompleteness is handled by the drain-gap fix, not by looping.
+#ifndef CN1_DISABLE_BIBOP
+        atomic_fetch_add_explicit(&cn1BibopBeltRuns, 1, memory_order_relaxed);
+#endif
         gcMarkWorklistOverflow = JAVA_TRUE;   // force the BiBOP page-rescan path on
         gcMarkDrain(d);
 #ifdef CN1_BIBOP_VALIDATE
@@ -1824,6 +1845,21 @@ BOOL isAppSuspended = 0;
 #ifndef CN1_BIBOP_GC_TRIGGER_BYTES
 #define CN1_BIBOP_GC_TRIGGER_BYTES (24*1024*1024)
 #endif
+#ifndef CN1_BIBOP_GC_MAX_TRIGGER_BYTES
+#define CN1_BIBOP_GC_MAX_TRIGGER_BYTES (192*1024*1024)
+#endif
+#ifndef CN1_BIBOP_HIGH_THROUGHPUT_BYTES
+#define CN1_BIBOP_HIGH_THROUGHPUT_BYTES (8*1024*1024)
+#endif
+#ifndef CN1_BIBOP_BYPASS_ALLOCATIONS
+#define CN1_BIBOP_BYPASS_ALLOCATIONS 65536
+#endif
+#ifndef CN1_BIBOP_BYPASS_MIN_SLOTS
+#define CN1_BIBOP_BYPASS_MIN_SLOTS 4096
+#endif
+#ifndef CN1_BIBOP_BYPASS_SURVIVAL_PERCENT
+#define CN1_BIBOP_BYPASS_SURVIVAL_PERCENT 25
+#endif
 // Header mark sentinel for a slot sitting on a page free-list (distinct from
 // -1 "fresh", and from any real epoch >= 1). The free-list link is stored in
 // the slot's first pointer word (the __codenameOneParentClsReference slot),
@@ -1848,6 +1884,7 @@ static signed char cn1BibopSizeToClass[CN1_BIBOP_MAX_OBJECT + 1];
 // struct CN1BibopPage is defined in cn1_globals.h (shared with the inlined bump).
 
 static CN1BibopPage* _Atomic bibopAllPages = 0;   // registry head (atomic)
+CN1BibopPage* _Atomic bibopFreshPages[2];         // alternating epoch stacks
 static _Atomic long long bibopAllPagesCount = 0;  // grow-only registration count
 static CN1BibopPage* bibopFreePool = 0;           // bibopMutex
 static CN1BibopPage* bibopPartialPool[CN1_BIBOP_NUM_CLASSES]; // bibopMutex
@@ -1856,6 +1893,22 @@ static pthread_mutex_t bibopMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_once_t  bibopOnce  = PTHREAD_ONCE_INIT;
 // Non-static: also read/written by the inlined bump fast path (cn1_globals.h).
 _Atomic long bibopBytesSinceGc = 0;
+_Atomic long bibopGcTriggerBytes = CN1_BIBOP_GC_TRIGGER_BYTES;
+_Atomic int bibopBypassGeneration[CN1_BIBOP_NUM_CLASSES];
+static long bibopCycleAllocatedBytes = 0;
+static long bibopLastCycleOccupiedBytes = 0;
+static long bibopLastCycleLiveBytes = 0;
+static long bibopLastCycleReclaimedBytes = 0;
+static int bibopHighSurvivalStreak[CN1_BIBOP_NUM_CLASSES];
+
+// QA instrumentation only. The adaptive policy itself is always enabled.
+_Atomic long cn1BibopHighThroughputPromotions = 0;
+_Atomic long cn1BibopBypassActivations = 0;
+_Atomic long cn1BibopBypassAllocations = 0;
+_Atomic long cn1BibopFreshPagesScanned = 0;
+_Atomic long cn1BibopBeltRuns = 0;
+_Atomic long cn1BibopAdoptedRescanSkips = 0;
+static int bibopTriggerHighSurvivalStreak = 0;
 
 // (The old global BiBOP-monitor count that suppressed the O(1) all-dead reclaim
 // for EVERY page while ANY monitor existed is gone: java.lang.System.LOCK is a
@@ -1884,6 +1937,8 @@ static void cn1BibopDoInit() {
     }
     for(int i = 0 ; i < CN1_BIBOP_NUM_CLASSES ; i++) {
         bibopPartialPool[i] = 0;
+        atomic_store_explicit(&bibopBypassGeneration[i], 0, memory_order_relaxed);
+        bibopHighSurvivalStreak[i] = 0;
     }
 }
 
@@ -1900,6 +1955,8 @@ static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
     p->freeList = 0;
     p->freeCount = 0;
     p->owned = JAVA_FALSE;
+    p->nextFresh[0] = 0;
+    p->nextFresh[1] = 0;
 #ifndef CN1_BIBOP_NO_FASTSWEEP
     p->gcAllocedSinceSweep = JAVA_FALSE;
     p->gcNeedsReclaim = JAVA_FALSE;
@@ -1908,6 +1965,38 @@ static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
     atomic_store_explicit(&p->gcLastMarkedEpoch, 0, memory_order_relaxed);
     p->gcGraceEpoch = 0;
 #endif
+    atomic_store_explicit(&p->gcFreshEpoch[0], 0, memory_order_relaxed);
+    atomic_store_explicit(&p->gcFreshEpoch[1], 0, memory_order_relaxed);
+}
+
+// Queue a page only on its first allocation in a GC epoch. The grace pass can
+// now walk pages that actually received fresh objects instead of rescanning the
+// grow-only registry on every collection.
+void cn1BibopNoteFreshAllocation(CN1BibopPage* page) {
+    int epoch = currentGcMarkValue;
+    int lane = epoch & 1;
+    int seen = atomic_load_explicit(&page->gcFreshEpoch[lane], memory_order_relaxed);
+    while(seen != epoch) {
+        if(atomic_compare_exchange_weak_explicit(&page->gcFreshEpoch[lane], &seen, epoch,
+                                                  memory_order_acq_rel,
+                                                  memory_order_relaxed)) {
+            CN1BibopPage* head = atomic_load_explicit(&bibopFreshPages[lane], memory_order_relaxed);
+            do {
+                page->nextFresh[lane] = head;
+            } while(!atomic_compare_exchange_weak_explicit(&bibopFreshPages[lane], &head, page,
+                                                            memory_order_release,
+                                                            memory_order_relaxed));
+            return;
+        }
+    }
+}
+
+void cn1BibopBeginGcCycle(void) {
+    // Charge allocations racing this mark to the NEXT cycle. The old sweep-end
+    // store lost those bytes and could delay a collection indefinitely under a
+    // sustained allocator.
+    bibopCycleAllocatedBytes = atomic_exchange_explicit(&bibopBytesSinceGc, 0,
+                                                         memory_order_acq_rel);
 }
 
 // Raw 64KB page memory comes from large arenas -- one posix_memalign per
@@ -1990,8 +2079,8 @@ static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i) {
 // GC exceeds this hard cap does the mutator wait for the collector to catch up,
 // bounding RSS. When the collector keeps up (bytes stays near the trigger) this
 // never waits. Disable with -DCN1_BIBOP_NO_PACING for A/B.
-#ifndef CN1_BIBOP_GC_HARD_CAP
-#define CN1_BIBOP_GC_HARD_CAP (CN1_BIBOP_GC_TRIGGER_BYTES * 3)
+#ifndef CN1_BIBOP_GC_HARD_CAP_MULTIPLIER
+#define CN1_BIBOP_GC_HARD_CAP_MULTIPLIER 3
 #endif
 // A thread with more than this many legacy allocations since the last GC (heapAllocationSize,
 // reset each cycle) is treated as high-throughput and gets the deeper pacing headroom below.
@@ -2016,8 +2105,34 @@ void cn1RefreshFreeMemCache(void) {
 // thread we most want to keep responsive -- gets double headroom; it must never be throttled
 // unless memory is genuinely tight. Never returns LESS than the old static cap, so no workload
 // gets a tighter bound than before. -DCN1_BIBOP_NO_PACING still disables pacing entirely for A/B.
+static void cn1BibopUpdateThreadPolicy(CODENAME_ONE_THREAD_STATE) {
+    int epoch = currentGcMarkValue;
+    if(threadStateData->bibopObservedGcEpoch != epoch) {
+        threadStateData->bibopObservedGcEpoch = epoch;
+        threadStateData->bibopEpochBytes = 0;
+    }
+    if(threadStateData->bibopEpochBytes >= CN1_BIBOP_HIGH_THROUGHPUT_BYTES &&
+       threadStateData->bibopHighThroughputUntilEpoch < epoch + 2) {
+        threadStateData->bibopHighThroughputUntilEpoch = epoch + 2;
+        atomic_fetch_add_explicit(&cn1BibopHighThroughputPromotions, 1,
+                                  memory_order_relaxed);
+    }
+    // Survivor-heavy size classes publish a new generation at sweep. Threads
+    // consume that signal only on their rare page-acquire path, then route a
+    // bounded allocation sample through the legacy collector before reprobing.
+    for(int ci = 0 ; ci < CN1_BIBOP_NUM_CLASSES ; ci++) {
+        int generation = atomic_load_explicit(&bibopBypassGeneration[ci],
+                                               memory_order_relaxed);
+        if(threadStateData->bibopBypassSeen[ci] != generation) {
+            threadStateData->bibopBypassSeen[ci] = generation;
+            threadStateData->bibopBypassRemaining[ci] = CN1_BIBOP_BYPASS_ALLOCATIONS;
+        }
+    }
+}
+
 static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
-    long base = (long)CN1_BIBOP_GC_HARD_CAP;                 // old static cap (3x trigger)
+    long trigger = atomic_load_explicit(&bibopGcTriggerBytes, memory_order_relaxed);
+    long base = trigger * CN1_BIBOP_GC_HARD_CAP_MULTIPLIER;
     long fm = atomic_load_explicit(&cn1CachedFreeMem, memory_order_relaxed);
     long cap = fm / 8;                                       // baseline: 1/8 of available RAM of slack
     if(cap < base) cap = base;                              // never tighter than before
@@ -2029,6 +2144,7 @@ static long cn1BibopPacingCap(CODENAME_ONE_THREAD_STATE) {
     // bounded by real available memory (get_free_memory now reports reclaimable pages), so RSS
     // stays safe and the collector reclaims the transient churn.
     if(isEdt(threadStateData->threadId)
+       || threadStateData->bibopHighThroughputUntilEpoch >= currentGcMarkValue
        || threadStateData->heapAllocationSize > CN1_BIBOP_HIGH_THROUGHPUT_ALLOCS) {
         long hi = fm / 2;
         if(hi > cap) cap = hi;
@@ -2040,6 +2156,7 @@ static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
     // LEVER A: flush this thread's plain-add byte accumulator into the global atomic
     // (once per page-acquire). No-op unless -DCN1_DEATOMIC_BYTES.
     CN1_BIBOP_FLUSH_BYTES(threadStateData);
+    cn1BibopUpdateThreadPolicy(threadStateData);
     if(constantPoolObjects == 0) {
         return;
     }
@@ -2069,8 +2186,9 @@ static void cn1BibopMaybeGc(CODENAME_ONE_THREAD_STATE) {
         }
         threadStateData->threadActive = JAVA_TRUE;
     }
+    long __gcTrigger = atomic_load_explicit(&bibopGcTriggerBytes, memory_order_relaxed);
     if(!gcCurrentlyRunning &&
-       atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed) > CN1_BIBOP_GC_TRIGGER_BYTES) {
+       atomic_load_explicit(&bibopBytesSinceGc, memory_order_relaxed) > __gcTrigger) {
         // save/restore: we may already be INSIDE a caller's native-allocation
         // bracket (reachable here under CN1_CONSERVATIVE_GC_ROOTS)
         JAVA_BOOLEAN wasNam = threadStateData->nativeAllocationMode;
@@ -2170,6 +2288,8 @@ static inline void cn1BibopInitSlot(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o, in
 #endif
     __atomic_store_n(&o->__codenameOneGcMark, -1, __ATOMIC_RELEASE);
 }
+
+#endif /* CN1_DISABLE_BIBOP */
 
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
 // ============================ Exact clazz registry ============================
@@ -2327,6 +2447,8 @@ void cn1GcRegisterImmortalObj(JAVA_OBJECT o) {
 static JAVA_BOOLEAN cn1SweepRemoving = JAVA_FALSE;
 #endif // CN1_CONSERVATIVE_GC_ROOTS
 
+#ifndef CN1_DISABLE_BIBOP
+
 // Allocate a small non-array object from the per-thread page for its size class.
 // Returns 0 only if pages cannot be obtained (caller falls back to the heap).
 static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
@@ -2334,6 +2456,14 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
     CN1_CLAZZ_REGISTER(parent);
     int ci = cn1BibopSizeToClass[size];
     if(ci < 0) {
+        return 0;
+    }
+    if(threadStateData->bibopBypassRemaining[ci] > 0) {
+        threadStateData->bibopBypassRemaining[ci]--;
+#ifdef CN1_GC_INSTRUMENT
+        atomic_fetch_add_explicit(&cn1BibopBypassAllocations, 1,
+                                  memory_order_relaxed);
+#endif
         return 0;
     }
     CN1BibopPage* p = bibopCurrent[ci];
@@ -2353,6 +2483,10 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
                 // publish the new cursor with release AFTER the slot (incl. its
                 // mark) is fully initialized.
                 atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
+                if(atomic_load_explicit(&p->gcFreshEpoch[currentGcMarkValue & 1], memory_order_relaxed)
+                   != currentGcMarkValue) {
+                    cn1BibopNoteFreshAllocation(p);
+                }
 #ifndef CN1_BIBOP_NO_FASTSWEEP
                 p->gcAllocedSinceSweep = JAVA_TRUE;
 #endif
@@ -2370,12 +2504,18 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
     }
     // free-list slot path
     cn1BibopInitSlot(threadStateData, o, size, parent);
+    if(atomic_load_explicit(&p->gcFreshEpoch[currentGcMarkValue & 1], memory_order_relaxed)
+       != currentGcMarkValue) {
+        cn1BibopNoteFreshAllocation(p);
+    }
 #ifndef CN1_BIBOP_NO_FASTSWEEP
     p->gcAllocedSinceSweep = JAVA_TRUE;
 #endif
     CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
     return o;
 }
+
+#endif /* CN1_DISABLE_BIBOP */
 
 // ---- Monitor side table (relocated __codenameOneThreadData out of the object header) ----
 // The lazily-attached per-object monitor (CN1ThreadData*) is NULL on virtually every
@@ -2437,6 +2577,8 @@ void* cn1MonitorDataRemove(JAVA_OBJECT o) {
     pthread_mutex_unlock(&cn1MonitorTableMutex);
     return r;
 }
+
+#ifndef CN1_DISABLE_BIBOP
 
 // Run finalizer + free monitor for a dead page slot (does NOT free() the slot;
 // the slot is recycled into the page free-list by the caller). Mirrors
@@ -2501,12 +2643,99 @@ void cn1BibopNoteMonitorAttached(JAVA_OBJECT obj) {
 void cn1BibopNoteNativePeer(JAVA_OBJECT obj) { (void)obj; }
 #endif
 
+static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
+                                    long reclaimedBytes,
+                                    long* classSlots, long* classLive) {
+    bibopLastCycleOccupiedBytes = occupiedBytes;
+    bibopLastCycleLiveBytes = liveBytes;
+    bibopLastCycleReclaimedBytes = reclaimedBytes;
+
+    if(occupiedBytes >= (2 * 1024 * 1024)) {
+        int survival = (int)((liveBytes * 100) / occupiedBytes);
+        long oldTrigger = atomic_load_explicit(&bibopGcTriggerBytes,
+                                               memory_order_relaxed);
+        long newTrigger = oldTrigger;
+        if(lowMemoryMode) {
+            bibopTriggerHighSurvivalStreak = 0;
+            newTrigger = CN1_BIBOP_GC_TRIGGER_BYTES;
+        } else if(survival >= CN1_BIBOP_BYPASS_SURVIVAL_PERCENT) {
+            bibopTriggerHighSurvivalStreak++;
+            if(bibopTriggerHighSurvivalStreak >= 2) {
+                long ceiling = CN1_BIBOP_GC_MAX_TRIGGER_BYTES;
+                long freeMem = atomic_load_explicit(&cn1CachedFreeMem,
+                                                    memory_order_relaxed);
+                if(freeMem > 0 && freeMem / 8 < ceiling) ceiling = freeMem / 8;
+                if(ceiling < CN1_BIBOP_GC_TRIGGER_BYTES) {
+                    ceiling = CN1_BIBOP_GC_TRIGGER_BYTES;
+                }
+                newTrigger = oldTrigger * 2;
+                if(newTrigger > ceiling) newTrigger = ceiling;
+                bibopTriggerHighSurvivalStreak = 0;
+            }
+        } else if(survival <= 20) {
+            bibopTriggerHighSurvivalStreak = 0;
+            if(oldTrigger > CN1_BIBOP_GC_TRIGGER_BYTES) {
+                newTrigger = oldTrigger / 2;
+                if(newTrigger < CN1_BIBOP_GC_TRIGGER_BYTES) {
+                    newTrigger = CN1_BIBOP_GC_TRIGGER_BYTES;
+                }
+            }
+        }
+        if(newTrigger != oldTrigger) {
+            atomic_store_explicit(&bibopGcTriggerBytes, newTrigger,
+                                  memory_order_relaxed);
+        }
+    }
+
+    for(int ci = 0 ; ci < CN1_BIBOP_NUM_CLASSES ; ci++) {
+        if(classSlots[ci] < CN1_BIBOP_BYPASS_MIN_SLOTS) {
+            continue;
+        }
+        int survival = (int)((classLive[ci] * 100) / classSlots[ci]);
+        if(survival >= CN1_BIBOP_BYPASS_SURVIVAL_PERCENT) {
+            if(++bibopHighSurvivalStreak[ci] >= 2) {
+                atomic_fetch_add_explicit(&bibopBypassGeneration[ci], 1,
+                                          memory_order_relaxed);
+                atomic_fetch_add_explicit(&cn1BibopBypassActivations, 1,
+                                          memory_order_relaxed);
+                bibopHighSurvivalStreak[ci] = 0;
+            }
+        } else if(survival <= 20) {
+            bibopHighSurvivalStreak[ci] = 0;
+        }
+    }
+#ifdef CN1_GC_INSTRUMENT
+    fprintf(stderr,
+            "[BIBOP-ADAPT] epoch=%d allocatedMB=%.1f triggerMB=%.1f occupiedMB=%.1f "
+            "liveMB=%.1f reclaimedMB=%.1f promotions=%ld bypass=%ld bypassAllocs=%ld freshPages=%ld "
+            "beltRuns=%ld adoptedSkips=%ld\n",
+            currentGcMarkValue,
+            bibopCycleAllocatedBytes / (1024.0 * 1024.0),
+            atomic_load_explicit(&bibopGcTriggerBytes, memory_order_relaxed) /
+                (1024.0 * 1024.0),
+            bibopLastCycleOccupiedBytes / (1024.0 * 1024.0),
+            bibopLastCycleLiveBytes / (1024.0 * 1024.0),
+            bibopLastCycleReclaimedBytes / (1024.0 * 1024.0),
+            atomic_load_explicit(&cn1BibopHighThroughputPromotions, memory_order_relaxed),
+            atomic_load_explicit(&cn1BibopBypassActivations, memory_order_relaxed),
+            atomic_load_explicit(&cn1BibopBypassAllocations, memory_order_relaxed),
+            atomic_load_explicit(&cn1BibopFreshPagesScanned, memory_order_relaxed),
+            atomic_load_explicit(&cn1BibopBeltRuns, memory_order_relaxed),
+            atomic_load_explicit(&cn1BibopAdoptedRescanSkips, memory_order_relaxed));
+#endif
+}
+
 // Sweep all retired pages. Runs on the GC thread AFTER mark completes; the
 // pages it processes are off the SWEEP stack (owner==0), so no mutator is
 // allocating into them and no marking is in flight -> plain header access.
 static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
     CN1BibopPage* list = atomic_exchange_explicit(&bibopSweepStack, (CN1BibopPage*)0, memory_order_acquire);
     int V = currentGcMarkValue;  // stable during the sweep (mark done, not yet incremented)
+    long occupiedBytes = 0;
+    long liveBytes = 0;
+    long reclaimedBytes = 0;
+    long classSlots[CN1_BIBOP_NUM_CLASSES] = {0};
+    long classLive[CN1_BIBOP_NUM_CLASSES] = {0};
 #ifndef CN1_BIBOP_NO_FASTSWEEP
     // Snapshot once: if ANY BiBOP object currently carries a monitor, suppress the O(1)
     // all-dead shortcut this whole sweep so dead monitored slots are full-walked and
@@ -2531,6 +2760,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
             abort();
         }
 #endif
+        int n = atomic_load_explicit(&page->bumpIndex, memory_order_acquire);
 #ifndef CN1_BIBOP_NO_FASTSWEEP
         // ---- O(1) page decision (no per-slot walk). -------------------------------
         // A page is HOMOGENEOUS when every occupied slot is a dead-or-graced object
@@ -2562,6 +2792,8 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 page->nextPool = bibopPartialPool[page->classIndex];
                 bibopPartialPool[page->classIndex] = page;
                 pthread_mutex_unlock(&bibopMutex);
+                occupiedBytes += (long)n * page->slotSize;
+                classSlots[page->classIndex] += n;
                 continue;
             } else if(!page->gcHasMonitors) {
                 // AGED PAST GRACE (even the youngest survivor at gcGraceEpoch < V-1 is
@@ -2578,6 +2810,9 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 page->nextPool = bibopFreePool;
                 bibopFreePool = page;
                 pthread_mutex_unlock(&bibopMutex);
+                occupiedBytes += (long)n * page->slotSize;
+                reclaimedBytes += (long)n * page->slotSize;
+                classSlots[page->classIndex] += n;
                 continue;
             }
             // else: all-dead but a BiBOP monitor is live -> fall through to the full walk
@@ -2588,24 +2823,26 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         // slot i < n the header stores (parentCls / heapPosition / mark) that
         // preceded that release are visible to this walk. Relaxed could observe a
         // freshly-bumped slot with a garbage header.
-        int n = atomic_load_explicit(&page->bumpIndex, memory_order_acquire);
+        int oldFreeCount = page->freeCount;
         void* fl = 0;
         int freeCount = 0;
         int liveCount = 0;
+        int policyLiveCount = 0;
 #ifndef CN1_BIBOP_NO_FASTSWEEP
         JAVA_BOOLEAN needsReclaim = JAVA_FALSE;
 #endif
         for(int i = 0 ; i < n ; i++) {
             JAVA_OBJECT o = cn1BibopSlot(page, i);
+            int m = o->__codenameOneGcMark;
             // MATURED (adopted) slot: its lifecycle belongs to the legacy mark/sweep now.
             // Skip it entirely (no double-clearing) -- BiBOP counts it as occupied/live so
             // the page isn't reclaimed. The legacy sweep flips it back to -3 on death, and a
             // LATER BiBOP sweep of this page then reclaims it as a normal dead slot.
             if(o->__heapPosition == CN1_BIBOP_ADOPTED) {
                 liveCount++;
+                if(m == V) policyLiveCount++;
                 continue;
             }
-            int m = o->__codenameOneGcMark;
             if(m == CN1_BIBOP_FREE_MARK) {
                 *(void**)o = fl; fl = o; freeCount++;
             } else if(m == -1) {
@@ -2628,6 +2865,7 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
                 *(void**)o = fl; fl = o; freeCount++;
             } else {
                 liveCount++;
+                if(m == V) policyLiveCount++;
 #ifndef CN1_BIBOP_NO_FASTSWEEP
                 // parentCls==0 guard mirrors the mark==-1 grace branch above: a
                 // memset-elided object can be published only once every field is
@@ -2641,6 +2879,12 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         }
         page->freeList = fl;
         page->freeCount = freeCount;
+        int sampledSlots = n - oldFreeCount;
+        occupiedBytes += (long)sampledSlots * page->slotSize;
+        liveBytes += (long)policyLiveCount * page->slotSize;
+        reclaimedBytes += (long)(sampledSlots - liveCount) * page->slotSize;
+        classSlots[page->classIndex] += sampledSlots;
+        classLive[page->classIndex] += policyLiveCount;
 #ifndef CN1_BIBOP_NO_FASTSWEEP
         // The monitor (CN1ThreadData) no longer lives in the object header, so the
         // per-slot "has a monitor" test is gone. Conservatively flag any page that still
@@ -2666,7 +2910,8 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
         }
         pthread_mutex_unlock(&bibopMutex);
     }
-    atomic_store_explicit(&bibopBytesSinceGc, 0, memory_order_relaxed);
+    cn1BibopAdaptAfterSweep(occupiedBytes, liveBytes, reclaimedBytes,
+                            classSlots, classLive);
 }
 
 // (The overflow-rescan helpers cn1BibopRescanStart / cn1BibopRescanStep live
@@ -2690,6 +2935,16 @@ void cn1BibopRetireThreadPages() {
     }
 }
 #endif /* CN1_DISABLE_BIBOP */
+
+#ifdef CN1_DISABLE_BIBOP
+// The legacy collector still uses the shared free-memory snapshot during mark.
+// Keep its QA build self-contained even though it has no BiBOP pacing policy.
+_Atomic long cn1CachedFreeMem = 0;
+void cn1RefreshFreeMemCache(void) {
+    atomic_store_explicit(&cn1CachedFreeMem, cn1_available_memory(),
+                          memory_order_relaxed);
+}
+#endif
 
 #ifdef CN1_CONSERVATIVE_GC_ROOTS
 // =========================================================================
@@ -3759,6 +4014,7 @@ static void gcMarkFlushLocal(struct gcMarkLocalBuffer* lb) {
     for(int i = 0 ; i < lb->count ; i++) {
         if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE) {
             gcMarkWorklistOverflow = JAVA_TRUE;
+            gcMarkOverflowSeen = JAVA_TRUE;
             break;
         }
         gcMarkWorklist[gcMarkWorklistTop] = lb->entries[i];
@@ -3787,6 +4043,7 @@ static inline void gcMarkWorklistPush(JAVA_OBJECT obj, JAVA_BOOLEAN force) {
     // Serial path: identical to the original single-threaded push.
     if(gcMarkWorklistTop >= CN1_GC_MARK_WORKLIST_SIZE) {
         gcMarkWorklistOverflow = JAVA_TRUE;
+        gcMarkOverflowSeen = JAVA_TRUE;
         return;
     }
     gcMarkWorklist[gcMarkWorklistTop].obj = obj;
@@ -4391,6 +4648,13 @@ static JAVA_BOOLEAN cn1BibopRescanStep() {
             JAVA_OBJECT o = cn1BibopSlot(p, bibopRescanSlot);
             bibopRescanSlot++;
             int m = __atomic_load_n(&o->__codenameOneGcMark, __ATOMIC_ACQUIRE);
+            if(m == currentGcMarkValue && o->__heapPosition == CN1_BIBOP_ADOPTED) {
+                // Overflow setup drains the adoption buffer into allObjectsInHeap;
+                // the legacy half of this same rescan owns this object now.
+                atomic_fetch_add_explicit(&cn1BibopAdoptedRescanSkips, 1,
+                                          memory_order_relaxed);
+                continue;
+            }
             if(m == currentGcMarkValue && o->__codenameOneParentClsReference->markFunction != 0) {
                 gcMarkWorklistPush(o, JAVA_FALSE);
             }
@@ -4477,14 +4741,24 @@ static void gcMarkDrain(CODENAME_ONE_THREAD_STATE) {
 #endif
             }
         }
-        int total = currentSizeOfAllObjectsInHeap;
 #ifndef CN1_DISABLE_BIBOP
+#if CN1_ADOPT_POLICY != 0
+        // A rescan drain can mature more descendants. Register each batch before
+        // the next page-rescan step so every adopted slot skipped by that step is
+        // already owned by the legacy half of the same fixed-point scan.
+        if(gcMarkWorklistOverflow || bibopActive) {
+            cn1DrainAdoptBuffer();
+        }
+#endif
         // First time we observe an overflow, start also rescanning page slots.
         if(gcMarkWorklistOverflow && !bibopActive) {
             bibopActive = JAVA_TRUE;
             bibopDone = JAVA_FALSE;
             cn1BibopRescanStart();
         }
+#endif
+        int total = currentSizeOfAllObjectsInHeap;
+#ifndef CN1_DISABLE_BIBOP
         JAVA_BOOLEAN scanDone = (rescanCursor >= total) && bibopDone;
 #else
         JAVA_BOOLEAN scanDone = (rescanCursor >= total);
