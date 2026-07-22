@@ -19149,30 +19149,45 @@ public class JavaSEPort extends CodenameOneImplementation {
 
    /**
     * Returns whether the glass pane should handle a mouse event at the given point.
-    * Swing popup menus are placed above the content pane in the root layered pane,
-    * so testing only whether the point overlaps the canvas would steal their events.
+    * The geometric canvas check must remain the default because native peers can be
+    * siblings of the canvas in the AppFrame hierarchy, and their HiDPI coordinates
+    * still need to pass through the glass-pane dispatcher. Swing menus are the one
+    * exception because lightweight popup menus can overlap the canvas.
     */
    static boolean shouldGlassPaneInterceptMouseEvent(JComponent glassPane,
            java.awt.Component canvas, int x, int y) {
+        if (!(canvas instanceof JComponent)) {
+            return false;
+        }
+        Point canvasPoint = SwingUtilities.convertPoint(
+                glassPane, new Point(x, y), canvas);
+        if (!((JComponent) canvas).getVisibleRect().contains(canvasPoint)) {
+            return false;
+        }
+
         JRootPane rootPane = SwingUtilities.getRootPane(glassPane);
         if (rootPane == null) {
-            return false;
+            return true;
         }
         JLayeredPane layeredPane = rootPane.getLayeredPane();
         Point layeredPoint = SwingUtilities.convertPoint(
                 glassPane, new Point(x, y), layeredPane);
         java.awt.Component component = SwingUtilities.getDeepestComponentAt(
                 layeredPane, layeredPoint.x, layeredPoint.y);
-        return component != null
-                && (canvas == component || containsInHierarchy(canvas, component));
+        return !isSwingMenuComponent(component);
    }
-   
-   private static boolean containsInHierarchy(java.awt.Component parent, java.awt.Component cmp) {
-        Container p = cmp.getParent();
-        while (p != parent && p != null) {
-            p = p.getParent();
+
+   private static boolean isSwingMenuComponent(java.awt.Component component) {
+        java.awt.Component current = component;
+        while (current != null) {
+            if (current instanceof JMenuBar
+                    || current instanceof JPopupMenu
+                    || current instanceof JMenuItem) {
+                return true;
+            }
+            current = current.getParent();
         }
-        return p == parent;
+        return false;
     }
     
    /**
