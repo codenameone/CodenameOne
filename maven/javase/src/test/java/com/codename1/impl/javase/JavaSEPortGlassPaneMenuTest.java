@@ -147,6 +147,43 @@ public class JavaSEPortGlassPaneMenuTest {
         rethrow(failure.get());
     }
 
+    @Test
+    public void glassPaneStillInterceptsNativePeerOverCanvas() throws Exception {
+        final AtomicReference<Throwable> failure = new AtomicReference<Throwable>();
+        SwingUtilities.invokeAndWait(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Fixture fixture = new Fixture();
+                    JPanel nativePeer = new JPanel();
+                    fixture.contentPane.add(nativePeer, 0);
+                    nativePeer.setBounds(50, 50, 120, 80);
+
+                    Point point = SwingUtilities.convertPoint(
+                            nativePeer, 10, 10, fixture.glassPane);
+                    Point canvasPoint = SwingUtilities.convertPoint(
+                            fixture.glassPane, point, fixture.canvas);
+                    Point layeredPoint = SwingUtilities.convertPoint(
+                            fixture.glassPane, point, fixture.rootPane.getLayeredPane());
+
+                    assertTrue(fixture.canvas.getVisibleRect().contains(canvasPoint),
+                            "the native peer must overlap the nested simulator canvas");
+                    assertSame(nativePeer, SwingUtilities.getDeepestComponentAt(
+                            fixture.rootPane.getLayeredPane(), layeredPoint.x, layeredPoint.y),
+                            "the native peer must be the topmost Swing component");
+
+                    assertTrue(JavaSEPort.shouldGlassPaneInterceptMouseEvent(
+                            fixture.glassPane, fixture.canvas, point.x, point.y),
+                            "the HiDPI glass pane must keep intercepting native peers "
+                                    + "over the canvas so it can transform their coordinates");
+                } catch (Throwable t) {
+                    failure.set(t);
+                }
+            }
+        });
+        rethrow(failure.get());
+    }
+
     private static void rethrow(Throwable failure) throws Exception {
         if (failure == null) {
             return;
@@ -172,13 +209,15 @@ public class JavaSEPortGlassPaneMenuTest {
             }
         };
         private final JPanel contentPane = new JPanel(null);
+        private final JPanel canvasHost = new JPanel(null);
         private final JComponent glassPane = new JComponent() {
         };
         private final JMenu deviceMenu = new JMenu("Device");
         private final JMenuBar menuBar = new JMenuBar();
 
         private Fixture() {
-            contentPane.add(canvas);
+            canvasHost.add(canvas);
+            contentPane.add(canvasHost);
             rootPane.setContentPane(contentPane);
 
             menuBar.add(deviceMenu);
@@ -193,6 +232,7 @@ public class JavaSEPortGlassPaneMenuTest {
             rootPane.setSize(400, 400);
             rootPane.getLayeredPane().setBounds(0, 0, 400, 400);
             contentPane.setBounds(0, 24, 400, 376);
+            canvasHost.setBounds(0, 0, 400, 376);
             canvas.setBounds(0, 0, 400, 376);
             menuBar.setBounds(0, 0, 400, 24);
             deviceMenu.setBounds(0, 0, 80, 24);
