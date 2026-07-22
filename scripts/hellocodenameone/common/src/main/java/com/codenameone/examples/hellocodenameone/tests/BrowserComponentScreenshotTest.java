@@ -27,6 +27,7 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
+import com.codename1.ui.RGBImage;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.UITimer;
 import com.codename1.util.SuccessCallback;
@@ -41,6 +42,7 @@ public class BrowserComponentScreenshotTest extends BaseTest {
     private Form form;
     private boolean jsReady;
     private boolean jsCheckPending;
+    private RGBImage visualBand;
 
     @Override
     public boolean runTest() throws Exception {
@@ -104,7 +106,11 @@ public class BrowserComponentScreenshotTest extends BaseTest {
             return;
         }
 
-        if (isHtml5()) {
+        if (isHtml5() || CN.isDesktop()) {
+            // Desktop screenshots intentionally cannot include the native web
+            // peer (the committed Mac/JavaSE baselines contain its black
+            // placeholder). The execute() assertion above validates the real
+            // DOM; use the normal harness capture for the surrounding form.
             UITimer.timer(2000, false, form, readyRunnable);
         } else {
             // DOM readiness and even WebKit's first meaningful paint do not
@@ -164,12 +170,19 @@ public class BrowserComponentScreenshotTest extends BaseTest {
             return false;
         }
 
-        int[] rgb = screen.getRGB();
-        int requiredBrightPixels = Math.max(32, (right - left) / 20);
+        int bandWidth = right - left;
+        int bandHeight = bottom - top;
+        if (visualBand == null || visualBand.getWidth() != bandWidth
+                || visualBand.getHeight() != bandHeight) {
+            visualBand = new RGBImage(new int[bandWidth * bandHeight], bandWidth, bandHeight);
+        }
+        screen.toRGB(visualBand, 0, 0, left, top, bandWidth, bandHeight);
+        int[] rgb = visualBand.getRGB();
+        int requiredBrightPixels = Math.max(32, bandWidth / 20);
         int brightPixels = 0;
-        for (int y = top; y < bottom; y++) {
-            int rowOffset = y * screenWidth;
-            for (int x = left; x < right; x++) {
+        for (int y = 0; y < bandHeight; y++) {
+            int rowOffset = y * bandWidth;
+            for (int x = 0; x < bandWidth; x++) {
                 int color = rgb[rowOffset + x];
                 int r = (color >> 16) & 0xff;
                 int g = (color >> 8) & 0xff;

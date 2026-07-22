@@ -2662,15 +2662,21 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
     bibopLastCycleLiveBytes = liveBytes;
     bibopLastCycleReclaimedBytes = reclaimedBytes;
 
-    if(occupiedBytes >= (2 * 1024 * 1024)) {
+    if(lowMemoryMode) {
+        long oldTrigger = atomic_load_explicit(&bibopGcTriggerBytes,
+                                               memory_order_relaxed);
+        bibopTriggerHighSurvivalStreak = 0;
+        if(oldTrigger != CN1_BIBOP_GC_TRIGGER_BYTES) {
+            atomic_store_explicit(&bibopGcTriggerBytes,
+                                  CN1_BIBOP_GC_TRIGGER_BYTES,
+                                  memory_order_relaxed);
+        }
+    } else if(occupiedBytes >= (2 * 1024 * 1024)) {
         int survival = (int)((liveBytes * 100) / occupiedBytes);
         long oldTrigger = atomic_load_explicit(&bibopGcTriggerBytes,
                                                memory_order_relaxed);
         long newTrigger = oldTrigger;
-        if(lowMemoryMode) {
-            bibopTriggerHighSurvivalStreak = 0;
-            newTrigger = CN1_BIBOP_GC_TRIGGER_BYTES;
-        } else if(survival >= CN1_BIBOP_BYPASS_SURVIVAL_PERCENT) {
+        if(survival >= CN1_BIBOP_BYPASS_SURVIVAL_PERCENT) {
             bibopTriggerHighSurvivalStreak++;
             if(bibopTriggerHighSurvivalStreak >= 2) {
                 long ceiling = CN1_BIBOP_GC_MAX_TRIGGER_BYTES;
@@ -2701,6 +2707,7 @@ static void cn1BibopAdaptAfterSweep(long occupiedBytes, long liveBytes,
 
     for(int ci = 0 ; ci < CN1_BIBOP_NUM_CLASSES ; ci++) {
         if(classSlots[ci] < CN1_BIBOP_BYPASS_MIN_SLOTS) {
+            bibopHighSurvivalStreak[ci] = 0;
             continue;
         }
         int survival = (int)((classLive[ci] * 100) / classSlots[ci]);
