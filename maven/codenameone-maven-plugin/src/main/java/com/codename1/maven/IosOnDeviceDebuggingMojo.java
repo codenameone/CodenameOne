@@ -6,9 +6,23 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.maven;
 
+import org.apache.maven.artifact.Artifact;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
@@ -16,6 +30,8 @@ import org.apache.maven.plugins.annotations.Parameter;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Launches the desktop on-device-debug proxy and prints instructions for
@@ -65,11 +81,7 @@ public class IosOnDeviceDebuggingMojo extends AbstractCN1Mojo {
         getLog().info("  3. Attach a debugger:  jdb -attach localhost:" + jdwpPort);
         getLog().info("");
 
-        ProcessBuilder pb = new ProcessBuilder(
-                javaBinary(),
-                "-jar", jar.getAbsolutePath(),
-                "--device-port=" + devicePort,
-                "--jdwp-port=" + jdwpPort);
+        ProcessBuilder pb = new ProcessBuilder(proxyCommand(jar));
         pb.inheritIO();
         try {
             Process proc = pb.start();
@@ -82,28 +94,38 @@ public class IosOnDeviceDebuggingMojo extends AbstractCN1Mojo {
         }
     }
 
-    private File resolveProxyJar() throws MojoFailureException {
+    File resolveProxyJar() throws MojoFailureException {
         if (proxyJar != null && !proxyJar.isEmpty()) {
             File f = new File(proxyJar);
             if (!f.isFile()) throw new MojoFailureException("Configured proxy jar does not exist: " + f);
             return f;
         }
-        // Try the locally-built standalone shaded jar (developer workflow).
-        String userHome = System.getProperty("user.home", "");
-        File m2 = new File(userHome, ".m2/repository/com/codenameone/cn1-debug-proxy");
-        if (m2.isDirectory()) {
-            File[] versions = m2.listFiles(File::isDirectory);
-            if (versions != null) {
-                for (File v : versions) {
-                    File jar = new File(v, "cn1-debug-proxy-" + v.getName() + "-standalone.jar");
-                    if (jar.isFile()) return jar;
+        if (pluginArtifacts != null) {
+            for (Artifact artifact : pluginArtifacts) {
+                if ("com.codenameone".equals(artifact.getGroupId())
+                        && "cn1-debug-proxy".equals(artifact.getArtifactId())
+                        && artifact.getClassifier() == null) {
+                    File jar = getJar(artifact);
+                    if (jar != null && (jar.isFile() || jar.isDirectory())) {
+                        return jar;
+                    }
                 }
             }
         }
         throw new MojoFailureException(
-                "Could not locate cn1-debug-proxy standalone jar in ~/.m2. "
-                        + "Build it once with 'cd maven/cn1-debug-proxy && mvn install', "
-                        + "or pass -Dcn1.onDeviceDebug.proxyJar=<path>.");
+                "Could not resolve the cn1-debug-proxy bundled with this Codename One Maven plugin. "
+                        + "Reinstall the plugin or pass -Dcn1.onDeviceDebug.proxyJar=<path>.");
+    }
+
+    List<String> proxyCommand(File jar) {
+        List<String> command = new ArrayList<String>();
+        command.add(javaBinary());
+        command.add("-cp");
+        command.add(jar.getAbsolutePath());
+        command.add("com.codename1.debug.proxy.ProxyMain");
+        command.add("--device-port=" + devicePort);
+        command.add("--jdwp-port=" + jdwpPort);
+        return command;
     }
 
     private String javaBinary() {
