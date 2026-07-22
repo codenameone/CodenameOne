@@ -58,6 +58,12 @@ public final class CalendarSyncEngine {
     }
 
     public synchronized String queueEventSave(CalendarEvent event, CalendarMutationScope scope) throws CalendarException {
+        if (event == null) {
+            throw new IllegalArgumentException("event required");
+        }
+        if (event.getCalendarId() == null) {
+            throw new IllegalArgumentException("event calendarId required");
+        }
         return queue("saveEvent", event.getCalendarId(), event.getId(), event.getVersion(), CalendarModelCodec.encodeEvent(event), scope);
     }
 
@@ -66,6 +72,12 @@ public final class CalendarSyncEngine {
     }
 
     public synchronized String queueTaskSave(CalendarTask task, CalendarMutationScope scope) throws CalendarException {
+        if (task == null) {
+            throw new IllegalArgumentException("task required");
+        }
+        if (task.getCalendarId() == null) {
+            throw new IllegalArgumentException("task calendarId required");
+        }
         return queue("saveTask", task.getCalendarId(), task.getId(), task.getVersion(), CalendarModelCodec.encodeTask(task), scope);
     }
 

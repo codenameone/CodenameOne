@@ -88,19 +88,78 @@ final class AndroidCalendarSource extends LocalCalendarSource {
             return value(new CalendarPage<CalendarInfo>(items,null,String.valueOf(System.currentTimeMillis())));
         }catch(Throwable ex){return failure(ex);}finally{if(c!=null)c.close();}
     }
-    public AsyncResource<CalendarPage<CalendarEvent>>queryEvents(CalendarQuery query){
-        if(!granted(Manifest.permission.READ_CALENDAR))return failed(CalendarError.PERMISSION_DENIED,"Calendar read permission is required");
-        List<CalendarEvent>items=new ArrayList<CalendarEvent>();StringBuilder where=new StringBuilder("1=1");List<String>args=new ArrayList<String>();
-        if(query!=null&&query.getCalendarId()!=null){where.append(" AND ").append(Events.CALENDAR_ID).append("=?");args.add(query.getCalendarId());}
-        if(query!=null&&query.getStartTime()!=null){where.append(" AND ").append(Events.DTEND).append(">=?");args.add(String.valueOf(query.getStartTime().toEpochMilli()));}
-        if(query!=null&&query.getEndTime()!=null){where.append(" AND ").append(Events.DTSTART).append("<=?");args.add(String.valueOf(query.getEndTime().toEpochMilli()));}
-        Cursor c=null;try{String[]columns={Events._ID,Events.CALENDAR_ID,Events.TITLE,Events.DESCRIPTION,Events.EVENT_LOCATION,Events.DTSTART,Events.DTEND,Events.EVENT_TIMEZONE,Events.ALL_DAY,Events.RRULE,Events.STATUS,Events.AVAILABILITY,Events.DIRTY};
-            c=resolver().query(Events.CONTENT_URI,columns,where.toString(),args.toArray(new String[args.size()]),Events.DTSTART+" ASC");
-            while(c!=null&&c.moveToNext()){CalendarEvent event=new CalendarEvent().setId(String.valueOf(c.getLong(0))).setCalendarId(String.valueOf(c.getLong(1))).setSourceId(getId()).setTitle(c.getString(2)).setDescription(c.getString(3)).setLocation(c.getString(4)).setVersion(String.valueOf(c.getLong(12)));
-                if(c.getInt(8)!=0){event.setStart(allDay(c.getLong(5))).setEnd(allDay(c.getLong(6)));}else{String zone=c.getString(7);if(zone==null)zone=TimeZone.getDefault().getID();event.setStart(CalendarDateTime.instant(Instant.ofEpochMilli(c.getLong(5)),ZoneId.of(zone))).setEnd(CalendarDateTime.instant(Instant.ofEpochMilli(c.getLong(6)),ZoneId.of(zone)));}
-                if(c.getString(9)!=null)event.setRecurrence(ICalendarCodec.readRecurrenceRule(c.getString(9)));if(c.getInt(10)==Events.STATUS_CANCELED)event.setStatus(CalendarEvent.Status.CANCELED);else if(c.getInt(10)==Events.STATUS_TENTATIVE)event.setStatus(CalendarEvent.Status.TENTATIVE);event.setAvailability(c.getInt(11)==Events.AVAILABILITY_FREE?CalendarEvent.Availability.FREE:c.getInt(11)==Events.AVAILABILITY_TENTATIVE?CalendarEvent.Availability.TENTATIVE:CalendarEvent.Availability.BUSY);readDetails(event);items.add(event);}
-            return value(new CalendarPage<CalendarEvent>(items,null,String.valueOf(System.currentTimeMillis())));
-        }catch(Throwable ex){return failure(ex);}finally{if(c!=null)c.close();}
+    public AsyncResource<CalendarPage<CalendarEvent>> queryEvents(CalendarQuery query) {
+        if (!granted(Manifest.permission.READ_CALENDAR)) {
+            return failed(CalendarError.PERMISSION_DENIED, "Calendar read permission is required");
+        }
+        List<CalendarEvent> items = new ArrayList<CalendarEvent>();
+        StringBuilder where = new StringBuilder("1=1");
+        List<String> args = new ArrayList<String>();
+        if (query != null && query.getCalendarId() != null) {
+            where.append(" AND ").append(Events.CALENDAR_ID).append("=?");
+            args.add(query.getCalendarId());
+        }
+        if (query != null && query.getStartTime() != null) {
+            where.append(" AND (").append(Events.DTEND).append(" IS NULL OR ")
+                    .append(Events.DTEND).append(">=?)");
+            args.add(String.valueOf(query.getStartTime().toEpochMilli()));
+        }
+        if (query != null && query.getEndTime() != null) {
+            where.append(" AND ").append(Events.DTSTART).append("<=?");
+            args.add(String.valueOf(query.getEndTime().toEpochMilli()));
+        }
+        Cursor c = null;
+        try {
+            String[] columns = {Events._ID, Events.CALENDAR_ID, Events.TITLE, Events.DESCRIPTION,
+                    Events.EVENT_LOCATION, Events.DTSTART, Events.DTEND, Events.DURATION,
+                    Events.EVENT_TIMEZONE, Events.ALL_DAY, Events.RRULE, Events.STATUS,
+                    Events.AVAILABILITY, Events.DIRTY};
+            c = resolver().query(Events.CONTENT_URI, columns, where.toString(),
+                    args.toArray(new String[args.size()]), Events.DTSTART + " ASC");
+            while (c != null && c.moveToNext()) {
+                long startMillis = c.getLong(5);
+                long endMillis = eventEndMillis(startMillis,
+                        c.isNull(6) ? null : Long.valueOf(c.getLong(6)), c.getString(7));
+                if (query != null && query.getStartTime() != null
+                        && endMillis < query.getStartTime().toEpochMilli()) {
+                    continue;
+                }
+                CalendarEvent event = new CalendarEvent().setId(String.valueOf(c.getLong(0)))
+                        .setCalendarId(String.valueOf(c.getLong(1))).setSourceId(getId())
+                        .setTitle(c.getString(2)).setDescription(c.getString(3))
+                        .setLocation(c.getString(4)).setVersion(String.valueOf(c.getLong(13)));
+                if (c.getInt(9) != 0) {
+                    event.setStart(allDay(startMillis)).setEnd(allDay(endMillis));
+                } else {
+                    String zone = c.getString(8);
+                    if (zone == null) {
+                        zone = TimeZone.getDefault().getID();
+                    }
+                    event.setStart(CalendarDateTime.instant(Instant.ofEpochMilli(startMillis), ZoneId.of(zone)))
+                            .setEnd(CalendarDateTime.instant(Instant.ofEpochMilli(endMillis), ZoneId.of(zone)));
+                }
+                if (c.getString(10) != null) {
+                    event.setRecurrence(ICalendarCodec.readRecurrenceRule(c.getString(10)));
+                }
+                if (c.getInt(11) == Events.STATUS_CANCELED) {
+                    event.setStatus(CalendarEvent.Status.CANCELED);
+                } else if (c.getInt(11) == Events.STATUS_TENTATIVE) {
+                    event.setStatus(CalendarEvent.Status.TENTATIVE);
+                }
+                event.setAvailability(c.getInt(12) == Events.AVAILABILITY_FREE
+                        ? CalendarEvent.Availability.FREE : c.getInt(12) == Events.AVAILABILITY_TENTATIVE
+                        ? CalendarEvent.Availability.TENTATIVE : CalendarEvent.Availability.BUSY);
+                readDetails(event);
+                items.add(event);
+            }
+            return value(new CalendarPage<CalendarEvent>(items, null, String.valueOf(System.currentTimeMillis())));
+        } catch (Throwable ex) {
+            return failure(ex);
+        } finally {
+            if (c != null) {
+                c.close();
+            }
+        }
     }
     public AsyncResource<CalendarEvent>getEvent(String calendarId,String eventId){
         CalendarPage<CalendarEvent>page=queryEvents(new CalendarQuery().setCalendarId(calendarId)).get();for(CalendarEvent event:page.getItems())if(eventId.equals(event.getId()))return value(event);return failed(CalendarError.NOT_FOUND,"Event not found");
@@ -118,5 +177,76 @@ final class AndroidCalendarSource extends LocalCalendarSource {
     private void readDetails(CalendarEvent event){Cursor c=null;try{c=resolver().query(Attendees.CONTENT_URI,new String[]{Attendees.ATTENDEE_NAME,Attendees.ATTENDEE_EMAIL,Attendees.ATTENDEE_TYPE,Attendees.ATTENDEE_STATUS},Attendees.EVENT_ID+"=?",new String[]{event.getId()},null);while(c!=null&&c.moveToNext()){CalendarAttendee a=new CalendarAttendee().setName(c.getString(0)).setEmail(c.getString(1));if(c.getInt(2)==Attendees.TYPE_OPTIONAL)a.setRole(CalendarAttendee.Role.OPTIONAL);else if(c.getInt(2)==Attendees.TYPE_RESOURCE)a.setRole(CalendarAttendee.Role.RESOURCE);int s=c.getInt(3);a.setResponse(s==Attendees.ATTENDEE_STATUS_ACCEPTED?CalendarAttendee.Response.ACCEPTED:s==Attendees.ATTENDEE_STATUS_DECLINED?CalendarAttendee.Response.DECLINED:s==Attendees.ATTENDEE_STATUS_TENTATIVE?CalendarAttendee.Response.TENTATIVE:CalendarAttendee.Response.NEEDS_ACTION);event.addAttendee(a);}}finally{if(c!=null)c.close();}try{c=resolver().query(Reminders.CONTENT_URI,new String[]{Reminders.MINUTES,Reminders.METHOD},Reminders.EVENT_ID+"=?",new String[]{event.getId()},null);while(c!=null&&c.moveToNext())event.addAlarm(new CalendarAlarm().setTimeBefore(Duration.ofMinutes(c.getInt(0))).setMethod(c.getInt(1)==Reminders.METHOD_EMAIL?CalendarAlarm.Method.EMAIL:CalendarAlarm.Method.ALERT));}finally{if(c!=null)c.close();}}
     private void replaceDetails(CalendarEvent event){resolver().delete(Reminders.CONTENT_URI,Reminders.EVENT_ID+"=?",new String[]{event.getId()});for(CalendarAlarm alarm:event.getAlarms())if(alarm.getTimeBefore()!=null){ContentValues v=new ContentValues();v.put(Reminders.EVENT_ID,Long.valueOf(event.getId()));v.put(Reminders.MINUTES,Long.valueOf(alarm.getTimeBefore().getSeconds()/60L));v.put(Reminders.METHOD,Integer.valueOf(alarm.getMethod()==CalendarAlarm.Method.EMAIL?Reminders.METHOD_EMAIL:Reminders.METHOD_ALERT));resolver().insert(Reminders.CONTENT_URI,v);}resolver().delete(Attendees.CONTENT_URI,Attendees.EVENT_ID+"=?",new String[]{event.getId()});for(CalendarAttendee a:event.getAttendees()){ContentValues v=new ContentValues();v.put(Attendees.EVENT_ID,Long.valueOf(event.getId()));v.put(Attendees.ATTENDEE_NAME,a.getName());v.put(Attendees.ATTENDEE_EMAIL,a.getEmail());v.put(Attendees.ATTENDEE_TYPE,Integer.valueOf(a.getRole()==CalendarAttendee.Role.OPTIONAL?Attendees.TYPE_OPTIONAL:a.getRole()==CalendarAttendee.Role.RESOURCE?Attendees.TYPE_RESOURCE:Attendees.TYPE_REQUIRED));resolver().insert(Attendees.CONTENT_URI,v);}}
     private ContentResolver resolver(){return context.getContentResolver();}private boolean granted(String permission){return ContextCompat.checkSelfPermission(context,permission)==PackageManager.PERMISSION_GRANTED;}private static CalendarDateTime allDay(long time){LocalDate date=ZonedDateTime.ofInstant(Instant.ofEpochMilli(time),ZoneOffset.UTC).toLocalDateTime().toLocalDate();return CalendarDateTime.allDay(date);}private static long millis(CalendarDateTime value){if(!value.isAllDay())return value.getDateTime().toInstant().toEpochMilli();return ZonedDateTime.of(value.getDate().atTime(0,0),ZoneOffset.UTC).toInstant().toEpochMilli();}
+    private static long eventEndMillis(long startMillis, Long endMillis, String duration) {
+        if (endMillis != null) {
+            return endMillis.longValue();
+        }
+        if (duration == null || duration.length() == 0) {
+            return startMillis;
+        }
+        try {
+            return startMillis + parseDurationMillis(duration);
+        } catch (IllegalArgumentException ex) {
+            return startMillis;
+        }
+    }
+
+    private static long parseDurationMillis(String duration) {
+        int length = duration.length();
+        int position = 0;
+        int sign = 1;
+        if (position < length && (duration.charAt(position) == '+' || duration.charAt(position) == '-')) {
+            if (duration.charAt(position++) == '-') {
+                sign = -1;
+            }
+        }
+        if (position >= length || (duration.charAt(position) != 'P' && duration.charAt(position) != 'p')) {
+            throw new IllegalArgumentException("Invalid event duration");
+        }
+        position++;
+        long millis = 0L;
+        long amount = 0L;
+        boolean digits = false;
+        boolean found = false;
+        while (position < length) {
+            char ch = duration.charAt(position++);
+            if (ch >= '0' && ch <= '9') {
+                amount = amount * 10L + ch - '0';
+                digits = true;
+                continue;
+            }
+            if ((ch == 'T' || ch == 't') && !digits) {
+                continue;
+            }
+            if (ch >= 'a' && ch <= 'z') {
+                ch = (char) (ch - ('a' - 'A'));
+            }
+            long factor;
+            if (ch == 'W') {
+                factor = 7L * 24L * 60L * 60L * 1000L;
+            } else if (ch == 'D') {
+                factor = 24L * 60L * 60L * 1000L;
+            } else if (ch == 'H') {
+                factor = 60L * 60L * 1000L;
+            } else if (ch == 'M') {
+                factor = 60L * 1000L;
+            } else if (ch == 'S') {
+                factor = 1000L;
+            } else {
+                throw new IllegalArgumentException("Invalid event duration");
+            }
+            if (!digits) {
+                throw new IllegalArgumentException("Invalid event duration");
+            }
+            millis += amount * factor;
+            amount = 0L;
+            digits = false;
+            found = true;
+        }
+        if (!found || digits) {
+            throw new IllegalArgumentException("Invalid event duration");
+        }
+        return sign * millis;
+    }
     private static <T>AsyncResource<T>value(T value){AsyncResource<T>out=new AsyncResource<T>();out.complete(value);return out;}private static <T>AsyncResource<T>failed(CalendarError type,String message){AsyncResource<T>out=new AsyncResource<T>();out.error(new CalendarException(type,message));return out;}private static <T>AsyncResource<T>failure(Throwable error){AsyncResource<T>out=new AsyncResource<T>();out.error(error instanceof CalendarException?error:new CalendarException(CalendarError.UNKNOWN,error.getMessage(),error));return out;}
 }

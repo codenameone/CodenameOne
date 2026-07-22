@@ -61,7 +61,7 @@ public final class Duration implements Comparable<Duration> {
         if (text == null) {
             throw new NullPointerException();
         }
-        String value = text.toString().toUpperCase();
+        String value = text.toString();
         int length = value.length();
         int position = 0;
         int overallSign = 1;
@@ -70,7 +70,11 @@ public final class Duration implements Comparable<Duration> {
                 overallSign = -1;
             }
         }
-        if (position >= length || value.charAt(position++) != 'P') {
+        if (position >= length) {
+            throw invalidDuration(value);
+        }
+        char prefix = value.charAt(position++);
+        if (prefix != 'P' && prefix != 'p') {
             throw invalidDuration(value);
         }
         boolean time = false;
@@ -81,7 +85,7 @@ public final class Duration implements Comparable<Duration> {
         long seconds = 0L;
         int nanos = 0;
         while (position < length) {
-            if (value.charAt(position) == 'T') {
+            if (value.charAt(position) == 'T' || value.charAt(position) == 't') {
                 if (time) {
                     throw invalidDuration(value);
                 }
@@ -109,6 +113,9 @@ public final class Duration implements Comparable<Duration> {
                 throw invalidDuration(value);
             }
             char unit = value.charAt(position++);
+            if (unit >= 'a' && unit <= 'z') {
+                unit = (char) (unit - ('a' - 'A'));
+            }
             String wholeText = value.substring(numberStart, fractionStart < 0 ? position - 1 : fractionStart - 1);
             long amount;
             try {

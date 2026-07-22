@@ -179,6 +179,14 @@ class CalendarIntegrationTest {
         MemoryCalendarCache cache=new MemoryCalendarCache();
         InMemorySource source=new InMemorySource();
         CalendarSyncEngine engine=new CalendarSyncEngine(source,cache);
+        assertThrows(IllegalArgumentException.class,
+                () -> engine.queueEventSave(null, CalendarMutationScope.ALL));
+        assertThrows(IllegalArgumentException.class,
+                () -> engine.queueEventSave(new CalendarEvent(), CalendarMutationScope.ALL));
+        assertThrows(IllegalArgumentException.class,
+                () -> engine.queueTaskSave(null, CalendarMutationScope.ALL));
+        assertThrows(IllegalArgumentException.class,
+                () -> engine.queueTaskSave(new CalendarTask(), CalendarMutationScope.ALL));
         engine.queueEventSave(new CalendarEvent().setCalendarId("work").setTitle("Offline"),CalendarMutationScope.ALL);
         assertEquals(0,source.saved);
         assertEquals(1,engine.getPendingCount());
