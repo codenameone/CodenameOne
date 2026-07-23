@@ -55,6 +55,13 @@ public class CN1FirebaseMessagingService extends com.google.firebase.messaging.F
         final Context context = this;
         System.out.println("Message received " + remoteMessage.getData());
 
+        final String cn1Envelope = (String)remoteMessage.getData().get("cn1Envelope");
+        if (cn1Envelope != null) {
+            com.codename1.impl.android.AndroidImplementation.handleV3Push(
+                    cn1Envelope, context, appIsRunning(), getAppStubClass());
+            return;
+        }
+
         final String messageType = (String)remoteMessage.getData().get("messageType");
         final String message = (String)remoteMessage.getData().get("message");
         final String image = (String)remoteMessage.getData().get("image");

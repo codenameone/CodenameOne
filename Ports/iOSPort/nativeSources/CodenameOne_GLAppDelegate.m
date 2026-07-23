@@ -780,6 +780,23 @@ int pushReceivedCount=0;
         }
         return;
     }
+    // Managed push carries the canonical typed envelope as a JSON object. Route it
+    // intact before the historical aps/message-type decoder can split or rewrite it.
+    id cn1Envelope = [userInfo objectForKey:@"cn1"];
+    if ([cn1Envelope isKindOfClass:[NSDictionary class]]) {
+        NSError *jsonError = nil;
+        NSData *jsonData = [NSJSONSerialization dataWithJSONObject:cn1Envelope options:0 error:&jsonError];
+        if (jsonData != nil && jsonError == nil) {
+            NSString *jsonString = [[[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding] autorelease];
+            pushReceivedCount = 1;
+            if (completionHandler != nil) {
+                cn1PushCompletionHandler = Block_copy(completionHandler);
+            }
+            com_codename1_impl_ios_IOSImplementation_pushReceived___java_lang_String_java_lang_String(
+                    CN1_THREAD_GET_STATE_PASS_ARG fromNSString(CN1_THREAD_GET_STATE_PASS_ARG jsonString), JAVA_NULL);
+            return;
+        }
+    }
     com_codename1_push_PushContent_reset__(CN1_THREAD_GET_STATE_PASS_SINGLE_ARG);
     
     BOOL pushIncludedBody = NO;

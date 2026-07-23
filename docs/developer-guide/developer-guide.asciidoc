@@ -192,4 +192,6 @@ include::Maven-Appendix-Rich-Properties.adoc[]
 
 = Historical reference
 
+include::Deprecated-Push-Notifications.asciidoc[]
+
 include::Working-with-UWP.asciidoc[]

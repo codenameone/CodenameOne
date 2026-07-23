@@ -2,7 +2,7 @@
 (function () {
     window.cn1_registerPush = registerPush;
     
-    function registerPush(onSuccess, onFail, onPush, pushActionCategories) {
+    function registerPush(onSuccess, onFail, onPush, pushActionCategories, typedEnvelope) {
         /**
          * Step one: run a function on load (or whenever is appropriate for you)
          * Function run on load sets up the service worker if it is supported in the
@@ -170,9 +170,12 @@
             // Get public key and user auth from the subscription object
             var key = subscription.getKey ? subscription.getKey('p256dh') : '';
             var auth = subscription.getKey ? subscription.getKey('auth') : '';
-            var id = 'cn1-web-'+Base64.encodeURI(subscription.endpoint + '?key=' + 
-                    encodeURIComponent(key ? btoa(String.fromCharCode.apply(null, new Uint8Array(key))) : '') +
-                    '&auth=' + encodeURIComponent(auth ? btoa(String.fromCharCode.apply(null, new Uint8Array(auth))) : ''));
+            var material = typedEnvelope && subscription.toJSON
+                    ? JSON.stringify(subscription.toJSON())
+                    : subscription.endpoint + '?key=' +
+                      encodeURIComponent(key ? btoa(String.fromCharCode.apply(null, new Uint8Array(key))) : '') +
+                      '&auth=' + encodeURIComponent(auth ? btoa(String.fromCharCode.apply(null, new Uint8Array(auth))) : '');
+            var id = 'cn1-web-'+Base64.encodeURI(material);
             onSuccess(id);
         }
     }

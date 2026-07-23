@@ -10525,6 +10525,11 @@ public class HTML5Implementation extends CodenameOneImplementation {
 
     @Override
     public void registerPush(Hashtable metaData, boolean noFallback) {
+        PushCallback explicit = CodenameOneImplementation.getPushCallback();
+        if (explicit != null) {
+            setPushCallback(explicit);
+            HTML5Push.setPushCallback(explicit);
+        }
         HTML5Push.registerPush();
     }
     

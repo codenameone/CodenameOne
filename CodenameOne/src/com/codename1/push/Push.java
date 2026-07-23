@@ -469,7 +469,7 @@ public class Push {
                                                     String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort, String wnsSID, String wnsClientSecret, int type, String... deviceKeys) {
         PushConnection cr = new PushConnection();
         cr.setPost(true);
-        cr.setUrl("https://push.codenameone.com/push/push");
+        cr.setUrl("https://cloud.codenameone.com/push/push");
         cr.addArgument("token", token);
         cr.addArguments("device", deviceKeys);
         cr.addArgument("type", "" + type);

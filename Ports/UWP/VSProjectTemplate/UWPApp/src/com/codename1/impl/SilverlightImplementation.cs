@@ -215,6 +215,12 @@ namespace com.codename1.impl
         */
         public override void registerPush(Hashtable metaData, bool noFallback)
         {
+            com.codename1.push.PushCallback explicitCallback =
+                    com.codename1.impl.CodenameOneImplementation.getPushCallback();
+            if (explicitCallback != null)
+            {
+                setPushCallback(explicitCallback);
+            }
 
             dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
             {
@@ -224,10 +230,18 @@ namespace com.codename1.impl
                        .CreatePushNotificationChannelForApplicationAsync();
                     if (channel != null && channel.Uri != null)
                     {
-                        byte[] idBytes = System.Text.Encoding.UTF8.GetBytes(channel.Uri);
-                        var id = Base64UrlEncode(idBytes);
-
-                        Display.getInstance().callSerially(new RegisterServerPushRunnable("cn1-win-" + id));
+                        if (com.codename1.push.PushClient.getActiveCallback() != null)
+                        {
+                            Display.getInstance().callSerially(
+                                    new RegisterV3PushRunnable("cn1-wns-" + channel.Uri));
+                        }
+                        else
+                        {
+                            byte[] idBytes = System.Text.Encoding.UTF8.GetBytes(channel.Uri);
+                            var id = Base64UrlEncode(idBytes);
+                            Display.getInstance().callSerially(
+                                    new RegisterServerPushRunnable("cn1-win-" + id));
+                        }
 
                         channel.PushNotificationReceived += Channel_PushNotificationReceived;
                     }
@@ -320,12 +334,19 @@ namespace com.codename1.impl
                 case Windows.Networking.PushNotifications.PushNotificationType.Toast:
                     {
                         XmlDocument xml = args.ToastNotification.Content;
-                        Display.getInstance().callSerially(new PushReceivedRunnable(xml.DocumentElement.GetAttribute("launch")));
+                        string content = xml.DocumentElement.GetAttribute("launch");
+                        Display.getInstance().callSerially(
+                                com.codename1.push.PushClient.getActiveCallback() != null
+                                ? (java.lang.Runnable)new V3PushReceivedRunnable(content)
+                                : new PushReceivedRunnable(content));
                         break;
                     }
                 case Windows.Networking.PushNotifications.PushNotificationType.Raw:
                     {
-                        Display.getInstance().callSerially(new PushReceivedRunnable(args.RawNotification.Content));
+                        Display.getInstance().callSerially(
+                                com.codename1.push.PushClient.getActiveCallback() != null
+                                ? (java.lang.Runnable)new V3PushReceivedRunnable(args.RawNotification.Content)
+                                : new PushReceivedRunnable(args.RawNotification.Content));
                         break;
                     }
                 default:
@@ -384,6 +405,36 @@ namespace com.codename1.impl
             {
 
                 SilverlightImplementation.instance._registerServerPush(this.id);
+            }
+        }
+
+        class RegisterV3PushRunnable : java.lang.Runnable
+        {
+            private string id;
+
+            public RegisterV3PushRunnable(string id)
+            {
+                this.id = id;
+            }
+
+            public void run()
+            {
+                com.codename1.push.PushClient.getActiveCallback().registeredForPush(this.id);
+            }
+        }
+
+        class V3PushReceivedRunnable : java.lang.Runnable
+        {
+            private string data;
+
+            public V3PushReceivedRunnable(string data)
+            {
+                this.data = data;
+            }
+
+            public void run()
+            {
+                com.codename1.push.PushClient.dispatch(this.data);
             }
         }
 
