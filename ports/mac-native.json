@@ -1,48 +1,48 @@
 {
-  "commit": "6a137bfd54efec34958621ac91b9681e3e107fdb",
-  "generated_at": "2026-07-23T18:46:20Z",
+  "commit": "9816282ec82cb5b2b282dd09a5c42a15bed65411",
+  "generated_at": "2026-07-23T23:39:57Z",
   "performance": {
     "benchmark_version": 1,
     "benchmarks": {
       "arrayRandom": {
         "checksum": "-2288487891715278",
-        "duration_ns": 293928000
+        "duration_ns": 381096000
       },
       "arraySequential": {
         "checksum": "0",
-        "duration_ns": 20882000
+        "duration_ns": 27301000
       },
       "hashMapChurn": {
         "checksum": "49941",
-        "duration_ns": 67464000
+        "duration_ns": 54537000
       },
       "intArithmetic": {
         "checksum": "1307491170054",
-        "duration_ns": 105436000
+        "duration_ns": 143891000
       },
       "longArithmetic": {
         "checksum": "6887886960473257608",
-        "duration_ns": 65281000
+        "duration_ns": 84779000
       },
       "mathTranscendental": {
         "checksum": "4729652805076374709",
-        "duration_ns": 292453000
+        "duration_ns": 344401000
       },
       "objectAllocation": {
         "checksum": "2999790376128",
-        "duration_ns": 605299000
+        "duration_ns": 210118000
       },
       "quicksort": {
         "checksum": "809667393311589960",
-        "duration_ns": 151107000
+        "duration_ns": 123127000
       },
       "recursion": {
         "checksum": "33385282",
-        "duration_ns": 168827000
+        "duration_ns": 150502000
       },
       "stringBuilding": {
         "checksum": "-609121604069",
-        "duration_ns": 107624000
+        "duration_ns": 67958000
       }
     },
     "method": "minimum of five measured runs after three in-process warm-ups",
@@ -51,13 +51,13 @@
     "suite_checksum": 0
   },
   "port": "mac-native",
-  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30030341270",
+  "run_url": "https://github.com/codenameone/CodenameOne/actions/runs/30052033714",
   "schema_version": 1,
   "suite_finished": true,
   "summary": {
     "fail": 0,
     "not-run": 0,
-    "pass": 164,
+    "pass": 165,
     "skip": 2
   },
   "tests": {
@@ -119,6 +119,10 @@
     },
     "BytecodeTranslatorRegressionTest": {
       "feature": "bytecode-runtime",
+      "status": "pass"
+    },
+    "CalendarApiTest": {
+      "feature": "calendar-integration",
       "status": "pass"
     },
     "CallDetectionAPITest": {
