@@ -521,22 +521,9 @@ final class IOSCalendarSource extends LocalCalendarSource {
         return out;
     }
 
-    private static <T> AsyncResource<T> value(T value) {
-        AsyncResource<T> out = new AsyncResource<T>();
-        out.complete(value);
-        return out;
-    }
-
     private static <T> AsyncResource<T> failed(CalendarError type, String message) {
         AsyncResource<T> out = new AsyncResource<T>();
         out.error(new CalendarException(type, message));
-        return out;
-    }
-
-    private static <T> AsyncResource<T> failure(Throwable error) {
-        AsyncResource<T> out = new AsyncResource<T>();
-        out.error(error instanceof CalendarException ? error
-                : new CalendarException(CalendarError.UNKNOWN, error.getMessage(), error));
         return out;
     }
 }
