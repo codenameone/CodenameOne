@@ -1,0 +1,548 @@
+{
+  "schemaVersion": 1,
+  "id": "portable-3d-graphics-api",
+  "title": "3D Graphics Without Writing Shaders: The Portable GPU API",
+  "output": {
+    "frameRate": 30,
+    "landscapeWidth": 1920,
+    "landscapeHeight": 1080,
+    "portraitWidth": 1080,
+    "portraitHeight": 1920,
+    "videoBitRate": 8000000
+  },
+  "narration": {
+    "provider": "kokoro",
+    "voice": "af_heart:60,af_bella:40",
+    "language": "en-us",
+    "speed": 0.97,
+    "model": ".video-tools/kokoro/kokoro-v1.0.onnx",
+    "minimumGapMs": 250,
+    "pronunciations": {
+      "Codename One": "Codename One",
+      "API": "API",
+      "AI": "AI",
+      "APK": "APK",
+      "AR/VR": "augmented reality and virtual reality",
+      "ARKit": "A-R kit",
+      "ARCore": "A-R core",
+      "AR": "A-R",
+      "VR": "V-R",
+      "2D": "2D",
+      "3D": "3D",
+      "GPU": "GPU",
+      "GA4": "G-A four",
+      "GDPR": "G-D-P-R",
+      "CCPA": "C-C-P-A",
+      "DPI": "D-P-I",
+      "glTF": "G-L-T-F",
+      "JVM": "JVM",
+      "JIT": "JIT",
+      "AOT": "A-O-T",
+      "GC": "G-C",
+      "CI": "C-I",
+      "CSS": "CSS",
+      "iOS": "iOS",
+      "macOS": "macOS",
+      "tvOS": "tvOS",
+      "UWP": "U-W-P",
+      "NFC": "NFC",
+      "PCM": "PCM",
+      "RGBA": "RGBA",
+      "EDT": "EDT",
+      "SRT": "SRT",
+      "VTT": "VTT",
+      "AAC": "A-A-C",
+      "H264": "H two sixty four",
+      "HTML": "HTML",
+      "IDE": "I-D-E",
+      "JS": "JS",
+      "XML": "XML",
+      "JSON": "jay son",
+      "WYSIWYG": "wizzy wig",
+      "CodeEditor": "Code Editor",
+      "RichTextArea": "Rich Text Area",
+      "AbstractEditorComponent": "Abstract Editor Component",
+      "CodeMirror": "Code Mirror",
+      "VideoIO": "video I-O",
+      "WAVWriter": "wave writer",
+      "SVG": "SVG",
+      "SPI": "S-P-I",
+      "AnalyticsService": "Analytics Service",
+      "AnalyticsProvider": "Analytics Provider",
+      "AbstractAnalyticsProvider": "Abstract Analytics Provider",
+      "CodenameOneAnalyticsProvider": "Codename One Analytics Provider",
+      "RASP": "rasp",
+      "DeviceIntegrity": "Device Integrity",
+      "AppReview": "App Review",
+      "CarApplication": "Car Application",
+      "CarScreen": "Car Screen",
+      "CarTemplate": "Car Template",
+      "UiModeManager": "U-I Mode Manager",
+      "AndroidX": "Android X",
+      "CN.isTV()": "C-N is T-V",
+      "Display.isTV()": "Display is T-V",
+      "TARGET_OS_TV": "target O-S T-V",
+      "MapSurface": "Map Surface",
+      "MapView": "Map View",
+      "NativeMap": "Native Map",
+      "MapKit": "Map Kit",
+      "MapComponent": "Map Component",
+      "MapLibre": "Map Libre",
+      "GeneralPath": "General Path",
+      "ORM": "O-R-M",
+      "OAuth": "oh auth",
+      "OIDC": "O-I-D-C",
+      "gRPC": "G-R-P-C",
+      "GraphQL": "graph Q-L",
+      "Box2D": "box 2D",
+      "JDWP": "J-D-W-P",
+      "JUnit": "J unit",
+      "ParparVM": "par par V-M",
+      "Win32": "win thirty two",
+      "App Store Connect": "App Store Connect",
+      "cn1": "C-N one",
+      "mvn": "Maven",
+      "clang": "clang",
+      "2FA": "two F-A",
+      ".p8": "P eight",
+      ".glb": "G-L-B",
+      ".ipa": "I-P-A"
+    }
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "durationMs": 32000,
+      "narration": {
+        "text": "The new com.codename1.gpu API renders the same Java code through Metal, OpenGL ES, WebGL, Direct3D 11, and a software rasterizer. You describe materials and the engine generates the shaders for each platform. Describing materials once while generating shaders for Metal, OpenGL, WebGL, and Direct3D."
+      },
+      "actions": [
+        {
+          "type": "intro.show",
+          "id": "welcome",
+          "atMs": 0,
+          "durationMs": 2050,
+          "title": "Codename One",
+          "subtitle": "3D Graphics Without Writing Shaders: The Portable GPU API",
+          "bounds": {
+            "x": 0.04,
+            "y": 0.08,
+            "width": 0.92,
+            "height": 0.8
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.18,
+              "width": 0.84,
+              "height": 0.58
+            }
+          }
+        },
+        {
+          "type": "bullets.show",
+          "id": "hook-points",
+          "atMs": 1900,
+          "durationMs": 2600,
+          "title": "3D Graphics Without Writing Shaders: The Portable GPU API",
+          "items": [
+            "Describing materials once while generating shaders for Metal, OpenGL, WebGL, and Direct3D",
+            "A cube in one screen of code",
+            "Real models, not just primitives"
+          ],
+          "bounds": {
+            "x": 0.025,
+            "y": 0.05,
+            "width": 0.95,
+            "height": 0.88
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.1,
+              "width": 0.86,
+              "height": 0.78
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "hook-points",
+          "atMs": 1900,
+          "durationMs": 650,
+          "effect": "wipe-up",
+          "easing": "ease-out"
+        },
+        {
+          "type": "layer.hide",
+          "target": "welcome",
+          "atMs": 2700
+        }
+      ]
+    },
+    {
+      "id": "problem",
+      "durationMs": 30000,
+      "narration": {
+        "text": "RenderView is a regular Codename One component. It participates in layout, sits next to buttons and labels, and the surrounding form keeps working exactly as before. This is a textured variant of the same code running on an iPhone through Metal."
+      },
+      "actions": [
+        {
+          "type": "bullets.show",
+          "id": "problem-bullets",
+          "atMs": 100,
+          "durationMs": 2700,
+          "title": "A cube in one screen of code",
+          "items": [
+            "Real models, not just primitives",
+            "What runs where",
+            "Describing materials once while generating shaders for Metal, OpenGL, WebGL, and Direct3D"
+          ],
+          "bounds": {
+            "x": 0.025,
+            "y": 0.05,
+            "width": 0.95,
+            "height": 0.88
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.1,
+              "width": 0.86,
+              "height": 0.78
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "problem-bullets",
+          "atMs": 100,
+          "durationMs": 650,
+          "effects": {
+            "landscape": "wipe-left",
+            "portrait": "wipe-up"
+          },
+          "easing": "ease-out"
+        }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "durationMs": 27500,
+      "narration": {
+        "text": "Primitives gives you cubes, spheres, and friends for getting started, but real content comes from 3D tools. The GltfLoader reads binary glTF (.glb), the de-facto standard interchange format that Blender and practically every modern 3D tool export."
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "mechanism-title",
+          "atMs": 0,
+          "text": "Real models, not just primitives",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.03,
+            "y": 0.025,
+            "width": 0.94,
+            "height": 0.14
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.035,
+              "width": 0.84,
+              "height": 0.16
+            }
+          }
+        },
+        {
+          "type": "diagram.show",
+          "id": "mechanism-diagram",
+          "atMs": 600,
+          "durationMs": 3200,
+          "texts": {
+            "landscape": "flowchart LR\nN0[cube one] --> N1[Real models,]\nN1[Real models,] --> N2[What runs]",
+            "portrait": "flowchart TD\nN0[cube one] --> N1[Real models,]\nN1[Real models,] --> N2[What runs]"
+          },
+          "bounds": {
+            "x": 0.025,
+            "y": 0.2,
+            "width": 0.95,
+            "height": 0.67
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.23,
+              "width": 0.86,
+              "height": 0.66
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "mechanism-diagram",
+          "atMs": 600,
+          "durationMs": 700,
+          "effect": "morph",
+          "easing": "ease-in-out"
+        }
+      ]
+    },
+    {
+      "id": "source",
+      "durationMs": 30000,
+      "narration": {
+        "text": "RenderView is a regular Codename One component. It participates in layout, sits next to buttons and labels, and the surrounding form keeps working exactly as before. This is a textured variant of the same code running on an iPhone through Metal."
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "source-title",
+          "atMs": 0,
+          "text": "A cube in one screen of code",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.03,
+            "y": 0.02,
+            "width": 0.94,
+            "height": 0.12
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.02,
+              "width": 0.84,
+              "height": 0.11
+            }
+          }
+        },
+        {
+          "type": "code.show",
+          "id": "source-code",
+          "atMs": 300,
+          "language": "java",
+          "path": "excerpt.txt",
+          "bounds": {
+            "x": 0.04,
+            "y": 0.17,
+            "width": 0.55,
+            "height": 0.7
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.15,
+              "width": 0.88,
+              "height": 0.34
+            }
+          }
+        },
+        {
+          "type": "bullets.show",
+          "id": "source-notes",
+          "atMs": 800,
+          "durationMs": 900,
+          "title": "What to notice",
+          "items": [
+            "RenderView is a regular Codename One component.",
+            "It participates in layout, sits next to buttons and labels, and the…"
+          ],
+          "bounds": {
+            "x": 0.61,
+            "y": 0.17,
+            "width": 0.35,
+            "height": 0.7
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.54,
+              "width": 0.86,
+              "height": 0.34
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "source-code",
+          "atMs": 300,
+          "durationMs": 600,
+          "effects": {
+            "landscape": "slide-right",
+            "portrait": "slide-up"
+          },
+          "easing": "ease-out"
+        },
+        {
+          "type": "focus.show",
+          "id": "source-focus",
+          "target": "source-code",
+          "atMs": 4000,
+          "relativeBounds": {
+            "x": 0.02,
+            "y": 0.05,
+            "width": 0.96,
+            "height": 0.34
+          },
+          "color": "50d8ff"
+        }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "durationMs": 34000,
+      "narration": {
+        "text": "The simulator's fallback deserves a note: it is a complete depth-buffered, perspective-correct, textured, lit rasterizer written in plain Java. When OpenGL isn't available, headless CI machines for instance, rendering keeps working and stays deterministic, which is how our screenshot test suite gates 3D output on every platform."
+      },
+      "actions": [
+        {
+          "type": "bullets.show",
+          "id": "tradeoffs-bullets",
+          "atMs": 100,
+          "durationMs": 2700,
+          "title": "Where this helps",
+          "items": [
+            "What runs where",
+            "Two levels of API",
+            "Designed to degrade"
+          ],
+          "bounds": {
+            "x": 0.025,
+            "y": 0.05,
+            "width": 0.95,
+            "height": 0.88
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.1,
+              "width": 0.86,
+              "height": 0.78
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "tradeoffs-bullets",
+          "atMs": 100,
+          "durationMs": 650,
+          "effects": {
+            "landscape": "wipe-left",
+            "portrait": "wipe-up"
+          },
+          "easing": "ease-out"
+        }
+      ]
+    },
+    {
+      "id": "result",
+      "durationMs": 30500,
+      "narration": {
+        "text": "The hybrid design goes deeper than materials. Most applications stay on the high level: Mesh, Material, Camera, Light, and Primitives, with Matrix4 providing the usual transform helpers (perspective, look-at, rotation, scaling, multiplication) as plain float[16] arrays with no object churn per frame."
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "result-title",
+          "atMs": 0,
+          "text": "From mechanism to practical result",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.03,
+            "y": 0.025,
+            "width": 0.94,
+            "height": 0.14
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.035,
+              "width": 0.84,
+              "height": 0.16
+            }
+          }
+        },
+        {
+          "type": "diagram.show",
+          "id": "result-diagram",
+          "atMs": 600,
+          "durationMs": 3200,
+          "texts": {
+            "landscape": "flowchart LR\nN0[cube one] --> N1[What runs]\nN1[What runs] --> N2[Two levels]",
+            "portrait": "flowchart TD\nN0[cube one] --> N1[What runs]\nN1[What runs] --> N2[Two levels]"
+          },
+          "bounds": {
+            "x": 0.025,
+            "y": 0.2,
+            "width": 0.95,
+            "height": 0.67
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.23,
+              "width": 0.86,
+              "height": 0.66
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "result-diagram",
+          "atMs": 600,
+          "durationMs": 700,
+          "effect": "morph",
+          "easing": "ease-in-out"
+        }
+      ]
+    },
+    {
+      "id": "outro",
+      "durationMs": 15000,
+      "narration": {
+        "text": "The full source and implementation details are linked below. Which mechanism should we unpack next?"
+      },
+      "actions": [
+        {
+          "type": "outro.show",
+          "id": "next",
+          "atMs": 0,
+          "durationMs": 1100,
+          "eyebrow": "CODENAME ONE · TECHNICAL DEEP DIVE",
+          "title": "Choose the next detail",
+          "subtitle": "The complete source and implementation links are below.",
+          "prompt": "Comment: Real models, not just primitives or What runs where?",
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        }
+      ]
+    }
+  ],
+  "editorial": {
+    "storyType": "visual-explainer",
+    "status": "blocked",
+    "proof": [
+      "automatic article template; requires story review"
+    ],
+    "humanBeat": "requires an article-specific human consequence",
+    "visualIdentity": "requires an article-specific recurring visual motif",
+    "bespokeVisualization": "requires a visualization authored for this article",
+    "heroJourney": {
+      "desire": "requires an article-specific desired outcome",
+      "problem": "requires an article-specific developer problem",
+      "difficulty": "requires concrete stakes and escalating difficulty",
+      "intervention": "requires a source-backed Codename One intervention",
+      "victory": "requires a proved developer transformation"
+    }
+  }
+}

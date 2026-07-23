@@ -1,0 +1,10 @@
+A hands-on walk through the three connectivity features that landed together this week, building a live chat over the new core WebSocket API and typed clients from a GraphQL schema and a proto file.
+
+Full article:
+https://www.codenameone.com/blog/websockets-grpc-and-graphql/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Codename One Native Platforms & Device APIs
+
+#Java #CodenameOne #Shorts

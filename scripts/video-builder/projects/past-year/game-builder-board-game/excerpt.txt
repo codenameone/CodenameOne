@@ -1,0 +1,12 @@
+public int handValue(List<Card> hand) {
+    int total = 0, aces = 0;
+    for (Card c : hand) {
+        total += c.value();
+        if (c.isAce()) aces++;
+    }
+    while (total > 21 && aces > 0) {
+        total -= 10;
+        aces--;
+    }
+    return total;
+}

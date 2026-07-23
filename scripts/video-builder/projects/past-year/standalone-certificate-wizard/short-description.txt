@@ -1,0 +1,10 @@
+The iOS certificate wizard is now a standalone desktop app launched with mvn cn1:certificatewizard. It authenticates with an App Store Connect API key instead of your Apple ID login, which removes the 2FA and login-flow breakage of the old wizard.
+
+Full article:
+https://www.codenameone.com/blog/standalone-certificate-wizard/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Build, Test & Ship Codename One Apps
+
+#Java #CodenameOne #Shorts

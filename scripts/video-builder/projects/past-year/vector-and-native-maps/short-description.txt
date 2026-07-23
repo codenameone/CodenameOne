@@ -1,0 +1,10 @@
+A new maps API (PR #5264) brings mapping back into Codename One core with two components on one MapSurface API — a pure-vector MapView drawn entirely through Graphics, and a NativeMap whose provider (Apple MapKit, Google Maps) is chosen by a build hint and injected at build time.
+
+Full article:
+https://www.codenameone.com/blog/vector-and-native-maps/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Codename One UI, Graphics & Media
+
+#Java #CodenameOne #Shorts

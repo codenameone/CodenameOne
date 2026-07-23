@@ -1,0 +1,10 @@
+A complete, code-included walkthrough that builds a playable 2D platformer — "Duke's Coffee Run" — with the Codename One Game Builder. Import a real animated sprite sheet, lay out the level, then wire win/lose logic in the generated companion class.
+
+Full article:
+https://www.codenameone.com/blog/game-builder-2d-platformer/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Game Development with Codename One
+
+#Java #CodenameOne #Shorts

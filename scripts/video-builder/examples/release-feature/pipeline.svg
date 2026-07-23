@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620">
+  <rect width="1200" height="620" rx="34" fill="#171c26"/>
+  <text x="600" y="80" text-anchor="middle" font-family="sans-serif" font-size="50" font-weight="700" fill="#f3f7fb">Deterministic video pipeline</text>
+  <g font-family="sans-serif" font-size="30" font-weight="700" text-anchor="middle">
+    <rect x="55" y="235" width="235" height="135" rx="24" fill="#202938" stroke="#50d8ff" stroke-width="6"/>
+    <text x="172" y="292" fill="#f3f7fb">JSON story</text>
+    <text x="172" y="332" fill="#9eabbc" font-size="24">LLM / CI</text>
+    <rect x="355" y="235" width="235" height="135" rx="24" fill="#202938" stroke="#ffc857" stroke-width="6"/>
+    <text x="472" y="292" fill="#f3f7fb">Compile demo</text>
+    <text x="472" y="332" fill="#9eabbc" font-size="24">8.0-SNAPSHOT</text>
+    <rect x="655" y="235" width="235" height="135" rx="24" fill="#202938" stroke="#50d8ff" stroke-width="6"/>
+    <text x="772" y="292" fill="#f3f7fb">Render frames</text>
+    <text x="772" y="332" fill="#9eabbc" font-size="24">VideoIO</text>
+    <rect x="955" y="235" width="190" height="135" rx="24" fill="#202938" stroke="#ffc857" stroke-width="6"/>
+    <text x="1050" y="292" fill="#f3f7fb">Mix audio</text>
+    <text x="1050" y="332" fill="#9eabbc" font-size="24">Local TTS</text>
+  </g>
+  <g fill="#50d8ff">
+    <rect x="290" y="298" width="52" height="10"/><polygon points="342,278 372,303 342,328"/>
+    <rect x="590" y="298" width="52" height="10"/><polygon points="642,278 672,303 642,328"/>
+    <rect x="890" y="298" width="52" height="10"/><polygon points="942,278 972,303 942,328"/>
+  </g>
+  <text x="600" y="500" text-anchor="middle" font-family="sans-serif" font-size="28" fill="#9eabbc">The same source produces portrait and landscape output.</text>
+</svg>

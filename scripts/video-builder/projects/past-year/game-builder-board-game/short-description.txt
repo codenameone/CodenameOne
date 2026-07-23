@@ -1,0 +1,10 @@
+A code-included walkthrough that builds Duke Jack, a playable blackjack card game, with the Codename One Game Builder — lay a felt table, deal real cards as data-driven elements, and drive the full hit/stand/dealer rules from the companion class.
+
+Full article:
+https://www.codenameone.com/blog/game-builder-board-game/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Game Development with Codename One
+
+#Java #CodenameOne #Shorts

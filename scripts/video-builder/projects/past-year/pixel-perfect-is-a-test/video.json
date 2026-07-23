@@ -1,0 +1,1022 @@
+{
+  "schemaVersion": 1,
+  "editorial": {
+    "storyType": "live-demo",
+    "status": "approved",
+    "topicTerms": [
+      "pixel fidelity",
+      "native fidelity",
+      "ui fidelity"
+    ],
+    "proof": [
+      "official Apple and Android migration guidance",
+      "versioned native-reference captures",
+      "compiled TabSelectionMorph geometry",
+      "current iOS and Android fidelity reports"
+    ],
+    "humanBeat": "A developer ships a tested screen, then discovers that a platform redesign changed the interface without an application code change.",
+    "visualIdentity": "A moving glass lens crosses a fixed pixel grid; the grid becomes a versioned answer sheet and finally a green regression ratchet.",
+    "bespokeVisualization": "Normal, pressed, selected, light, dark, and moving states form a matrix that collapses into one native-reference pipeline.",
+    "heroJourney": {
+      "identity": "Codename One is introduced subtly as a native Java app platform, and the topic is measurable UI fidelity.",
+      "problem": "Platform-owned controls can adopt a new design after the application team has already tested and shipped its screen.",
+      "difficulty": "Apple and Android evolve independently, while appearance spans geometry, state, contrast, translucency, and motion.",
+      "intervention": "The developer versions native reference captures and compares deterministic Codename One renders in continuous integration.",
+      "victory": "The developer chooses when to adopt a visual change and a one-way gate prevents known fidelity from silently regressing."
+    },
+    "problemDimensions": [
+      "platform timing",
+      "cross-platform divergence",
+      "state and motion",
+      "subjective review"
+    ],
+    "resolutionMap": [
+      {
+        "problem": "platform timing",
+        "solution": "versioned native golden sets",
+        "proof": "pinned iOS 26 and Android API 36 captures"
+      },
+      {
+        "problem": "cross-platform divergence",
+        "solution": "separate UIKit and Material reference applications",
+        "proof": "authentic iOS and Android comparison reports"
+      },
+      {
+        "problem": "state and motion",
+        "solution": "fixed state and progress matrices",
+        "proof": "compiled morph demo and seven committed progress frames"
+      },
+      {
+        "problem": "subjective review",
+        "solution": "visual scores plus geometric metrics and human review",
+        "proof": "baselines, offsets, ratios, radius, and report captures"
+      }
+    ]
+  },
+  "output": {
+    "frameRate": 30,
+    "landscapeWidth": 1920,
+    "landscapeHeight": 1080,
+    "portraitWidth": 1080,
+    "portraitHeight": 1920,
+    "videoBitRate": 8000000
+  },
+  "narration": {
+    "provider": "kokoro",
+    "voice": "af_heart:60,af_bella:40",
+    "language": "en-us",
+    "speed": 0.97,
+    "model": ".video-tools/kokoro/kokoro-v1.0.onnx",
+    "minimumGapMs": 250,
+    "pronunciations": {
+      "Codename One": "Codename One",
+      "API": "API",
+      "AI": "AI",
+      "APK": "APK",
+      "AR/VR": "augmented reality and virtual reality",
+      "ARKit": "A-R kit",
+      "ARCore": "A-R core",
+      "AR": "A-R",
+      "VR": "V-R",
+      "2D": "2D",
+      "3D": "3D",
+      "GPU": "GPU",
+      "GA4": "G-A four",
+      "GDPR": "G-D-P-R",
+      "CCPA": "C-C-P-A",
+      "DPI": "D-P-I",
+      "glTF": "G-L-T-F",
+      "JVM": "JVM",
+      "JIT": "JIT",
+      "AOT": "A-O-T",
+      "GC": "G-C",
+      "CI": "C-I",
+      "CSS": "CSS",
+      "iOS": "iOS",
+      "macOS": "macOS",
+      "tvOS": "tvOS",
+      "UWP": "U-W-P",
+      "NFC": "NFC",
+      "PCM": "PCM",
+      "RGBA": "RGBA",
+      "EDT": "E-D-T",
+      "ETA": "E-T-A",
+      "SRT": "SRT",
+      "VTT": "VTT",
+      "AAC": "A-A-C",
+      "H264": "H two sixty four",
+      "HTML": "HTML",
+      "IDE": "I-D-E",
+      "JS": "JS",
+      "XML": "XML",
+      "JSON": "jay son",
+      "WYSIWYG": "wizzy wig",
+      "CodeEditor": "Code Editor",
+      "RichTextArea": "Rich Text Area",
+      "AbstractEditorComponent": "Abstract Editor Component",
+      "CodeMirror": "Code Mirror",
+      "WidgetKit": "Widget Kit",
+      "ActivityKit": "Activity Kit",
+      "RemoteViews": "Remote Views",
+      "Dynamic Island": "Dynamic Island",
+      "JavaSE": "Java S-E",
+      "WidgetTimeline": "Widget Timeline",
+      "LiveActivity": "Live Activity",
+      "LiveActivityDescriptor": "Live Activity Descriptor",
+      "SurfaceDynamicText": "Surface Dynamic Text",
+      "VideoIO": "video I-O",
+      "WAVWriter": "wave writer",
+      "SVG": "SVG",
+      "SPI": "S-P-I",
+      "AnalyticsService": "Analytics Service",
+      "AnalyticsProvider": "Analytics Provider",
+      "AbstractAnalyticsProvider": "Abstract Analytics Provider",
+      "CodenameOneAnalyticsProvider": "Codename One Analytics Provider",
+      "RASP": "rasp",
+      "DeviceIntegrity": "Device Integrity",
+      "AppReview": "App Review",
+      "CarApplication": "Car Application",
+      "CarScreen": "Car Screen",
+      "CarTemplate": "Car Template",
+      "UiModeManager": "U-I Mode Manager",
+      "AndroidX": "Android X",
+      "CN.isTV()": "C-N is T-V",
+      "Display.isTV()": "Display is T-V",
+      "TARGET_OS_TV": "target O-S T-V",
+      "MapSurface": "Map Surface",
+      "MapView": "Map View",
+      "NativeMap": "Native Map",
+      "MapKit": "Map Kit",
+      "MapComponent": "Map Component",
+      "MapLibre": "Map Libre",
+      "GeneralPath": "General Path",
+      "ORM": "O-R-M",
+      "OAuth": "oh auth",
+      "OIDC": "O-I-D-C",
+      "gRPC": "G-R-P-C",
+      "GraphQL": "graph Q-L",
+      "Box2D": "box 2D",
+      "JDWP": "J-D-W-P",
+      "JUnit": "J unit",
+      "ParparVM": "par par V-M",
+      "Win32": "win thirty two",
+      "App Store Connect": "App Store Connect",
+      "cn1": "C-N one",
+      "mvn": "Maven",
+      "clang": "clang",
+      "2FA": "two F-A",
+      ".p8": "P eight",
+      ".glb": "G-L-B",
+      ".ipa": "I-P-A"
+    }
+  },
+  "id": "pixel-perfect-is-a-test",
+  "title": "Own Your Pixels: Native Fidelity on Your Schedule",
+  "scenes": [
+    {
+      "id": "who-and-what",
+      "durationMs": 10000,
+      "storyBeats": [
+        "identity"
+      ],
+      "actions": [
+        {
+          "type": "image.show",
+          "id": "brand",
+          "role": "brand",
+          "kind": "illustration",
+          "atMs": 200,
+          "path": "codename-one-logo.png",
+          "bounds": {
+            "x": 0.045,
+            "y": 0.04,
+            "width": 0.12,
+            "height": 0.04
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.18,
+              "height": 0.027
+            }
+          }
+        },
+        {
+          "type": "svg.show",
+          "id": "intro-art",
+          "atMs": 300,
+          "paths": {
+            "landscape": "fidelity-intro-landscape.svg",
+            "portrait": "fidelity-intro-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.15,
+            "width": 0.92,
+            "height": 0.79
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.13,
+              "width": 0.88,
+              "height": 0.82
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "opening-title",
+          "atMs": 350,
+          "text": "The pixels moved.\nThe code did not.",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.055,
+            "y": 0.1,
+            "width": 0.48,
+            "height": 0.15
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.07,
+              "width": 0.86,
+              "height": 0.22
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "Codename One builds native apps in Java from one codebase. Today: how pixel fidelity becomes a test instead of an argument.",
+          "caption": "Codename One builds native apps in Java from one codebase. Today: how pixel fidelity becomes a test instead of an argument."
+        }
+      ]
+    },
+    {
+      "id": "the-platform-owns-the-update",
+      "durationMs": 15000,
+      "storyBeats": [
+        "problem"
+      ],
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "platform-title",
+          "atMs": 0,
+          "text": "A platform update can redesign a shipped screen",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.14
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.025,
+              "width": 0.86,
+              "height": 0.13
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "apple-reference",
+          "role": "evidence",
+          "kind": "capture",
+          "atMs": 350,
+          "path": "ios-native-reference.jpg",
+          "sourceTitle": "Apple: Adopting Liquid Glass",
+          "sourceUrl": "https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass",
+          "bounds": {
+            "x": 0.1,
+            "y": 0.2,
+            "width": 0.8,
+            "height": 0.69
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.1,
+              "y": 0.2,
+              "width": 0.8,
+              "height": 0.65
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "apple-source",
+          "atMs": 700,
+          "text": "Apple: standard components pick up the latest look on the latest platform release",
+          "uiid": "VideoCaption",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.13,
+            "y": 0.82,
+            "width": 0.74,
+            "height": 0.1
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.1,
+              "y": 0.84,
+              "width": 0.8,
+              "height": 0.08
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "A team can test one interface, ship it, and later discover that the platform's standard controls now look and behave differently. Apple says the latest platform release gives standard components its latest look and feel.",
+          "caption": "A team can test one interface, ship it, and later discover that the platform's standard controls now look and behave differently. Apple says the latest platform release gives standard components its latest look and feel."
+        }
+      ]
+    },
+    {
+      "id": "the-other-platform-has-another-migration",
+      "durationMs": 16500,
+      "storyBeats": [
+        "difficulty"
+      ],
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "android-title",
+          "atMs": 0,
+          "text": "Android has a different design migration",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.14
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.025,
+              "width": 0.86,
+              "height": 0.13
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "android-reference",
+          "role": "evidence",
+          "kind": "capture",
+          "atMs": 300,
+          "path": "android-native-reference.jpg",
+          "sourceTitle": "Android: Migrate from Material 2 to Material 3",
+          "sourceUrl": "https://developer.android.com/develop/ui/compose/designsystems/material2-material3",
+          "bounds": {
+            "x": 0.09,
+            "y": 0.19,
+            "width": 0.82,
+            "height": 0.68
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.09,
+              "y": 0.2,
+              "width": 0.82,
+              "height": 0.62
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "android-source",
+          "atMs": 700,
+          "text": "Android: migrate dependencies, themes, screens, colors, typography, shapes, and components",
+          "uiid": "VideoCaption",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.12,
+            "y": 0.82,
+            "width": 0.76,
+            "height": 0.1
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.1,
+              "y": 0.84,
+              "width": 0.8,
+              "height": 0.08
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "Android's Material 3 migration changes packages, themes, colors, typography, shapes, and component behavior. Now the same product has two design schedules, two reference implementations, and two sets of regressions to find.",
+          "caption": "Android's Material 3 migration changes packages, themes, colors, typography, shapes, and component behavior. Now the same product has two design schedules, two reference implementations, and two sets of regressions to find."
+        }
+      ]
+    },
+    {
+      "id": "a-screenshot-is-one-state",
+      "durationMs": 15500,
+      "storyBeats": [
+        "difficulty"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "state-matrix",
+          "atMs": 250,
+          "paths": {
+            "landscape": "state-matrix-landscape.svg",
+            "portrait": "state-matrix-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.15,
+            "width": 0.92,
+            "height": 0.79
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.13,
+              "width": 0.88,
+              "height": 0.82
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "A single screenshot is not enough. Normal, pressed, selected, disabled, light, and dark states can all diverge. Motion adds another dimension: a tab can finish in the right place while taking the wrong path to get there.",
+          "caption": "A single screenshot is not enough. Normal, pressed, selected, disabled, light, and dark states can all diverge. Motion adds another dimension: a tab can finish in the right place while taking the wrong path to get there."
+        }
+      ]
+    },
+    {
+      "id": "build-an-answer-sheet",
+      "durationMs": 18500,
+      "storyBeats": [
+        "intervention"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "answer-sheet",
+          "atMs": 250,
+          "paths": {
+            "landscape": "answer-sheet-landscape.svg",
+            "portrait": "answer-sheet-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.15,
+            "width": 0.92,
+            "height": 0.79
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.13,
+              "width": 0.88,
+              "height": 0.82
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "answer-sheet",
+          "atMs": 250,
+          "durationMs": 900,
+          "effect": "morph",
+          "easing": "ease-out"
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "Codename One turns the native platform into a versioned answer sheet. Small UIKit and Material apps render real controls on pinned toolchains. Their captures become goldens. Continuous integration renders the matching Codename One state and refuses a regression.",
+          "caption": "Codename One turns the native platform into a versioned answer sheet. Small UIKit and Material apps render real controls on pinned toolchains. Their captures become goldens. Continuous integration renders the matching Codename One state and refuses a regression."
+        }
+      ]
+    },
+    {
+      "id": "run-the-motion-model",
+      "durationMs": 31000,
+      "storyBeats": [
+        "proof"
+      ],
+      "composition": {
+        "landscape": "code-left-demo-right",
+        "portrait": "code-over-demo"
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "motion-title",
+          "atMs": 0,
+          "text": "The motion is code, frames, and a bounded result",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.14
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.025,
+              "width": 0.86,
+              "height": 0.13
+            }
+          }
+        },
+        {
+          "type": "code.show",
+          "id": "morph-code",
+          "role": "code",
+          "atMs": 250,
+          "language": "java",
+          "path": "morph-code.txt"
+        },
+        {
+          "type": "demo.mount",
+          "id": "morph-demo",
+          "role": "demo",
+          "atMs": 300,
+          "class": "com.codename1.ui.FidelityMorphDemoScene",
+          "animated": false
+        },
+        {
+          "type": "pointer.show",
+          "id": "tap-tab",
+          "atMs": 2700,
+          "style": "touch",
+          "area": "morph-demo",
+          "x": 0.83,
+          "y": 0.72
+        },
+        {
+          "type": "pointer.click",
+          "target": "tap-tab",
+          "atMs": 3000,
+          "durationMs": 320
+        },
+        {
+          "type": "demo.action",
+          "atMs": 12500,
+          "name": "toggleAppearance",
+          "arguments": {}
+        },
+        {
+          "type": "focus.show",
+          "id": "flight-focus",
+          "target": "morph-code",
+          "atMs": 4300,
+          "relativeBounds": {
+            "x": 0.02,
+            "y": 0.25,
+            "width": 0.96,
+            "height": 0.62
+          },
+          "label": "position, flight, magnification, aberration",
+          "color": "62e6ff"
+        },
+        {
+          "type": "replay",
+          "atMs": 16500,
+          "fromMs": 2500,
+          "toMs": 10600,
+          "rewindDurationMs": 650,
+          "rewindFps": 10,
+          "replayFps": 10,
+          "playbackRate": 0.62,
+          "label": "Again: measured travel and bounded spring settle"
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "This is the shipped tab-selection geometry running inside the compiled sample. The same progress value determines position, stretch, lift, magnification, color separation, and the bounded spring settle.",
+          "caption": "This is the shipped tab-selection geometry running inside the compiled sample. The same progress value determines position, stretch, lift, magnification, color separation, and the bounded spring settle."
+        },
+        {
+          "type": "narration.cue",
+          "id": "replay-voice",
+          "atMs": 14000,
+          "text": "Watch the transition again more slowly. The lens grows during flight, compresses at the destination, overshoots without leaving the bar, and settles on the same final frame every time.",
+          "caption": "Watch the transition again more slowly. The lens grows during flight, compresses at the destination, overshoots without leaving the bar, and settles on the same final frame every time."
+        },
+        {
+          "type": "narration.cue",
+          "id": "motion-answer-sheet",
+          "atMs": 23500,
+          "text": "Motion gets fixed reference frames and repeatable review too.",
+          "caption": "Motion gets fixed reference frames and repeatable review too."
+        },
+        {
+          "type": "demo.action",
+          "atMs": 3000,
+          "name": "setProgress",
+          "arguments": {
+            "value": 0.0
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 3450,
+          "name": "setProgress",
+          "arguments": {
+            "value": 0.0625
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 3900,
+          "name": "setProgress",
+          "arguments": {
+            "value": 0.125
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 4350,
+          "name": "setProgress",
+          "arguments": {
+            "value": 0.1875
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 4800,
+          "name": "setProgress",
+          "arguments": {
+            "value": 0.25
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 5250,
+          "name": "setProgress",
+          "arguments": {
+            "value": 0.3125
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 5700,
+          "name": "setProgress",
+          "arguments": {
+            "value": 0.375
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 6150,
+          "name": "setProgress",
+          "arguments": {
+            "value": 0.4375
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 6600,
+          "name": "setProgress",
+          "arguments": {
+            "value": 0.5
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 7050,
+          "name": "setProgress",
+          "arguments": {
+            "value": 0.5625
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 7500,
+          "name": "setProgress",
+          "arguments": {
+            "value": 0.625
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 7950,
+          "name": "setProgress",
+          "arguments": {
+            "value": 0.6875
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 8400,
+          "name": "setProgress",
+          "arguments": {
+            "value": 0.75
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 8850,
+          "name": "setProgress",
+          "arguments": {
+            "value": 0.8125
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 9300,
+          "name": "setProgress",
+          "arguments": {
+            "value": 0.875
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 9750,
+          "name": "setProgress",
+          "arguments": {
+            "value": 0.9375
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 10200,
+          "name": "setProgress",
+          "arguments": {
+            "value": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "compare-real-output",
+      "durationMs": 16000,
+      "storyBeats": [
+        "proof"
+      ],
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "capture-title",
+          "atMs": 0,
+          "text": "Native on the left. Codename One on the right.",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.14
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.025,
+              "width": 0.86,
+              "height": 0.13
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "ios-pairs",
+          "role": "proof",
+          "kind": "capture",
+          "atMs": 250,
+          "path": "ios-native-vs-cn1.jpg",
+          "bounds": {
+            "x": 0.08,
+            "y": 0.17,
+            "width": 0.39,
+            "height": 0.76
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.16,
+              "width": 0.84,
+              "height": 0.43
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "android-pairs",
+          "role": "proof",
+          "kind": "capture",
+          "atMs": 500,
+          "path": "android-native-vs-cn1.jpg",
+          "bounds": {
+            "x": 0.53,
+            "y": 0.2,
+            "width": 0.39,
+            "height": 0.69
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.61,
+              "width": 0.84,
+              "height": 0.3
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "android-pairs",
+          "atMs": 500,
+          "durationMs": 800,
+          "effects": {
+            "landscape": "slide-right",
+            "portrait": "slide-up"
+          },
+          "easing": "ease-out"
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "These are current report captures, not illustrations. Native controls are on the left and Codename One controls are on the right. The divider makes a wrong width or corner radius visible before a release changes every screen.",
+          "caption": "These are current report captures, not illustrations. Native controls are on the left and Codename One controls are on the right. The divider makes a wrong width or corner radius visible before a release changes every screen."
+        }
+      ]
+    },
+    {
+      "id": "measure-without-worshipping-the-score",
+      "durationMs": 20500,
+      "storyBeats": [
+        "proof"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "metrics",
+          "atMs": 250,
+          "paths": {
+            "landscape": "fidelity-metrics-landscape.svg",
+            "portrait": "fidelity-metrics-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.15,
+            "width": 0.92,
+            "height": 0.79
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.13,
+              "width": 0.88,
+              "height": 0.82
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "The Android baseline has fifty-four pairs with a ninety-five point five percent median. The iOS baseline has sixty-eight pairs with a ninety-four point four percent median. Those numbers catch movement; bounds, center offsets, size ratios, radius, and human review explain it.",
+          "caption": "The Android baseline has fifty-four pairs with a ninety-five point five percent median. The iOS baseline has sixty-eight pairs with a ninety-four point four percent median. Those numbers catch movement; bounds, center offsets, size ratios, radius, and human review explain it."
+        }
+      ]
+    },
+    {
+      "id": "adopt-the-look-on-your-schedule",
+      "durationMs": 18000,
+      "storyBeats": [
+        "victory"
+      ],
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "victory-title",
+          "atMs": 0,
+          "text": "The developer chooses when the UI moves",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.14
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.025,
+              "width": 0.86,
+              "height": 0.13
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "before-after-ios",
+          "kind": "capture",
+          "atMs": 300,
+          "path": "ios-showcase-before-after.jpg",
+          "bounds": {
+            "x": 0.08,
+            "y": 0.2,
+            "width": 0.84,
+            "height": 0.53
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.23,
+              "width": 0.84,
+              "height": 0.43
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "victory-copy",
+          "atMs": 1000,
+          "text": "Version the reference\nRatchet the baseline\nShip the visual change deliberately",
+          "uiid": "VideoBody",
+          "responsive": true,
+          "maxLines": 5,
+          "bounds": {
+            "x": 0.16,
+            "y": 0.76,
+            "width": 0.68,
+            "height": 0.19
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.1,
+              "y": 0.7,
+              "width": 0.8,
+              "height": 0.18
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "The result is control. Codename One can adopt Liquid Glass and Material 3 deliberately, prove the change against native references, and keep the component implementation inside the shipped app. The operating system cannot silently replace that button after release.",
+          "caption": "The result is control. Codename One can adopt Liquid Glass and Material 3 deliberately, prove the change against native references, and keep the component implementation inside the shipped app. The operating system cannot silently replace that button after release."
+        }
+      ]
+    },
+    {
+      "id": "outro",
+      "durationMs": 15000,
+      "storyBeats": [
+        "outro"
+      ],
+      "actions": [
+        {
+          "type": "outro.show",
+          "id": "next",
+          "atMs": 0,
+          "durationMs": 1100,
+          "eyebrow": "CODENAME ONE · NATIVE UI ENGINEERING",
+          "title": "Own the pixels. Test the promise.",
+          "subtitle": "Next: how ParparVM closed the warmed-JVM performance gap",
+          "prompt": "Which component should the fidelity suite test next?",
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "The next video shows how ParparVM closed a warmed Java performance gap. Which component should the fidelity suite test next?",
+          "caption": "The next video shows how ParparVM closed a warmed Java performance gap. Which component should the fidelity suite test next?"
+        }
+      ]
+    }
+  ]
+}

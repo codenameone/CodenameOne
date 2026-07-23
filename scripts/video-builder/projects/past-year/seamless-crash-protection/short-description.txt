@@ -1,0 +1,10 @@
+The new com.codename1.crash client captures crashes on device, scrubs personal data before anything is sent, retries reliably through a storage-first queue, and lets the build cloud symbolicate native crashes and file them as GitHub issues instead of emails.
+
+Full article:
+https://www.codenameone.com/blog/seamless-crash-protection/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Security, Privacy & Reliability in Codename One
+
+#Java #CodenameOne #Shorts

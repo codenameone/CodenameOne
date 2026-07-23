@@ -1,0 +1,10 @@
+Deeper AI integration in the framework core, modern authentication via OAuth / OIDC and WebAuthn passkeys driven from the system browser, and a few smaller additions (WiFi / connectivity, share-sheet result callbacks) alongside.
+
+Full article:
+https://www.codenameone.com/blog/platform-apis-in-the-core/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Codename One Native Platforms & Device APIs
+
+#Java #CodenameOne #Shorts

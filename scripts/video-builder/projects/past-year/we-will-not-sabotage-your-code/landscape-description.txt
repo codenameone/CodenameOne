@@ -1,0 +1,23 @@
+A maintainer recently hid a destructive prompt-injection payload aimed at AI agents inside his own framework. That is a betrayal of the trust open source runs on. Here is where we stand, and why I think AI is the biggest opportunity small OSS players have ever had.
+
+This video explains why open-source maintainers must treat ai agents as part of the software supply chain.
+
+Full article and source material:
+https://www.codenameone.com/blog/we-will-not-sabotage-your-code/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://arstechnica.com/security/2026/05/fed-up-with-vibe-coders-dev-sneaks-data-nuking-prompt-injection-into-their-code/
+
+Chapters
+00:00 Hook
+00:21 Problem
+00:51 Mechanism
+01:19 Source
+01:43 Tradeoffs
+02:07 Result
+02:28 Outro
+
+Which part should we unpack next?
+
+Series: Security, Privacy & Reliability in Codename One — part 5 of 5
+
+#Java #CodenameOne

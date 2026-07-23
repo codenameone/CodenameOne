@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 820">
+  <rect x="10" y="10" width="1580" height="800" rx="34" fill="#171c26" stroke="#273143" stroke-width="4"/>
+  <text x="70" y="92" fill="#50d8ff" font-size="58">The client-VM memory story</text>
+  <text x="70" y="142" fill="#9eabbc" font-size="28">Concurrent, non-moving collection. Ordinary native-visible memory.</text>
+
+  <rect x="70" y="205" width="680" height="430" rx="28" fill="#202838"/>
+  <text x="110" y="265" fill="#ffc857" font-size="36">IDLE FLOOR</text>
+  <text x="110" y="345" fill="#f3f7fb" font-size="31">ParparVM</text><rect x="330" y="310" width="42" height="48" rx="12" fill="#50d8ff"/><text x="392" y="347" fill="#50d8ff" font-size="34">2.4 MB</text>
+  <text x="110" y="445" fill="#f3f7fb" font-size="31">Java 25</text><rect x="330" y="410" width="350" height="48" rx="12" fill="#435069"/><text x="535" y="505" fill="#f3f7fb" font-size="34">about 40 MB</text>
+  <text x="110" y="580" fill="#9eabbc" font-size="27">The process holds what the app uses.</text>
+
+  <rect x="850" y="205" width="680" height="430" rx="28" fill="#202838"/>
+  <text x="890" y="265" fill="#ffc857" font-size="36">PEAK ALLOCATION CHURN</text>
+  <text x="890" y="345" fill="#f3f7fb" font-size="31">Old trigger bug</text><rect x="1190" y="310" width="285" height="48" rx="12" fill="#6b3947"/><text x="1250" y="402" fill="#ef9aa9" font-size="30">up to 2.1 GB</text>
+  <text x="890" y="465" fill="#f3f7fb" font-size="31">This PR</text><rect x="1190" y="430" width="106" height="48" rx="12" fill="#50d8ff"/><text x="1316" y="467" fill="#50d8ff" font-size="31">390 MB</text>
+  <text x="890" y="555" fill="#f3f7fb" font-size="31">Java 25</text><rect x="1190" y="520" width="138" height="48" rx="12" fill="#435069"/><text x="1348" y="557" fill="#f3f7fb" font-size="31">508 MB</text>
+
+  <rect x="330" y="690" width="940" height="76" rx="22" fill="#152d34" stroke="#50d8ff" stroke-width="3"/>
+  <text x="800" y="739" fill="#f3f7fb" font-size="31" text-anchor="middle">No compaction. Native pointers remain valid.</text>
+</svg>

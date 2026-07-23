@@ -1,0 +1,25 @@
+Last month I mentioned an option to enable UIScene in Codename One builds. We've tested that mode for the past month and with the coming update this Friday we will flip the default mode. This means that builds will implicitly set the build hint ios.uiscene=true instead of the current default of false. Ideally, this would have no impact on anyone...
+
+This video explains the uiscene migration and the compiler hints behind measurable ios performance work.
+
+Full article and source material:
+https://www.codenameone.com/blog/uiscene-on-by-default-ios-performance/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://github.com/codenameone/CodenameOne/issues/3152
+https://github.com/codenameone/CodenameOne/issues/4733
+https://github.com/codenameone/CodenameOne/issues/2085
+
+Chapters
+00:00 Hook
+00:25 Problem
+00:53 Mechanism
+01:22 Source
+01:35 Tradeoffs
+01:55 Result
+02:16 Outro
+
+Which part should we unpack next?
+
+Series: Codename One UI, Graphics & Media — part 9 of 9
+
+#Java #CodenameOne

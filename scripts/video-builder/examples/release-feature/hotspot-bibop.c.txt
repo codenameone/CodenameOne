@@ -1,0 +1,13 @@
+/* One current page for each compile-time size class. */
+CN1BibopPage* page = bibopCurrent[SIZE_CLASS];
+
+/* The fast path is a pointer bump. */
+JAVA_OBJECT object = page_slot(
+        page, page->bumpIndex++);
+
+/* The constructor initializes every field. */
+object->field1 = argument1;
+object->field2 = argument2;
+
+/* Publish last: the collector never sees half an object. */
+object->parentCls = &class__Foo;

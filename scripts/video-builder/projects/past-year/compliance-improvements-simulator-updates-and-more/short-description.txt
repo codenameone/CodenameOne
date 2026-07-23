@@ -1,0 +1,10 @@
+In today's update, we're finally removing Proguard from the build process with many implications for all of us.
+
+Full article:
+https://www.codenameone.com/blog/compliance-improvements-simulator-updates-and-more/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Build, Test & Ship Codename One Apps
+
+#Java #CodenameOne #Shorts

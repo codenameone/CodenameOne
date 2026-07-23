@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1100">
+<style>.title{font:700 48px sans-serif;fill:#f5f8fb}.label{font:700 29px sans-serif;fill:#f5f8fb}.body{font:25px sans-serif;fill:#c8d4e3}.small{font:21px sans-serif;fill:#8ea4ba}.card{fill:#111a27;stroke:#26384c;stroke-width:3}</style>
+
+<defs><linearGradient id="lens" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#62e6ff"/><stop offset="1" stop-color="#9f7aea"/></linearGradient></defs>
+<rect x="65" y="115" width="670" height="800" rx="48" fill="#0b1420" stroke="#2b4057" stroke-width="4"/>
+<rect x="115" y="230" width="570" height="300" rx="70" fill="#e9eef5"/>
+<circle cx="205" cy="380" r="48" fill="#f8fafc" stroke="#8798aa" stroke-width="4"/><circle cx="400" cy="380" r="48" fill="#f8fafc" stroke="#8798aa" stroke-width="4"/><circle cx="595" cy="380" r="48" fill="#f8fafc" stroke="#8798aa" stroke-width="4"/>
+<path d="M205 380 C285 300 325 300 400 380 C480 465 525 455 595 380" fill="none" stroke="#51677f" stroke-width="7" stroke-dasharray="14 12"/>
+<ellipse cx="400" cy="380" rx="104" ry="78" fill="url(#lens)" opacity=".7" stroke="#ffffff" stroke-width="6"/>
+<g fill="#26384c"><rect x="145" y="635" width="88" height="88" rx="10"/><rect x="249" y="635" width="88" height="88" rx="10"/><rect x="353" y="635" width="88" height="88" rx="10"/></g>
+<g fill="#4fd1c5"><rect x="457" y="635" width="88" height="88" rx="10"/><rect x="561" y="635" width="88" height="88" rx="10"/></g>
+<path d="M272 817 l44 44 l104 -118" fill="none" stroke="#68d391" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="400" y="1000" class="body" text-anchor="middle">version the look</text><text x="400" y="1038" class="body" text-anchor="middle">measure the motion</text>
+
+</svg>

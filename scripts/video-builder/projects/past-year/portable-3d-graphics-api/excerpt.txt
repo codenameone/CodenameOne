@@ -1,0 +1,18 @@
+RenderView view = new RenderView(new Renderer() {
+    private final Camera camera = new Camera();
+    private Mesh cube;
+    private Material material;
+
+    public void onInit(GraphicsDevice device) {
+        cube = Primitives.cube(device, 1.6f);
+        material = new Material(Material.Type.PHONG)
+                .setColor(0xff3366ff)
+                .setShininess(24f);
+        camera.setPerspective(45f, 0.1f, 100f)
+                .setPosition(2.6f, 2.1f, 3.4f)
+                .setTarget(0f, 0f, 0f);
+        device.setLight(new Light().setDirection(-0.4f, -1f, -0.55f));
+    }
+
+    public void onResize(GraphicsDevice device, int width, int height) {
+        camera.setAspect((float) width / Math.max(1, height));

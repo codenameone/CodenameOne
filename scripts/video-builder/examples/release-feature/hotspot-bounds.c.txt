@@ -1,0 +1,17 @@
+/* BEFORE: failure returns into the loop. */
+while (cn1_array_element_int(ts, array, i) < pivot) {
+    i++;
+}
+
+/* AFTER: failure leaves the method. */
+for (;;) {
+    JAVA_OBJECT a = array;
+    JAVA_INT idx = i;
+    CN1_ARRAY_CHECK_DIVERGE(a, idx, );
+
+    if (((JAVA_ARRAY_INT*)
+            (*(JAVA_ARRAY)a).data)[idx] >= pivot) {
+        break;
+    }
+    i++;
+}

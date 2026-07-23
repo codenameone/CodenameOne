@@ -1,0 +1,24 @@
+Two new core APIs shipped this week. DeviceIntegrity gives high-security apps portable attestation and RASP signals (Play Integrity, App Attest, root/jailbreak/Frida and accessibility-abuse detection), while AppReview handles native store-review prompts with a graceful fallback and a smart feedback split.
+
+This video explains separating portable integrity signals from a respectful store-review flow.
+
+Full article and source material:
+https://www.codenameone.com/blog/device-integrity-and-app-review/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+
+
+Chapters
+00:00 Who And What
+00:14 The Real World Problem
+00:30 Independent Context 1
+00:46 The Change In Mechanism
+01:02 Source And Product Proof
+01:16 Canonical Captures
+01:28 Developer Victory
+01:40 Outro
+
+Which part should we unpack next?
+
+Series: Security, Privacy & Reliability in Codename One — part 2 of 5
+
+#Java #CodenameOne

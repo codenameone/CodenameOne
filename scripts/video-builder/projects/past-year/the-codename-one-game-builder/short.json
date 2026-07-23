@@ -1,0 +1,786 @@
+{
+  "schemaVersion": 1,
+  "editorial": {
+    "storyType": "code-and-capture",
+    "status": "approved",
+    "topicTerms": [
+      "visual scene",
+      "Codename One Game Builder",
+      "Java level editor",
+      "GameLevel",
+      "GameSceneView"
+    ],
+    "proof": [
+      "canonical article source",
+      "independent technical documentation",
+      "article code",
+      "canonical product captures"
+    ],
+    "humanBeat": "A developer has sprites, physics, input, and sound, but still cannot judge a level until dozens of object coordinates compile and run.",
+    "visualIdentity": "A wall of object setters collapses into one plain game file that fans out into platformer, board, and dungeon scenes.",
+    "bespokeVisualization": "The same data model visibly serves three kinds of game while a separate Java lane carries only application behavior.",
+    "heroJourney": {
+      "identity": "Codename One and visual game authoring are introduced.",
+      "problem": "A portable runtime still leaves levels invisible when every object is created and positioned in code.",
+      "difficulty": "Different game types need layers, assets, properties, projections, terrain, preview, and eventually streaming worlds.",
+      "intervention": "Game Builder edits one plain scene model and generates companion bindings for the runtime.",
+      "victory": "The developer draws 2D, board, or 3D levels, reviews them as data, and keeps Java focused on the rules."
+    },
+    "problemDimensions": [
+      "invisible authoring loop",
+      "different game modes",
+      "large-world memory"
+    ],
+    "resolutionMap": [
+      {
+        "problem": "invisible authoring loop",
+        "solution": "hierarchy, asset library, canvas, and inspector",
+        "proof": "the platformer editor capture"
+      },
+      {
+        "problem": "different game modes",
+        "solution": "one GameLevel data model for 2D, board, and 3D",
+        "proof": "the three canonical game captures"
+      },
+      {
+        "problem": "large-world memory",
+        "solution": "chunk and region streaming around the camera",
+        "proof": "StreamingTerrain and RegionProvider described in the article"
+      }
+    ]
+  },
+  "output": {
+    "frameRate": 30,
+    "landscapeWidth": 1920,
+    "landscapeHeight": 1080,
+    "portraitWidth": 1080,
+    "portraitHeight": 1920,
+    "videoBitRate": 8000000
+  },
+  "narration": {
+    "provider": "kokoro",
+    "voice": "af_heart:60,af_bella:40",
+    "language": "en-us",
+    "speed": 0.97,
+    "model": ".video-tools/kokoro/kokoro-v1.0.onnx",
+    "minimumGapMs": 250,
+    "pronunciations": {
+      "Codename One": "Codename One",
+      "API": "API",
+      "AI": "AI",
+      "APK": "APK",
+      "AR/VR": "augmented reality and virtual reality",
+      "ARKit": "A-R kit",
+      "ARCore": "A-R core",
+      "AR": "A-R",
+      "VR": "V-R",
+      "2D": "2D",
+      "3D": "3D",
+      "GPU": "GPU",
+      "GA4": "G-A four",
+      "GDPR": "G-D-P-R",
+      "CCPA": "C-C-P-A",
+      "DPI": "D-P-I",
+      "glTF": "G-L-T-F",
+      "JVM": "JVM",
+      "JIT": "JIT",
+      "AOT": "A-O-T",
+      "GC": "G-C",
+      "CI": "C-I",
+      "CSS": "CSS",
+      "iOS": "iOS",
+      "macOS": "macOS",
+      "tvOS": "tvOS",
+      "UWP": "U-W-P",
+      "NFC": "NFC",
+      "PCM": "PCM",
+      "RGBA": "RGBA",
+      "EDT": "E-D-T",
+      "ETA": "E-T-A",
+      "SRT": "SRT",
+      "VTT": "VTT",
+      "AAC": "A-A-C",
+      "H264": "H two sixty four",
+      "HTML": "HTML",
+      "IDE": "I-D-E",
+      "JS": "JS",
+      "XML": "XML",
+      "JSON": "jay son",
+      "WYSIWYG": "wizzy wig",
+      "CodeEditor": "Code Editor",
+      "RichTextArea": "Rich Text Area",
+      "AbstractEditorComponent": "Abstract Editor Component",
+      "CodeMirror": "Code Mirror",
+      "WidgetKit": "Widget Kit",
+      "ActivityKit": "Activity Kit",
+      "RemoteViews": "Remote Views",
+      "Dynamic Island": "Dynamic Island",
+      "JavaSE": "Java S-E",
+      "WidgetTimeline": "Widget Timeline",
+      "LiveActivity": "Live Activity",
+      "LiveActivityDescriptor": "Live Activity Descriptor",
+      "SurfaceDynamicText": "Surface Dynamic Text",
+      "VideoIO": "video I-O",
+      "AudioMixer": "Audio Mixer",
+      "AppGallery": "App Gallery",
+      "FFmpeg": "F-F-M-peg",
+      "WAVWriter": "wave writer",
+      "SVG": "SVG",
+      "SPI": "S-P-I",
+      "AnalyticsService": "Analytics Service",
+      "AnalyticsProvider": "Analytics Provider",
+      "AbstractAnalyticsProvider": "Abstract Analytics Provider",
+      "CodenameOneAnalyticsProvider": "Codename One Analytics Provider",
+      "RASP": "rasp",
+      "DeviceIntegrity": "Device Integrity",
+      "AppReview": "App Review",
+      "CarApplication": "Car Application",
+      "CarScreen": "Car Screen",
+      "CarTemplate": "Car Template",
+      "CarPlay": "Car Play",
+      "Android Auto": "Android Auto",
+      "App Attest": "App Attest",
+      "Play Integrity": "Play Integrity",
+      "StoreKit": "Store Kit",
+      "Matomo": "ma-TOE-mo",
+      "Firebase": "Fire base",
+      "Frida": "FREE-da",
+      "SKU": "S-K-U",
+      "UiModeManager": "U-I Mode Manager",
+      "AndroidX": "Android X",
+      "CN.isTV()": "C-N is T-V",
+      "Display.isTV()": "Display is T-V",
+      "TARGET_OS_TV": "target O-S T-V",
+      "MapSurface": "Map Surface",
+      "MapView": "Map View",
+      "NativeMap": "Native Map",
+      "MapKit": "Map Kit",
+      "MapComponent": "Map Component",
+      "MapLibre": "Map Libre",
+      "GeneralPath": "General Path",
+      "ORM": "O-R-M",
+      "OAuth": "oh auth",
+      "OIDC": "O-I-D-C",
+      "gRPC": "G-R-P-C",
+      "GraphQL": "graph Q-L",
+      "Box2D": "box 2D",
+      "JDWP": "J-D-W-P",
+      "JUnit": "J unit",
+      "ParparVM": "par par V-M",
+      "Win32": "win thirty two",
+      "App Store Connect": "App Store Connect",
+      "cn1": "C-N one",
+      "mvn": "Maven",
+      "clang": "clang",
+      "2FA": "two F-A",
+      ".p8": "P eight",
+      ".glb": "G-L-B",
+      ".ipa": "I-P-A"
+    }
+  },
+  "id": "the-codename-one-game-builder-short",
+  "title": "The runtime was ready The level was still invisible",
+  "scenes": [
+    {
+      "id": "short-who-and-what",
+      "durationMs": 15500,
+      "storyBeats": [
+        "identity"
+      ],
+      "actions": [
+        {
+          "type": "image.show",
+          "id": "brand",
+          "role": "brand",
+          "kind": "illustration",
+          "atMs": 150,
+          "path": "codename-one-logo.png",
+          "bounds": {
+            "x": 0.045,
+            "y": 0.04,
+            "width": 0.12,
+            "height": 0.04
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.18,
+              "height": 0.027
+            }
+          }
+        },
+        {
+          "type": "svg.show",
+          "id": "opening-motif",
+          "atMs": 200,
+          "paths": {
+            "landscape": "opening-landscape.svg",
+            "portrait": "opening-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.58,
+            "y": 0.13,
+            "width": 0.38,
+            "height": 0.74
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.2,
+              "width": 0.89,
+              "height": 0.73
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "opening-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "The runtime was ready\nThe level was still invisible",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.055,
+            "y": 0.23,
+            "width": 0.49,
+            "height": 0.34
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.06,
+              "width": 0.86,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "opening-voice",
+          "atMs": 650,
+          "text": "Codename One builds native applications and games in Java from one codebase. Today, one visual scene format turns the gaming runtime into an authoring workflow for two-dimensional, board, and three-dimensional games.",
+          "caption": "Codename One builds native applications and games in Java from one codebase. Today, one visual scene format turns the gaming runtime into an authoring workflow for two-dimensional, board, and three-dimensional games."
+        }
+      ]
+    },
+    {
+      "id": "short-real-world-problem",
+      "durationMs": 15500,
+      "storyBeats": [
+        "problem"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "problem-motif",
+          "atMs": 200,
+          "paths": {
+            "landscape": "problem-landscape.svg",
+            "portrait": "problem-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.16,
+            "width": 0.92,
+            "height": 0.79
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.14,
+              "width": 0.89,
+              "height": 0.82
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "problem-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "A game engine without authoring still hides the game",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-28fef5225f6c",
+          "atMs": 250,
+          "text": "A loop, sprites, physics, input, and sound can all be portable while the level remains dozens of constructors and position setters. Every visual change needs compilation, and data that artists should edit is mixed with runtime rules.",
+          "caption": "A loop, sprites, physics, input, and sound can all be portable while the level remains dozens of constructors and position setters. Every visual change needs compilation, and data that artists should edit is mixed with runtime rules."
+        }
+      ]
+    },
+    {
+      "id": "short-independent-context",
+      "durationMs": 23500,
+      "storyBeats": [
+        "difficulty"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "short-evidence-1",
+          "atMs": 200,
+          "paths": {
+            "landscape": "evidence-1-landscape.svg",
+            "portrait": "evidence-1-landscape.svg"
+          },
+          "bounds": {
+            "x": 0.05,
+            "y": 0.08,
+            "width": 0.9,
+            "height": 0.4
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.07,
+              "width": 0.89,
+              "height": 0.42
+            }
+          },
+          "role": "evidence",
+          "sourceTitle": "Godot: Nodes and Scenes",
+          "sourceUrl": "https://docs.godotengine.org/en/stable/getting_started/step_by_step/nodes_and_scenes.html"
+        },
+        {
+          "type": "svg.show",
+          "id": "short-evidence-2",
+          "atMs": 200,
+          "paths": {
+            "landscape": "evidence-2-landscape.svg",
+            "portrait": "evidence-2-landscape.svg"
+          },
+          "bounds": {
+            "x": 0.05,
+            "y": 0.53,
+            "width": 0.9,
+            "height": 0.4
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.53,
+              "width": 0.89,
+              "height": 0.42
+            }
+          },
+          "role": "evidence",
+          "sourceTitle": "Tiled JSON Map Format",
+          "sourceUrl": "https://doc.mapeditor.org/en/stable/reference/json-map-format/"
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-a8185af24b3b",
+          "atMs": 250,
+          "text": "The outside documentation exposes both sides of the same problem: Godot's scene system composes nodes into reusable trees so spatial structure can be authored and instantiated separately from gameplay scripts. Tiled exports visual maps with layers, object data, tile sets, and custom properties that runtimes can load independently of editor code.",
+          "caption": "The outside documentation exposes both sides of the same problem: Godot's scene system composes nodes into reusable trees so spatial structure can be authored and instantiated separately from gameplay scripts. Tiled exports visual maps with layers, object data, tile sets, and custom properties that runtimes can load independently of editor code."
+        }
+      ]
+    },
+    {
+      "id": "short-change-in-mechanism",
+      "durationMs": 18500,
+      "storyBeats": [
+        "intervention"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "solution-motif",
+          "atMs": 200,
+          "paths": {
+            "landscape": "solution-landscape.svg",
+            "portrait": "solution-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.16,
+            "width": 0.92,
+            "height": 0.79
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.14,
+              "width": 0.89,
+              "height": 0.82
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "solution-motif",
+          "atMs": 200,
+          "durationMs": 1000,
+          "effect": "morph",
+          "easing": "ease-out"
+        },
+        {
+          "type": "text.show",
+          "id": "intervention-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "Make the level a project artifact",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-f8931169c54d",
+          "atMs": 250,
+          "text": "Game Builder stores layers, assets, objects, transforms, terrain, and typed properties in a plain game file. The runtime realizes that file into a Scene, and generated fields bind named objects without overwriting the constructor or update logic the developer owns.",
+          "caption": "Game Builder stores layers, assets, objects, transforms, terrain, and typed properties in a plain game file. The runtime realizes that file into a Scene, and generated fields bind named objects without overwriting the constructor or update logic the developer owns."
+        }
+      ]
+    },
+    {
+      "id": "short-source-and-product-proof",
+      "durationMs": 15000,
+      "storyBeats": [
+        "proof"
+      ],
+      "composition": {
+        "landscape": "code-left-demo-right",
+        "portrait": "code-over-demo"
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "proof-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "One loader, three kinds of scene",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "code.show",
+          "id": "source-code",
+          "role": "code",
+          "atMs": 250,
+          "language": "java",
+          "path": "excerpt.txt",
+          "bounds": {
+            "x": 0.035,
+            "y": 0.17,
+            "width": 0.48,
+            "height": 0.72
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.15,
+              "width": 0.89,
+              "height": 0.35
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "proof-capture",
+          "role": "proof",
+          "kind": "capture",
+          "atMs": 450,
+          "path": "capture-1.png",
+          "bounds": {
+            "x": 0.55,
+            "y": 0.17,
+            "width": 0.42,
+            "height": 0.72
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.54,
+              "width": 0.89,
+              "height": 0.38
+            }
+          }
+        },
+        {
+          "type": "focus.show",
+          "id": "source-focus",
+          "target": "source-code",
+          "atMs": 4000,
+          "relativeBounds": {
+            "x": 0.02,
+            "y": 0.08,
+            "width": 0.96,
+            "height": 0.5
+          },
+          "label": "Make the level a project artifact",
+          "color": "50d8ff"
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-e2a09689ecbf",
+          "atMs": 250,
+          "text": "The companion class loads a GameLevel resource into GameSceneView and starts the rules loop. The same model supports a side-scroller, an isometric board, or a three-dimensional dungeon without changing that loading shape.",
+          "caption": "The companion class loads a GameLevel resource into GameSceneView and starts the rules loop. The same model supports a side-scroller, an isometric board, or a three-dimensional dungeon without changing that loading shape."
+        }
+      ]
+    },
+    {
+      "id": "short-canonical-captures",
+      "durationMs": 16500,
+      "storyBeats": [
+        "proof"
+      ],
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "captures-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "What changes in the actual workflow",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "canonical-capture-1",
+          "role": "proof",
+          "kind": "capture",
+          "atMs": 250,
+          "path": "capture-1.png",
+          "bounds": {
+            "x": 0.035,
+            "y": 0.19,
+            "width": 0.44,
+            "height": 0.68
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.16,
+              "width": 0.88,
+              "height": 0.25
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "canonical-capture-2",
+          "role": "proof",
+          "kind": "capture",
+          "atMs": 600,
+          "path": "capture-2.png",
+          "bounds": {
+            "x": 0.52,
+            "y": 0.19,
+            "width": 0.44,
+            "height": 0.32
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.43,
+              "width": 0.88,
+              "height": 0.25
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "canonical-capture-3",
+          "role": "proof",
+          "kind": "capture",
+          "atMs": 950,
+          "path": "capture-3.png",
+          "bounds": {
+            "x": 0.52,
+            "y": 0.55,
+            "width": 0.44,
+            "height": 0.32
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.7,
+              "width": 0.88,
+              "height": 0.25
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "canonical-capture-1",
+          "atMs": 250,
+          "durationMs": 850,
+          "effects": {
+            "landscape": "slide-right",
+            "portrait": "slide-up"
+          },
+          "easing": "ease-out"
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-9293625d1806",
+          "atMs": 250,
+          "text": "The editor exposes hierarchy, assets, canvas, and properties in one place. The board and dungeon captures show that the format is not a platformer skin; each mode has its own projection and preview while retaining the same project data model.",
+          "caption": "The editor exposes hierarchy, assets, canvas, and properties in one place. The board and dungeon captures show that the format is not a platformer skin; each mode has its own projection and preview while retaining the same project data model."
+        }
+      ]
+    },
+    {
+      "id": "short-developer-victory",
+      "durationMs": 14000,
+      "storyBeats": [
+        "victory"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "victory-motif",
+          "atMs": 200,
+          "paths": {
+            "landscape": "victory-landscape.svg",
+            "portrait": "victory-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.16,
+            "width": 0.92,
+            "height": 0.79
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.14,
+              "width": 0.89,
+              "height": 0.82
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "victory-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "Draw what changes often; code what makes it yours",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-452edffdc937",
+          "atMs": 250,
+          "text": "The developer can review a level as data, regenerate object bindings safely, reuse standard Codename One UI for menus and heads-up displays, and stream neighboring regions when the world grows beyond one scene.",
+          "caption": "The developer can review a level as data, regenerate object bindings safely, reuse standard Codename One UI for menus and heads-up displays, and stream neighboring regions when the world grows beyond one scene."
+        }
+      ]
+    },
+    {
+      "id": "short-outro",
+      "durationMs": 15000,
+      "storyBeats": [
+        "outro"
+      ],
+      "actions": [
+        {
+          "type": "outro.show",
+          "id": "next",
+          "atMs": 0,
+          "durationMs": 1100,
+          "eyebrow": "CODENAME ONE · ENGINEERING STORY",
+          "title": "Which game should this scene model build next?",
+          "subtitle": "Source, captions, and the full article are linked below.",
+          "prompt": "Choose a platformer, board game, dungeon, racer, or open world.",
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-09dc4c31832c",
+          "atMs": 250,
+          "text": "Choose a platformer, board game, dungeon, racer, or open world.",
+          "caption": "Choose a platformer, board game, dungeon, racer, or open world."
+        }
+      ]
+    }
+  ]
+}

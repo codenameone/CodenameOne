@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1200" viewBox="0 0 900 1200">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#081321"/><stop offset="1" stop-color="#102b42"/></linearGradient>
+  <filter id="glow"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect width="100%" height="100%" rx="36" fill="url(#bg)"/>
+
+<text x="450" y="92" fill="#7890a4" font-family="Arial, sans-serif" font-size="24" font-weight="700" text-anchor="middle">APP WINDOW</text>
+<rect x="170" y="135" width="560" height="650" rx="62" fill="#101f31" stroke="#4b657d" stroke-width="5"/>
+<rect x="215" y="210" width="470" height="330" rx="36" fill="#172a40"/>
+<rect x="270" y="275" width="92" height="92" rx="22" fill="#ff8a34"/>
+<text x="395" y="320" fill="#f5f8fb" font-family="Arial, sans-serif" font-size="34" font-weight="700" text-anchor="start">Out for delivery</text>
+<text x="395" y="380" fill="#50d8ff" font-family="Arial, sans-serif" font-size="54" font-weight="700" text-anchor="start">03:42</text>
+<path d="M450 560 C450 700 450 770 450 900" fill="none" stroke="#ff8a34" stroke-width="11" stroke-linecap="round" filter="url(#glow)"/>
+<rect x="120" y="850" width="660" height="210" rx="70" fill="#02070c" stroke="#ff8a34" stroke-width="4"/>
+<text x="205" y="935" fill="#ff8a34" font-family="Arial, sans-serif" font-size="28" font-weight="700" text-anchor="start">LIVE ACTIVITY</text>
+<text x="205" y="1000" fill="#f5f8fb" font-family="Arial, sans-serif" font-size="42" font-weight="700" text-anchor="start">ETA keeps moving</text>
+
+</svg>

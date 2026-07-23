@@ -1,0 +1,10 @@
+A walk-through of the new JDWP-based on-device debugging pipeline for ParparVM iOS apps and Android apps, with a step-by-step IntelliJ tutorial for each. Plus a short tutorial on the new standard JUnit 5 integration against the JavaSE simulator, with annotations for the visual configuration.
+
+Full article:
+https://www.codenameone.com/blog/developer-workflow-debug-and-junit/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Build, Test & Ship Codename One Apps
+
+#Java #CodenameOne #Shorts

@@ -1,0 +1,23 @@
+Why we moved the Codename One website from WordPress to Hugo and Cloudflare Pages, what improved, and how to use Giscus for discussions.
+
+This video explains the engineering tradeoffs in moving a large technical site from wordpress to hugo and cloudflare pages.
+
+Full article and source material:
+https://www.codenameone.com/blog/moving-from-wordpress-to-hugo-cloudflare-pages/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+
+
+Chapters
+00:00 Hook
+00:28 Problem
+00:43 Mechanism
+00:56 Source
+01:22 Tradeoffs
+01:38 Result
+02:00 Outro
+
+Which part should we unpack next?
+
+Series: Building Codename One in the Open — part 2 of 2
+
+#Java #CodenameOne

@@ -1,0 +1,10 @@
+Analytics.addProvider(new MatomoAnalyticsProvider(url, 7));
+
+Analytics.screen("Home", null); // dropped: no consent yet
+
+Analytics.setConsent(AnalyticsConsent.builder()
+        .analytics(true)
+        .crashReporting(true)
+        .build());
+
+Analytics.screen("Home", null); // now delivered

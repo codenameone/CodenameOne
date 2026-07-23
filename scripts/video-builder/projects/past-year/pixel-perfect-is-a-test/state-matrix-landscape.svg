@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700">
+<style>.title{font:700 48px sans-serif;fill:#f5f8fb}.label{font:700 29px sans-serif;fill:#f5f8fb}.body{font:25px sans-serif;fill:#c8d4e3}.small{font:21px sans-serif;fill:#8ea4ba}.card{fill:#111a27;stroke:#26384c;stroke-width:3}</style>
+
+<text x="600" y="58" class="title" text-anchor="middle">A component is a matrix of states</text>
+<g transform="translate(75 112)">
+<rect width="1050" height="480" rx="28" class="card"/>
+<g class="label"><text x="260" y="56" text-anchor="middle">Normal</text><text x="525" y="56" text-anchor="middle">Pressed</text><text x="790" y="56" text-anchor="middle">Selected</text></g>
+<g class="body"><text x="80" y="165">Light</text><text x="80" y="345">Dark</text></g>
+<g fill="#e8edf4"><rect x="175" y="105" width="170" height="88" rx="44"/><rect x="440" y="105" width="170" height="88" rx="44"/><rect x="705" y="105" width="170" height="88" rx="44"/></g>
+<g fill="#1c2938"><rect x="175" y="285" width="170" height="88" rx="44"/><rect x="440" y="285" width="170" height="88" rx="44"/><rect x="705" y="285" width="170" height="88" rx="44"/></g>
+<g fill="none" stroke-width="7"><rect x="440" y="105" width="170" height="88" rx="44" stroke="#7c8da1"/><rect x="705" y="105" width="170" height="88" rx="44" stroke="#4fd1c5"/><rect x="440" y="285" width="170" height="88" rx="44" stroke="#9f7aea"/><rect x="705" y="285" width="170" height="88" rx="44" stroke="#62e6ff"/></g>
+<path d="M925 120 v255" stroke="#3d5269" stroke-width="3"/><text x="965" y="180" class="small">geometry</text><text x="965" y="225" class="small">color</text><text x="965" y="270" class="small">contrast</text><text x="965" y="315" class="small">motion</text>
+</g>
+<text x="600" y="650" class="body" text-anchor="middle">one screenshot can pass while the interaction is still wrong</text>
+
+</svg>

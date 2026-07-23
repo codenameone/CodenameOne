@@ -1,0 +1,28 @@
+Deeper AI integration in the framework core, modern authentication via OAuth / OIDC and WebAuthn passkeys driven from the system browser, and a few smaller additions (WiFi / connectivity, share-sheet result callbacks) alongside.
+
+This video explains moving ai, authentication, passkeys, and connectivity into stable framework apis.
+
+Full article and source material:
+https://www.codenameone.com/blog/platform-apis-in-the-core/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://github.com/codenameone/CodenameOne/pull/5035
+https://github.com/codenameone/CodenameOne/pull/5057
+https://www.codenameone.com/developer-guide/#_ai_chat_ui_and_speech
+https://github.com/codenameone/CodenameOne/pull/5018
+https://github.com/codenameone/CodenameOne/pull/5039
+https://accounts.google.com
+
+Chapters
+00:00 Hook
+00:31 Problem
+00:51 Mechanism
+01:25 Source
+01:59 Tradeoffs
+02:23 Result
+02:52 Outro
+
+Which part should we unpack next?
+
+Series: Codename One Native Platforms & Device APIs — part 11 of 13
+
+#Java #CodenameOne

@@ -1,0 +1,63 @@
+#Constants {
+    includeNativeBool: true;
+}
+
+Form {
+    background-color: #10131a;
+    color: #f5f7fb;
+    font-family: "native:MainRegular";
+}
+
+Label {
+    background-color: transparent;
+    color: #f5f7fb;
+}
+
+Button {
+    background-color: #4d7cff;
+    color: #ffffff;
+    border-radius: 2mm;
+    padding: 2mm 4mm 2mm 4mm;
+}
+
+VideoTitle {
+    background-color: transparent;
+    color: #ffffff;
+    font-size: 8mm;
+    font-family: "native:MainBold";
+    text-align: center;
+}
+
+VideoBody {
+    background-color: transparent;
+    color: #d8e0ef;
+    font-size: 4mm;
+}
+
+VideoStatus {
+    color: #8fa2bf;
+    font-size: 3mm;
+    padding: 2mm;
+}
+
+VideoReplayBadge {
+    background-color: rgba(23, 28, 38, 0.92);
+    color: #50d8ff;
+    border: 1px solid #50d8ff;
+    border-radius: 2mm;
+    font-family: "native:MainBold";
+    font-size: 4mm;
+    padding: 2mm;
+    text-align: center;
+}
+
+VideoStage, DemoSurface {
+    background-color: #10131a;
+}
+
+CodeEditor {
+    background-color: #171c26;
+    color: #e7edf7;
+    border: 1px solid #2a3445;
+    padding: 3mm;
+}

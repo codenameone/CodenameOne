@@ -1,0 +1,10 @@
+Codename One can now generate and inspect real video: encode app-rendered frames with audio, decode exact frames back out, mix PCM on a sample clock, and turn Whisper segment timestamps into subtitles.
+
+Full article:
+https://www.codenameone.com/blog/videoio-audio-mixer-whisper/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Codename One UI, Graphics & Media
+
+#Java #CodenameOne #Shorts

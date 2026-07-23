@@ -1,0 +1,25 @@
+The biggest change this week is that native interfaces now support Swift on iOS and Kotlin on Android.
+
+This video explains writing native interfaces in swift and kotlin while keeping a portable java boundary.
+
+Full article and source material:
+https://www.codenameone.com/blog/swift-and-kotlin-native-interfaces-faster-base64/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://github.com/codenameone/CodenameOne/issues/3274
+https://developer.apple.com/fonts/
+https://github.com/codenameone/CodenameOne/issues
+
+Chapters
+00:00 Hook
+00:23 Problem
+00:52 Mechanism
+01:12 Source
+01:32 Tradeoffs
+02:04 Result
+02:23 Outro
+
+Which part should we unpack next?
+
+Series: Codename One Native Platforms & Device APIs — part 12 of 13
+
+#Java #CodenameOne

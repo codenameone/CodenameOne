@@ -1,0 +1,7 @@
+target/
+**/target/
+.video-cache/
+.video-tools/
+.*-measurement.json
+projects/past-year/state.json
+output/

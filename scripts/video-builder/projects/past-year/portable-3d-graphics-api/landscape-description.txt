@@ -1,0 +1,24 @@
+The new com.codename1.gpu API renders the same Java code through Metal, OpenGL ES, WebGL, Direct3D 11, and a software rasterizer. You describe materials and the engine generates the shaders for each platform.
+
+This video explains describing materials once while generating shaders for metal, opengl, webgl, and direct3d.
+
+Full article and source material:
+https://www.codenameone.com/blog/portable-3d-graphics-api/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://github.com/codenameone/CodenameOne/pull/5151
+https://github.com/codenameone/CodenameOne/issues
+
+Chapters
+00:00 Hook
+00:32 Problem
+01:02 Mechanism
+01:29 Source
+01:59 Tradeoffs
+02:33 Result
+03:04 Outro
+
+Which part should we unpack next?
+
+Series: Codename One UI, Graphics & Media — part 5 of 9
+
+#Java #CodenameOne

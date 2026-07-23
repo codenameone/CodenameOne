@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 700">
+<rect x="280" y="25" width="540" height="130" fill="#171c26" stroke="#ffc857" stroke-width="5" rx="24"/><text x="550" y="105" font-size="48" fill="#f3f7fb" font-family="sans-serif" font-weight="700" text-anchor="middle">ONE JAVA API</text>
+<line x1="550" y1="155" x2="185" y2="350" stroke="#50d8ff" stroke-width="8"/><line x1="550" y1="155" x2="550" y2="350" stroke="#50d8ff" stroke-width="8"/><line x1="550" y1="155" x2="915" y2="350" stroke="#50d8ff" stroke-width="8"/>
+<polygon points="185,350 199,310 225,345" fill="#50d8ff"/><polygon points="550,350 530,314 570,314" fill="#50d8ff"/><polygon points="915,350 875,345 901,310" fill="#50d8ff"/>
+<rect x="25" y="350" width="320" height="180" fill="#171c26" stroke="#ffc857" stroke-width="5" rx="24"/><rect x="390" y="350" width="320" height="180" fill="#171c26" stroke="#ffc857" stroke-width="5" rx="24"/><rect x="755" y="350" width="320" height="180" fill="#171c26" stroke="#ffc857" stroke-width="5" rx="24"/>
+<text x="185" y="430" font-size="42" fill="#f3f7fb" font-family="sans-serif" font-weight="700" text-anchor="middle">ARKit</text><text x="185" y="480" font-size="27" fill="#f3f7fb" font-family="sans-serif" font-weight="700" text-anchor="middle">native iOS</text>
+<text x="550" y="430" font-size="42" fill="#f3f7fb" font-family="sans-serif" font-weight="700" text-anchor="middle">ARCore</text><text x="550" y="480" font-size="27" fill="#f3f7fb" font-family="sans-serif" font-weight="700" text-anchor="middle">native Android</text>
+<text x="915" y="420" font-size="35" fill="#f3f7fb" font-family="sans-serif" font-weight="700" text-anchor="middle">JavaSE</text><text x="915" y="465" font-size="35" fill="#f3f7fb" font-family="sans-serif" font-weight="700" text-anchor="middle">simulator</text>
+<text x="550" y="630" font-size="34" fill="#50d8ff" font-family="sans-serif" font-weight="700" text-anchor="middle">WRITE ONCE · DEBUG THE SAME FLOW</text>
+</svg>

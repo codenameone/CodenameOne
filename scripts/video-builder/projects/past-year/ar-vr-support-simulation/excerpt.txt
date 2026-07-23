@@ -1,0 +1,17 @@
+view.addPointerReleasedListener(e -> {
+    float xn =
+        (e.getX() - view.getAbsoluteX())
+        / (float) view.getWidth();
+    float yn =
+        (e.getY() - view.getAbsoluteY())
+        / (float) view.getHeight();
+    session.hitTest(xn, yn)
+        .ready(hits -> {
+            if (hits.length == 0) return;
+            ARAnchor anchor =
+                hits[0].createAnchor();
+            ARNode node = new ARNode(
+                ARModel.fromGltf(modelBytes));
+            anchor.setNode(node);
+        });
+});

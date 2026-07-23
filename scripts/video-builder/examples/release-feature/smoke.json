@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "video-builder-smoke",
+  "title": "Video Builder Smoke",
+  "output": {
+    "frameRate": 10,
+    "landscapeWidth": 640,
+    "landscapeHeight": 360,
+    "portraitWidth": 360,
+    "portraitHeight": 640,
+    "videoBitRate": 1000000
+  },
+  "scenes": [
+    {
+      "id": "code",
+      "durationMs": 800,
+      "actions": [
+        {"type": "text.show", "id": "title", "text": "Compiled Codename One", "uiid": "VideoBody", "bounds": {"x": 0.05, "y": 0.03, "width": 0.9, "height": 0.18}},
+        {"type": "code.show", "id": "source", "atMs": 100, "language": "java", "text": "", "bounds": {"x": 0.1, "y": 0.23, "width": 0.8, "height": 0.7}},
+        {"type": "code.type", "target": "source", "atMs": 100, "durationMs": 600, "text": "Button b = new Button(\"Run\");\nb.addActionListener(e -> animate());"}
+      ]
+    },
+    {
+      "id": "demo",
+      "durationMs": 800,
+      "actions": [
+        {"type": "demo.mount", "id": "demo", "class": "com.codename1.videobuilder.demos.CounterDemoScene", "bounds": {"x": 0.15, "y": 0.12, "width": 0.7, "height": 0.76}},
+        {"type": "demo.action", "atMs": 300, "name": "increment", "arguments": {"count": 7}},
+        {"type": "transition", "target": "demo", "atMs": 0, "durationMs": 250, "effect": "fade"}
+      ]
+    }
+  ]
+}

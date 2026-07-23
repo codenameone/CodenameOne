@@ -1,0 +1,16 @@
+VideoWriter writer = new VideoWriterBuilder()
+        .path(outputPath)
+        .width(width).height(height).frameRate(30)
+        .videoCodec(VideoIO.CODEC_H264)
+        .hasAudio(true).audioCodec(VideoIO.CODEC_AAC)
+        .sampleRate(48000).audioChannels(2)
+        .build();
+
+for (int i = 0; i < frames.size(); i++) {
+    writer.writeFrame(frames.get(i), i * 1000L / 30L);
+}
+
+AudioMixer mixer = new AudioMixer(48000, 2);
+mixer.addTrack(narration, 0, 1.0f);
+writer.writeAudio(mixer.mix(), 0);
+writer.close();

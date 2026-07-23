@@ -1,0 +1,24 @@
+Codename One now treats TV as a first-class form factor with CN.isTV(), runtime device-tv and device-watch CSS @media variants, an Android TV APK via the android.tv build hint, and a separate tvOS Metal target built by TvNativeBuilder.
+
+This video explains treating tv as a first-class form factor with runtime checks and css media variants.
+
+Full article and source material:
+https://www.codenameone.com/blog/apple-tv-and-android-tv/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://github.com/codenameone/CodenameOne/pull/5261
+
+Chapters
+00:00 Who And What
+00:13 The Real World Problem
+00:29 Independent Context 1
+00:44 The Change In Mechanism
+01:01 Source And Product Proof
+01:13 Canonical Captures
+01:24 Developer Victory
+01:37 Outro
+
+Which part should we unpack next?
+
+Series: Codename One Native Platforms & Device APIs — part 4 of 13
+
+#Java #CodenameOne

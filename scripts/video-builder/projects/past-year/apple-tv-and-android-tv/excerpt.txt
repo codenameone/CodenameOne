@@ -1,0 +1,10 @@
+@media device-tv {
+    Title { font-size: 9mm; padding: 4mm; }
+    Button.selected {
+        border: 3px solid #ffcc00;
+        padding: 5mm;
+    }
+}
+
+android.tv=true
+android.tv.banner=tv_banner.png

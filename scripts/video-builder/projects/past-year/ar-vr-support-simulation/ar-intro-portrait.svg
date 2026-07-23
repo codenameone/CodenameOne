@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#50d8ff"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs>
+<ellipse cx="400" cy="720" rx="325" ry="120" fill="#111827" stroke="#50d8ff" stroke-width="6"/>
+<path d="M105 720 L250 530 L400 625 L550 390 L695 720" fill="none" stroke="url(#g)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="250" cy="530" r="27" fill="#ffc857"/><circle cx="400" cy="625" r="27" fill="#50d8ff"/><circle cx="550" cy="390" r="27" fill="#8b5cf6"/>
+<rect x="270" y="95" width="260" height="170" rx="30" fill="#171c26" stroke="#f3f7fb" stroke-width="5"/>
+<circle cx="400" cy="180" r="42" fill="none" stroke="#ffc857" stroke-width="7"/><path d="M400 134 V226 M354 180 H446" stroke="#ffc857" stroke-width="6"/>
+<text x="400" y="930" fill="#cbd5e1" font-family="sans-serif" font-size="31" text-anchor="middle">digital objects in physical space</text>
+</svg>

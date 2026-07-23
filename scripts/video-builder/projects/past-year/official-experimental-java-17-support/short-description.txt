@@ -1,0 +1,10 @@
+Codename One projects generated with the Initializr can now use official experimental Java 17 support, with record support arriving in Codename One 7.0.229 on March 20, 2026, and more JDK support planned next.
+
+Full article:
+https://www.codenameone.com/blog/official-experimental-java-17-support/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Native Java Ports & Performance
+
+#Java #CodenameOne #Shorts

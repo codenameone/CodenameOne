@@ -1,0 +1,28 @@
+A platform update can change standard controls after your team has tested and shipped a screen. See how Codename One versions native iOS and Android reference captures, compares every component state, and turns UI fidelity into a one-way regression gate.
+
+The compiled sample runs the shipped TabSelectionMorph geometry through fixed progress points. Authentic report captures show native controls on the left and Codename One on the right.
+
+Full article and source material:
+https://www.codenameone.com/blog/pixel-perfect-is-a-test/?utm_source=youtube&utm_medium=video&utm_campaign=native-ui-fidelity
+
+https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass
+https://developer.android.com/develop/ui/compose/designsystems/material2-material3
+https://github.com/codenameone/CodenameOne/pull/5274
+
+Chapters
+00:00 Who And What
+00:10 The Platform Owns The Update
+00:25 The Other Platform Has Another Migration
+00:41 A Screenshot Is One State
+00:57 Build An Answer Sheet
+01:15 Run The Motion Model
+01:46 Compare Real Output
+02:02 Measure Without Worshipping The Score
+02:23 Adopt The Look On Your Schedule
+02:41 Outro
+
+Which component should the fidelity suite test next?
+
+Series: Codename One UI, Graphics & Media — part 1 of 9
+
+#Java #UITesting #CodenameOne

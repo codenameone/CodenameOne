@@ -1,0 +1,11 @@
+/* AFTER: ordinary C locals can stay in registers. */
+JAVA_LONG fib(CODENAME_ONE_THREAD_STATE, JAVA_INT n) {
+    JAVA_INT ilocals_0_ = n;
+    CN1_FRAMELESS_SOE_GUARD(0);
+
+    if (ilocals_0_ < 2) {
+        return ilocals_0_;
+    }
+    return fib(threadStateData, ilocals_0_ - 1)
+         + fib(threadStateData, ilocals_0_ - 2);
+}

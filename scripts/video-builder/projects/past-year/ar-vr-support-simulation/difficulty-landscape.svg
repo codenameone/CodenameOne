@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650">
+<rect x="420" y="20" width="360" height="110" fill="#171c26" stroke="#ffc857" stroke-width="5" rx="24"/>
+<text x="600" y="88" font-size="42" fill="#f3f7fb" font-family="sans-serif" font-weight="700" text-anchor="middle">ONE AR FEATURE</text>
+<line x1="600" y1="130" x2="290" y2="260" stroke="#50d8ff" stroke-width="8"/><polygon points="290,260 310,224 326,264" fill="#50d8ff"/>
+<line x1="600" y1="130" x2="910" y2="260" stroke="#50d8ff" stroke-width="8"/><polygon points="910,260 874,264 890,224" fill="#50d8ff"/>
+<rect x="60" y="260" width="460" height="130" fill="#171c26" stroke="#ffc857" stroke-width="5" rx="24"/><rect x="680" y="260" width="460" height="130" fill="#171c26" stroke="#ffc857" stroke-width="5" rx="24"/>
+<text x="290" y="318" font-size="38" fill="#f3f7fb" font-family="sans-serif" font-weight="700" text-anchor="middle">ARKit path</text><text x="290" y="360" font-size="27" fill="#f3f7fb" font-family="sans-serif" font-weight="700" text-anchor="middle">native classes + coordinates</text>
+<text x="910" y="318" font-size="38" fill="#f3f7fb" font-family="sans-serif" font-weight="700" text-anchor="middle">ARCore path</text><text x="910" y="360" font-size="27" fill="#f3f7fb" font-family="sans-serif" font-weight="700" text-anchor="middle">different classes + coordinates</text>
+<line x1="290" y1="390" x2="460" y2="500" stroke="#50d8ff" stroke-width="8"/><line x1="910" y1="390" x2="740" y2="500" stroke="#50d8ff" stroke-width="8"/>
+<polygon points="460,500 421,493 443,462" fill="#50d8ff"/><polygon points="740,500 757,462 779,493" fill="#50d8ff"/>
+<rect x="320" y="500" width="560" height="125" fill="#171c26" stroke="#ffc857" stroke-width="5" rx="24"/>
+<text x="600" y="555" font-size="37" fill="#f3f7fb" font-family="sans-serif" font-weight="700" text-anchor="middle">BACK TO THE DEVICE</text><text x="600" y="598" font-size="27" fill="#f3f7fb" font-family="sans-serif" font-weight="700" text-anchor="middle">reproduce, patch, rebuild, repeat</text>
+</svg>

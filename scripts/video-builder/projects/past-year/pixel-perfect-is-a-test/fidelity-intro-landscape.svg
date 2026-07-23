@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700">
+<style>.title{font:700 48px sans-serif;fill:#f5f8fb}.label{font:700 29px sans-serif;fill:#f5f8fb}.body{font:25px sans-serif;fill:#c8d4e3}.small{font:21px sans-serif;fill:#8ea4ba}.card{fill:#111a27;stroke:#26384c;stroke-width:3}</style>
+
+<defs><linearGradient id="lens" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#62e6ff"/><stop offset="1" stop-color="#9f7aea"/></linearGradient></defs>
+<rect x="75" y="100" width="1050" height="500" rx="46" fill="#0b1420" stroke="#2b4057" stroke-width="4"/>
+<rect x="145" y="185" width="910" height="265" rx="64" fill="#e9eef5"/>
+<circle cx="260" cy="317" r="55" fill="#f8fafc" stroke="#8798aa" stroke-width="4"/><circle cx="600" cy="317" r="55" fill="#f8fafc" stroke="#8798aa" stroke-width="4"/><circle cx="940" cy="317" r="55" fill="#f8fafc" stroke="#8798aa" stroke-width="4"/>
+<path d="M260 317 C380 215 465 225 600 317 C725 410 825 405 940 317" fill="none" stroke="#51677f" stroke-width="8" stroke-dasharray="16 14"/>
+<ellipse cx="600" cy="317" rx="122" ry="82" fill="url(#lens)" opacity=".68" stroke="#ffffff" stroke-width="6"/>
+<path d="M540 286 Q600 242 660 286 M540 348 Q600 392 660 348" fill="none" stroke="#ffffff" stroke-width="6" opacity=".9"/>
+<g fill="#26384c"><rect x="170" y="505" width="72" height="72" rx="8"/><rect x="252" y="505" width="72" height="72" rx="8"/><rect x="334" y="505" width="72" height="72" rx="8"/></g>
+<g fill="#4fd1c5"><rect x="416" y="505" width="72" height="72" rx="8"/><rect x="498" y="505" width="72" height="72" rx="8"/></g>
+<path d="M790 520 l36 36 l86 -95" fill="none" stroke="#68d391" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="600" y="660" class="body" text-anchor="middle">appearance becomes versioned input · motion becomes measurable output</text>
+
+</svg>

@@ -1,0 +1,17 @@
+public final class CounterDemoScene implements DemoScene {
+    private int value;
+    private Label count;
+
+    public Component create(DemoContext context) {
+        count = new Label("0");
+        Button increment = new Button("Increment");
+        increment.addActionListener(e -> setValue(value + 1));
+        return BoxLayout.encloseYCenter(count, increment);
+    }
+
+    private void setValue(int next) {
+        value = next;
+        count.setText(String.valueOf(value));
+        count.getParent().animateLayout(450);
+    }
+}

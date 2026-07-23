@@ -1,0 +1,10 @@
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+List<String> names = Stream.of("Shai", "Steve", "Chen", "Shai")
+        .distinct()
+        .filter(name -> name.length() >= 4)
+        .map(String::toUpperCase)
+        .sorted()
+        .collect(Collectors.toList());

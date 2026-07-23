@@ -1,0 +1,16 @@
+        LiveActivityDescriptor descriptor = new LiveActivityDescriptor("delivery")
+                .setContent(buildDeliveryLayout())
+                .setCompactLeading(new SurfaceImage(createCourierAvatar())
+                        .setSize(24, 24).setCornerRadius(12))
+                .setCompactTrailing(new SurfaceDynamicText(
+                        SurfaceDynamicText.STYLE_TIMER_DOWN, "eta")
+                        .setFontSize(14).setColor(SurfaceColor.ACCENT))
+                .setExpandedCenter(new SurfaceText("${status}")
+                        .setFontSize(16).setFontWeight(SurfaceFontWeight.SEMIBOLD))
+                .setExpandedBottom(new SurfaceProgress(SurfaceProgress.STYLE_LINEAR)
+                        .setValueState("progress")
+                        .setColor(SurfaceColor.rgb(ACCENT_COLOR)))
+                .setTint(SurfaceColor.rgb(ACCENT_COLOR));
+        activity = LiveActivity.start(descriptor,
+                deliveryState("Out for delivery", activityEta, activityProgress));
+        updateActivityLabel(activity.isActive()

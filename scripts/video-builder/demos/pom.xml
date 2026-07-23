@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.codenameone.videobuilder</groupId>
+        <artifactId>cn1-video-builder</artifactId>
+        <version>8.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>cn1-video-builder-demos</artifactId>
+    <name>cn1-video-builder-demos</name>
+    <description>Compiled live demo scenes used by scripted videos.</description>
+    <dependencies>
+        <dependency>
+            <groupId>com.codenameone.videobuilder</groupId>
+            <artifactId>cn1-video-builder-common</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration><release>17</release></configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

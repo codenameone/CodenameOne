@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1100">
+<style>.title{font:700 48px sans-serif;fill:#f5f8fb}.label{font:700 29px sans-serif;fill:#f5f8fb}.body{font:25px sans-serif;fill:#c8d4e3}.small{font:21px sans-serif;fill:#8ea4ba}.card{fill:#111a27;stroke:#26384c;stroke-width:3}</style>
+
+<text x="400" y="55" class="title" text-anchor="middle">Build an answer sheet</text>
+<g transform="translate(110 105)">
+<g class="card"><rect x="0" y="0" width="580" height="170" rx="28"/><rect x="0" y="220" width="580" height="170" rx="28"/><rect x="0" y="440" width="580" height="170" rx="28"/><rect x="0" y="660" width="580" height="170" rx="28"/></g>
+<g class="label"><text x="45" y="62">1 · Native reference apps</text><text x="45" y="282">2 · Versioned golden images</text><text x="45" y="502">3 · Matching Codename One render</text><text x="45" y="722">4 · One-way regression gate</text></g>
+<g class="body"><text x="45" y="112">UIKit and Material 3 controls</text><text x="45" y="332">light, dark, normal, pressed, selected</text><text x="45" y="552">same component, theme, and state</text><text x="45" y="772">visual score plus geometry metrics</text></g>
+<g fill="none" stroke="#62e6ff" stroke-width="7"><path d="M290 170 V213"/><path d="M290 390 V433"/><path d="M290 610 V653"/></g>
+<g fill="#62e6ff"><path d="M290 213 l-12 -18 h24z"/><path d="M290 433 l-12 -18 h24z"/><path d="M290 653 l-12 -18 h24z"/></g>
+</g><text x="400" y="1015" class="body" text-anchor="middle">version the look · ratchet the result</text>
+
+</svg>

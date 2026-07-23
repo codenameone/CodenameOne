@@ -140,6 +140,23 @@ class FFMPEGVideoWriter extends VideoWriter {
             command.add("yuv420p");
             command.add("-g");
             command.add(String.valueOf(gop));
+            if ("h264_videotoolbox".equals(encoder)) {
+                command.add("-profile:v");
+                command.add("high");
+                command.add("-allow_sw");
+                command.add("0");
+                command.add("-realtime");
+                command.add("1");
+                command.add("-prio_speed");
+                command.add("1");
+                command.add("-power_efficient");
+                command.add("1");
+                command.add("-tag:v");
+                command.add("avc1");
+            } else if ("libx264".equals(encoder)) {
+                command.add("-preset");
+                command.add("veryfast");
+            }
             command.add("-f");
             command.add(FFMPEGVideoIO.muxerFormat(container));
             command.add(videoOut.getAbsolutePath());

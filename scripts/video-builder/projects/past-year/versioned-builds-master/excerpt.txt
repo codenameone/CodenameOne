@@ -1,0 +1,8 @@
+# Reproduce the last known good framework
+build.cn1Version=7.0.182
+
+# Verify a fix that just landed
+build.cn1Version=master
+
+# Ship from a released version after verification
+# build.cn1Version=<released version>

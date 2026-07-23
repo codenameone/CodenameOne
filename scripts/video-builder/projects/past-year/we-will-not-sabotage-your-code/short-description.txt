@@ -1,0 +1,10 @@
+A maintainer recently hid a destructive prompt-injection payload aimed at AI agents inside his own framework. That is a betrayal of the trust open source runs on. Here is where we stand, and why I think AI is the biggest opportunity small OSS players have ever had.
+
+Full article:
+https://www.codenameone.com/blog/we-will-not-sabotage-your-code/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Security, Privacy & Reliability in Codename One
+
+#Java #CodenameOne #Shorts

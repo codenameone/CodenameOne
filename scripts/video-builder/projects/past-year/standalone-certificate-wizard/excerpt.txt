@@ -1,0 +1,6 @@
+mvn cn1:certificatewizard
+
+App Store Connect API Key
+  keyId      = 2X9R4HXF34
+  issuerId   = 57246542-96fe-1a63-e053-0824d011072a
+  privateKey = AuthKey_2X9R4HXF34.p8

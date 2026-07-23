@@ -31,6 +31,10 @@ workflows to build and validate Codename One ports.
   workflow.
 - `device-runner-app/` – Java sources for the shared sample application and its
   DeviceRunner UI tests.
+- `video-builder/` – JavaSE-only Codename One application for rendering
+  JSON-scripted, narrated landscape and portrait videos through `VideoIO`.
+  It includes a deterministic CLI, compiled demo scenes, and an MCP server for
+  LLM and CI automation.
 - `website/` – Hugo website helpers for the WordPress migration content under
   `docs/website`.
   - `website/preview.sh` – runs the Hugo dev server for local previews.

@@ -1,0 +1,9 @@
+metadata/
+  app-store/
+    en-US/description.txt
+    en-US/release-notes.txt
+    screenshots/
+  google-play/
+  app-gallery/
+
+mvn cn1:metadata-push

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 1500">
+  <rect x="10" y="10" width="840" height="1480" rx="34" fill="#171c26" stroke="#273143" stroke-width="4"/>
+  <text x="55" y="90" fill="#50d8ff" font-size="48">Client-VM memory</text>
+  <text x="55" y="140" fill="#9eabbc" font-size="26">Concurrent. Non-moving. Native-visible.</text>
+
+  <rect x="55" y="205" width="750" height="460" rx="28" fill="#202838"/>
+  <text x="95" y="270" fill="#ffc857" font-size="35">IDLE FLOOR</text>
+  <text x="95" y="365" fill="#f3f7fb" font-size="30">ParparVM</text><rect x="330" y="328" width="44" height="50" rx="12" fill="#50d8ff"/><text x="395" y="366" fill="#50d8ff" font-size="34">2.4 MB</text>
+  <text x="95" y="475" fill="#f3f7fb" font-size="30">Java 25</text><rect x="330" y="438" width="350" height="50" rx="12" fill="#435069"/><text x="460" y="542" fill="#f3f7fb" font-size="34">about 40 MB</text>
+  <text x="95" y="615" fill="#9eabbc" font-size="26">Only reserve what the app uses.</text>
+
+  <rect x="55" y="715" width="750" height="560" rx="28" fill="#202838"/>
+  <text x="95" y="780" fill="#ffc857" font-size="35">PEAK ALLOCATION CHURN</text>
+  <text x="95" y="875" fill="#f3f7fb" font-size="30">Old trigger bug</text><rect x="380" y="838" width="350" height="50" rx="12" fill="#6b3947"/><text x="462" y="938" fill="#ef9aa9" font-size="30">up to 2.1 GB</text>
+  <text x="95" y="1030" fill="#f3f7fb" font-size="30">This PR</text><rect x="380" y="993" width="130" height="50" rx="12" fill="#50d8ff"/><text x="530" y="1031" fill="#50d8ff" font-size="30">390 MB</text>
+  <text x="95" y="1130" fill="#f3f7fb" font-size="30">Java 25</text><rect x="380" y="1093" width="170" height="50" rx="12" fill="#435069"/><text x="570" y="1131" fill="#f3f7fb" font-size="30">508 MB</text>
+  <text x="95" y="1222" fill="#9eabbc" font-size="26">Peak now lands below the JVM.</text>
+
+  <rect x="105" y="1340" width="650" height="92" rx="22" fill="#152d34" stroke="#50d8ff" stroke-width="3"/>
+  <text x="430" y="1398" fill="#f3f7fb" font-size="29" text-anchor="middle">Native pointers remain valid.</text>
+</svg>

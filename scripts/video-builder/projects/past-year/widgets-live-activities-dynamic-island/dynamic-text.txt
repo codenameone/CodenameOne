@@ -1,0 +1,13 @@
+                                .add(new SurfaceText("${status}")
+                                        .setFontSize(15)
+                                        .setFontWeight(SurfaceFontWeight.SEMIBOLD)
+                                        .setMaxLines(1))
+                                .add(new SurfaceDynamicText(
+                                        SurfaceDynamicText.STYLE_TIMER_DOWN, "eta")
+                                        .setFontSize(24)
+                                        .setFontWeight(SurfaceFontWeight.BOLD)
+                                        .setColor(SurfaceColor.ACCENT))))
+                .add(new SurfaceProgress(SurfaceProgress.STYLE_LINEAR)
+                        .setValueState("progress")
+                        .setColor(SurfaceColor.rgb(ACCENT_COLOR)))
+                .setAction("open_order", params);

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "tailMs": 0,
+  "landscape": {
+    "who-and-what": 14000,
+    "the-real-world-problem": 17000,
+    "independent-context-1": 10500,
+    "independent-context-2": 11000,
+    "the-change-in-mechanism": 18000,
+    "source-and-product-proof": 18000,
+    "canonical-captures": 16500,
+    "developer-victory": 15500,
+    "outro": 15000
+  },
+  "portrait": {
+    "short-who-and-what": 14000,
+    "short-real-world-problem": 17000,
+    "short-independent-context": 25500,
+    "short-change-in-mechanism": 18000,
+    "short-source-and-product-proof": 18000,
+    "short-canonical-captures": 16500,
+    "short-developer-victory": 15500,
+    "short-outro": 15000
+  }
+}

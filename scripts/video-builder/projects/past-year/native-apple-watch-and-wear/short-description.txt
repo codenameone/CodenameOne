@@ -1,0 +1,10 @@
+The new native Apple Watch port runs real Codename One UI on watchOS through a dedicated Core Graphics backend inside a SwiftUI shell, while Wear OS rides the existing Android pipeline. The same code base, branched with CN.isWatch(), reaches both platforms, seamlessly!
+
+Full article:
+https://www.codenameone.com/blog/native-apple-watch-and-wear/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Codename One Native Platforms & Device APIs
+
+#Java #CodenameOne #Shorts

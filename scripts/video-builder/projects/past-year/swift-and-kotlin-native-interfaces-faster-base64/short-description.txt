@@ -1,0 +1,10 @@
+The biggest change this week is that native interfaces now support Swift on iOS and Kotlin on Android.
+
+Full article:
+https://www.codenameone.com/blog/swift-and-kotlin-native-interfaces-faster-base64/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Codename One Native Platforms & Device APIs
+
+#Java #CodenameOne #Shorts

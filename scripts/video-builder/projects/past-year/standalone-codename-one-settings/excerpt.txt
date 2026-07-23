@@ -1,0 +1,6 @@
+mvn cn1:settings
+
+# codenameone_settings.properties
+codename1.nativeTheme=native
+codename1.arg.ios.themeMode=dark
+codename1.arg.and.themeMode=light

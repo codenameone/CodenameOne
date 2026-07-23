@@ -1,0 +1,365 @@
+{
+  "schemaVersion": 1,
+  "id": "moving-from-wordpress-to-hugo-cloudflare-pages-short",
+  "title": "The engineering tradeoffs in moving a large technical site from WordPress to Hugo and Cloudflare Pages",
+  "output": {
+    "frameRate": 30,
+    "landscapeWidth": 1920,
+    "landscapeHeight": 1080,
+    "portraitWidth": 1080,
+    "portraitHeight": 1920,
+    "videoBitRate": 8000000
+  },
+  "narration": {
+    "provider": "kokoro",
+    "voice": "af_heart:60,af_bella:40",
+    "language": "en-us",
+    "speed": 0.97,
+    "model": ".video-tools/kokoro/kokoro-v1.0.onnx",
+    "minimumGapMs": 250,
+    "pronunciations": {
+      "Codename One": "Codename One",
+      "API": "API",
+      "AI": "AI",
+      "APK": "APK",
+      "AR/VR": "augmented reality and virtual reality",
+      "ARKit": "A-R kit",
+      "ARCore": "A-R core",
+      "AR": "A-R",
+      "VR": "V-R",
+      "2D": "2D",
+      "3D": "3D",
+      "GPU": "GPU",
+      "GA4": "G-A four",
+      "GDPR": "G-D-P-R",
+      "CCPA": "C-C-P-A",
+      "DPI": "D-P-I",
+      "glTF": "G-L-T-F",
+      "JVM": "JVM",
+      "JIT": "JIT",
+      "AOT": "A-O-T",
+      "GC": "G-C",
+      "CI": "C-I",
+      "CSS": "CSS",
+      "iOS": "iOS",
+      "macOS": "macOS",
+      "tvOS": "tvOS",
+      "UWP": "U-W-P",
+      "NFC": "NFC",
+      "PCM": "PCM",
+      "RGBA": "RGBA",
+      "EDT": "EDT",
+      "SRT": "SRT",
+      "VTT": "VTT",
+      "AAC": "A-A-C",
+      "H264": "H two sixty four",
+      "HTML": "HTML",
+      "IDE": "I-D-E",
+      "JS": "JS",
+      "XML": "XML",
+      "JSON": "jay son",
+      "WYSIWYG": "wizzy wig",
+      "CodeEditor": "Code Editor",
+      "RichTextArea": "Rich Text Area",
+      "AbstractEditorComponent": "Abstract Editor Component",
+      "CodeMirror": "Code Mirror",
+      "VideoIO": "video I-O",
+      "WAVWriter": "wave writer",
+      "SVG": "SVG",
+      "SPI": "S-P-I",
+      "AnalyticsService": "Analytics Service",
+      "AnalyticsProvider": "Analytics Provider",
+      "AbstractAnalyticsProvider": "Abstract Analytics Provider",
+      "CodenameOneAnalyticsProvider": "Codename One Analytics Provider",
+      "RASP": "rasp",
+      "DeviceIntegrity": "Device Integrity",
+      "AppReview": "App Review",
+      "CarApplication": "Car Application",
+      "CarScreen": "Car Screen",
+      "CarTemplate": "Car Template",
+      "UiModeManager": "U-I Mode Manager",
+      "AndroidX": "Android X",
+      "CN.isTV()": "C-N is T-V",
+      "Display.isTV()": "Display is T-V",
+      "TARGET_OS_TV": "target O-S T-V",
+      "MapSurface": "Map Surface",
+      "MapView": "Map View",
+      "NativeMap": "Native Map",
+      "MapKit": "Map Kit",
+      "MapComponent": "Map Component",
+      "MapLibre": "Map Libre",
+      "GeneralPath": "General Path",
+      "ORM": "O-R-M",
+      "OAuth": "oh auth",
+      "OIDC": "O-I-D-C",
+      "gRPC": "G-R-P-C",
+      "GraphQL": "graph Q-L",
+      "Box2D": "box 2D",
+      "JDWP": "J-D-W-P",
+      "JUnit": "J unit",
+      "ParparVM": "par par V-M",
+      "Win32": "win thirty two",
+      "App Store Connect": "App Store Connect",
+      "cn1": "C-N one",
+      "mvn": "Maven",
+      "clang": "clang",
+      "2FA": "two F-A",
+      ".p8": "P eight",
+      ".glb": "G-L-B",
+      ".ipa": "I-P-A"
+    }
+  },
+  "scenes": [
+    {
+      "id": "short-hook",
+      "durationMs": 18000,
+      "narration": {
+        "text": "Why we moved the Codename One website from WordPress to Hugo and Cloudflare Pages, what improved, and how to use Giscus for discussions."
+      },
+      "actions": [
+        {
+          "type": "intro.show",
+          "id": "short-welcome",
+          "atMs": 0,
+          "durationMs": 1650,
+          "title": "Codename One",
+          "subtitle": "Moving from WordPress to Hugo + Cloudflare Pages",
+          "bounds": {
+            "x": 0.08,
+            "y": 0.18,
+            "width": 0.84,
+            "height": 0.58
+          }
+        },
+        {
+          "type": "bullets.show",
+          "id": "short-hook-points",
+          "atMs": 1500,
+          "durationMs": 2300,
+          "title": "The engineering tradeoffs in moving a large technical site from WordPress to Hugo and Cloudflare Pages",
+          "items": [
+            "Why We Made This Change",
+            "Faster Site and Faster Iteration"
+          ],
+          "bounds": {
+            "x": 0.07,
+            "y": 0.1,
+            "width": 0.86,
+            "height": 0.78
+          }
+        },
+        {
+          "type": "transition",
+          "target": "short-hook-points",
+          "atMs": 1500,
+          "durationMs": 550,
+          "effect": "wipe-up",
+          "easing": "ease-out"
+        },
+        {
+          "type": "layer.hide",
+          "target": "short-welcome",
+          "atMs": 2300
+        }
+      ]
+    },
+    {
+      "id": "short-problem",
+      "durationMs": 14500,
+      "narration": {
+        "text": "This removes a lot of manual overhead and lowers the risk of site breakage from plugin/theme drift."
+      },
+      "actions": [
+        {
+          "type": "bullets.show",
+          "id": "short-problem-bullets",
+          "atMs": 100,
+          "durationMs": 2700,
+          "title": "Why We Made This Change",
+          "items": [
+            "Faster Site and Faster Iteration",
+            "JavaDocs Are Better Now",
+            "New Light/Dark Mode Toggle"
+          ],
+          "bounds": {
+            "x": 0.025,
+            "y": 0.05,
+            "width": 0.95,
+            "height": 0.88
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.1,
+              "width": 0.86,
+              "height": 0.78
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "short-problem-bullets",
+          "atMs": 100,
+          "durationMs": 650,
+          "effects": {
+            "landscape": "wipe-left",
+            "portrait": "wipe-up"
+          },
+          "easing": "ease-out"
+        }
+      ]
+    },
+    {
+      "id": "short-mechanism",
+      "durationMs": 13000,
+      "narration": {
+        "text": "It also makes it practical for us to iterate on the website much more frequently."
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "short-mechanism-title",
+          "atMs": 0,
+          "text": "Faster Site and Faster Iteration",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.03,
+            "y": 0.025,
+            "width": 0.94,
+            "height": 0.14
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.035,
+              "width": 0.84,
+              "height": 0.16
+            }
+          }
+        },
+        {
+          "type": "diagram.show",
+          "id": "short-mechanism-diagram",
+          "atMs": 600,
+          "durationMs": 3200,
+          "texts": {
+            "landscape": "flowchart LR\nN0[Why We] --> N1[Faster Site]\nN1[Faster Site] --> N2[JavaDocs Now]",
+            "portrait": "flowchart TD\nN0[Why We] --> N1[Faster Site]\nN1[Faster Site] --> N2[JavaDocs Now]"
+          },
+          "bounds": {
+            "x": 0.025,
+            "y": 0.2,
+            "width": 0.95,
+            "height": 0.67
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.23,
+              "width": 0.86,
+              "height": 0.66
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "short-mechanism-diagram",
+          "atMs": 600,
+          "durationMs": 700,
+          "effect": "morph",
+          "easing": "ease-in-out"
+        }
+      ]
+    },
+    {
+      "id": "short-scope",
+      "durationMs": 26500,
+      "narration": {
+        "text": "They are now significantly better looking, easier to navigate, and much more searchable than before. This has been a long-standing pain point for many users (myself included), and the new setup makes this experience much better."
+      },
+      "actions": [
+        {
+          "type": "bullets.show",
+          "id": "short-scope-bullets",
+          "atMs": 100,
+          "durationMs": 2700,
+          "title": "What the developer gains",
+          "items": [
+            "JavaDocs Are Better Now",
+            "New Light/Dark Mode Toggle",
+            "Comments and Discussion: How Giscus Works"
+          ],
+          "bounds": {
+            "x": 0.025,
+            "y": 0.05,
+            "width": 0.95,
+            "height": 0.88
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.1,
+              "width": 0.86,
+              "height": 0.78
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "short-scope-bullets",
+          "atMs": 100,
+          "durationMs": 650,
+          "effects": {
+            "landscape": "wipe-left",
+            "portrait": "wipe-up"
+          },
+          "easing": "ease-out"
+        }
+      ]
+    },
+    {
+      "id": "short-outro",
+      "durationMs": 15000,
+      "narration": {
+        "text": "Tap the related video for the complete explanation and source links. Then comment with the mechanism you want unpacked next."
+      },
+      "actions": [
+        {
+          "type": "outro.show",
+          "id": "short-next",
+          "atMs": 0,
+          "durationMs": 1000,
+          "eyebrow": "CODENAME ONE · DEEP DIVE",
+          "title": "See the complete explanation",
+          "subtitle": "The related video carries the code, tradeoffs, and source links.",
+          "prompt": "Comment: Faster Site and Faster Iteration or JavaDocs Are Better Now?",
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        }
+      ]
+    }
+  ],
+  "editorial": {
+    "storyType": "visual-explainer",
+    "status": "blocked",
+    "proof": [
+      "automatic article template; requires story review"
+    ],
+    "humanBeat": "requires an article-specific human consequence",
+    "visualIdentity": "requires an article-specific recurring visual motif",
+    "bespokeVisualization": "requires a visualization authored for this article",
+    "heroJourney": {
+      "desire": "requires an article-specific desired outcome",
+      "problem": "requires an article-specific developer problem",
+      "difficulty": "requires concrete stakes and escalating difficulty",
+      "intervention": "requires a source-backed Codename One intervention",
+      "victory": "requires a proved developer transformation"
+    }
+  }
+}

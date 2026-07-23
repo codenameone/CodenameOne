@@ -1,0 +1,6 @@
+WorkRequest req = WorkRequest.builder("daily-sync", SyncWorker.class)
+    .setRequiresNetwork(true)
+    .setRequiresCharging(true)
+    .setPeriodic(6 * 60 * 60 * 1000L)
+    .build();
+BackgroundWork.schedule(req);

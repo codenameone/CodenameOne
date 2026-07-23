@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "id": "beating-hotspot-performance-short",
+  "title": "How an AOT Java VM closed a 4.21x gap",
+  "output": {
+    "frameRate": 30,
+    "landscapeWidth": 1920,
+    "landscapeHeight": 1080,
+    "portraitWidth": 1080,
+    "portraitHeight": 1920,
+    "videoBitRate": 8000000
+  },
+  "narration": {
+    "provider": "kokoro",
+    "voice": "af_heart:60,af_bella:40",
+    "language": "en-us",
+    "speed": 0.98,
+    "model": ".video-tools/kokoro/kokoro-v1.0.onnx",
+    "minimumGapMs": 220,
+    "pronunciations": {
+      "Codename One": "codename one",
+      "ParparVM": "par par V M",
+      "HotSpot": "hot spot",
+      "AOT": "ay oh tee",
+      "JIT": "jeet",
+      "clang": "C lang",
+      "GC": "G C"
+    }
+  },
+  "scenes": [
+    {
+      "id": "short-hook",
+      "durationMs": 16000,
+      "narration": {
+        "text": "ParparVM began four point two one times slower than warmed Java twenty five. The final ten benchmark geomean was one point zero. Not by removing Java's safety checks, but by changing the C beneath them."
+      },
+      "actions": [
+        {"type": "intro.show", "id": "short-welcome", "atMs": 0, "durationMs": 1500, "title": "Codename One", "subtitle": "An AOT VM closes a 4.21x gap", "bounds": {"x": 0.08, "y": 0.18, "width": 0.84, "height": 0.58}},
+        {"type": "bullets.show", "id": "short-thesis", "atMs": 1400, "durationMs": 2200, "title": "4.21x slower → 1.00x geomean", "items": ["Warmed Java 25", "Bit-identical output", "Six of ten at or ahead"], "bounds": {"x": 0.07, "y": 0.12, "width": 0.86, "height": 0.76}},
+        {"type": "transition", "target": "short-thesis", "atMs": 1400, "durationMs": 500, "effect": "wipe-up", "easing": "ease-out"},
+        {"type": "layer.hide", "target": "short-welcome", "atMs": 2100}
+      ]
+    },
+    {
+      "id": "short-proof",
+      "durationMs": 16000,
+      "narration": {
+        "text": "The harness alternated both runtimes on the same M two and rejected mismatched checksums. String building finished at point six seven. Recursion still lost at one point six. The average is parity, not universal victory."
+      },
+      "actions": [
+        {"type": "svg.show", "id": "short-benchmark", "atMs": 100, "path": "hotspot-bench-portrait.svg", "bounds": {"x": 0.06, "y": 0.06, "width": 0.88, "height": 0.88}},
+        {"type": "transition", "target": "short-benchmark", "atMs": 100, "durationMs": 650, "effect": "morph", "easing": "ease-in-out"}
+      ]
+    },
+    {
+      "id": "short-frameless",
+      "durationMs": 17000,
+      "narration": {
+        "text": "First, generated methods stopped publishing every local through a G C visible frame. Plain C locals let clang keep values in registers. Recursion improved from seven point six times slower to one point six."
+      },
+      "actions": [
+        {"type": "text.show", "id": "short-frame-title", "atMs": 0, "text": "Let clang see ordinary C", "uiid": "VideoTitle", "responsive": true, "maxLines": 2, "bounds": {"x": 0.08, "y": 0.02, "width": 0.84, "height": 0.10}},
+        {"type": "code.show", "id": "short-frame-code", "atMs": 0, "language": "c", "path": "hotspot-frameless.c.txt", "bounds": {"x": 0.05, "y": 0.13, "width": 0.90, "height": 0.43}},
+        {"type": "transition", "target": "short-frame-code", "atMs": 0, "durationMs": 500, "effect": "slide-up", "easing": "ease-out"},
+        {"type": "bullets.show", "id": "short-frame-notes", "atMs": 700, "durationMs": 1900, "title": "Frameless codegen", "items": ["C locals become registers", "No heap-visible frame", "7.6x → 1.6x recursion"], "bounds": {"x": 0.07, "y": 0.59, "width": 0.86, "height": 0.34}},
+        {"type": "focus.show", "id": "short-frame-focus", "target": "short-frame-code", "atMs": 3500, "relativeBounds": {"x": 0.03, "y": 0.08, "width": 0.94, "height": 0.30}, "label": "C locals, not tagged stack slots", "color": "50d8ff"}
+      ]
+    },
+    {
+      "id": "short-bounds",
+      "durationMs": 17000,
+      "narration": {
+        "text": "Second, a bounds failure used to return into the loop. That reachable call forced reloads on every pass. Making the failure path leave the method let clang hoist array metadata while preserving every check."
+      },
+      "actions": [
+        {"type": "text.show", "id": "short-bounds-title", "atMs": 0, "text": "The check was not the problem", "uiid": "VideoTitle", "responsive": true, "maxLines": 2, "bounds": {"x": 0.08, "y": 0.02, "width": 0.84, "height": 0.10}},
+        {"type": "code.show", "id": "short-bounds-code", "atMs": 0, "language": "c", "path": "hotspot-bounds.c.txt", "bounds": {"x": 0.05, "y": 0.13, "width": 0.90, "height": 0.43}},
+        {"type": "transition", "target": "short-bounds-code", "atMs": 0, "durationMs": 500, "effect": "fade", "easing": "ease-out"},
+        {"type": "bullets.show", "id": "short-bounds-notes", "atMs": 700, "durationMs": 1900, "title": "Control flow was the bug", "items": ["Failure now diverges", "Metadata leaves the loop", "Quicksort: 0.92x HotSpot"], "bounds": {"x": 0.07, "y": 0.59, "width": 0.86, "height": 0.34}},
+        {"type": "focus.show", "id": "short-bounds-focus", "target": "short-bounds-code", "atMs": 3600, "relativeBounds": {"x": 0.03, "y": 0.43, "width": 0.94, "height": 0.33}, "label": "Throw, then leave the method", "color": "ffc857"}
+      ]
+    },
+    {
+      "id": "short-memory",
+      "durationMs": 17000,
+      "narration": {
+        "text": "Third, the BiBOP heap replaced one malloc and tracking search per object with page-local pointer bumps. Peak allocation churn fell below Java twenty five, while the idle floor stayed at two point four megabytes."
+      },
+      "actions": [
+        {"type": "svg.show", "id": "short-memory-chart", "atMs": 100, "path": "hotspot-memory-portrait.svg", "bounds": {"x": 0.06, "y": 0.06, "width": 0.88, "height": 0.88}},
+        {"type": "transition", "target": "short-memory-chart", "atMs": 100, "durationMs": 700, "effect": "morph", "easing": "ease-in-out"}
+      ]
+    },
+    {
+      "id": "short-tagged",
+      "durationMs": 17000,
+      "narration": {
+        "text": "Finally, boxed integers became tagged pointer values on sixty-four-bit targets. Boxing allocates nothing, but Integer identity changes, so the build rejects synchronization on primitive wrappers instead of hiding the tradeoff."
+      },
+      "actions": [
+        {"type": "text.show", "id": "short-tagged-title", "atMs": 0, "text": "Boxing without allocation", "uiid": "VideoTitle", "responsive": true, "maxLines": 2, "bounds": {"x": 0.08, "y": 0.02, "width": 0.84, "height": 0.10}},
+        {"type": "code.show", "id": "short-tagged-code", "atMs": 0, "language": "c", "path": "hotspot-tagged-integer.c.txt", "bounds": {"x": 0.05, "y": 0.13, "width": 0.90, "height": 0.43}},
+        {"type": "transition", "target": "short-tagged-code", "atMs": 0, "durationMs": 500, "effect": "fade", "easing": "ease-out"},
+        {"type": "bullets.show", "id": "short-tagged-notes", "atMs": 700, "durationMs": 2100, "title": "Tagged Integer", "items": ["0.97x HotSpot", "No allocation", "Identity is the tradeoff"], "bounds": {"x": 0.07, "y": 0.59, "width": 0.86, "height": 0.34}},
+        {"type": "focus.show", "id": "short-tagged-focus", "target": "short-tagged-code", "atMs": 3600, "relativeBounds": {"x": 0.03, "y": 0.05, "width": 0.94, "height": 0.34}, "label": "Low bit: value or pointer", "color": "50d8ff"}
+      ]
+    },
+    {
+      "id": "short-result",
+      "durationMs": 16000,
+      "narration": {
+        "text": "This does not make an A O T VM universally faster than a JIT. It shows a narrower result: warmed-JVM throughput, direct native memory, and a two point four megabyte floor can coexist."
+      },
+      "actions": [
+        {"type": "bullets.show", "id": "short-result-points", "atMs": 100, "durationMs": 2500, "title": "Parity, with a client-VM tradeoff", "items": ["1.00x ten-test geomean", "2.4 MB idle floor", "Recursion still favors HotSpot"], "bounds": {"x": 0.07, "y": 0.12, "width": 0.86, "height": 0.76}},
+        {"type": "transition", "target": "short-result-points", "atMs": 100, "durationMs": 650, "effect": "zoom-in", "easing": "ease-out"}
+      ]
+    },
+    {
+      "id": "short-outro",
+      "durationMs": 12000,
+      "narration": {
+        "text": "Tap the related video for the full benchmark and methodology. Then comment with the mechanism you want us to unpack next."
+      },
+      "actions": [
+        {"type": "outro.show", "id": "short-next", "atMs": 0, "durationMs": 1000, "eyebrow": "CODENAME ONE · VM INTERNALS", "title": "See the complete benchmark", "subtitle": "Tap the related video for every result, caveat, and source link.", "prompt": "Comment: codegen, allocator, or tagged integers?", "bounds": {"x": 0, "y": 0, "width": 1, "height": 1}}
+      ]
+    }
+  ]
+}

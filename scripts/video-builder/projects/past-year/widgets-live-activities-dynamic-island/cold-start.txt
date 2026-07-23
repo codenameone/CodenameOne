@@ -1,0 +1,10 @@
+                .setDescription("A vector clock face")
+                .addSupportedSize(WidgetSize.SMALL));
+        // One handler receives every surface tap on the EDT -- including the tap that
+        // cold-started the app (queued until this registration, flagged isColdStart()).
+        Surfaces.setActionHandler(evt -> {
+            if ("open_order".equals(evt.getActionId())) {
+                showOrderForm(evt);
+            } else {
+                Dialog.show("Surface Action", "Action \"" + evt.getActionId() + "\" from "
+                        + evt.getSource() + "\nparams: " + evt.getParams()

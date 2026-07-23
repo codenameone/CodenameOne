@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "tailMs": 1500,
+  "landscape": {
+    "who-and-what": 14000,
+    "one-feature-two-worlds": 18000,
+    "the-simulator-problem": 13000,
+    "debugging-on-two-devices": 16500,
+    "simulation-is-an-environment": 16000,
+    "one-development-loop": 20000,
+    "run-the-same-ar-code": 28500,
+    "the-vr-side-runs-too": 18500,
+    "what-the-developer-gets-back": 18500,
+    "outro": 18000
+  },
+  "portrait": {
+    "short-who-and-what": 14000,
+    "short-one-feature-two-worlds": 18000,
+    "short-simulator-proof": 13000,
+    "short-debugging-proof": 16500,
+    "short-one-development-loop": 20000,
+    "short-running-ar": 28500,
+    "short-victory": 18500,
+    "short-outro": 18000
+  }
+}

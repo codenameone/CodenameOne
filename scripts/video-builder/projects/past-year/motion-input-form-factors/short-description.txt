@@ -1,0 +1,10 @@
+Two new core APIs expose the hardware modern apps actually see: motion sensors and gestures on one side, rich pointer detail, wheel events, stylus input, trackpads and foldable posture on the other.
+
+Full article:
+https://www.codenameone.com/blog/motion-input-form-factors/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Codename One Native Platforms & Device APIs
+
+#Java #CodenameOne #Shorts

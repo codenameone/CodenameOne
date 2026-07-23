@@ -1,0 +1,28 @@
+An OpenAPI 3.x client generator that turns a spec into typed Codename One code, a JPA-shaped SQLite ORM, JAXB-shaped JSON / XML mappers, build-time SVG and Lottie transcoders, plus a declarative router and deep-link API. All ride on the same build-time codegen pipeline.
+
+This video explains one build-time code-generation pipeline for openapi, orm, mapping, svg, and routing.
+
+Full article and source material:
+https://www.codenameone.com/blog/build-time-codegen/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://petstore3.swagger.io/api/v3/openapi.json</specUrl
+https://www.codenameone.com/developer-guide/#_appendix_goal_generate_openapi_client
+https://api.example.com/users/42
+https://api.example.com/users
+https://github.com/codenameone/CodenameOne/pull/5056
+https://github.com/codenameone/CodenameOne/issues
+
+Chapters
+00:00 Hook
+00:31 Problem
+00:52 Mechanism
+01:12 Source
+01:34 Tradeoffs
+01:56 Result
+02:27 Outro
+
+Which part should we unpack next?
+
+Series: Build, Test & Ship Codename One Apps — part 6 of 10
+
+#Java #CodenameOne

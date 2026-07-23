@@ -1,0 +1,11 @@
+CodeEditor editor = new CodeEditor();
+editor.setLanguage("java");
+editor.setTheme("dark");
+editor.setCompletionProvider((ed, code, cursor, results) -> {
+    List<CodeCompletion> out = new ArrayList<>();
+    out.add(new CodeCompletion("println", "println(String x)"));
+    results.onSucess(out);
+});
+
+RichTextArea rich = new RichTextArea();
+rich.setHtml("<p><b>Portable</b> editing</p>");
