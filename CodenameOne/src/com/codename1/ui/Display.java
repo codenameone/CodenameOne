@@ -535,6 +535,12 @@ public final class Display extends CN1Constants {
     /// Returns the SIMD API instance bound to the current implementation.
     public Simd getSimd() {
         if (simd == null) {
+            if (impl == null) {
+                // Runtime not yet initialized (e.g. plain unit tests): hand out
+                // the portable scalar fallback without caching it, so the real
+                // implementation's SIMD is still installed once init() runs.
+                return new Simd();
+            }
             Simd created = impl.createSimd();
             if (created == null) {
                 created = new Simd();

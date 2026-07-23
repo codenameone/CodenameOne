@@ -24,7 +24,7 @@ package com.codename1.impl.javase.bluetooth;
 
 import com.codename1.bluetooth.BluetoothUuid;
 import com.codename1.bluetooth.gatt.GattCharacteristic;
-/* fixture JSON codec is JavaSE-side (FixtureJson); core has no public JSON */
+import com.codename1.io.JSONWriter;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -48,11 +48,12 @@ import java.util.Map;
  * {@link FixtureScrambler} before they are written to disk, so committed
  * traces never carry real device identities.</p>
  *
- * <p>Serialization is plain JSON without external libraries:
- * {@link #toJson()} hand-rolls the writer (indented, deterministic field
- * order) and {@link #fromJson(InputStream)} parses with the core
- * {@code com.codename1.io.JSONParser} through {@link FixtureJson}. Format
- * (version {@value #FORMAT_VERSION}):</p>
+ * <p>Serialization uses the core JSON codec: {@link #toJson()} builds an
+ * ordered {@code Map}/{@code List} tree and hands it to
+ * {@code com.codename1.io.JSONWriter}, and {@link #fromJson(InputStream)}
+ * parses with the core {@code com.codename1.io.JSONParser} through
+ * {@link FixtureJson}. Field order is deterministic (backed by
+ * {@link LinkedHashMap}). Format (version {@value #FORMAT_VERSION}):</p>
  *
  * <pre>
  * {"version": 1,
@@ -275,136 +276,110 @@ public final class BluetoothFixture {
     // JSON writing
     // ------------------------------------------------------------------
 
-    /** Serializes the fixture as indented JSON (format sketched above). */
+    /**
+     * Serializes the fixture as JSON via the core
+     * {@code com.codename1.io.JSONWriter}, building an ordered
+     * {@code Map}/{@code List} tree (format sketched above).
+     */
     public String toJson() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("{\n");
-        sb.append("  \"version\": ").append(version);
+        Map<String, Object> root = new LinkedHashMap<String, Object>();
+        root.put("version", Integer.valueOf(version));
         if (platform != null) {
-            sb.append(",\n  \"platform\": \"")
-                    .append(FixtureJson.escape(platform)).append('"');
+            root.put("platform", platform);
         }
-        sb.append(",\n  \"devices\": [");
+        List<Object> deviceList = new ArrayList<Object>();
         int size = devices.size();
         for (int i = 0; i < size; i++) {
-            if (i > 0) {
-                sb.append(',');
-            }
-            sb.append('\n');
-            writeDevice(sb, devices.get(i));
+            deviceList.add(deviceToMap(devices.get(i)));
         }
-        sb.append(size == 0 ? "]\n" : "\n  ]\n").append("}\n");
-        return sb.toString();
+        root.put("devices", deviceList);
+        return JSONWriter.toJson(root);
     }
 
-    private static void writeDevice(StringBuilder sb, Device d) {
-        sb.append("    {\"id\": \"").append(FixtureJson.escape(d.id)).append('"');
+    private static Map<String, Object> deviceToMap(Device d) {
+        Map<String, Object> obj = new LinkedHashMap<String, Object>();
+        obj.put("id", d.id);
         if (d.name != null) {
-            sb.append(",\n     \"name\": \"").append(FixtureJson.escape(d.name))
-                    .append('"');
+            obj.put("name", d.name);
         }
-        sb.append(",\n     \"connectable\": ").append(d.connectable);
+        obj.put("connectable", Boolean.valueOf(d.connectable));
         if (d.txPower != null) {
-            sb.append(",\n     \"txPower\": ").append(d.txPower);
+            obj.put("txPower", d.txPower);
         }
-        sb.append(",\n     \"rssiTimeline\": [");
+        List<Object> timeline = new ArrayList<Object>();
         int size = d.rssiTimeline.size();
         for (int i = 0; i < size; i++) {
             RssiSample s = d.rssiTimeline.get(i);
-            if (i > 0) {
-                sb.append(", ");
-            }
-            sb.append("{\"relTimeMs\": ").append(s.relTimeMs)
-                    .append(", \"rssi\": ").append(s.rssi).append('}');
+            Map<String, Object> sample = new LinkedHashMap<String, Object>();
+            sample.put("relTimeMs", Long.valueOf(s.relTimeMs));
+            sample.put("rssi", Integer.valueOf(s.rssi));
+            timeline.add(sample);
         }
-        sb.append(']');
-        sb.append(",\n     \"serviceUuids\": [");
+        obj.put("rssiTimeline", timeline);
+        List<Object> uuids = new ArrayList<Object>();
         size = d.serviceUuids.size();
         for (int i = 0; i < size; i++) {
-            if (i > 0) {
-                sb.append(", ");
-            }
-            sb.append('"').append(d.serviceUuids.get(i)).append('"');
+            uuids.add(d.serviceUuids.get(i).toString());
         }
-        sb.append(']');
-        sb.append(",\n     \"manufacturerData\": {");
-        boolean first = true;
+        obj.put("serviceUuids", uuids);
+        Map<String, Object> manufacturer = new LinkedHashMap<String, Object>();
         for (Map.Entry<Integer, byte[]> e : d.manufacturerData.entrySet()) {
-            if (!first) {
-                sb.append(", ");
-            }
-            first = false;
-            sb.append('"').append(e.getKey()).append("\": \"")
-                    .append(FixtureJson.encodeBase64(e.getValue())).append('"');
+            manufacturer.put(String.valueOf(e.getKey()),
+                    FixtureJson.encodeBase64(e.getValue()));
         }
-        sb.append('}');
-        sb.append(",\n     \"serviceData\": {");
-        first = true;
+        obj.put("manufacturerData", manufacturer);
+        Map<String, Object> serviceData = new LinkedHashMap<String, Object>();
         for (Map.Entry<BluetoothUuid, byte[]> e : d.serviceData.entrySet()) {
-            if (!first) {
-                sb.append(", ");
-            }
-            first = false;
-            sb.append('"').append(e.getKey()).append("\": \"")
-                    .append(FixtureJson.encodeBase64(e.getValue())).append('"');
+            serviceData.put(e.getKey().toString(),
+                    FixtureJson.encodeBase64(e.getValue()));
         }
-        sb.append('}');
+        obj.put("serviceData", serviceData);
         if (!d.gatt.isEmpty()) {
-            sb.append(",\n     \"gatt\": [");
+            List<Object> gatt = new ArrayList<Object>();
             int gs = d.gatt.size();
             for (int i = 0; i < gs; i++) {
-                if (i > 0) {
-                    sb.append(',');
-                }
-                sb.append('\n');
-                writeService(sb, d.gatt.get(i));
+                gatt.add(serviceToMap(d.gatt.get(i)));
             }
-            sb.append("\n     ]");
+            obj.put("gatt", gatt);
         }
-        sb.append('}');
+        return obj;
     }
 
-    private static void writeService(StringBuilder sb, ServiceRecord s) {
-        sb.append("       {\"uuid\": \"").append(s.uuid)
-                .append("\", \"primary\": ").append(s.primary)
-                .append(", \"characteristics\": [");
+    private static Map<String, Object> serviceToMap(ServiceRecord s) {
+        Map<String, Object> obj = new LinkedHashMap<String, Object>();
+        obj.put("uuid", s.uuid.toString());
+        obj.put("primary", Boolean.valueOf(s.primary));
+        List<Object> chars = new ArrayList<Object>();
         int size = s.characteristics.size();
         for (int i = 0; i < size; i++) {
-            if (i > 0) {
-                sb.append(',');
-            }
-            sb.append('\n');
-            writeCharacteristic(sb, s.characteristics.get(i));
+            chars.add(characteristicToMap(s.characteristics.get(i)));
         }
-        sb.append("]}");
+        obj.put("characteristics", chars);
+        return obj;
     }
 
-    private static void writeCharacteristic(StringBuilder sb,
+    private static Map<String, Object> characteristicToMap(
             CharacteristicRecord c) {
-        sb.append("         {\"uuid\": \"").append(c.uuid)
-                .append("\", \"properties\": [");
+        Map<String, Object> obj = new LinkedHashMap<String, Object>();
+        obj.put("uuid", c.uuid.toString());
+        List<Object> props = new ArrayList<Object>();
         String[] names = propertyNames(c.properties);
         for (int i = 0; i < names.length; i++) {
-            if (i > 0) {
-                sb.append(", ");
-            }
-            sb.append('"').append(names[i]).append('"');
+            props.add(names[i]);
         }
-        sb.append(']');
+        obj.put("properties", props);
         if (c.value != null) {
-            sb.append(", \"value\": \"").append(FixtureJson.encodeBase64(c.value))
-                    .append('"');
+            obj.put("value", FixtureJson.encodeBase64(c.value));
         }
-        sb.append(", \"descriptors\": [");
+        List<Object> descriptors = new ArrayList<Object>();
         int size = c.descriptors.size();
         for (int i = 0; i < size; i++) {
-            if (i > 0) {
-                sb.append(", ");
-            }
-            sb.append("{\"uuid\": \"").append(c.descriptors.get(i).uuid)
-                    .append("\"}");
+            Map<String, Object> desc = new LinkedHashMap<String, Object>();
+            desc.put("uuid", c.descriptors.get(i).uuid.toString());
+            descriptors.add(desc);
         }
-        sb.append("]}");
+        obj.put("descriptors", descriptors);
+        return obj;
     }
 
     /**

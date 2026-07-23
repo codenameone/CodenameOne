@@ -24,21 +24,22 @@ package com.codename1.impl.javase.bluetooth;
 
 import com.codename1.bluetooth.gatt.GattCharacteristic;
 import com.codename1.io.JSONParser;
+import com.codename1.util.Base64;
 
 import java.io.IOException;
 import java.io.StringReader;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * JSON read/write helpers for the JavaSE simulator's Bluetooth fixture files
- * ({@link BluetoothFixture}). The persisted fixture format is JSON, so this
- * tooling needs a codec -- but it lives entirely on the (full-JDK) JavaSE
- * side, so it uses {@code java.util.Base64} and stays package-private. The
- * runtime BLE path in core has no JSON in its API.
+ * JSON read helpers for the JavaSE simulator's Bluetooth fixture files
+ * ({@link BluetoothFixture}). Parsing delegates to the core
+ * {@code com.codename1.io.JSONParser} and Base64 payloads to the core
+ * {@code com.codename1.util.Base64}; the helpers here are just typed reads
+ * over the parsed map. Package-private -- the runtime BLE path in core has
+ * no JSON in its API.
  */
 final class FixtureJson {
 
@@ -50,41 +51,6 @@ final class FixtureJson {
         parser.setUseLongsInstance(true);
         parser.setUseBooleanInstance(true);
         return parser.parseJSON(new StringReader(text));
-    }
-
-    static String escape(String s) {
-        if (s == null) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder(s.length());
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            switch (c) {
-                case '"':
-                    sb.append("\\\"");
-                    break;
-                case '\\':
-                    sb.append("\\\\");
-                    break;
-                case '\n':
-                    sb.append("\\n");
-                    break;
-                case '\r':
-                    sb.append("\\r");
-                    break;
-                case '\t':
-                    sb.append("\\t");
-                    break;
-                default:
-                    if (c < 0x20) {
-                        String t = "000" + Integer.toHexString(c);
-                        sb.append("\\u").append(t.substring(t.length() - 4));
-                    } else {
-                        sb.append(c);
-                    }
-            }
-        }
-        return sb.toString();
     }
 
     static String str(Map<String, Object> m, String key, String def) {
@@ -135,18 +101,12 @@ final class FixtureJson {
 
     static String encodeBase64(byte[] data) {
         return data == null || data.length == 0 ? ""
-                : Base64.getEncoder().encodeToString(data);
+                : Base64.encodeNoNewline(data);
     }
 
     static byte[] decodeBase64(String s) {
-        if (s == null || s.length() == 0) {
-            return new byte[0];
-        }
-        try {
-            return Base64.getDecoder().decode(s);
-        } catch (IllegalArgumentException ex) {
-            return new byte[0];
-        }
+        return s == null || s.length() == 0 ? new byte[0]
+                : Base64.decode(s.getBytes());
     }
 
     /** Maps fixture characteristic-property names onto GattCharacteristic bits. */

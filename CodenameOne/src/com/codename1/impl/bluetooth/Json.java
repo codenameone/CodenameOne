@@ -23,6 +23,7 @@
 package com.codename1.impl.bluetooth;
 
 import com.codename1.io.JSONParser;
+import com.codename1.util.Base64;
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -31,12 +32,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/// Internal event decoder for the in-process native BLE engine
-/// (`libcn1ble`). The engine's commands are typed native calls, so nothing is
-/// serialized on the way out; only inbound events arrive as one JSON object
-/// per {@link NativeBleBridge#pollEvent}, with Base64-encoded
-/// characteristic/descriptor payloads decoded here. Package-private -- it is
-/// not part of any API.
+/// Internal decoder for the inbound events of the in-process native BLE engine
+/// (`libcn1ble`) -- one JSON object per {@link NativeBleBridge#pollEvent}. The
+/// engine's commands are typed native calls, so nothing is serialized on the
+/// way out. This is not a JSON implementation: parsing is the core
+/// {@link JSONParser} and Base64 payloads use the core {@link Base64}; the
+/// helpers here are just typed reads over the parsed event map.
+/// Package-private -- not part of any API.
 final class Json {
 
     private Json() {
@@ -97,92 +99,16 @@ final class Json {
                 : new HashMap<String, Object>();
     }
 
-    // Standard Base64 (RFC 4648) is hand-rolled rather than using
-    // java.util.Base64: this class is translated by ParparVM for the native
-    // ports and java.util.Base64 is not part of the device API surface. Pure
-    // array arithmetic, so it runs identically on the JVM and on-device.
-    private static final char[] B64 =
-            ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
-                    .toCharArray();
-
+    /// Standard-Base64 encode of a characteristic/descriptor value, delegating
+    /// to the core {@link Base64} (device-safe; not {@code java.util.Base64}).
     static String encodeBase64(byte[] data) {
-        if (data == null || data.length == 0) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder((data.length + 2) / 3 * 4);
-        int i = 0;
-        while (i + 3 <= data.length) {
-            int n = ((data[i] & 0xFF) << 16) | ((data[i + 1] & 0xFF) << 8)
-                    | (data[i + 2] & 0xFF);
-            sb.append(B64[(n >> 18) & 0x3F]).append(B64[(n >> 12) & 0x3F])
-                    .append(B64[(n >> 6) & 0x3F]).append(B64[n & 0x3F]);
-            i += 3;
-        }
-        int rem = data.length - i;
-        if (rem == 1) {
-            int n = (data[i] & 0xFF) << 16;
-            sb.append(B64[(n >> 18) & 0x3F]).append(B64[(n >> 12) & 0x3F])
-                    .append("==");
-        } else if (rem == 2) {
-            int n = ((data[i] & 0xFF) << 16) | ((data[i + 1] & 0xFF) << 8);
-            sb.append(B64[(n >> 18) & 0x3F]).append(B64[(n >> 12) & 0x3F])
-                    .append(B64[(n >> 6) & 0x3F]).append('=');
-        }
-        return sb.toString();
+        return data == null || data.length == 0 ? ""
+                : Base64.encodeNoNewline(data);
     }
 
+    /// Standard-Base64 decode via the core {@link Base64}.
     static byte[] decodeBase64(String s) {
-        if (s == null || s.length() == 0) {
-            return new byte[0];
-        }
-        int symbols = 0;
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c == '=') {
-                break;
-            }
-            if (b64Value(c) >= 0) {
-                symbols++;
-            }
-        }
-        byte[] out = new byte[symbols * 6 / 8];
-        int acc = 0;
-        int bits = 0;
-        int o = 0;
-        for (int i = 0; i < s.length(); i++) {
-            int v = b64Value(s.charAt(i));
-            if (v < 0) {
-                continue;
-            }
-            acc = (acc << 6) | v;
-            bits += 6;
-            if (bits >= 8) {
-                bits -= 8;
-                out[o++] = (byte) ((acc >> bits) & 0xFF);
-                if (o >= out.length) {
-                    break;
-                }
-            }
-        }
-        return out;
-    }
-
-    private static int b64Value(char c) {
-        if (c >= 'A' && c <= 'Z') {
-            return c - 'A';
-        }
-        if (c >= 'a' && c <= 'z') {
-            return c - 'a' + 26;
-        }
-        if (c >= '0' && c <= '9') {
-            return c - '0' + 52;
-        }
-        if (c == '+') {
-            return 62;
-        }
-        if (c == '/') {
-            return 63;
-        }
-        return -1;
+        return s == null || s.length() == 0 ? new byte[0]
+                : Base64.decode(s.getBytes());
     }
 }
