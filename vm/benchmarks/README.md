@@ -122,6 +122,15 @@ The fresh-page-stack grace scheme this audit was written against reported
 `gcAllocedSinceSweep`-pruned registry walk reports zero doomed across the
 suite. `StormAB` (sustained single-thread storm) and `LoadLoop` (repeated
 dictionary build/drop) are the matching wall-time/RSS A/B drivers.
+`LargeArrayLoad` models the FINAL issue-5425 Dtest shape -- a persistent
+small-object survivor set plus a retained LARGE (>CN1_BIBOP_MAX_OBJECT,
+legacy-path) byte[] phase that produces no garbage -- and guards the
+legacy-allocation GC-trigger storm (its CI twin is
+`LargeArrayGcIntegrationTest` in `vm/tests`). Run it with
+`CN1_GC_LOG_CYCLES=1` and count `[GC-CYCLE]` stderr lines: collection must be
+volume-driven (~6 cycles on this workload), not re-armed at wall-clock
+cadence by the pre-BiBOP 1MB high-frequency threshold (15 cycles when
+regressed).
 
 `ClinitThrow` is a standalone liveness reproducer (not byte-identical to the
 host JVM by design — ParparVM's initialization-failure semantics differ): a
