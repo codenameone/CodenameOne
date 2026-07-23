@@ -228,7 +228,7 @@ API_AVAILABLE(ios(16.0))
 static id g_cn1WebAuthnCurrentDelegate = nil;
 static id g_cn1WebAuthnCurrentController = nil;
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_webauthnSupported__(
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_webauthnSupported___R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     if (@available(iOS 16.0, *)) {
         return NSClassFromString(@"ASAuthorizationPlatformPublicKeyCredentialProvider") != nil
@@ -252,7 +252,7 @@ static NSDictionary *cn1WebAuthnParse(NSString *jsonStr) {
     return [obj isKindOfClass:[NSDictionary class]] ? (NSDictionary *)obj : nil;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_webauthnCreate___java_lang_String(
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_webauthnCreate___java_lang_String_R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT optionsJsonObj) {
     if (@available(iOS 16.0, *)) {
         // fall through
@@ -345,7 +345,7 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_webauthnCreate___java_lang_String(
     return fromNSString(CN1_THREAD_GET_STATE_PASS_ARG finalResult);
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_webauthnGet___java_lang_String(
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_webauthnGet___java_lang_String_R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT optionsJsonObj) {
     if (@available(iOS 16.0, *)) {
         // fall through
@@ -450,17 +450,17 @@ JAVA_OBJECT com_codename1_impl_ios_IOSNative_webauthnGet___java_lang_String(
 // WebAuthnNativeImpl and these natives are unreachable. ParparVM still needs
 // the symbols to satisfy the native-method declarations on IOSNative.java.
 
-JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_webauthnSupported__(
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_webauthnSupported___R_boolean(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me) {
     return JAVA_FALSE;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_webauthnCreate___java_lang_String(
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_webauthnCreate___java_lang_String_R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT optionsJsonObj) {
     return JAVA_NULL;
 }
 
-JAVA_OBJECT com_codename1_impl_ios_IOSNative_webauthnGet___java_lang_String(
+JAVA_OBJECT com_codename1_impl_ios_IOSNative_webauthnGet___java_lang_String_R_java_lang_String(
         CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT me, JAVA_OBJECT optionsJsonObj) {
     return JAVA_NULL;
 }

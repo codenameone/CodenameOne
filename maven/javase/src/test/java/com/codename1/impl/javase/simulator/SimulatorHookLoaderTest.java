@@ -259,11 +259,22 @@ class SimulatorHookLoaderTest {
      * Classloader whose only "extra" root is the temp dir, so
      * {@code getResources("META-INF/codenameone/simulator-hooks.properties")}
      * sees exactly the fixture and the fixture class is resolvable via parent
-     * delegation. Avoids polluting the surrounding test classpath with a
-     * resource that other tests would also discover.
+     * delegation. The parent hides the hooks resource the JavaSE port itself
+     * ships (the Bluetooth menu's file lands on the test classpath via
+     * target/classes) -- these tests assert exact hook counts and must see
+     * only the fixture.
      */
     private static ClassLoader classloaderFor(Path tempDir) throws Exception {
         URL url = tempDir.toUri().toURL();
-        return new URLClassLoader(new URL[]{url}, SimulatorHookLoaderTest.class.getClassLoader());
+        ClassLoader hidingParent = new ClassLoader(SimulatorHookLoaderTest.class.getClassLoader()) {
+            @Override
+            public java.util.Enumeration<URL> getResources(String name) throws java.io.IOException {
+                if ("META-INF/codenameone/simulator-hooks.properties".equals(name)) {
+                    return java.util.Collections.emptyEnumeration();
+                }
+                return super.getResources(name);
+            }
+        };
+        return new URLClassLoader(new URL[]{url}, hidingParent);
     }
 }

@@ -920,6 +920,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     static LocationSimulation locSimulation;
     static MotionSimulation motionSimulation;
     static ARSimulation arSimulation;
+    static BluetoothSimulation bluetoothSimulation;
     private JavaSEMotionSensorManager motionSensorManager;
     static PushSimulator pushSimulation;
     private static boolean blockMonitors;
@@ -6377,6 +6378,18 @@ public class JavaSEPort extends CodenameOneImplementation {
         });
         simulateMenu.add(locationSim);
 
+        JMenuItem bluetoothSim = new JMenuItem("Bluetooth Simulation");
+        bluetoothSim.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                if(bluetoothSimulation == null) {
+                        bluetoothSimulation = new BluetoothSimulation();
+                }
+                bluetoothSimulation.setVisible(true);
+            }
+        });
+        simulateMenu.add(bluetoothSim);
+
         JMenuItem motionSim = new JMenuItem("Motion / Gesture Simulation");
         motionSim.addActionListener(new ActionListener() {
             @Override
@@ -7008,6 +7021,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         simulateMenu.add(appArg);
         simulateMenu.addSeparator();
         simulateMenu.add(locationSim);
+        simulateMenu.add(bluetoothSim);
         simulateMenu.add(motionSim);
         simulateMenu.add(pushSim);
         simulateMenu.add(biometricMenu);
@@ -14820,6 +14834,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private JavaSEBiometrics biometrics;
     private JavaSESecureStorage secureStorage;
     private JavaSENfc nfc;
+    private com.codename1.bluetooth.Bluetooth bluetooth;
     private boolean biometricsBuildHintsInstalled;
     private boolean nfcBuildHintsInstalled;
 
@@ -14848,6 +14863,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             nfc = new JavaSENfc();
         }
         return nfc;
+    }
+
+    @Override
+    public com.codename1.bluetooth.Bluetooth getBluetooth() {
+        if (bluetooth == null) {
+            bluetooth = new com.codename1.impl.javase.bluetooth.JavaSEBluetooth();
+        }
+        return bluetooth;
     }
 
     /**

@@ -617,3 +617,17 @@ stdio
 JSON-RPC
 subprocess
 Codex
+
+# Bluetooth chapter terms (Bluetooth.asciidoc). The all-caps and
+# digit-containing generic shapes above already cover GATT, CCCD, MTU,
+# PSM, SPP, RSSI, RFCOMM, BLE and L2CAP; the entries below are the
+# remaining proper nouns and technical adjectives.
+# The Rust BLE library that powers the simulator's native backend.
+btleplug
+# The Linux Bluetooth stack (trailing single capital defeats the
+# PascalCase shape).
+BlueZ
+[Ss]criptable
+# Canonical 36 character Bluetooth UUID form, in case one appears
+# outside a code span (0000180d-0000-1000-8000-00805f9b34fb).
+[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}

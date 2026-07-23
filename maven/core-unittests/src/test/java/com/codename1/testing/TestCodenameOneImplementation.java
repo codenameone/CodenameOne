@@ -146,6 +146,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private boolean callDetectionSupported;
     private boolean inCall;
     private LocationManager locationManager;
+    private com.codename1.bluetooth.Bluetooth bluetooth;
     private L10NManager localizationManager;
     private ImageIO imageIO;
     private VideoIO videoIO;
@@ -1253,6 +1254,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         mediaRecorderHandler = null;
         mediaRecorderBuilderHandler = null;
         locationManager = null;
+        bluetooth = null;
         localizationManager = null;
         imageIO = null;
         inAppPurchase = null;
@@ -1397,6 +1399,25 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void setLocationManager(LocationManager locationManager) {
         this.locationManager = locationManager;
+    }
+
+    /**
+     * Returns the scripted Bluetooth entry point installed via
+     * {@link #setBluetooth(com.codename1.bluetooth.Bluetooth)}. Defaults to
+     * {@code null} so {@code Bluetooth.getInstance()} falls back to the
+     * no-op base instance, mirroring ports without Bluetooth support.
+     */
+    @Override
+    public com.codename1.bluetooth.Bluetooth getBluetooth() {
+        return bluetooth;
+    }
+
+    /**
+     * Scripts the Bluetooth stack returned by {@link #getBluetooth()};
+     * cleared back to {@code null} by {@link #reset()}.
+     */
+    public void setBluetooth(com.codename1.bluetooth.Bluetooth bluetooth) {
+        this.bluetooth = bluetooth;
     }
 
     public void setLocalizationManager(L10NManager localizationManager) {

@@ -7714,6 +7714,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private AndroidBiometrics biometrics;
     private AndroidSecureStorage secureStorage;
     private AndroidNfc nfc;
+    private AndroidBluetooth bluetooth;
 
     @Override
     public com.codename1.security.Biometrics getBiometrics() {
@@ -7737,6 +7738,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             nfc = new AndroidNfc(this);
         }
         return nfc;
+    }
+
+    @Override
+    public com.codename1.bluetooth.Bluetooth getBluetooth() {
+        if (bluetooth == null) {
+            bluetooth = new AndroidBluetooth();
+        }
+        return bluetooth;
     }
 
     /**

@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     ant \
     maven \
     libncurses6 \
+    libdbus-1-3 \
     sudo \
     openjdk-17-jdk \
     openjdk-21-jdk \

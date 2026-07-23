@@ -116,6 +116,20 @@ jobs:
           rm -rf maven/target/cn1-binaries
           mkdir -p maven/target
           cp -r /opt/cn1-binaries maven/target/cn1-binaries
+          # The container bakes a cn1-binaries snapshot at image-build time, so
+          # recently added native libraries lag until the image is rebuilt.
+          # Overlay a fresh ble/ from master (a small sparse/partial clone) so
+          # libcn1ble -- required by the JavaSE native-engine integration tests
+          # -- is present. Best-effort: a network hiccup leaves the baked copy.
+          rm -rf /tmp/cn1bin-ble
+          if git clone --no-checkout --depth 1 --filter=blob:none \
+                https://github.com/codenameone/cn1-binaries /tmp/cn1bin-ble \
+              && git -C /tmp/cn1bin-ble sparse-checkout set ble \
+              && git -C /tmp/cn1bin-ble checkout \
+              && [ -d /tmp/cn1bin-ble/ble ]; then
+            rm -rf maven/target/cn1-binaries/ble
+            cp -r /tmp/cn1bin-ble/ble maven/target/cn1-binaries/ble
+          fi
       - name: Run Maven plugin tests
         if: ${{ matrix.java-version == 8 }}
         working-directory: maven
@@ -127,6 +141,14 @@ jobs:
             -Dcodename1.platform=javase \
             -Dcn1.binaries="${CN1_BINARIES}" \
             -pl codenameone-maven-plugin -am -Plocal-dev-javase test
+      - name: Install native BLE runtime dependency (libdbus)
+        if: ${{ matrix.java-version == 8 }}
+        # libcn1ble.so (the JavaSE native Bluetooth backend) links libdbus-1
+        # for BlueZ, so it must be present for the native-engine integration
+        # tests to load the library. Also baked into the pr-ci-container image
+        # (.ci/container/Dockerfile); this step covers running against the
+        # previously published container before the rebuild propagates.
+        run: apt-get update -qq && apt-get install -y -qq libdbus-1-3
       - name: Run JavaSE port unit tests
         if: ${{ matrix.java-version == 8 }}
         # Surface regressions in the simulator-side helpers (CSSWatcher
