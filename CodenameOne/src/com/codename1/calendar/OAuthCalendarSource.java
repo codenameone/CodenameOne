@@ -167,11 +167,7 @@ public abstract class OAuthCalendarSource extends CalendarSource {
     private CalendarException httpError(CalendarHttpResponse response) {
         int code = response.getStatusCode();
         CalendarError type = code == 401 ? CalendarError.AUTHENTICATION_REQUIRED : code == 403 ? CalendarError.PERMISSION_DENIED : code == 404 ? CalendarError.NOT_FOUND : code == 409 || code == 412 ? CalendarError.CONFLICT : code == 429 ? CalendarError.RATE_LIMITED : code >= 500 ? CalendarError.NETWORK : CalendarError.INVALID_ARGUMENT;
-        String message = "Calendar provider returned HTTP " + code;
-        if (response.getBody() != null && response.getBody().length() > 0) {
-            message += ": " + response.getBody();
-        }
-        return new CalendarException(type, message, code, null);
+        return new CalendarException(type, "Calendar provider returned HTTP " + code, code, null);
     }
 
     private CalendarException authentication(Throwable error) {

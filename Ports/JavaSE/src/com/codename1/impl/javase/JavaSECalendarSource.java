@@ -28,6 +28,7 @@ import com.codename1.calendar.CalendarAuthorizationStatus;
 import com.codename1.calendar.CalendarCapabilities;
 import com.codename1.calendar.CalendarCapability;
 import com.codename1.calendar.CalendarChange;
+import com.codename1.calendar.CalendarDateTime;
 import com.codename1.calendar.CalendarEvent;
 import com.codename1.calendar.CalendarInfo;
 import com.codename1.calendar.CalendarMutationScope;
@@ -38,6 +39,8 @@ import com.codename1.calendar.FreeBusyInterval;
 import com.codename1.calendar.LocalCalendarSource;
 import com.codename1.util.AsyncResource;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -92,13 +95,18 @@ final class JavaSECalendarSource extends LocalCalendarSource {
         List<CalendarEvent> out = new ArrayList<CalendarEvent>();
         for (CalendarEvent e : events.values()) {
             if (query != null && query.getCalendarId() != null && !query.getCalendarId().equals(e.getCalendarId())) continue;
-            if (query != null && query.getStartTime() != null && e.getEnd() != null && !e.getEnd().isAllDay()
-                    && e.getEnd().getDateTime().toInstant().compareTo(query.getStartTime()) < 0) continue;
-            if (query != null && query.getEndTime() != null && e.getStart() != null && !e.getStart().isAllDay()
-                    && e.getStart().getDateTime().toInstant().compareTo(query.getEndTime()) > 0) continue;
+            if (query != null && query.getStartTime() != null && e.getEnd() != null
+                    && instant(e.getEnd()).compareTo(query.getStartTime()) < 0) continue;
+            if (query != null && query.getEndTime() != null && e.getStart() != null
+                    && instant(e.getStart()).compareTo(query.getEndTime()) > 0) continue;
             out.add(e);
         }
         return completed(new CalendarPage<CalendarEvent>(out, null, String.valueOf(nextId)));
+    }
+    private static Instant instant(CalendarDateTime value) {
+        return value.isAllDay()
+                ? ZonedDateTime.of(value.getDate().atTime(0, 0), ZoneOffset.UTC).toInstant()
+                : value.getDateTime().toInstant();
     }
     public synchronized AsyncResource<CalendarEvent> getEvent(String calendarId, String id) { return completed(events.get(id)); }
     public synchronized AsyncResource<CalendarEvent> saveEvent(CalendarEvent event, CalendarMutationScope scope) {

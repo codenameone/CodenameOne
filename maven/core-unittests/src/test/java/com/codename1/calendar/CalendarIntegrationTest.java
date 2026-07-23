@@ -127,6 +127,19 @@ class CalendarIntegrationTest {
     }
 
     @Test
+    void providerHttpErrorsDoNotExposeResponseBodies() {
+        RecordingTransport transport = new RecordingTransport();
+        transport.add(400, "{\"error\":\"private-user-data\"}", null);
+        GoogleCalendarSource source = new GoogleCalendarSource(new RecordingTokens(), transport);
+
+        AsyncResource.AsyncExecutionException error = assertThrows(AsyncResource.AsyncExecutionException.class,
+                () -> source.queryEvents(new CalendarQuery().setCalendarId("primary")).get());
+
+        assertTrue(error.getCause() instanceof CalendarException);
+        assertEquals("Calendar provider returned HTTP 400", error.getCause().getMessage());
+    }
+
+    @Test
     void microsoftSourceReturnsDeltaLinkAndPortableRecurrence() {
         RecordingTokens tokens=new RecordingTokens();
         RecordingTransport transport=new RecordingTransport();
@@ -187,6 +200,14 @@ class CalendarIntegrationTest {
                 () -> engine.queueTaskSave(null, CalendarMutationScope.ALL));
         assertThrows(IllegalArgumentException.class,
                 () -> engine.queueTaskSave(new CalendarTask(), CalendarMutationScope.ALL));
+        assertThrows(IllegalArgumentException.class,
+                () -> engine.queueEventDelete(null, "event", null, CalendarMutationScope.ALL));
+        assertThrows(IllegalArgumentException.class,
+                () -> engine.queueEventDelete("work", null, null, CalendarMutationScope.ALL));
+        assertThrows(IllegalArgumentException.class,
+                () -> engine.queueTaskDelete(null, "task", null, CalendarMutationScope.ALL));
+        assertThrows(IllegalArgumentException.class,
+                () -> engine.queueTaskDelete("work", null, null, CalendarMutationScope.ALL));
         engine.queueEventSave(new CalendarEvent().setCalendarId("work").setTitle("Offline"),CalendarMutationScope.ALL);
         assertEquals(0,source.saved);
         assertEquals(1,engine.getPendingCount());

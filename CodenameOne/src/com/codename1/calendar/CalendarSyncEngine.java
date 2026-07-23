@@ -68,6 +68,12 @@ public final class CalendarSyncEngine {
     }
 
     public synchronized String queueEventDelete(String calendarId, String eventId, String version, CalendarMutationScope scope) throws CalendarException {
+        if (calendarId == null) {
+            throw new IllegalArgumentException("calendarId required");
+        }
+        if (eventId == null) {
+            throw new IllegalArgumentException("eventId required");
+        }
         return queue("deleteEvent", calendarId, eventId, version, null, scope);
     }
 
@@ -82,6 +88,12 @@ public final class CalendarSyncEngine {
     }
 
     public synchronized String queueTaskDelete(String calendarId, String taskId, String version, CalendarMutationScope scope) throws CalendarException {
+        if (calendarId == null) {
+            throw new IllegalArgumentException("calendarId required");
+        }
+        if (taskId == null) {
+            throw new IllegalArgumentException("taskId required");
+        }
         return queue("deleteTask", calendarId, taskId, version, null, scope);
     }
 

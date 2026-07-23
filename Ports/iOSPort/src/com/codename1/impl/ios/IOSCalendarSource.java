@@ -26,6 +26,7 @@ import com.codename1.calendar.*;
 import com.codename1.io.JSONParser;
 import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -66,17 +67,32 @@ final class IOSCalendarSource extends LocalCalendarSource {
         }
         try {
             Map<String, Object> result = parse(nativeInstance.calendarEvent(calendarId, id));
-            return s(result, "id") == null
-                    ? failed(CalendarError.NOT_FOUND, "Event not found") : value(event(result));
+            if (s(result, "id") == null) {
+                return failed(CalendarError.NOT_FOUND, "Event not found");
+            }
+            return value(event(result));
         } catch (Exception ex) {
             return failure(ex);
         }
     }
     public AsyncResource<CalendarEvent>saveEvent(CalendarEvent event,CalendarMutationScope scope){try{Map<String,Object>m=new HashMap<String,Object>();m.put("id",event.getId());m.put("calendarId",event.getCalendarId());m.put("title",event.getTitle());m.put("notes",event.getDescription());m.put("location",event.getLocation());putDate(m,"start",event.getStart());putDate(m,"end",event.getEnd());m.put("allDay",Boolean.valueOf(event.getStart()!=null&&event.getStart().isAllDay()));List<Map<String,Object>>alarms=new ArrayList<Map<String,Object>>();for(CalendarAlarm alarm:event.getAlarms()){Map<String,Object>a=new HashMap<String,Object>();a.put("minutes",alarm.getTimeBefore()==null?null:Long.valueOf(alarm.getTimeBefore().getSeconds()/60L));a.put("absolute",alarm.getAbsoluteTime()==null?null:Long.valueOf(alarm.getAbsoluteTime().toEpochMilli()));alarms.add(a);}m.put("alarms",alarms);boolean create=event.getId()==null;Map<String,Object>saved=parseResult(nativeInstance.calendarSaveEvent(JSONParser.toJson(m),scope==null?0:scope.ordinal()));CalendarEvent result=event(saved);fireChange(new CalendarChange(getId(),result.getCalendarId(),result.getId(),CalendarChange.EntityType.EVENT,create?CalendarChange.ChangeType.CREATED:CalendarChange.ChangeType.UPDATED));return value(result);}catch(IOException ex){return failure(ex);}catch(CalendarException ex){return failure(ex);}}
     public AsyncResource<Boolean>deleteEvent(String calendarId,String eventId,CalendarMutationScope scope,String version){boolean deleted=nativeInstance.calendarDeleteEvent(eventId,scope==null?0:scope.ordinal());if(deleted)fireChange(new CalendarChange(getId(),calendarId,eventId,CalendarChange.EntityType.EVENT,CalendarChange.ChangeType.DELETED));return value(Boolean.valueOf(deleted));}
-    public AsyncResource<List<FreeBusyInterval>>queryFreeBusy(List<String>ids,Instant start,Instant end){List<FreeBusyInterval>out=new ArrayList<FreeBusyInterval>();for(CalendarEvent event:queryEvents(new CalendarQuery().setStartTime(start).setEndTime(end)).get().getItems())if(event.getAvailability()!=CalendarEvent.Availability.FREE&&!event.getStart().isAllDay())out.add(new FreeBusyInterval(event.getStart().getDateTime().toInstant(),event.getEnd().getDateTime().toInstant(),event.getAvailability()));return value(out);}
+    public AsyncResource<List<FreeBusyInterval>>queryFreeBusy(List<String>ids,Instant start,Instant end){
+        final AsyncResource<List<FreeBusyInterval>>out=new AsyncResource<List<FreeBusyInterval>>();
+        queryEvents(new CalendarQuery().setStartTime(start).setEndTime(end)).ready(new SuccessCallback<CalendarPage<CalendarEvent>>(){
+            public void onSucess(CalendarPage<CalendarEvent>page){List<FreeBusyInterval>items=new ArrayList<FreeBusyInterval>();for(CalendarEvent event:page.getItems())if(event.getAvailability()!=CalendarEvent.Availability.FREE&&event.getStart()!=null&&event.getEnd()!=null&&!event.getStart().isAllDay())items.add(new FreeBusyInterval(event.getStart().getDateTime().toInstant(),event.getEnd().getDateTime().toInstant(),event.getAvailability()));out.complete(items);}
+        }).except(new SuccessCallback<Throwable>(){public void onSucess(Throwable error){out.error(error);}});
+        return out;
+    }
     public AsyncResource<CalendarPage<CalendarTask>>queryTasks(CalendarQuery query){try{List<CalendarTask>out=new ArrayList<CalendarTask>();for(Map<String,Object>m:items(nativeInstance.calendarTasks(query==null?null:query.getCalendarId())))out.add(task(m));return value(new CalendarPage<CalendarTask>(out,null,String.valueOf(System.currentTimeMillis())));}catch(Exception ex){return failure(ex);}}
-    public AsyncResource<CalendarTask>getTask(String calendarId,String id){for(CalendarTask task:queryTasks(new CalendarQuery().setCalendarId(calendarId)).get().getItems())if(id.equals(task.getId()))return value(task);return failed(CalendarError.NOT_FOUND,"Task not found");}
+    public AsyncResource<CalendarTask>getTask(String calendarId,final String id){
+        if(id==null)return failed(CalendarError.INVALID_ARGUMENT,"taskId required");
+        final AsyncResource<CalendarTask>out=new AsyncResource<CalendarTask>();
+        queryTasks(new CalendarQuery().setCalendarId(calendarId)).ready(new SuccessCallback<CalendarPage<CalendarTask>>(){
+            public void onSucess(CalendarPage<CalendarTask>page){for(CalendarTask task:page.getItems())if(id.equals(task.getId())){out.complete(task);return;}out.error(new CalendarException(CalendarError.NOT_FOUND,"Task not found"));}
+        }).except(new SuccessCallback<Throwable>(){public void onSucess(Throwable error){out.error(error);}});
+        return out;
+    }
     public AsyncResource<CalendarTask>saveTask(CalendarTask task,CalendarMutationScope scope){try{Map<String,Object>m=new HashMap<String,Object>();m.put("id",task.getId());m.put("calendarId",task.getCalendarId());m.put("title",task.getTitle());m.put("notes",task.getDescription());m.put("completed",Boolean.valueOf(task.isCompleted()));putDate(m,"due",task.getDue());boolean create=task.getId()==null;CalendarTask saved=task(parseResult(nativeInstance.calendarSaveTask(JSONParser.toJson(m))));fireChange(new CalendarChange(getId(),saved.getCalendarId(),saved.getId(),CalendarChange.EntityType.TASK,create?CalendarChange.ChangeType.CREATED:CalendarChange.ChangeType.UPDATED));return value(saved);}catch(IOException ex){return failure(ex);}catch(CalendarException ex){return failure(ex);}}
     public AsyncResource<Boolean>deleteTask(String calendarId,String id,CalendarMutationScope scope,String version){boolean deleted=nativeInstance.calendarDeleteTask(id);if(deleted)fireChange(new CalendarChange(getId(),calendarId,id,CalendarChange.EntityType.TASK,CalendarChange.ChangeType.DELETED));return value(Boolean.valueOf(deleted));}
     private CalendarEvent event(Map<String,Object>m){CalendarEvent out=new CalendarEvent().setId(s(m,"id")).setCalendarId(s(m,"calendarId")).setSourceId(getId()).setVersion(s(m,"version")).setTitle(s(m,"title")).setDescription(s(m,"notes")).setLocation(s(m,"location")).setAvailability(b(m,"available")?CalendarEvent.Availability.FREE:CalendarEvent.Availability.BUSY);out.setStart(date(m,"start",b(m,"allDay"))).setEnd(date(m,"end",b(m,"allDay")));for(Map<String,Object>a:maps(m.get("alarms"))){if(a.get("minutes")!=null)out.addAlarm(new CalendarAlarm().setTimeBefore(Duration.ofMinutes(i(a,"minutes"))));else if(a.get("absolute")!=null)out.addAlarm(new CalendarAlarm().setAbsoluteTime(Instant.ofEpochMilli(l(a,"absolute"))));}return out;}

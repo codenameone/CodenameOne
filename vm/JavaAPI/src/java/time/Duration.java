@@ -22,6 +22,8 @@
  */
 package java.time;
 
+import java.time.format.DateTimeParseException;
+
 public final class Duration implements Comparable<Duration> {
     private final long seconds;
     private final int nanos;
@@ -162,8 +164,8 @@ public final class Duration implements Comparable<Duration> {
         return ofSeconds(overallSign * seconds, overallSign * (long) nanos);
     }
 
-    private static DateTimeException invalidDuration(String value) {
-        return new DateTimeException("Invalid duration: " + value);
+    private static DateTimeParseException invalidDuration(String value) {
+        return new DateTimeParseException("Text cannot be parsed to a Duration", value, 0);
     }
 
     public long getSeconds() {

@@ -7,6 +7,7 @@ import java.time.Period;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
 
 public class TimeEdgeApp {
     private static String two(int value) {
@@ -37,6 +38,13 @@ public class TimeEdgeApp {
         ZonedDateTime berlinSummer = ZonedDateTime.ofInstant(Instant.parse("2020-06-01T10:15:30Z"), ZoneId.of("Europe/Berlin"));
 
         Duration duration = Duration.ofMillis(90061).plus(Duration.ofSeconds(5));
+        String durationParseError;
+        try {
+            Duration.parse("invalid");
+            durationParseError = "missing";
+        } catch (DateTimeParseException ex) {
+            durationParseError = ex.getParsedString() + ":" + ex.getErrorIndex();
+        }
         Period period = Period.of(1, 1, 1);
         LocalDate periodTarget = LocalDate.of(2019, 1, 31).plusYears(period.getYears()).plusMonths(period.getMonths()).plusDays(period.getDays());
         LocalDateTime utcLocal = LocalDateTime.ofInstant(baseInstant, ZoneOffset.UTC);
@@ -55,7 +63,8 @@ public class TimeEdgeApp {
         result.append(duration.toMillis()).append('|');
         result.append(periodTarget).append('|');
         result.append(LocalTime.of(23, 59, 59).plusSeconds(2)).append('|');
-        result.append(localDateTimeString(utcLocal));
+        result.append(localDateTimeString(utcLocal)).append('|');
+        result.append(durationParseError);
         return result.toString();
     }
 
