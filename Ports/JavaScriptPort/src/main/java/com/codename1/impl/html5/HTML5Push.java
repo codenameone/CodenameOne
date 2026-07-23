@@ -70,8 +70,11 @@ public class HTML5Push {
     @JSBody(params={"o", "key"}, script="return o[key] || 0;")
     private static native boolean getBoolean(JSObject o, String key);
     
-    @JSBody(params={"onSuccess", "onFail", "onPush", "pushActionCategories"}, script="window.cn1_registerPush(onSuccess, onFail, onPush, pushActionCategories)")
-    private static native void registerPushNative(PushRegisterSuccessCallback onSuccess, PushRegisterFailCallback onFail, OnPushCallback onPush, JSArray pushActionCategories);
+    @JSBody(params={"onSuccess", "onFail", "onPush", "pushActionCategories", "typedEnvelope"}, script="window.cn1_registerPush(onSuccess, onFail, onPush, pushActionCategories, typedEnvelope)")
+    private static native void registerPushNative(PushRegisterSuccessCallback onSuccess, PushRegisterFailCallback onFail, OnPushCallback onPush, JSArray pushActionCategories, boolean typedEnvelope);
+
+    @JSBody(params={"value"}, script="return JSON.stringify(value)")
+    private static native String stringify(JSObject value);
     
     @JSBody(params={"id", "title", "icon"}, script="return {action:id, title:title}")
     private static native JSObject createPushAction(String id, String title, String icon);
@@ -160,7 +163,9 @@ public class HTML5Push {
                 final String id = _id.stringValue();
                 HTML5Implementation.callSerially(new Runnable() {
                     public void run() {
-                        HTML5Implementation.getInstance()._registerServerPush(id);
+                        PushCallback active = com.codename1.push.PushClient.getActiveCallback();
+                        if (active != null) active.registeredForPush(id);
+                        else HTML5Implementation.getInstance()._registerServerPush(id);
                     }
                 });
             }
@@ -170,6 +175,10 @@ public class HTML5Push {
 
             @Override
             public void onPush(final JSObject data) {
+                if (com.codename1.push.PushClient.getActiveCallback() != null) {
+                    com.codename1.push.PushClient.dispatch(stringify(data));
+                    return;
+                }
                 //System.out.println("In onPush");
                 final int messageType = getInt(data, "messageType");
                 final String image = getString(data, "image");
@@ -265,6 +274,7 @@ public class HTML5Push {
         if (pushCallback instanceof PushActionsProvider) {
             pushActionCategories = convertPushActionCategoriesToJSArray(((PushActionsProvider)pushCallback).getPushActionCategories());
         }
-        registerPushNative(onSuccess, onFail, onPush, pushActionCategories);
+        registerPushNative(onSuccess, onFail, onPush, pushActionCategories,
+                com.codename1.push.PushClient.getActiveCallback() != null);
     }
 }

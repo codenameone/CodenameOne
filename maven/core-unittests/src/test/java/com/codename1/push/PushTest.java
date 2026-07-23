@@ -23,7 +23,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PushTest extends UITestBase {
-    private static final String PUSH_URL = "https://push.codenameone.com/push/push";
+    private static final String PUSH_URL = "https://cloud.codenameone.com/push/push";
     private String originalPreferencesLocation;
 
     @BeforeEach

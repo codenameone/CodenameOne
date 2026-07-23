@@ -22,6 +22,11 @@ function findActionsForCategory(categoryId) {
   
 self.addEventListener('push', function(event) {
   var obj = event.data.json();
+
+  if (isV3Push(obj)) {
+      event.waitUntil(deliverV3Push(obj));
+      return;
+  }
   
   var chain = [];
   if (includesHiddenPush(obj)) {
@@ -78,6 +83,28 @@ self.addEventListener('push', function(event) {
   
 });
 
+function deliverV3Push(obj) {
+    return clients.matchAll({type: 'window', includeUncontrolled: true})
+      .then((windowClients) => {
+          var target = null;
+          for (var i = 0; i < windowClients.length; i++) {
+              if (windowClients[i].focused) {
+                  target = windowClients[i];
+                  break;
+              }
+              if (target === null && urlToOpen.indexOf(windowClients[i].url) >= 0) {
+                  target = windowClients[i];
+              }
+          }
+          if (target !== null) {
+              target.postMessage({type: 'push', data: obj, visual: false});
+          }
+          if (includesVisualPush(obj) && (target === null || !target.focused)) {
+              return self.registration.showNotification(getNotificationTitle(obj), buildNotification(obj));
+          }
+      });
+}
+
 self.addEventListener('notificationclick', function(event) {
   const clickedNotification = event.notification;
   clickedNotification.close();
@@ -109,7 +136,8 @@ self.addEventListener('notificationclick', function(event) {
           data.action = event.action;
       }
       pendingPushes.push({type: 'push', data: data, 'visual' : true});
-      return clients.openWindow(urlToOpen[0]);
+      var destination = isV3Push(data) && data.deepLink ? data.deepLink : urlToOpen[0];
+      return clients.openWindow(destination);
     }
   }).then((windowClient) => {
       console.log("Posting push event on click "+event.notification.data);
@@ -171,6 +199,23 @@ function fireNotification(obj, event) {
 
 function buildNotification(data) {
     var n = {};
+    if (isV3Push(data)) {
+        n.body = data.body || '';
+        if (data.image) {
+            n.image = data.image;
+        }
+        n.data = data;
+        n.icon = data.icon || "icon.png";
+        n.badge = data.badge || "icon.png";
+        if (data.platform && data.platform.web) {
+            var web = data.platform.web;
+            if (web.icon) n.icon = web.icon;
+            if (web.badge) n.badge = web.badge;
+            if (web.actions) n.actions = web.actions;
+            if (web.requireInteraction !== undefined) n.requireInteraction = web.requireInteraction;
+        }
+        return n;
+    }
     if (data.alertBody !== undefined && data.alertTitle !== undefined) {
         n.body = data.alertBody;
     }
@@ -201,6 +246,9 @@ function buildNotification(data) {
 
 
 function getNotificationTitle(data) {
+    if (isV3Push(data)) {
+        return data.title || data.body || '';
+    }
     if (data.alertTitle) {
         return data.alertTitle;
     }
@@ -208,6 +256,9 @@ function getNotificationTitle(data) {
 }
 
 function includesHiddenPush(data) {
+    if (isV3Push(data)) {
+        return true;
+    }
     
     switch (data.messageType) {
         case 2:
@@ -221,6 +272,9 @@ function includesHiddenPush(data) {
 }
 
 function includesVisualPush(data) {
+    if (isV3Push(data)) {
+        return data.silent !== true && !!(data.title || data.body || data.image);
+    }
     switch (data.messageType) {
         case 0:
         case 1:
@@ -232,6 +286,10 @@ function includesVisualPush(data) {
             return true;
     }
     return false;
+}
+
+function isV3Push(data) {
+    return data && Number(data.schema) >= 3;
 }
 
 // When the user clicks a notification focus the window if it exists or open

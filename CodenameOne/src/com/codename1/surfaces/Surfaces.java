@@ -143,6 +143,17 @@ public final class Surfaces {
         b.publishWidgetTimeline(kindId, json, images);
     }
 
+    /// Push-framework entry point for a server-rendered timeline descriptor. The descriptor uses
+    /// the same wire format as `publish()` and is persisted directly so widgets can update while
+    /// the application UI is not running.
+    public static void publishRemote(String kindId, String timelineJson) {
+        SurfaceBridge b = bridgeInternal();
+        if (b == null || !b.areWidgetsSupported() || kindId == null || timelineJson == null) {
+            return;
+        }
+        b.publishWidgetTimeline(kindId, timelineJson, new LinkedHashMap<String, byte[]>());
+    }
+
     /// Asks the platform to re-render widgets from their already-published timelines.
     ///
     /// #### Parameters

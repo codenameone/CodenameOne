@@ -821,6 +821,51 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     public static void appendNotification(String type, String body, Context a) {
         appendNotification(type, body, null, null, a);
     }
+
+    /** Receives the managed typed envelope from FCM without applying legacy push decoding. */
+    public static void handleV3Push(final String envelope, Context context,
+            boolean appRunning, Class appStubClass) {
+        if (appRunning && Display.isInitialized()) {
+            Display.getInstance().callSerially(new Runnable() {
+                public void run() {
+                    com.codename1.push.PushClient.dispatch(envelope);
+                }
+            });
+            return;
+        }
+        try {
+            org.json.JSONObject message = new org.json.JSONObject(envelope);
+            appendNotification(null, envelope, context);
+            if (message.optBoolean("silent", false)) {
+                return;
+            }
+            String title = message.optString("title", "");
+            if (title.length() == 0) {
+                title = context.getApplicationInfo().loadLabel(context.getPackageManager()).toString();
+            }
+            String body = message.optString("body", "");
+            Intent intent = new Intent(context, appStubClass);
+            PendingIntent contentIntent = createPendingIntent(context, 0, intent);
+            int smallIcon = context.getResources().getIdentifier("ic_stat_notify", "drawable",
+                    context.getPackageName());
+            if (smallIcon == 0) {
+                smallIcon = context.getApplicationInfo().icon;
+            }
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(context)
+                    .setContentTitle(title)
+                    .setContentText(body)
+                    .setSmallIcon(smallIcon)
+                    .setContentIntent(contentIntent)
+                    .setAutoCancel(true)
+                    .setWhen(System.currentTimeMillis());
+            NotificationManager manager = (NotificationManager)
+                    context.getSystemService(Context.NOTIFICATION_SERVICE);
+            setNotificationChannel(manager, builder, context);
+            manager.notify(1, builder.build());
+        } catch (Exception error) {
+            error.printStackTrace();
+        }
+    }
     
     public static void appendNotification(String type, String body, String image, String category, Context a) {
         try {
@@ -10516,7 +10561,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
         }
 
-        if (!hasAndroidMarket()) {
+        boolean huawei = "huawei".equals(Display.getInstance().getProperty("cn1.push.transport", ""));
+        if (!hasAndroidMarket() && !huawei) {
             Log.d("Codename One", "Device doesn't have Android market/google play can't register for push!");
             return;
         }
@@ -10538,7 +10584,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
     @Override
     public void deregisterPush() {
-        boolean has = hasAndroidMarket();
+        boolean has = hasAndroidMarket()
+                || "huawei".equals(Display.getInstance().getProperty("cn1.push.transport", ""));
         if (has) {
             ((CodenameOneActivity) getActivity()).stopReceivingPush();
             deregisterPushFromServer();
