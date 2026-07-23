@@ -1988,7 +1988,14 @@ static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
     p->freeCount = 0;
     p->owned = JAVA_FALSE;
 #ifndef CN1_BIBOP_NO_FASTSWEEP
-    p->gcAllocedSinceSweep = JAVA_FALSE;
+    // Relaxed atomic, not plain: the acquire-path format (cn1BibopAcquirePage)
+    // reformats a FREE-pool page that is already in the registry, on a mutator
+    // thread, possibly while the grace pass concurrently reads this flag. The
+    // store is value-identical (the sweep already reset the flag before pooling
+    // the page) so any interleaving reads FALSE; the atomic just keeps the
+    // concurrent read/write pair well-defined. The new-page path formats before
+    // registry insertion, where nothing can observe the page.
+    __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_FALSE, __ATOMIC_RELAXED);
     p->gcNeedsReclaim = JAVA_FALSE;
     p->gcHasMonitors = JAVA_FALSE;
     p->gcHasAdopted = JAVA_FALSE;
@@ -1996,7 +2003,9 @@ static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
     p->gcGraceEpoch = 0;
 #endif
 #ifdef CN1_GRACE_AUDIT
-    p->gcAuditSnapshot = 0;
+    // Same registry-visible reformat race as the flag above: the GC thread reads
+    // and rewrites this field during marking in audit builds.
+    __atomic_store_n(&p->gcAuditSnapshot, 0, __ATOMIC_RELAXED);
 #endif
 }
 
@@ -2025,7 +2034,9 @@ void cn1BibopBeginGcCycle(void) {
     {
         CN1BibopPage* ap = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
         while(ap != 0) {
-            ap->gcAuditSnapshot = atomic_load_explicit(&ap->bumpIndex, memory_order_acquire);
+            __atomic_store_n(&ap->gcAuditSnapshot,
+                             atomic_load_explicit(&ap->bumpIndex, memory_order_acquire),
+                             __ATOMIC_RELAXED);
             ap = atomic_load_explicit(&ap->nextAll, memory_order_acquire);
         }
     }
@@ -2969,7 +2980,7 @@ static void cn1GraceAuditPreSweep(CODENAME_ONE_THREAD_STATE) {
     long beforeFresh = gcMarkNewObjectCount;
     CN1BibopPage* gp = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
     while(gp != 0) {
-        int gn = gp->gcAuditSnapshot;
+        int gn = __atomic_load_n(&gp->gcAuditSnapshot, __ATOMIC_RELAXED);
         int bi = atomic_load_explicit(&gp->bumpIndex, memory_order_acquire);
         if(gn > bi) gn = bi;   // page was reformatted mid-cycle; stale snapshot
         for(int gi = 0 ; gi < gn ; gi++) {

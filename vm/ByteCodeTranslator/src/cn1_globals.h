@@ -1305,10 +1305,15 @@ typedef struct CN1BibopPage {
     // homogeneous. The fields are always present (so the struct layout is identical in
     // A/B builds); only the writes/reads are gated. See cn1BibopSweep for the proof.
     JAVA_BOOLEAN gcAllocedSinceSweep;     // any alloc into the page since last sweep/reset.
-                                          //  Alloc paths set it / the grace pass reads it
-                                          //  via relaxed __atomic ops (concurrent pair);
-                                          //  sweep/format access it plain -- they only
-                                          //  touch retired/pooled pages no mutator holds
+                                          //  Alloc paths set it, the FREE-pool reformat
+                                          //  resets it, and the grace pass reads it, all
+                                          //  via relaxed __atomic ops (those can overlap
+                                          //  a concurrent mark). Only the sweep accesses
+                                          //  it plain: it runs on the GC thread after
+                                          //  mark (program-ordered vs the grace pass) on
+                                          //  retired pages no mutator holds, and the
+                                          //  pool handoff mutex orders it vs the next
+                                          //  owner's stores
                                           // (owner-thread single-writer; published to the
                                           //  GC via the sweep-stack release-push)
     JAVA_BOOLEAN gcNeedsReclaim;          // a survivor carries a finalizer or monitor ->
@@ -1339,7 +1344,11 @@ typedef struct CN1BibopPage {
     int gcGraceEpoch;                     // upper bound on survivor epochs as of the last
                                           //  full walk (GC-thread only)
 #ifdef CN1_GRACE_AUDIT
-    int gcAuditSnapshot;                  // QA builds only: bumpIndex at mark start
+    int gcAuditSnapshot;                  // QA builds only: bumpIndex at mark start.
+                                          //  Relaxed __atomic access everywhere -- the
+                                          //  GC writes/reads it during marking while a
+                                          //  mutator can reformat the page from the
+                                          //  FREE pool
 #endif
 } CN1BibopPage;
 
