@@ -41,7 +41,9 @@ public final class PushMessage {
         this.values = freezeMap(values);
     }
 
-    public static Builder builder() { return new Builder(); }
+    public static Builder builder() {
+        return new Builder();
+    }
 
     public static PushMessage parse(String json) throws IOException {
         Map<String, Object> parsed = JSONParser.parseJSON(json);
@@ -52,17 +54,49 @@ public final class PushMessage {
         return new PushMessage(parsed);
     }
 
-    public String getId() { return string("id"); }
-    public String getTitle() { return string("title"); }
-    public String getBody() { return string("body"); }
-    public String getImageUrl() { return string("image"); }
-    public String getDeepLink() { return string("deepLink"); }
-    public String getCollapseKey() { return string("collapseKey"); }
-    public Map<String, Object> getData() { return map("data"); }
-    public Map<String, Object> getSurface() { return map("surface"); }
-    public Map<String, Object> getPlatformOptions() { return map("platform"); }
-    public Map<String, Object> toMap() { return values; }
-    public String toJson() { return JSONParser.mapToJson(values); }
+    public String getId() {
+        return string("id");
+    }
+
+    public String getTitle() {
+        return string("title");
+    }
+
+    public String getBody() {
+        return string("body");
+    }
+
+    public String getImageUrl() {
+        return string("image");
+    }
+
+    public String getDeepLink() {
+        return string("deepLink");
+    }
+
+    public String getCollapseKey() {
+        return string("collapseKey");
+    }
+
+    public Map<String, Object> getData() {
+        return map("data");
+    }
+
+    public Map<String, Object> getSurface() {
+        return map("surface");
+    }
+
+    public Map<String, Object> getPlatformOptions() {
+        return map("platform");
+    }
+
+    public Map<String, Object> toMap() {
+        return values;
+    }
+
+    public String toJson() {
+        return JSONParser.mapToJson(values);
+    }
 
     private String string(String key) {
         Object value = values.get(key);
@@ -91,7 +125,9 @@ public final class PushMessage {
         }
         if (value instanceof List) {
             List<Object> copy = new ArrayList<Object>();
-            for (Object item : (List<?>) value) copy.add(freeze(item));
+            for (Object item : (List<?>) value) {
+                copy.add(freeze(item));
+            }
             return Collections.unmodifiableList(copy);
         }
         return value;
@@ -102,32 +138,81 @@ public final class PushMessage {
         private final Map<String, Object> data = new LinkedHashMap<String, Object>();
         private final Map<String, Object> platform = new LinkedHashMap<String, Object>();
 
-        private Builder() { values.put("schema", Integer.valueOf(SCHEMA_VERSION)); }
+        private Builder() {
+            values.put("schema", Integer.valueOf(SCHEMA_VERSION));
+        }
 
-        public Builder id(String value) { return put("id", value); }
-        public Builder title(String value) { return put("title", value); }
-        public Builder body(String value) { return put("body", value); }
-        public Builder imageUrl(String value) { return put("image", value); }
-        public Builder deepLink(String value) { return put("deepLink", value); }
-        public Builder collapseKey(String value) { return put("collapseKey", value); }
-        public Builder ttlSeconds(int value) { values.put("ttl", Integer.valueOf(value)); return this; }
-        public Builder silent(boolean value) { values.put("silent", Boolean.valueOf(value)); return this; }
-        public Builder data(String key, Object value) { data.put(key, value); return this; }
+        public Builder id(String value) {
+            return put("id", value);
+        }
+
+        public Builder title(String value) {
+            return put("title", value);
+        }
+
+        public Builder body(String value) {
+            return put("body", value);
+        }
+
+        public Builder imageUrl(String value) {
+            return put("image", value);
+        }
+
+        public Builder deepLink(String value) {
+            return put("deepLink", value);
+        }
+
+        public Builder collapseKey(String value) {
+            return put("collapseKey", value);
+        }
+
+        public Builder ttlSeconds(int value) {
+            values.put("ttl", Integer.valueOf(value));
+            return this;
+        }
+
+        public Builder silent(boolean value) {
+            values.put("silent", Boolean.valueOf(value));
+            return this;
+        }
+
+        public Builder data(String key, Object value) {
+            data.put(key, value);
+            return this;
+        }
         public Builder platform(String platformId, Map<String, Object> options) {
-            platform.put(platformId, new LinkedHashMap<String, Object>(options));
+            if (options == null) {
+                platform.remove(platformId);
+            } else {
+                platform.put(platformId, new LinkedHashMap<String, Object>(options));
+            }
             return this;
         }
         public Builder surface(Map<String, Object> command) {
-            values.put("surface", new LinkedHashMap<String, Object>(command));
+            if (command == null) {
+                values.remove("surface");
+            } else {
+                values.put("surface", new LinkedHashMap<String, Object>(command));
+            }
             return this;
         }
         private Builder put(String key, String value) {
-            if (value == null) values.remove(key); else values.put(key, value);
+            if (value == null) {
+                values.remove(key);
+            } else {
+                values.put(key, value);
+            }
             return this;
         }
         public PushMessage build() {
-            if (!data.isEmpty()) values.put("data", new LinkedHashMap<String, Object>(data));
-            if (!platform.isEmpty()) values.put("platform", new LinkedHashMap<String, Object>(platform));
+            if (!data.isEmpty()) {
+                values.put("data", new LinkedHashMap<String, Object>(data));
+            }
+            if (!platform.isEmpty()) {
+                values.put("platform", new LinkedHashMap<String, Object>(platform));
+            } else {
+                values.remove("platform");
+            }
             return new PushMessage(values);
         }
     }

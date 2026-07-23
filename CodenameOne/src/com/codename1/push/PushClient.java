@@ -55,7 +55,9 @@ public final class PushClient {
         transport = builder.transport;
     }
 
-    public static Builder builder(String appId) { return new Builder(appId); }
+    public static Builder builder(String appId) {
+        return new Builder(appId);
+    }
 
     public void register() {
         active = this;
@@ -78,8 +80,13 @@ public final class PushClient {
         }
     }
 
-    public String getAppId() { return appId; }
-    public PushSubscription getSubscription() { return subscription; }
+    public String getAppId() {
+        return appId;
+    }
+
+    public PushSubscription getSubscription() {
+        return subscription;
+    }
 
     /// Used by generated native bootstraps to find the explicit callback binding.
     public static PushCallback getActiveCallback() {
@@ -88,13 +95,18 @@ public final class PushClient {
 
     /// Native/custom transport entry point for an encoded v3 envelope.
     public static void dispatch(String envelopeJson) {
-        if (active != null) active.receive(envelopeJson);
+        if (active != null) {
+            active.receive(envelopeJson);
+        }
     }
 
     private void registered(final PushSubscription value) {
         if (!Display.getInstance().isEdt()) {
             Display.getInstance().callSerially(new Runnable() {
-                public void run() { registered(value); }
+                @Override
+                public void run() {
+                    registered(value);
+                }
             });
             return;
         }
@@ -104,20 +116,27 @@ public final class PushClient {
         } else if (transport == null) {
             registerManaged(value);
         }
-        if (listener != null) listener.onRegistration(value);
+        if (listener != null) {
+            listener.onRegistration(value);
+        }
     }
 
     private void receive(final String json) {
         if (!Display.getInstance().isEdt()) {
             Display.getInstance().callSerially(new Runnable() {
-                public void run() { receive(json); }
+                @Override
+                public void run() {
+                    receive(json);
+                }
             });
             return;
         }
         try {
             PushMessage message = PushMessage.parse(json);
             applySurface(message);
-            if (listener != null) listener.onMessage(message);
+            if (listener != null) {
+                listener.onMessage(message);
+            }
         } catch (IOException ex) {
             Log.e(ex);
             fireError(new PushError("invalid_envelope", ex.getMessage(), false));
@@ -125,8 +144,10 @@ public final class PushClient {
     }
 
     private static void applySurface(PushMessage message) {
-        java.util.Map<String, Object> surface = message.getSurface();
-        if (surface.isEmpty()) return;
+        Map<String, Object> surface = message.getSurface();
+        if (surface.isEmpty()) {
+            return;
+        }
         String operation = value(surface.get("operation"));
         if ("widget".equals(operation)) {
             Surfaces.publishRemote(value(surface.get("kind")), value(surface.get("timeline")));
@@ -138,22 +159,27 @@ public final class PushClient {
         }
     }
 
-    private static String value(Object value) { return value == null ? null : String.valueOf(value); }
+    private static String value(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
 
     private void notifyUnregistered() {
         if (!Display.getInstance().isEdt()) {
             Display.getInstance().callSerially(new Runnable() {
-                public void run() { notifyUnregistered(); }
+                @Override
+                public void run() {
+                    notifyUnregistered();
+                }
             });
             return;
         }
         if (subscription != null && registrationSink != null) {
             registrationSink.unregistered(subscription);
-        } else if (subscription != null && transport == null) {
+        } else if (transport == null) {
             unregisterManaged();
         }
         subscription = null;
-        if (active == this) {
+        if (this.equals(active)) {
             active = null;
             CodenameOneImplementation.setPushCallback(null);
         }
@@ -165,15 +191,20 @@ public final class PushClient {
         body.put("token", value.getToken());
         body.put("installationId", installationId());
         ConnectionRequest request = new ConnectionRequest() {
+            @Override
             protected void postResponse() {
                 try {
                     Map<String, Object> response = JSONParser.parseJSON(getResponseData());
                     Object id = response.get("id");
-                    if (id != null) Preferences.set("push_v3_subscription", String.valueOf(id));
+                    if (id != null) {
+                        Preferences.set("push_v3_subscription", String.valueOf(id));
+                    }
                 } catch (IOException ex) {
                     fireError(new PushError("registration_response", ex.getMessage(), false));
                 }
             }
+
+            @Override
             protected void handleErrorResponseCode(int code, String message) {
                 fireError(new PushError(code == 402 ? "upgrade_required" : "managed_registration",
                         message == null ? "BuildCloud registration failed" : message, code >= 500));
@@ -189,7 +220,9 @@ public final class PushClient {
 
     private void unregisterManaged() {
         String id = Preferences.get("push_v3_subscription", null);
-        if (id == null) return;
+        if (id == null) {
+            return;
+        }
         ConnectionRequest request = new ConnectionRequest();
         request.setUrl(endpoint("/subscriptions/") + id);
         request.setHttpMethod("DELETE");
@@ -216,21 +249,33 @@ public final class PushClient {
     private void fireError(final PushError error) {
         if (!Display.getInstance().isEdt()) {
             Display.getInstance().callSerially(new Runnable() {
-                public void run() { fireError(error); }
+                @Override
+                public void run() {
+                    fireError(error);
+                }
             });
             return;
         }
-        if (listener != null) listener.onError(error);
+        if (listener != null) {
+            listener.onError(error);
+        }
     }
 
     private final class CompatibilityCallback implements PushCallback {
-        public void push(String value) { receive(value); }
+        @Override
+        public void push(String value) {
+            receive(value);
+        }
+
+        @Override
         public void registeredForPush(String deviceId) {
             String transportId = transportId(deviceId);
             registered(new PushSubscription(transportId, nativeToken(deviceId),
                     Display.getInstance().getPlatformName(),
                     installationId(), 0, Collections.<String>emptyList()));
         }
+
+        @Override
         public void pushRegistrationError(String error, int errorCode) {
             fireError(new PushError("registration_" + errorCode, error, errorCode == 1));
         }
@@ -243,10 +288,18 @@ public final class PushClient {
             return "hms".equals(value) ? "huawei" : value;
         }
         String platform = Display.getInstance().getPlatformName();
-        if ("ios".equals(platform)) return "apns";
-        if ("win".equals(platform)) return "wns";
-        if ("and".equals(platform)) return "fcm";
-        if ("js".equals(platform)) return "web";
+        if ("ios".equals(platform)) {
+            return "apns";
+        }
+        if ("win".equals(platform)) {
+            return "wns";
+        }
+        if ("and".equals(platform)) {
+            return "fcm";
+        }
+        if ("js".equals(platform)) {
+            return "web";
+        }
         return "native";
     }
 
@@ -269,10 +322,25 @@ public final class PushClient {
     }
 
     private final class TransportCallback implements PushTransport.Callback {
-        public void registered(PushSubscription value) { PushClient.this.registered(value); }
-        public void unregistered() { notifyUnregistered(); }
-        public void message(String envelopeJson) { receive(envelopeJson); }
-        public void failed(PushError error) { fireError(error); }
+        @Override
+        public void registered(PushSubscription value) {
+            PushClient.this.registered(value);
+        }
+
+        @Override
+        public void unregistered() {
+            notifyUnregistered();
+        }
+
+        @Override
+        public void message(String envelopeJson) {
+            receive(envelopeJson);
+        }
+
+        @Override
+        public void failed(PushError error) {
+            fireError(error);
+        }
     }
 
     public static final class Builder {
@@ -282,14 +350,29 @@ public final class PushClient {
         private PushTransport transport;
 
         private Builder(String appId) {
-            if (appId == null || appId.length() == 0) throw new IllegalArgumentException("appId is required");
+            if (appId == null || appId.length() == 0) {
+                throw new IllegalArgumentException("appId is required");
+            }
             this.appId = appId;
         }
-        public Builder listener(PushListener value) { listener = value; return this; }
-        public Builder registrationSink(PushRegistrationSink value) { registrationSink = value; return this; }
-        public Builder transport(PushTransport value) { transport = value; return this; }
+        public Builder listener(PushListener value) {
+            listener = value;
+            return this;
+        }
+
+        public Builder registrationSink(PushRegistrationSink value) {
+            registrationSink = value;
+            return this;
+        }
+
+        public Builder transport(PushTransport value) {
+            transport = value;
+            return this;
+        }
         public PushClient build() {
-            if (listener == null) throw new IllegalStateException("listener is required");
+            if (listener == null) {
+                throw new IllegalStateException("listener is required");
+            }
             if (transport != null && registrationSink == null) {
                 throw new IllegalStateException("custom transports require a registrationSink");
             }

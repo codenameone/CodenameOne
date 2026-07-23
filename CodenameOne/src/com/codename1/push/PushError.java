@@ -35,7 +35,15 @@ public final class PushError {
         this.retryable = retryable;
     }
 
-    public String getCode() { return code; }
-    public String getMessage() { return message; }
-    public boolean isRetryable() { return retryable; }
+    public String getCode() {
+        return code;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public boolean isRetryable() {
+        return retryable;
+    }
 }

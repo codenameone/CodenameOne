@@ -17,6 +17,8 @@ Open the Codename One Console and select *Push*. Create an application, then com
 
 Credentials are encrypted in the BuildCloud secrets vault and are write-only. The setup UI shows whether each provider is configured but never reads a secret back. Rotate a credential by saving its replacement.
 
+Cloud builds detect `PushClient` usage and generate the typed native bootstrap automatically. Android uses FCM unless `android.messagingService=huawei` selects Huawei Push Kit. iOS enables push support automatically when `PushClient` is referenced; set `ios.includePush=false` only when a custom transport intentionally owns registration.
+
 The Console displays an application key. This key identifies an application during device registration; it isn't a server API key and doesn't authorize sending messages. Keep send API keys on your server.
 
 === Bind the client
@@ -25,31 +27,7 @@ Create one `PushClient`, retain it for the life of the application, and call `re
 
 [source,java]
 ----
-private PushClient push;
-
-public void init(Object context) {
-    push = PushClient.builder("cn1_push_application_key")
-            .listener(new PushListener() {
-                public void onRegistration(PushSubscription subscription) {
-                    Log.p("Push ready on " + subscription.getTransportId());
-                }
-
-                public void onMessage(PushMessage message) {
-                    if (message.getDeepLink() != null) {
-                        route(message.getDeepLink());
-                    }
-                }
-
-                public void onError(PushError error) {
-                    Log.p(error.getCode() + ": " + error.getMessage());
-                }
-            })
-            .build();
-}
-
-public void start() {
-    push.register();
-}
+include::../demos/common/src/main/java/com/codename1/demos/push/PushNotificationSnippets.java[tag=push-notifications-java-001,indent=0]
 ----
 
 Registration is asynchronous. With managed delivery, the framework registers the native token with BuildCloud automatically. `PushSubscription` exposes the transport identifier, opaque native token, platform, expiry, and capability list for diagnostics. Application code shouldn't parse or persist the token.
@@ -64,37 +42,14 @@ Callbacks are delivered on the Codename One EDT. A notification received while t
 
 [source,java]
 ----
-PushMessage message = PushMessage.builder()
-        .title("Order shipped")
-        .body("Order 4815 is on its way")
-        .deepLink("myapp://orders/4815")
-        .imageUrl("https://example.com/orders/4815.png")
-        .collapseKey("order-4815")
-        .ttlSeconds(3600)
-        .data("orderId", "4815")
-        .build();
+include::../demos/common/src/main/java/com/codename1/demos/push/PushNotificationSnippets.java[tag=push-notifications-java-002,indent=0]
 ----
 
 Common fields have consistent meanings on every provider. Add provider-specific settings under the `platform` object only when the common model isn't sufficient. Unknown settings are ignored by unrelated providers.
 
 [source,json]
 ----
-{
-  "schema": 3,
-  "title": "Order shipped",
-  "body": "Order 4815 is on its way",
-  "deepLink": "myapp://orders/4815",
-  "collapseKey": "order-4815",
-  "ttl": 3600,
-  "data": { "orderId": "4815" },
-  "platform": {
-    "apns": { "badge": 3, "sound": "default", "interruptionLevel": "time-sensitive" },
-    "fcm": { "channelId": "orders", "priority": "high" },
-    "huawei": { "channelId": "orders", "importance": "HIGH" },
-    "wns": { "type": "toast" },
-    "web": { "urgency": "high" }
-  }
-}
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.json[tag=push-notifications-json-001,indent=0]
 ----
 
 Don't place secrets or irreplaceable data in a notification. Providers, operating systems, and lock-screen UI may retain or expose payloads.
@@ -105,22 +60,7 @@ Create an API key with the `push` scope in the Console. Submit a typed message a
 
 [source,bash]
 ----
-curl -X POST https://cloud.codenameone.com/api/v3/push/messages \
-  -H 'Authorization: Bearer YOUR_SERVER_API_KEY' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "appId": "APPLICATION_ID",
-    "targets": [
-      {"provider":"fcm", "token":"OPAQUE_DEVICE_TOKEN"},
-      {"provider":"apns", "token":"OPAQUE_DEVICE_TOKEN"}
-    ],
-    "message": {
-      "schema":3,
-      "title":"Order shipped",
-      "body":"Order 4815 is on its way",
-      "data":{"orderId":"4815"}
-    }
-  }'
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.sh[tag=push-notifications-bash-001,indent=0]
 ----
 
 A successful admission returns HTTP `202` with durable delivery IDs and the current quota snapshot. Accepted recipients consume quota once. Provider retries don't consume more quota. Invalid targets are deactivated when the provider identifies them as permanent failures.
@@ -133,27 +73,14 @@ An automation is an enabled rule containing `trigger.event`, a schema-3 `message
 
 [source,json]
 ----
-{
-  "enabled": true,
-  "trigger": {"event": "order.ready"},
-  "delaySeconds": 0,
-  "message": {
-    "schema": 3,
-    "title": "Order update",
-    "body": "Order ${event.orderId} is ready"
-  }
-}
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.json[tag=push-notifications-json-002,indent=0]
 ----
 
 Your server triggers enabled rules with `POST /api/v3/push/apps/{appId}/events` using a `push`-scoped API key:
 
 [source,json]
 ----
-{
-  "name": "order.ready",
-  "externalUserId": "customer-4815",
-  "properties": {"orderId": "4815"}
-}
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.json[tag=push-notifications-json-003,indent=0]
 ----
 
 Immediate matches enter the durable delivery queue. Delayed matches become scheduled campaigns, so restarts don't lose them. Automations are intentionally push rules, not a general-purpose customer journey or analytics product.
@@ -180,15 +107,7 @@ A push can publish widget content or update a live activity before the regular l
 
 [source,json]
 ----
-{
-  "schema": 3,
-  "silent": true,
-  "surface": {
-    "operation": "widget",
-    "kind": "order-status",
-    "timeline": "{...serialized widget timeline...}"
-  }
-}
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.json[tag=push-notifications-json-004,indent=0]
 ----
 
 For a live activity use `live-update` or `live-end` with `id`, serialized `state`, and optional `dismissImmediately`. Unsupported surfaces are ignored. Surface updates remain subject to native OS delivery policy, so applications must also refresh stale state during foreground activation.
@@ -199,19 +118,7 @@ A CN1Lib can implement `PushTransport` for a private native push service. It mus
 
 [source,java]
 ----
-PushClient client = PushClient.builder("private-app-id")
-        .transport(new CompanyPushTransport())
-        .registrationSink(new PushRegistrationSink() {
-            public void registered(PushSubscription value) {
-                companyApi.register(value);
-            }
-
-            public void unregistered(PushSubscription value) {
-                companyApi.unregister(value);
-            }
-        })
-        .listener(listener)
-        .build();
+include::../demos/common/src/main/java/com/codename1/demos/push/PushNotificationSnippets.java[tag=push-notifications-java-003,indent=0]
 ----
 
 When a custom transport is present, `PushClient` never contacts BuildCloud. The transport calls its callback's `message()` method with a schema-3 envelope. This API intentionally stays low-level so native provider SDKs aren't coupled to the managed backend.
