@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.maven;
 
 import org.apache.maven.project.MavenProject;
@@ -95,12 +117,16 @@ public class OpenCertificateWizardMojoTest {
     }
 
     @Test
-    public void namedJavaLauncherUsesCertificateWizardProcessName() throws Exception {
+    public void namedJavaLauncherNeverCopiesTheWindowsJvmLauncher() throws Exception {
         File runtimeDir = tmp.newFolder("runtime");
         File launcher = new OpenCertificateWizardMojo().namedJavaLauncher(runtimeDir);
 
         if (OpenCertificateWizardMojo.isWindows()) {
-            assertEquals("CertificateWizard.exe", launcher.getName());
+            // A javaw.exe copied out of the JDK loses its DLL search anchor and
+            // breaks font/native rendering (issue #5443) - the real launcher
+            // must be used and nothing may be materialized in the runtime dir.
+            assertEquals("javaw.exe", launcher.getName());
+            assertFalse(new File(runtimeDir, "CertificateWizard.exe").exists());
         } else {
             assertEquals("Certificate Wizard", launcher.getName());
             assertTrue(Files.isSymbolicLink(launcher.toPath()) || launcher.exists());

@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.maven;
 
 import org.apache.maven.project.MavenProject;
@@ -49,14 +71,41 @@ public class OpenSettingsMojoTest {
     }
 
     @Test
-    public void namedJavaLauncherUsesSettingsProcessName() throws Exception {
-        File launcher = new OpenSettingsMojo().namedJavaLauncher(tmp.newFolder("runtime"));
+    public void namedJavaLauncherNeverCopiesTheWindowsJvmLauncher() throws Exception {
+        File runtimeDir = tmp.newFolder("runtime");
+        File launcher = new OpenSettingsMojo().namedJavaLauncher(runtimeDir);
 
         if (OpenSettingsMojo.isWindows()) {
-            assertEquals("CodenameOneSettings.exe", launcher.getName());
+            // A javaw.exe copied out of the JDK loses its DLL search anchor and
+            // breaks font/native rendering (issue #5443) - the real launcher
+            // must be used and nothing may be materialized in the runtime dir.
+            assertEquals("javaw.exe", launcher.getName());
+            assertFalse(new File(runtimeDir, "CodenameOneSettings.exe").exists());
         } else {
             assertEquals("Codename One Settings", launcher.getName());
             assertTrue(Files.isSymbolicLink(launcher.toPath()) || launcher.exists());
+        }
+    }
+
+    @Test
+    public void forwardsSettingsSystemPropertiesButNotLaunchInternals() {
+        System.setProperty("settings.screenshot", "/tmp/out.png");
+        System.setProperty("settings.screenshot.delay", "5000");
+        System.setProperty("settings.input", "/tmp/should-not-forward.input");
+        System.setProperty("settings.spawn", "false");
+        try {
+            List<String> args = new OpenSettingsMojo().forwardedSettingsProperties();
+            assertTrue(args.contains("-Dsettings.screenshot=/tmp/out.png"));
+            assertTrue(args.contains("-Dsettings.screenshot.delay=5000"));
+            for (String arg : args) {
+                assertFalse(arg.startsWith("-Dsettings.input="));
+                assertFalse(arg.startsWith("-Dsettings.spawn="));
+            }
+        } finally {
+            System.clearProperty("settings.screenshot");
+            System.clearProperty("settings.screenshot.delay");
+            System.clearProperty("settings.input");
+            System.clearProperty("settings.spawn");
         }
     }
 
