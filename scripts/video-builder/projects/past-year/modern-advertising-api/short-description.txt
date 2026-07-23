@@ -1,0 +1,10 @@
+A single pluggable advertising subsystem in the core replaces a stack of dead-end legacy mechanisms, covering every modern ad format with a working AdMob reference provider.
+
+Full article:
+https://www.codenameone.com/blog/modern-advertising-api/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Codename One Native Platforms & Device APIs
+
+#Java #CodenameOne #Shorts

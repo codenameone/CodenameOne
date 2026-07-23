@@ -1,0 +1,10 @@
+CommerceManager cm = CommerceManager.getInstance();
+cm.setAppUserId(accountId);
+cm.refresh();
+
+if (cm.isEntitled("pro")) {
+    unlockProFeatures();
+}
+if (cm.isDegraded()) {
+    Log.p("Using store-direct fallback");
+}

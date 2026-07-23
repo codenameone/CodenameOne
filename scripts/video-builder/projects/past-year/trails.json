@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "channelId": "UCb-4T86pwSFyN66s7QJI90A",
+  "shortsPlaylist": {
+    "id": "codename-one-shorts",
+    "title": "Codename One Shorts — Java Mobile Engineering",
+    "description": "Short, source-grounded explanations of Codename One APIs, ports, tooling, performance work, and engineering tradeoffs.",
+    "privacyStatus": "private",
+    "officialSeries": false
+  },
+  "trails": [
+    {
+      "id": "native-platforms",
+      "title": "Codename One Native Platforms & Device APIs",
+      "description": "A guided trail through widgets, automotive, TV, watch, background, communication, and native-interface APIs in one Java codebase.",
+      "privacyStatus": "private",
+      "officialSeries": true,
+      "slugs": [
+        "widgets-live-activities-dynamic-island",
+        "motion-input-form-factors",
+        "carplay-android-auto-codename-one",
+        "apple-tv-and-android-tv",
+        "native-apple-watch-and-wear",
+        "ar-vr-support-simulation",
+        "background-execution-and-push",
+        "printing-and-apple-wallet",
+        "modern-advertising-api",
+        "websockets-grpc-and-graphql",
+        "platform-apis-in-the-core",
+        "swift-and-kotlin-native-interfaces-faster-base64",
+        "stream-apis-spm-tutorial-trail-and-uwp"
+      ]
+    },
+    {
+      "id": "build-test-ship",
+      "title": "Build, Test & Ship Codename One Apps",
+      "description": "A practical trail covering project settings, certificates, reproducible builds, store delivery, code generation, debugging, tests, compliance, and modern Java workflows.",
+      "privacyStatus": "private",
+      "officialSeries": true,
+      "slugs": [
+        "standalone-codename-one-settings",
+        "standalone-certificate-wizard",
+        "versioned-builds-master",
+        "automated-store-submissions",
+        "commerce-secrets-without-iap-tax",
+        "build-time-codegen",
+        "developer-workflow-debug-and-junit",
+        "compliance-improvements-simulator-updates-and-more",
+        "playground-and-java-time-support",
+        "skills-java17-and-theme-accents"
+      ]
+    },
+    {
+      "id": "ui-graphics-media",
+      "title": "Codename One UI, Graphics & Media",
+      "description": "A technical trail through visual fidelity, video generation, editors, maps, portable 3D, Metal, modern themes, density, accessibility, and iOS rendering.",
+      "privacyStatus": "private",
+      "officialSeries": true,
+      "slugs": [
+        "pixel-perfect-is-a-test",
+        "videoio-audio-mixer-whisper",
+        "rich-text-and-code-editing",
+        "vector-and-native-maps",
+        "portable-3d-graphics-api",
+        "metal-and-skins",
+        "liquid-glass-material-3-modern-native-themes",
+        "ios-density-scroll-and-accessibility",
+        "uiscene-on-by-default-ios-performance"
+      ]
+    },
+    {
+      "id": "game-development",
+      "title": "Game Development with Codename One",
+      "description": "Start with the Game Builder data model, then build 2D, board, and 3D games and understand the portable loop, sprites, physics, and sound underneath.",
+      "privacyStatus": "private",
+      "officialSeries": true,
+      "slugs": [
+        "the-codename-one-game-builder",
+        "game-builder-2d-platformer",
+        "game-builder-board-game",
+        "game-builder-3d-dungeon",
+        "game-development-api-box2d"
+      ]
+    },
+    {
+      "id": "native-java-performance",
+      "title": "Native Java Ports & Performance",
+      "description": "A deep technical trail through AOT optimization, self-contained Linux, Windows, and Mac applications, and the experimental Java 17 boundary.",
+      "privacyStatus": "private",
+      "officialSeries": true,
+      "slugs": [
+        "beating-hotspot-performance",
+        "java-to-a-native-linux-app",
+        "native-windows-port-no-jvm",
+        "mac-native-builds-and-desktop-integration",
+        "official-experimental-java-17-support"
+      ]
+    },
+    {
+      "id": "security-privacy-reliability",
+      "title": "Security, Privacy & Reliability in Codename One",
+      "description": "A source-grounded trail through consent-first analytics, device integrity, crash delivery and symbolication, cryptography, biometrics, and AI supply-chain trust.",
+      "privacyStatus": "private",
+      "officialSeries": true,
+      "slugs": [
+        "privacy-first-analytics",
+        "device-integrity-and-app-review",
+        "seamless-crash-protection",
+        "nfc-crypto-biometrics-and-build-cloud",
+        "we-will-not-sabotage-your-code"
+      ]
+    },
+    {
+      "id": "open-source-engineering",
+      "title": "Building Codename One in the Open",
+      "description": "How Codename One funds long-term open-source engineering and evolves the infrastructure that publishes its technical work.",
+      "privacyStatus": "private",
+      "officialSeries": true,
+      "slugs": [
+        "funding-open-source-without-the-bait-and-switch",
+        "moving-from-wordpress-to-hugo-cloudflare-pages"
+      ]
+    }
+  ]
+}

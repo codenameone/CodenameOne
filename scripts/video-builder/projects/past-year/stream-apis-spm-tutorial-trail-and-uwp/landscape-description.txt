@@ -1,0 +1,23 @@
+Codename One now includes built-in java.util.stream support, adds Swift Package Manager support for iOS dependencies, refreshes the written tutorial trail, and removes the UWP target from the Maven plugin in 7.0.229.
+
+This video explains modernizing a java mobile stack with streams and swift package manager while retiring uwp.
+
+Full article and source material:
+https://www.codenameone.com/blog/stream-apis-spm-tutorial-trail-and-uwp/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://github.com/apple/swift-collections.git|from:1.1.0
+
+Chapters
+00:00 Hook
+00:23 Problem
+00:54 Mechanism
+01:15 Source
+01:46 Tradeoffs
+02:03 Result
+02:15 Outro
+
+Which part should we unpack next?
+
+Series: Codename One Native Platforms & Device APIs — part 13 of 13
+
+#Java #CodenameOne

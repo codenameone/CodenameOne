@@ -1,0 +1,8 @@
+ARKit and ARCore normally mean separate tools and device-only debugging. Codename One runs the same Java AR flow on both platforms and in a controllable desktop room.
+
+Full article:
+https://www.codenameone.com/blog/ar-vr-support-simulation/?utm_source=youtube&utm_medium=short&utm_campaign=ar-vr-java
+
+The related landscape video shows the running AR and VR samples, source code, and complete debugging loop.
+
+#Java #AugmentedReality #CodenameOne #Shorts

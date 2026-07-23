@@ -1,0 +1,10 @@
+String nonce = backend.fetchIntegrityNonce();
+DeviceIntegrity.requestIntegrityToken(nonce).ready(token -> {
+    backend.verifyIntegrity(token);
+});
+
+AppReview review = AppReview.getInstance();
+review.setMinimumLaunches(5);
+review.setMinimumDaysInstalled(7);
+review.setDaysBetweenPrompts(60);
+review.registerSession();

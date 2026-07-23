@@ -1,0 +1,10 @@
+Device APIs move into the framework core, revolutionary Bluetooth debugging, and the Build Cloud's new UI is live in preview.
+
+Full article:
+https://www.codenameone.com/blog/nfc-crypto-biometrics-and-build-cloud/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Security, Privacy & Reliability in Codename One
+
+#Java #CodenameOne #Shorts

@@ -1,0 +1,10 @@
+New iOS Modern (liquid glass) and Android Material 3 native themes, how they work in the Playground, in the simulator, and on devices, plus a week of performance and look-and-feel improvements including sticky headers.
+
+Full article:
+https://www.codenameone.com/blog/liquid-glass-material-3-modern-native-themes/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Codename One UI, Graphics & Media
+
+#Java #CodenameOne #Shorts

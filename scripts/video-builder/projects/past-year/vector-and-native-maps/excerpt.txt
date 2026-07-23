@@ -1,0 +1,11 @@
+TileSource tiles = new HttpTileSource(
+        "https://example.com/tiles/{z}/{x}/{y}.pbf", true, 0, 14);
+MapView map = new MapView(tiles, MapStyle.dark());
+map.setCameraPosition(new CameraPosition(
+        new LatLng(37.7749, -122.4194), 13));
+map.addMarker(new MarkerOptions()
+        .position(new LatLng(37.7749, -122.4194))
+        .title("San Francisco"));
+
+// For the platform map, application code stays simple:
+NativeMap nativeMap = new NativeMap();

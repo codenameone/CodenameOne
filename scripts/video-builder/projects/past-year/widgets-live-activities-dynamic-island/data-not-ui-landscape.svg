@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="760" viewBox="0 0 1400 760">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#081321"/><stop offset="1" stop-color="#102b42"/></linearGradient>
+  <filter id="glow"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect width="100%" height="100%" rx="36" fill="url(#bg)"/>
+
+<g opacity=".50"><g>
+<rect x="70" y="230" width="390" height="260" rx="28" fill="#142438" stroke="#425b72" stroke-width="3"/>
+<rect x="94" y="254" width="12" height="212" rx="6" fill="#ff6d78"/>
+<text x="132" y="296" fill="#f5f8fb" font-family="Arial, sans-serif" font-size="32" font-weight="700" text-anchor="start">Live UI tree</text>
+<text x="132" y="342" fill="#9fb5c8" font-family="Arial, sans-serif" font-size="23" font-weight="400" text-anchor="start">component + listener
+needs a process</text>
+</g></g>
+<path d="M500 360 H650" stroke="#50d8ff" stroke-width="10"/>
+<g>
+<rect x="675" y="125" width="650" height="220" rx="28" fill="#142438" stroke="#425b72" stroke-width="3"/>
+<rect x="699" y="149" width="12" height="172" rx="6" fill="#50d8ff"/>
+<text x="737" y="191" fill="#f5f8fb" font-family="Arial, sans-serif" font-size="32" font-weight="700" text-anchor="start">Serializable layout</text>
+<text x="737" y="237" fill="#9fb5c8" font-family="Arial, sans-serif" font-size="23" font-weight="400" text-anchor="start">surface nodes + state keys</text>
+</g>
+<g>
+<rect x="675" y="400" width="650" height="220" rx="28" fill="#142438" stroke="#425b72" stroke-width="3"/>
+<rect x="699" y="424" width="12" height="172" rx="6" fill="#ff8a34"/>
+<text x="737" y="466" fill="#f5f8fb" font-family="Arial, sans-serif" font-size="32" font-weight="700" text-anchor="start">Dated timeline</text>
+<text x="737" y="512" fill="#9fb5c8" font-family="Arial, sans-serif" font-size="23" font-weight="400" text-anchor="start">Preparing → Out → Arriving → Delivered</text>
+</g>
+<text x="700" y="700" fill="#7ce6ad" font-family="Arial, sans-serif" font-size="35" font-weight="700" text-anchor="middle">DATA OUTLIVES THE PROCESS</text>
+
+</svg>

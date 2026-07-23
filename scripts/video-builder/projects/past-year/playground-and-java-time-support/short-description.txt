@@ -1,0 +1,10 @@
+Codename One now includes a new Playground for rapid UI scripting and iteration, and adds built-in support for the java.time API.
+
+Full article:
+https://www.codenameone.com/blog/playground-and-java-time-support/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Build, Test & Ship Codename One Apps
+
+#Java #CodenameOne #Shorts

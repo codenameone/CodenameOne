@@ -1,0 +1,5 @@
+Container root = new Container(BoxLayout.y());
+Button btn = new Button("Click me");
+btn.addActionListener(e -> Dialog.show("Hello", "World", "OK", null));
+root.add(btn);
+root;

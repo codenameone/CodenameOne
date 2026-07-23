@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "ar-demo-smoke",
+  "title": "Compiled AR demo smoke test",
+  "output": {
+    "frameRate": 10,
+    "landscapeWidth": 640,
+    "landscapeHeight": 360,
+    "portraitWidth": 360,
+    "portraitHeight": 640,
+    "videoBitRate": 1200000
+  },
+  "scenes": [
+    {
+      "id": "live-ar",
+      "durationMs": 8000,
+      "actions": [
+        {
+          "type": "demo.mount",
+          "id": "ar-running",
+          "role": "demo",
+          "atMs": 0,
+          "animated": false,
+          "class": "com.codename1.videobuilder.demos.ARDemoScene",
+          "bounds": {"x": 0.02, "y": 0.02, "width": 0.96, "height": 0.96}
+        },
+        {"type": "demo.action", "atMs": 1000, "name": "placeModel", "arguments": {}},
+        {"type": "demo.action", "atMs": 2500, "name": "scaleModel", "arguments": {"scale": 1.8}},
+        {"type": "demo.action", "atMs": 4000, "name": "trackingLimited", "arguments": {}},
+        {"type": "demo.action", "atMs": 5500, "name": "trackingNormal", "arguments": {}}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+AR development usually splits across ARKit, ARCore, devices, and separate debugging loops. See how Codename One runs the same Java AR code on iOS, Android, and a controllable JavaSE simulated room.
+
+The running sample places and moves an AR model, changes detected planes, resets tracking, and exercises VR rendering from the same Java project.
+
+Full article and source material:
+https://www.codenameone.com/blog/ar-vr-support-simulation/?utm_source=youtube&utm_medium=video&utm_campaign=ar-vr-java
+
+https://github.com/codenameone/CodenameOne/pull/5335
+
+Chapters
+00:00 AR in one Java codebase
+00:14 Why AR development fragments
+00:32 Why a simulator is not enough
+00:45 Device-only debugging slows the loop
+01:01 Simulate the room, not just the screen
+01:17 One Java development loop
+01:37 Run the same AR code
+02:06 VR in the same project
+02:24 What changes for the developer
+02:43 Test the hard states at your desk
+
+What AR state is hardest for you to reproduce on demand?
+
+Series: Codename One Native Platforms & Device APIs — part 6 of 13
+
+#Java #AugmentedReality #CodenameOne

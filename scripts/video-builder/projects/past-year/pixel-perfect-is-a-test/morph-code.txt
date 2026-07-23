@@ -1,0 +1,14 @@
+TabSelectionMorph m = new TabSelectionMorph();
+float progress = clamp(t);
+
+float position = springEase(progress, tokens.spring);
+int x = fromX + (int)((toX - fromX) * position);
+int width = fromWidth
+        + (int)((toWidth - fromWidth) * position);
+
+m.flight = smooth(0f, 0.12f, progress)
+        * (1f - smooth(0.64f, 0.86f, progress));
+m.magnify = tokens.restMag
+        + (tokens.peakMag - tokens.restMag) * m.flight;
+m.aberration = tokens.peakAb * m.flight;
+return m;

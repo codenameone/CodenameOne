@@ -1,0 +1,14 @@
+<plugin>
+    <groupId>com.codenameone</groupId>
+    <artifactId>codenameone-maven-plugin</artifactId>
+    <executions>
+        <execution>
+            <id>petstore-client</id>
+            <goals><goal>generate-openapi-client</goal></goals>
+            <configuration>
+                <specUrl>https://petstore3.swagger.io/api/v3/openapi.json</specUrl>
+                <basePackage>com.example.petstore</basePackage>
+            </configuration>
+        </execution>
+    </executions>
+</plugin>

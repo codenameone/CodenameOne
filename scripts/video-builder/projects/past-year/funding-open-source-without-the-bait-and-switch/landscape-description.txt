@@ -1,0 +1,30 @@
+This week adds a privacy-first analytics API, a pure-vector map engine with pluggable native providers, Apple TV and Android TV support with CSS @media for form factors, rich text and code editors, and device integrity and app review APIs. It is also a good moment to explain how we fund the project without doing the thing open source so often does to you.
+
+This video explains a sustainable open-source business boundary that does not sabotage the free product.
+
+Full article and source material:
+https://www.codenameone.com/blog/funding-open-source-without-the-bait-and-switch/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://debugagent.com/open-source-bait-and-switch
+https://github.com/codenameone/CodenameOne/pull/5266
+https://stats.example.com
+https://github.com/codenameone/CodenameOne/pull/5264
+https://github.com/codenameone/CodenameOne/pull/5261
+https://github.com/codenameone/CodenameOne/pull/5272
+
+Chapters
+00:00 Who And What
+00:14 The Real World Problem
+00:31 Independent Context 1
+00:41 Independent Context 2
+00:52 The Change In Mechanism
+01:10 Source And Product Proof
+01:28 Canonical Captures
+01:45 Developer Victory
+02:00 Outro
+
+Which part should we unpack next?
+
+Series: Building Codename One in the Open — part 1 of 2
+
+#Java #CodenameOne

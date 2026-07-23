@@ -1,0 +1,10 @@
+A new cross-platform printing API hands PDFs and images to the native print dialog on every port, and iOS builds can now generate Apple Wallet issuer-provisioning extensions from build hints with no native code.
+
+Full article:
+https://www.codenameone.com/blog/printing-and-apple-wallet/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Codename One Native Platforms & Device APIs
+
+#Java #CodenameOne #Shorts

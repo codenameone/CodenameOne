@@ -1,0 +1,785 @@
+{
+  "schemaVersion": 1,
+  "editorial": {
+    "storyType": "visual-explainer",
+    "status": "approved",
+    "topicTerms": [
+      "open source",
+      "open source business model",
+      "GPL Classpath Exception",
+      "sustainable open source"
+    ],
+    "proof": [
+      "canonical article source",
+      "independent technical documentation",
+      "article code",
+      "canonical product captures"
+    ],
+    "humanBeat": "A developer adopts an open platform for control, then worries that neglect or a later license change will turn years of application work into leverage against them.",
+    "visualIdentity": "Two familiar dead ends—abandonment and lock-in—are replaced by a loop connecting an open project, optional paid value, and continued engineering.",
+    "bespokeVisualization": "The business model is shown as a testable exchange: freedom remains in the core while paid services finance the next visible engineering result.",
+    "heroJourney": {
+      "identity": "Codename One and long-term open-source maintenance are introduced.",
+      "problem": "Projects without revenue can decay, while companies with trapped users can take promised freedoms back.",
+      "difficulty": "Maintainers, native ports, build infrastructure, security work, and support all cost money even when source code is free.",
+      "intervention": "The project remains GPL with the Classpath Exception, while the company sells metered build capacity and optional integrated services.",
+      "victory": "The developer keeps a forkable platform and ownership of the application; paid features must win through usefulness rather than sabotage."
+    },
+    "problemDimensions": [
+      "maintenance without revenue",
+      "relicensing after adoption",
+      "paid value that weakens the free project"
+    ],
+    "resolutionMap": [
+      {
+        "problem": "maintenance without revenue",
+        "solution": "metered build infrastructure and optional services",
+        "proof": "the shipped build cloud, analytics, and crash workflows"
+      },
+      {
+        "problem": "relicensing after adoption",
+        "solution": "GPL with the Classpath Exception",
+        "proof": "the repository license and application-linking exception"
+      },
+      {
+        "problem": "paid value that weakens the free project",
+        "solution": "open provider APIs with replaceable backends",
+        "proof": "AnalyticsProvider can target first-party, third-party, self-hosted, or custom services"
+      }
+    ]
+  },
+  "output": {
+    "frameRate": 30,
+    "landscapeWidth": 1920,
+    "landscapeHeight": 1080,
+    "portraitWidth": 1080,
+    "portraitHeight": 1920,
+    "videoBitRate": 8000000
+  },
+  "narration": {
+    "provider": "kokoro",
+    "voice": "af_heart:60,af_bella:40",
+    "language": "en-us",
+    "speed": 0.97,
+    "model": ".video-tools/kokoro/kokoro-v1.0.onnx",
+    "minimumGapMs": 250,
+    "pronunciations": {
+      "Codename One": "Codename One",
+      "API": "API",
+      "AI": "AI",
+      "APK": "APK",
+      "AR/VR": "augmented reality and virtual reality",
+      "ARKit": "A-R kit",
+      "ARCore": "A-R core",
+      "AR": "A-R",
+      "VR": "V-R",
+      "2D": "2D",
+      "3D": "3D",
+      "GPU": "GPU",
+      "GA4": "G-A four",
+      "GDPR": "G-D-P-R",
+      "CCPA": "C-C-P-A",
+      "DPI": "D-P-I",
+      "glTF": "G-L-T-F",
+      "JVM": "JVM",
+      "JIT": "JIT",
+      "AOT": "A-O-T",
+      "GC": "G-C",
+      "CI": "C-I",
+      "CSS": "CSS",
+      "iOS": "iOS",
+      "macOS": "macOS",
+      "tvOS": "tvOS",
+      "UWP": "U-W-P",
+      "NFC": "NFC",
+      "PCM": "PCM",
+      "RGBA": "RGBA",
+      "EDT": "E-D-T",
+      "ETA": "E-T-A",
+      "SRT": "SRT",
+      "VTT": "VTT",
+      "AAC": "A-A-C",
+      "H264": "H two sixty four",
+      "HTML": "HTML",
+      "IDE": "I-D-E",
+      "JS": "JS",
+      "XML": "XML",
+      "JSON": "jay son",
+      "WYSIWYG": "wizzy wig",
+      "CodeEditor": "Code Editor",
+      "RichTextArea": "Rich Text Area",
+      "AbstractEditorComponent": "Abstract Editor Component",
+      "CodeMirror": "Code Mirror",
+      "WidgetKit": "Widget Kit",
+      "ActivityKit": "Activity Kit",
+      "RemoteViews": "Remote Views",
+      "Dynamic Island": "Dynamic Island",
+      "JavaSE": "Java S-E",
+      "WidgetTimeline": "Widget Timeline",
+      "LiveActivity": "Live Activity",
+      "LiveActivityDescriptor": "Live Activity Descriptor",
+      "SurfaceDynamicText": "Surface Dynamic Text",
+      "VideoIO": "video I-O",
+      "AudioMixer": "Audio Mixer",
+      "AppGallery": "App Gallery",
+      "FFmpeg": "F-F-M-peg",
+      "WAVWriter": "wave writer",
+      "SVG": "SVG",
+      "SPI": "S-P-I",
+      "AnalyticsService": "Analytics Service",
+      "AnalyticsProvider": "Analytics Provider",
+      "AbstractAnalyticsProvider": "Abstract Analytics Provider",
+      "CodenameOneAnalyticsProvider": "Codename One Analytics Provider",
+      "RASP": "rasp",
+      "DeviceIntegrity": "Device Integrity",
+      "AppReview": "App Review",
+      "CarApplication": "Car Application",
+      "CarScreen": "Car Screen",
+      "CarTemplate": "Car Template",
+      "CarPlay": "Car Play",
+      "Android Auto": "Android Auto",
+      "App Attest": "App Attest",
+      "Play Integrity": "Play Integrity",
+      "StoreKit": "Store Kit",
+      "Matomo": "ma-TOE-mo",
+      "Firebase": "Fire base",
+      "Frida": "FREE-da",
+      "SKU": "S-K-U",
+      "UiModeManager": "U-I Mode Manager",
+      "AndroidX": "Android X",
+      "CN.isTV()": "C-N is T-V",
+      "Display.isTV()": "Display is T-V",
+      "TARGET_OS_TV": "target O-S T-V",
+      "MapSurface": "Map Surface",
+      "MapView": "Map View",
+      "NativeMap": "Native Map",
+      "MapKit": "Map Kit",
+      "MapComponent": "Map Component",
+      "MapLibre": "Map Libre",
+      "GeneralPath": "General Path",
+      "ORM": "O-R-M",
+      "OAuth": "oh auth",
+      "OIDC": "O-I-D-C",
+      "gRPC": "G-R-P-C",
+      "GraphQL": "graph Q-L",
+      "Box2D": "box 2D",
+      "JDWP": "J-D-W-P",
+      "JUnit": "J unit",
+      "ParparVM": "par par V-M",
+      "Win32": "win thirty two",
+      "App Store Connect": "App Store Connect",
+      "cn1": "C-N one",
+      "mvn": "Maven",
+      "clang": "clang",
+      "2FA": "two F-A",
+      ".p8": "P eight",
+      ".glb": "G-L-B",
+      ".ipa": "I-P-A"
+    }
+  },
+  "id": "funding-open-source-without-the-bait-and-switch-short",
+  "title": "Open source needs money without taking freedom back",
+  "scenes": [
+    {
+      "id": "short-who-and-what",
+      "durationMs": 14000,
+      "storyBeats": [
+        "identity"
+      ],
+      "actions": [
+        {
+          "type": "image.show",
+          "id": "brand",
+          "role": "brand",
+          "kind": "illustration",
+          "atMs": 150,
+          "path": "codename-one-logo.png",
+          "bounds": {
+            "x": 0.045,
+            "y": 0.04,
+            "width": 0.12,
+            "height": 0.04
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.18,
+              "height": 0.027
+            }
+          }
+        },
+        {
+          "type": "svg.show",
+          "id": "opening-motif",
+          "atMs": 200,
+          "paths": {
+            "landscape": "opening-landscape.svg",
+            "portrait": "opening-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.58,
+            "y": 0.13,
+            "width": 0.38,
+            "height": 0.74
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.2,
+              "width": 0.89,
+              "height": 0.73
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "opening-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "Open source needs money\nwithout taking freedom back",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.055,
+            "y": 0.23,
+            "width": 0.49,
+            "height": 0.34
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.06,
+              "width": 0.86,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "opening-voice",
+          "atMs": 650,
+          "text": "Codename One is an open source Java platform for native applications. Today, the subject is how the company funds new ports, APIs, and maintenance without making the free project worse.",
+          "caption": "Codename One is an open source Java platform for native applications. Today, the subject is how the company funds new ports, APIs, and maintenance without making the free project worse."
+        }
+      ]
+    },
+    {
+      "id": "short-real-world-problem",
+      "durationMs": 17000,
+      "storyBeats": [
+        "problem"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "problem-motif",
+          "atMs": 200,
+          "paths": {
+            "landscape": "problem-landscape.svg",
+            "portrait": "problem-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.16,
+            "width": 0.92,
+            "height": 0.79
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.14,
+              "width": 0.89,
+              "height": 0.82
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "problem-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "Free source does not pay the maintenance bill",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-80f286d8c042",
+          "atMs": 250,
+          "text": "Native platforms, cloud builders, security fixes, support, and compatibility work continue every week. Without revenue, maintenance slows. With lock-in, a company can instead weaken the free path and charge users to escape a dependency it created.",
+          "caption": "Native platforms, cloud builders, security fixes, support, and compatibility work continue every week. Without revenue, maintenance slows. With lock-in, a company can instead weaken the free path and charge users to escape a dependency it created."
+        }
+      ]
+    },
+    {
+      "id": "short-independent-context",
+      "durationMs": 25500,
+      "storyBeats": [
+        "difficulty"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "short-evidence-1",
+          "atMs": 200,
+          "paths": {
+            "landscape": "evidence-1-landscape.svg",
+            "portrait": "evidence-1-landscape.svg"
+          },
+          "bounds": {
+            "x": 0.05,
+            "y": 0.08,
+            "width": 0.9,
+            "height": 0.4
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.07,
+              "width": 0.89,
+              "height": 0.42
+            }
+          },
+          "role": "evidence",
+          "sourceTitle": "GNU Classpath License",
+          "sourceUrl": "https://www.gnu.org/software/classpath/license.html"
+        },
+        {
+          "type": "svg.show",
+          "id": "short-evidence-2",
+          "atMs": 200,
+          "paths": {
+            "landscape": "evidence-2-landscape.svg",
+            "portrait": "evidence-2-landscape.svg"
+          },
+          "bounds": {
+            "x": 0.05,
+            "y": 0.53,
+            "width": 0.9,
+            "height": 0.4
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.53,
+              "width": 0.89,
+              "height": 0.42
+            }
+          },
+          "role": "evidence",
+          "sourceTitle": "Open Source Guides: Getting Paid",
+          "sourceUrl": "https://opensource.guide/getting-paid/"
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-11d45e0ebf2d",
+          "atMs": 250,
+          "text": "The outside documentation exposes both sides of the same problem: GNU Classpath explains how the exception permits linking independent modules with the library without placing the resulting application under the GPL. Open Source Guides documents services, support, crowdfunding, and other ways maintainers can fund ongoing work rather than relying on invisible unpaid labor.",
+          "caption": "The outside documentation exposes both sides of the same problem: GNU Classpath explains how the exception permits linking independent modules with the library without placing the resulting application under the GPL. Open Source Guides documents services, support, crowdfunding, and other ways maintainers can fund ongoing work rather than relying on invisible unpaid labor."
+        }
+      ]
+    },
+    {
+      "id": "short-change-in-mechanism",
+      "durationMs": 18000,
+      "storyBeats": [
+        "intervention"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "solution-motif",
+          "atMs": 200,
+          "paths": {
+            "landscape": "solution-landscape.svg",
+            "portrait": "solution-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.16,
+            "width": 0.92,
+            "height": 0.79
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.14,
+              "width": 0.89,
+              "height": 0.82
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "solution-motif",
+          "atMs": 200,
+          "durationMs": 1000,
+          "effect": "morph",
+          "easing": "ease-out"
+        },
+        {
+          "type": "text.show",
+          "id": "intervention-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "Sell convenience and integration; keep the project whole",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-5ace12f111a1",
+          "atMs": 250,
+          "text": "Codename One keeps the framework, ports, and build tooling open under GPL with the Classpath Exception. The company charges for metered build-cloud capacity and optional services such as integrated analytics or crash handling that sit on open APIs.",
+          "caption": "Codename One keeps the framework, ports, and build tooling open under GPL with the Classpath Exception. The company charges for metered build-cloud capacity and optional services such as integrated analytics or crash handling that sit on open APIs."
+        }
+      ]
+    },
+    {
+      "id": "short-source-and-product-proof",
+      "durationMs": 18000,
+      "storyBeats": [
+        "proof"
+      ],
+      "composition": {
+        "landscape": "code-left-demo-right",
+        "portrait": "code-over-demo"
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "proof-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "The provider choice stays in application code",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "code.show",
+          "id": "source-code",
+          "role": "code",
+          "atMs": 250,
+          "language": "java",
+          "path": "excerpt.txt",
+          "bounds": {
+            "x": 0.035,
+            "y": 0.17,
+            "width": 0.48,
+            "height": 0.72
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.15,
+              "width": 0.89,
+              "height": 0.35
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "proof-capture",
+          "role": "proof",
+          "kind": "capture",
+          "atMs": 450,
+          "path": "capture-1.png",
+          "bounds": {
+            "x": 0.55,
+            "y": 0.17,
+            "width": 0.42,
+            "height": 0.72
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.54,
+              "width": 0.89,
+              "height": 0.38
+            }
+          }
+        },
+        {
+          "type": "focus.show",
+          "id": "source-focus",
+          "target": "source-code",
+          "atMs": 4000,
+          "relativeBounds": {
+            "x": 0.02,
+            "y": 0.08,
+            "width": 0.96,
+            "height": 0.5
+          },
+          "label": "Sell convenience and integration; keep the project whole",
+          "color": "50d8ff"
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-ff320e473a8d",
+          "atMs": 250,
+          "text": "The same analytics facade can use Matomo, GA4, Firebase, logging, a custom backend, or Codename One's service. Selecting the first-party option helps fund the project; declining it does not remove the consent gate or the provider API.",
+          "caption": "The same analytics facade can use Matomo, GA4, Firebase, logging, a custom backend, or Codename One's service. Selecting the first-party option helps fund the project; declining it does not remove the consent gate or the provider API."
+        }
+      ]
+    },
+    {
+      "id": "short-canonical-captures",
+      "durationMs": 16500,
+      "storyBeats": [
+        "proof"
+      ],
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "captures-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "What changes in the actual workflow",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "canonical-capture-1",
+          "role": "proof",
+          "kind": "capture",
+          "atMs": 250,
+          "path": "capture-1.png",
+          "bounds": {
+            "x": 0.035,
+            "y": 0.19,
+            "width": 0.44,
+            "height": 0.68
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.16,
+              "width": 0.88,
+              "height": 0.25
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "canonical-capture-2",
+          "role": "proof",
+          "kind": "capture",
+          "atMs": 600,
+          "path": "capture-2.png",
+          "bounds": {
+            "x": 0.52,
+            "y": 0.19,
+            "width": 0.44,
+            "height": 0.32
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.43,
+              "width": 0.88,
+              "height": 0.25
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "canonical-capture-3",
+          "role": "proof",
+          "kind": "capture",
+          "atMs": 950,
+          "path": "capture-3.png",
+          "bounds": {
+            "x": 0.52,
+            "y": 0.55,
+            "width": 0.44,
+            "height": 0.32
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.7,
+              "width": 0.88,
+              "height": 0.25
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "canonical-capture-1",
+          "atMs": 250,
+          "durationMs": 850,
+          "effects": {
+            "landscape": "slide-right",
+            "portrait": "slide-up"
+          },
+          "easing": "ease-out"
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-8819bce105aa",
+          "atMs": 250,
+          "text": "The value is visible in shipped work: the analytics console, the portable vector map, and the syntax-aware Java editor all exist in the open platform. Paid integration must finance more work like this, not hide the foundational API.",
+          "caption": "The value is visible in shipped work: the analytics console, the portable vector map, and the syntax-aware Java editor all exist in the open platform. Paid integration must finance more work like this, not hide the foundational API."
+        }
+      ]
+    },
+    {
+      "id": "short-developer-victory",
+      "durationMs": 15500,
+      "storyBeats": [
+        "victory"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "victory-motif",
+          "atMs": 200,
+          "paths": {
+            "landscape": "victory-landscape.svg",
+            "portrait": "victory-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.16,
+            "width": 0.92,
+            "height": 0.79
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.14,
+              "width": 0.89,
+              "height": 0.82
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "victory-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "Make the paid option earn the next renewal",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-e4828006fdfa",
+          "atMs": 250,
+          "text": "The developer retains source access, application ownership, alternative providers, and a self-hostable toolchain. The company earns revenue only when its build capacity or integrated service saves enough work to be worth choosing.",
+          "caption": "The developer retains source access, application ownership, alternative providers, and a self-hostable toolchain. The company earns revenue only when its build capacity or integrated service saves enough work to be worth choosing."
+        }
+      ]
+    },
+    {
+      "id": "short-outro",
+      "durationMs": 15000,
+      "storyBeats": [
+        "outro"
+      ],
+      "actions": [
+        {
+          "type": "outro.show",
+          "id": "next",
+          "atMs": 0,
+          "durationMs": 1100,
+          "eyebrow": "CODENAME ONE · ENGINEERING STORY",
+          "title": "What optional service would earn your trust?",
+          "subtitle": "Source, captions, and the full article are linked below.",
+          "prompt": "Comment: which optional service would help you most?",
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-63588ef2689b",
+          "atMs": 250,
+          "text": "Name the integration that would save work without reducing your control.",
+          "caption": "Name the integration that would save work without reducing your control."
+        }
+      ]
+    }
+  ]
+}

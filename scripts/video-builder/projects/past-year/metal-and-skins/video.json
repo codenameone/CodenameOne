@@ -1,0 +1,548 @@
+{
+  "schemaVersion": 1,
+  "id": "metal-and-skins",
+  "title": "Metal and Skins",
+  "output": {
+    "frameRate": 30,
+    "landscapeWidth": 1920,
+    "landscapeHeight": 1080,
+    "portraitWidth": 1080,
+    "portraitHeight": 1920,
+    "videoBitRate": 8000000
+  },
+  "narration": {
+    "provider": "kokoro",
+    "voice": "af_heart:60,af_bella:40",
+    "language": "en-us",
+    "speed": 0.97,
+    "model": ".video-tools/kokoro/kokoro-v1.0.onnx",
+    "minimumGapMs": 250,
+    "pronunciations": {
+      "Codename One": "Codename One",
+      "API": "API",
+      "AI": "AI",
+      "APK": "APK",
+      "AR/VR": "augmented reality and virtual reality",
+      "ARKit": "A-R kit",
+      "ARCore": "A-R core",
+      "AR": "A-R",
+      "VR": "V-R",
+      "2D": "2D",
+      "3D": "3D",
+      "GPU": "GPU",
+      "GA4": "G-A four",
+      "GDPR": "G-D-P-R",
+      "CCPA": "C-C-P-A",
+      "DPI": "D-P-I",
+      "glTF": "G-L-T-F",
+      "JVM": "JVM",
+      "JIT": "JIT",
+      "AOT": "A-O-T",
+      "GC": "G-C",
+      "CI": "C-I",
+      "CSS": "CSS",
+      "iOS": "iOS",
+      "macOS": "macOS",
+      "tvOS": "tvOS",
+      "UWP": "U-W-P",
+      "NFC": "NFC",
+      "PCM": "PCM",
+      "RGBA": "RGBA",
+      "EDT": "EDT",
+      "SRT": "SRT",
+      "VTT": "VTT",
+      "AAC": "A-A-C",
+      "H264": "H two sixty four",
+      "HTML": "HTML",
+      "IDE": "I-D-E",
+      "JS": "JS",
+      "XML": "XML",
+      "JSON": "jay son",
+      "WYSIWYG": "wizzy wig",
+      "CodeEditor": "Code Editor",
+      "RichTextArea": "Rich Text Area",
+      "AbstractEditorComponent": "Abstract Editor Component",
+      "CodeMirror": "Code Mirror",
+      "VideoIO": "video I-O",
+      "WAVWriter": "wave writer",
+      "SVG": "SVG",
+      "SPI": "S-P-I",
+      "AnalyticsService": "Analytics Service",
+      "AnalyticsProvider": "Analytics Provider",
+      "AbstractAnalyticsProvider": "Abstract Analytics Provider",
+      "CodenameOneAnalyticsProvider": "Codename One Analytics Provider",
+      "RASP": "rasp",
+      "DeviceIntegrity": "Device Integrity",
+      "AppReview": "App Review",
+      "CarApplication": "Car Application",
+      "CarScreen": "Car Screen",
+      "CarTemplate": "Car Template",
+      "UiModeManager": "U-I Mode Manager",
+      "AndroidX": "Android X",
+      "CN.isTV()": "C-N is T-V",
+      "Display.isTV()": "Display is T-V",
+      "TARGET_OS_TV": "target O-S T-V",
+      "MapSurface": "Map Surface",
+      "MapView": "Map View",
+      "NativeMap": "Native Map",
+      "MapKit": "Map Kit",
+      "MapComponent": "Map Component",
+      "MapLibre": "Map Libre",
+      "GeneralPath": "General Path",
+      "ORM": "O-R-M",
+      "OAuth": "oh auth",
+      "OIDC": "O-I-D-C",
+      "gRPC": "G-R-P-C",
+      "GraphQL": "graph Q-L",
+      "Box2D": "box 2D",
+      "JDWP": "J-D-W-P",
+      "JUnit": "J unit",
+      "ParparVM": "par par V-M",
+      "Win32": "win thirty two",
+      "App Store Connect": "App Store Connect",
+      "cn1": "C-N one",
+      "mvn": "Maven",
+      "clang": "clang",
+      "2FA": "two F-A",
+      ".p8": "P eight",
+      ".glb": "G-L-B",
+      ".ipa": "I-P-A"
+    }
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "durationMs": 33000,
+      "narration": {
+        "text": "A new Metal rendering backend for iOS, a browser-hosted Skin Designer that retires the skin downloader, an iOS Reminders-style Return-as-Done flag, status-bar tap diagnostics, a simulator dark/light toggle, and a candid look at how we balance quality with the speed of a small open source company."
+      },
+      "actions": [
+        {
+          "type": "intro.show",
+          "id": "welcome",
+          "atMs": 0,
+          "durationMs": 2050,
+          "title": "Codename One",
+          "subtitle": "Metal and Skins",
+          "bounds": {
+            "x": 0.04,
+            "y": 0.08,
+            "width": 0.92,
+            "height": 0.8
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.18,
+              "width": 0.84,
+              "height": 0.58
+            }
+          }
+        },
+        {
+          "type": "bullets.show",
+          "id": "hook-points",
+          "atMs": 1900,
+          "durationMs": 2600,
+          "title": "Metal and Skins",
+          "items": [
+            "Migrating a custom-rendered iOS UI to Metal while preserving visual verification",
+            "How we think about quality",
+            "Sticky headers were half baked, and that was by design"
+          ],
+          "bounds": {
+            "x": 0.025,
+            "y": 0.05,
+            "width": 0.95,
+            "height": 0.88
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.1,
+              "width": 0.86,
+              "height": 0.78
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "hook-points",
+          "atMs": 1900,
+          "durationMs": 650,
+          "effect": "wipe-up",
+          "easing": "ease-out"
+        },
+        {
+          "type": "layer.hide",
+          "target": "welcome",
+          "atMs": 2700
+        }
+      ]
+    },
+    {
+      "id": "problem",
+      "durationMs": 19500,
+      "narration": {
+        "text": "Codename One is a small open source company. We are not a 200-engineer platform team with a dedicated SRE rotation and a separate QA org."
+      },
+      "actions": [
+        {
+          "type": "bullets.show",
+          "id": "problem-bullets",
+          "atMs": 100,
+          "durationMs": 2700,
+          "title": "How we think about quality",
+          "items": [
+            "Sticky headers were half baked, and that was by design",
+            "The SIMD bug, which was my mistake",
+            "Migrating a custom-rendered iOS UI to Metal while preserving visual verification"
+          ],
+          "bounds": {
+            "x": 0.025,
+            "y": 0.05,
+            "width": 0.95,
+            "height": 0.88
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.1,
+              "width": 0.86,
+              "height": 0.78
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "problem-bullets",
+          "atMs": 100,
+          "durationMs": 650,
+          "effects": {
+            "landscape": "wipe-left",
+            "portrait": "wipe-up"
+          },
+          "easing": "ease-out"
+        }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "durationMs": 27500,
+      "narration": {
+        "text": "Last week's post introduced StickyHeaderContainer with an animated transition between section headers. Within a couple of days the issue tracker had #4849, the NONE and FADE transitions were not behaving correctly and the swap had visible jitter."
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "mechanism-title",
+          "atMs": 0,
+          "text": "Sticky headers were half baked, and that was by design",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.03,
+            "y": 0.025,
+            "width": 0.94,
+            "height": 0.14
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.035,
+              "width": 0.84,
+              "height": 0.16
+            }
+          }
+        },
+        {
+          "type": "diagram.show",
+          "id": "mechanism-diagram",
+          "atMs": 600,
+          "durationMs": 3200,
+          "texts": {
+            "landscape": "flowchart LR\nN0[How we] --> N1[Sticky headers]\nN1[Sticky headers] --> N2[SIMD bug,]",
+            "portrait": "flowchart TD\nN0[How we] --> N1[Sticky headers]\nN1[Sticky headers] --> N2[SIMD bug,]"
+          },
+          "bounds": {
+            "x": 0.025,
+            "y": 0.2,
+            "width": 0.95,
+            "height": 0.67
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.23,
+              "width": 0.86,
+              "height": 0.66
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "mechanism-diagram",
+          "atMs": 600,
+          "durationMs": 700,
+          "effect": "morph",
+          "easing": "ease-in-out"
+        }
+      ]
+    },
+    {
+      "id": "source",
+      "durationMs": 32000,
+      "narration": {
+        "text": "PR #4799 is the largest single change we have landed in months: a complete Metal rendering backend for iOS. It sits next to the existing OpenGL ES 2 path, behind a single build hint, with its own CI job and its own pixel-diff goldens."
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "source-title",
+          "atMs": 0,
+          "text": "Metal is here",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.03,
+            "y": 0.02,
+            "width": 0.94,
+            "height": 0.12
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.02,
+              "width": 0.84,
+              "height": 0.11
+            }
+          }
+        },
+        {
+          "type": "code.show",
+          "id": "source-code",
+          "atMs": 300,
+          "language": "java",
+          "path": "excerpt.txt",
+          "bounds": {
+            "x": 0.04,
+            "y": 0.17,
+            "width": 0.55,
+            "height": 0.7
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.15,
+              "width": 0.88,
+              "height": 0.34
+            }
+          }
+        },
+        {
+          "type": "bullets.show",
+          "id": "source-notes",
+          "atMs": 800,
+          "durationMs": 900,
+          "title": "What to notice",
+          "items": [
+            "PR #4799 is the largest single change we have landed in months: a complete…",
+            "It sits next to the existing OpenGL ES 2 path, behind a single build hint,…"
+          ],
+          "bounds": {
+            "x": 0.61,
+            "y": 0.17,
+            "width": 0.35,
+            "height": 0.7
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.54,
+              "width": 0.86,
+              "height": 0.34
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "source-code",
+          "atMs": 300,
+          "durationMs": 600,
+          "effects": {
+            "landscape": "slide-right",
+            "portrait": "slide-up"
+          },
+          "easing": "ease-out"
+        },
+        {
+          "type": "focus.show",
+          "id": "source-focus",
+          "target": "source-code",
+          "atMs": 4000,
+          "relativeBounds": {
+            "x": 0.02,
+            "y": 0.05,
+            "width": 0.96,
+            "height": 0.34
+          },
+          "color": "50d8ff"
+        }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "durationMs": 17500,
+      "narration": {
+        "text": "PR #4842 is a different story. The SIMD code on iOS uses alloca to put working buffers on the stack for speed."
+      },
+      "actions": [
+        {
+          "type": "bullets.show",
+          "id": "tradeoffs-bullets",
+          "atMs": 100,
+          "durationMs": 2700,
+          "title": "Where this helps",
+          "items": [
+            "The SIMD bug, which was my mistake",
+            "Metal is here",
+            "The end of the skin downloader"
+          ],
+          "bounds": {
+            "x": 0.025,
+            "y": 0.05,
+            "width": 0.95,
+            "height": 0.88
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.1,
+              "width": 0.86,
+              "height": 0.78
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "tradeoffs-bullets",
+          "atMs": 100,
+          "durationMs": 650,
+          "effects": {
+            "landscape": "wipe-left",
+            "portrait": "wipe-up"
+          },
+          "easing": "ease-out"
+        }
+      ]
+    },
+    {
+      "id": "result",
+      "durationMs": 32000,
+      "narration": {
+        "text": "PR #4799 is the largest single change we have landed in months: a complete Metal rendering backend for iOS. It sits next to the existing OpenGL ES 2 path, behind a single build hint, with its own CI job and its own pixel-diff goldens."
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "result-title",
+          "atMs": 0,
+          "text": "From mechanism to practical result",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.03,
+            "y": 0.025,
+            "width": 0.94,
+            "height": 0.14
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.035,
+              "width": 0.84,
+              "height": 0.16
+            }
+          }
+        },
+        {
+          "type": "diagram.show",
+          "id": "result-diagram",
+          "atMs": 600,
+          "durationMs": 3200,
+          "texts": {
+            "landscape": "flowchart LR\nN0[How we] --> N1[SIMD bug,]\nN1[SIMD bug,] --> N2[Metal here]",
+            "portrait": "flowchart TD\nN0[How we] --> N1[SIMD bug,]\nN1[SIMD bug,] --> N2[Metal here]"
+          },
+          "bounds": {
+            "x": 0.025,
+            "y": 0.2,
+            "width": 0.95,
+            "height": 0.67
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.23,
+              "width": 0.86,
+              "height": 0.66
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "result-diagram",
+          "atMs": 600,
+          "durationMs": 700,
+          "effect": "morph",
+          "easing": "ease-in-out"
+        }
+      ]
+    },
+    {
+      "id": "outro",
+      "durationMs": 15000,
+      "narration": {
+        "text": "The full source and implementation details are linked below. Which mechanism should we unpack next?"
+      },
+      "actions": [
+        {
+          "type": "outro.show",
+          "id": "next",
+          "atMs": 0,
+          "durationMs": 1100,
+          "eyebrow": "CODENAME ONE · TECHNICAL DEEP DIVE",
+          "title": "Choose the next detail",
+          "subtitle": "The complete source and implementation links are below.",
+          "prompt": "Comment: Sticky headers were half baked, and that was by… or The SIMD bug, which was my mistake?",
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        }
+      ]
+    }
+  ],
+  "editorial": {
+    "storyType": "visual-explainer",
+    "status": "blocked",
+    "proof": [
+      "automatic article template; requires story review"
+    ],
+    "humanBeat": "requires an article-specific human consequence",
+    "visualIdentity": "requires an article-specific recurring visual motif",
+    "bespokeVisualization": "requires a visualization authored for this article",
+    "heroJourney": {
+      "desire": "requires an article-specific desired outcome",
+      "problem": "requires an article-specific developer problem",
+      "difficulty": "requires concrete stakes and escalating difficulty",
+      "intervention": "requires a source-backed Codename One intervention",
+      "victory": "requires a proved developer transformation"
+    }
+  }
+}

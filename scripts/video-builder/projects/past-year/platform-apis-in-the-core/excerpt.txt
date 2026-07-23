@@ -1,0 +1,16 @@
+LlmClient client = LlmClient.openai(apiKey);
+
+ChatRequest req = new ChatRequest.Builder()
+        .model("gpt-4o-mini")
+        .system("You are a helpful assistant.")
+        .user("What is the capital of France?")
+        .temperature(0.7)
+        .build();
+
+client.chat(req).onResult((resp, err) -> {
+    if (err != null) {
+        Log.e(err);
+        return;
+    }
+    Log.p(resp.firstChoice().content());
+});

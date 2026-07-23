@@ -1,0 +1,7 @@
+if (Printer.isPrintingSupported()) {
+    Printer.printPDF(reportPath, result -> {
+        if (result.isFailed()) {
+            ToastBar.showErrorMessage("Print failed: " + result.getError());
+        }
+    });
+}

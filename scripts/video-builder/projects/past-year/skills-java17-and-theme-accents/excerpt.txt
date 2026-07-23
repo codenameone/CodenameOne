@@ -1,0 +1,9 @@
+#Constants {
+    includeNativeBool: true;
+    darkModeBool: true;
+
+    --accent-color: #ff2d95;
+    --accent-color-dark: #ff2d95;
+    --accent-pressed-color: #c71a75;
+    --accent-on-color: #ffffff;
+}

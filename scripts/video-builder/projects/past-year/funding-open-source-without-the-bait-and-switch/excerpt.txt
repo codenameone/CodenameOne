@@ -1,0 +1,8 @@
+Analytics.addProvider(new MatomoAnalyticsProvider(url, siteId));
+// Or register GA4, Firebase, logging, your own provider,
+// or Codename One's integrated cloud provider.
+
+Analytics.setConsent(AnalyticsConsent.builder()
+        .analytics(true)
+        .build());
+Analytics.event(AnalyticsEvent.create("checkout").build());

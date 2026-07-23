@@ -1,0 +1,6 @@
+scripts/fidelity-app/goldens/
+  ios-26-metal/
+  ios-26-metal-anim/
+  ios-26-metal-frames/
+  android-m3/
+  android-m3-anim/

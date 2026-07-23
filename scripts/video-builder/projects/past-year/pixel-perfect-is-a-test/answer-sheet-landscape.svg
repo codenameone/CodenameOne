@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700">
+<style>.title{font:700 48px sans-serif;fill:#f5f8fb}.label{font:700 29px sans-serif;fill:#f5f8fb}.body{font:25px sans-serif;fill:#c8d4e3}.small{font:21px sans-serif;fill:#8ea4ba}.card{fill:#111a27;stroke:#26384c;stroke-width:3}</style>
+
+<text x="600" y="62" class="title" text-anchor="middle">Turn the platform into an answer sheet</text>
+<g transform="translate(55 170)">
+<rect x="0" y="0" width="235" height="260" rx="28" class="card"/><rect x="285" y="0" width="235" height="260" rx="28" class="card"/><rect x="570" y="0" width="235" height="260" rx="28" class="card"/><rect x="855" y="0" width="235" height="260" rx="28" class="card"/>
+<g class="label" text-anchor="middle"><text x="117" y="65">Native app</text><text x="402" y="65">Versioned goldens</text><text x="687" y="65">Codename One</text><text x="972" y="65">One-way gate</text></g>
+<g class="body" text-anchor="middle"><text x="117" y="120">UIKit + Material 3</text><text x="117" y="158">real controls</text><text x="402" y="120">light + dark</text><text x="402" y="158">pressed + selected</text><text x="687" y="120">same component</text><text x="687" y="158">same pinned state</text><text x="972" y="120">visual score</text><text x="972" y="158">geometry metrics</text></g>
+<g fill="none" stroke="#62e6ff" stroke-width="7"><path d="M235 130 H278"/><path d="M520 130 H563"/><path d="M805 130 H848"/></g>
+<g fill="#62e6ff"><path d="M278 130 l-18 -12 v24z"/><path d="M563 130 l-18 -12 v24z"/><path d="M848 130 l-18 -12 v24z"/></g>
+<path d="M910 210 l35 35 l75 -90" fill="none" stroke="#68d391" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<text x="600" y="565" class="body" text-anchor="middle">a score may improve · a known baseline may never silently get worse</text>
+
+</svg>

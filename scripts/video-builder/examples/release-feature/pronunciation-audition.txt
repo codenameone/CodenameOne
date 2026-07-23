@@ -1,0 +1,1 @@
+Codename One uses A-R kit and A-R core. The API runs on iOS. JIT and A-O-T compilation use clang.

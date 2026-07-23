@@ -1,0 +1,4 @@
+codename1.arg.ios.onDeviceDebug=true
+codename1.arg.ios.onDeviceDebug.proxyHost=127.0.0.1
+codename1.arg.ios.onDeviceDebug.proxyPort=55333
+codename1.arg.ios.onDeviceDebug.waitForAttach=true

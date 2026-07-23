@@ -1,0 +1,10 @@
+If you have shipped to an iPhone 14 Pro or anything newer, your density calculations have been wrong until this week. Also in this update, Codename One delivers the performance benefits that Java developers are still waiting on from the Vector API and Project Valhalla — available today, and already making our Base64 on iOS faster than Apple's own.
+
+Full article:
+https://www.codenameone.com/blog/ios-density-scroll-and-accessibility/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Codename One UI, Graphics & Media
+
+#Java #CodenameOne #Shorts

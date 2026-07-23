@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000">
+<style>.h{font:700 35px sans-serif;fill:#f3f7fb}.b{font:26px sans-serif;fill:#cbd5e1}.box{fill:#171c26;stroke-width:4;rx:22}</style>
+<rect x="55" y="55" width="690" height="390" class="box" stroke="#ffc857"/><text x="95" y="115" class="h">iOS path · ARKit</text><text x="95" y="180" class="b">Swift / Objective-C</text><text x="95" y="230" class="b">Xcode + iOS device</text><text x="95" y="280" class="b">camera + sensors + physical room</text><text x="95" y="350" class="h">its own debug loop</text>
+<path d="M90 500 H710" stroke="#ef4444" stroke-width="5" stroke-dasharray="12 12"/>
+<rect x="55" y="555" width="690" height="390" class="box" stroke="#50d8ff"/><text x="95" y="615" class="h">Android path · ARCore</text><text x="95" y="680" class="b">Kotlin / Java / C</text><text x="95" y="730" class="b">Android Studio + Android device</text><text x="95" y="780" class="b">camera + sensors + physical room</text><text x="95" y="850" class="h">another debug loop</text>
+</svg>

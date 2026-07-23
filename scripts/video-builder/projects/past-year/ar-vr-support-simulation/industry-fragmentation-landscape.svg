@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650">
+<style>.h{font:700 38px sans-serif;fill:#f3f7fb}.b{font:28px sans-serif;fill:#cbd5e1}.box{fill:#171c26;stroke-width:4;rx:22}</style>
+<text x="280" y="60" class="h" text-anchor="middle">iOS path</text><text x="920" y="60" class="h" text-anchor="middle">Android path</text>
+<rect x="60" y="95" width="440" height="470" class="box" stroke="#ffc857"/><rect x="700" y="95" width="440" height="470" class="box" stroke="#50d8ff"/>
+<text x="105" y="160" class="h">API</text><text x="105" y="204" class="b">ARKit</text><text x="105" y="280" class="h">Language</text><text x="105" y="324" class="b">Swift / Objective-C</text><text x="105" y="400" class="h">Tooling</text><text x="105" y="444" class="b">Xcode + iOS device</text><text x="105" y="520" class="h">Debug loop</text><text x="105" y="554" class="b">camera · sensors · room</text>
+<text x="745" y="160" class="h">API</text><text x="745" y="204" class="b">ARCore</text><text x="745" y="280" class="h">Language</text><text x="745" y="324" class="b">Kotlin / Java / C</text><text x="745" y="400" class="h">Tooling</text><text x="745" y="444" class="b">Android Studio + device</text><text x="745" y="520" class="h">Debug loop</text><text x="745" y="554" class="b">camera · sensors · room</text>
+<path d="M575 110 V570" stroke="#ef4444" stroke-width="5" stroke-dasharray="12 12"/><text x="600" y="625" class="b" text-anchor="middle">one feature · two development environments</text>
+</svg>

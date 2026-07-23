@@ -1,0 +1,10 @@
+The same Codename One project can now build a REAL native Mac app through the iOS pipeline, and a deeper desktop layer gives it a real title bar, a native menu bar, interactive scrollbars, and desktop notifications.
+
+Full article:
+https://www.codenameone.com/blog/mac-native-builds-and-desktop-integration/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Native Java Ports & Performance
+
+#Java #CodenameOne #Shorts

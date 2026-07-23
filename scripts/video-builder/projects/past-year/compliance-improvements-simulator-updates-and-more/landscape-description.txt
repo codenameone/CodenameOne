@@ -1,0 +1,23 @@
+In today's update, we're finally removing Proguard from the build process with many implications for all of us.
+
+This video explains replacing proguard-era compliance checks with explicit build-time verification.
+
+Full article and source material:
+https://www.codenameone.com/blog/compliance-improvements-simulator-updates-and-more/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+
+
+Chapters
+00:00 Hook
+00:20 Problem
+00:41 Mechanism
+01:00 Source
+01:14 Tradeoffs
+01:36 Result
+01:47 Outro
+
+Which part should we unpack next?
+
+Series: Build, Test & Ship Codename One Apps — part 8 of 10
+
+#Java #CodenameOne

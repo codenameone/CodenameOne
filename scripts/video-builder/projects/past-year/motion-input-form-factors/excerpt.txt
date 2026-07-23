@@ -1,0 +1,9 @@
+drawingArea.addStylusListener(e -> {
+    PointerEvent pe = e.getPointerEvent();
+    float width = 1f + pe.getPressure() * 9f;
+    if (pe.isEraser()) erase(pe.getX(), pe.getY());
+    else drawPoint(pe.getX(), pe.getY(), width);
+});
+
+DevicePosture posture = CN.getDevicePosture();
+if (posture.isTableTop()) layoutForTableTop(posture);

@@ -1,0 +1,10 @@
+An OpenAPI 3.x client generator that turns a spec into typed Codename One code, a JPA-shaped SQLite ORM, JAXB-shaped JSON / XML mappers, build-time SVG and Lottie transcoders, plus a declarative router and deep-link API. All ride on the same build-time codegen pipeline.
+
+Full article:
+https://www.codenameone.com/blog/build-time-codegen/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Build, Test & Ship Codename One Apps
+
+#Java #CodenameOne #Shorts

@@ -1,0 +1,10 @@
+This week adds a privacy-first analytics API, a pure-vector map engine with pluggable native providers, Apple TV and Android TV support with CSS @media for form factors, rich text and code editors, and device integrity and app review APIs. It is also a good moment to explain how we fund the project without doing the thing open source so often does to you.
+
+Full article:
+https://www.codenameone.com/blog/funding-open-source-without-the-bait-and-switch/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Building Codename One in the Open
+
+#Java #CodenameOne #Shorts

@@ -1,0 +1,17 @@
+/* BEFORE: every call publishes a GC-visible frame. */
+JAVA_LONG fib(CODENAME_ONE_THREAD_STATE, JAVA_INT n) {
+    stack = pushFrameOnThreadStack(
+            threadStateData, 2, 4);
+    memset(stack, 0, 6 * sizeof(elementStruct));
+
+    locals[0].type = CN1_TYPE_INT;
+    locals[0].data.i = n;
+    (*SP).type = CN1_TYPE_INT;
+    (*SP).data.i = 2;
+    SP++;
+
+    if (locals[0].data.i < SP[-1].data.i) {
+        /* ... */
+    }
+    releaseForReturn(threadStateData, stack);
+}

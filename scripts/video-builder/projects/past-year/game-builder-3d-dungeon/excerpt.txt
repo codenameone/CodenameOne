@@ -1,0 +1,18 @@
+private final List<float[]> beans = new ArrayList<>();   // {x, z, dirX, dirZ}
+
+@Override
+protected void onUpdate(double dt) {
+    GameInput in = getInput();
+    if (in.wasGameKeyPressed(Display.GAME_FIRE)) {
+        beans.add(new float[]{playerX(), playerZ(),
+                (float) Math.sin(yaw()), (float) -Math.cos(yaw())});
+    }
+    for (Iterator<float[]> it = beans.iterator(); it.hasNext();) {
+        float[] b = it.next();
+        b[0] += b[2] * 7 * dt;
+        b[1] += b[3] * 7 * dt;
+        GameElement cup = enemyNear(b[0], b[1], 0.5);   // your spatial test
+        if (cup != null) {
+            scene().remove(spriteFor(cup));              // smash it
+            addScore(cup.getInt("value", 25));
+            it.remove();

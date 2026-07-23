@@ -1,0 +1,24 @@
+Two new core APIs expose the hardware modern apps actually see: motion sensors and gestures on one side, rich pointer detail, wheel events, stylus input, trackpads and foldable posture on the other.
+
+This video explains one input model for sensors, stylus, trackpads, wheels, and foldable posture.
+
+Full article and source material:
+https://www.codenameone.com/blog/motion-input-form-factors/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://github.com/codenameone/CodenameOne/pull/5310
+https://github.com/codenameone/CodenameOne/pull/5309
+
+Chapters
+00:00 Who And What
+00:14 The Real World Problem
+00:28 Independent Context 1
+00:46 The Change In Mechanism
+01:01 Source And Product Proof
+01:13 Canonical Captures
+01:25 Developer Victory
+
+Which part should we unpack next?
+
+Series: Codename One Native Platforms & Device APIs — part 2 of 13
+
+#Java #CodenameOne

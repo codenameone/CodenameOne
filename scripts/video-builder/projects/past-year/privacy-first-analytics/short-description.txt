@@ -1,0 +1,10 @@
+A new analytics API replaces the deprecated Google Analytics v1 service with a single facade, a provider SPI you can point at GA4, Matomo, Firebase, our cloud or your own backend, and a consent gate that is opt-in by default. Nothing leaves the device until consent is granted.
+
+Full article:
+https://www.codenameone.com/blog/privacy-first-analytics/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Security, Privacy & Reliability in Codename One
+
+#Java #CodenameOne #Shorts

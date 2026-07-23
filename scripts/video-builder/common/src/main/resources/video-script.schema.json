@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://www.codenameone.com/schemas/video-script-v1.json",
+  "title": "Codename One scripted video",
+  "type": "object",
+  "required": ["schemaVersion", "id", "scenes"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+    "title": {"type": "string"},
+    "editorial": {
+      "type": "object",
+      "required": ["storyType", "status", "humanBeat", "visualIdentity", "bespokeVisualization", "heroJourney", "problemDimensions", "resolutionMap"],
+      "properties": {
+        "storyType": {"enum": ["live-demo", "code-and-capture", "code-deep-dive", "visual-explainer"]},
+        "status": {"enum": ["draft", "approved", "blocked"]},
+        "proof": {"type": "array", "items": {"type": "string"}},
+        "humanBeat": {"type": "string"},
+        "visualIdentity": {"type": "string"},
+        "bespokeVisualization": {"type": "string"},
+        "heroJourney": {
+          "type": "object",
+          "required": ["identity", "problem", "difficulty", "intervention", "victory"],
+          "properties": {
+            "identity": {"type": "string"},
+            "problem": {"type": "string"},
+            "difficulty": {"type": "string"},
+            "intervention": {"type": "string"},
+            "victory": {"type": "string"}
+          },
+          "additionalProperties": false
+        },
+        "problemDimensions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "resolutionMap": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["problem", "solution", "proof"],
+            "properties": {
+              "problem": {"type": "string"},
+              "solution": {"type": "string"},
+              "proof": {"type": "string"}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "frameRate": {"type": "integer", "minimum": 1, "maximum": 60},
+        "landscapeWidth": {"type": "integer", "minimum": 1},
+        "landscapeHeight": {"type": "integer", "minimum": 1},
+        "portraitWidth": {"type": "integer", "minimum": 1},
+        "portraitHeight": {"type": "integer", "minimum": 1},
+        "videoBitRate": {"type": "integer", "minimum": 1}
+      }
+    },
+    "narration": {
+      "type": "object",
+      "properties": {
+        "provider": {"enum": ["auto", "kokoro", "piper", "command"]},
+        "voice": {"type": "string"},
+        "language": {"type": "string"},
+        "speed": {"type": "number", "exclusiveMinimum": 0},
+        "executable": {"type": "string"},
+        "model": {"type": "string"},
+        "command": {"type": "array", "items": {"type": "string"}},
+        "pronunciations": {"type": "object", "additionalProperties": {"type": "string"}},
+        "minimumGapMs": {"type": "integer", "minimum": 0}
+      }
+    },
+    "audio": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "path": {"type": "string"}, "atMs": {"type": "integer", "minimum": 0},
+          "gain": {"type": "number", "minimum": 0}, "loop": {"type": "boolean"}
+        }
+      }
+    },
+    "scenes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "durationMs", "actions"],
+        "properties": {
+          "id": {"type": "string"}, "durationMs": {"type": "integer", "minimum": 1},
+          "storyBeats": {"type": "array", "minItems": 1, "items": {"enum": ["identity", "problem", "difficulty", "intervention", "proof", "victory", "outro"]}},
+          "bounds": {"$ref": "#/$defs/bounds"},
+          "orientation": {"type": "object", "properties": {"landscape": {"$ref": "#/$defs/bounds"}, "portrait": {"$ref": "#/$defs/bounds"}}},
+          "composition": {
+            "type": "object",
+            "properties": {
+              "landscape": {"enum": ["code-over-demo", "code-left-demo-right"]},
+              "portrait": {"enum": ["code-over-demo", "code-left-demo-right"]}
+            },
+            "additionalProperties": false
+          },
+          "narration": {"type": "object", "required": ["text"], "properties": {"text": {"type": "string"}, "provider": {"type": "string"}, "voice": {"type": "string"}, "language": {"type": "string"}, "speed": {"type": "number"}, "gain": {"type": "number"}, "overflow": {"enum": ["error", "extend"]}}},
+          "actions": {"type": "array", "items": {"$ref": "#/$defs/action"}}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "bounds": {"type": "object", "required": ["x", "y", "width", "height"], "properties": {"x": {"type": "number"}, "y": {"type": "number"}, "width": {"type": "number"}, "height": {"type": "number"}}},
+    "action": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {"enum": ["text.show", "text.hide", "code.show", "code.type", "demo.mount", "demo.action", "layer.hide", "layer.animate", "transition", "focus.show", "focus.hide", "pointer.show", "pointer.move", "pointer.click", "pointer.hide", "replay", "narration.cue", "bullets.show", "diagram.show", "svg.show", "image.show", "intro.show", "outro.show"]},
+        "id": {"type": "string"},
+        "atMs": {"type": "integer", "minimum": 0},
+        "durationMs": {"type": "integer", "minimum": 0},
+        "role": {"enum": ["title", "code", "demo", "brand", "evidence"]},
+        "kind": {"enum": ["capture", "illustration", "photo", "diagram"]},
+        "target": {"type": "string"},
+        "name": {"type": "string"},
+        "arguments": {"type": "object"},
+        "area": {"type": "string"},
+        "bounds": {"$ref": "#/$defs/bounds"},
+        "relativeBounds": {"$ref": "#/$defs/bounds"},
+        "orientation": {"type": "object", "properties": {"landscape": {"$ref": "#/$defs/bounds"}, "portrait": {"$ref": "#/$defs/bounds"}}},
+        "effects": {"type": "object", "properties": {"landscape": {"type": "string"}, "portrait": {"type": "string"}}},
+        "effect": {"enum": ["none", "fade", "slide-left", "slide-right", "slide-up", "slide-down", "zoom-in", "zoom-out", "morph", "wipe-left", "wipe-right", "wipe-up", "wipe-down"]},
+        "easing": {"enum": ["linear", "ease-in", "ease-out", "ease-in-out", "spring"]},
+        "easings": {"type": "object", "properties": {"landscape": {"type": "string"}, "portrait": {"type": "string"}}},
+        "style": {"enum": ["mouse", "touch"]},
+        "x": {"type": "number", "minimum": 0, "maximum": 1},
+        "y": {"type": "number", "minimum": 0, "maximum": 1},
+        "fromMs": {"type": "integer", "minimum": 0},
+        "toMs": {"type": "integer", "minimum": 1},
+        "rewindDurationMs": {"type": "integer", "minimum": 1},
+        "rewindFps": {"type": "integer", "minimum": 1},
+        "playbackRate": {"type": "number", "exclusiveMinimum": 0, "maximum": 2},
+        "label": {"type": "string"},
+        "caption": {"type": "string"},
+        "title": {"type": "string"},
+        "subtitle": {"type": "string"},
+        "eyebrow": {"type": "string"},
+        "prompt": {"type": "string"},
+        "items": {"type": "array", "items": {"type": "string"}},
+        "path": {"type": "string"},
+        "sourceTitle": {"type": "string"},
+        "sourceUrl": {"type": "string", "format": "uri"},
+        "semanticIntent": {"type": "string"},
+        "paths": {"type": "object", "properties": {"landscape": {"type": "string"}, "portrait": {"type": "string"}}, "additionalProperties": false},
+        "texts": {"type": "object", "properties": {"landscape": {"type": "string"}, "portrait": {"type": "string"}}, "additionalProperties": false},
+        "animated": {"type": "boolean"},
+        "text": {"type": "string"},
+        "responsive": {"type": "boolean"},
+        "maxLines": {"type": "integer", "minimum": 1},
+        "provider": {"type": "string"},
+        "voice": {"type": "string"},
+        "language": {"type": "string"},
+        "speed": {"type": "number", "exclusiveMinimum": 0},
+        "gain": {"type": "number", "minimum": 0},
+        "overflow": {"enum": ["error", "extend"]},
+        "allowOverlap": {"type": "boolean"},
+        "fromX": {"type": "number", "minimum": -1, "maximum": 1},
+        "toX": {"type": "number", "minimum": -1, "maximum": 1},
+        "fromY": {"type": "number", "minimum": -1, "maximum": 1},
+        "toY": {"type": "number", "minimum": -1, "maximum": 1},
+        "fromScale": {"type": "number", "exclusiveMinimum": 0},
+        "toScale": {"type": "number", "exclusiveMinimum": 0},
+        "fromAlpha": {"type": "number", "minimum": 0, "maximum": 1},
+        "toAlpha": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 820">
+  <rect x="10" y="10" width="1580" height="800" rx="34" fill="#171c26" stroke="#273143" stroke-width="4"/>
+  <text x="70" y="92" fill="#50d8ff" font-size="58">Final time ratio vs warmed Java 25</text>
+  <text x="70" y="140" fill="#9eabbc" font-size="28">Lower is better. The cyan line is parity.</text>
+  <line x1="808" y1="180" x2="808" y2="730" stroke="#50d8ff" stroke-width="5"/>
+  <text x="820" y="206" fill="#50d8ff" font-size="24">1.00x</text>
+
+  <text x="70" y="242" fill="#f3f7fb" font-size="29">string building</text><rect x="340" y="212" width="314" height="36" rx="12" fill="#ffc857"/><text x="665" y="241" fill="#ffc857" font-size="28">0.67</text>
+  <text x="70" y="307" fill="#f3f7fb" font-size="29">array sequential</text><rect x="340" y="277" width="384" height="36" rx="12" fill="#ffc857"/><text x="735" y="306" fill="#ffc857" font-size="28">0.82</text>
+  <text x="70" y="372" fill="#f3f7fb" font-size="29">quicksort</text><rect x="340" y="342" width="431" height="36" rx="12" fill="#ffc857"/><text x="782" y="371" fill="#ffc857" font-size="28">0.92</text>
+  <text x="70" y="437" fill="#f3f7fb" font-size="29">hash map churn</text><rect x="340" y="407" width="445" height="36" rx="12" fill="#ffc857"/><text x="796" y="436" fill="#ffc857" font-size="28">0.95</text>
+  <text x="70" y="502" fill="#f3f7fb" font-size="29">math / random array</text><rect x="340" y="472" width="450" height="36" rx="12" fill="#ffc857"/><text x="801" y="501" fill="#ffc857" font-size="28">0.96</text>
+
+  <text x="870" y="307" fill="#f3f7fb" font-size="29">integer arithmetic</text><rect x="1165" y="277" width="268" height="36" rx="12" fill="#435069"/><text x="1445" y="306" fill="#f3f7fb" font-size="28">1.07</text>
+  <text x="870" y="372" fill="#f3f7fb" font-size="29">long arithmetic</text><rect x="1165" y="342" width="280" height="36" rx="12" fill="#435069"/><text x="1457" y="371" fill="#f3f7fb" font-size="28">1.12</text>
+  <text x="870" y="437" fill="#f3f7fb" font-size="29">object allocation</text><rect x="1165" y="407" width="298" height="36" rx="12" fill="#435069"/><text x="1475" y="436" fill="#f3f7fb" font-size="28">1.19</text>
+  <text x="870" y="502" fill="#f3f7fb" font-size="29">recursion</text><rect x="1165" y="472" width="400" height="36" rx="12" fill="#435069"/><text x="1475" y="541" fill="#f3f7fb" font-size="28">1.60</text>
+
+  <rect x="70" y="635" width="660" height="96" rx="24" fill="#202838" stroke="#ffc857" stroke-width="3"/>
+  <text x="105" y="676" fill="#ffc857" font-size="28">START</text><text x="105" y="714" fill="#f3f7fb" font-size="38">4.21x geomean</text>
+  <rect x="870" y="635" width="660" height="96" rx="24" fill="#202838" stroke="#50d8ff" stroke-width="3"/>
+  <text x="905" y="676" fill="#50d8ff" font-size="28">FINAL</text><text x="905" y="714" fill="#f3f7fb" font-size="38">1.00x geomean</text>
+</svg>

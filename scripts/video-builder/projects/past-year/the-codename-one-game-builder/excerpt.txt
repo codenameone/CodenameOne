@@ -1,0 +1,15 @@
+public class MyScene extends GameSceneView {
+    public MyScene(AssetCatalog catalog) {
+        super(loadLevel(), catalog);
+        setArcadeBehavior(true);
+    }
+
+    private static GameLevel loadLevel() throws IOException {
+        return GameLevel.load(Display.getInstance()
+                .getResourceAsStream(MyScene.class, "/MyScene.game"));
+    }
+
+    @Override protected void onUpdate(double dt) {
+        // rules stay here
+    }
+}

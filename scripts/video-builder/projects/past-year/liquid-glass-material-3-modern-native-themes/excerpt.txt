@@ -1,0 +1,18 @@
+Container row = new Container(BoxLayout.x());
+row.add(new Button("Default"));
+Button raised = new Button("Raised");
+raised.setUIID("RaisedButton");
+row.add(raised);
+form.add(row);
+
+TextField tf = new TextField("hello@example.com");
+form.add(tf);
+
+Container toggles = new Container(BoxLayout.x());
+CheckBox cb = new CheckBox("Remember me");
+cb.setSelected(true);
+toggles.add(cb);
+RadioButton rb = new RadioButton("Agree");
+rb.setSelected(true);
+toggles.add(rb);
+form.add(toggles);

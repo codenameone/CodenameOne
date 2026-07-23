@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "id": "visual-smoke",
+  "output": {
+    "frameRate": 10,
+    "landscapeWidth": 640,
+    "landscapeHeight": 360,
+    "portraitWidth": 360,
+    "portraitHeight": 640,
+    "videoBitRate": 1000000
+  },
+  "scenes": [
+    {
+      "id": "responsive-bullets",
+      "durationMs": 1000,
+      "actions": [
+        {"type": "intro.show", "id": "welcome", "durationMs": 450, "title": "Codename One", "subtitle": "Build. Explain. Ship.", "bounds": {"x": 0.05, "y": 0.08, "width": 0.90, "height": 0.84}},
+        {"type": "bullets.show", "id": "points", "atMs": 350, "durationMs": 550, "title": "A long title that must wrap safely", "items": ["A longer bullet point that wraps instead of overflowing", "Portrait and landscape stay readable"], "bounds": {"x": 0.02, "y": 0.05, "width": 0.96, "height": 0.90}, "orientation": {"portrait": {"x": 0.06, "y": 0.08, "width": 0.88, "height": 0.84}}},
+        {"type": "transition", "target": "points", "atMs": 350, "durationMs": 300, "effect": "wipe-up", "easing": "ease-out"},
+        {"type": "layer.hide", "target": "welcome", "atMs": 650}
+      ]
+    },
+    {
+      "id": "svg",
+      "durationMs": 1000,
+      "actions": [
+        {"type": "svg.show", "id": "asset", "paths": {"landscape": "pipeline.svg", "portrait": "pipeline-portrait.svg"}, "bounds": {"x": 0.04, "y": 0.08, "width": 0.92, "height": 0.84}},
+        {"type": "transition", "target": "asset", "durationMs": 600, "effects": {"landscape": "wipe-left", "portrait": "wipe-up"}, "easing": "ease-out"}
+      ]
+    },
+    {
+      "id": "diagram",
+      "durationMs": 1000,
+      "actions": [
+        {"type": "text.show", "id": "title", "text": "A responsive architecture title", "uiid": "VideoTitle", "responsive": true, "bounds": {"x": 0.06, "y": 0.02, "width": 0.88, "height": 0.20}},
+        {"type": "diagram.show", "id": "flow", "atMs": 100, "durationMs": 700, "texts": {"landscape": "flowchart LR\nA[Script] --> B[Compile]\nB[Compile] --> C[Live UI]", "portrait": "flowchart TD\nA[Script] --> B[Compile]\nB[Compile] --> C[Live UI]"}, "bounds": {"x": 0.04, "y": 0.24, "width": 0.92, "height": 0.70}},
+        {"type": "transition", "target": "flow", "atMs": 100, "durationMs": 500, "effect": "zoom-in", "easing": "ease-in-out"}
+      ]
+    },
+    {
+      "id": "replay",
+      "durationMs": 3000,
+      "actions": [
+        {"type": "demo.mount", "id": "demo", "class": "com.codename1.videobuilder.demos.CounterDemoScene", "bounds": {"x": 0.15, "y": 0.15, "width": 0.70, "height": 0.70}},
+        {"type": "pointer.show", "id": "pointer", "atMs": 100, "style": "touch", "area": "demo", "x": 0.5, "y": 0.58},
+        {"type": "pointer.click", "target": "pointer", "atMs": 300, "durationMs": 200},
+        {"type": "demo.action", "atMs": 400, "name": "increment", "arguments": {"count": 1}},
+        {"type": "replay", "atMs": 900, "fromMs": 100, "toMs": 500, "rewindDurationMs": 400, "rewindFps": 5, "playbackRate": 0.8}
+      ]
+    },
+    {
+      "id": "outro",
+      "durationMs": 1000,
+      "actions": [
+        {"type": "outro.show", "id": "next", "durationMs": 800, "eyebrow": "CODENAME ONE · VM INTERNALS", "title": "Choose the next teardown", "subtitle": "Frameless calls, the allocator, or tagged integers?", "prompt": "Comment with the mechanism you want next.", "bounds": {"x": 0, "y": 0, "width": 1, "height": 1}}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+A visual level editor for the Codename One gaming API that saves a plain-data .game file the runtime plays, across 2D, isometric board, and 3D modes, plus a streaming engine for large open worlds. The orientation before the three hands-on tutorials.
+
+This video explains why game levels should be visual data while java owns the rules.
+
+Full article and source material:
+https://www.codenameone.com/blog/the-codename-one-game-builder/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://github.com/codenameone/CodenameOne/pull/5253
+https://github.com/codenameone/CodenameOne/issues
+
+Chapters
+00:00 Who And What
+00:15 The Real World Problem
+00:31 Independent Context 1
+00:41 Independent Context 2
+01:09 Source And Product Proof
+01:24 Canonical Captures
+01:40 Developer Victory
+01:54 Outro
+
+Which part should we unpack next?
+
+Series: Game Development with Codename One — part 1 of 5
+
+#Java #CodenameOne

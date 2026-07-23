@@ -1,0 +1,11 @@
+public class MyScrubber extends PiiScrubber {
+    @Override
+    public String scrubMessage(String message) {
+        String safe = super.scrubMessage(message);
+        return safe.replaceAll("ACCT-\\d+", "[acct]");
+    }
+}
+
+CrashProtection.setScrubber(new MyScrubber());
+CrashProtection.install();
+CrashProtection.setEnabled(true);
