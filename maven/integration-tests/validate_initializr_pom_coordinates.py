@@ -77,6 +77,10 @@ def validate_root_pom(archive):
         fail("pom.xml is missing <properties>")
     require_equal(direct_text(properties, "cn1app.name", "pom.xml/properties"),
                   ROOT_ARTIFACT_ID, "pom.xml/properties", "cn1app.name")
+    modules = project.find("m:modules", NS)
+    if modules is None or "common" not in {
+            module.text.strip() for module in modules.findall("m:module", NS) if module.text}:
+        fail("pom.xml does not declare the common module")
     reject_initializr_coordinates(data, "pom.xml")
 
 
@@ -134,6 +138,9 @@ def main():
     with zipfile.ZipFile(str(archive_path), "r") as archive:
         embedded_poms = {name for name in archive.namelist()
                          if name == "pom.xml" or name.endswith("/pom.xml")}
+        # common/pom.xml is deliberately not stored in common.zip: GeneratorModel
+        # injects the selected template's common POM after reading this artifact.
+        # The generated common POM is covered by its runtime guard and matrix tests.
         expected_poms = {"pom.xml"} | {platform + "/pom.xml" for platform in PLATFORMS}
         if embedded_poms != expected_poms:
             fail("Initializr artifact POM set differs from the validated platform set: found "

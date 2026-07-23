@@ -136,7 +136,7 @@ public class GeneratorModel {
 
     public void generate() {
         cleanupGeneratedZips();
-        String fileName = appName.toLowerCase() + ".zip";
+        String fileName = toLowerCaseInvariant(appName) + ".zip";
 
         // Collect the project's entries (read source/template/cn1lib bytes).
         Map<String, byte[]> entries;
@@ -255,7 +255,7 @@ public class GeneratorModel {
     /// runtime guard in addition to the tests: common.zip is a committed binary
     /// artifact, so a bad manual rebuild must fail closed instead of reaching users.
     void validateGeneratedPomCoordinates(Map<String, byte[]> entries) throws IOException {
-        String rootArtifactId = appName.toLowerCase();
+        String rootArtifactId = toLowerCaseInvariant(appName);
         String version = "1.0-SNAPSHOT";
 
         String rootPom = normalizedPom(entries, "pom.xml");
@@ -295,7 +295,7 @@ public class GeneratorModel {
         String expectedCoordinates =
                 "</modelVersion><parent>"
                         + "<groupId>" + packageName + "</groupId>"
-                        + "<artifactId>" + appName.toLowerCase() + "</artifactId>"
+                        + "<artifactId>" + toLowerCaseInvariant(appName) + "</artifactId>"
                         + "<version>" + version + "</version>"
                         + "</parent>"
                         + "<groupId>" + packageName + "</groupId>"
@@ -337,6 +337,16 @@ public class GeneratorModel {
             throw new IOException("Refusing to generate project: " + path
                     + " does not declare the expected " + description);
         }
+    }
+
+    static String toLowerCaseInvariant(String value) {
+        // The CN1 runtime does not expose String.toLowerCase(Locale), so apply
+        // the locale-independent Character mapping one code unit at a time.
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            out.append(Character.toLowerCase(value.charAt(i)));
+        }
+        return out.toString();
     }
 
     /// Writes the collected entries as a STORED (uncompressed) zip. STORED rather
@@ -480,7 +490,7 @@ public class GeneratorModel {
         replaced = StringUtil.replaceAll(replaced, sourcePackagePath, packagePath);
         replaced = StringUtil.replaceAll(replaced, "MyAppName", appName);
         replaced = StringUtil.replaceAll(replaced, template.SOURCE_MAIN_CLASS, appName);
-        replaced = StringUtil.replaceAll(replaced, "myappname", appName.toLowerCase());
+        replaced = StringUtil.replaceAll(replaced, "myappname", toLowerCaseInvariant(appName));
         return replaced;
     }
 
@@ -494,7 +504,7 @@ public class GeneratorModel {
         content = StringUtil.replaceAll(content, template.SOURCE_PACKAGE, packageName);
         content = StringUtil.replaceAll(content, "MyAppName", appName);
         content = StringUtil.replaceAll(content, template.SOURCE_MAIN_CLASS, appName);
-        content = StringUtil.replaceAll(content, "myappname", appName.toLowerCase());
+        content = StringUtil.replaceAll(content, "myappname", toLowerCaseInvariant(appName));
         if ("common/codenameone_settings.properties".equals(targetPath)) {
             content = replaceProperty(content, "codename1.kotlin", String.valueOf(template.IS_KOTLIN));
             content = applyJavaVersionSettings(content);
