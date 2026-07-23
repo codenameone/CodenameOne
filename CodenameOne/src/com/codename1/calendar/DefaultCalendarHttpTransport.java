@@ -130,6 +130,17 @@ public class DefaultCalendarHttpTransport implements CalendarHttpTransport {
         return origin(a).equals(origin(b));
     }
 
+    // Locale-independent lowering: default-locale toLowerCase() would map
+    // 'I' to a dotless i under Turkish locales and break host comparison.
+    private static String asciiLowerCase(String value) {
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            out.append(c >= 'A' && c <= 'Z' ? (char) (c + ('a' - 'A')) : c);
+        }
+        return out.toString();
+    }
+
     private static String origin(String url) {
         if (url == null) {
             return "";
@@ -138,7 +149,7 @@ public class DefaultCalendarHttpTransport implements CalendarHttpTransport {
         if (schemeEnd < 0) {
             return url;
         }
-        String scheme = url.substring(0, schemeEnd).toLowerCase();
+        String scheme = asciiLowerCase(url.substring(0, schemeEnd));
         String rest = url.substring(schemeEnd + 3);
         int pathStart = rest.length();
         for (int i = 0; i < rest.length(); i++) {
@@ -153,7 +164,7 @@ public class DefaultCalendarHttpTransport implements CalendarHttpTransport {
         if (at >= 0) {
             authority = authority.substring(at + 1);
         }
-        authority = authority.toLowerCase();
+        authority = asciiLowerCase(authority);
         String host = authority;
         String port = null;
         if (authority.startsWith("[")) {

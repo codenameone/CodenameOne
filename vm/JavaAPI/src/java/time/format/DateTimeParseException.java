@@ -34,6 +34,12 @@ public class DateTimeParseException extends DateTimeException {
         this.errorIndex = errorIndex;
     }
 
+    public DateTimeParseException(String message, CharSequence parsedData, int errorIndex, Throwable cause) {
+        super(message, cause);
+        this.parsedData = parsedData == null ? null : parsedData.toString();
+        this.errorIndex = errorIndex;
+    }
+
     public String getParsedString() {
         return parsedData;
     }
