@@ -25,6 +25,7 @@ package com.codename1.impl.javase.bluetooth;
 import com.codename1.bluetooth.gatt.GattCharacteristic;
 import com.codename1.io.JSONParser;
 import com.codename1.util.Base64;
+import com.codename1.util.StringUtil;
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -106,7 +107,7 @@ final class FixtureJson {
 
     static byte[] decodeBase64(String s) {
         return s == null || s.length() == 0 ? new byte[0]
-                : Base64.decode(s.getBytes());
+                : Base64.decode(StringUtil.getBytes(s));
     }
 
     /** Maps fixture characteristic-property names onto GattCharacteristic bits. */

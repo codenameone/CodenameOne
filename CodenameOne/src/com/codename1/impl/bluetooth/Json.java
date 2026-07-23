@@ -24,6 +24,7 @@ package com.codename1.impl.bluetooth;
 
 import com.codename1.io.JSONParser;
 import com.codename1.util.Base64;
+import com.codename1.util.StringUtil;
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -109,6 +110,6 @@ final class Json {
     /// Standard-Base64 decode via the core {@link Base64}.
     static byte[] decodeBase64(String s) {
         return s == null || s.length() == 0 ? new byte[0]
-                : Base64.decode(s.getBytes());
+                : Base64.decode(StringUtil.getBytes(s));
     }
 }
