@@ -170,7 +170,7 @@ final class JavaSECalendarSource extends LocalCalendarSource {
         if (saved.getCalendarId() == null) {
             saved.setCalendarId("sim-events");
         }
-        saved.setSourceId(getId()).setVersion(String.valueOf(nextId));
+        saved.setSourceId(getId()).setVersion(String.valueOf(nextId++));
         events.put(saved.getId(), saved);
         fireChange(new CalendarChange(getId(), saved.getCalendarId(), saved.getId(), CalendarChange.EntityType.EVENT,
                 created ? CalendarChange.ChangeType.CREATED : CalendarChange.ChangeType.UPDATED));
@@ -246,7 +246,7 @@ final class JavaSECalendarSource extends LocalCalendarSource {
         if (saved.getCalendarId() == null) {
             saved.setCalendarId("sim-tasks");
         }
-        saved.setSourceId(getId()).setVersion(String.valueOf(nextId));
+        saved.setSourceId(getId()).setVersion(String.valueOf(nextId++));
         tasks.put(saved.getId(), saved);
         fireChange(new CalendarChange(getId(), saved.getCalendarId(), saved.getId(), CalendarChange.EntityType.TASK,
                 created ? CalendarChange.ChangeType.CREATED : CalendarChange.ChangeType.UPDATED));

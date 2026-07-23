@@ -37,6 +37,7 @@ import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 class JavaSECalendarSourceTest {
@@ -113,6 +114,20 @@ class JavaSECalendarSourceTest {
                 CalendarAttendee.Response.ACCEPTED, null));
         assertNotFound(source.respondToEvent(null, "missing-id",
                 CalendarAttendee.Response.ACCEPTED, null));
+    }
+
+    @Test
+    void repeatedSavesAdvanceTheVersionToken() {
+        JavaSECalendarSource source = new JavaSECalendarSource();
+        CalendarEvent event = source.saveEvent(new CalendarEvent().setTitle("v1"), CalendarMutationScope.ALL).get();
+        String firstVersion = event.getVersion();
+        String secondVersion = source.saveEvent(event.setTitle("v2"), CalendarMutationScope.ALL).get().getVersion();
+        assertNotEquals(firstVersion, secondVersion);
+
+        CalendarTask task = source.saveTask(new CalendarTask().setTitle("v1"), CalendarMutationScope.ALL).get();
+        String firstTaskVersion = task.getVersion();
+        String secondTaskVersion = source.saveTask(task.setTitle("v2"), CalendarMutationScope.ALL).get().getVersion();
+        assertNotEquals(firstTaskVersion, secondTaskVersion);
     }
 
     private static void assertNotFound(AsyncResource<?> result) {
