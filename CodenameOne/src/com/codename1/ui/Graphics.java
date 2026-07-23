@@ -1110,6 +1110,53 @@ public final class Graphics {
         }
     }
 
+    /// Fills the given shape and casts a blurred drop shadow behind it in a single GPU-accelerated
+    /// draw where the platform supports it (e.g. Android `Paint.setShadowLayer`, iOS
+    /// `CGContextSetShadow`), with no retained bitmap. This lets borders/decorations render soft
+    /// shadows every frame without caching a per-component image. Guard with
+    /// `#isShapeShadowSupported()` and fall back to your own path otherwise.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shape`: the shape to fill (and whose fill casts the shadow)
+    ///
+    /// - `fillColor`: the fill color as 0xRRGGBB
+    ///
+    /// - `fillAlpha`: the fill alpha 0..255
+    ///
+    /// - `shadowColor`: the shadow color as 0xRRGGBB
+    ///
+    /// - `shadowOpacity`: the shadow opacity in the range 0..1
+    ///
+    /// - `blurRadius`: the gaussian blur radius in pixels
+    ///
+    /// - `offsetX`: the shadow x offset in pixels
+    ///
+    /// - `offsetY`: the shadow y offset in pixels
+    public void fillShapeShadow(Shape shape, int fillColor, int fillAlpha, int shadowColor,
+            float shadowOpacity, int blurRadius, int offsetX, int offsetY) {
+        if (!isShapeSupported()) {
+            return;
+        }
+        if (xTranslate != 0 || yTranslate != 0) {
+            GeneralPath p = tmpClipShape();
+            p.setShape(shape, translation());
+            shape = p;
+        }
+        impl.fillShapeShadow(nativeGraphics, shape, fillColor, fillAlpha, shadowColor, shadowOpacity,
+                blurRadius, offsetX, offsetY);
+    }
+
+    /// Checks whether `#fillShapeShadow` renders a GPU shadow on this platform. When false the caller
+    /// should draw its shadow another way (e.g. the cached-image fallback in `RoundRectBorder`).
+    ///
+    /// #### Returns
+    ///
+    /// true if a GPU shape shadow is supported by the current graphics context
+    public boolean isShapeShadowSupported() {
+        return impl.isShapeShadowSupported(nativeGraphics);
+    }
+
     /// Checks to see if `com.codename1.ui.geom.Matrix` transforms are supported by this graphics context.
     ///
     /// #### Returns

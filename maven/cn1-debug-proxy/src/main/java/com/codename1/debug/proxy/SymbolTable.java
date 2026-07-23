@@ -6,6 +6,19 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.debug.proxy;
 
@@ -36,6 +49,7 @@ public final class SymbolTable {
     public static final class ClassInfo {
         public final int classId;
         public final String name;        // e.g. "java_lang_String" (translator convention)
+        public final String jvmName;     // e.g. "java/lang/String$CaseInsensitiveComparator"
         public final String sourceFile;
         /** Superclass classId, or -1 if java.lang.Object / unknown. */
         public int superId = -1;
@@ -48,15 +62,16 @@ public final class SymbolTable {
          */
         public final List<FieldInfo> instanceFields = new ArrayList<>();
 
-        ClassInfo(int classId, String name, String sourceFile) {
+        ClassInfo(int classId, String name, String sourceFile, String jvmName) {
             this.classId = classId;
             this.name = name;
             this.sourceFile = sourceFile;
+            this.jvmName = jvmName;
         }
 
-        /** JVM-style signature: "Ljava/lang/String;" derived from the underscore-separated name. */
+        /** JVM-style signature retaining inner-class markers and literal underscores. */
         public String jvmSignature() {
-            return "L" + name.replace('_', '/') + ";";
+            return "L" + jvmName + ";";
         }
     }
 
@@ -159,7 +174,13 @@ public final class SymbolTable {
                     case "class": {
                         if (parts.length < 4) continue;
                         int id = Integer.parseInt(parts[1]);
-                        ClassInfo c = new ClassInfo(id, parts[2], parts[3]);
+                        // New tables carry the original JVM internal name in
+                        // column 6. Older tables only contain ParparVM's
+                        // underscore-mangled identifier, so retain the legacy
+                        // best-effort reconstruction for compatibility.
+                        String jvmName = parts.length >= 6 && !parts[5].isEmpty()
+                                ? parts[5] : parts[2].replace('_', '/');
+                        ClassInfo c = new ClassInfo(id, parts[2], parts[3], jvmName);
                         if (parts.length >= 5) {
                             try { c.superId = Integer.parseInt(parts[4]); }
                             catch (NumberFormatException ignore) {}
@@ -233,7 +254,9 @@ public final class SymbolTable {
      */
     public MethodInfo methodCoveringLine(String className, int line) {
         ClassInfo c = classesById.values().stream()
-                .filter(ci -> ci.name.equals(className) || ci.name.replace('_', '.').equals(className))
+                .filter(ci -> ci.name.equals(className)
+                        || ci.jvmName.equals(className)
+                        || ci.jvmName.replace('/', '.').equals(className))
                 .findFirst().orElse(null);
         if (c == null) return null;
         for (MethodInfo m : c.methods) {

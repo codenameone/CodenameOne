@@ -352,6 +352,15 @@ public class RichView extends EditorView {
     }
 
     private int runPx(int blockType, int level) {
+        return runPx(blockType, level, -1);
+    }
+
+    /// Pixel size for a run: an absolute {@code fontSizePx} (&gt; 0) wins over the relative
+    /// level, and heading scale still applies on top so an H1 absolute-sized run stays larger.
+    private int runPx(int blockType, int level, int fontSizePx) {
+        if (fontSizePx > 0) {
+            return Math.round(fontSizePx * headingScale(blockType));
+        }
         return Math.round(baseSize() * headingScale(blockType) * sizeLevelScale(level));
     }
 
@@ -366,13 +375,19 @@ public class RichView extends EditorView {
         int lineStart = getDocument().getLineStart(line);
         String text = getDocument().getLineText(line);
         int maxLevel = 0;
+        int maxPx = 0;
         for (int i = 0; i < text.length(); i++) {
-            int lv = inline.styleAt(lineStart + i).getFontSizeLevel();
+            TextStyle stl = inline.styleAt(lineStart + i);
+            int lv = stl.getFontSizeLevel();
             if (lv > maxLevel) {
                 maxLevel = lv;
             }
+            int stPx = runPx(b.type, lv, stl.getFontSizePx());
+            if (stPx > maxPx) {
+                maxPx = stPx;
+            }
         }
-        int px = runPx(b.type, maxLevel);
+        int px = maxPx > 0 ? maxPx : runPx(b.type, maxLevel);
         int h = fontFor(isHeading(b.type), false, px).getHeight();
         int textH = h + Math.max(2, h / 6);
         int imgH = 0;
@@ -602,7 +617,7 @@ public class RichView extends EditorView {
             return 0;
         }
         TextStyle st = inline.styleAt(lineStart + from);
-        Font rf = fontFor(st.isBold() || isHeading(b.type), st.isItalic(), runPx(b.type, st.getFontSizeLevel()));
+        Font rf = fontFor(st.isBold() || isHeading(b.type), st.isItalic(), runPx(b.type, st.getFontSizeLevel(), st.getFontSizePx()));
         return rf.stringWidth(text.substring(from, to));
     }
 
@@ -675,7 +690,7 @@ public class RichView extends EditorView {
                     && inline.styleAt(lineStart + runEnd).equals(st)) {
                 runEnd++;
             }
-            Font rf = fontFor(st.isBold() || isHeading(b.type), st.isItalic(), runPx(b.type, st.getFontSizeLevel()));
+            Font rf = fontFor(st.isBold() || isHeading(b.type), st.isItalic(), runPx(b.type, st.getFontSizeLevel(), st.getFontSizePx()));
             x += rf.stringWidth(text.substring(c, runEnd));
             c = runEnd;
         }
@@ -876,7 +891,7 @@ public class RichView extends EditorView {
         TextStyle st = inline.styleAt(lineStart + from);
         String run = text.substring(from, to);
         boolean bold = st.isBold() || isHeading(b.type);
-        Font rf = fontFor(bold, st.isItalic(), runPx(b.type, st.getFontSizeLevel()));
+        Font rf = fontFor(bold, st.isItalic(), runPx(b.type, st.getFontSizeLevel(), st.getFontSizePx()));
         int w = rf.stringWidth(run);
         int ry = y + baseline(lineHeight, rf);
         if (st.getHighlight() >= 0) {

@@ -12319,32 +12319,28 @@ JAVA_VOID com_codename1_impl_ios_IOSNative_splitString___java_lang_String_char_j
 #else
 JAVA_VOID com_codename1_impl_ios_IOSNative_splitString___java_lang_String_char_java_util_ArrayList(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT instanceObject, JAVA_OBJECT string, JAVA_CHAR separator, JAVA_OBJECT outArr) {
     enteringNativeAllocations();
-    struct obj__java_lang_String* encString = (struct obj__java_lang_String*)string;
-    JAVA_INT strlen = encString->java_lang_String_count;
-    JAVA_INT offset = get_field_java_lang_String_offset(string);
-    JAVA_ARRAY srcArr = (JAVA_ARRAY)get_field_java_lang_String_value(string);
-    JAVA_ARRAY_CHAR* src = (JAVA_ARRAY_CHAR*)srcArr->data;
-    JAVA_INT startPos = offset;
-    JAVA_INT endOffset = offset + strlen;
-    JAVA_INT i = startPos;
-    for (; i < endOffset; i++) {
-        if (src[i] == separator) {
+    // Read through the coder-aware String accessors (charAt/substring) rather than
+    // casting the backing array to JAVA_ARRAY_CHAR*: value may be a char[] (UTF-16)
+    // or a byte[] (Latin-1), and both offset and coder are handled inside those
+    // accessors. Indices here are logical (0..count), not raw array offsets.
+    JAVA_INT strlen = ((struct obj__java_lang_String*)string)->java_lang_String_count;
+    JAVA_INT startPos = 0;
+    JAVA_INT i = 0;
+    for (; i < strlen; i++) {
+        if (java_lang_String_charAt___int_R_char(CN1_THREAD_STATE_PASS_ARG string, i) == separator) {
             if (i > startPos) {
-                JAVA_OBJECT str = __NEW_java_lang_String(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-                java_lang_String___INIT_____char_1ARRAY_int_int(CN1_THREAD_STATE_PASS_ARG str, (JAVA_OBJECT)srcArr, startPos, i - startPos);
-
+                JAVA_OBJECT str = java_lang_String_substring___int_int_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG string, startPos, i);
                 java_util_ArrayList_add___java_lang_Object_R_boolean(CN1_THREAD_STATE_PASS_ARG outArr, str);
             }
             startPos = i + 1;
         }
     }
     if (i > startPos) {
-        JAVA_OBJECT str = __NEW_java_lang_String(CN1_THREAD_STATE_PASS_SINGLE_ARG);
-        java_lang_String___INIT_____char_1ARRAY_int_int(CN1_THREAD_STATE_PASS_ARG str, (JAVA_OBJECT)srcArr, startPos, i - startPos);
+        JAVA_OBJECT str = java_lang_String_substring___int_int_R_java_lang_String(CN1_THREAD_STATE_PASS_ARG string, startPos, i);
         java_util_ArrayList_add___java_lang_Object_R_boolean(CN1_THREAD_STATE_PASS_ARG outArr, str);
     }
     finishedNativeAllocations();
-    
+
 }
 #endif
 

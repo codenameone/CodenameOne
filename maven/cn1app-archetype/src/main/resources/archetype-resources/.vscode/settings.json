@@ -44,6 +44,10 @@
     "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=javascript\" \"-Dcodename1.buildTarget=javascript\" \"-U\" \"-e\""
   },
   {
+    "alias": "Local > JavaScript Build",
+    "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=javascript\" \"-Dcodename1.buildTarget=local-javascript\" \"-U\" \"-e\""
+  },
+  {
     "alias": "Cloud > Windows Desktop Build",
     "command": "\"package\" \"-DskipTests\" \"-Dcodename1.platform=javase\" \"-Dcodename1.buildTarget=windows-desktop\" \"-U\" \"-e\""
   },

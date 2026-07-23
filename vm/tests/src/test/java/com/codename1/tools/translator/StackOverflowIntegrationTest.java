@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.tools.translator;
 
 import org.junit.jupiter.params.ParameterizedTest;
@@ -154,11 +176,15 @@ class StackOverflowIntegrationTest {
                 "void StackOverflowApp_report___java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT msg) {\n" +
                 "    struct obj__java_lang_String* str = (struct obj__java_lang_String*)msg;\n" +
                 "    if (str && str->java_lang_String_value) {\n" +
-                "        JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)str->java_lang_String_value)->data;\n" +
+                "        JAVA_ARRAY arr = (JAVA_ARRAY)str->java_lang_String_value;\n" +
                 "        int len = str->java_lang_String_count;\n" +
                 "        int off = str->java_lang_String_offset;\n" +
-                "        for (int i = 0; i < len; i++) {\n" +
-                "            printf(\"%c\", (char)chars[off + i]);\n" +
+                "        if (arr->__codenameOneParentClsReference == &class_array1__JAVA_BYTE) {\n" +
+                "            JAVA_ARRAY_BYTE* bytes = (JAVA_ARRAY_BYTE*)arr->data;\n" +
+                "            for (int i = 0; i < len; i++) { printf(\"%c\", (char)(bytes[off + i] & 0xff)); }\n" +
+                "        } else {\n" +
+                "            JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)arr->data;\n" +
+                "            for (int i = 0; i < len; i++) { printf(\"%c\", (char)chars[off + i]); }\n" +
                 "        }\n" +
                 "        printf(\"\\n\");\n" +
                 "        fflush(stdout);\n" +

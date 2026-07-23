@@ -1081,6 +1081,186 @@ bindNative([
   return jvm.wrapJsObject(u8, "com_codename1_html5_js_typedarrays_Uint8Array");
 });
 
+function javaRegexReplacement(matchArgs, replacement) {
+  let out = "";
+  for (let i = 0; i < replacement.length; i++) {
+    const ch = replacement.charAt(i);
+    if (ch === "\\" && i + 1 < replacement.length) {
+      out += replacement.charAt(++i);
+      continue;
+    }
+    if (ch === "$" && i + 1 < replacement.length) {
+      let end = i + 1;
+      while (end < replacement.length && /[0-9]/.test(replacement.charAt(end))) {
+        end++;
+      }
+      if (end > i + 1) {
+        const group = parseInt(replacement.substring(i + 1, end), 10);
+        if (group < matchArgs.length - 2) {
+          out += matchArgs[group] == null ? "" : String(matchArgs[group]);
+          i = end - 1;
+          continue;
+        }
+      }
+    }
+    out += ch;
+  }
+  return out;
+}
+
+function replaceJavaRegex(source, regex, replacement, replaceAll) {
+  const input = jvm.toNativeString(source);
+  const pattern = jvm.toNativeString(regex);
+  const replacementText = jvm.toNativeString(replacement);
+  const compiled = new RegExp(pattern, replaceAll ? "g" : "");
+  return jvm.createStringLiteral(input.replace(compiled, function() {
+    return javaRegexReplacement(arguments, replacementText);
+  }));
+}
+
+bindNative([
+  "cn1_com_codename1_impl_JdkApiRewriteHelper_replaceAll_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String"
+], function*(source, regex, replacement) {
+  return replaceJavaRegex(source, regex, replacement, true);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_JdkApiRewriteHelper_replaceFirst_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String"
+], function*(source, regex, replacement) {
+  return replaceJavaRegex(source, regex, replacement, false);
+});
+
+function cn1CryptoByteValues(value) {
+  if (value == null) {
+    return null;
+  }
+  const out = new Array(value.length | 0);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = (value[i] | 0) & 0xff;
+  }
+  return out;
+}
+
+function cn1CryptoJavaBytes(value) {
+  if (value == null) {
+    return null;
+  }
+  const out = jvm.newArray(value.length | 0, "JAVA_BYTE", 1);
+  for (let i = 0; i < out.length; i++) {
+    const unsigned = value[i] | 0;
+    out[i] = unsigned > 127 ? unsigned - 256 : unsigned;
+  }
+  return out;
+}
+
+function* cn1CryptoHost(request) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    throw new Error("Web Crypto host bridge is unavailable");
+  }
+  try {
+    return yield jvm.invokeHostNative("__cn1_crypto__", [request]);
+  } catch (err) {
+    // The public security API deliberately translates port RuntimeExceptions
+    // into CryptoException.  A rejected Web Crypto Promise arrives as a host
+    // Error, so normalize it into the Java exception hierarchy before it
+    // crosses back through Cipher/Signature/KeyGenerator.
+    const ex = jvm.createException("java_lang_RuntimeException");
+    if (typeof ex.ctor === "function") {
+      yield* cn1_ivAdapt(ex.ctor(ex.object));
+    }
+    ex.object.__cn1HostCryptoError = err == null ? "Web Crypto operation failed" : String(err);
+    throw ex.object;
+  }
+}
+
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_secureRandomBytes_byte_1ARRAY_R_void",
+  "cn1_com_codename1_impl_CodenameOneImplementation_secureRandomBytes_byte_1ARRAY"
+], function*(_impl, out) {
+  const random = yield* cn1CryptoHost({ op: "random", length: out.length | 0 });
+  for (let i = 0; i < out.length; i++) {
+    const unsigned = random[i] | 0;
+    out[i] = unsigned > 127 ? unsigned - 256 : unsigned;
+  }
+  return null;
+});
+
+function cn1CryptoAesBinding(op) {
+  return function*(_impl, transformation, key, iv, aad, data) {
+    const result = yield* cn1CryptoHost({
+      op: op,
+      transformation: jvm.toNativeString(transformation),
+      key: cn1CryptoByteValues(key),
+      iv: cn1CryptoByteValues(iv),
+      aad: cn1CryptoByteValues(aad),
+      data: cn1CryptoByteValues(data)
+    });
+    return cn1CryptoJavaBytes(result);
+  };
+}
+
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_aesEncrypt_java_lang_String_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY"
+], cn1CryptoAesBinding("aesEncrypt"));
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_aesDecrypt_java_lang_String_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY"
+], cn1CryptoAesBinding("aesDecrypt"));
+
+function cn1CryptoRsaBinding(op) {
+  return function*(_impl, transformation, key, data) {
+    const result = yield* cn1CryptoHost({
+      op: op,
+      transformation: jvm.toNativeString(transformation),
+      key: cn1CryptoByteValues(key),
+      data: cn1CryptoByteValues(data)
+    });
+    return cn1CryptoJavaBytes(result);
+  };
+}
+
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_rsaEncrypt_java_lang_String_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY"
+], cn1CryptoRsaBinding("rsaEncrypt"));
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_rsaDecrypt_java_lang_String_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY"
+], cn1CryptoRsaBinding("rsaDecrypt"));
+
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_cryptoSign_java_lang_String_java_lang_String_byte_1ARRAY_byte_1ARRAY_R_byte_1ARRAY"
+], function*(_impl, algorithm, keyAlgorithm, key, data) {
+  const result = yield* cn1CryptoHost({
+    op: "sign",
+    algorithm: jvm.toNativeString(algorithm),
+    keyAlgorithm: jvm.toNativeString(keyAlgorithm),
+    key: cn1CryptoByteValues(key),
+    data: cn1CryptoByteValues(data)
+  });
+  return cn1CryptoJavaBytes(result);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_cryptoVerify_java_lang_String_java_lang_String_byte_1ARRAY_byte_1ARRAY_byte_1ARRAY_R_boolean"
+], function*(_impl, algorithm, keyAlgorithm, key, data, signature) {
+  return (yield* cn1CryptoHost({
+    op: "verify",
+    algorithm: jvm.toNativeString(algorithm),
+    keyAlgorithm: jvm.toNativeString(keyAlgorithm),
+    key: cn1CryptoByteValues(key),
+    data: cn1CryptoByteValues(data),
+    signature: cn1CryptoByteValues(signature)
+  })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_CodenameOneImplementation_generateRsaKeyPair_int_R_byte_2ARRAY"
+], function*(_impl, bits) {
+  const result = yield* cn1CryptoHost({ op: "generateRsaKeyPair", bits: bits | 0 });
+  const pair = jvm.newArray(2, "JAVA_BYTE", 2);
+  pair[0] = cn1CryptoJavaBytes(result[0]);
+  pair[1] = cn1CryptoJavaBytes(result[1]);
+  return pair;
+});
+
 bindNative(["cn1_com_codename1_html5_js_core_JSArray_create_R_com_codename1_html5_js_core_JSArray", "cn1_com_codename1_html5_js_core_JSArray_create___R_com_codename1_html5_js_core_JSArray"], function() {
   const arr = [];
   return jvm.wrapJsObject(arr, "com_codename1_html5_js_core_JSArray");
@@ -1122,6 +1302,78 @@ bindNative(["cn1_com_codename1_html5_js_browser_Window_current_R_com_codename1_h
   jvm.enhanceJsWrapper(wrapper, "com_codename1_impl_html5_JSOImplementations_WindowExt");
   self.__cn1WindowWrapper = wrapper;
   return wrapper;
+});
+
+// Window's static timer methods are Java stubs so the same API can compile
+// without a DOM. On the worker port they must run on the browser host: leaving
+// the stubs in place returns timer id 0 and silently drops every callback
+// (camera frame delivery was the first assertion test to expose this).
+function* cn1SetHostTimer(kind, handler, delay) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return 0;
+  }
+  if (!handler || !handler.__class) {
+    return 0;
+  }
+  if (!handler.__cn1NativeTimerCallback) {
+    handler.__cn1NativeTimerCallback = function() {
+      try {
+        spawnVirtualCallback(handler, "cn1_s_onTimer", [], "__cn1TimerCallbackPending");
+      } catch (err) {
+        jvm.fail(err);
+      }
+    };
+  }
+  return (yield jvm.invokeHostNative(kind, [
+    handler.__cn1NativeTimerCallback,
+    Math.max(0, delay | 0)
+  ])) | 0;
+}
+
+bindNative([
+  "cn1_com_codename1_html5_js_browser_Window_setTimeout_java_lang_Object_int_R_int",
+  "cn1_com_codename1_html5_js_browser_Window_setTimeout___java_lang_Object_int_R_int"
+], function*(handler, delay) {
+  return yield* cn1SetHostTimer("__cn1_timer_set_timeout__", handler, delay);
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_browser_Window_clearTimeout_int",
+  "cn1_com_codename1_html5_js_browser_Window_clearTimeout___int"
+], function*(id) {
+  if (typeof jvm.invokeHostNative === "function") {
+    yield jvm.invokeHostNative("__cn1_timer_clear_timeout__", [id | 0]);
+  }
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_browser_Window_setInterval_java_lang_Object_int_R_int",
+  "cn1_com_codename1_html5_js_browser_Window_setInterval___java_lang_Object_int_R_int"
+], function*(handler, delay) {
+  return yield* cn1SetHostTimer("__cn1_timer_set_interval__", handler, delay);
+});
+
+bindNative([
+  "cn1_com_codename1_html5_js_browser_Window_clearInterval_int",
+  "cn1_com_codename1_html5_js_browser_Window_clearInterval___int"
+], function*(id) {
+  if (typeof jvm.invokeHostNative === "function") {
+    yield jvm.invokeHostNative("__cn1_timer_clear_interval__", [id | 0]);
+  }
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5BrowserComponent_installShouldLoadURLCallback_com_codename1_impl_html5_JSOImplementations_HTMLIFrameElement_com_codename1_impl_html5_HTML5BrowserComponent_ShouldLoadURLCallback"
+], function*(iframe, callback) {
+  yield jvm.invokeHostNative("__cn1_install_browser_navigation_callback__", [iframe, callback]);
+  return null;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5BrowserComponent_installShouldLoadURLCallbackShared_com_codename1_impl_html5_HTML5BrowserComponent_ShouldLoadURLCallback"
+], function*(callback) {
+  yield jvm.invokeHostNative("__cn1_install_browser_navigation_callback__", [null, callback]);
+  return null;
 });
 
 bindNative([
@@ -2046,6 +2298,198 @@ bindNative([
   }
   const ref = jvm.unwrapJsValue(video);
   yield jvm.invokeHostNative("__cn1_camera_close__", [{ video: ref }]);
+});
+
+// HTML5VideoIO uses Window-only APIs (document, HTMLVideoElement, WebCodecs,
+// and the muxer scripts).  Translated Java runs in a Worker, so every one of
+// these operations must execute on the browser host.  Keeping the complete
+// media session on the host also means async script loads and encoder flushes
+// have a real Promise completion instead of a worker-side polling race.
+function* cn1VideoIoHost(request) {
+  if (typeof jvm.invokeHostNative !== "function") {
+    throw new Error("VideoIO host bridge is unavailable");
+  }
+  return yield jvm.invokeHostNative("__cn1_video_io__", [request]);
+}
+
+function cn1VideoIoString(value) {
+  return value == null ? null : jvm.createStringLiteral(String(value));
+}
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1WebCodecsAvailable_R_boolean"
+], function*() {
+  return (yield* cn1VideoIoHost({ op: "webCodecsAvailable" })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1AudioWebCodecsAvailable_R_boolean"
+], function*() {
+  return (yield* cn1VideoIoHost({ op: "audioWebCodecsAvailable" })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoEncoderSupported_java_lang_String_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoEncoderSupported___java_lang_String_R_boolean"
+], function*(codec) {
+  return (yield* cn1VideoIoHost({
+    op: "videoEncoderSupported", codec: jvm.toNativeString(codec)
+  })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1AudioEncoderSupported_java_lang_String_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1AudioEncoderSupported___java_lang_String_R_boolean"
+], function*(codec) {
+  return (yield* cn1VideoIoHost({
+    op: "audioEncoderSupported", codec: jvm.toNativeString(codec)
+  })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoOpen_java_lang_String_R_int"
+], function*(url) {
+  return (yield* cn1VideoIoHost({ op: "videoOpen", url: jvm.toNativeString(url) })) | 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoReady_int_R_boolean"
+], function*(id) {
+  return (yield* cn1VideoIoHost({ op: "videoReady", id: id | 0 })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoWidth_int_R_int"
+], function*(id) {
+  return (yield* cn1VideoIoHost({ op: "videoWidth", id: id | 0 })) | 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoHeight_int_R_int"
+], function*(id) {
+  return (yield* cn1VideoIoHost({ op: "videoHeight", id: id | 0 })) | 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoDuration_int_R_int"
+], function*(id) {
+  return (yield* cn1VideoIoHost({ op: "videoDuration", id: id | 0 })) | 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoSeek_int_int"
+], function*(id, ms) {
+  yield* cn1VideoIoHost({ op: "videoSeek", id: id | 0, ms: ms | 0 });
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoSeeked_int_R_boolean"
+], function*(id) {
+  return (yield* cn1VideoIoHost({ op: "videoSeeked", id: id | 0 })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoCapture_int_int_int_R_java_lang_String"
+], function*(id, w, h) {
+  return cn1VideoIoString(yield* cn1VideoIoHost({
+    op: "videoCapture", id: id | 0, w: w | 0, h: h | 0
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoClose_int"
+], function*(id) {
+  yield* cn1VideoIoHost({ op: "videoClose", id: id | 0 });
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoBlobUrl_java_lang_String_java_lang_String_R_java_lang_String"
+], function*(b64, mime) {
+  return cn1VideoIoString(yield* cn1VideoIoHost({
+    op: "videoBlobUrl", b64: jvm.toNativeString(b64), mime: jvm.toNativeString(mime)
+  }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncEnsureLibs"
+], function*() {
+  yield* cn1VideoIoHost({ op: "encEnsureLibs" });
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncLibsReady_java_lang_String_R_boolean"
+], function*(container) {
+  return (yield* cn1VideoIoHost({
+    op: "encLibsReady", container: jvm.toNativeString(container)
+  })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncOpen_java_lang_String_java_lang_String_int_int_int_int_boolean_java_lang_String_int_int_int_R_int"
+], function*(container, videoCodec, w, h, fps, videoBitRate, hasAudio,
+             audioCodec, audioBitRate, sampleRate, channels) {
+  return (yield* cn1VideoIoHost({
+    op: "encOpen",
+    container: jvm.toNativeString(container),
+    videoCodec: jvm.toNativeString(videoCodec),
+    w: w | 0,
+    h: h | 0,
+    fps: fps | 0,
+    videoBitRate: videoBitRate | 0,
+    hasAudio: !!hasAudio,
+    audioCodec: audioCodec == null ? null : jvm.toNativeString(audioCodec),
+    audioBitRate: audioBitRate | 0,
+    sampleRate: sampleRate | 0,
+    channels: channels | 0
+  })) | 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncError_int_R_java_lang_String"
+], function*(peer) {
+  return cn1VideoIoString(yield* cn1VideoIoHost({ op: "encError", peer: peer | 0 }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncFrame_int_java_lang_String_int_int_double"
+], function*(peer, b64, w, h, ptsUs) {
+  yield* cn1VideoIoHost({
+    op: "encFrame", peer: peer | 0, b64: jvm.toNativeString(b64),
+    w: w | 0, h: h | 0, ptsUs: +ptsUs
+  });
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncAudio_int_java_lang_String_int_int_double"
+], function*(peer, b64, sampleRate, channels, ptsUs) {
+  yield* cn1VideoIoHost({
+    op: "encAudio", peer: peer | 0, b64: jvm.toNativeString(b64),
+    sampleRate: sampleRate | 0, channels: channels | 0, ptsUs: +ptsUs
+  });
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncFlush_int"
+], function*(peer) {
+  yield* cn1VideoIoHost({ op: "encFlush", peer: peer | 0 });
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncDone_int_R_boolean"
+], function*(peer) {
+  return (yield* cn1VideoIoHost({ op: "encDone", peer: peer | 0 })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncResult_int_R_java_lang_String"
+], function*(peer) {
+  return cn1VideoIoString(yield* cn1VideoIoHost({ op: "encResult", peer: peer | 0 }));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1EncClose_int"
+], function*(peer) {
+  yield* cn1VideoIoHost({ op: "encClose", peer: peer | 0 });
 });
 
 // Fullscreen: document.fullscreen* lives on the main thread. Queries return the
@@ -3896,216 +4340,8 @@ const baseTestPrepareMethodId = "cn1_s_prepare";
 const baseTestRunTestMethodId = "cn1_s_runTest_R_boolean";
 const baseTestFailMethodId = "cn1_s_fail_java_lang_String";
 const baseTestDoneMethodId = "cn1_s_done";
-const cn1ssForcedTimeoutTestClasses = Object.freeze({
-  // UNSKIP-PHASE2: "com_codenameone_examples_hellocodenameone_tests_MediaPlaybackScreenshotTest": "mediaPlayback",
-  "com_codenameone_examples_hellocodenameone_tests_BytecodeTranslatorRegressionTest": "bytecodeTranslatorRegression",
-  // The 3D model test loads a ~6K-triangle glTF model with a decoded JPEG
-  // base-color texture. The heavy onInit (glTF parse + image decode + a large
-  // getRGB upload) reliably wedges the headless SwiftShader WebGL path before
-  // the capture window, and a curved, bilinearly-textured model would not match
-  // a stored golden across the ARM/x64 SwiftShader rasterizers anyway. It is
-  // validated on the real-GPU platforms (iOS Metal) and in the simulator
-  // instead; the geometry path is still covered on JS by Gpu3DCube /
-  // Gpu3DTexturedCube / Gpu3DAnimation, which capture reliably.
-  "com_codenameone_examples_hellocodenameone_tests_Gpu3DModelScreenshotTest": "gpu3dModelHeadlessGl",
-  // BrowserComponent's ``onLoad`` event never reaches the worker side
-  // — the iframe ``load`` event isn't currently routed through the
-  // worker-callback transport, so ``loaded = true`` never gets set
-  // and the test waits on its own ``readyRunnable`` indefinitely. The
-  // 10s ``cn1ssTestTimeoutMs`` deadline in the lambdaBridge await
-  // never gets a chance to fire because we're still inside the
-  // bytecode-emitted dispatch chain. Force-timeout so the rest of
-  // the screenshot suite can finalize.
-  "com_codenameone_examples_hellocodenameone_tests_BrowserComponentScreenshotTest": "browserComponentLoadEvent",
-  // ChatInput/ChatView un-parked: their dark-phase emit no longer spills into the
-  // next test now that awaitTestCompletion gives DualAppearanceBaseTest its full
-  // 30s on HTML5 (was clobbered to a flat 10s by the bridge).
-  // The 14 *ThemeScreenshotTest entries that used to live here were
-  // unparked when the JS port started bundling the modern native
-  // theme resources (iOSModernTheme.res / AndroidMaterialTheme.res
-  // mirrored into webapp/assets/ by scripts/build-native-themes.sh).
-  // DualAppearanceBaseTest now installs the OS-appropriate modern
-  // theme via the cn1.modernThemeResource Display property that
-  // HTML5Implementation publishes during installNativeTheme(); see
-  // the matching cn1ssForcedTimeoutTestNames map below for the
-  // short-name list that was un-parked in tandem.
-  // jsChunkDrop block removed for the graphics grid, KotlinUiTest,
-  // MainScreenScreenshotTest, the Tabs / ImageViewer / TextArea /
-  // ToastBar / picker tests, and ChartLine -- the chunk emitter bug
-  // those entries worked around is fixed on master in #4875
-  // (8582151ec). Verified on CI: all 26 ``tests.graphics.*`` cells,
-  // KotlinUiTest, MainScreenScreenshotTest, ChartLine, and the
-  // animation / transition grid now produce comparable PNGs.
-  //
-  // The chart tests below run AFTER ~60 prior tests have accumulated
-  // ~420 hostRef-tracked canvases on the page, at which point the
-  // JS port's Document.createElement bridge starts returning a null
-  // host receiver and the runtime emits ``VIRTUAL_FAIL ...
-  // methodId=cn1_s_createElement_..._HTMLElement receiverClass=null``.
-  // The first failure cascades through every chart that runs later
-  // -- ChartLine (the first chart in the suite order) succeeds for
-  // the same reason: it runs before the threshold. This is a
-  // separate canvas-accumulation / Document-wrapper-staleness bug
-  // (likely in the ``Window.getDocument`` cache landed in
-  // 80bfa41de) tracked separately from the chunk-emit fix. Skip
-  // these charts under a distinct reason so the cause is obvious in
-  // CI logs.
-  // Un-parked after wrapJsObject class-wipe fix landed: the previous
-  // logic at parparvm_runtime.js wrapJsObject unconditionally
-  // overwrote cached wrapper.__class with whatever inferJsObjectClass
-  // returned, including null. Re-wrapping the same Document value via
-  // a host-bridge round-trip without ``__cn1HostClass`` set wiped its
-  // class, and the next ``cn1_s_createElement`` virtual dispatch
-  // failed with receiverClass=null, cascading through every chart
-  // that ran later. The fix preserves the cached class when the new
-  // resolution is null.
-  //"com_codenameone_examples_hellocodenameone_tests_charts_ChartDoughnutScreenshotTest": "chartDocumentStaleness",
-  //"com_codenameone_examples_hellocodenameone_tests_charts_ChartRadarScreenshotTest": "chartDocumentStaleness",
-  //"com_codenameone_examples_hellocodenameone_tests_charts_ChartTimeChartScreenshotTest": "chartDocumentStaleness",
-  // ChartCombinedXY re-parked: exact longs did NOT fix it -- it still hangs the
-  // suite in a non-terminating form-construction/layout loop (runTest never
-  // returns, so the per-test deadline never arms). Distinct from the chart
-  // axis-label bug that exact longs DID fix. Needs its own non-termination fix.
-  "com_codenameone_examples_hellocodenameone_tests_charts_ChartCombinedXYScreenshotTest": "chartCombinedXyHang",
-  // SVGStatic re-parked: installGlobal() runs and the GeneratedSVGImage is
-  // registered with correct dimensions (each grid cell is sized), but paintSVG
-  // renders BLANK on the JS port -- the shapes draw under GeneratedSVGImage's
-  // getTransform/setTransform round-trip, which is the known JS-port canvas
-  // transform-leak family. isShapeSupported=true and fillShape/drawShape
-  // delegate fine, so this is a transform-composition bug, not missing shape
-  // support. The build-time SVG wiring (SVGRegistry.installGlobal in the JS
-  // launcher) is correct and stays; only the runtime transform render is the
-  // gap. Park until the SVG transform render is fixed so the suite stays green
-  // (a delivering test with no golden fails as "Reference screenshot missing").
-  // UNSKIP-PHASE2: "com_codenameone_examples_hellocodenameone_tests_SVGStaticScreenshotTest": "svgTransformBlankRender",
-  // FileSystemStorageOpenInputStreamMissingTest RE-PARKED: its runTest blocks on
-  // a flaky LocalForage.getItem host call. The per-test dispatch watchdog DOES
-  // fire on it, but force-advancing cannot recover a DEGRADED host channel (the
-  // recovery path runNextTestMethod itself needs the channel), so once the
-  // channel is bad the suite is dead regardless. Parking removes it as a wedge
-  // candidate (no golden -> zero parity impact) and restores the known-green tail
-  // from efabb3e1a. The watchdog stays as a healthy-channel safety net for
-  // genuine isolated blocks; it is NOT a cure for host-channel degradation.
-  "com_codenameone_examples_hellocodenameone_tests_FileSystemStorageOpenInputStreamMissingTest": "fileSystemStorageLocalForageHang",
-  // Transform + Rotated kept UN-parked -- never reached on the prior run
-  // (CombinedXY hung first); testing whether they render now.
-  // Two more late-suite tests that hit the canvas-accumulation
-  // threshold and hang waiting for SCREENSHOT_DONE. On the run that
-  // didn't get this far they finish cleanly, but the canary-test
-  // identity drifts between runs depending on cumulative canvas
-  // pressure -- consistently breaks once an instance of the cascade
-  // bites. Park them with the chart tail so the suite reliably
-  // reaches comparison.
-  // Un-parked: canvasContextWipe root cause fixed at 5dce6a24a
-  // (defensive __cn1CachedDocWrapper invalidation in getDocument).
-  // UNSKIP-TRIAGE(surface-id+freeze fix): "com_codenameone_examples_hellocodenameone_tests_ToastBarTopPositionScreenshotTest": "canvasContextWipe",
-  // Un-parked: canvasContextWipe no-op recovery for save/restore/
-  // setTransform/etc at d696fb682 + AbstractAnimationScreenshotTest
-  // safety net (efc9bdb67) should now keep this from hanging.
-  //"com_codenameone_examples_hellocodenameone_tests_SheetSlideUpAnimationScreenshotTest": "canvasContextWipe",
-  // TextAreaAlignmentStates' form renders correctly, but the screenshot
-  // captures it underneath a leftover Sheet overlay from
-  // SheetScreenshotTest (which ran ~7 tests earlier). On JS port the
-  // Sheet teardown doesn't complete before the next test starts so
-  // a dim/blur layer persists across forms. Separate test-isolation
-  // bug worth chasing; for now park here so the suite is reliable.
-  // UNSKIP-TRIAGE(surface-id+freeze fix): "com_codenameone_examples_hellocodenameone_tests_TextAreaAlignmentScreenshotTest": "sheetTearDownLeak",
-  // LightweightPickerButtons HARD-parks the worker (heartbeat keeps firing
-  // but the green scheduler goes fully idle: runnable=0, resumes frozen, NOT
-  // a jso-bridge cross -- RETRIES/HOSTCALL_TIMEOUT both 0). It is the
-  // lightweight-popup capture deadlock: Picker.setUseLightweightPopup(true) +
-  // startEditingAsync() opens a popup whose animating date wheels never settle,
-  // and the nested callSerially -> emitCurrentFormScreenshot -> stopEditing()
-  // chain waits on a paint that the popup animation starves. This is a
-  // test/popup-lifecycle deadlock, distinct from the chartDocumentStaleness
-  // response-cross (now handled by the invokeJsoBridge retry + host-call
-  // watchdog), so the retry can't rescue it -- park it so the suite reaches
-  // comparison. ValidatorLightweightPicker, which DID drift here previously,
-  // now runs clean once the cross is recovered, so it stays un-parked.
-  //"com_codenameone_examples_hellocodenameone_tests_ValidatorLightweightPickerScreenshotTest": "chartDocumentStaleness",
-  "com_codenameone_examples_hellocodenameone_tests_LightweightPickerButtonsScreenshotTest": "lightweightPopupCaptureDeadlock",
-  // CssGradients lands at suite index ~92 -- well past the canvas-
-  // accumulation threshold that exhausts the JS port's
-  // Document.createElement host-receiver cache. The failure manifests
-  // as the same ``cn1_s_createElement ... receiverClass=null`` cascade
-  // documented in the chartDocumentStaleness comment above, and on
-  // half of CI runs it halts the entire screenshot suite before the
-  // FINAL marker fires (taking ~18 trailing tests with it). The test
-  // has a JS golden so was earlier flipped on, but the underlying
-  // staleness has to be fixed at the bridge layer before it can run
-  // reliably -- park here in the meantime so the rest of the suite
-  // is deterministic.
-  // Un-parked: canvasContextWipe root cause fixed at 5dce6a24a.
-  // UNSKIP-TRIAGE(surface-id+freeze fix): "com_codenameone_examples_hellocodenameone_tests_CssGradientsScreenshotTest": "canvasContextWipe",
-  // Sheet's backdrop blur path produces a cn1_s_save VIRTUAL_FAIL loop
-  // on the canvas-accumulation tail (same ~suite-position-90 staleness
-  // as ChartDoughnut etc.). The runtime fix in 618629361 turned the
-  // first throw from a single suite-halt into a retry loop, which on
-  // half of CI runs sits at SheetScreenshotTest for the remainder of
-  // the budget. Park here for deterministic completion.
-  // Un-parked: canvasContextWipe root cause fixed at 5dce6a24a.
-  // UNSKIP-TRIAGE(surface-id+freeze fix): "com_codenameone_examples_hellocodenameone_tests_SheetScreenshotTest": "canvasContextWipe",
-  // graphicsTransform3dCanvasHang: the 3D perspective / camera transform
-  // tests render into a surface the worker-side screenshot path can't
-  // resolve (SCREENSHOT_START reports canvasCandidates=0), so the suite
-  // re-dispatches the same index indefinitely and never reaches the
-  // per-test deadline. The 2D transform tests (rotation / translation /
-  // affine) are unaffected. Mirrored in Cn1ssDeviceRunner's Java skip list.
-  // UNSKIP-TRIAGE(surface-id+freeze fix): "com_codenameone_examples_hellocodenameone_tests_graphics_TransformPerspective": "graphicsTransform3dCanvasHang",
-  // UNSKIP-TRIAGE(surface-id+freeze fix): "com_codenameone_examples_hellocodenameone_tests_graphics_TransformCamera": "graphicsTransform3dCanvasHang"
-});
-const cn1ssForcedTimeoutTestNames = Object.freeze({
-  // UNSKIP-PHASE2: "MediaPlaybackScreenshotTest": "mediaPlayback",
-  "BytecodeTranslatorRegressionTest": "bytecodeTranslatorRegression",
-  // SimdLargeAllocaTest hung the suite on bk76kkr50 with VIRTUAL_FAILs
-  // on HTML5Impl methods (cn1_s_paintDirty / cn1_s_flushGraphics) and
-  // Canvas2D getImageData. The {} receiver propagated into the
-  // HTML5Implementation instance itself, not just the Canvas2DContext.
-  // Likely SimdLargeAlloca corrupts shared state via its large-alloca
-  // pattern; needs its own investigation.
-  "SimdLargeAllocaTest": "simdLargeAllocaCorrupt",
-  "BackgroundThreadUiAccessTest": "backgroundThreadUiAccess",
-  "VPNDetectionAPITest": "vpnDetectionApi",
-  "CallDetectionAPITest": "callDetectionApi",
-  "LocalNotificationOverrideTest": "localNotificationOverride",
-  "Base64NativePerformanceTest": "base64NativePerformance",
-  "BrowserComponentScreenshotTest": "browserComponentLoadEvent",
-  "AccessibilityTest": "accessibility",
-  // ChatInput/ChatView were parked because their dark-phase capture ran past the
-  // flat 10s deadline the bridge imposed, so the runner force-advanced and the
-  // pending dark emit captured the NEXT test (ChatInput_dark -> ImageViewer).
-  // Root cause fixed: awaitTestCompletion now computes the type-aware deadline
-  // (DualAppearanceBaseTest gets 30s on HTML5) instead of the bridge's flat 10s.
-  // The 14 *ThemeScreenshotTest short-name entries were un-parked
-  // alongside the fully-qualified-class entries in
-  // cn1ssForcedTimeoutTestClasses above when the modern native
-  // theme resources started shipping in the JS port bundle.
-  // See the matching comment in cn1ssForcedTimeoutTestClasses above:
-  // the jsChunkDrop short-name entries (KotlinUiTest,
-  // MainScreenScreenshotTest, the ImageViewer / Tabs / TextArea /
-  // ToastBar / picker tests, and the tests.graphics.* grid) have been
-  // removed because the chunk emitter bug they worked around is fixed
-  // on master in #4875 (8582151ec). The chart short-names below stay
-  // until the canvas-accumulation / Document-wrapper-staleness bug
-  // tracked under "chartDocumentStaleness" is resolved.
-  //"ChartDoughnutScreenshotTest": "chartDocumentStaleness",
-  //"ChartRadarScreenshotTest": "chartDocumentStaleness",
-  //"ChartTimeChartScreenshotTest": "chartDocumentStaleness",
-  // ChartCombinedXY re-parked (non-terminating layout loop); Transform + Rotated
-  // kept un-parked -- see note in cn1ssForcedTimeoutTestClasses above.
-  "ChartCombinedXYScreenshotTest": "chartCombinedXyHang",
-  // UNSKIP-TRIAGE(surface-id+freeze fix): "ToastBarTopPositionScreenshotTest": "canvasContextWipe",
-  //"SheetSlideUpAnimationScreenshotTest": "canvasContextWipe",
-  // UNSKIP-TRIAGE(surface-id+freeze fix): "TextAreaAlignmentScreenshotTest": "sheetTearDownLeak",
-  //"ValidatorLightweightPickerScreenshotTest": "chartDocumentStaleness",
-  //"LightweightPickerButtonsScreenshotTest": "chartDocumentStaleness",
-  // UNSKIP-TRIAGE(surface-id+freeze fix): "CssGradientsScreenshotTest": "canvasContextWipe",
-  // UNSKIP-TRIAGE(surface-id+freeze fix): "SheetScreenshotTest": "canvasContextWipe",
-  // graphicsTransform3dCanvasHang -- see matching fully-qualified entries
-  // in cn1ssForcedTimeoutTestClasses above.
-  // UNSKIP-TRIAGE(surface-id+freeze fix): "TransformPerspective": "graphicsTransform3dCanvasHang",
-  // UNSKIP-TRIAGE(surface-id+freeze fix): "TransformCamera": "graphicsTransform3dCanvasHang"
-});
+// Every selected port-status test executes normally. Failures are surfaced to
+// the harness; there is no forced-timeout or known-bad bypass list.
 
 if (jvm && typeof jvm.addVirtualMethod === "function" && jvm.classes && jvm.classes["java_lang_String"]) {
   const stringMethods = jvm.classes["java_lang_String"].methods || {};
@@ -4294,6 +4530,21 @@ function getCn1ssLambdaCaptureValue(lambdaObject, ordinal) {
   return null;
 }
 
+function getCn1ssLambdaCaptureValues(lambdaObject) {
+  if (!lambdaObject || typeof lambdaObject !== "object") {
+    return [];
+  }
+  const captures = [];
+  const keys = Object.keys(lambdaObject);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (key.indexOf("Cn1ssDeviceRunner_lambda_") >= 0 && /_arg_\d+$/.test(key)) {
+      captures.push(lambdaObject[key]);
+    }
+  }
+  return captures;
+}
+
 function resolveCn1ssRunnerTranslatedMethod(methodIds, fallbackSymbol) {
   return resolveCurrentTranslatedMethod(methodIds, cn1ssRunnerClassId, fallbackSymbol);
 }
@@ -4439,29 +4690,6 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
   // "connecting" with the PNG queued, and onopen's flush never runs -> 0
   // delivered even though capture succeeded.
   cn1ssWsConnect();
-  const forcedTimeoutReason = cn1ssForcedTimeoutTestClasses[effectiveTestClassId]
-    || cn1ssForcedTimeoutTestNames[nativeTestName]
-    || null;
-  if (forcedTimeoutReason != null) {
-    emitDiagLine("PARPAR:DIAG:FALLBACK:key=FALLBACK:Cn1ssDeviceRunner.forcedTimeout:" + forcedTimeoutReason + ":HIT");
-    try {
-      const finalizeMethod = jvm.resolveVirtual(callTarget.__class, cn1ssRunnerFinalizeTestMethodId);
-      if (typeof finalizeMethod === "function") {
-        return yield* cn1_ivAdapt(finalizeMethod(
-          callTarget,
-          effectiveIndex,
-          effectiveTestObject,
-          normalizedTestName,
-          1
-        ));
-      }
-    } catch (_finalizeErr) {
-      const finalizeErrDetail = yield* stringifyThrowable(_finalizeErr);
-      emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambdaBridge:forcedTimeoutFinalizeError=" + finalizeErrDetail);
-      return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "forcedTimeoutFinalizeFailed");
-    }
-    return yield* forceAdvanceCn1ssRunner(callTarget, effectiveIndex, "forcedTimeoutFinalizeMissing");
-  }
   // PER-TEST DISPATCH WATCHDOG: a test whose prepare()/runTest() BLOCKS (parked
   // on a hung host round-trip -- LocalForage.getItem, getContext, etc.) never
   // returns, so it never reaches the catch (only synchronous THROWS do -- those
@@ -4665,10 +4893,23 @@ function* runCn1ssResolvedTest(callTarget, effectiveTestObject, effectiveTestNam
 bindCiFallback("Cn1ssDeviceRunner.lambda1RunBridge", [
   cn1ssRunnerLambda1RunMethodId
 ], function*(__cn1ThisObject) {
-  const runner = getCn1ssLambdaCaptureValue(__cn1ThisObject, 1);
-  const testName = getCn1ssLambdaCaptureValue(__cn1ThisObject, 2);
-  const index = getCn1ssLambdaCaptureValue(__cn1ThisObject, 3);
-  const testObject = getCn1ssLambdaCaptureValue(__cn1ThisObject, 4);
+  const captures = getCn1ssLambdaCaptureValues(__cn1ThisObject);
+  let runner = null;
+  let testName = null;
+  let index = null;
+  let testObject = null;
+  for (let i = 0; i < captures.length; i++) {
+    const value = captures[i];
+    if (value && value.__class === cn1ssRunnerClassId) {
+      runner = value;
+    } else if (jvm.instanceOf(value, "com_codenameone_examples_hellocodenameone_tests_BaseTest")) {
+      testObject = value;
+    } else if (value && value.__class === "java_lang_String") {
+      testName = value;
+    } else if (typeof value === "number" || typeof value === "bigint") {
+      index = Number(value);
+    }
+  }
   if (!runner || runner.__class !== cn1ssRunnerClassId) {
     emitLambdaBridgeDiag("PARPAR:DIAG:FALLBACK:lambda1RunBridge:missingDispatch=1");
     return null;
@@ -4677,6 +4918,9 @@ bindCiFallback("Cn1ssDeviceRunner.lambda1RunBridge", [
     "PARPAR:DIAG:FALLBACK:lambda1RunBridge:dispatch:index=" + String(index == null ? "null" : (index | 0))
     + ":test=" + (testObject && testObject.__class ? testObject.__class : "null")
   );
+  if (!testObject && index != null) {
+    testObject = resolveCn1ssIndexedTestObject(index | 0);
+  }
   return yield* runCn1ssResolvedTest(runner, testObject, testName, index | 0);
 });
 

@@ -77,7 +77,10 @@ public final class MCPSocketTransport implements MCPTransport {
     @Override
     public void open() throws IOException {
         // Bind to the loopback interface only so the MCP control channel is never exposed
-        // to the local network. Backlog of one: a single agent attaches at a time.
+        // to the local network. Backlog of one: a single agent attaches at a time, but the
+        // listening socket stays bound across client sessions so an agent can disconnect and
+        // reconnect (each screenshot / drive call is its own short-lived connection) without
+        // the server thread exiting. The first client is accepted lazily in readMessage().
         ServerSocket ss = new ServerSocket(port, 1, InetAddress.getLoopbackAddress());
         synchronized (lock) {
             if (closed) {
@@ -90,12 +93,24 @@ public final class MCPSocketTransport implements MCPTransport {
             }
             serverSocket = ss;
         }
+    }
+
+    /// Accepts the next client on the already-bound listening socket. Returns false when
+    /// the transport has been closed (server shutting down).
+    private boolean acceptNextClient() throws IOException {
+        ServerSocket ss;
+        synchronized (lock) {
+            ss = serverSocket;
+        }
+        if (ss == null) {
+            return false;
+        }
         Socket socket;
         try {
             socket = ss.accept();
         } catch (IOException ex) {
             if (isClosed()) {
-                throw new IOException("Socket transport closed before a client connected");
+                return false;
             }
             throw ex;
         }
@@ -104,6 +119,25 @@ public final class MCPSocketTransport implements MCPTransport {
         }
         reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
         writer = new OutputStreamWriter(socket.getOutputStream(), "UTF-8");
+        return true;
+    }
+
+    /// Drops the current client (its session ended) but keeps the listening socket bound.
+    private void closeClientOnly() {
+        Socket cs;
+        synchronized (lock) {
+            cs = clientSocket;
+            clientSocket = null;
+        }
+        reader = null;
+        writer = null;
+        if (cs != null) {
+            try {
+                cs.close();
+            } catch (IOException ignored) {
+                // best effort
+            }
+        }
     }
 
     private boolean isClosed() {
@@ -114,20 +148,42 @@ public final class MCPSocketTransport implements MCPTransport {
 
     @Override
     public String readMessage() throws IOException {
-        if (reader == null) {
-            return null;
+        // Reads the next line from the current client; when that client disconnects,
+        // transparently accepts the next one so the server survives reconnects. Returns
+        // null only when the whole transport is closed (server shutdown).
+        while (true) {
+            if (reader == null) {
+                if (!acceptNextClient()) {
+                    return null;
+                }
+            }
+            String line;
+            try {
+                line = reader.readLine();
+            } catch (IOException ex) {
+                line = null;   // treat a read error as a disconnect
+            }
+            if (line != null) {
+                return line;
+            }
+            closeClientOnly();
+            if (isClosed()) {
+                return null;
+            }
         }
-        return reader.readLine();
     }
 
     @Override
     public void writeMessage(String message) throws IOException {
-        if (writer == null) {
-            throw new IOException("Socket transport is not open");
+        Writer w = writer;
+        if (w == null) {
+            // No current client (it disconnected between request and response); the reply
+            // is moot. Dropping it keeps the server alive for the next connection.
+            return;
         }
-        writer.write(message);
-        writer.write('\n');
-        writer.flush();
+        w.write(message);
+        w.write('\n');
+        w.flush();
     }
 
     @Override

@@ -149,6 +149,10 @@ body:not(.dark) .cn1-brand-logo {
   display: none;
 }
 
+.cn1-header #menu > .cn1-mobile-dashboard-item {
+  display: none;
+}
+
 .cn1-header #menu > li > a,
 .cn1-header #menu > li > .cn1-menu-trigger {
   color: var(--cn1-text);
@@ -229,6 +233,7 @@ body:not(.dark) .cn1-brand-logo {
 
 .cn1-menu-search-link svg,
 .cn1-theme-toggle-btn svg,
+.cn1-dashboard-link svg,
 .cn1-create-project-link svg,
 .cn1-action svg,
 .cn1-nav-toggle-btn svg {
@@ -273,6 +278,9 @@ body:not(.dark) .cn1-brand-logo {
 }
 
 .cn1-header .cn1-dashboard-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   margin: 0;
   padding: 0 5px;
   border: 0;
@@ -280,6 +288,10 @@ body:not(.dark) .cn1-brand-logo {
   font-size: 14px;
   font-weight: 600;
   line-height: 38px;
+}
+
+.cn1-header .cn1-dashboard-link svg {
+  display: none;
 }
 
 .cn1-header .cn1-dashboard-link:hover {
@@ -1326,7 +1338,21 @@ body.dark .cn1-footer-logo {
   }
 
   .cn1-header .cn1-dashboard-link {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 1px solid var(--cn1-border);
+    border-radius: 8px;
+    color: var(--cn1-text);
+    line-height: 1;
+  }
+
+  .cn1-header .cn1-dashboard-link span {
     display: none;
+  }
+
+  .cn1-header .cn1-dashboard-link svg {
+    display: block;
   }
 
   .cn1-v2-hero {
@@ -1392,6 +1418,14 @@ body.dark .cn1-footer-logo {
 
   .cn1-header #menu {
     display: block;
+  }
+
+  .cn1-header #menu > .cn1-mobile-dashboard-item {
+    display: block;
+  }
+
+  .cn1-header .cn1-dashboard-link {
+    display: none;
   }
 
   .cn1-header #menu > li > a,

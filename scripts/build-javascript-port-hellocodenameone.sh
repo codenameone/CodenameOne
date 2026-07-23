@@ -96,8 +96,14 @@ COMMON_CLASSES="$COMMON_ROOT/target/classes"
 COMMON_DEPS_DIR="$COMMON_ROOT/target/parparvm-deps"
 PARPARVM_JAVA_API="$PARPARVM_ROOT/target/bundle/parparvm-java-api.jar"
 PARPARVM_COMPILER="$PARPARVM_ROOT/target/bundle/parparvm-compiler.jar"
-CN1_CORE_JAR="$(find "$HOME/.m2/repository/com/codenameone/codenameone-core" -path '*/8.0-SNAPSHOT/codenameone-core-8.0-SNAPSHOT.jar' -type f | head -n 1 || true)"
-JAVA_RUNTIME_JAR="$(find "$HOME/.m2/repository/com/codenameone/java-runtime" -path '*/8.0-SNAPSHOT/java-runtime-8.0-SNAPSHOT.jar' -type f | head -n 1 || true)"
+CN1_CORE_JAR="$REPO_ROOT/maven/core/target/codenameone-core-8.0-SNAPSHOT.jar"
+if [ ! -f "$CN1_CORE_JAR" ]; then
+  CN1_CORE_JAR="$(find "$HOME/.m2/repository/com/codenameone/codenameone-core" -path '*/8.0-SNAPSHOT/codenameone-core-8.0-SNAPSHOT.jar' -type f | head -n 1 || true)"
+fi
+JAVA_RUNTIME_JAR="$REPO_ROOT/maven/java-runtime/target/java-runtime-8.0-SNAPSHOT.jar"
+if [ ! -f "$JAVA_RUNTIME_JAR" ]; then
+  JAVA_RUNTIME_JAR="$(find "$HOME/.m2/repository/com/codenameone/java-runtime" -path '*/8.0-SNAPSHOT/java-runtime-8.0-SNAPSHOT.jar' -type f | head -n 1 || true)"
+fi
 
 for required in "$COMMON_CLASSES" "$PARPARVM_JAVA_API" "$PARPARVM_COMPILER" "$CN1_CORE_JAR" "$JAVA_RUNTIME_JAR"; do
   if [ ! -e "$required" ]; then

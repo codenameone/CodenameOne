@@ -21,8 +21,6 @@ import com.codename1.charts.renderers.SimpleSeriesRenderer;
 import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
 import com.codename1.charts.renderers.XYMultipleSeriesRenderer.Orientation;
 import com.codename1.charts.renderers.XYSeriesRenderer;
-import com.codename1.io.Log;
-
 import java.util.List;
 
 
@@ -42,11 +40,6 @@ public class CombinedXYChart extends XYChart {
     /// The embedded XY charts.
     private final XYChart[] mCharts;
 
-    /// The supported charts for being combined.
-    private final Class<?>[] xyChartTypes = new Class<?>[]{TimeChart.class, LineChart.class,
-            CubicLineChart.class, BarChart.class, BubbleChart.class, ScatterChart.class,
-            RangeBarChart.class, RangeStackedBarChart.class};
-
     /// Builds a new combined XY chart instance.
     ///
     /// #### Parameters
@@ -63,11 +56,7 @@ public class CombinedXYChart extends XYChart {
         int length = chartDefinitions.length;
         mCharts = new XYChart[length];
         for (int i = 0; i < length; i++) {
-            try {
-                mCharts[i] = getXYChart(chartDefinitions[i].getType());
-            } catch (Exception e) { // PMD Fix: EmptyCatchBlock log exception
-                Log.e(e);
-            }
+            mCharts[i] = createXYChart(chartDefinitions[i].getType());
             if (mCharts[i] == null) {
                 throw new IllegalArgumentException("Unknown chart type " + chartDefinitions[i].getType());
             } else {
@@ -95,21 +84,32 @@ public class CombinedXYChart extends XYChart {
     ///
     /// an instance of a chart implementation
     ///
-    /// #### Throws
-    ///
-    /// - `IllegalAccessException`
-    ///
-    /// - `InstantiationException`
-    private XYChart getXYChart(String type) throws IllegalAccessException, InstantiationException {
-        XYChart chart = null;
-        int length = xyChartTypes.length;
-        for (int i = 0; i < length && chart == null; i++) {
-            XYChart newChart = (XYChart) xyChartTypes[i].newInstance();
-            if (type.equals(newChart.getChartType())) {
-                chart = newChart;
-            }
+    static XYChart createXYChart(String type) {
+        if (TimeChart.TYPE.equals(type)) {
+            return new TimeChart();
         }
-        return chart;
+        if (LineChart.TYPE.equals(type)) {
+            return new LineChart();
+        }
+        if (CubicLineChart.TYPE.equals(type)) {
+            return new CubicLineChart();
+        }
+        if (BarChart.TYPE.equals(type)) {
+            return new BarChart();
+        }
+        if (BubbleChart.TYPE.equals(type)) {
+            return new BubbleChart();
+        }
+        if (ScatterChart.TYPE.equals(type)) {
+            return new ScatterChart();
+        }
+        if (RangeBarChart.TYPE.equals(type)) {
+            return new RangeBarChart();
+        }
+        if (RangeStackedBarChart.TYPE.equals(type)) {
+            return new RangeStackedBarChart();
+        }
+        return null;
     }
 
     /// The graphical representation of a series.

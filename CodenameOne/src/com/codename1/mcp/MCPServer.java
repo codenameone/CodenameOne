@@ -160,7 +160,15 @@ public class MCPServer {
         try {
             transport.open();
         } catch (IOException ex) {
-            Log.e(ex);
+            // The transport failed to start listening. Log defensively: the CN1 Log
+            // routes through the platform implementation, which may not be registered
+            // yet when the server is auto-started early in Display.init(), and a raw
+            // NullPointerException here would silently kill the reader thread.
+            try {
+                Log.e(ex);
+            } catch (Throwable logErr) {
+                System.err.println("[cn1.mcp] transport open failed: " + ex);
+            }
             running = false;
             return;
         }

@@ -107,9 +107,9 @@ Windows Desktop builds are a Pro user feature.  https://www.codenameone.com/pric
 javascript::
 Builds app as Javascript app (for Web).  Uses Codeame One build server.
 +
-[IMPORTANT]
-+
-Javascript builds are an Enterprise user feature. https://www.codenameone.com/pricing.html[See pricing]
+JavaScript builds are available to all users. ParparVM is the default compiler;
+cloud builds can select the TeaVM compatibility fallback with
+`javascript.port=teavm`.
 
 
 

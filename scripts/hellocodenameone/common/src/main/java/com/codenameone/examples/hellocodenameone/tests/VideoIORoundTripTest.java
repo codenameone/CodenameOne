@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.io.FileSystemStorage;
@@ -78,23 +100,48 @@ public class VideoIORoundTripTest extends BaseTest {
             return;
         }
 
-        // Pick an available video codec (prefer H.264) and audio codec (prefer AAC).
-        String videoCodec = null;
-        String audioCodec = null;
+        // Pick a container-compatible pair. Audio and video codecs cannot be
+        // selected independently: Opus is valid for WebM but not MP4, while
+        // AAC is valid for MP4 but not WebM. Prefer a complete A/V round trip,
+        // then fall back to a video-only round trip when the browser has no
+        // compatible audio encoder.
+        boolean h264 = false;
+        boolean vp8 = false;
+        boolean vp9 = false;
+        boolean aac = false;
+        boolean opus = false;
         for (VideoCodec c : io.getAvailableEncoders()) {
-            if (c.isVideo()) {
-                if (VideoIO.CODEC_H264.equals(c.getId())) {
-                    videoCodec = c.getId();
-                } else if (videoCodec == null) {
-                    videoCodec = c.getId();
-                }
-            } else {
-                if (VideoIO.CODEC_AAC.equals(c.getId())) {
-                    audioCodec = c.getId();
-                } else if (audioCodec == null) {
-                    audioCodec = c.getId();
-                }
-            }
+            String id = c.getId();
+            h264 |= VideoIO.CODEC_H264.equals(id);
+            vp8 |= VideoIO.CODEC_VP8.equals(id);
+            vp9 |= VideoIO.CODEC_VP9.equals(id);
+            aac |= VideoIO.CODEC_AAC.equals(id);
+            opus |= VideoIO.CODEC_OPUS.equals(id);
+        }
+
+        String videoCodec;
+        String audioCodec;
+        if (h264 && aac) {
+            videoCodec = VideoIO.CODEC_H264;
+            audioCodec = VideoIO.CODEC_AAC;
+        } else if (vp8 && opus) {
+            videoCodec = VideoIO.CODEC_VP8;
+            audioCodec = VideoIO.CODEC_OPUS;
+        } else if (vp9 && opus) {
+            videoCodec = VideoIO.CODEC_VP9;
+            audioCodec = VideoIO.CODEC_OPUS;
+        } else if (h264) {
+            videoCodec = VideoIO.CODEC_H264;
+            audioCodec = null;
+        } else if (vp8) {
+            videoCodec = VideoIO.CODEC_VP8;
+            audioCodec = null;
+        } else if (vp9) {
+            videoCodec = VideoIO.CODEC_VP9;
+            audioCodec = null;
+        } else {
+            videoCodec = null;
+            audioCodec = null;
         }
         if (videoCodec == null) {
             skip("no-video-encoder-on-" + Display.getInstance().getPlatformName());
@@ -105,11 +152,6 @@ public class VideoIORoundTripTest extends BaseTest {
         String container = webm ? VideoIO.CONTAINER_WEBM : VideoIO.CONTAINER_MP4;
         String mime = webm ? "video/webm" : "video/mp4";
         boolean withAudio = audioCodec != null;
-        if (webm && withAudio && VideoIO.CODEC_AAC.equals(audioCodec)) {
-            // AAC isn't a WebM audio codec; only keep audio if Opus is available.
-            withAudio = io.isEncoderSupported(VideoIO.CODEC_OPUS);
-            audioCodec = VideoIO.CODEC_OPUS;
-        }
 
         String path = FileSystemStorage.getInstance().getAppHomePath()
                 + "/cn1-videoio-roundtrip-" + System.currentTimeMillis() + (webm ? ".webm" : ".mp4");

@@ -1775,7 +1775,9 @@ public class BytecodeMethod implements SignatureSet {
                     // promote its fields to registers. No header is needed -- the
                     // object is primitive-only and never visible to the GC. The id
                     // is stable (assigned during optimize), independent of list pos.
-                    b.append("    struct obj__").append(saTi.getStackAllocType())
+                    // Use the actual NEW'd type (scalar replacement is now per-usage, not gated on
+                    // the @StackAllocate annotation, so getStackAllocType() may be null here).
+                    b.append("    struct obj__").append(srMangle(saTi.getTypeName()))
                             .append(" __cn1sr_").append(saTi.getScalarStructId()).append(";\n");
                     continue;
                 }
@@ -2792,6 +2794,7 @@ public class BytecodeMethod implements SignatureSet {
         // matching loop below -- which only uses index-stable set() edits -- stays
         // valid throughout.
         List<int[]> acceptedReads = new ArrayList<int[]>();
+        List<ByteCodeClass> acceptedClasses = new ArrayList<ByteCodeClass>();
         for (int idx = 0; idx < instructions.size(); idx++) {
             Instruction ins = instructions.get(idx);
             if (!(ins instanceof TypeInstruction)) {
@@ -2801,13 +2804,16 @@ public class BytecodeMethod implements SignatureSet {
             if (ti.getOpcode() != Opcodes.NEW) {
                 continue;
             }
-            String saType = ti.getStackAllocType();
-            if (saType == null) {
-                continue; // not a @StackAllocate NEW
-            }
+            // Per-USAGE escape analysis (no per-class annotation): scalar-replace any NEW of a
+            // primitive-only direct-Object value class whose instance provably does not escape at
+            // this site (the srValidateLocalUses check below). Escape/identity are properties of the
+            // usage, not the class, so eligibility is the class SHAPE + the local's uses -- matching
+            // what an escape-analysing JIT (e.g. HotSpot) does automatically. (The old @StackAllocate
+            // opt-in gate is gone.)
+            String saType = srMangle(ti.getTypeName());
             ByteCodeClass x = Parser.getClassObject(saType);
             if (x == null || !srPrimitiveOnlyDirectObject(x)) {
-                continue; // bail -> today's stack-alloc path
+                continue; // not a scalar-replaceable value-class shape
             }
 
             // DUP must immediately follow the NEW.
@@ -2874,9 +2880,9 @@ public class BytecodeMethod implements SignatureSet {
             members = mapOut[0];
             quals = qualOut[0];
 
-            // Validate every use of local n is exactly "ALOAD n; GETFIELD X.f"
+            // Validate every use of local n is exactly "ALOAD n; GETFIELD X.f" (or a trivial getter)
             // and there is no second store / no read before the construction.
-            if (!srValidateLocalUses(localN, storeIdx)) {
+            if (!srValidateLocalUses(localN, storeIdx, x)) {
                 continue;
             }
 
@@ -2887,9 +2893,10 @@ public class BytecodeMethod implements SignatureSet {
             instructions.set(invIdx, new ScalarAllocInit(id, members, quals));
             instructions.set(storeIdx, srEmpty());
             acceptedReads.add(new int[]{localN, id});
+            acceptedClasses.add(x);
         }
-        for (int[] site : acceptedReads) {
-            srRewriteFieldReads(site[0], site[1]);
+        for (int s = 0; s < acceptedReads.size(); s++) {
+            srRewriteFieldReads(acceptedReads.get(s)[0], acceptedReads.get(s)[1], acceptedClasses.get(s));
         }
     }
 
@@ -3688,7 +3695,7 @@ public class BytecodeMethod implements SignatureSet {
     }
 
     /** True iff every use of local n is "ALOAD n; GETFIELD" and n is not read before storeIdx. */
-    private boolean srValidateLocalUses(int localN, int storeIdx) {
+    private boolean srValidateLocalUses(int localN, int storeIdx, ByteCodeClass x) {
         for (int i = 0; i < instructions.size(); i++) {
             Instruction in = instructions.get(i);
             if (!(in instanceof VarOp)) {
@@ -3714,14 +3721,57 @@ public class BytecodeMethod implements SignatureSet {
                     return false;
                 }
                 Instruction nxt = instructions.get(g);
-                if (!(nxt instanceof Field) || nxt.getOpcode() != Opcodes.GETFIELD) {
-                    return false; // any use other than an immediate field read
+                // Accept a direct field read OR a trivial-getter call (the receiver is a `new x()`,
+                // so the virtual dispatch resolves to x's own getter -> equivalent to GETFIELD, and
+                // it does not escape the instance). Anything else is a real escape/identity use.
+                if (nxt instanceof Field && nxt.getOpcode() == Opcodes.GETFIELD) {
+                    continue;
                 }
-                continue;
+                if (nxt instanceof Invoke && srTrivialGetterField((Invoke) nxt, x) != null) {
+                    continue;
+                }
+                return false; // any use other than an immediate field read / trivial getter
             }
             return false; // ILOAD/etc. on this slot -> type confusion, bail
         }
         return true;
+    }
+
+    /** If {@code inv} calls a trivial getter (body exactly {@code ALOAD 0; GETFIELD f; xRETURN})
+     *  declared on {@code x}, returns that field, else null. The receiver at the call is a
+     *  {@code new x()}, so dispatch is deterministically x's own method -- folding it to a field
+     *  read is sound regardless of any subclass overrides. */
+    private Field srTrivialGetterField(Invoke inv, ByteCodeClass x) {
+        int op = inv.getOpcode();
+        if (op != Opcodes.INVOKEVIRTUAL && op != Opcodes.INVOKESPECIAL && op != Opcodes.INVOKEINTERFACE) {
+            return null;
+        }
+        for (BytecodeMethod m : x.getMethods()) {
+            if (!inv.getName().equals(m.getMethodName())) {
+                continue;
+            }
+            Instruction a = null, b = null, c = null;
+            int count = 0;
+            for (Instruction bi : m.getInstructions()) {
+                if (bi instanceof LineNumber || bi instanceof LabelInstruction || bi instanceof LocalVariable) {
+                    continue;
+                }
+                count++;
+                if (count == 1) { a = bi; } else if (count == 2) { b = bi; } else if (count == 3) { c = bi; } else { return null; }
+            }
+            if (count != 3
+                    || !(a instanceof VarOp) || a.getOpcode() != Opcodes.ALOAD || ((VarOp) a).getIndex() != 0
+                    || !(b instanceof Field) || b.getOpcode() != Opcodes.GETFIELD) {
+                return null;
+            }
+            int rc = c.getOpcode();
+            if (rc != Opcodes.IRETURN && rc != Opcodes.LRETURN && rc != Opcodes.FRETURN
+                    && rc != Opcodes.DRETURN && rc != Opcodes.ARETURN) {
+                return null;
+            }
+            return (Field) b;
+        }
+        return null;
     }
 
     /**
@@ -3731,7 +3781,7 @@ public class BytecodeMethod implements SignatureSet {
      * leftover blank breaks the operand adjacency the arithmetic/store reduction
      * relies on and the surrounding math stays in slow operand-stack form.
      */
-    private void srRewriteFieldReads(int localN, int id) {
+    private void srRewriteFieldReads(int localN, int id, ByteCodeClass x) {
         for (int i = 0; i < instructions.size(); i++) {
             Instruction in = instructions.get(i);
             if (!(in instanceof VarOp) || in.getOpcode() != Opcodes.ALOAD
@@ -3739,7 +3789,10 @@ public class BytecodeMethod implements SignatureSet {
                 continue;
             }
             int g = srNextReal(i + 1);
-            Field f = (Field) instructions.get(g);
+            Instruction gi = instructions.get(g);
+            // Either an immediate GETFIELD or a trivial-getter call (validated above); both fold to
+            // the same scalar member read, replacing the second instruction and dropping the ALOAD.
+            Field f = (gi instanceof Field) ? (Field) gi : srTrivialGetterField((Invoke) gi, x);
             String member = srMangle(f.getOwner()) + "_" + f.getFieldName();
             String push;
             switch (f.getDesc().charAt(0)) {
@@ -4476,6 +4529,14 @@ public class BytecodeMethod implements SignatureSet {
                             // keep CN1_CMP_EXPR for NaN-correct ordering.
                             String directLongCmp = (leftArg instanceof ArithmeticExpression)
                                     ? ((ArithmeticExpression) leftArg).getLongCompareDirect(operator) : null;
+                            // Same fusion for float/double compares (NaN-correct); folds
+                            // FCMPx/DCMPx + IFxx into a single IEEE comparison instead of
+                            // the three-way CN1_CMP_EXPR that blocks clang's FP optimisation.
+                            boolean directFloatCmp = false;
+                            if (directLongCmp == null && leftArg instanceof ArithmeticExpression) {
+                                directLongCmp = ((ArithmeticExpression) leftArg).getFloatCompareDirect(operator);
+                                directFloatCmp = directLongCmp != null;
+                            }
                             // Diverging-check prelude for a fused array-load operand
                             // (frameless only) -- see the IF_ICMP arm above.
                             String arrayCmpPrelude1 = null;
@@ -4488,7 +4549,19 @@ public class BytecodeMethod implements SignatureSet {
                                 }
                             }
                             if (directLongCmp != null) {
-                                sb.append("if (").append(directLongCmp).append(") /* ").append(opName).append(" CustomJump LCMP */ ");
+                                // FP conditional guards (e.g. an `if(acc>1e12)acc-=1e12`
+                                // normalization) get if-converted by clang into an fcsel, which drags
+                                // the almost-never-taken body onto the FP recurrence's critical path
+                                // EVERY iteration -- making ParparVM's tight FP loops slower than even
+                                // HotSpot (whose JIT profiles the guard as not-taken and keeps a real
+                                // branch). __builtin_expect biases clang to the same predicted branch,
+                                // so the guard stays off the recurrence. The transpiler emits the jump
+                                // as "skip/continue" (the common, taken direction), so expect(...,1)
+                                // matches. Correctness is unaffected (identical results either way).
+                                String fpCond = directFloatCmp
+                                        ? "__builtin_expect(" + directLongCmp + ", 1)"
+                                        : directLongCmp;
+                                sb.append("if (").append(fpCond).append(") /* ").append(opName).append(" CustomJump LCMP */ ");
                             } else {
                                 if (arrayCmpPrelude1 != null) {
                                     sb.append("{\n    ").append(arrayCmpPrelude1);

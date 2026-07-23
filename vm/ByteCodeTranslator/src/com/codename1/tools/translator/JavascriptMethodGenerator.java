@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.tools.translator;
 
 import com.codename1.tools.translator.bytecodes.BasicInstruction;
@@ -235,9 +257,12 @@ final class JavascriptMethodGenerator {
         // host-side dispatch lookup misses and the calling Java
         // thread deadlocks on the corresponding wait/notify pair.
         // Tag every method on a JSO bridge type as referenced so the
-        // entry survives.
+        // entry survives. TimerHandler is also host-dispatched even though it
+        // is a @JSFunctor rather than a JSObject subtype, so retain its SAM
+        // dispatch slot for setTimeout/setInterval callbacks too.
         for (ByteCodeClass c : allClasses) {
-            if (c == null || !isJsoBridgeType(c, index)) continue;
+            if (c == null || (!isJsoBridgeType(c, index)
+                    && !"com_codename1_html5_js_browser_TimerHandler".equals(c.getClsName()))) continue;
             for (BytecodeMethod m : c.getMethods()) {
                 if (m == null || m.isStatic()) continue;
                 String name = m.getMethodName();

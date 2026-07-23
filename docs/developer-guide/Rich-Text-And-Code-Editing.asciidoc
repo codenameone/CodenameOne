@@ -7,7 +7,11 @@ compose formatted prose and the application stores HTML. Use
 https://www.codenameone.com/javadoc/com/codename1/ui/CodeEditor.html[`CodeEditor`] for source code,
 configuration files, queries, or any text that benefits from syntax highlighting, line numbers,
 completion, and diagnostics. Both are lightweight Codename One components and share the same editing,
-selection, scrolling, undo, and platform-input infrastructure.
+selection, scrolling, undo, and platform-input infrastructure. When you only need to _display_
+formatted text — no editing — use
+https://www.codenameone.com/javadoc/com/codename1/ui/RichTextComponent.html[`RichTextComponent`], the
+read-only, word-wrapping renderer described later in this chapter; it reuses the same document model
+and styling engine.
 
 .The rich-text and code editors rendered by the same lightweight engine
 image::img/editors-overview.png[RichTextArea and CodeEditor rendered together,scaledwidth=45%]
@@ -196,6 +200,54 @@ supported text and structure rather than controlling document layout.
 TIP: Treat imported HTML as document data, not as a browser page. The pure importer doesn't execute
 scripts. Keep image URLs and link destinations subject to the same trust and validation rules used by
 the rest of the application.
+
+=== Read-only rich text with RichTextComponent
+
+`RichTextComponent` (in `com.codename1.ui`) is the read-only counterpart to `RichTextArea`. It renders
+multi-styled, word-wrapped text — headings, bold, italic, underline, strike-through, inline code,
+colored and highlighted spans, per-paragraph alignment and indentation, ordered and unordered lists,
+block quotes, preformatted blocks, inline images, and tappable hyperlinks — without any of the editing
+machinery. It sits between a single-style `SpanLabel` (one style for the whole component) and a full
+`BrowserComponent` (a native web view): a lightweight native component that keeps a distinct style per
+character, measures and paints text directly, and reports an accurate height-for-width preferred size,
+so it embeds cleanly inside ordinary layouts. It's the modern replacement for the deprecated
+`HTMLComponent`.
+
+It shares the editor's document model and the `RichRunPainter` styling primitive, so styled text
+rendered read-only matches what the editor produces for the same content.
+
+Content is supplied in any of the interchange formats the rich model understands, or built up
+programmatically from styled runs:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/RichTextAndCodeEditingJavaSnippet.java[tag=rich-text-and-code-editing-java-read-only,indent=0]
+----
+
+Hyperlinks in the content fire an `ActionListener` whose event source is the link target string, so the
+application decides what a link means:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/RichTextAndCodeEditingJavaSnippet.java[tag=rich-text-and-code-editing-java-links,indent=0]
+----
+
+The component resolves inline images through an `ImageResolver`, keeping image loading and caching policy
+in the application rather than the component. Return `null` to render a placeholder:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/RichTextAndCodeEditingJavaSnippet.java[tag=rich-text-and-code-editing-java-images,indent=0]
+----
+
+By default (`SizeMode.SHRINK`) the component is exactly as tall as its wrapped content at the width it
+is given, which is ideal inside a scrollable `Form`. `SizeMode.SCROLL` instead keeps the size the
+parent assigns and scrolls the content vertically. `setTextAlign(...)` overrides the alignment of every
+paragraph, and `preferredSizeForWidth(width)` is a stateless height-for-width query for custom layout
+managers.
+
+TIP: The same trust guidance applies as for `RichTextArea` — imported HTML is document data, not a
+browser page; validate link targets and image sources with the application's own rules.
 
 === CodeEditor
 

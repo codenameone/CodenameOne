@@ -1,11 +1,24 @@
 /*
- * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 
 package com.codename1.tools.translator;
@@ -104,12 +117,21 @@ final class JavascriptReachability {
         }
     }
 
-    static int run(List<ByteCodeClass> classes, String[] nativeSources) {
+    static int run(List<ByteCodeClass> classes, List<ByteCodeClass> classPool,
+            String[] nativeSources) {
         JavascriptReachability rta = new JavascriptReachability();
-        rta.index(classes);
-        rta.seedRoots(classes, nativeSources);
+        // The conservative pass may have removed an entire class after
+        // eliminating the only method that instantiated it.  RTA can later
+        // resurrect that method through a runtime-only edge (JSO callback,
+        // Thread.run, native binding, etc.).  Index the original class pool so
+        // visiting the resurrected NEW instruction can restore its target too.
+        List<ByteCodeClass> candidates = classPool == null ? classes : classPool;
+        rta.index(candidates);
+        rta.seedRoots(candidates, nativeSources);
         rta.propagate();
-        return rta.eliminate(classes);
+        int eliminated = rta.eliminate(candidates);
+        rta.mergeInstantiatedClasses(classes, candidates);
+        return eliminated;
     }
 
     private void index(List<ByteCodeClass> classes) {
@@ -186,6 +208,11 @@ final class JavascriptReachability {
         // reachable via the INVOKEINTERFACE inside Thread.run()'s body.
         seedRuntimeDispatched("java_lang_Thread", "run", "()V");
         seedRuntimeDispatched("java_lang_Runnable", "run", "()V");
+        // Window.setTimeout/setInterval are replaced by port.js host bindings.
+        // The host posts the TimerHandler SAM back into the worker, so the
+        // callback edge is invisible to bytecode-only RTA. Keep concrete
+        // onTimer implementations on instantiated handlers reachable.
+        seedRuntimeDispatched("com_codename1_html5_js_browser_TimerHandler", "onTimer", "()V");
         // JSO bridge methods are reachable via hand-written port.js
         // dispatch sites that the bytecode-only RTA can't see (e.g.
         // ``__nativeEventListener`` in port.js calls
@@ -320,6 +347,7 @@ final class JavascriptReachability {
         if (cls == null) {
             return;
         }
+        cls.restoreEliminatedClass();
         // Static-initialiser fires implicitly on first touch.
         for (BytecodeMethod m : cls.getMethods()) {
             if ("__CLINIT__".equals(m.getMethodName())) {
@@ -711,5 +739,38 @@ final class JavascriptReachability {
             }
         }
         return eliminated;
+    }
+
+    private void mergeInstantiatedClasses(List<ByteCodeClass> classes,
+            List<ByteCodeClass> candidates) {
+        Set<String> keep = new HashSet<String>(instantiated);
+        for (ByteCodeClass cls : classes) {
+            keep.add(cls.getClsName());
+        }
+        classes.clear();
+        for (ByteCodeClass cls : candidates) {
+            if (!keep.contains(cls.getClsName())) {
+                continue;
+            }
+            if (instantiated.contains(cls.getClsName())) {
+                cls.restoreEliminatedClass();
+            }
+            classes.add(cls);
+        }
+
+        // clearUnmarked() infers finality from the temporarily pruned class
+        // list.  A restored subtype proves each of its ancestors non-final;
+        // clear those inferred flags before JavaScript direct-call emission.
+        for (ByteCodeClass cls : classes) {
+            String base = cls.getBaseClass();
+            while (base != null) {
+                ByteCodeClass parent = byName.get(JavascriptNameUtil.sanitizeClassName(base));
+                if (parent == null) {
+                    break;
+                }
+                parent.setFinalClass(false);
+                base = parent.getBaseClass();
+            }
+        }
     }
 }

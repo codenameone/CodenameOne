@@ -274,7 +274,7 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 | Native Linux target: `glibc` (default) or `musl`. The default compiles against an old glibc so the ELF runs on essentially any mainstream distro; `musl` targets Alpine (where the GTK stack is itself musl-built). A glibc binary and a musl binary aren't interchangeable.
 
 |ios.associatedDomains
-|Comma-delimited list of domains associated with this app. Since 6.0.  Note that each domain should be prefixed by a supported prefix. For example, "applinks:" or "webcredentials:." See https://developer.apple.com/documentation/security/password_autofill/setting_up_an_app_s_associated_domains?language=objc[Apple's documentation on Associated domains] for more information.
+|Comma-delimited list of domains associated with this app. Each domain should be prefixed by a supported prefix. For example, "applinks:" or "webcredentials:." See https://developer.apple.com/documentation/security/password_autofill/setting_up_an_app_s_associated_domains?language=objc[Apple's documentation on Associated domains] for more information.
 
 |ios.bitcode
 |true/false defaults to false. Enables bitcode support for the build.
@@ -374,7 +374,7 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |Valid values include 5 or 8. Indicates the JVM version that should be used for server compilation, this is defined by default for newly created apps based on the Java 8 mode selection
 
 |javascript.inject_proxy
-|true/false (defaults to `true`) By default, the build server will configure the .war version of your app to use the bundled proxy servlet for HTTP requests (to get around same-origin restrictions on network requests). Setting this to `false` prevents this, causing the application to make network requests without a proxy.
+|true/false (defaults to `true`). The ParparVM builder generates a same-origin proxy bundle and configures the app to use it. Setting this to `false` disables both proxy generation and proxy URL injection.
 
 |javascript.inject.beforeHead
 | Content to be injected into the index.html file at the beginning of the `<head>` tag.
@@ -385,14 +385,23 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |javascript.minifying
 |true/false (defaults to `true`). By default the JavaScript code is minified to reduce file size. You may optionally disable minification by setting `javascript.minifying` to `false`.
 
+|javascript.port
+|`parparvm` (default) or `teavm`. Selects the public JavaScript compiler for cloud builds. `teavm` retains the original builder as a compatibility fallback.
+
+|javascript.proxy.allowedTargets
+|Comma-separated target origins, host names, or wildcard subdomains that a generated proxy may access, for example `https://api.example.com,*.services.example.org`. If omitted, the proxy accepts any HTTP or HTTPS target and the build emits a warning.
+
+|javascript.proxy.target
+|The generated ParparVM proxy deployment platform. Supported values are `jakarta-servlet` (default), `javax-servlet`, `node`, `php`, `aws-lambda`, `google-cloud-functions`, `cloudflare-workers`, and `none`.
+
 |javascript.proxy.url
-|The URL to the proxy servlet that should be used for making network requests. If this is omitted, the .war version of the app will be set to use the bundled proxy servlet, and the .zip version of the app will be set to use no proxy. If `javascript.inject_proxy` is `false`, this build-hint will be ignored.
+|The URL of an existing proxy to use for network requests. Setting it suppresses generated proxy packaging unless `javascript.proxy.target` is also set. If `javascript.inject_proxy` is `false`, this build hint is ignored.
 
 |javascript.sourceFilesCopied
 |true/false (defaults to `false`). Setting this flag to `true` will cause available java source files to be included in the resulting .zip and .war files. These may be used by Chrome during debugging.
 
 |javascript.stopOnErrors
-|true/false (defaults to `true`). Cause JavaScript build to fail if there are warnings during the build. Sometimes build warnings won't affect the running of the app. For example, if the JavaScript port is missing a method that the app depends on, but it isn't used in most of the app. Or if there is multithreaded code detected in static initializers, but that code-path isn't used by the app. Setting this to `false` may allow you to get past some build errors, but it might just result in runtime errors later on, which are much more difficult to debug.  *This build hint is only available in Codename One 3.4 and later.
+|true/false (defaults to `true`). Causes a TeaVM JavaScript build to fail when the compiler reports warnings. Setting this to `false` may allow the fallback builder to complete, but can turn compiler diagnostics into runtime failures that are more difficult to debug.
 
 |javascript.teavm.version
 | (Optional)  The version of TeaVM to use for the build.  *Use caution*, only use this property if you know what you're doing!
@@ -485,7 +494,7 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |Selects the `CAMetalLayer.colorspace` for the Metal renderer. Accepts `sRGB` (default), `displayP3`, `deviceRGB`, `linearSRGB`, `extendedSRGB`, `extendedLinearSRGB`, or `none`. Has no effect when `ios.metal=false`. See link:#_choosing_a_color_space_for_the_metal_renderer[Working with iOS / Choosing a color space] for the full table.
 
 |ios.generateSplashScreens
-|Boolean true/false defaults to false as of 5.0.  Enable legacy generation of splash screen images for use when launching the app. These have been replaced now by the new launch storyboards.
+|Boolean true/false defaults to false. Enables legacy generation of splash screen images instead of the current launch storyboards.
 
 |ios.onDeviceDebug
 |Boolean true/false defaults to false. When `true`, the iOS build links a small JDWP listener thread (`cn1_debugger`) into the binary and the ParparVM translator emits source-line and locals metadata so a desktop proxy can serve the running app to any JDWP-speaking debugger. Has no effect on release builds. See the <<On-Device Debugging (iOS),On-Device Debugging (iOS) chapter>> for the full flow.

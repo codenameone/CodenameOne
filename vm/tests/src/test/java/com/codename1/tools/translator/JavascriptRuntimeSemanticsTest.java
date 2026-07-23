@@ -68,7 +68,30 @@ class JavascriptRuntimeSemanticsTest {
     void executesLocaleTimeZoneAndDateFormatInWorkerRuntime(CompilerHelper.CompilerConfig config) throws Exception {
         WorkerRunResult result = translateAndRunFixture(config, "JsLocaleTimeZoneApp.java", "JsLocaleTimeZoneApp");
 
-        assertEquals(511, result.result, "Translated runtime should preserve browser-safe Locale/TimeZone/DateFormat semantics");
+        assertEquals(2047, result.result, "Translated runtime should preserve browser-safe Locale/TimeZone/DateFormat semantics, including fixed GMT offsets");
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void formatsScientificFloatAndDoubleValuesLikeJava(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config, "JsFloatingFormatApp.java", "JsFloatingFormatApp");
+
+        assertEquals(255, result.result,
+                "Translated runtime should use Java scientific notation thresholds and preserve PrintStream output. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
+        assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
+    }
+
+    @ParameterizedTest
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void restoresClassesUsedByRtaResurrectedMethods(CompilerHelper.CompilerConfig config) throws Exception {
+        WorkerRunResult result = translateAndRunFixture(config,
+                "JsRtaResurrectedClassApp.java", "JsRtaResurrectedClassApp");
+
+        assertEquals(73, result.result,
+                "RTA must restore classes instantiated by Thread.run methods resurrected after conservative class culling. raw="
+                        + result.rawMessage + " err=" + result.errorMessage);
         assertTrue(result.errorMessage == null || result.errorMessage.isEmpty(), "Worker should not emit an error message");
     }
 

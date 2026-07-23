@@ -9014,6 +9014,21 @@ public class JavaSEPort extends CodenameOneImplementation {
         MCPStdioTransport.register();
         MCPSocketTransport.register();
 
+        // Optional headless auto-start of the loopback MCP socket server so an
+        // agent (or CI) can drive and screenshot a running simulator without a
+        // human clicking the MCP menu. Enabled only when -Dcn1.mcp.port=<port>
+        // is passed; default behavior is unchanged.
+        String mcpPort = System.getProperty("cn1.mcp.port");
+        if (mcpPort != null) {
+            try {
+                com.codename1.mcp.MCP.startSocketServer(Integer.parseInt(mcpPort.trim()));
+                System.out.println("[cn1.mcp] MCP socket server listening on 127.0.0.1:" + mcpPort.trim());
+            } catch (Throwable mcpErr) {
+                System.err.println("[cn1.mcp] could not auto-start MCP socket server on port "
+                        + mcpPort + ": " + mcpErr);
+            }
+        }
+
         // Fire-and-forget probe so LlmClient.simulatorRedirect=auto
         // can detect a local Ollama install without blocking startup.
         probeOllamaAsync();
@@ -17486,15 +17501,43 @@ public class JavaSEPort extends CodenameOneImplementation {
         return gpuImpl;
     }
 
+    /// Cached availability of the optional jhlabs image-filter library. When the
+    /// filters jar is missing from the simulator classpath, referencing the filter
+    /// classes throws NoClassDefFoundError; a missing optional blur must degrade to
+    /// an unblurred image rather than crash the whole simulator (a single component
+    /// such as Switch's shadowed thumb otherwise takes the app down on first paint).
+    private static Boolean gaussianBlurAvailable;
+
+    private static boolean isGaussianBlurAvailable() {
+        if (gaussianBlurAvailable == null) {
+            try {
+                Class.forName("com.jhlabs.image.GaussianFilter");
+                gaussianBlurAvailable = Boolean.TRUE;
+            } catch (Throwable t) {
+                gaussianBlurAvailable = Boolean.FALSE;
+                System.err.println("[cn1] jhlabs image filters unavailable; blur effects disabled: " + t);
+            }
+        }
+        return gaussianBlurAvailable.booleanValue();
+    }
+
     public Image gaussianBlurImage(Image image, float radius) {
-        GaussianFilter gf = new GaussianFilter(radius);
-        Image bim = Image.createImage(image.getWidth(), image.getHeight());
-        BufferedImage blurredImage = gf.filter((BufferedImage)image.getImage(), (BufferedImage)bim.getImage());
-        return new NativeImage(blurredImage);
+        if (!isGaussianBlurAvailable()) {
+            return image;
+        }
+        try {
+            GaussianFilter gf = new GaussianFilter(radius);
+            Image bim = Image.createImage(image.getWidth(), image.getHeight());
+            BufferedImage blurredImage = gf.filter((BufferedImage) image.getImage(), (BufferedImage) bim.getImage());
+            return new NativeImage(blurredImage);
+        } catch (Throwable t) {
+            gaussianBlurAvailable = Boolean.FALSE;
+            return image;
+        }
     }
 
     public boolean isGaussianBlurSupported() {
-        return true;
+        return isGaussianBlurAvailable();
     }
 
     @Override
@@ -19122,18 +19165,52 @@ public class JavaSEPort extends CodenameOneImplementation {
             // would go to Canvas.  If we don't do this, then the glasspane will 
             // intercept all events, even those destined for the menu items - and
             // that causes all hell to break loose on Windows.
-            Point p = SwingUtilities.convertPoint(this, new Point(x, y), instance.canvas);
-            return instance.canvas.getVisibleRect().contains(p);
+            return shouldGlassPaneInterceptMouseEvent(this, instance.canvas, x, y);
 
         }
    }
-   
-   private static boolean containsInHierarchy(java.awt.Component parent, java.awt.Component cmp) {
-        Container p = cmp.getParent();
-        while (p != parent && p != null) {
-            p = p.getParent();
+
+   /**
+    * Returns whether the glass pane should handle a mouse event at the given point.
+    * The geometric canvas check must remain the default because native peers can be
+    * siblings of the canvas in the AppFrame hierarchy, and their HiDPI coordinates
+    * still need to pass through the glass-pane dispatcher. Swing menus are the one
+    * exception because lightweight popup menus can overlap the canvas.
+    */
+   static boolean shouldGlassPaneInterceptMouseEvent(JComponent glassPane,
+           java.awt.Component canvas, int x, int y) {
+        if (!(canvas instanceof JComponent)) {
+            return false;
         }
-        return p == parent;
+        Point canvasPoint = SwingUtilities.convertPoint(
+                glassPane, new Point(x, y), canvas);
+        if (!((JComponent) canvas).getVisibleRect().contains(canvasPoint)) {
+            return false;
+        }
+
+        JRootPane rootPane = SwingUtilities.getRootPane(glassPane);
+        if (rootPane == null) {
+            return true;
+        }
+        JLayeredPane layeredPane = rootPane.getLayeredPane();
+        Point layeredPoint = SwingUtilities.convertPoint(
+                glassPane, new Point(x, y), layeredPane);
+        java.awt.Component component = SwingUtilities.getDeepestComponentAt(
+                layeredPane, layeredPoint.x, layeredPoint.y);
+        return !isSwingMenuComponent(component);
+   }
+
+   private static boolean isSwingMenuComponent(java.awt.Component component) {
+        java.awt.Component current = component;
+        while (current != null) {
+            if (current instanceof JMenuBar
+                    || current instanceof JPopupMenu
+                    || current instanceof JMenuItem) {
+                return true;
+            }
+            current = current.getParent();
+        }
+        return false;
     }
     
    /**

@@ -24,6 +24,9 @@ CN1_BENCH_CFLAGS="" ./run-benchmark.sh    # without ThinLTO (debug shape)
 
 ./run-gauntlet.sh           # the correctness gate: all tortures byte-identical
                             # + GC stress in cooperative AND forced-signal modes
+
+./run-bibop-adaptive.sh     # issue-5425 retained-small-array correctness,
+                            # adaptive-policy, wall-time, and peak-RSS gate
 ```
 
 Requirements: Maven and clang on `PATH` (gcc also works:
@@ -62,6 +65,24 @@ measurement runner (`BENCH <name> rep <n> ns=<t> checksum=<c>` lines):
 | SoeTest | StackOverflowError must be catchable and the VM functional afterwards (guards the preallocated-SOE design) |
 | ThreadChurn | thread lifecycle |
 | GcStress / MtStress | allocation storms, single- and multi-threaded, in cooperative and forced-signal (`CN1_GC_SIGNAL_STOP=1`) stop modes |
+
+## Adaptive BiBOP regression gate
+
+`run-bibop-adaptive.sh` reproduces the allocator shape from issue 5425 at its
+reported scale: 560,000 retained small `byte[]` values, temporary key arrays,
+and continued churn across several completed GC epochs. The Java workload checks
+every sampled retained array after each collection and asserts a checksum produced
+by the host JVM. The harness additionally requires runtime evidence that:
+
+- the BiBOP-only allocator thread graduated to the high-throughput pacing tier;
+- the 24 MiB baseline trigger grew under sustained survival;
+- a survivor-heavy size class activated the bounded legacy bypass/reprobe path;
+- grace marking used the fresh-page set rather than the grow-only page registry.
+
+It then measures best wall time and per-process peak RSS for the production
+adaptive collector against the legacy collector and a no-pacing diagnostic build.
+Those compile-time variants are QA controls only; applications ship one collector
+with the adaptive behavior enabled, not user-selectable GC flags.
 
 `ClinitThrow` is a standalone liveness reproducer (not byte-identical to the
 host JVM by design — ParparVM's initialization-failure semantics differ): a

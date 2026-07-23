@@ -33,15 +33,9 @@ WEBSITE_INCLUDE_SKINDESIGNER="${WEBSITE_INCLUDE_SKINDESIGNER:-true}"
 WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS="${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS:-auto}"
 WEBSITE_REFRESH_PORT_STATUS="${WEBSITE_REFRESH_PORT_STATUS:-false}"
 WEBSITE_CN1_VERSION="${WEBSITE_CN1_VERSION:-auto}"
-CN1_USER="${CN1_USER:-}"
-CN1_TOKEN="${CN1_TOKEN:-}"
 
 if [ "${WEBSITE_INCLUDE_INITIALIZR}" = "auto" ]; then
-  if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
-    WEBSITE_INCLUDE_INITIALIZR="true"
-  else
-    WEBSITE_INCLUDE_INITIALIZR="false"
-  fi
+  WEBSITE_INCLUDE_INITIALIZR="true"
 fi
 
 bootstrap_local_cn1_snapshots() {
@@ -82,11 +76,7 @@ activate_bootstrapped_java17() {
 }
 
 if [ "${WEBSITE_INCLUDE_PLAYGROUND}" = "auto" ]; then
-  if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
-    WEBSITE_INCLUDE_PLAYGROUND="true"
-  else
-    WEBSITE_INCLUDE_PLAYGROUND="false"
-  fi
+  WEBSITE_INCLUDE_PLAYGROUND="true"
 fi
 
 if [ "${WEBSITE_INCLUDE_SKINDESIGNER}" = "auto" ]; then
@@ -104,62 +94,6 @@ if [ "${WEBSITE_CN1_VERSION}" = "auto" ]; then
     exit 1
   fi
 fi
-
-set_cn1_user_token() {
-  local project_dir="$1"
-
-  if [ -n "${CN1_USER}" ] && [ -n "${CN1_TOKEN}" ]; then
-    # CN1_TOKEN holds the account *password*, not a build token. The build
-    # sends whatever is stored in the prefs "token" slot as an
-    # "Authorization: Bearer" header; the cloud server parses that as a JWT,
-    # so seeding the raw password makes every cloud call 401 and the build
-    # falls back to an interactive browser login that hangs in CI
-    # ("Waiting for login..."). Exchange the password for a short-lived
-    # Keycloak access token (OAuth2 direct grant on the public cn1cloudapp
-    # client) and seed THAT instead.
-    local cn1_access_token=""
-    cn1_access_token="$(curl -fsS -m 20 \
-      -d 'grant_type=password' \
-      -d 'client_id=cn1cloudapp' \
-      --data-urlencode "username=${CN1_USER}" \
-      --data-urlencode "password=${CN1_TOKEN}" \
-      'https://auth.codenameone.com/auth/realms/Realm/protocol/openid-connect/token' \
-      | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')" || true
-    if [ -z "${cn1_access_token}" ]; then
-      echo "Failed to obtain a Codename One access token from CN1_USER/CN1_TOKEN — check the credentials (the secret must be the account password)." >&2
-      return 1
-    fi
-
-    if ! sh ./mvnw -q -U -pl javascript -am \
-      cn1:set-user-token \
-      -Dcodename1.platform=javascript \
-      -Duser="${CN1_USER}" \
-      -Dtoken="${cn1_access_token}"; then
-      echo "cn1:set-user-token is unavailable in this plugin version for ${project_dir}; writing CN1 credentials directly to Java preferences." >&2
-      local tmp_dir
-      tmp_dir="$(mktemp -d)"
-      cat > "${tmp_dir}/SetCn1Prefs.java" <<'JAVA'
-import java.util.prefs.Preferences;
-
-public class SetCn1Prefs {
-    public static void main(String[] args) {
-        if (args.length != 2) {
-            throw new IllegalArgumentException("Usage: SetCn1Prefs <user> <token>");
-        }
-        Preferences prefs = Preferences.userRoot().node("/com/codename1/ui");
-        prefs.put("user", args[0]);
-        prefs.put("token", args[1]);
-    }
-}
-JAVA
-      javac "${tmp_dir}/SetCn1Prefs.java"
-      java -cp "${tmp_dir}" SetCn1Prefs "${CN1_USER}" "${cn1_access_token}"
-      rm -rf "${tmp_dir}"
-    fi
-  else
-    echo "CN1_USER/CN1_TOKEN not provided; building ${project_dir} JavaScript without setting token." >&2
-  fi
-}
 
 build_javadocs_for_site() {
   if [ "${WEBSITE_INCLUDE_JAVADOCS}" != "true" ]; then
@@ -636,8 +570,6 @@ build_initializr_for_site() {
       -Dcodename1.platform=javascript \
       install
 
-    set_cn1_user_token "Initializr"
-
     run_initializr_mvn -q -U -pl javascript -am \
       "${initializr_workspace_args[@]}" \
       -DskipTests \
@@ -710,7 +642,6 @@ build_playground_for_site() {
       fi
     }
 
-    set_cn1_user_token "Playground"
     local playground_workspace_args=()
     if [ "${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS}" = "true" ]; then
       playground_workspace_args+=(-Dcn1.localWorkspace=true)
@@ -799,7 +730,6 @@ build_skindesigner_for_site() {
       fi
     }
 
-    set_cn1_user_token "Skin Designer"
     local skindesigner_workspace_args=()
     if [ "${WEBSITE_BOOTSTRAP_CN1_SNAPSHOTS}" = "true" ]; then
       skindesigner_workspace_args+=(-Dcn1.localWorkspace=true)

@@ -265,7 +265,7 @@ public class Parser extends ClassVisitor {
      * The uncompressed payload is the same line-based ASCII the proxy's
      * SymbolTable parses:
      *   version &lt;n&gt;
-     *   class   &lt;classId&gt; &lt;clsName&gt; &lt;sourceFile&gt; &lt;superId&gt;
+     *   class   &lt;classId&gt; &lt;clsName&gt; &lt;sourceFile&gt; &lt;superId&gt; &lt;jvmName&gt;
      *   method  &lt;methodId&gt; &lt;classId&gt; &lt;methodName&gt; &lt;desc&gt; &lt;isStatic&gt;
      *   line    &lt;methodId&gt; &lt;sourceLine&gt;
      *   var     &lt;methodId&gt; &lt;slot&gt; &lt;name&gt; &lt;desc&gt;
@@ -280,15 +280,7 @@ public class Parser extends ClassVisitor {
                 if (src == null) {
                     src = "";
                 }
-                // Extended class row: id, name, sourceFile, superId.
-                // Older proxies (4-column form) ignore the trailing
-                // column since the parser tolerates extras.
-                int superId = -1;
-                if (bc.getBaseClassObject() != null) {
-                    superId = bc.getBaseClassObject().getClassOffset();
-                }
-                w.write("class\t" + bc.getClassOffset() + "\t" + bc.getClsName()
-                        + "\t" + src + "\t" + superId + "\n");
+                w.write(classSymbolRow(bc, src));
             }
             // Emit instance-field metadata so the proxy can answer JDWP
             // ClassType.Fields / FieldsWithGeneric without a device round-trip,
@@ -391,6 +383,28 @@ public class Parser extends ClassVisitor {
             System.out.println("Wrote on-device-debug symbol blob: " + f.getAbsolutePath()
                     + " (" + gz.length + " gz bytes, " + raw.size() + " raw)");
         }
+    }
+
+    /**
+     * Builds a symbol-table class row while retaining both ParparVM's mangled
+     * identifier and the original JVM internal name. The latter is required
+     * for JDWP signatures because mangling maps both {@code '/'} and
+     * {@code '$'} to {@code '_'}, making anonymous and inner classes
+     * impossible to reconstruct reliably in the debugger proxy.
+     */
+    static String classSymbolRow(ByteCodeClass bc, String sourceFile) {
+        int superId = -1;
+        if (bc.getBaseClassObject() != null) {
+            superId = bc.getBaseClassObject().getClassOffset();
+        }
+        String jvmName = bc.getOriginalClassName();
+        if (jvmName == null || jvmName.isEmpty()) {
+            // Defensive compatibility for synthetic ByteCodeClass instances
+            // that predate original-name tracking.
+            jvmName = bc.getClsName().replace('_', '/');
+        }
+        return "class\t" + bc.getClassOffset() + "\t" + bc.getClsName()
+                + "\t" + sourceFile + "\t" + superId + "\t" + jvmName + "\n";
     }
     
     private static void appendClassOffset(ByteCodeClass bc, List<Integer> clsIds) {
@@ -714,6 +728,9 @@ public class Parser extends ClassVisitor {
 			System.exit(1);
 		}
         String file = "Unknown File";
+        List<ByteCodeClass> javascriptClassPool = ByteCodeTranslator.output
+                == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT
+                ? new ArrayList<ByteCodeClass>(classes) : null;
         try {
             for(ByteCodeClass bc : classes) {
                 // special case for an object
@@ -791,7 +808,8 @@ public class Parser extends ClassVisitor {
                     && ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_JAVASCRIPT
                     && System.getProperty("parparvm.js.rta.off") == null) {
                 Date rtaStart = new Date();
-                int rtaEliminated = JavascriptReachability.run(classes, nativeSources);
+                int rtaEliminated = JavascriptReachability.run(
+                        classes, javascriptClassPool, nativeSources);
                 Date rtaEnd = new Date();
                 long rtaDif = rtaEnd.getTime() - rtaStart.getTime();
                 if (ByteCodeTranslator.verbose) {
@@ -1422,6 +1440,73 @@ public class Parser extends ClassVisitor {
                 String helperName = "cn1$concat$" + (stringConcatCounter++);
                 BytecodeMethod helper = new BytecodeMethod(clsName, Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC, helperName, desc, null, null);
                 cls.addMethod(helper);
+
+                // FAST PATH: when every argument is already String-typed (the common interpolation /
+                // a + b + c shape), build the result compactly in one pass via String.cn1ConcatN
+                // instead of the char[]-backed StringBuilder -- which decodes each compact byte[] arg
+                // to char on append and re-encodes to byte in toString, over a 2-byte/char scratch
+                // buffer (4 allocations + 2 conversions per concat). cn1ConcatN is 2 allocations and
+                // no conversion. Only for 2..5 total parts (constants + args); anything else, or a
+                // non-String arg, falls through to the general StringBuilder helper below.
+                boolean cn1AllStringArgs = invokedType.getArgumentTypes().length > 0;
+                for (Type at : invokedType.getArgumentTypes()) {
+                    if (at.getSort() != Type.OBJECT || !"java/lang/String".equals(at.getInternalName())) {
+                        cn1AllStringArgs = false;
+                        break;
+                    }
+                }
+                if (cn1AllStringArgs) {
+                    // Ordered parts: a String means "literal/constant -> LDC", an Integer means
+                    // "arg at that local -> ALOAD". Empty literals are dropped.
+                    List<Object> cn1Parts = new ArrayList<>();
+                    Type[] cn1Ats = invokedType.getArgumentTypes();
+                    if ("makeConcat".equals(bsm.getName())) {
+                        int li = 0;
+                        for (Type at : cn1Ats) { cn1Parts.add(Integer.valueOf(li)); li += at.getSize(); }
+                    } else {
+                        String rcp = bsmArgs != null && bsmArgs.length > 0 ? String.valueOf(bsmArgs[0]) : "";
+                        List<String> csts = new ArrayList<>();
+                        if (bsmArgs != null) {
+                            for (int i = 1; i < bsmArgs.length; i++) csts.add(String.valueOf(bsmArgs[i]));
+                        }
+                        int ci = 0, li = 0, ai = 0;
+                        StringBuilder lit = new StringBuilder();
+                        for (int i = 0; i < rcp.length(); i++) {
+                            char ch = rcp.charAt(i);
+                            if (ch == '\u0001') {
+                                if (lit.length() > 0) { cn1Parts.add(lit.toString()); lit.setLength(0); }
+                                if (ai < cn1Ats.length) { cn1Parts.add(Integer.valueOf(li)); li += cn1Ats[ai++].getSize(); }
+                            } else if (ch == '\u0002') {
+                                if (lit.length() > 0) { cn1Parts.add(lit.toString()); lit.setLength(0); }
+                                if (ci < csts.size()) cn1Parts.add(csts.get(ci++));
+                            } else {
+                                lit.append(ch);
+                            }
+                        }
+                        if (lit.length() > 0) cn1Parts.add(lit.toString());
+                        while (ai < cn1Ats.length) { cn1Parts.add(Integer.valueOf(li)); li += cn1Ats[ai++].getSize(); }
+                    }
+                    int cn1N = cn1Parts.size();
+                    if (cn1N >= 2 && cn1N <= 5) {
+                        for (Object p : cn1Parts) {
+                            if (p instanceof String) {
+                                helper.addLdc((String) p);
+                            } else {
+                                helper.addVariableOperation(Opcodes.ALOAD, ((Integer) p).intValue());
+                            }
+                        }
+                        StringBuilder cn1Sig = new StringBuilder("(");
+                        for (int k = 0; k < cn1N; k++) cn1Sig.append("Ljava/lang/String;");
+                        cn1Sig.append(")Ljava/lang/String;");
+                        helper.addInvoke(Opcodes.INVOKESTATIC, "java/lang/String", "cn1Concat" + cn1N, cn1Sig.toString(), false);
+                        helper.addInstruction(Opcodes.ARETURN);
+                        int cn1MaxLocal = 0;
+                        for (Type t : cn1Ats) cn1MaxLocal += t.getSize();
+                        helper.setMaxes(cn1N + 1, cn1MaxLocal + 2);
+                        mtd.addInvoke(Opcodes.INVOKESTATIC, clsName, helperName, desc, false);
+                        return;
+                    }
+                }
 
                 // Pre-size the StringBuilder from the recipe literals + per-argument length
                 // estimates so the common-case concat never grows its char[] (each growth is

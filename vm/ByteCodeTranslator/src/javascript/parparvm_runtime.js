@@ -588,7 +588,12 @@ function identityHash(obj) {
 }
 function createConsolePrintStream() {
   try {
-    return jvm.newObject("java_io_PrintStream");
+    const stream = jvm.newObject("java_io_PrintStream");
+    // Only VM-created System.out/System.err streams are console-backed.  A
+    // regular new PrintStream(OutputStream) must retain the translated Java
+    // implementation so it writes to its wrapped stream.
+    stream.__cn1ConsolePrintStream = true;
+    return stream;
   } catch (err) {
     if (global.console && typeof global.console.warn === "function") {
       global.console.warn("PARPAR:console-printstream-init-failed", err);
@@ -608,6 +613,27 @@ function ensureSystemPrintStreams() {
   if (staticFields.err == null) {
     staticFields.err = staticFields.out != null ? staticFields.out : createConsolePrintStream();
   }
+}
+function invokeTranslatedNativeFallback(receiver, methodId, translatedName, args) {
+  let className = receiver && receiver.__class;
+  while (className) {
+    const fallback = jvm.translatedNativeFallbacks[className + "|" + methodId];
+    if (typeof fallback === "function") {
+      return fallback.apply(null, [receiver].concat(args || []));
+    }
+    const classDef = jvm.classes[className];
+    className = classDef ? classDef.baseClass : null;
+  }
+  // Whole-program RTA can remove a dispatch-map entry even though a direct
+  // invocation of the translated method remains. installNativeBindings()
+  // records that original global before replacing it, so use it as the
+  // authoritative fallback when the virtual slot is absent.
+  const directFallback = jvm.translatedMethods[translatedName];
+  if (typeof directFallback === "function") {
+    return directFallback.apply(null, [receiver].concat(args || []));
+  }
+  throw new Error("Missing translated fallback for native override " + methodId
+      + " on " + (receiver && receiver.__class));
 }
 function threadDebugLabel(threadObject) {
   if (!threadObject) {
@@ -768,6 +794,7 @@ function threadDebugLabel(threadObject) {
 const jvm = {
   classes: {},
   nativeMethods: Object.create(null),
+  translatedNativeFallbacks: Object.create(null),
   literalStrings: Object.create(null),
   methodTailCache: Object.create(null),
   remappedMethodIdCache: Object.create(null),
@@ -3405,7 +3432,8 @@ const jvm = {
   applyNativeOverrides() {
     const classNames = Object.keys(this.classes);
     for (let i = 0; i < classNames.length; i++) {
-      const cls = this.classes[classNames[i]];
+      const className = classNames[i];
+      const cls = this.classes[className];
       if (!cls) {
         continue;
       }
@@ -3423,6 +3451,13 @@ const jvm = {
         const methodId = methodIds[j];
         const nativeOverride = this.nativeMethods[methodId];
         if (typeof nativeOverride === "function" && cls.methods[methodId] !== nativeOverride) {
+          let translated = cls.methods[methodId];
+          if (typeof translated === "string") {
+            translated = resolveMethodEntry(cls.methods, methodId);
+          }
+          if (typeof translated === "function") {
+            this.translatedNativeFallbacks[className + "|" + methodId] = translated;
+          }
           cls.methods[methodId] = nativeOverride;
         }
       }
@@ -4740,6 +4775,19 @@ function normalizeTimeZoneId(name) {
   const value = name == null ? "" : jvm.toNativeString(name);
   return value ? value : defaultTimeZoneId();
 }
+function fixedTimeZoneOffsetMillis(timeZone) {
+  const match = /^(?:GMT|UTC)([+-])(\d{1,2})(?::?(\d{2}))?$/.exec(String(timeZone || ""));
+  if (!match) {
+    return null;
+  }
+  const hours = parseInt(match[2], 10);
+  const minutes = match[3] == null ? 0 : parseInt(match[3], 10);
+  if (hours > 23 || minutes > 59) {
+    return null;
+  }
+  const offset = ((hours * 60) + minutes) * 60000;
+  return match[1] === "-" ? -offset : offset;
+}
 function timezoneDateParts(timeZone, millis) {
   millis = _LtoNum(millis); // millis may be a Java long (Long object); Date needs a Number
   const format = new Intl.DateTimeFormat("en-US", {
@@ -4763,6 +4811,10 @@ function timezoneDateParts(timeZone, millis) {
 }
 function timezoneOffsetMillis(timeZone, millis) {
   millis = _LtoNum(millis); // millis may be a Java long (Long object)
+  const fixedOffset = fixedTimeZoneOffsetMillis(timeZone);
+  if (fixedOffset != null) {
+    return fixedOffset;
+  }
   if (timeZone === "GMT" || typeof Intl === "undefined" || !Intl.DateTimeFormat) {
     return 0;
   }
@@ -4778,6 +4830,10 @@ function timezoneOffsetMillis(timeZone, millis) {
   return utcMillis - millis;
 }
 function timezoneRawOffsetMillis(timeZone) {
+  const fixedOffset = fixedTimeZoneOffsetMillis(timeZone);
+  if (fixedOffset != null) {
+    return fixedOffset;
+  }
   if (timeZone === "GMT") {
     return 0;
   }
@@ -5179,16 +5235,28 @@ bindNative([
   return jvm.getClassObject(__cn1ThisObject.__class);
 });
 bindNative(["cn1_java_io_PrintStream_print_java_lang_String"], function(__cn1ThisObject, value) {
-  printToConsole(printStreamValue(value));
-  return null;
+  if (__cn1ThisObject && __cn1ThisObject.__cn1ConsolePrintStream) {
+    printToConsole(printStreamValue(value));
+    return null;
+  }
+  return invokeTranslatedNativeFallback(__cn1ThisObject, "cn1_s_print_java_lang_String",
+      "cn1_java_io_PrintStream_print_java_lang_String", [value]);
 });
 bindNative(["cn1_java_io_PrintStream_println_java_lang_String"], function(__cn1ThisObject, value) {
-  printToConsole(printStreamValue(value));
-  return null;
+  if (__cn1ThisObject && __cn1ThisObject.__cn1ConsolePrintStream) {
+    printToConsole(printStreamValue(value));
+    return null;
+  }
+  return invokeTranslatedNativeFallback(__cn1ThisObject, "cn1_s_println_java_lang_String",
+      "cn1_java_io_PrintStream_println_java_lang_String", [value]);
 });
 bindNative(["cn1_java_io_PrintStream_println_java_lang_Object"], function(__cn1ThisObject, value) {
-  printToConsole(printStreamValue(value));
-  return null;
+  if (__cn1ThisObject && __cn1ThisObject.__cn1ConsolePrintStream) {
+    printToConsole(printStreamValue(value));
+    return null;
+  }
+  return invokeTranslatedNativeFallback(__cn1ThisObject, "cn1_s_println_java_lang_Object",
+      "cn1_java_io_PrintStream_println_java_lang_Object", [value]);
 });
 bindNative(["cn1_java_lang_System___CLINIT__"], function() {
   ensureSystemPrintStreams();
@@ -5318,10 +5386,31 @@ bindNative(["cn1_java_lang_Character_toLowerCase_char_R_char"], function(ch) { r
 bindNative(["cn1_java_lang_Character_toLowerCase_int_R_int"], function(ch) { return String.fromCharCode(ch | 0).toLowerCase().charCodeAt(0) | 0; });
 bindNative(["cn1_java_lang_Float_floatToIntBits_float_R_int"], function(v) { return intBitsFromFloat(v); });
 bindNative(["cn1_java_lang_Float_intBitsToFloat_int_R_float"], function(bits) { return floatFromIntBits(bits); });
-bindNative(["cn1_java_lang_Float_toStringImpl_float_boolean_R_java_lang_String"], function(v) { return createJavaString(String(v)); });
+function formatJavaFloating(value, scientificNotation) {
+  value = Number(value);
+  if (!scientificNotation) {
+    return String(value);
+  }
+  const parts = value.toExponential().split("e");
+  let mantissa = parts[0];
+  if (mantissa.indexOf(".") < 0) {
+    mantissa += ".0";
+  }
+  let exponent = parts.length > 1 ? parts[1] : "0";
+  if (exponent.charAt(0) === "+") {
+    exponent = exponent.substring(1);
+  }
+  exponent = exponent.replace(/^(-?)0+(\d)/, "$1$2");
+  return mantissa + "E" + exponent;
+}
+bindNative(["cn1_java_lang_Float_toStringImpl_float_boolean_R_java_lang_String"], function(v, scientificNotation) {
+  return createJavaString(formatJavaFloating(v, !!scientificNotation));
+});
 bindNative(["cn1_java_lang_Double_doubleToLongBits_double_R_long"], function(v) { return longBitsFromDouble(v); });
 bindNative(["cn1_java_lang_Double_longBitsToDouble_long_R_double"], function(bits) { return doubleFromLongBits(bits); });
-bindNative(["cn1_java_lang_Double_toStringImpl_double_boolean_R_java_lang_String"], function(v) { return createJavaString(String(v)); });
+bindNative(["cn1_java_lang_Double_toStringImpl_double_boolean_R_java_lang_String"], function(v, scientificNotation) {
+  return createJavaString(formatJavaFloating(v, !!scientificNotation));
+});
 bindNative(["cn1_java_lang_StringBuilder_append_char_R_java_lang_StringBuilder"], function(__cn1ThisObject, ch) { return sbAppendNativeString(__cn1ThisObject, String.fromCharCode(ch | 0)); });
 bindNative(["cn1_java_lang_StringBuilder_append_int_R_java_lang_StringBuilder"], function(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, String(value | 0)); });
 bindNative(["cn1_java_lang_StringBuilder_append_long_R_java_lang_StringBuilder"], function(__cn1ThisObject, value) { return sbAppendNativeString(__cn1ThisObject, _LtoStr(value)); });
@@ -5411,6 +5500,24 @@ bindNative(["cn1_java_lang_String_toLowerCase_R_java_lang_String"], function(__c
 bindNative(["cn1_java_lang_String_toString_R_java_lang_String"], function(__cn1ThisObject) { return __cn1ThisObject; });
 bindNative(["cn1_java_lang_String_toUpperCase_R_java_lang_String"], function(__cn1ThisObject) { return createJavaString(jvm.toNativeString(__cn1ThisObject).toUpperCase()); });
 bindNative(["cn1_java_lang_String_releaseNSString_long"], function() { return null; });
+// cn1FusedConcatN is a ParparVM single-allocation fused byte[] concat optimization; the
+// cn1ConcatN callers only reach it when every part is a Latin-1 byte[]-backed String, which
+// never happens on the JS runtime (strings are native), so at runtime this is unreachable --
+// but it is statically reachable from cn1ConcatN's bytecode, so it needs a binding. A plain
+// string concatenation is the correct result. null maps to "null" like makeConcat.
+function cn1FusedConcatArg(x) { return x == null ? "null" : jvm.toNativeString(x); }
+bindNative(["cn1_java_lang_String_cn1FusedConcat2_java_lang_String_java_lang_String_R_java_lang_String"], function(a, b) {
+  return createJavaString(cn1FusedConcatArg(a) + cn1FusedConcatArg(b));
+});
+bindNative(["cn1_java_lang_String_cn1FusedConcat3_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String"], function(a, b, c) {
+  return createJavaString(cn1FusedConcatArg(a) + cn1FusedConcatArg(b) + cn1FusedConcatArg(c));
+});
+bindNative(["cn1_java_lang_String_cn1FusedConcat4_java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String"], function(a, b, c, d) {
+  return createJavaString(cn1FusedConcatArg(a) + cn1FusedConcatArg(b) + cn1FusedConcatArg(c) + cn1FusedConcatArg(d));
+});
+bindNative(["cn1_java_lang_String_cn1FusedConcat5_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String"], function(a, b, c, d, e) {
+  return createJavaString(cn1FusedConcatArg(a) + cn1FusedConcatArg(b) + cn1FusedConcatArg(c) + cn1FusedConcatArg(d) + cn1FusedConcatArg(e));
+});
 bindNative(["cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY"], function(bytes, off, len, encoding) {
   const slice = bytes.slice(off | 0, (off | 0) + (len | 0));
   const array = Uint8Array.from(slice, function(v) { return v & 0xff; });

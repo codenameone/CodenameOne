@@ -1,0 +1,57 @@
+name: OSS Traction Snapshot
+
+on:
+  schedule:
+    # GitHub traffic is a rolling 14-day window. Weekly snapshots preserve it.
+    - cron: '41 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  # The scheduled job stores aggregate star history in an unpublished draft
+  # release. It does not push commits or publish a release.
+  contents: write
+  discussions: read
+  issues: read
+
+concurrency:
+  group: oss-traction-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out default branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Capture GitHub metrics
+        env:
+          # Keep repository reads on the installation token. The fine-grained
+          # token has Administration read access solely for traffic endpoints.
+          GITHUB_TOKEN: ${{ github.token }}
+          OSS_TRACTION_TOKEN: ${{ secrets.OSS_TRACTION_TOKEN }}
+        run: |
+          python3 scripts/website/capture_oss_traction.py \
+            --output "${RUNNER_TEMP}/oss-traction.json" \
+            --summary "${RUNNER_TEMP}/oss-traction.md"
+          cat "${RUNNER_TEMP}/oss-traction.md" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Preserve snapshot
+        uses: actions/upload-artifact@v7
+        with:
+          # Keep the human-readable output under the repository's intentionally
+          # short artifact-retention policy. Durable aggregate state lives in
+          # an unpublished draft release.
+          name: oss-traction-snapshot
+          path: |
+            ${{ runner.temp }}/oss-traction.json
+            ${{ runner.temp }}/oss-traction.md
+          retention-days: 2

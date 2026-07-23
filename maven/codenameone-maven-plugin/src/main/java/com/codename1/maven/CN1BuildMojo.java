@@ -1639,10 +1639,7 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         }
     }
 
-    // Local ParparVM-backed JavaScript build target. Enterprise-gated; see
-    // JavaScriptBuilder#checkUserLevel. Intentionally undocumented in the
-    // archetype build scripts — discoverable via `mvn cn1:build
-    // -Dcodename1.platform=javascript -Dcodename1.buildTarget=local-javascript`.
+    // Local ParparVM-backed JavaScript build target.
     private void doJavaScriptLocalBuild(File tmpProjectDir, Properties props, File distJar) throws MojoExecutionException {
         File codenameOneJar = getJar("com.codenameone", "codenameone-core");
 
@@ -1731,6 +1728,22 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 }
                 projectHelper.attachArtifact(project, "zip", "webapp", copyTo);
                 getLog().info("JavaScript bundle written to " + copyTo);
+            }
+            File deployable = e.getJavaScriptDeployableArtifact();
+            if (deployable != null && deployable.isFile()) {
+                String name = deployable.getName();
+                int dot = name.lastIndexOf('.');
+                String extension = dot < 0 ? "zip" : name.substring(dot + 1);
+                String classifier = "war".equals(extension) ? "webapp-proxy" : "proxy-"
+                        + r.getArg("javascript.proxy.target", "jakarta-servlet");
+                File copyTo = new File(project.getBuild().getDirectory(), name);
+                try {
+                    FileUtils.copyFile(deployable, copyTo);
+                } catch (IOException ex) {
+                    throw new MojoExecutionException("Failed to copy JavaScript deployable bundle to " + copyTo, ex);
+                }
+                projectHelper.attachArtifact(project, extension, classifier, copyTo);
+                getLog().info("JavaScript deployable bundle written to " + copyTo);
             }
         } catch (BuildException ex) {
             String builderLog = e.getErrorMessage();

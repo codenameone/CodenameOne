@@ -1,0 +1,46 @@
+name: Documentation failure
+description: Report instructions that are missing, ambiguous, or out of date.
+title: "[Docs] "
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Page or source location
+      placeholder: https://www.codenameone.com/... or a repository path
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: What you were trying to do
+      description: State the task and the environment in which you attempted it.
+    validations:
+      required: true
+  - type: textarea
+    id: interpretation
+    attributes:
+      label: What the instructions led you to expect
+      description: Quote only the small relevant fragment, then explain how you interpreted it.
+    validations:
+      required: true
+  - type: textarea
+    id: failure
+    attributes:
+      label: Where the instructions failed
+      description: Include the first step, command, screenshot, or result that stopped matching the documentation.
+    validations:
+      required: true
+  - type: textarea
+    id: versions
+    attributes:
+      label: Relevant versions
+      description: Include Codename One, JDK, target, OS, SDK, and IDE or Maven versions where applicable.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Report checks
+      options:
+        - label: I checked that this page is part of the current Maven-based workflow rather than an explicitly archived guide.
+          required: true

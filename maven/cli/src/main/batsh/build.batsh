@@ -88,7 +88,7 @@ function help() {
     println("    *Windows Desktop builds are a Pro user feature.");
     println("  javascript");
     println("    Builds as a web app.");
-    println("    *Javascript builds are an Enterprise user feature");
+    println("    *JavaScript builds are available to all users.");
 
 
 }

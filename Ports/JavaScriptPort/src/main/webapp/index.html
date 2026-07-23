@@ -107,29 +107,26 @@
     <!-- CN1-CSS-INCLUDES -->
     
     <!-- 
-        This value points to the location of the proxy servlet that allows us to 
-        avoid cross origin policy issues! You will need to deploy a proxy servlet 
-        or equivalent on your server.  If you are using the .war distribution for
-        your app, then a compatible proxy comes bundled already.  It will be 
-        accessible at the URL http://yourdomain.com/yourapp/cn1-cors-proxy.
-    
-        If you are deploying on App Engine, you should use the GAE proxy instead
-        which is also bundled with the .war distribution and is accessible at
-        http://yourdomain.com/yourapp/cn1-gae-cors-proxy.
-    
-        By default, your application will be configured to use this bundled 
-        proxy.  You can disable it using the build hint:
+        This value points to the same-origin proxy that allows requests to hosts
+        which don't provide suitable CORS headers.  ParparVM builds generate a
+        deployment wrapper by default.  Select Jakarta Servlet, javax Servlet,
+        Node.js, PHP, AWS Lambda, Google Cloud Functions, or Cloudflare Workers
+        with the javascript.proxy.target build hint.  The endpoint in each
+        wrapper is /cn1-cors-proxy?_target=.
+
+        Restrict public proxy deployments with javascript.proxy.allowedTargets.
+        You can disable proxy generation and URL injection using:
             javascript.inject_proxy=false
-        
-        Alternatively you are not using the .war distribution or you want to use
-        the proxy separately, you can specify the build hint:
+
+        To use a proxy that you operate separately, specify:
             javascript.proxy.url=http://yourdomain.com/yourapp/cn1-cors-proxy?_target=
     
         You can also set this value inside your application using:
     
             Display.getInstance().setProperty("javascript.proxy.url", "http://yourdomain.com/yourapp/cn1-cors-proxy?_target=");
     
-        For more information about the CORS proxy, see https://github.com/shannah/cors-proxy
+        See the Codename One developer guide's JavaScript proxy section for the
+        deployment profiles and build-hint precedence.
     -->
     <script type="text/javascript">
         //INJECT-DEFAULT-PROXY

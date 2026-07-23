@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.examples.hellocodenameone.tests;
 
 /**
@@ -38,12 +60,31 @@ public class StringApiTest extends BaseTest {
                     "replaceFirst literal token failed");
             assertEqual("nochange", "nochange".replaceFirst("zzz", "X"),
                     "replaceFirst with no match should return original");
+
+            // A ParparVM String can be fused with its backing array. A slice must
+            // therefore own its backing storage: sharing the parent's inline array
+            // leaves a dangling pointer after the parent is collected. The native
+            // clean-target regression forces collection; these assertions keep the
+            // compact-slice semantics covered on every device port.
+            String latin1Slice = makeSlice("prefix-LATIN1-suffix", 7, 13);
+            String utf16Slice = makeSlice("prefix-\u20acuro-suffix", 7, 11);
+            assertEqual("LATIN1", latin1Slice, "Latin-1 substring lost its fused parent backing");
+            assertEqual("\u20acuro", utf16Slice, "UTF-16 substring lost its fused parent backing");
+            assertEqual("[LATIN1][\u20acuro]",
+                    new StringBuilder().append('[').append(latin1Slice).append("][")
+                            .append(utf16Slice).append(']').toString(),
+                    "StringBuilder append should consume surviving slices safely");
         } catch (Throwable t) {
             fail("String API test failed: " + t);
             return false;
         }
         done();
         return true;
+    }
+
+    private String makeSlice(String text, int start, int end) {
+        String parent = new StringBuilder(text.length()).append(text).toString();
+        return parent.substring(start, end);
     }
 
     @Override
