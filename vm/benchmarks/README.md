@@ -93,7 +93,9 @@ must be traced by the mark's grace pass or the sweep frees it while it is
 still referenced (the issue-5425 dictionary corruption). `-DCN1_GRACE_AUDIT`
 compiles in a QA-only pre-sweep pass that snapshots every page's bump cursor
 at mark start and, right before the sweep, full-walks the registry tracing
-any pre-snapshot slot that is still fresh. It reports per cycle:
+any pre-snapshot slot that is still fresh. A cycle in which the grace pass
+missed nothing prints nothing -- **silence is success**. A cycle with a miss
+prints one `[GRACE-AUDIT]` line reporting:
 
 - `missedFresh` — fresh slots the grace pass did not visit. Small counts can
   be benign (a free-list slot re-allocated mid-mark, below the snapshot, after
@@ -110,7 +112,9 @@ runs, then goes quiet across the next cycle. Gate:
 
 ```bash
 ./translate-and-build.sh GraceAudit target/grace-audit -DCN1_GRACE_AUDIT
-./target/grace-audit    # stderr must show doomedChildren=0 on every line
+./target/grace-audit    # PASS: no line reports doomedChildren != 0
+                        # (an empty stderr is a fully clean run; benign
+                        #  missedFresh-only lines may still appear)
 ```
 
 The fresh-page-stack grace scheme this audit was written against reported
