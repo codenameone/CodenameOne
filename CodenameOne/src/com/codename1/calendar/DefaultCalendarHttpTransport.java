@@ -148,10 +148,32 @@ public class DefaultCalendarHttpTransport implements CalendarHttpTransport {
                 break;
             }
         }
-        String authority = rest.substring(0, pathStart).toLowerCase();
-        if (authority.indexOf(':') < 0) {
-            authority = authority + (("https".equals(scheme)) ? ":443" : ":80");
+        String authority = rest.substring(0, pathStart);
+        int at = authority.lastIndexOf('@');
+        if (at >= 0) {
+            authority = authority.substring(at + 1);
         }
-        return scheme + "://" + authority;
+        authority = authority.toLowerCase();
+        String host = authority;
+        String port = null;
+        if (authority.startsWith("[")) {
+            int close = authority.indexOf(']');
+            if (close >= 0) {
+                host = authority.substring(0, close + 1);
+                if (close + 1 < authority.length() && authority.charAt(close + 1) == ':') {
+                    port = authority.substring(close + 2);
+                }
+            }
+        } else {
+            int colon = authority.indexOf(':');
+            if (colon >= 0) {
+                host = authority.substring(0, colon);
+                port = authority.substring(colon + 1);
+            }
+        }
+        if (port == null || port.length() == 0) {
+            port = "https".equals(scheme) ? "443" : "80";
+        }
+        return scheme + "://" + host + ":" + port;
     }
 }
