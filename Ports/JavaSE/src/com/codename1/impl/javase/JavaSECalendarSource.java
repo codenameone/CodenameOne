@@ -31,6 +31,7 @@ import com.codename1.calendar.CalendarChange;
 import com.codename1.calendar.CalendarDateTime;
 import com.codename1.calendar.CalendarEvent;
 import com.codename1.calendar.CalendarInfo;
+import com.codename1.calendar.CalendarModelCodec;
 import com.codename1.calendar.CalendarMutationScope;
 import com.codename1.calendar.CalendarPage;
 import com.codename1.calendar.CalendarQuery;
@@ -99,7 +100,7 @@ final class JavaSECalendarSource extends LocalCalendarSource {
                     && instant(e.getEnd()).compareTo(query.getStartTime()) < 0) continue;
             if (query != null && query.getEndTime() != null && e.getStart() != null
                     && instant(e.getStart()).compareTo(query.getEndTime()) > 0) continue;
-            out.add(e);
+            out.add(copyEvent(e));
         }
         return completed(new CalendarPage<CalendarEvent>(out, null, String.valueOf(nextId)));
     }
@@ -108,16 +109,17 @@ final class JavaSECalendarSource extends LocalCalendarSource {
                 ? ZonedDateTime.of(value.getDate().atTime(0, 0), ZoneOffset.UTC).toInstant()
                 : value.getDateTime().toInstant();
     }
-    public synchronized AsyncResource<CalendarEvent> getEvent(String calendarId, String id) { return completed(events.get(id)); }
+    public synchronized AsyncResource<CalendarEvent> getEvent(String calendarId, String id) { return completed(copyEvent(events.get(id))); }
     public synchronized AsyncResource<CalendarEvent> saveEvent(CalendarEvent event, CalendarMutationScope scope) {
-        boolean created = event.getId() == null;
-        if (created) event.setId("sim-event-" + nextId++);
-        if (event.getCalendarId() == null) event.setCalendarId("sim-events");
-        event.setSourceId(getId()).setVersion(String.valueOf(nextId));
-        events.put(event.getId(), event);
-        fireChange(new CalendarChange(getId(), event.getCalendarId(), event.getId(), CalendarChange.EntityType.EVENT,
+        CalendarEvent saved = copyEvent(event);
+        boolean created = saved.getId() == null;
+        if (created) saved.setId("sim-event-" + nextId++);
+        if (saved.getCalendarId() == null) saved.setCalendarId("sim-events");
+        saved.setSourceId(getId()).setVersion(String.valueOf(nextId));
+        events.put(saved.getId(), saved);
+        fireChange(new CalendarChange(getId(), saved.getCalendarId(), saved.getId(), CalendarChange.EntityType.EVENT,
                 created ? CalendarChange.ChangeType.CREATED : CalendarChange.ChangeType.UPDATED));
-        return completed(event);
+        return completed(copyEvent(saved));
     }
     public synchronized AsyncResource<Boolean> deleteEvent(String calendarId, String id, CalendarMutationScope scope, String version) {
         boolean removed = events.remove(id) != null;
@@ -127,7 +129,7 @@ final class JavaSECalendarSource extends LocalCalendarSource {
     public synchronized AsyncResource<CalendarEvent> respondToEvent(String calendarId, String id, CalendarAttendee.Response response, String comment) {
         CalendarEvent event = events.get(id);
         if (event != null) for (CalendarAttendee a : event.getAttendees()) if (a.isSelf()) a.setResponse(response);
-        return completed(event);
+        return completed(copyEvent(event));
     }
     public synchronized AsyncResource<List<FreeBusyInterval>> queryFreeBusy(List<String> ids, Instant start, Instant end) {
         List<FreeBusyInterval> out = new ArrayList<FreeBusyInterval>();
@@ -141,23 +143,30 @@ final class JavaSECalendarSource extends LocalCalendarSource {
     }
     public synchronized AsyncResource<CalendarPage<CalendarTask>> queryTasks(CalendarQuery query) {
         List<CalendarTask> out = new ArrayList<CalendarTask>();
-        for (CalendarTask task : tasks.values()) if (query == null || query.getCalendarId() == null || query.getCalendarId().equals(task.getCalendarId())) out.add(task);
+        for (CalendarTask task : tasks.values()) if (query == null || query.getCalendarId() == null || query.getCalendarId().equals(task.getCalendarId())) out.add(copyTask(task));
         return completed(new CalendarPage<CalendarTask>(out, null, String.valueOf(nextId)));
     }
-    public synchronized AsyncResource<CalendarTask> getTask(String calendarId, String id) { return completed(tasks.get(id)); }
+    public synchronized AsyncResource<CalendarTask> getTask(String calendarId, String id) { return completed(copyTask(tasks.get(id))); }
     public synchronized AsyncResource<CalendarTask> saveTask(CalendarTask task, CalendarMutationScope scope) {
-        boolean created = task.getId() == null;
-        if (created) task.setId("sim-task-" + nextId++);
-        if (task.getCalendarId() == null) task.setCalendarId("sim-tasks");
-        task.setSourceId(getId()).setVersion(String.valueOf(nextId));
-        tasks.put(task.getId(), task);
-        fireChange(new CalendarChange(getId(), task.getCalendarId(), task.getId(), CalendarChange.EntityType.TASK,
+        CalendarTask saved = copyTask(task);
+        boolean created = saved.getId() == null;
+        if (created) saved.setId("sim-task-" + nextId++);
+        if (saved.getCalendarId() == null) saved.setCalendarId("sim-tasks");
+        saved.setSourceId(getId()).setVersion(String.valueOf(nextId));
+        tasks.put(saved.getId(), saved);
+        fireChange(new CalendarChange(getId(), saved.getCalendarId(), saved.getId(), CalendarChange.EntityType.TASK,
                 created ? CalendarChange.ChangeType.CREATED : CalendarChange.ChangeType.UPDATED));
-        return completed(task);
+        return completed(copyTask(saved));
     }
     public synchronized AsyncResource<Boolean> deleteTask(String calendarId, String id, CalendarMutationScope scope, String version) {
         boolean removed = tasks.remove(id) != null;
         if (removed) fireChange(new CalendarChange(getId(), calendarId, id, CalendarChange.EntityType.TASK, CalendarChange.ChangeType.DELETED));
         return completed(Boolean.valueOf(removed));
+    }
+    private static CalendarEvent copyEvent(CalendarEvent event) {
+        return event == null ? null : CalendarModelCodec.decodeEvent(CalendarModelCodec.encodeEvent(event));
+    }
+    private static CalendarTask copyTask(CalendarTask task) {
+        return task == null ? null : CalendarModelCodec.decodeTask(CalendarModelCodec.encodeTask(task));
     }
 }
