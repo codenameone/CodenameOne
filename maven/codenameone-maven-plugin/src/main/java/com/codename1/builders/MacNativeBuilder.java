@@ -353,8 +353,14 @@ class MacNativeBuilder {
             if (micOptIn) {
                 sb.append("    <key>com.apple.security.device.microphone</key>\n    <true/>\n");
             }
+            // The sandbox calendars entitlement gates all EventKit access, so any
+            // calendar or reminder usage-description hint requires it -- including
+            // write-only calendar access and reminders-only apps.
             boolean needsCalendar = request.getArg("ios.NSCalendarsUsageDescription", null) != null
-                    || request.getArg("ios.NSCalendarsFullAccessUsageDescription", null) != null;
+                    || request.getArg("ios.NSCalendarsFullAccessUsageDescription", null) != null
+                    || request.getArg("ios.NSCalendarsWriteOnlyAccessUsageDescription", null) != null
+                    || request.getArg("ios.NSRemindersUsageDescription", null) != null
+                    || request.getArg("ios.NSRemindersFullAccessUsageDescription", null) != null;
             if (parseEntitlementBool(request,
                     "macNative.entitlements.personalInformation.calendars", needsCalendar)) {
                 sb.append("    <key>com.apple.security.personal-information.calendars</key>\n    <true/>\n");
