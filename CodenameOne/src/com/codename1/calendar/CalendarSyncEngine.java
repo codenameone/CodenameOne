@@ -58,7 +58,25 @@ public final class CalendarSyncEngine {
         if (!(state.get(MUTATIONS) instanceof List)) {
             state.put(MUTATIONS, new ArrayList<Object>());
         }
-        nextId = System.currentTimeMillis();
+        // Seed above every persisted mutation id: reseeding from the clock
+        // alone can mint duplicate ids after a restart (queue bursts advance
+        // nextId past the clock) or after a clock rollback, and duplicate ids
+        // break find()/resolveConflict and the cn1.mutationId dedup key.
+        long seed = System.currentTimeMillis();
+        String prefix = source.getId() + "-";
+        for (Object value : mutations()) {
+            Object id = ((Map<String, Object>) value).get("id");
+            if (id instanceof String && ((String) id).startsWith(prefix)) {
+                try {
+                    long suffix = Long.parseLong(((String) id).substring(prefix.length()));
+                    if (suffix >= seed) {
+                        seed = suffix + 1;
+                    }
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+        nextId = seed;
     }
 
     public synchronized String queueEventSave(CalendarEvent event, CalendarMutationScope scope) throws CalendarException {

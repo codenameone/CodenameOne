@@ -90,7 +90,13 @@ public class TimeEdgeApp {
         result.append(Duration.ofMillis(500)).append('|');
         result.append(Duration.ofMillis(-500)).append('|');
         result.append(Duration.parse(Duration.ofMillis(500).toString()).toMillis()).append('|');
-        result.append(Duration.parse(Duration.ofMillis(-500).toString()).toMillis());
+        result.append(Duration.parse(Duration.ofMillis(-500).toString()).toMillis()).append('|');
+        result.append(Duration.ofMinutes(15)).append('|');
+        result.append(Duration.ofSeconds(7384)).append('|');
+        result.append(Duration.ofSeconds(-7384)).append('|');
+        result.append(Duration.ofSeconds(-60, 1)).append('|');
+        result.append(Duration.parse("P1DT2H3M4.5S").toMillis()).append('|');
+        result.append(Duration.parse("-P1DT1H1M").toMillis());
         return result.toString();
     }
 

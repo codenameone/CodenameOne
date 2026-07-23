@@ -29,11 +29,15 @@ import com.codename1.calendar.CalendarMutationScope;
 import com.codename1.calendar.CalendarPage;
 import com.codename1.calendar.CalendarQuery;
 import com.codename1.calendar.CalendarTask;
+import com.codename1.calendar.CalendarError;
+import com.codename1.calendar.CalendarException;
+import com.codename1.util.AsyncResource;
 import java.time.Instant;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
 class JavaSECalendarSourceTest {
 
@@ -88,6 +92,36 @@ class JavaSECalendarSourceTest {
 
         queried.setTitle("Changed query");
         assertEquals("Stored", source.getTask(saved.getCalendarId(), saved.getId()).get().getTitle());
+    }
+
+    @Test
+    void scopedReadsRejectCalendarIdMismatch() {
+        JavaSECalendarSource source = new JavaSECalendarSource();
+        CalendarEvent event = source.saveEvent(new CalendarEvent().setTitle("Scoped")
+                .addAttendee(new CalendarAttendee().setName("Me").setSelf(true)), CalendarMutationScope.ALL).get();
+        CalendarTask task = source.saveTask(new CalendarTask().setTitle("Scoped"), CalendarMutationScope.ALL).get();
+
+        assertEquals("Scoped", source.getEvent(null, event.getId()).get().getTitle());
+        assertEquals("Scoped", source.getEvent(event.getCalendarId(), event.getId()).get().getTitle());
+        assertNotFound(source.getEvent("sim-tasks", event.getId()));
+        assertEquals("Scoped", source.getTask(task.getCalendarId(), task.getId()).get().getTitle());
+        assertNotFound(source.getTask("sim-events", task.getId()));
+
+        assertEquals("Scoped", source.respondToEvent(event.getCalendarId(), event.getId(),
+                CalendarAttendee.Response.ACCEPTED, null).get().getTitle());
+        assertNotFound(source.respondToEvent("sim-tasks", event.getId(),
+                CalendarAttendee.Response.ACCEPTED, null));
+        assertNotFound(source.respondToEvent(null, "missing-id",
+                CalendarAttendee.Response.ACCEPTED, null));
+    }
+
+    private static void assertNotFound(AsyncResource<?> result) {
+        try {
+            result.get();
+            fail("Expected a NOT_FOUND failure");
+        } catch (AsyncResource.AsyncExecutionException failure) {
+            assertEquals(CalendarError.NOT_FOUND, ((CalendarException) failure.getCause()).getError());
+        }
     }
 
     private static CalendarEvent allDayEvent(String title, LocalDate date) {

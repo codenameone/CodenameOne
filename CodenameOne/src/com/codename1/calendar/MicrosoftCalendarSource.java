@@ -60,6 +60,9 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
     @Override
     public AsyncResource<CalendarPage<CalendarInfo>> listCalendars(final CalendarInfo.ContentType type, String pageToken) {
         final AsyncResource<CalendarPage<CalendarInfo>> out = new AsyncResource<CalendarPage<CalendarInfo>>();
+        if (invalidPageToken(pageToken)) {
+            return fail(out, "Invalid page token");
+        }
         String url = pageToken != null ? pageToken : (type == CalendarInfo.ContentType.TASKS ? GRAPH + "/me/todo/lists" : GRAPH + "/me/calendars");
         json("GET", url, null, null).ready(new SuccessCallback<Map<String, Object>>() {
 
@@ -122,6 +125,9 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
         }
         String url;
         if (query.getPageToken() != null) {
+            if (invalidPageToken(query.getPageToken())) {
+                return fail(out, "Invalid page token");
+            }
             url = query.getPageToken();
         } else {
             if (query.getSyncToken() != null) {
@@ -286,6 +292,9 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
         final AsyncResource<CalendarPage<CalendarTask>> out = new AsyncResource<CalendarPage<CalendarTask>>();
         if (query == null || query.getCalendarId() == null) {
             return fail(out, "calendarId required");
+        }
+        if (invalidPageToken(query.getPageToken())) {
+            return fail(out, "Invalid page token");
         }
         String url = query.getPageToken() != null ? query.getPageToken() : GRAPH + "/me/todo/lists/" + e(query.getCalendarId()) + "/tasks?$top=" + query.getPageSize();
         final String list = query.getCalendarId();
@@ -462,10 +471,16 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
             out.setDue(graphDate(map(m.get("dueDateTime"))));
         }
         if (m.get("completedDateTime") instanceof Map) {
-            out.setCompletionTime(graphDate(map(m.get("completedDateTime"))).getDateTime().toInstant());
+            CalendarDateTime completed = graphDate(map(m.get("completedDateTime")));
+            if (completed != null) {
+                out.setCompletionTime(completed.getDateTime().toInstant());
+            }
         }
         if (bool(m, "isReminderOn") && m.get("reminderDateTime") instanceof Map) {
-            out.addAlarm(new CalendarAlarm().setAbsoluteTime(graphDate(map(m.get("reminderDateTime"))).getDateTime().toInstant()));
+            CalendarDateTime reminder = graphDate(map(m.get("reminderDateTime")));
+            if (reminder != null) {
+                out.addAlarm(new CalendarAlarm().setAbsoluteTime(reminder.getDateTime().toInstant()));
+            }
         }
         return out;
     }
@@ -623,6 +638,12 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
     private static <T> AsyncResource<T> fail(AsyncResource<T> out, String message) {
         out.error(new CalendarException(CalendarError.INVALID_ARGUMENT, message));
         return out;
+    }
+
+    private static boolean invalidPageToken(String pageToken) {
+        // Page tokens are @odata.nextLink URLs that are sent with a Bearer
+        // token attached; only Graph URLs may ever be dispatched.
+        return pageToken != null && !pageToken.startsWith(GRAPH + "/");
     }
 
     private static CalendarRecurrenceRule readGraphRecurrence(Map<String, Object> recurrence)

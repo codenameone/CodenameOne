@@ -22,6 +22,7 @@
  */
 package com.codename1.calendar;
 
+import com.codename1.io.Util;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.SuccessCallback;
 import java.time.Instant;
@@ -418,7 +419,9 @@ public class CalDavCalendarSource extends CalendarSource {
     }
 
     private static String safe(String value) {
-        return value.replace(" ", "%20").replace("/", "%2F");
+        // Percent-encode the id as a single path segment so ids containing
+        // '?', '#', '%', '/' or non-ASCII cannot address a different resource.
+        return Util.encodeUrl(value);
     }
 
     private static String calendarQuery(String component, CalendarQuery q) {

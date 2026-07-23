@@ -344,10 +344,15 @@ public final class ICalendarCodec {
         append(out, "ACTION:" + (alarm.getMethod() == CalendarAlarm.Method.EMAIL ? "EMAIL" : alarm.getMethod() == CalendarAlarm.Method.AUDIO ? "AUDIO" : "DISPLAY"));
         if (alarm.getTimeBefore() != null) {
             long seconds = alarm.getTimeBefore().getSeconds();
-            if (alarm.getTimeBefore().getNano() != 0 || seconds < 0) {
-                throw new IllegalArgumentException("timeBefore must be a non-negative whole-second duration");
+            if (seconds < 0) {
+                throw new IllegalArgumentException("timeBefore must be a non-negative duration");
             }
-            append(out, "TRIGGER:-" + alarm.getTimeBefore());
+            // iCalendar triggers are whole seconds; round sub-second values
+            // instead of failing an export queued long after the value was set.
+            if (alarm.getTimeBefore().getNano() >= 500000000) {
+                seconds++;
+            }
+            append(out, "TRIGGER:-" + Duration.ofSeconds(seconds));
         } else if (alarm.getAbsoluteTime() != null) {
             append(out, "TRIGGER;VALUE=DATE-TIME:" + utc(alarm.getAbsoluteTime()));
         }
@@ -378,6 +383,11 @@ public final class ICalendarCodec {
             }
         } else if (trigger != null) {
             out.setAbsoluteTime(parseDateTime(trigger, null).getDateTime().toInstant());
+        }
+        if (out.getTimeBefore() == null && out.getAbsoluteTime() == null) {
+            // An alarm without a mappable trigger would re-serialize as a
+            // VALARM missing its required TRIGGER property; drop it instead.
+            return null;
         }
         return out;
     }
@@ -498,6 +508,11 @@ public final class ICalendarCodec {
             while (end > start && utf8Length(line.substring(start, end)) > 74) {
                 end--;
             }
+            // Never fold between a surrogate pair: each half would encode as
+            // a replacement character and permanently corrupt the text.
+            while (end > start + 1 && end < chars && Character.isLowSurrogate(line.charAt(end))) {
+                end--;
+            }
             if (start > 0) {
                 out.append(' ');
             }
@@ -545,11 +560,47 @@ public final class ICalendarCodec {
     }
 
     private static String quote(String value) {
-        return '"' + value.replace("\"", "\\\"") + '"';
+        // RFC 5545 forbids a raw double quote inside a quoted parameter value;
+        // RFC 6868 caret encoding represents it (and caret/newline) portably
+        // and keeps the emitted line parseable by colon()/splitParameters().
+        return '"' + value.replace("^", "^^").replace("\"", "^'").replace("\n", "^n") + '"';
     }
 
     private static String unquote(String value) {
-        return value.length() > 1 && value.charAt(0) == '"' && value.charAt(value.length() - 1) == '"' ? value.substring(1, value.length() - 1) : value;
+        if (value.length() > 1 && value.charAt(0) == '"' && value.charAt(value.length() - 1) == '"') {
+            return caretDecode(value.substring(1, value.length() - 1));
+        }
+        return caretDecode(value);
+    }
+
+    private static String caretDecode(String value) {
+        if (value.indexOf('^') < 0) {
+            return value;
+        }
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '^' && i + 1 < value.length()) {
+                char next = value.charAt(i + 1);
+                if (next == '^') {
+                    out.append('^');
+                    i++;
+                    continue;
+                }
+                if (next == '\'') {
+                    out.append('"');
+                    i++;
+                    continue;
+                }
+                if (next == 'n' || next == 'N') {
+                    out.append('\n');
+                    i++;
+                    continue;
+                }
+            }
+            out.append(c);
+        }
+        return out.toString();
     }
 
     private static int colon(String value) {

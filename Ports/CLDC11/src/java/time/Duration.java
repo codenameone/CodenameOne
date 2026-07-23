@@ -204,24 +204,46 @@ public final class Duration implements Comparable<Duration> {
     }
 
     public String toString() {
-        StringBuffer sb = new StringBuffer("PT");
-        boolean negative = seconds < 0;
-        long displayedSeconds = negative && nanos != 0 ? seconds + 1L : seconds;
-        int displayedNanos = negative && nanos != 0 ? 1000000000 - nanos : nanos;
-        if (negative && displayedSeconds == 0L) {
-            sb.append("-0");
-        } else {
-            sb.append(displayedSeconds);
+        long effectiveTotalSecs = seconds;
+        if (seconds < 0L && nanos > 0) {
+            effectiveTotalSecs++;
         }
-        if (displayedNanos != 0) {
-            sb.append('.');
-            String frac = String.valueOf(1000000000L + displayedNanos).substring(1);
-            while (frac.endsWith("0")) {
-                frac = frac.substring(0, frac.length() - 1);
+        long hours = effectiveTotalSecs / 3600L;
+        int minutes = (int) ((effectiveTotalSecs % 3600L) / 60L);
+        int secs = (int) (effectiveTotalSecs % 60L);
+        StringBuffer buf = new StringBuffer(24);
+        buf.append("PT");
+        if (hours != 0L) {
+            buf.append(hours).append('H');
+        }
+        if (minutes != 0) {
+            buf.append(minutes).append('M');
+        }
+        if (secs == 0 && nanos == 0 && buf.length() > 2) {
+            return buf.toString();
+        }
+        if (seconds < 0L && nanos > 0) {
+            if (secs == 0) {
+                buf.append("-0");
+            } else {
+                buf.append(secs);
             }
-            sb.append(frac);
+        } else {
+            buf.append(secs);
         }
-        sb.append('S');
-        return sb.toString();
+        if (nanos > 0) {
+            int pos = buf.length();
+            if (seconds < 0L) {
+                buf.append(2000000000L - nanos);
+            } else {
+                buf.append(nanos + 1000000000L);
+            }
+            while (buf.charAt(buf.length() - 1) == '0') {
+                buf.setLength(buf.length() - 1);
+            }
+            buf.setCharAt(pos, '.');
+        }
+        buf.append('S');
+        return buf.toString();
     }
 }

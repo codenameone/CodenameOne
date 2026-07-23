@@ -83,6 +83,12 @@ public class TimeApiTest extends BaseTest {
             assertEqual("PT-0.5S", Duration.ofMillis(-500).toString());
             assertEqual(Duration.ofMillis(500), Duration.parse(Duration.ofMillis(500).toString()));
             assertEqual(Duration.ofMillis(-500), Duration.parse(Duration.ofMillis(-500).toString()));
+            assertEqual("PT15M", Duration.ofMinutes(15).toString());
+            assertEqual("PT2H3M4S", Duration.ofSeconds(7384).toString());
+            assertEqual("PT-2H-3M-4S", Duration.ofSeconds(-7384).toString());
+            assertEqual("PT-59.999999999S", Duration.ofSeconds(-60, 1).toString());
+            assertEqual(Duration.ofSeconds(7384), Duration.parse("P0DT2H3M4S"));
+            assertEqual(Duration.ofSeconds(-90060), Duration.parse("-P1DT1H1M"));
             Period period = Period.of(1, 1, 1);
             assertEqual("2020-03-01", LocalDate.of(2019, 1, 31).plusYears(period.getYears()).plusMonths(period.getMonths()).plusDays(period.getDays()).toString());
             assertEqual("00:00:01", LocalTime.of(23, 59, 59).plusSeconds(2).toString());

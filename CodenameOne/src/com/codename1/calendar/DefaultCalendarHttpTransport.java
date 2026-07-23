@@ -55,6 +55,9 @@ public class DefaultCalendarHttpTransport implements CalendarHttpTransport {
             }
 
             private void capture(Object c) throws IOException {
+                // Redirect hops call this once per response; reset so headers from
+                // an intermediate 3xx are never attributed to the final response.
+                responseHeaders.clear();
                 String[] names = { "ETag", "WWW-Authenticate", "Location", "Retry-After", "Sync-Token" };
                 for (String name : names) {
                     String value = getHeader(c, name);
@@ -62,6 +65,18 @@ public class DefaultCalendarHttpTransport implements CalendarHttpTransport {
                         responseHeaders.put(name, value);
                     }
                 }
+            }
+
+            @Override
+            public boolean onRedirect(String redirectUrl) {
+                if (sameOrigin(spec.getUrl(), redirectUrl)) {
+                    return false;
+                }
+                // Following would re-send the Authorization header to a different
+                // host, leaking the user's credentials or token.
+                errorOnce(new CalendarException(CalendarError.NETWORK,
+                        "Refusing to follow cross-origin redirect"));
+                return true;
             }
 
             @Override
@@ -109,5 +124,34 @@ public class DefaultCalendarHttpTransport implements CalendarHttpTransport {
         }
         NetworkManager.getInstance().addToQueue(request);
         return out;
+    }
+
+    static boolean sameOrigin(String a, String b) {
+        return origin(a).equals(origin(b));
+    }
+
+    private static String origin(String url) {
+        if (url == null) {
+            return "";
+        }
+        int schemeEnd = url.indexOf("://");
+        if (schemeEnd < 0) {
+            return url;
+        }
+        String scheme = url.substring(0, schemeEnd).toLowerCase();
+        String rest = url.substring(schemeEnd + 3);
+        int pathStart = rest.length();
+        for (int i = 0; i < rest.length(); i++) {
+            char c = rest.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                pathStart = i;
+                break;
+            }
+        }
+        String authority = rest.substring(0, pathStart).toLowerCase();
+        if (authority.indexOf(':') < 0) {
+            authority = authority + (("https".equals(scheme)) ? ":443" : ":80");
+        }
+        return scheme + "://" + authority;
     }
 }

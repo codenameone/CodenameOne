@@ -33,16 +33,48 @@ public class MemoryCalendarCache implements CalendarCache {
     @Override
     public synchronized Map<String, Object> load(String sourceId) {
         Map<String, Object> state = states.get(sourceId);
-        return state == null ? new HashMap<String, Object>() : new HashMap<String, Object>(state);
+        return state == null ? new HashMap<String, Object>() : deepCopyMap(state);
     }
 
     @Override
     public synchronized void store(String sourceId, Map<String, Object> state) {
-        states.put(sourceId, new HashMap<String, Object>(state));
+        states.put(sourceId, deepCopyMap(state));
     }
 
     @Override
     public synchronized void clear(String sourceId) {
         states.remove(sourceId);
+    }
+
+    // A shallow copy would share the nested mutation lists/maps by reference,
+    // so a caller's later in-memory edits would silently alter the "persisted"
+    // snapshot and two engines over one cache would share live mutable state.
+    private static Map<String, Object> deepCopyMap(Map<String, Object> source) {
+        Map<String, Object> out = new HashMap<String, Object>();
+        for (Map.Entry<String, Object> entry : source.entrySet()) {
+            out.put(entry.getKey(), deepCopyValue(entry.getValue()));
+        }
+        return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Object deepCopyValue(Object value) {
+        if (value instanceof Map) {
+            return deepCopyMap((Map<String, Object>) value);
+        }
+        if (value instanceof java.util.List) {
+            java.util.List<Object> out = new java.util.ArrayList<Object>();
+            for (Object item : (java.util.List<Object>) value) {
+                out.add(deepCopyValue(item));
+            }
+            return out;
+        }
+        if (value instanceof byte[]) {
+            byte[] bytes = (byte[]) value;
+            byte[] copy = new byte[bytes.length];
+            System.arraycopy(bytes, 0, copy, 0, bytes.length);
+            return copy;
+        }
+        return value;
     }
 }

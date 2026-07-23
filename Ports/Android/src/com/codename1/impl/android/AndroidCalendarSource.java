@@ -202,17 +202,26 @@ final class AndroidCalendarSource extends LocalCalendarSource {
             }
         });
     }
-    public AsyncResource<CalendarEvent>saveEvent(final CalendarEvent event,CalendarMutationScope scope){
+    public AsyncResource<CalendarEvent>saveEvent(final CalendarEvent event,final CalendarMutationScope scope){
         if(!granted(Manifest.permission.WRITE_CALENDAR))return failed(CalendarError.PERMISSION_DENIED,"Calendar write permission is required");if(event==null||event.getCalendarId()==null)return failed(CalendarError.INVALID_ARGUMENT,"event and calendarId required");
         if(event.getRecurrence()!=null&&(event.getStart()==null||event.getEnd()==null))return failed(CalendarError.INVALID_ARGUMENT,"Recurring events require start and end");
         if(event.getRecurrence()!=null&&millis(event.getEnd())<millis(event.getStart()))return failed(CalendarError.INVALID_ARGUMENT,"Event end must not precede start");
-        return background(new BlockingOperation<CalendarEvent>(){public CalendarEvent run(){
+        return background(new BlockingOperation<CalendarEvent>(){public CalendarEvent run()throws Exception{
+            if(instanceScoped(scope)&&event.getId()!=null&&(event.getRecurrence()!=null||hasRecurrence(event.getId()))){
+                throw new CalendarException(CalendarError.NOT_SUPPORTED,
+                        "Android Calendar Provider cannot mutate a single occurrence; use CalendarMutationScope.ALL");
+            }
             ContentValues v=new ContentValues();v.put(Events.CALENDAR_ID,Long.valueOf(event.getCalendarId()));v.put(Events.TITLE,event.getTitle());v.put(Events.DESCRIPTION,event.getDescription());v.put(Events.EVENT_LOCATION,event.getLocation());if(event.getStart()!=null){v.put(Events.ALL_DAY,Integer.valueOf(event.getStart().isAllDay()?1:0));v.put(Events.DTSTART,Long.valueOf(millis(event.getStart())));v.put(Events.EVENT_TIMEZONE,event.getStart().isAllDay()?"UTC":event.getStart().getDateTime().getZone().getId());}
             if(event.getRecurrence()!=null){long durationMillis=millis(event.getEnd())-millis(event.getStart());v.putNull(Events.DTEND);v.put(Events.DURATION,providerDuration(durationMillis));v.put(Events.RRULE,ICalendarCodec.writeRecurrenceRule(event.getRecurrence()));}else{v.putNull(Events.DURATION);v.putNull(Events.RRULE);if(event.getEnd()!=null)v.put(Events.DTEND,Long.valueOf(millis(event.getEnd())));}
             boolean create=event.getId()==null;if(create){Uri uri=resolver().insert(Events.CONTENT_URI,v);event.setId(String.valueOf(ContentUris.parseId(uri)));}else resolver().update(ContentUris.withAppendedId(Events.CONTENT_URI,Long.parseLong(event.getId())),v,null,null);replaceDetails(event);event.setSourceId(getId()).setVersion(String.valueOf(System.currentTimeMillis()));fireChange(new CalendarChange(getId(),event.getCalendarId(),event.getId(),CalendarChange.EntityType.EVENT,create?CalendarChange.ChangeType.CREATED:CalendarChange.ChangeType.UPDATED));return event;}});
     }
-    public AsyncResource<Boolean>deleteEvent(final String calendarId,final String eventId,CalendarMutationScope scope,String version){
-        if(!granted(Manifest.permission.WRITE_CALENDAR))return failed(CalendarError.PERMISSION_DENIED,"Calendar write permission is required");if(eventId==null)return failed(CalendarError.INVALID_ARGUMENT,"eventId required");return background(new BlockingOperation<Boolean>(){public Boolean run(){boolean deleted=resolver().delete(ContentUris.withAppendedId(Events.CONTENT_URI,Long.parseLong(eventId)),null,null)>0;if(deleted)fireChange(new CalendarChange(getId(),calendarId,eventId,CalendarChange.EntityType.EVENT,CalendarChange.ChangeType.DELETED));return Boolean.valueOf(deleted);}});
+    public AsyncResource<Boolean>deleteEvent(final String calendarId,final String eventId,final CalendarMutationScope scope,String version){
+        if(!granted(Manifest.permission.WRITE_CALENDAR))return failed(CalendarError.PERMISSION_DENIED,"Calendar write permission is required");if(eventId==null)return failed(CalendarError.INVALID_ARGUMENT,"eventId required");return background(new BlockingOperation<Boolean>(){public Boolean run()throws Exception{
+            if(instanceScoped(scope)&&hasRecurrence(eventId)){
+                throw new CalendarException(CalendarError.NOT_SUPPORTED,
+                        "Android Calendar Provider cannot delete a single occurrence; use CalendarMutationScope.ALL");
+            }
+            boolean deleted=resolver().delete(ContentUris.withAppendedId(Events.CONTENT_URI,Long.parseLong(eventId)),null,null)>0;if(deleted)fireChange(new CalendarChange(getId(),calendarId,eventId,CalendarChange.EntityType.EVENT,CalendarChange.ChangeType.DELETED));return Boolean.valueOf(deleted);}});
     }
     public AsyncResource<List<FreeBusyInterval>>queryFreeBusy(List<String>ids,Instant start,Instant end){
         final AsyncResource<List<FreeBusyInterval>>result=new AsyncResource<List<FreeBusyInterval>>();
@@ -224,6 +233,22 @@ final class AndroidCalendarSource extends LocalCalendarSource {
 
     private void readDetails(CalendarEvent event){Cursor c=null;try{c=resolver().query(Attendees.CONTENT_URI,new String[]{Attendees.ATTENDEE_NAME,Attendees.ATTENDEE_EMAIL,Attendees.ATTENDEE_TYPE,Attendees.ATTENDEE_STATUS},Attendees.EVENT_ID+"=?",new String[]{event.getId()},null);while(c!=null&&c.moveToNext()){CalendarAttendee a=new CalendarAttendee().setName(c.getString(0)).setEmail(c.getString(1));if(c.getInt(2)==Attendees.TYPE_OPTIONAL)a.setRole(CalendarAttendee.Role.OPTIONAL);else if(c.getInt(2)==Attendees.TYPE_RESOURCE)a.setRole(CalendarAttendee.Role.RESOURCE);int s=c.getInt(3);a.setResponse(s==Attendees.ATTENDEE_STATUS_ACCEPTED?CalendarAttendee.Response.ACCEPTED:s==Attendees.ATTENDEE_STATUS_DECLINED?CalendarAttendee.Response.DECLINED:s==Attendees.ATTENDEE_STATUS_TENTATIVE?CalendarAttendee.Response.TENTATIVE:CalendarAttendee.Response.NEEDS_ACTION);event.addAttendee(a);}}finally{if(c!=null)c.close();}try{c=resolver().query(Reminders.CONTENT_URI,new String[]{Reminders.MINUTES,Reminders.METHOD},Reminders.EVENT_ID+"=?",new String[]{event.getId()},null);while(c!=null&&c.moveToNext())event.addAlarm(new CalendarAlarm().setTimeBefore(Duration.ofMinutes(c.getInt(0))).setMethod(c.getInt(1)==Reminders.METHOD_EMAIL?CalendarAlarm.Method.EMAIL:CalendarAlarm.Method.ALERT));}finally{if(c!=null)c.close();}}
     private void replaceDetails(CalendarEvent event){resolver().delete(Reminders.CONTENT_URI,Reminders.EVENT_ID+"=?",new String[]{event.getId()});for(CalendarAlarm alarm:event.getAlarms())if(alarm.getTimeBefore()!=null){ContentValues v=new ContentValues();v.put(Reminders.EVENT_ID,Long.valueOf(event.getId()));v.put(Reminders.MINUTES,Long.valueOf(alarm.getTimeBefore().getSeconds()/60L));v.put(Reminders.METHOD,Integer.valueOf(alarm.getMethod()==CalendarAlarm.Method.EMAIL?Reminders.METHOD_EMAIL:Reminders.METHOD_ALERT));resolver().insert(Reminders.CONTENT_URI,v);}resolver().delete(Attendees.CONTENT_URI,Attendees.EVENT_ID+"=?",new String[]{event.getId()});for(CalendarAttendee a:event.getAttendees()){ContentValues v=new ContentValues();v.put(Attendees.EVENT_ID,Long.valueOf(event.getId()));v.put(Attendees.ATTENDEE_NAME,a.getName());v.put(Attendees.ATTENDEE_EMAIL,a.getEmail());v.put(Attendees.ATTENDEE_TYPE,Integer.valueOf(a.getRole()==CalendarAttendee.Role.OPTIONAL?Attendees.TYPE_OPTIONAL:a.getRole()==CalendarAttendee.Role.RESOURCE?Attendees.TYPE_RESOURCE:Attendees.TYPE_REQUIRED));resolver().insert(Attendees.CONTENT_URI,v);}}
+    private static boolean instanceScoped(CalendarMutationScope scope){
+        return scope==CalendarMutationScope.THIS_INSTANCE||scope==CalendarMutationScope.THIS_AND_FUTURE;
+    }
+    private boolean hasRecurrence(String eventId){
+        Cursor c=null;
+        try{
+            c=resolver().query(ContentUris.withAppendedId(Events.CONTENT_URI,Long.parseLong(eventId)),
+                    new String[]{Events.RRULE,Events.RDATE},null,null,null);
+            if(c!=null&&c.moveToFirst()){
+                String rrule=c.isNull(0)?null:c.getString(0);
+                String rdate=c.isNull(1)?null:c.getString(1);
+                return (rrule!=null&&rrule.length()>0)||(rdate!=null&&rdate.length()>0);
+            }
+            return false;
+        }finally{if(c!=null)c.close();}
+    }
     private ContentResolver resolver(){return context.getContentResolver();}private boolean granted(String permission){return ContextCompat.checkSelfPermission(context,permission)==PackageManager.PERMISSION_GRANTED;}private static CalendarDateTime allDay(long time){LocalDate date=ZonedDateTime.ofInstant(Instant.ofEpochMilli(time),ZoneOffset.UTC).toLocalDateTime().toLocalDate();return CalendarDateTime.allDay(date);}private static long millis(CalendarDateTime value){if(!value.isAllDay())return value.getDateTime().toInstant().toEpochMilli();return ZonedDateTime.of(value.getDate().atTime(0,0),ZoneOffset.UTC).toInstant().toEpochMilli();}
     private CalendarEvent event(Cursor c, long startMillis, long endMillis) throws CalendarException {
         CalendarEvent event = new CalendarEvent().setId(String.valueOf(c.getLong(0)))

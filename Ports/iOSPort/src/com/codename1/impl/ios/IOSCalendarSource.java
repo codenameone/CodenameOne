@@ -87,73 +87,76 @@ final class IOSCalendarSource extends LocalCalendarSource {
     }
 
     @Override
-    public AsyncResource<CalendarPage<CalendarInfo>> listCalendars(CalendarInfo.ContentType type, String token) {
-        int entity = type == CalendarInfo.ContentType.TASKS ? REMINDERS : EVENTS;
+    public AsyncResource<CalendarPage<CalendarInfo>> listCalendars(final CalendarInfo.ContentType type, String token) {
+        final int entity = type == CalendarInfo.ContentType.TASKS ? REMINDERS : EVENTS;
         if (!canRead(entity)) {
             return failed(CalendarError.PERMISSION_DENIED, "Calendar read permission is required");
         }
-        try {
-            List<CalendarInfo> items = new ArrayList<CalendarInfo>();
-            for (Map<String, Object> m : items(nativeInstance.calendarList(entity))) {
-                items.add(new CalendarInfo()
-                        .setId(s(m, "id"))
-                        .setSourceId(getId())
-                        .setName(s(m, "title"))
-                        .setColor(i(m, "color"))
-                        .setReadOnly(!b(m, "allowsModify"))
-                        .setContentType(type)
-                        .setCapabilities(capabilities));
+        return background(new NativeOperation<CalendarPage<CalendarInfo>>() {
+            @Override
+            public CalendarPage<CalendarInfo> run() throws Exception {
+                List<CalendarInfo> items = new ArrayList<CalendarInfo>();
+                for (Map<String, Object> m : items(nativeInstance.calendarList(entity))) {
+                    items.add(new CalendarInfo()
+                            .setId(s(m, "id"))
+                            .setSourceId(getId())
+                            .setName(s(m, "title"))
+                            .setColor(i(m, "color"))
+                            .setReadOnly(!b(m, "allowsModify"))
+                            .setContentType(type)
+                            .setCapabilities(capabilities));
+                }
+                return new CalendarPage<CalendarInfo>(items, null, String.valueOf(System.currentTimeMillis()));
             }
-            return value(new CalendarPage<CalendarInfo>(items, null, String.valueOf(System.currentTimeMillis())));
-        } catch (Exception ex) {
-            return failure(ex);
-        }
+        });
     }
 
     @Override
-    public AsyncResource<CalendarPage<CalendarEvent>> queryEvents(CalendarQuery query) {
+    public AsyncResource<CalendarPage<CalendarEvent>> queryEvents(final CalendarQuery query) {
         if (!canRead(EVENTS)) {
             return failed(CalendarError.PERMISSION_DENIED, "Calendar read permission is required");
         }
-        try {
-            String calendar = query == null ? null : query.getCalendarId();
-            long start = query == null || query.getStartTime() == null
-                    ? System.currentTimeMillis() - ONE_YEAR_MILLIS
-                    : query.getStartTime().toEpochMilli();
-            long end = query == null || query.getEndTime() == null
-                    ? System.currentTimeMillis() + ONE_YEAR_MILLIS
-                    : query.getEndTime().toEpochMilli();
-            List<CalendarEvent> items = new ArrayList<CalendarEvent>();
-            for (Map<String, Object> m : items(nativeInstance.calendarEvents(calendar, start, end))) {
-                items.add(event(m));
+        return background(new NativeOperation<CalendarPage<CalendarEvent>>() {
+            @Override
+            public CalendarPage<CalendarEvent> run() throws Exception {
+                String calendar = query == null ? null : query.getCalendarId();
+                long start = query == null || query.getStartTime() == null
+                        ? System.currentTimeMillis() - ONE_YEAR_MILLIS
+                        : query.getStartTime().toEpochMilli();
+                long end = query == null || query.getEndTime() == null
+                        ? System.currentTimeMillis() + ONE_YEAR_MILLIS
+                        : query.getEndTime().toEpochMilli();
+                List<CalendarEvent> items = new ArrayList<CalendarEvent>();
+                for (Map<String, Object> m : items(nativeInstance.calendarEvents(calendar, start, end))) {
+                    items.add(event(m));
+                }
+                return new CalendarPage<CalendarEvent>(items, null, String.valueOf(System.currentTimeMillis()));
             }
-            return value(new CalendarPage<CalendarEvent>(items, null, String.valueOf(System.currentTimeMillis())));
-        } catch (Exception ex) {
-            return failure(ex);
-        }
+        });
     }
 
     @Override
-    public AsyncResource<CalendarEvent> getEvent(String calendarId, String id) {
+    public AsyncResource<CalendarEvent> getEvent(final String calendarId, final String id) {
         if (id == null) {
             return failed(CalendarError.INVALID_ARGUMENT, "eventId required");
         }
         if (!canRead(EVENTS)) {
             return failed(CalendarError.PERMISSION_DENIED, "Calendar read permission is required");
         }
-        try {
-            Map<String, Object> result = parse(nativeInstance.calendarEvent(calendarId, id));
-            if (s(result, "id") == null) {
-                return failed(CalendarError.NOT_FOUND, "Event not found");
+        return background(new NativeOperation<CalendarEvent>() {
+            @Override
+            public CalendarEvent run() throws Exception {
+                Map<String, Object> result = parse(nativeInstance.calendarEvent(calendarId, id));
+                if (s(result, "id") == null) {
+                    throw new CalendarException(CalendarError.NOT_FOUND, "Event not found");
+                }
+                return event(result);
             }
-            return value(event(result));
-        } catch (Exception ex) {
-            return failure(ex);
-        }
+        });
     }
 
     @Override
-    public AsyncResource<CalendarEvent> saveEvent(CalendarEvent event, CalendarMutationScope scope) {
+    public AsyncResource<CalendarEvent> saveEvent(final CalendarEvent event, final CalendarMutationScope scope) {
         if (!canWriteEvents()) {
             return failed(CalendarError.PERMISSION_DENIED, "Calendar write permission is required");
         }
@@ -163,43 +166,42 @@ final class IOSCalendarSource extends LocalCalendarSource {
         if (scope == CalendarMutationScope.ALL) {
             return failed(CalendarError.NOT_SUPPORTED, "EventKit cannot mutate all occurrences as one operation");
         }
-        try {
-            Map<String, Object> m = new HashMap<String, Object>();
-            m.put("id", event.getId());
-            m.put("calendarId", event.getCalendarId());
-            m.put("title", event.getTitle());
-            m.put("notes", event.getDescription());
-            m.put("location", event.getLocation());
-            putDate(m, "start", event.getStart());
-            putDate(m, "end", event.getEnd());
-            m.put("allDay", Boolean.valueOf(event.getStart() != null && event.getStart().isAllDay()));
-            List<Map<String, Object>> alarms = new ArrayList<Map<String, Object>>();
-            for (CalendarAlarm alarm : event.getAlarms()) {
-                Map<String, Object> a = new HashMap<String, Object>();
-                a.put("minutes", alarm.getTimeBefore() == null ? null
-                        : Long.valueOf(alarm.getTimeBefore().getSeconds() / 60L));
-                a.put("absolute", alarm.getAbsoluteTime() == null ? null
-                        : Long.valueOf(alarm.getAbsoluteTime().toEpochMilli()));
-                alarms.add(a);
+        return background(new NativeOperation<CalendarEvent>() {
+            @Override
+            public CalendarEvent run() throws Exception {
+                Map<String, Object> m = new HashMap<String, Object>();
+                m.put("id", event.getId());
+                m.put("calendarId", event.getCalendarId());
+                m.put("title", event.getTitle());
+                m.put("notes", event.getDescription());
+                m.put("location", event.getLocation());
+                putDate(m, "start", event.getStart());
+                putDate(m, "end", event.getEnd());
+                m.put("allDay", Boolean.valueOf(event.getStart() != null && event.getStart().isAllDay()));
+                List<Map<String, Object>> alarms = new ArrayList<Map<String, Object>>();
+                for (CalendarAlarm alarm : event.getAlarms()) {
+                    Map<String, Object> a = new HashMap<String, Object>();
+                    a.put("minutes", alarm.getTimeBefore() == null ? null
+                            : Long.valueOf(alarm.getTimeBefore().getSeconds() / 60L));
+                    a.put("absolute", alarm.getAbsoluteTime() == null ? null
+                            : Long.valueOf(alarm.getAbsoluteTime().toEpochMilli()));
+                    alarms.add(a);
+                }
+                m.put("alarms", alarms);
+                boolean create = event.getId() == null;
+                Map<String, Object> saved = parseResult(nativeInstance.calendarSaveEvent(
+                        JSONParser.toJson(m), scope == null ? 0 : scope.ordinal()));
+                CalendarEvent result = event(saved);
+                fireChange(new CalendarChange(getId(), result.getCalendarId(), result.getId(),
+                        CalendarChange.EntityType.EVENT,
+                        create ? CalendarChange.ChangeType.CREATED : CalendarChange.ChangeType.UPDATED));
+                return result;
             }
-            m.put("alarms", alarms);
-            boolean create = event.getId() == null;
-            Map<String, Object> saved = parseResult(nativeInstance.calendarSaveEvent(
-                    JSONParser.toJson(m), scope == null ? 0 : scope.ordinal()));
-            CalendarEvent result = event(saved);
-            fireChange(new CalendarChange(getId(), result.getCalendarId(), result.getId(),
-                    CalendarChange.EntityType.EVENT,
-                    create ? CalendarChange.ChangeType.CREATED : CalendarChange.ChangeType.UPDATED));
-            return value(result);
-        } catch (IOException ex) {
-            return failure(ex);
-        } catch (CalendarException ex) {
-            return failure(ex);
-        }
+        });
     }
 
     @Override
-    public AsyncResource<Boolean> deleteEvent(String calendarId, String eventId, CalendarMutationScope scope, String version) {
+    public AsyncResource<Boolean> deleteEvent(final String calendarId, final String eventId, final CalendarMutationScope scope, String version) {
         if (!canWriteEvents()) {
             return failed(CalendarError.PERMISSION_DENIED, "Calendar write permission is required");
         }
@@ -209,16 +211,17 @@ final class IOSCalendarSource extends LocalCalendarSource {
         if (scope == CalendarMutationScope.ALL) {
             return failed(CalendarError.NOT_SUPPORTED, "EventKit cannot mutate all occurrences as one operation");
         }
-        try {
-            boolean deleted = nativeInstance.calendarDeleteEvent(eventId, scope == null ? 0 : scope.ordinal());
-            if (deleted) {
-                fireChange(new CalendarChange(getId(), calendarId, eventId,
-                        CalendarChange.EntityType.EVENT, CalendarChange.ChangeType.DELETED));
+        return background(new NativeOperation<Boolean>() {
+            @Override
+            public Boolean run() throws Exception {
+                boolean deleted = nativeInstance.calendarDeleteEvent(eventId, scope == null ? 0 : scope.ordinal());
+                if (deleted) {
+                    fireChange(new CalendarChange(getId(), calendarId, eventId,
+                            CalendarChange.EntityType.EVENT, CalendarChange.ChangeType.DELETED));
+                }
+                return Boolean.valueOf(deleted);
             }
-            return value(Boolean.valueOf(deleted));
-        } catch (Exception ex) {
-            return failure(ex);
-        }
+        });
     }
 
     @Override
@@ -236,23 +239,16 @@ final class IOSCalendarSource extends LocalCalendarSource {
             return failed(CalendarError.PERMISSION_DENIED, "Reminder read permission is required");
         }
         final String calendarId = query == null ? null : query.getCalendarId();
-        final AsyncResource<CalendarPage<CalendarTask>> result = new AsyncResource<CalendarPage<CalendarTask>>();
-        Display.getInstance().scheduleBackgroundTask(new Runnable() {
+        return background(new NativeOperation<CalendarPage<CalendarTask>>() {
             @Override
-            public void run() {
-                try {
-                    List<CalendarTask> out = new ArrayList<CalendarTask>();
-                    for (Map<String, Object> m : items(nativeInstance.calendarTasks(calendarId))) {
-                        out.add(task(m));
-                    }
-                    result.complete(new CalendarPage<CalendarTask>(out, null, String.valueOf(System.currentTimeMillis())));
-                } catch (Exception ex) {
-                    result.error(ex instanceof CalendarException ? ex
-                            : new CalendarException(CalendarError.UNKNOWN, ex.getMessage(), ex));
+            public CalendarPage<CalendarTask> run() throws Exception {
+                List<CalendarTask> out = new ArrayList<CalendarTask>();
+                for (Map<String, Object> m : items(nativeInstance.calendarTasks(calendarId))) {
+                    out.add(task(m));
                 }
+                return new CalendarPage<CalendarTask>(out, null, String.valueOf(System.currentTimeMillis()));
             }
         });
-        return result;
     }
 
     @Override
@@ -268,52 +264,52 @@ final class IOSCalendarSource extends LocalCalendarSource {
     }
 
     @Override
-    public AsyncResource<CalendarTask> saveTask(CalendarTask task, CalendarMutationScope scope) {
+    public AsyncResource<CalendarTask> saveTask(final CalendarTask task, CalendarMutationScope scope) {
         if (!canRead(REMINDERS)) {
             return failed(CalendarError.PERMISSION_DENIED, "Reminder write permission is required");
         }
         if (task == null || task.getCalendarId() == null) {
             return failed(CalendarError.INVALID_ARGUMENT, "task and calendarId required");
         }
-        try {
-            Map<String, Object> m = new HashMap<String, Object>();
-            m.put("id", task.getId());
-            m.put("calendarId", task.getCalendarId());
-            m.put("title", task.getTitle());
-            m.put("notes", task.getDescription());
-            m.put("completed", Boolean.valueOf(task.isCompleted()));
-            putDate(m, "due", task.getDue());
-            boolean create = task.getId() == null;
-            CalendarTask saved = task(parseResult(nativeInstance.calendarSaveTask(JSONParser.toJson(m))));
-            fireChange(new CalendarChange(getId(), saved.getCalendarId(), saved.getId(),
-                    CalendarChange.EntityType.TASK,
-                    create ? CalendarChange.ChangeType.CREATED : CalendarChange.ChangeType.UPDATED));
-            return value(saved);
-        } catch (IOException ex) {
-            return failure(ex);
-        } catch (CalendarException ex) {
-            return failure(ex);
-        }
+        return background(new NativeOperation<CalendarTask>() {
+            @Override
+            public CalendarTask run() throws Exception {
+                Map<String, Object> m = new HashMap<String, Object>();
+                m.put("id", task.getId());
+                m.put("calendarId", task.getCalendarId());
+                m.put("title", task.getTitle());
+                m.put("notes", task.getDescription());
+                m.put("completed", Boolean.valueOf(task.isCompleted()));
+                putDate(m, "due", task.getDue());
+                boolean create = task.getId() == null;
+                CalendarTask saved = task(parseResult(nativeInstance.calendarSaveTask(JSONParser.toJson(m))));
+                fireChange(new CalendarChange(getId(), saved.getCalendarId(), saved.getId(),
+                        CalendarChange.EntityType.TASK,
+                        create ? CalendarChange.ChangeType.CREATED : CalendarChange.ChangeType.UPDATED));
+                return saved;
+            }
+        });
     }
 
     @Override
-    public AsyncResource<Boolean> deleteTask(String calendarId, String id, CalendarMutationScope scope, String version) {
+    public AsyncResource<Boolean> deleteTask(final String calendarId, final String id, CalendarMutationScope scope, String version) {
         if (!canRead(REMINDERS)) {
             return failed(CalendarError.PERMISSION_DENIED, "Reminder write permission is required");
         }
         if (id == null) {
             return failed(CalendarError.INVALID_ARGUMENT, "taskId required");
         }
-        try {
-            boolean deleted = nativeInstance.calendarDeleteTask(id);
-            if (deleted) {
-                fireChange(new CalendarChange(getId(), calendarId, id,
-                        CalendarChange.EntityType.TASK, CalendarChange.ChangeType.DELETED));
+        return background(new NativeOperation<Boolean>() {
+            @Override
+            public Boolean run() throws Exception {
+                boolean deleted = nativeInstance.calendarDeleteTask(id);
+                if (deleted) {
+                    fireChange(new CalendarChange(getId(), calendarId, id,
+                            CalendarChange.EntityType.TASK, CalendarChange.ChangeType.DELETED));
+                }
+                return Boolean.valueOf(deleted);
             }
-            return value(Boolean.valueOf(deleted));
-        } catch (Exception ex) {
-            return failure(ex);
-        }
+        });
     }
 
     private CalendarEvent event(Map<String, Object> m) {
@@ -500,6 +496,29 @@ final class IOSCalendarSource extends LocalCalendarSource {
     private static boolean b(Map<String, Object> m, String k) {
         Object v = m.get(k);
         return Boolean.TRUE.equals(v) || "true".equals(String.valueOf(v));
+    }
+
+    private interface NativeOperation<T> {
+        T run() throws Exception;
+    }
+
+    // EventKit fetches and mutations block until the store answers; run them
+    // off the calling thread so invoking a query from the EDT cannot freeze
+    // the UI or deadlock against a main-queue completion.
+    private static <T> AsyncResource<T> background(final NativeOperation<T> operation) {
+        final AsyncResource<T> out = new AsyncResource<T>();
+        Display.getInstance().scheduleBackgroundTask(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    out.complete(operation.run());
+                } catch (Throwable error) {
+                    out.error(error instanceof CalendarException ? error
+                            : new CalendarException(CalendarError.UNKNOWN, error.getMessage(), error));
+                }
+            }
+        });
+        return out;
     }
 
     private static <T> AsyncResource<T> value(T value) {
