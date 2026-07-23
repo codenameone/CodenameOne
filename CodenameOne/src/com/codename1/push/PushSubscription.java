@@ -51,10 +51,27 @@ public final class PushSubscription {
                 : Collections.unmodifiableList(new ArrayList<String>(capabilities));
     }
 
-    public String getTransportId() { return transportId; }
-    public String getToken() { return token; }
-    public String getPlatform() { return platform; }
-    public String getInstallationId() { return installationId; }
-    public long getExpiresAt() { return expiresAt; }
-    public List<String> getCapabilities() { return capabilities; }
+    public String getTransportId() {
+        return transportId;
+    }
+
+    public String getToken() {
+        return token;
+    }
+
+    public String getPlatform() {
+        return platform;
+    }
+
+    public String getInstallationId() {
+        return installationId;
+    }
+
+    public long getExpiresAt() {
+        return expiresAt;
+    }
+
+    public List<String> getCapabilities() {
+        return capabilities;
+    }
 }

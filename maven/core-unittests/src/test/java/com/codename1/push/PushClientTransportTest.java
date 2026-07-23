@@ -23,16 +23,33 @@
  */
 package com.codename1.push;
 
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.Preferences;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.surfaces.Surfaces;
 import com.codename1.surfaces.spi.SurfaceBridge;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PushClientTransportTest extends UITestBase {
+    @BeforeEach
+    void clearManagedRegistrationState() {
+        Preferences.delete("push_v3_subscription");
+        implementation.clearQueuedRequests();
+    }
+
+    @AfterEach
+    void restoreManagedRegistrationState() {
+        Preferences.delete("push_v3_subscription");
+        implementation.clearQueuedRequests();
+    }
+
     @FormTest
     void customTransportExercisesTheNativeBoundaryWithoutBuildCloud() {
         FakeTransport transport = new FakeTransport();
@@ -63,6 +80,22 @@ class PushClientTransportTest extends UITestBase {
     void customTransportRequiresAnApplicationOwnedRegistrationSink() {
         assertThrows(IllegalStateException.class, () -> PushClient.builder("custom-app")
                 .listener(new RecordingListener()).transport(new FakeTransport()).build());
+    }
+
+    @FormTest
+    void managedUnregisterDeletesPersistedSubscriptionAfterRestart() {
+        Preferences.set("push_v3_subscription", "persisted-subscription");
+        PushClient client = PushClient.builder("managed-app")
+                .listener(new RecordingListener()).build();
+
+        client.unregister();
+
+        List<ConnectionRequest> requests = implementation.getQueuedRequests();
+        assertEquals(1, requests.size());
+        assertEquals("DELETE", requests.get(0).getHttpMethod());
+        assertTrue(requests.get(0).getUrl().endsWith(
+                "/subscriptions/persisted-subscription"));
+        assertNull(Preferences.get("push_v3_subscription", null));
     }
 
     @FormTest

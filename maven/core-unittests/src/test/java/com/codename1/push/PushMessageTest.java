@@ -75,4 +75,21 @@ class PushMessageTest {
         assertThrows(UnsupportedOperationException.class,
                 () -> nested.put("operation", "changed"));
     }
+
+    @Test
+    void nullBuilderMapsRemoveOptionalSections() {
+        PushMessage.Builder builder = PushMessage.builder()
+                .platform("fcm", Collections.<String, Object>singletonMap(
+                        "priority", "high"))
+                .surface(Collections.<String, Object>singletonMap(
+                        "operation", "widget"));
+
+        builder.build();
+        PushMessage message = builder.platform("fcm", null)
+                .surface(null)
+                .build();
+
+        assertTrue(message.getPlatformOptions().isEmpty());
+        assertTrue(message.getSurface().isEmpty());
+    }
 }
