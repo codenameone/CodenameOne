@@ -29,6 +29,7 @@ import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.JSONParser;
 import com.codename1.io.Preferences;
+import com.codename1.io.Util;
 import com.codename1.ui.Display;
 import com.codename1.surfaces.Surfaces;
 import com.codename1.surfaces.LiveActivity;
@@ -240,7 +241,7 @@ public final class PushClient {
     private static String installationId() {
         String value = Preferences.get("push_v3_installation", null);
         if (value == null) {
-            value = Long.toHexString(System.currentTimeMillis()) + Long.toHexString(Double.doubleToLongBits(Math.random()));
+            value = Util.getUUID();
             Preferences.set("push_v3_installation", value);
         }
         return value;

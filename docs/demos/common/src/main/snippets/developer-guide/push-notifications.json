@@ -51,3 +51,14 @@
   }
 }
 // end::push-notifications-json-004[]
+
+// tag::push-notifications-json-005[]
+{
+  "externalUserId": "customer-4815",
+  "tags": {
+    "plan": "pro",
+    "region": "emea",
+    "testUser": "false"
+  }
+}
+// end::push-notifications-json-005[]

@@ -3,11 +3,18 @@
 [[push-notifications-section,Codename One Push Notifications]]
 Codename One push uses a typed message envelope and an explicit client binding. Your main application class doesn't implement a push interface. The same application code receives messages from Android, iOS, Huawei devices, and supported web browsers.
 
-You can use the managed BuildCloud service or install a custom native transport. A custom transport is a low-level escape hatch: it bypasses BuildCloud registration and delivery completely, so your server owns tokens, credentials, targeting, quotas, retries, and provider errors.
+You can use the managed BuildCloud service or install an adapter for custom native push. A custom-provider adapter is a low-level escape hatch: it bypasses BuildCloud registration and delivery completely, so your server owns tokens, credentials, targeting, quotas, retries, and provider errors.
 
 === Create and configure an application
 
-Open the Codename One Console and select *Push*. Create an application, then complete the provider setup cards you need:
+Open the Codename One Console and select *Push*. Create one Push application for each logical application and environment. For example, keep production and staging separate so credentials, audiences, and analytics remain isolated.
+
+The *Overview* page displays the client binding key and one readiness card for every supported provider. Copy the key into `PushClient.builder()`. Select any readiness card, including a green *Ready* card, to open *Settings* on that provider's tab.
+
+.Push Overview shows the copyable application key and actionable provider readiness
+image::img/push-v3-console-overview.png[Push Overview with client binding and provider readiness cards,scaledwidth=95%]
+
+Complete the provider setup tabs you need:
 
 * *Android / FCM*: upload the Firebase service-account JSON file. The server uses the FCM HTTP v1 API.
 * *iOS / APNs*: save the Apple team ID, key ID, bundle ID, and `.p8` signing key. Token authentication replaces expiring push certificates.
@@ -19,9 +26,12 @@ The managed backend includes WNS delivery for explicit Windows targets. It doesn
 
 Credentials are encrypted in the BuildCloud secrets vault and are write-only. The setup UI shows whether each provider is configured but never reads a secret back. Rotate a credential by saving its replacement.
 
-Cloud builds detect `PushClient` usage and generate the typed native bootstrap automatically. Android uses FCM unless `android.messagingService=huawei` selects Huawei Push Kit. iOS enables push support automatically when `PushClient` is referenced; set `ios.includePush=false` only when a custom transport intentionally owns registration.
+Cloud builds detect `PushClient` usage and generate the typed native bootstrap automatically. Android uses FCM unless `android.messagingService=huawei` selects Huawei Push Kit. iOS enables push support automatically when `PushClient` is referenced; set `ios.includePush=false` only when an installed custom-provider adapter intentionally owns registration.
 
 The Console displays an application key. This key identifies an application during device registration; it isn't a server API key and doesn't authorize sending messages. Keep send API keys on your server.
+
+.Provider Settings explains each credential and links to the provider console
+image::img/push-v3-console-settings.png[Push Settings with platform tabs and credential onboarding,scaledwidth=95%]
 
 === Bind the client
 
@@ -34,7 +44,7 @@ include::../demos/common/src/main/java/com/codename1/demos/push/PushNotification
 
 Registration is asynchronous. With managed delivery, the framework registers the native token with BuildCloud automatically. `PushSubscription` exposes the transport identifier, opaque native token, platform, expiry, and capability list for diagnostics. Application code shouldn't parse or persist the token.
 
-The managed subscription registry is a database-backed Pro feature. Free and Basic applications can provide a `PushRegistrationSink` without a custom transport; the normal native provider remains active, while the sink sends registration material to the application's own server. That server can address explicit targets through the send API within the plan quota.
+The managed subscription registry is a database-backed Pro feature. Free and Basic applications can provide a `PushRegistrationSink` without installing a custom-provider adapter; the normal native provider remains active, while the sink sends registration material to the application's own server. That server can address explicit targets through the send API within the plan quota.
 
 Callbacks are delivered on the Codename One EDT. A notification received while the app is foregrounded is delivered directly. A notification tapped from a system tray is delivered after the application becomes ready. Silent/background execution remains subject to each OS's power and scheduling rules.
 
@@ -67,7 +77,40 @@ include::../demos/common/src/main/snippets/developer-guide/push-notifications.sh
 
 A successful admission returns HTTP `202` with durable delivery IDs and the current quota snapshot. Accepted recipients consume quota once. Provider retries don't consume more quota. Invalid targets are deactivated when the provider identifies them as permanent failures.
 
-Use the Console for an operator-driven blast. It supports audience estimates, provider and tag filters, test sends, scheduling, cancellation before admission, per-provider settings, and delivery metrics. Templates, stored subscriptions, audience segments, campaign history, and other database-backed features require Pro. Automations require Enterprise.
+Use the Console for operator-driven messages. Templates, stored subscriptions, audience segments, campaign history, and other database-backed features require Pro. Automations require Enterprise.
+
+=== Build audiences in the Console
+
+Managed audiences are application-scoped. They don't contain copied device tokens. A saved segment stores a dynamic filter, and BuildCloud resolves that filter against active subscriptions when a campaign launches.
+
+Your authenticated server assigns an external user ID and tags to an installation with `PUT /api/v3/push/apps/{appId}/installations/{installationId}`. Tags should be stable application facts such as `plan=pro`, `region=emea`, `role=technician`, or `testUser=true`. Don't let an untrusted client grant itself a privileged tag.
+
+[source,json]
+----
+include::../demos/common/src/main/snippets/developer-guide/push-notifications.json[tag=push-notifications-json-005,indent=0]
+----
+
+Open *Push > Audience*. The tag and value pickers contain values discovered from current active subscriptions for the selected application. Choose an optional platform, choose one tag rule, enter a segment name, and select *Save segment*. The new segment appears immediately under *Saved segments* with its current recipient estimate. It also becomes available in the Messages recipient picker.
+
+.Audience uses discovered tag values and shows every saved segment
+image::img/push-v3-console-audience.png[Push Audience builder and saved segment list,scaledwidth=95%]
+
+Segments are evaluated at send time. Changing a subscription's tags changes future membership without editing the segment. A count is an estimate of the current state; registrations, subscription removals, and tag updates can change it before admission.
+
+For a safe rollout, tag internal devices with `testUser=true`, create a test-user segment, and send the message there first. Create the production segment only from server-controlled tags.
+
+=== Send a message from the Console
+
+Open *Push > Messages* and complete the three numbered sections:
+
+. *Audience*: choose *All subscribed devices* or a saved segment. The Console displays the current recipient estimate. Individual provider tokens aren't entered in this workflow.
+. *Message*: enter a notification title and message. A visible notification requires message text. For a silent notification, enable *Silent / data-only notification* and provide an additional-data key and value. The Console builds valid JSON; operators don't paste JSON into the primary composer.
+. *Delivery*: choose how long providers may retain an undelivered message. Console messages use safe cross-platform defaults and enter the durable queue immediately.
+
+.The restrictive message composer accepts a saved audience and typed fields
+image::img/push-v3-console-messages.png[New Push Message composer with audience, message, and delivery sections,scaledwidth=95%]
+
+Select *Queue message* only after checking the audience name and estimate. BuildCloud creates the campaign, resolves the segment, applies organization quota and rate limits, and admits the recipients to the durable delivery queue. The provider may accept a notification that the device never displays, so inspect *Push > Analytics* for provider acceptance and failures without treating acceptance as device delivery.
 
 === Enterprise event automations
 
@@ -114,7 +157,7 @@ include::../demos/common/src/main/snippets/developer-guide/push-notifications.js
 
 For a live activity use `live-update` or `live-end` with `id`, serialized `state`, and optional `dismissImmediately`. Unsupported surfaces are ignored. Surface updates remain subject to native OS delivery policy, so applications must also refresh stale state during foreground activation.
 
-=== Install a custom native transport
+=== Install a custom native push adapter
 
 A CN1Lib can implement `PushTransport` for a private native push service. It must obtain native registration material and forward incoming messages as the canonical JSON envelope. A matching `PushRegistrationSink` stores and removes the subscription on your server:
 
@@ -123,7 +166,7 @@ A CN1Lib can implement `PushTransport` for a private native push service. It mus
 include::../demos/common/src/main/java/com/codename1/demos/push/PushNotificationSnippets.java[tag=push-notifications-java-003,indent=0]
 ----
 
-When a custom transport is present, `PushClient` never contacts BuildCloud. The transport calls its callback's `message()` method with a schema-3 envelope. This API intentionally stays low-level so native provider SDKs aren't coupled to the managed backend.
+When a `PushTransport` implementation is present, `PushClient` never contacts BuildCloud. The adapter calls its callback's `message()` method with a schema-3 envelope. This API intentionally stays low-level so native provider SDKs aren't coupled to the managed backend.
 
 === Testing delivery behavior
 
