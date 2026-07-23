@@ -30,13 +30,18 @@ fi
 
 winpath() { cygpath -w "$1"; }
 
+# Keep every path the shell tools touch in POSIX form: GNU tar (and friends)
+# treat the colon in D:\a\_temp as a remote-host separator. Windows form is
+# produced via winpath only at java/maven argument boundaries.
+TEMP_BASE="$(cygpath -u "${RUNNER_TEMP:-${TMPDIR:-/tmp}}")"
+
 JAVA_BIN="${JAVA_HOME:?JAVA_HOME (JDK 17+) must be set}/bin/java"
 JAVAC_BIN="$JAVA_HOME/bin/javac"
 
 CN1_VERSION=$(awk -F'[<>]' '/<version>/{print $3; exit}' maven/pom.xml)
 wt_log "Codename One version: $CN1_VERSION"
 
-ARTIFACTS_BASE="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
+ARTIFACTS_BASE="$(cygpath -u "${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}")"
 ARTIFACTS_DIR="$ARTIFACTS_BASE/windows-tooling-tests"
 mkdir -p "$ARTIFACTS_DIR"
 ARTIFACTS_W="$(winpath "$ARTIFACTS_DIR")"
@@ -48,7 +53,7 @@ SANITY_SRC_W="$(winpath "$SCRIPT_DIR/windows/ScreenshotSanity.java")"
 #    The directory deliberately contains spaces on both levels: Windows user
 #    dirs commonly do, and the file://-URL round trip must survive them.
 # ---------------------------------------------------------------------------
-WORK_DIR="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/cn1 tooling tests/Demo App"
+WORK_DIR="$TEMP_BASE/cn1 tooling tests/Demo App"
 rm -rf "$WORK_DIR"
 mkdir -p "$WORK_DIR"
 
@@ -91,7 +96,7 @@ fi
 # ---------------------------------------------------------------------------
 # 2. JavaSE simulator smoke via the shared verifier harness.
 # ---------------------------------------------------------------------------
-BUILD_DIR="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/cn1-windows-sim"
+BUILD_DIR="$TEMP_BASE/cn1-windows-sim"
 mkdir -p "$BUILD_DIR"
 
 wt_log "Resolving simulator classpath from maven artifacts"
@@ -127,7 +132,7 @@ wt_log "Compiling simulator verifier harness"
   "$(winpath "$SCRIPT_DIR/javase/lib/SimulatorModeTestApp.java")" \
   "$(winpath "$SCRIPT_DIR/javase/lib/SimulatorWindowModeVerifier.java")"
 
-SKIN_CACHE_DIR="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/cn1-windows-skins"
+SKIN_CACHE_DIR="$TEMP_BASE/cn1-windows-skins"
 mkdir -p "$SKIN_CACHE_DIR"
 SKIN_ARCHIVE="$SKIN_CACHE_DIR/skins.tar.gz"
 SKIN_EXTRACT_DIR="$SKIN_CACHE_DIR/extracted"
