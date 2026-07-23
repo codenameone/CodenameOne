@@ -5500,6 +5500,24 @@ bindNative(["cn1_java_lang_String_toLowerCase_R_java_lang_String"], function(__c
 bindNative(["cn1_java_lang_String_toString_R_java_lang_String"], function(__cn1ThisObject) { return __cn1ThisObject; });
 bindNative(["cn1_java_lang_String_toUpperCase_R_java_lang_String"], function(__cn1ThisObject) { return createJavaString(jvm.toNativeString(__cn1ThisObject).toUpperCase()); });
 bindNative(["cn1_java_lang_String_releaseNSString_long"], function() { return null; });
+// cn1FusedConcatN is a ParparVM single-allocation fused byte[] concat optimization; the
+// cn1ConcatN callers only reach it when every part is a Latin-1 byte[]-backed String, which
+// never happens on the JS runtime (strings are native), so at runtime this is unreachable --
+// but it is statically reachable from cn1ConcatN's bytecode, so it needs a binding. A plain
+// string concatenation is the correct result. null maps to "null" like makeConcat.
+function cn1FusedConcatArg(x) { return x == null ? "null" : jvm.toNativeString(x); }
+bindNative(["cn1_java_lang_String_cn1FusedConcat2_java_lang_String_java_lang_String_R_java_lang_String"], function(a, b) {
+  return createJavaString(cn1FusedConcatArg(a) + cn1FusedConcatArg(b));
+});
+bindNative(["cn1_java_lang_String_cn1FusedConcat3_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String"], function(a, b, c) {
+  return createJavaString(cn1FusedConcatArg(a) + cn1FusedConcatArg(b) + cn1FusedConcatArg(c));
+});
+bindNative(["cn1_java_lang_String_cn1FusedConcat4_java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String"], function(a, b, c, d) {
+  return createJavaString(cn1FusedConcatArg(a) + cn1FusedConcatArg(b) + cn1FusedConcatArg(c) + cn1FusedConcatArg(d));
+});
+bindNative(["cn1_java_lang_String_cn1FusedConcat5_java_lang_String_java_lang_String_java_lang_String_java_lang_String_java_lang_String_R_java_lang_String"], function(a, b, c, d, e) {
+  return createJavaString(cn1FusedConcatArg(a) + cn1FusedConcatArg(b) + cn1FusedConcatArg(c) + cn1FusedConcatArg(d) + cn1FusedConcatArg(e));
+});
 bindNative(["cn1_java_lang_String_bytesToChars_byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY"], function(bytes, off, len, encoding) {
   const slice = bytes.slice(off | 0, (off | 0) + (len | 0));
   const array = Uint8Array.from(slice, function(v) { return v & 0xff; });

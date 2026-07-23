@@ -4554,6 +4554,7 @@ public class IOSImplementation extends CodenameOneImplementation {
     private IOSBiometrics biometrics;
     private IOSSecureStorage secureStorage;
     private IOSNfc nfc;
+    private static IOSBluetooth bluetooth;
     private IOSDeviceIntegrity deviceIntegrity;
 
     @Override
@@ -4599,6 +4600,16 @@ public class IOSImplementation extends CodenameOneImplementation {
             calendarSource = new IOSCalendarSource(nativeInstance);
         }
         return calendarSource;
+    }
+
+    @Override
+    public com.codename1.bluetooth.Bluetooth getBluetooth() {
+        synchronized (IOSImplementation.class) {
+            if (bluetooth == null) {
+                bluetooth = new IOSBluetooth(nativeInstance);
+            }
+            return bluetooth;
+        }
     }
 
     public LocationManager getLocationManager() {

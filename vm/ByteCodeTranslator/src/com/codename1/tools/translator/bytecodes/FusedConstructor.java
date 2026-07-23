@@ -296,9 +296,12 @@ public final class FusedConstructor {
                             && body.get(pfIdx).getOpcode() == Opcodes.PUTFIELD) {
                         Field f = (Field) body.get(pfIdx);
                         // field must be declared by this class and its descriptor
-                        // must match the NEWARRAY element type
+                        // must match the NEWARRAY element type -- OR be the special
+                        // compact-string backing slot (see stringCompactValueMatch).
+                        int __at = ((VarOp) body.get(j)).getIndex();
                         if (f.getOwner().replace('/', '_').replace('$', '_').equals(ctor.getClsName())
-                                && descMatchesArrayType(f.getDesc(), ((VarOp) body.get(j)).getIndex())) {
+                                && (descMatchesArrayType(f.getDesc(), __at)
+                                    || stringCompactValueMatch(ctor.getClsName(), f, __at))) {
                             if (found.size() >= MAX_CHILDREN) {
                                 return null;
                             }
@@ -500,6 +503,23 @@ public final class FusedConstructor {
             default:
                 return Integer.MIN_VALUE;
         }
+    }
+
+    /**
+     * Compact-string special case: java.lang.String's single backing slot is declared
+     * {@code Object value} so it can hold EITHER a {@code char[]} (general UTF-16, the
+     * original representation) OR a {@code byte[]} (pure Latin-1, 1 byte/char). That
+     * dual representation means the field descriptor is {@code Ljava/lang/Object;}, which
+     * {@link #descMatchesArrayType} rejects -- but fusion is still valid and desirable:
+     * the block is sized/installed from the concrete NEWARRAY element type at the site,
+     * so a char[]-producing ctor fuses a char[] and a byte[]-producing one fuses a byte[].
+     * We accept it only for exactly String.value with a char or byte NEWARRAY.
+     */
+    private static boolean stringCompactValueMatch(String ctorClsName, Field f, int arrayType) {
+        return "java_lang_String".equals(ctorClsName)
+                && "value".equals(f.getFieldName())
+                && "Ljava/lang/Object;".equals(f.getDesc())
+                && (arrayType == 5 /* char */ || arrayType == 8 /* byte */);
     }
 
     private static boolean descMatchesArrayType(String fieldDesc, int arrayType) {

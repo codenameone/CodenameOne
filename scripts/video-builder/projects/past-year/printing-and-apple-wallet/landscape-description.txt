@@ -1,0 +1,26 @@
+A new cross-platform printing API hands PDFs and images to the native print dialog on every port, and iOS builds can now generate Apple Wallet issuer-provisioning extensions from build hints with no native code.
+
+This video explains portable printing and build-generated apple wallet extensions without native application code.
+
+Full article and source material:
+https://www.codenameone.com/blog/printing-and-apple-wallet/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://github.com/codenameone/CodenameOne/pull/5217
+https://github.com/codenameone/CodenameOne/pull/5227
+https://api.mybank.com/wallet/provision
+https://github.com/codenameone/CodenameOne/issues
+
+Chapters
+00:00 Hook
+00:25 Problem
+00:48 Mechanism
+01:23 Source
+01:46 Tradeoffs
+02:23 Result
+03:00 Outro
+
+Which part should we unpack next?
+
+Series: Codename One Native Platforms & Device APIs — part 8 of 13
+
+#Java #CodenameOne

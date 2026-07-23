@@ -1,7 +1,24 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.tools.translator.bytecodes;
 
@@ -60,6 +77,63 @@ public class ArithmeticExpression extends Instruction implements AssignableExpre
                     + subExpression2.getExpressionAsString().trim() + ")";
         }
         return null;
+    }
+
+    /**
+     * Float/double analogue of {@link #getLongCompareDirect(String)}. An
+     * {@code FCMPx}/{@code DCMPx} feeding an {@code IFxx} branch-on-zero is
+     * emitted as a single IEEE C comparison instead of the three-way
+     * {@code CN1_CMP_EXPR(a,b) <op> 0} (which forces clang to materialise a
+     * -1/0/1 result and blocks its FP-loop optimisation).
+     *
+     * <p>NaN correctness is preserved exactly. javac selects the {@code CMPG}
+     * variant (NaN&nbsp;&rarr;&nbsp;+1) for source {@code >}/{@code >=} and the
+     * {@code CMPL} variant (NaN&nbsp;&rarr;&nbsp;-1) for {@code <}/{@code <=},
+     * precisely so the branch-on-zero treats an unordered result as
+     * "condition false". The fused form reproduces that: the cases where an
+     * unordered pair must take the branch map to a <em>negated ordered</em>
+     * comparison (e.g. {@code !(a > b)}), which is true for NaN because every
+     * ordered C comparison is false for NaN; the other cases map to the plain
+     * ordered comparison, which is false for NaN. Operands are only ever the
+     * pure loads/constants the reducer folds, so evaluating them once is safe.</p>
+     */
+    public String getFloatCompareDirect(String operator) {
+        if (lastInstruction == null || subExpression == null || subExpression2 == null) {
+            return null;
+        }
+        boolean nanGreater;
+        switch (lastInstruction.getOpcode()) {
+            case Opcodes.DCMPG:
+            case Opcodes.FCMPG:
+                nanGreater = true;  // NaN -> +1
+                break;
+            case Opcodes.DCMPL:
+            case Opcodes.FCMPL:
+                nanGreater = false; // NaN -> -1
+                break;
+            default:
+                return null;
+        }
+        String a = subExpression.getExpressionAsString().trim();
+        String b = subExpression2.getExpressionAsString().trim();
+        // The branch tests (threeWayResult <operator> 0). Reproduce it directly.
+        String c = null;
+        if (!nanGreater) { // CMPL: NaN -> -1 (unordered counts as "less")
+            if (operator.equals("<"))       c = "!(" + a + " >= " + b + ")"; // a<b || NaN
+            else if (operator.equals("<=")) c = "!(" + a + " > "  + b + ")"; // a<=b || NaN
+            else if (operator.equals(">"))  c =  "(" + a + " > "  + b + ")";
+            else if (operator.equals(">=")) c =  "(" + a + " >= " + b + ")";
+            else if (operator.equals("==")) c =  "(" + a + " == " + b + ")";
+            else if (operator.equals("!=")) c = "!(" + a + " == " + b + ")"; // a!=b || NaN
+        } else { // CMPG: NaN -> +1 (unordered counts as "greater")
+            if (operator.equals("<"))       c =  "(" + a + " < "  + b + ")";
+            else if (operator.equals("<=")) c =  "(" + a + " <= " + b + ")";
+            else if (operator.equals(">"))  c = "!(" + a + " <= " + b + ")"; // a>b || NaN
+            else if (operator.equals(">=")) c = "!(" + a + " < "  + b + ")"; // a>=b || NaN
+            else if (operator.equals("==")) c =  "(" + a + " == " + b + ")";
+            else if (operator.equals("!=")) c = "!(" + a + " == " + b + ")"; // a!=b || NaN
+        }
+        return c;
     }
 
     @Override

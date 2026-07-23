@@ -1,0 +1,24 @@
+Commerce validates receipts and normalizes entitlements, while Secrets keeps credentials out of the binary. Both are designed to fail soft, stay optional, and avoid turning IAP into a Codename One royalty.
+
+This video explains portable entitlements and build-time secrets without a framework revenue tax.
+
+Full article and source material:
+https://www.codenameone.com/blog/commerce-secrets-without-iap-tax/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://github.com/codenameone/CodenameOne/pull/5300
+
+Chapters
+00:00 Who And What
+00:13 The Real World Problem
+00:26 Independent Context 1
+00:42 The Change In Mechanism
+00:59 Source And Product Proof
+01:11 Canonical Captures
+01:26 Developer Victory
+01:37 Outro
+
+Which part should we unpack next?
+
+Series: Build, Test & Ship Codename One Apps — part 5 of 10
+
+#Java #CodenameOne

@@ -107,11 +107,11 @@ NOTE: The UWP target was discontinued in release 7.0.229 and is no longer part o
 
 ===== JavaScript port
 
-The JavaScript port of Codename One is based on the work of the http://teavm.org:[TeaVM project]. The team behind TeaVM effectively built a JVM that translates Java bytecode into JavaScript source code while maintaining threading semantics with an imaginative approach.
+The JavaScript port of Codename One uses ParparVM to translate Java bytecode into JavaScript. Cloud builds retain the original http://teavm.org:[TeaVM-based builder] as a compatibility fallback, selected with the public `javascript.port=teavm` build hint.
 
 The JavaScript port allows unmodified Codename One applications to run within a desktop or mobile browser. The port itself is based on the HTML5 Canvas API, which provides a pixel-perfect implementation of the Codename One API.
 
-NOTE: The JavaScript port is available for Enterprise grade subscribers of Codename One
+NOTE: The JavaScript port is available to all Codename One users.
 
 ===== Desktop and Android
 

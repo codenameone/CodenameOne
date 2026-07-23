@@ -1,0 +1,365 @@
+{
+  "schemaVersion": 1,
+  "id": "platform-apis-in-the-core-short",
+  "title": "Moving AI, authentication, passkeys, and connectivity into stable framework APIs",
+  "output": {
+    "frameRate": 30,
+    "landscapeWidth": 1920,
+    "landscapeHeight": 1080,
+    "portraitWidth": 1080,
+    "portraitHeight": 1920,
+    "videoBitRate": 8000000
+  },
+  "narration": {
+    "provider": "kokoro",
+    "voice": "af_heart:60,af_bella:40",
+    "language": "en-us",
+    "speed": 0.97,
+    "model": ".video-tools/kokoro/kokoro-v1.0.onnx",
+    "minimumGapMs": 250,
+    "pronunciations": {
+      "Codename One": "Codename One",
+      "API": "API",
+      "AI": "AI",
+      "APK": "APK",
+      "AR/VR": "augmented reality and virtual reality",
+      "ARKit": "A-R kit",
+      "ARCore": "A-R core",
+      "AR": "A-R",
+      "VR": "V-R",
+      "2D": "2D",
+      "3D": "3D",
+      "GPU": "GPU",
+      "GA4": "G-A four",
+      "GDPR": "G-D-P-R",
+      "CCPA": "C-C-P-A",
+      "DPI": "D-P-I",
+      "glTF": "G-L-T-F",
+      "JVM": "JVM",
+      "JIT": "JIT",
+      "AOT": "A-O-T",
+      "GC": "G-C",
+      "CI": "C-I",
+      "CSS": "CSS",
+      "iOS": "iOS",
+      "macOS": "macOS",
+      "tvOS": "tvOS",
+      "UWP": "U-W-P",
+      "NFC": "NFC",
+      "PCM": "PCM",
+      "RGBA": "RGBA",
+      "EDT": "EDT",
+      "SRT": "SRT",
+      "VTT": "VTT",
+      "AAC": "A-A-C",
+      "H264": "H two sixty four",
+      "HTML": "HTML",
+      "IDE": "I-D-E",
+      "JS": "JS",
+      "XML": "XML",
+      "JSON": "jay son",
+      "WYSIWYG": "wizzy wig",
+      "CodeEditor": "Code Editor",
+      "RichTextArea": "Rich Text Area",
+      "AbstractEditorComponent": "Abstract Editor Component",
+      "CodeMirror": "Code Mirror",
+      "VideoIO": "video I-O",
+      "WAVWriter": "wave writer",
+      "SVG": "SVG",
+      "SPI": "S-P-I",
+      "AnalyticsService": "Analytics Service",
+      "AnalyticsProvider": "Analytics Provider",
+      "AbstractAnalyticsProvider": "Abstract Analytics Provider",
+      "CodenameOneAnalyticsProvider": "Codename One Analytics Provider",
+      "RASP": "rasp",
+      "DeviceIntegrity": "Device Integrity",
+      "AppReview": "App Review",
+      "CarApplication": "Car Application",
+      "CarScreen": "Car Screen",
+      "CarTemplate": "Car Template",
+      "UiModeManager": "U-I Mode Manager",
+      "AndroidX": "Android X",
+      "CN.isTV()": "C-N is T-V",
+      "Display.isTV()": "Display is T-V",
+      "TARGET_OS_TV": "target O-S T-V",
+      "MapSurface": "Map Surface",
+      "MapView": "Map View",
+      "NativeMap": "Native Map",
+      "MapKit": "Map Kit",
+      "MapComponent": "Map Component",
+      "MapLibre": "Map Libre",
+      "GeneralPath": "General Path",
+      "ORM": "O-R-M",
+      "OAuth": "oh auth",
+      "OIDC": "O-I-D-C",
+      "gRPC": "G-R-P-C",
+      "GraphQL": "graph Q-L",
+      "Box2D": "box 2D",
+      "JDWP": "J-D-W-P",
+      "JUnit": "J unit",
+      "ParparVM": "par par V-M",
+      "Win32": "win thirty two",
+      "App Store Connect": "App Store Connect",
+      "cn1": "C-N one",
+      "mvn": "Maven",
+      "clang": "clang",
+      "2FA": "two F-A",
+      ".p8": "P eight",
+      ".glb": "G-L-B",
+      ".ipa": "I-P-A"
+    }
+  },
+  "scenes": [
+    {
+      "id": "short-hook",
+      "durationMs": 24500,
+      "narration": {
+        "text": "Deeper AI integration in the framework core, modern authentication via OAuth / OIDC and WebAuthn passkeys driven from the system browser, and a few smaller additions (WiFi / connectivity, share-sheet result callbacks) alongside."
+      },
+      "actions": [
+        {
+          "type": "intro.show",
+          "id": "short-welcome",
+          "atMs": 0,
+          "durationMs": 1650,
+          "title": "Codename One",
+          "subtitle": "AI, OAuth, And Other Platform APIs In The Core",
+          "bounds": {
+            "x": 0.08,
+            "y": 0.18,
+            "width": 0.84,
+            "height": 0.58
+          }
+        },
+        {
+          "type": "bullets.show",
+          "id": "short-hook-points",
+          "atMs": 1500,
+          "durationMs": 2300,
+          "title": "Moving AI, authentication, passkeys, and connectivity into stable framework APIs",
+          "items": [
+            "AI: a first-class LLM client and a ChatView component",
+            "LlmClient: the basic chat request"
+          ],
+          "bounds": {
+            "x": 0.07,
+            "y": 0.1,
+            "width": 0.86,
+            "height": 0.78
+          }
+        },
+        {
+          "type": "transition",
+          "target": "short-hook-points",
+          "atMs": 1500,
+          "durationMs": 550,
+          "effect": "wipe-up",
+          "easing": "ease-out"
+        },
+        {
+          "type": "layer.hide",
+          "target": "short-welcome",
+          "atMs": 2300
+        }
+      ]
+    },
+    {
+      "id": "short-problem",
+      "durationMs": 20000,
+      "narration": {
+        "text": "PR #5035 lands the com.codename1.ai package, the ChatView UI component, the speech and TTS additions, and the build-time dependency injection that wires the native pieces in."
+      },
+      "actions": [
+        {
+          "type": "bullets.show",
+          "id": "short-problem-bullets",
+          "atMs": 100,
+          "durationMs": 2700,
+          "title": "AI: a first-class LLM client and a ChatView component",
+          "items": [
+            "LlmClient: the basic chat request",
+            "Streaming chat (what you actually want for chat UIs)",
+            "Tool calls"
+          ],
+          "bounds": {
+            "x": 0.025,
+            "y": 0.05,
+            "width": 0.95,
+            "height": 0.88
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.1,
+              "width": 0.86,
+              "height": 0.78
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "short-problem-bullets",
+          "atMs": 100,
+          "durationMs": 650,
+          "effects": {
+            "landscape": "wipe-left",
+            "portrait": "wipe-up"
+          },
+          "easing": "ease-out"
+        }
+      ]
+    },
+    {
+      "id": "short-mechanism",
+      "durationMs": 34000,
+      "narration": {
+        "text": "LlmClient.openai(...), LlmClient.anthropic(...), LlmClient.gemini(...), LlmClient.ollama(...), and LlmClient.openAiCompatible(baseUrl, apiKey) are the factories. All five are fully implemented native clients. The OpenAI client also drives Ollama, vLLM, llama.cpp, and any other endpoint that speaks the OpenAI wire format, so most local-model stacks plug in through LlmClient.openAiCompatible(...) without a separate driver."
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "short-mechanism-title",
+          "atMs": 0,
+          "text": "LlmClient: the basic chat request",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.03,
+            "y": 0.025,
+            "width": 0.94,
+            "height": 0.14
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.035,
+              "width": 0.84,
+              "height": 0.16
+            }
+          }
+        },
+        {
+          "type": "diagram.show",
+          "id": "short-mechanism-diagram",
+          "atMs": 600,
+          "durationMs": 3200,
+          "texts": {
+            "landscape": "flowchart LR\nN0[AI: component] --> N1[LlmClient:]\nN1[LlmClient:] --> N2[Streaming chat]",
+            "portrait": "flowchart TD\nN0[AI: component] --> N1[LlmClient:]\nN1[LlmClient:] --> N2[Streaming chat]"
+          },
+          "bounds": {
+            "x": 0.025,
+            "y": 0.2,
+            "width": 0.95,
+            "height": 0.67
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.23,
+              "width": 0.86,
+              "height": 0.66
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "short-mechanism-diagram",
+          "atMs": 600,
+          "durationMs": 700,
+          "effect": "morph",
+          "easing": "ease-in-out"
+        }
+      ]
+    },
+    {
+      "id": "short-scope",
+      "durationMs": 24500,
+      "narration": {
+        "text": "For any UI that types responses out token-by-token, the streaming entry point is the one to reach for. The callback fires on the EDT, so you can append directly to a text component."
+      },
+      "actions": [
+        {
+          "type": "bullets.show",
+          "id": "short-scope-bullets",
+          "atMs": 100,
+          "durationMs": 2700,
+          "title": "What the developer gains",
+          "items": [
+            "Streaming chat (what you actually want for chat UIs)",
+            "Tool calls",
+            "Embeddings"
+          ],
+          "bounds": {
+            "x": 0.025,
+            "y": 0.05,
+            "width": 0.95,
+            "height": 0.88
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.1,
+              "width": 0.86,
+              "height": 0.78
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "short-scope-bullets",
+          "atMs": 100,
+          "durationMs": 650,
+          "effects": {
+            "landscape": "wipe-left",
+            "portrait": "wipe-up"
+          },
+          "easing": "ease-out"
+        }
+      ]
+    },
+    {
+      "id": "short-outro",
+      "durationMs": 15000,
+      "narration": {
+        "text": "Tap the related video for the complete explanation and source links. Then comment with the mechanism you want unpacked next."
+      },
+      "actions": [
+        {
+          "type": "outro.show",
+          "id": "short-next",
+          "atMs": 0,
+          "durationMs": 1000,
+          "eyebrow": "CODENAME ONE · DEEP DIVE",
+          "title": "See the complete explanation",
+          "subtitle": "The related video carries the code, tradeoffs, and source links.",
+          "prompt": "Comment: LlmClient: the basic chat request or Streaming chat (what you actually want for…?",
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        }
+      ]
+    }
+  ],
+  "editorial": {
+    "storyType": "visual-explainer",
+    "status": "blocked",
+    "proof": [
+      "automatic article template; requires story review"
+    ],
+    "humanBeat": "requires an article-specific human consequence",
+    "visualIdentity": "requires an article-specific recurring visual motif",
+    "bespokeVisualization": "requires a visualization authored for this article",
+    "heroJourney": {
+      "desire": "requires an article-specific desired outcome",
+      "problem": "requires an article-specific developer problem",
+      "difficulty": "requires concrete stakes and escalating difficulty",
+      "intervention": "requires a source-backed Codename One intervention",
+      "victory": "requires a proved developer transformation"
+    }
+  }
+}

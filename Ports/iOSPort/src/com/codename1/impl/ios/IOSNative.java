@@ -1173,6 +1173,157 @@ public final class IOSNative {
     /** Sends the HCE response for the APDU currently outstanding on CardSession. */
     native void hceSendResponse(byte[] response);
 
+    // --- Bluetooth (Core Bluetooth) ------------------------------------------
+    //
+    // Implemented in nativeSources/CN1Bluetooth.m, gated on
+    // CN1_INCLUDE_BLUETOOTH. Asynchronous results and events come back
+    // through the static IOSBluetooth.nativeBt* callbacks; request ids are
+    // allocated by IOSBluetooth.takeId.
+
+    /** True when the BLE peripheral role (CBPeripheralManager) exists on
+     * this target slice -- false on tvOS / watchOS. */
+    native boolean isBlePeripheralSupported();
+
+    /** Raw CBManagerAuthorization: 0 notDetermined, 1 restricted, 2 denied,
+     * 3 allowedAlways. Does not create a manager / prompt the user. */
+    native int getBluetoothAuthorization();
+
+    /** Lazily creates the CBCentralManager (this pops the permission
+     * dialog on first run) and starts forwarding state changes through
+     * IOSBluetooth.nativeBtStateChanged. Idempotent. */
+    native void startBluetoothStateMonitor();
+
+    /** Starts / retunes the platform scan. `serviceUuids` may be null for
+     * an unfiltered scan; results via IOSBluetooth.nativeBtScanResult. */
+    native void btStartScan(String[] serviceUuids, boolean allowDuplicates);
+
+    /** Stops the platform scan. */
+    native void btStopScan();
+
+    /** Resolves a persisted identifier via
+     * retrievePeripheralsWithIdentifiers and retains the CBPeripheral.
+     * Returns the peripheral name ("" when unnamed) or null when the
+     * identifier cannot be resolved. */
+    native String btRetrievePeripheral(String peripheralId);
+
+    /** System-connected peripherals offering the given service
+     * (retrieveConnectedPeripheralsWithServices). Returns
+     * "id\tname\n"-joined entries; empty/null when none. */
+    native String btGetKnownPeripherals(String serviceUuid);
+
+    /** Connects; resolution via IOSBluetooth.nativeBtConnected /
+     * nativeBtConnectFailed. */
+    native void btConnect(String peripheralId);
+
+    /** Disconnects / cancels a pending connect
+     * (cancelPeripheralConnection). */
+    native void btDisconnect(String peripheralId);
+
+    /** Full discovery pass (services, then characteristics, then
+     * descriptors); one aggregated result via
+     * IOSBluetooth.nativeBtServicesDiscovered. */
+    native void btDiscoverServices(int requestId, String peripheralId);
+
+    /** Reads a characteristic; result via IOSBluetooth.nativeBtValue. */
+    native void btReadCharacteristic(int requestId, String peripheralId,
+            String serviceUuid, int serviceInstance, String charUuid,
+            int charInstance);
+
+    /** Writes a characteristic; completion via
+     * IOSBluetooth.nativeBtOperationComplete (immediate for
+     * write-without-response). */
+    native void btWriteCharacteristic(int requestId, String peripheralId,
+            String serviceUuid, int serviceInstance, String charUuid,
+            int charInstance, byte[] value, boolean withResponse);
+
+    /** Reads a descriptor; result via IOSBluetooth.nativeBtValue. */
+    native void btReadDescriptor(int requestId, String peripheralId,
+            String serviceUuid, int serviceInstance, String charUuid,
+            int charInstance, String descriptorUuid);
+
+    /** Writes a descriptor; completion via
+     * IOSBluetooth.nativeBtOperationComplete. */
+    native void btWriteDescriptor(int requestId, String peripheralId,
+            String serviceUuid, int serviceInstance, String charUuid,
+            int charInstance, String descriptorUuid, byte[] value);
+
+    /** Arms / disarms notifications (setNotifyValue); completion via
+     * IOSBluetooth.nativeBtOperationComplete. */
+    native void btSetNotify(int requestId, String peripheralId,
+            String serviceUuid, int serviceInstance, String charUuid,
+            int charInstance, boolean enable);
+
+    /** Reads the connection RSSI; result via IOSBluetooth.nativeBtRssi. */
+    native void btReadRssi(int requestId, String peripheralId);
+
+    /** Synchronous maximumWriteValueLengthForType (ATT MTU minus 3);
+     * 0 when the peripheral is unknown / disconnected. */
+    native int btGetMaxWriteLength(String peripheralId, boolean withResponse);
+
+    /** Creates the CBPeripheralManager (lazily) and reports through
+     * IOSBluetooth.nativeBtGattServerOpened once poweredOn. */
+    native void btOpenGattServer(int requestId);
+
+    /** Adds a service from the serialized definition (see
+     * IOSGattServer.doAddService for the S|/C|/D| line format); completion
+     * via IOSBluetooth.nativeBtOperationComplete. */
+    native void btAddService(int requestId, String serviceDefinition);
+
+    /** Removes a service previously added under the given local id. */
+    native void btRemoveService(int serviceLocalId);
+
+    /** Removes all services from the peripheral manager. */
+    native void btCloseGattServer();
+
+    /** Starts advertising. `localName` null omits the name, "" uses the
+     * device name; result via IOSBluetooth.nativeBtAdvertiseStarted. */
+    native void btStartAdvertising(int requestId, String localName,
+            String[] serviceUuids);
+
+    /** Stops advertising. */
+    native void btStopAdvertising();
+
+    /** updateValue:forCharacteristic:onSubscribedCentrals; retried on
+     * peripheralManagerIsReadyToUpdateSubscribers until accepted, then
+     * IOSBluetooth.nativeBtOperationComplete. `centralId` null targets all
+     * subscribed centrals. */
+    native void btNotifyValue(int requestId, int charLocalId, byte[] value,
+            String centralId);
+
+    /** Responds to a parked CBATTRequest read. `attStatus` 0 is success,
+     * otherwise the ATT error code (GattStatus.getAttCode). */
+    native void btRespondToReadRequest(long requestHandle, byte[] value,
+            int attStatus);
+
+    /** Responds to a parked CBATTRequest write. */
+    native void btRespondToWriteRequest(long requestHandle, int attStatus);
+
+    /** Opens an L2CAP channel to a connected peripheral; result via
+     * IOSBluetooth.nativeBtL2capOpened. */
+    native void btOpenL2cap(int requestId, String peripheralId, int psm);
+
+    /** Publishes an L2CAP endpoint
+     * (publishL2CAPChannelWithEncryption); PSM via
+     * IOSBluetooth.nativeBtL2capPublished, incoming channels via
+     * IOSBluetooth.nativeBtL2capIncoming. */
+    native void btPublishL2cap(int requestId, boolean secure);
+
+    /** Unpublishes a previously published PSM. */
+    native void btUnpublishL2cap(int psm);
+
+    /** Blocking read from an open L2CAP channel. Returns the byte count,
+     * -1 on orderly end of stream, -2 on error. */
+    native int btL2capRead(long channelHandle, byte[] buffer, int offset,
+            int len);
+
+    /** Blocking write to an open L2CAP channel. Returns the byte count
+     * written (possibly short), or -2 on error. */
+    native int btL2capWrite(long channelHandle, byte[] buffer, int offset,
+            int len);
+
+    /** Closes an L2CAP channel and releases its native wrapper. */
+    native void btL2capClose(long channelHandle);
+
     native long gausianBlurImage(long peer, float radius);
     
     /**

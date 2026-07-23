@@ -2329,6 +2329,24 @@ bindNative([
 });
 
 bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoEncoderSupported_java_lang_String_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoEncoderSupported___java_lang_String_R_boolean"
+], function*(codec) {
+  return (yield* cn1VideoIoHost({
+    op: "videoEncoderSupported", codec: jvm.toNativeString(codec)
+  })) ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1AudioEncoderSupported_java_lang_String_R_boolean",
+  "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1AudioEncoderSupported___java_lang_String_R_boolean"
+], function*(codec) {
+  return (yield* cn1VideoIoHost({
+    op: "audioEncoderSupported", codec: jvm.toNativeString(codec)
+  })) ? 1 : 0;
+});
+
+bindNative([
   "cn1_com_codename1_impl_html5_HTML5VideoIO_cn1VideoOpen_java_lang_String_R_int"
 ], function*(url) {
   return (yield* cn1VideoIoHost({ op: "videoOpen", url: jvm.toNativeString(url) })) | 0;
@@ -6026,4 +6044,347 @@ bindCiFallback("BrowserComponent.access102InternalAssignFix", [
     browserComponent["cn1_com_codename1_ui_BrowserComponent_internal"] = peerComponent;
   }
   return peerComponent;
+});
+
+// ============================ Web Bluetooth ============================
+// Worker-side natives for com.codename1.impl.html5.JSBluetooth. The Java
+// app runs in the worker where navigator.bluetooth does not exist, so every
+// operation is an invokeHostNative round-trip to the __cn1_bt_*__ handlers
+// in browser_bridge.js (which owns the BluetoothDevice / GATT handle
+// tables). browser_bridge.js ships from the translator artifact while
+// port.js ships fresh from source, so every binding here is NULL-SAFE
+// against an older host bundle that lacks the __cn1_bt_*__ handlers: an
+// unhandled-host-call rejection is caught and converted into the typed
+// {ok:0, code:"NOT_SUPPORTED"} result contract instead of throwing raw.
+
+function cn1BtJavaString(value) {
+  return jvm.createStringLiteral(String(value));
+}
+
+// One host round-trip; always resolves to a plain result object (never
+// throws) so the Java side can rely on the {ok, code, message} contract.
+function* cn1BtHostCall(symbol, args) {
+  if (!jvm || typeof jvm.invokeHostNative !== "function") {
+    return { ok: 0, code: "NOT_SUPPORTED", message: "Bluetooth host bridge unavailable" };
+  }
+  let res;
+  try {
+    res = yield jvm.invokeHostNative(symbol, args);
+  } catch (err) {
+    // Older browser_bridge.js without the Bluetooth handlers rejects with
+    // "Unhandled host call ..." -- surface it as a typed unsupported error.
+    return {
+      ok: 0, code: "NOT_SUPPORTED",
+      message: "Bluetooth host call " + symbol + " failed: "
+        + (err && err.message ? err.message : String(err))
+    };
+  }
+  if (res == null || typeof res !== "object") {
+    return { ok: 0, code: "UNKNOWN", message: "Empty response from " + symbol };
+  }
+  return res;
+}
+
+// Same, but marshals the result object to a Java JSON string -- the shape
+// all the String-returning JSBluetooth natives use.
+function* cn1BtHostCallJson(symbol, args) {
+  const res = yield* cn1BtHostCall(symbol, args);
+  let json;
+  try {
+    json = JSON.stringify(res);
+  } catch (_err) {
+    json = "{\"ok\":0,\"code\":\"UNKNOWN\",\"message\":\"unserializable host response\"}";
+  }
+  return cn1BtJavaString(json);
+}
+
+// Java byte[] (plain JS array with byte metadata, possibly signed values)
+// -> structured-cloneable Uint8Array for the host.
+function cn1BtToUint8Array(bytes) {
+  if (!bytes || typeof bytes.length !== "number") {
+    return new Uint8Array(0);
+  }
+  const n = bytes.length | 0;
+  const out = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    out[i] = bytes[i] & 0xff;
+  }
+  return out;
+}
+
+// --------------------------------------------------------------------
+// host -> worker event pump
+// --------------------------------------------------------------------
+// browser_bridge.js posts {kind, deviceId, detail, bytes} payloads through
+// the standard worker-callback channel; this dispatches them into the
+// translated static JSBluetooth.dispatchNativeEvent(String,String,String,
+// byte[]). The callback token is minted directly against jvm's
+// worker-callback table (rather than passing a bare function through
+// toHostTransferArg) so it works even when DOM event forwarding is
+// disabled (cn1DisableEventForwarding=1 in the screenshot harness).
+
+const cn1BtDispatchEventCandidates = [
+  "cn1_com_codename1_impl_html5_JSBluetooth_dispatchNativeEvent_java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY",
+  "cn1_com_codename1_impl_html5_JSBluetooth_dispatchNativeEvent_java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY_R_void",
+  "cn1_com_codename1_impl_html5_JSBluetooth_dispatchNativeEvent___java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY",
+  "cn1_com_codename1_impl_html5_JSBluetooth_dispatchNativeEvent___java_lang_String_java_lang_String_java_lang_String_byte_1ARRAY_R_void"
+];
+let cn1BtDispatchMissingLogged = false;
+
+function cn1BtResolveDispatch() {
+  for (let i = 0; i < cn1BtDispatchEventCandidates.length; i++) {
+    const name = cn1BtDispatchEventCandidates[i];
+    if (typeof global[name] === "function") {
+      return global[name];
+    }
+    if (jvm && jvm.translatedMethods && typeof jvm.translatedMethods[name] === "function") {
+      return jvm.translatedMethods[name];
+    }
+  }
+  return null;
+}
+
+function cn1BtDeliverEvent(payload) {
+  const fn = cn1BtResolveDispatch();
+  if (!fn) {
+    if (!cn1BtDispatchMissingLogged) {
+      cn1BtDispatchMissingLogged = true;
+      if (global.console && typeof global.console.warn === "function") {
+        global.console.warn("PARPAR:bt-event-dropped:JSBluetooth.dispatchNativeEvent not found");
+      }
+    }
+    return;
+  }
+  const kind = payload && payload.kind != null ? cn1BtJavaString(payload.kind) : null;
+  const deviceId = payload && payload.deviceId != null ? cn1BtJavaString(payload.deviceId) : null;
+  const detail = payload && payload.detail != null ? cn1BtJavaString(payload.detail) : null;
+  let bytes = null;
+  const raw = payload && payload.bytes;
+  if (raw && typeof raw.length === "number") {
+    const n = raw.length | 0;
+    bytes = jvm.newArray(n, "JAVA_BYTE", 1);
+    for (let i = 0; i < n; i++) {
+      const v = raw[i] & 0xff;
+      bytes[i] = v > 127 ? v - 256 : v;
+    }
+  }
+  try {
+    jvm.spawn(null, (function*() {
+      yield* cn1_ivAdapt(fn(kind, deviceId, detail, bytes));
+    })());
+  } catch (err) {
+    if (global.console && typeof global.console.error === "function") {
+      global.console.error("PARPAR:bt-event-error:" + (err && err.message ? err.message : String(err)));
+    }
+  }
+}
+
+function cn1BtMintEventCallbackToken() {
+  try {
+    if (jvm && jvm.workerCallbacks && typeof jvm.nextWorkerCallbackId === "number") {
+      const id = jvm.nextWorkerCallbackId++;
+      jvm.workerCallbacks[id] = cn1BtDeliverEvent;
+      return { __cn1WorkerCallback: id };
+    }
+  } catch (_err) {}
+  return null;
+}
+
+// --------------------------------------------------------------------
+// native bindings
+// --------------------------------------------------------------------
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtSupported__R_int",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtSupported___R_int"
+], function*() {
+  const res = yield* cn1BtHostCall("__cn1_bt_support__", []);
+  return res.ok === 1 && res.supported ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtInit__R_int",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtInit___R_int"
+], function*() {
+  const token = cn1BtMintEventCallbackToken();
+  if (!token) {
+    // no event channel (very old runtime) -- request/read/write still work,
+    // notifications and disconnect events just won't stream
+    return 0;
+  }
+  const res = yield* cn1BtHostCall("__cn1_bt_set_event_callback__", [token]);
+  return res.ok === 1 ? 1 : 0;
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtAdapterState__R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtAdapterState___R_java_lang_String"
+], function*() {
+  return yield* cn1BtHostCallJson("__cn1_bt_adapter_state__", []);
+});
+
+// Reads the (setter-only) ScanFilter criteria straight off the translated
+// object's fields -- worker-local, no host call. Long fields (the
+// BluetoothUuid halves) may be BigInt (exact-longs runtime), the legacy
+// {__l:1,l,h} record, or a plain number; all three are handled.
+function cn1BtLongToUnsignedHex16(v) {
+  try {
+    if (typeof v === "bigint") {
+      return BigInt.asUintN(64, v).toString(16).padStart(16, "0");
+    }
+    if (v && typeof v === "object" && v.__l === 1) {
+      return (v.h >>> 0).toString(16).padStart(8, "0")
+        + (v.l >>> 0).toString(16).padStart(8, "0");
+    }
+    if (typeof v === "number" && isFinite(v)) {
+      return BigInt.asUintN(64, BigInt(Math.trunc(v))).toString(16).padStart(16, "0");
+    }
+  } catch (_err) {}
+  return null;
+}
+
+function cn1BtUuidFieldToString(uuidObj) {
+  if (!uuidObj) {
+    return null;
+  }
+  const msb = cn1BtLongToUnsignedHex16(uuidObj.cn1_com_codename1_bluetooth_BluetoothUuid_msb);
+  const lsb = cn1BtLongToUnsignedHex16(uuidObj.cn1_com_codename1_bluetooth_BluetoothUuid_lsb);
+  if (msb == null || lsb == null) {
+    return null;
+  }
+  const hex = msb + lsb;
+  return hex.substring(0, 8) + "-" + hex.substring(8, 12) + "-"
+    + hex.substring(12, 16) + "-" + hex.substring(16, 20) + "-"
+    + hex.substring(20);
+}
+
+function cn1BtJavaBytesToPlainArray(bytes) {
+  if (!bytes || typeof bytes.length !== "number") {
+    return null;
+  }
+  const n = bytes.length | 0;
+  const out = new Array(n);
+  for (let i = 0; i < n; i++) {
+    out[i] = bytes[i] & 0xff;
+  }
+  return out;
+}
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtExtractScanFilter_java_lang_Object_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtExtractScanFilter___java_lang_Object_R_java_lang_String"
+], function(filter) {
+  const out = {};
+  try {
+    if (filter) {
+      const service = cn1BtUuidFieldToString(filter.cn1_com_codename1_bluetooth_le_ScanFilter_serviceUuid);
+      if (service) {
+        out.service = service;
+      }
+      const name = filter.cn1_com_codename1_bluetooth_le_ScanFilter_name;
+      if (name != null) {
+        out.name = jvm.toNativeString(name);
+      }
+      const namePrefix = filter.cn1_com_codename1_bluetooth_le_ScanFilter_namePrefix;
+      if (namePrefix != null) {
+        out.namePrefix = jvm.toNativeString(namePrefix);
+      }
+      const address = filter.cn1_com_codename1_bluetooth_le_ScanFilter_address;
+      if (address != null) {
+        out.address = jvm.toNativeString(address);
+      }
+      const manufacturerId = filter.cn1_com_codename1_bluetooth_le_ScanFilter_manufacturerId;
+      out.manufacturerId = typeof manufacturerId === "number" ? manufacturerId | 0 : -1;
+      const data = cn1BtJavaBytesToPlainArray(filter.cn1_com_codename1_bluetooth_le_ScanFilter_manufacturerData);
+      if (data) {
+        out.manufacturerData = data;
+      }
+      const mask = cn1BtJavaBytesToPlainArray(filter.cn1_com_codename1_bluetooth_le_ScanFilter_manufacturerDataMask);
+      if (mask) {
+        out.manufacturerDataMask = mask;
+      }
+    }
+  } catch (_err) {
+    // best effort -- an unreadable filter degrades to acceptAllDevices
+  }
+  return cn1BtJavaString(JSON.stringify(out));
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtRequestDevice_java_lang_String_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtRequestDevice___java_lang_String_R_java_lang_String"
+], function*(optionsJson) {
+  let options = {};
+  try {
+    options = JSON.parse(jvm.toNativeString(optionsJson));
+  } catch (_err) {
+    options = { acceptAllDevices: true };
+  }
+  return yield* cn1BtHostCallJson("__cn1_bt_request_device__", [options]);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtConnect_java_lang_String_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtConnect___java_lang_String_R_java_lang_String"
+], function*(deviceId) {
+  return yield* cn1BtHostCallJson("__cn1_bt_connect__", [{ id: jvm.toNativeString(deviceId) }]);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtDisconnect_java_lang_String_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtDisconnect___java_lang_String_R_java_lang_String"
+], function*(deviceId) {
+  return yield* cn1BtHostCallJson("__cn1_bt_disconnect__", [{ id: jvm.toNativeString(deviceId) }]);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtDiscoverServices_java_lang_String_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtDiscoverServices___java_lang_String_R_java_lang_String"
+], function*(deviceId) {
+  return yield* cn1BtHostCallJson("__cn1_bt_discover__", [{ id: jvm.toNativeString(deviceId) }]);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtReadCharacteristic_java_lang_String_int_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtReadCharacteristic___java_lang_String_int_R_java_lang_String"
+], function*(deviceId, iid) {
+  return yield* cn1BtHostCallJson("__cn1_bt_read_char__",
+    [{ id: jvm.toNativeString(deviceId), iid: iid | 0 }]);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtWriteCharacteristic_java_lang_String_int_byte_1ARRAY_boolean_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtWriteCharacteristic___java_lang_String_int_byte_1ARRAY_boolean_R_java_lang_String"
+], function*(deviceId, iid, value, withResponse) {
+  return yield* cn1BtHostCallJson("__cn1_bt_write_char__", [{
+    id: jvm.toNativeString(deviceId), iid: iid | 0,
+    value: cn1BtToUint8Array(value), withResponse: !!withResponse
+  }]);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtReadDescriptor_java_lang_String_int_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtReadDescriptor___java_lang_String_int_R_java_lang_String"
+], function*(deviceId, iid) {
+  return yield* cn1BtHostCallJson("__cn1_bt_read_desc__",
+    [{ id: jvm.toNativeString(deviceId), iid: iid | 0 }]);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtWriteDescriptor_java_lang_String_int_byte_1ARRAY_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtWriteDescriptor___java_lang_String_int_byte_1ARRAY_R_java_lang_String"
+], function*(deviceId, iid, value) {
+  return yield* cn1BtHostCallJson("__cn1_bt_write_desc__", [{
+    id: jvm.toNativeString(deviceId), iid: iid | 0,
+    value: cn1BtToUint8Array(value)
+  }]);
+});
+
+bindNative([
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtSetNotifications_java_lang_String_int_boolean_R_java_lang_String",
+  "cn1_com_codename1_impl_html5_JSBluetooth_nativeBtSetNotifications___java_lang_String_int_boolean_R_java_lang_String"
+], function*(deviceId, iid, enable) {
+  return yield* cn1BtHostCallJson("__cn1_bt_set_notify__", [{
+    id: jvm.toNativeString(deviceId), iid: iid | 0, enable: !!enable
+  }]);
 });

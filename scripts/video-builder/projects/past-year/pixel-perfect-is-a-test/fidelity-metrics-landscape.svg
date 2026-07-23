@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700">
+<style>.title{font:700 48px sans-serif;fill:#f5f8fb}.label{font:700 29px sans-serif;fill:#f5f8fb}.body{font:25px sans-serif;fill:#c8d4e3}.small{font:21px sans-serif;fill:#8ea4ba}.card{fill:#111a27;stroke:#26384c;stroke-width:3}</style>
+
+<text x="600" y="60" class="title" text-anchor="middle">A percentage is a gate, not a verdict</text>
+<g transform="translate(90 145)"><rect width="1020" height="390" rx="32" class="card"/>
+<text x="250" y="75" class="label" text-anchor="middle">Android · 54 pairs</text><text x="770" y="75" class="label" text-anchor="middle">iOS · 68 pairs</text>
+<text x="250" y="205" font-family="sans-serif" font-size="96" font-weight="700" fill="#4fd1c5" text-anchor="middle">95.5%</text><text x="770" y="205" font-family="sans-serif" font-size="96" font-weight="700" fill="#62e6ff" text-anchor="middle">94.4%</text>
+<text x="250" y="255" class="body" text-anchor="middle">median tolerant score</text><text x="770" y="255" class="body" text-anchor="middle">median tolerant score</text>
+<path d="M510 45 V335" stroke="#2b4057" stroke-width="4"/>
+<text x="510" y="330" class="small" text-anchor="middle">also measure bounds · width · center · radius</text></g>
+<text x="600" y="610" class="body" text-anchor="middle">human review still judges motion, translucency, and whether the right detail matched</text>
+
+</svg>

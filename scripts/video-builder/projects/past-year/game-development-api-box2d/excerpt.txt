@@ -1,0 +1,18 @@
+static class PhysicsDemoView extends GameView {
+    private PhysicsWorld world;
+    private final Image ballImage = makeBall(60, 0xffff5a5f);
+
+    PhysicsDemoView() {
+        setClearColor(0xff101826);
+    }
+
+    private void setupWorld() {
+        int w = getWidth(), h = getHeight();
+        world = new PhysicsWorld(0, 900); // gravity in pixels/s^2, downward
+        world.createBox(w / 2f, h - 10, w, 20, BodyType.STATIC);   // floor
+        world.createBox(-10, h / 2f, 20, h * 2f, BodyType.STATIC); // walls
+        world.createBox(w + 10, h / 2f, 20, h * 2f, BodyType.STATIC);
+    }
+
+    private void dropBall(float x, float y) {
+        PhysicsBody body = world.createCircle(x, y, 30, BodyType.DYNAMIC);

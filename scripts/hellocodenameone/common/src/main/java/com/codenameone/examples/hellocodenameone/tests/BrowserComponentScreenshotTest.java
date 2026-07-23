@@ -26,17 +26,23 @@ import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.RGBImage;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.UITimer;
 import com.codename1.util.SuccessCallback;
 
 public class BrowserComponentScreenshotTest extends BaseTest {
+    private static final int VISUAL_RETRY_MS = 250;
+    private static final int VISUAL_TIMEOUT_MS = 12000;
+
     private BrowserComponent browser;
     private boolean loaded;
     private Runnable readyRunnable;
     private Form form;
     private boolean jsReady;
     private boolean jsCheckPending;
+    private RGBImage visualBand;
 
     @Override
     public boolean runTest() throws Exception {
@@ -100,8 +106,98 @@ public class BrowserComponentScreenshotTest extends BaseTest {
             return;
         }
 
-        UITimer.timer(2000, false, form, readyRunnable);
+        if (isHtml5() || CN.isDesktop()) {
+            // Desktop screenshots intentionally cannot include the native web
+            // peer (the committed Mac/JavaSE baselines contain its black
+            // placeholder). The execute() assertion above validates the real
+            // DOM; use the normal harness capture for the surrounding form.
+            UITimer.timer(2000, false, form, readyRunnable);
+        } else {
+            // DOM readiness and even WebKit's first meaningful paint do not
+            // guarantee that the native peer has reached the Metal surface.
+            // Verify the exact screen image that will be emitted instead of
+            // relying on a fixed delay and then taking an unrelated capture.
+            awaitRenderedBrowserFrame(0);
+        }
         readyRunnable = null;
+    }
+
+    private void awaitRenderedBrowserFrame(final int waitedMs) {
+        browser.repaint();
+        form.repaint();
+        markCaptureStarted();
+        Display.getInstance().screenshot(screen -> {
+            if (screen == null) {
+                fail("BrowserComponent screen capture returned null");
+                return;
+            }
+            if (containsRenderedBrowserContent(screen)) {
+                Cn1ssDeviceRunnerHelper.emitImage(screen, "BrowserComponent", this::done);
+                return;
+            }
+            screen.dispose();
+            if (waitedMs >= VISUAL_TIMEOUT_MS) {
+                fail("BrowserComponent DOM loaded, but its native peer was not composited into the screen capture");
+                return;
+            }
+            UITimer.timer(VISUAL_RETRY_MS, false, form,
+                    () -> awaitRenderedBrowserFrame(waitedMs + VISUAL_RETRY_MS));
+        });
+    }
+
+    private boolean containsRenderedBrowserContent(Image screen) {
+        int screenWidth = screen.getWidth();
+        int screenHeight = screen.getHeight();
+        int displayWidth = Display.getInstance().getDisplayWidth();
+        int displayHeight = Display.getInstance().getDisplayHeight();
+        if (screenWidth <= 0 || screenHeight <= 0 || displayWidth <= 0 || displayHeight <= 0
+                || browser.getWidth() <= 0 || browser.getHeight() <= 0) {
+            return false;
+        }
+
+        double scaleX = screenWidth / (double) displayWidth;
+        double scaleY = screenHeight / (double) displayHeight;
+        int insetX = Math.max(1, (int) Math.round(8 * scaleX));
+        int insetY = Math.max(1, (int) Math.round(8 * scaleY));
+        int left = Math.max(0, (int) Math.round(browser.getAbsoluteX() * scaleX) + insetX);
+        int right = Math.min(screenWidth,
+                (int) Math.round((browser.getAbsoluteX() + browser.getWidth()) * scaleX) - insetX);
+        int top = Math.max(0, (int) Math.round(browser.getAbsoluteY() * scaleY) + insetY);
+        int contentBandHeight = Math.min(browser.getHeight() - 16, 180);
+        int bottom = Math.min(screenHeight, top + Math.max(1,
+                (int) Math.round(contentBandHeight * scaleY)));
+        if (left >= right || top >= bottom) {
+            return false;
+        }
+
+        int bandWidth = right - left;
+        int bandHeight = bottom - top;
+        if (visualBand == null || visualBand.getWidth() != bandWidth
+                || visualBand.getHeight() != bandHeight) {
+            visualBand = new RGBImage(new int[bandWidth * bandHeight], bandWidth, bandHeight);
+        }
+        screen.toRGB(visualBand, 0, 0, left, top, bandWidth, bandHeight);
+        int[] rgb = visualBand.getRGB();
+        int requiredBrightPixels = Math.max(32, bandWidth / 20);
+        int brightPixels = 0;
+        for (int y = 0; y < bandHeight; y++) {
+            int rowOffset = y * bandWidth;
+            for (int x = 0; x < bandWidth; x++) {
+                int color = rgb[rowOffset + x];
+                int r = (color >> 16) & 0xff;
+                int g = (color >> 8) & 0xff;
+                int b = color & 0xff;
+                // The local fixture contains white and cyan text on a dark
+                // background. The black uncomposited peer contains neither.
+                if ((r > 160 && g > 160 && b > 160)
+                        || (g > 120 && b > 160 && b > r + 30)) {
+                    if (++brightPixels >= requiredBrightPixels) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private static String buildHtml() {

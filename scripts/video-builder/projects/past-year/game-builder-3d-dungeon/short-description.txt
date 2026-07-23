@@ -1,0 +1,10 @@
+A code-included walkthrough that builds a first-person 3D dungeon with the Codename One Game Builder — pick a play style, sculpt terrain, build walls, place a spawn, then drive first-person logic in the companion class. Includes a gameplay clip and how to scale to large streaming worlds.
+
+Full article:
+https://www.codenameone.com/blog/game-builder-3d-dungeon/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Game Development with Codename One
+
+#Java #CodenameOne #Shorts

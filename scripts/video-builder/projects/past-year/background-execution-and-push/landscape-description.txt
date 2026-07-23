@@ -1,0 +1,23 @@
+Constraint-based background work, foreground services, push topic subscriptions, shared-content handling, and a much richer local notification API, all with full simulator support.
+
+This video explains constraint-based background work with richer notifications and simulator coverage.
+
+Full article and source material:
+https://www.codenameone.com/blog/background-execution-and-push/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://github.com/codenameone/CodenameOne/pull/5142
+
+Chapters
+00:00 Hook
+00:23 Problem
+00:48 Mechanism
+01:27 Source
+01:52 Tradeoffs
+02:17 Result
+02:54 Outro
+
+Which part should we unpack next?
+
+Series: Codename One Native Platforms & Device APIs — part 7 of 13
+
+#Java #CodenameOne

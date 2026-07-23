@@ -81,23 +81,39 @@ public class FFMPEGVideoIO extends VideoIO {
     }
 
     /// Resolves a concrete ffmpeg encoder executable name (e.g. {@code libx264} or
-    /// {@code h264_videotoolbox}) for the supplied canonical codec id, preferring a
-    /// software encoder, then a hardware one. Returns null when none is available.
+    /// {@code h264_videotoolbox}) for the supplied canonical codec id. Apple Silicon
+    /// prefers VideoToolbox unless {@code video.hardwareEncoding=false}; other hosts
+    /// retain the software-first behavior. {@code video.encoder} may name an exact
+    /// encoder exposed for this codec.
     String resolveEncoderName(String codecId) {
         VideoCodec software = null;
         VideoCodec hardware = null;
+        VideoCodec videoToolbox = null;
+        String forced = System.getProperty("video.encoder", "").trim();
         for (VideoCodec c : getAvailableEncoders()) {
             if (codecId.equals(c.getId())) {
+                if (!forced.isEmpty() && forced.equals(c.getName())) {
+                    return c.getName();
+                }
                 if (c.isHardwareAccelerated()) {
                     if (hardware == null) {
                         hardware = c;
+                    }
+                    if (c.getName().contains("videotoolbox")) {
+                        videoToolbox = c;
                     }
                 } else if (software == null) {
                     software = c;
                 }
             }
         }
-        VideoCodec pick = software != null ? software : hardware;
+        boolean appleSilicon = System.getProperty("os.name", "").toLowerCase().contains("mac")
+                && ("aarch64".equals(System.getProperty("os.arch"))
+                    || "arm64".equals(System.getProperty("os.arch")));
+        boolean preferVideoToolbox = appleSilicon
+                && !"false".equals(System.getProperty("video.hardwareEncoding"));
+        VideoCodec pick = preferVideoToolbox && videoToolbox != null
+                ? videoToolbox : (software != null ? software : hardware);
         return pick == null ? null : pick.getName();
     }
 

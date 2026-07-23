@@ -1,0 +1,102 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.impl.javase.bluetooth;
+
+import com.codename1.bluetooth.BluetoothException;
+import com.codename1.bluetooth.BluetoothUuid;
+import com.codename1.impl.bluetooth.BleBackend;
+import com.codename1.bluetooth.le.BlePeripheral;
+import com.codename1.bluetooth.le.BluetoothLE;
+import com.codename1.bluetooth.le.L2capServer;
+import com.codename1.bluetooth.le.ScanResult;
+import com.codename1.bluetooth.le.server.AdvertiseData;
+import com.codename1.bluetooth.le.server.AdvertiseSettings;
+import com.codename1.bluetooth.le.server.BleAdvertisement;
+import com.codename1.bluetooth.le.server.GattServer;
+import com.codename1.bluetooth.le.server.GattServerListener;
+import com.codename1.util.AsyncResource;
+
+import java.util.List;
+
+/**
+ * The one stable {@link BluetoothLE} instance of the JavaSE port. Every
+ * hook routes to the owner's <em>current</em> {@link BleBackend}, so
+ * switching between the simulator and the future native backend never
+ * invalidates references application code holds.
+ */
+class JavaSEBluetoothLE extends BluetoothLE {
+
+    private final JavaSEBluetooth owner;
+
+    JavaSEBluetoothLE(JavaSEBluetooth owner) {
+        this.owner = owner;
+    }
+
+    protected boolean isScanSupported() {
+        return owner.backend().isLeSupported();
+    }
+
+    protected void startPlatformScan() {
+        owner.backend().startScan(new BleBackend.ScanSink() {
+            public void onResult(ScanResult result) {
+                fireScanResult(result);
+            }
+
+            public void onFailed(BluetoothException reason) {
+                fireScanFailed(reason);
+            }
+        });
+    }
+
+    protected void stopPlatformScan() {
+        owner.backend().stopScan();
+    }
+
+    public BlePeripheral getPeripheral(String address) {
+        return owner.backend().getPeripheral(address);
+    }
+
+    public List<BlePeripheral> getConnectedPeripherals(
+            BluetoothUuid serviceFilter) {
+        return owner.backend().getConnectedPeripherals(serviceFilter);
+    }
+
+    public List<BlePeripheral> getBondedPeripherals() {
+        return owner.backend().getBondedPeripherals();
+    }
+
+    public AsyncResource<GattServer> openGattServer(
+            GattServerListener listener) {
+        return owner.backend().openGattServer(listener);
+    }
+
+    public AsyncResource<BleAdvertisement> startAdvertising(
+            AdvertiseSettings settings, AdvertiseData data,
+            AdvertiseData scanResponse) {
+        return owner.backend().startAdvertising(settings, data, scanResponse);
+    }
+
+    public AsyncResource<L2capServer> openL2capServer(boolean secure) {
+        return owner.backend().openL2capServer(secure);
+    }
+}

@@ -1,0 +1,548 @@
+{
+  "schemaVersion": 1,
+  "id": "websockets-grpc-and-graphql",
+  "title": "WebSockets, gRPC, And GraphQL In The Core",
+  "output": {
+    "frameRate": 30,
+    "landscapeWidth": 1920,
+    "landscapeHeight": 1080,
+    "portraitWidth": 1080,
+    "portraitHeight": 1920,
+    "videoBitRate": 8000000
+  },
+  "narration": {
+    "provider": "kokoro",
+    "voice": "af_heart:60,af_bella:40",
+    "language": "en-us",
+    "speed": 0.97,
+    "model": ".video-tools/kokoro/kokoro-v1.0.onnx",
+    "minimumGapMs": 250,
+    "pronunciations": {
+      "Codename One": "Codename One",
+      "API": "API",
+      "AI": "AI",
+      "APK": "APK",
+      "AR/VR": "augmented reality and virtual reality",
+      "ARKit": "A-R kit",
+      "ARCore": "A-R core",
+      "AR": "A-R",
+      "VR": "V-R",
+      "2D": "2D",
+      "3D": "3D",
+      "GPU": "GPU",
+      "GA4": "G-A four",
+      "GDPR": "G-D-P-R",
+      "CCPA": "C-C-P-A",
+      "DPI": "D-P-I",
+      "glTF": "G-L-T-F",
+      "JVM": "JVM",
+      "JIT": "JIT",
+      "AOT": "A-O-T",
+      "GC": "G-C",
+      "CI": "C-I",
+      "CSS": "CSS",
+      "iOS": "iOS",
+      "macOS": "macOS",
+      "tvOS": "tvOS",
+      "UWP": "U-W-P",
+      "NFC": "NFC",
+      "PCM": "PCM",
+      "RGBA": "RGBA",
+      "EDT": "EDT",
+      "SRT": "SRT",
+      "VTT": "VTT",
+      "AAC": "A-A-C",
+      "H264": "H two sixty four",
+      "HTML": "HTML",
+      "IDE": "I-D-E",
+      "JS": "JS",
+      "XML": "XML",
+      "JSON": "jay son",
+      "WYSIWYG": "wizzy wig",
+      "CodeEditor": "Code Editor",
+      "RichTextArea": "Rich Text Area",
+      "AbstractEditorComponent": "Abstract Editor Component",
+      "CodeMirror": "Code Mirror",
+      "VideoIO": "video I-O",
+      "WAVWriter": "wave writer",
+      "SVG": "SVG",
+      "SPI": "S-P-I",
+      "AnalyticsService": "Analytics Service",
+      "AnalyticsProvider": "Analytics Provider",
+      "AbstractAnalyticsProvider": "Abstract Analytics Provider",
+      "CodenameOneAnalyticsProvider": "Codename One Analytics Provider",
+      "RASP": "rasp",
+      "DeviceIntegrity": "Device Integrity",
+      "AppReview": "App Review",
+      "CarApplication": "Car Application",
+      "CarScreen": "Car Screen",
+      "CarTemplate": "Car Template",
+      "UiModeManager": "U-I Mode Manager",
+      "AndroidX": "Android X",
+      "CN.isTV()": "C-N is T-V",
+      "Display.isTV()": "Display is T-V",
+      "TARGET_OS_TV": "target O-S T-V",
+      "MapSurface": "Map Surface",
+      "MapView": "Map View",
+      "NativeMap": "Native Map",
+      "MapKit": "Map Kit",
+      "MapComponent": "Map Component",
+      "MapLibre": "Map Libre",
+      "GeneralPath": "General Path",
+      "ORM": "O-R-M",
+      "OAuth": "oh auth",
+      "OIDC": "O-I-D-C",
+      "gRPC": "G-R-P-C",
+      "GraphQL": "graph Q-L",
+      "Box2D": "box 2D",
+      "JDWP": "J-D-W-P",
+      "JUnit": "J unit",
+      "ParparVM": "par par V-M",
+      "Win32": "win thirty two",
+      "App Store Connect": "App Store Connect",
+      "cn1": "C-N one",
+      "mvn": "Maven",
+      "clang": "clang",
+      "2FA": "two F-A",
+      ".p8": "P eight",
+      ".glb": "G-L-B",
+      ".ipa": "I-P-A"
+    }
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "durationMs": 25500,
+      "narration": {
+        "text": "A hands-on walk through the three connectivity features that landed together this week, building a live chat over the new core WebSocket API and typed clients from a GraphQL schema and a proto file."
+      },
+      "actions": [
+        {
+          "type": "intro.show",
+          "id": "welcome",
+          "atMs": 0,
+          "durationMs": 2050,
+          "title": "Codename One",
+          "subtitle": "WebSockets, gRPC, And GraphQL In The Core",
+          "bounds": {
+            "x": 0.04,
+            "y": 0.08,
+            "width": 0.92,
+            "height": 0.8
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.18,
+              "width": 0.84,
+              "height": 0.58
+            }
+          }
+        },
+        {
+          "type": "bullets.show",
+          "id": "hook-points",
+          "atMs": 1900,
+          "durationMs": 2600,
+          "title": "WebSockets, gRPC, And GraphQL In The Core",
+          "items": [
+            "Live sockets and generated typed clients through one Java application stack",
+            "Part 1: WebSockets, no cn1lib required",
+            "Step 1: open a connection"
+          ],
+          "bounds": {
+            "x": 0.025,
+            "y": 0.05,
+            "width": 0.95,
+            "height": 0.88
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.1,
+              "width": 0.86,
+              "height": 0.78
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "hook-points",
+          "atMs": 1900,
+          "durationMs": 650,
+          "effect": "wipe-up",
+          "easing": "ease-out"
+        },
+        {
+          "type": "layer.hide",
+          "target": "welcome",
+          "atMs": 2700
+        }
+      ]
+    },
+    {
+      "id": "problem",
+      "durationMs": 33000,
+      "narration": {
+        "text": "WebSockets used to require the cn1-websockets cn1lib. They are now part of the framework as com.codename1.io.WebSocket, implemented natively on every port (a hand-rolled RFC 6455 handshake on JavaSE and Android, NSURLSessionWebSocketTask on iOS, the browser WebSocket on JavaScript), with no third-party dependencies pulled into your build."
+      },
+      "actions": [
+        {
+          "type": "bullets.show",
+          "id": "problem-bullets",
+          "atMs": 100,
+          "durationMs": 2700,
+          "title": "Part 1: WebSockets, no cn1lib required",
+          "items": [
+            "Step 1: open a connection",
+            "Step 2: build the chat screen",
+            "Live sockets and generated typed clients through one Java application stack"
+          ],
+          "bounds": {
+            "x": 0.025,
+            "y": 0.05,
+            "width": 0.95,
+            "height": 0.88
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.1,
+              "width": 0.86,
+              "height": 0.78
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "problem-bullets",
+          "atMs": 100,
+          "durationMs": 650,
+          "effects": {
+            "landscape": "wipe-left",
+            "portrait": "wipe-up"
+          },
+          "easing": "ease-out"
+        }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "durationMs": 26500,
+      "narration": {
+        "text": "There is no URL-in-constructor subclassing trap from the old API; the connection is an object you hold. send(...) has a String and a byte[] overload, getReadyState() returns a WebSocketState, and close() does a clean close handshake."
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "mechanism-title",
+          "atMs": 0,
+          "text": "Step 1: open a connection",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.03,
+            "y": 0.025,
+            "width": 0.94,
+            "height": 0.14
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.035,
+              "width": 0.84,
+              "height": 0.16
+            }
+          }
+        },
+        {
+          "type": "diagram.show",
+          "id": "mechanism-diagram",
+          "atMs": 600,
+          "durationMs": 3200,
+          "texts": {
+            "landscape": "flowchart LR\nN0[Part 1:] --> N1[Step 1:]\nN1[Step 1:] --> N2[Step 2:]",
+            "portrait": "flowchart TD\nN0[Part 1:] --> N1[Step 1:]\nN1[Step 1:] --> N2[Step 2:]"
+          },
+          "bounds": {
+            "x": 0.025,
+            "y": 0.2,
+            "width": 0.95,
+            "height": 0.67
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.23,
+              "width": 0.86,
+              "height": 0.66
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "mechanism-diagram",
+          "atMs": 600,
+          "durationMs": 700,
+          "effect": "morph",
+          "easing": "ease-in-out"
+        }
+      ]
+    },
+    {
+      "id": "source",
+      "durationMs": 26500,
+      "narration": {
+        "text": "There is no URL-in-constructor subclassing trap from the old API; the connection is an object you hold. send(...) has a String and a byte[] overload, getReadyState() returns a WebSocketState, and close() does a clean close handshake."
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "source-title",
+          "atMs": 0,
+          "text": "Step 1: open a connection",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.03,
+            "y": 0.02,
+            "width": 0.94,
+            "height": 0.12
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.02,
+              "width": 0.84,
+              "height": 0.11
+            }
+          }
+        },
+        {
+          "type": "code.show",
+          "id": "source-code",
+          "atMs": 300,
+          "language": "java",
+          "path": "excerpt.txt",
+          "bounds": {
+            "x": 0.04,
+            "y": 0.17,
+            "width": 0.55,
+            "height": 0.7
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.15,
+              "width": 0.88,
+              "height": 0.34
+            }
+          }
+        },
+        {
+          "type": "bullets.show",
+          "id": "source-notes",
+          "atMs": 800,
+          "durationMs": 900,
+          "title": "What to notice",
+          "items": [
+            "There is no URL-in-constructor subclassing trap from the old API; the…",
+            "send(...) has a String and a byte[] overload, getReadyState() returns a…"
+          ],
+          "bounds": {
+            "x": 0.61,
+            "y": 0.17,
+            "width": 0.35,
+            "height": 0.7
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.54,
+              "width": 0.86,
+              "height": 0.34
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "source-code",
+          "atMs": 300,
+          "durationMs": 600,
+          "effects": {
+            "landscape": "slide-right",
+            "portrait": "slide-up"
+          },
+          "easing": "ease-out"
+        },
+        {
+          "type": "focus.show",
+          "id": "source-focus",
+          "target": "source-code",
+          "atMs": 4000,
+          "relativeBounds": {
+            "x": 0.02,
+            "y": 0.05,
+            "width": 0.96,
+            "height": 0.34
+          },
+          "color": "50d8ff"
+        }
+      ]
+    },
+    {
+      "id": "tradeoffs",
+      "durationMs": 23500,
+      "narration": {
+        "text": "Here is a compact chat form. Outgoing messages are added immediately; incoming ones arrive on the onTextMessage handler, and because the handler can touch the UI we wrap that in callSerially."
+      },
+      "actions": [
+        {
+          "type": "bullets.show",
+          "id": "tradeoffs-bullets",
+          "atMs": 100,
+          "durationMs": 2700,
+          "title": "Where this helps",
+          "items": [
+            "Step 2: build the chat screen",
+            "Step 3: negotiate a subprotocol when you need one",
+            "Part 2: a typed GraphQL client"
+          ],
+          "bounds": {
+            "x": 0.025,
+            "y": 0.05,
+            "width": 0.95,
+            "height": 0.88
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.1,
+              "width": 0.86,
+              "height": 0.78
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "tradeoffs-bullets",
+          "atMs": 100,
+          "durationMs": 650,
+          "effects": {
+            "landscape": "wipe-left",
+            "portrait": "wipe-up"
+          },
+          "easing": "ease-out"
+        }
+      ]
+    },
+    {
+      "id": "result",
+      "durationMs": 37500,
+      "narration": {
+        "text": "One reason to trust this implementation: our own screenshot CI now runs on it. The pipeline that ships rendered PNGs from each device back to the host machine uses a WebSocket as its transport, so the same code your app calls is carrying the binary payloads that validate the framework on every commit."
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "result-title",
+          "atMs": 0,
+          "text": "From mechanism to practical result",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.03,
+            "y": 0.025,
+            "width": 0.94,
+            "height": 0.14
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.035,
+              "width": 0.84,
+              "height": 0.16
+            }
+          }
+        },
+        {
+          "type": "diagram.show",
+          "id": "result-diagram",
+          "atMs": 600,
+          "durationMs": 3200,
+          "texts": {
+            "landscape": "flowchart LR\nN0[Part 1:] --> N1[Step 2:]\nN1[Step 2:] --> N2[Step 3:]",
+            "portrait": "flowchart TD\nN0[Part 1:] --> N1[Step 2:]\nN1[Step 2:] --> N2[Step 3:]"
+          },
+          "bounds": {
+            "x": 0.025,
+            "y": 0.2,
+            "width": 0.95,
+            "height": 0.67
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.23,
+              "width": 0.86,
+              "height": 0.66
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "result-diagram",
+          "atMs": 600,
+          "durationMs": 700,
+          "effect": "morph",
+          "easing": "ease-in-out"
+        }
+      ]
+    },
+    {
+      "id": "outro",
+      "durationMs": 15000,
+      "narration": {
+        "text": "The full source and implementation details are linked below. Which mechanism should we unpack next?"
+      },
+      "actions": [
+        {
+          "type": "outro.show",
+          "id": "next",
+          "atMs": 0,
+          "durationMs": 1100,
+          "eyebrow": "CODENAME ONE · TECHNICAL DEEP DIVE",
+          "title": "Choose the next detail",
+          "subtitle": "The complete source and implementation links are below.",
+          "prompt": "Comment: Step 1: open a connection or Step 2: build the chat screen?",
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        }
+      ]
+    }
+  ],
+  "editorial": {
+    "storyType": "visual-explainer",
+    "status": "blocked",
+    "proof": [
+      "automatic article template; requires story review"
+    ],
+    "humanBeat": "requires an article-specific human consequence",
+    "visualIdentity": "requires an article-specific recurring visual motif",
+    "bespokeVisualization": "requires a visualization authored for this article",
+    "heroJourney": {
+      "desire": "requires an article-specific desired outcome",
+      "problem": "requires an article-specific developer problem",
+      "difficulty": "requires concrete stakes and escalating difficulty",
+      "intervention": "requires a source-backed Codename One intervention",
+      "victory": "requires a proved developer transformation"
+    }
+  }
+}

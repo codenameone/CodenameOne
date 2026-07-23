@@ -1,0 +1,28 @@
+New iOS Modern (liquid glass) and Android Material 3 native themes, how they work in the Playground, in the simulator, and on devices, plus a week of performance and look-and-feel improvements including sticky headers.
+
+This video explains adopting liquid glass and material 3 through controlled custom-rendered themes.
+
+Full article and source material:
+https://www.codenameone.com/blog/liquid-glass-material-3-modern-native-themes/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://github.com/codenameone/CodenameOne/blob/master/native-themes/ios-modern/theme.css
+https://github.com/codenameone/CodenameOne/blob/master/native-themes/android-material/theme.css
+https://github.com/codenameone/CodenameOne/blob/master/scripts/hellocodenameone/common/src/main/java/com/codenameone/examples/hellocodenameone/tests/DarkLightShowcaseThemeScreenshotTest.java
+https://github.com/codenameone/CodenameOne/issues/4807
+https://github.com/codenameone/CodenameOne/tree/master/scripts/hellocodenameone/common/src/main/java/com/codenameone/examples/hellocodenameone/tests
+https://github.com/codenameone/CodenameOne/issues/4825
+
+Chapters
+00:00 Hook
+00:32 Problem
+01:02 Mechanism
+01:23 Source
+01:47 Tradeoffs
+02:10 Result
+02:36 Outro
+
+Which part should we unpack next?
+
+Series: Codename One UI, Graphics & Media — part 7 of 9
+
+#Java #CodenameOne

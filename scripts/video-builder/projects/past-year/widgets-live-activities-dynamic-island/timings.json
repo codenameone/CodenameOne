@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "tailMs": 0,
+  "landscape": {
+    "who-and-what": 10500,
+    "the-glance": 10000,
+    "outside-the-process": 11000,
+    "every-platform-changes-the-rules": 16000,
+    "publish-data-not-a-live-ui": 14000,
+    "one-timeline-four-moments": 31500,
+    "time-moves-without-java": 12000,
+    "native-system-surfaces": 12500,
+    "live-activity-running": 18500,
+    "tap-crosses-the-cold-start": 14000,
+    "the-honest-constraint": 14500,
+    "experience-keeps-moving": 12000,
+    "outro": 15000
+  },
+  "portrait": {
+    "short-who-and-what": 10500,
+    "short-the-glance": 9500,
+    "short-problem-proof": 11000,
+    "short-data-not-ui": 14000,
+    "short-timeline": 15500,
+    "short-live-activity": 18500,
+    "short-cold-start": 14000,
+    "short-victory": 12000,
+    "short-outro": 15000
+  }
+}

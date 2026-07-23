@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650">
+<style>.p{font:700 28px sans-serif;fill:#ffc857}.s{font:700 28px sans-serif;fill:#50d8ff}.d{font:24px sans-serif;fill:#cbd5e1}.r{fill:#171c26;stroke:#34445d;stroke-width:3;rx:16}</style>
+<text x="250" y="55" class="p" text-anchor="middle">THE FRICTION</text><text x="900" y="55" class="s" text-anchor="middle">WHAT CHANGES</text>
+<rect x="35" y="85" width="1130" height="78" class="r"/><text x="70" y="133" class="p">APIs</text><text x="440" y="133" class="d">→</text><text x="520" y="133" class="s">one com.codename1.ar surface</text>
+<rect x="35" y="177" width="1130" height="78" class="r"/><text x="70" y="225" class="p">Languages</text><text x="440" y="225" class="d">→</text><text x="520" y="225" class="s">shared Java application code</text>
+<rect x="35" y="269" width="1130" height="78" class="r"/><text x="70" y="317" class="p">Tools</text><text x="440" y="317" class="d">→</text><text x="520" y="317" class="s">one project and build pipeline</text>
+<rect x="35" y="361" width="1130" height="78" class="r"/><text x="70" y="409" class="p">Debugging</text><text x="440" y="409" class="d">→</text><text x="520" y="409" class="s">breakpoints in the JavaSE process</text>
+<rect x="35" y="453" width="1130" height="78" class="r"/><text x="70" y="501" class="p">Simulation</text><text x="440" y="501" class="d">→</text><text x="520" y="501" class="s">planes, tracking, light and images as input</text>
+<rect x="35" y="545" width="1130" height="78" class="r"/><text x="70" y="593" class="p">Hardware</text><text x="440" y="593" class="d">→</text><text x="520" y="593" class="s">capability checks + native backends at build</text>
+</svg>

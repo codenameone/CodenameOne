@@ -1,0 +1,24 @@
+The new native Linux port compiles your Java to a single self-contained ELF through ParparVM and GTK3, with no JVM on the target machine. It runs on an ancient universal glibc, supports musl for Alpine, and ships for both x64 and arm64.
+
+This video explains compiling java to a self-contained linux elf with no target jvm.
+
+Full article and source material:
+https://www.codenameone.com/blog/java-to-a-native-linux-app/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://github.com/codenameone/CodenameOne/issues
+
+Chapters
+00:00 Who And What
+00:15 The Real World Problem
+00:35 Independent Context 1
+00:52 The Change In Mechanism
+01:13 Source And Product Proof
+01:29 Canonical Captures
+01:46 Developer Victory
+02:00 Outro
+
+Which part should we unpack next?
+
+Series: Native Java Ports & Performance — part 2 of 5
+
+#Java #CodenameOne

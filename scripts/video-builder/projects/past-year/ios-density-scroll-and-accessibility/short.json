@@ -1,0 +1,365 @@
+{
+  "schemaVersion": 1,
+  "id": "ios-density-scroll-and-accessibility-short",
+  "title": "How stale device-density data distorted modern iPhone rendering and accessibility previews",
+  "output": {
+    "frameRate": 30,
+    "landscapeWidth": 1920,
+    "landscapeHeight": 1080,
+    "portraitWidth": 1080,
+    "portraitHeight": 1920,
+    "videoBitRate": 8000000
+  },
+  "narration": {
+    "provider": "kokoro",
+    "voice": "af_heart:60,af_bella:40",
+    "language": "en-us",
+    "speed": 0.97,
+    "model": ".video-tools/kokoro/kokoro-v1.0.onnx",
+    "minimumGapMs": 250,
+    "pronunciations": {
+      "Codename One": "Codename One",
+      "API": "API",
+      "AI": "AI",
+      "APK": "APK",
+      "AR/VR": "augmented reality and virtual reality",
+      "ARKit": "A-R kit",
+      "ARCore": "A-R core",
+      "AR": "A-R",
+      "VR": "V-R",
+      "2D": "2D",
+      "3D": "3D",
+      "GPU": "GPU",
+      "GA4": "G-A four",
+      "GDPR": "G-D-P-R",
+      "CCPA": "C-C-P-A",
+      "DPI": "D-P-I",
+      "glTF": "G-L-T-F",
+      "JVM": "JVM",
+      "JIT": "JIT",
+      "AOT": "A-O-T",
+      "GC": "G-C",
+      "CI": "C-I",
+      "CSS": "CSS",
+      "iOS": "iOS",
+      "macOS": "macOS",
+      "tvOS": "tvOS",
+      "UWP": "U-W-P",
+      "NFC": "NFC",
+      "PCM": "PCM",
+      "RGBA": "RGBA",
+      "EDT": "EDT",
+      "SRT": "SRT",
+      "VTT": "VTT",
+      "AAC": "A-A-C",
+      "H264": "H two sixty four",
+      "HTML": "HTML",
+      "IDE": "I-D-E",
+      "JS": "JS",
+      "XML": "XML",
+      "JSON": "jay son",
+      "WYSIWYG": "wizzy wig",
+      "CodeEditor": "Code Editor",
+      "RichTextArea": "Rich Text Area",
+      "AbstractEditorComponent": "Abstract Editor Component",
+      "CodeMirror": "Code Mirror",
+      "VideoIO": "video I-O",
+      "WAVWriter": "wave writer",
+      "SVG": "SVG",
+      "SPI": "S-P-I",
+      "AnalyticsService": "Analytics Service",
+      "AnalyticsProvider": "Analytics Provider",
+      "AbstractAnalyticsProvider": "Abstract Analytics Provider",
+      "CodenameOneAnalyticsProvider": "Codename One Analytics Provider",
+      "RASP": "rasp",
+      "DeviceIntegrity": "Device Integrity",
+      "AppReview": "App Review",
+      "CarApplication": "Car Application",
+      "CarScreen": "Car Screen",
+      "CarTemplate": "Car Template",
+      "UiModeManager": "U-I Mode Manager",
+      "AndroidX": "Android X",
+      "CN.isTV()": "C-N is T-V",
+      "Display.isTV()": "Display is T-V",
+      "TARGET_OS_TV": "target O-S T-V",
+      "MapSurface": "Map Surface",
+      "MapView": "Map View",
+      "NativeMap": "Native Map",
+      "MapKit": "Map Kit",
+      "MapComponent": "Map Component",
+      "MapLibre": "Map Libre",
+      "GeneralPath": "General Path",
+      "ORM": "O-R-M",
+      "OAuth": "oh auth",
+      "OIDC": "O-I-D-C",
+      "gRPC": "G-R-P-C",
+      "GraphQL": "graph Q-L",
+      "Box2D": "box 2D",
+      "JDWP": "J-D-W-P",
+      "JUnit": "J unit",
+      "ParparVM": "par par V-M",
+      "Win32": "win thirty two",
+      "App Store Connect": "App Store Connect",
+      "cn1": "C-N one",
+      "mvn": "Maven",
+      "clang": "clang",
+      "2FA": "two F-A",
+      ".p8": "P eight",
+      ".glb": "G-L-B",
+      ".ipa": "I-P-A"
+    }
+  },
+  "scenes": [
+    {
+      "id": "short-hook",
+      "durationMs": 17000,
+      "narration": {
+        "text": "If you have shipped to an iPhone 14 Pro or anything newer, your density calculations have been wrong until this week."
+      },
+      "actions": [
+        {
+          "type": "intro.show",
+          "id": "short-welcome",
+          "atMs": 0,
+          "durationMs": 1650,
+          "title": "Codename One",
+          "subtitle": "iOS Density, Scroll Physics, and Accessibility",
+          "bounds": {
+            "x": 0.08,
+            "y": 0.18,
+            "width": 0.84,
+            "height": 0.58
+          }
+        },
+        {
+          "type": "bullets.show",
+          "id": "short-hook-points",
+          "atMs": 1500,
+          "durationMs": 2300,
+          "title": "How stale device-density data distorted modern iPhone rendering and accessibility previews",
+          "items": [
+            "The iOS PPI Table Was Out of Date",
+            "Previewing Larger Fonts in the Simulator"
+          ],
+          "bounds": {
+            "x": 0.07,
+            "y": 0.1,
+            "width": 0.86,
+            "height": 0.78
+          }
+        },
+        {
+          "type": "transition",
+          "target": "short-hook-points",
+          "atMs": 1500,
+          "durationMs": 550,
+          "effect": "wipe-up",
+          "easing": "ease-out"
+        },
+        {
+          "type": "layer.hide",
+          "target": "short-welcome",
+          "atMs": 2300
+        }
+      ]
+    },
+    {
+      "id": "short-problem",
+      "durationMs": 22500,
+      "narration": {
+        "text": "The iOS port converts between physical millimetres and pixels using a per-device PPI lookup keyed on the screen's pixel dimensions. That table had not been updated in a long time."
+      },
+      "actions": [
+        {
+          "type": "bullets.show",
+          "id": "short-problem-bullets",
+          "atMs": 100,
+          "durationMs": 2700,
+          "title": "The iOS PPI Table Was Out of Date",
+          "items": [
+            "Previewing Larger Fonts in the Simulator",
+            "iOS Scroll, One More Time",
+            "Localized App Icons"
+          ],
+          "bounds": {
+            "x": 0.025,
+            "y": 0.05,
+            "width": 0.95,
+            "height": 0.88
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.1,
+              "width": 0.86,
+              "height": 0.78
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "short-problem-bullets",
+          "atMs": 100,
+          "durationMs": 650,
+          "effects": {
+            "landscape": "wipe-left",
+            "portrait": "wipe-up"
+          },
+          "easing": "ease-out"
+        }
+      ]
+    },
+    {
+      "id": "short-mechanism",
+      "durationMs": 37500,
+      "narration": {
+        "text": "A personal aside: my eyes are not what they used to be. Somewhere in the last few years I stopped being able to read small text on my phone/laptop the way I used to, and over time I have found myself quietly cranking the system font size up a notch, then another notch."
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "short-mechanism-title",
+          "atMs": 0,
+          "text": "Previewing Larger Fonts in the Simulator",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.03,
+            "y": 0.025,
+            "width": 0.94,
+            "height": 0.14
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.035,
+              "width": 0.84,
+              "height": 0.16
+            }
+          }
+        },
+        {
+          "type": "diagram.show",
+          "id": "short-mechanism-diagram",
+          "atMs": 600,
+          "durationMs": 3200,
+          "texts": {
+            "landscape": "flowchart LR\nN0[iOS PPI] --> N1[Previewing]\nN1[Previewing] --> N2[iOS Scroll,]",
+            "portrait": "flowchart TD\nN0[iOS PPI] --> N1[Previewing]\nN1[Previewing] --> N2[iOS Scroll,]"
+          },
+          "bounds": {
+            "x": 0.025,
+            "y": 0.2,
+            "width": 0.95,
+            "height": 0.67
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.23,
+              "width": 0.86,
+              "height": 0.66
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "short-mechanism-diagram",
+          "atMs": 600,
+          "durationMs": 700,
+          "effect": "morph",
+          "easing": "ease-in-out"
+        }
+      ]
+    },
+    {
+      "id": "short-scope",
+      "durationMs": 32500,
+      "narration": {
+        "text": "Scroll feel on iOS has been through more iterations in this framework than I can reliably count. Every time I have thought we had it right, somebody would flick a list on a new device and the whole thing would feel half a beat off."
+      },
+      "actions": [
+        {
+          "type": "bullets.show",
+          "id": "short-scope-bullets",
+          "atMs": 100,
+          "durationMs": 2700,
+          "title": "What the developer gains",
+          "items": [
+            "iOS Scroll, One More Time",
+            "Localized App Icons",
+            "UIManager.zoomFonts(factor)"
+          ],
+          "bounds": {
+            "x": 0.025,
+            "y": 0.05,
+            "width": 0.95,
+            "height": 0.88
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.1,
+              "width": 0.86,
+              "height": 0.78
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "short-scope-bullets",
+          "atMs": 100,
+          "durationMs": 650,
+          "effects": {
+            "landscape": "wipe-left",
+            "portrait": "wipe-up"
+          },
+          "easing": "ease-out"
+        }
+      ]
+    },
+    {
+      "id": "short-outro",
+      "durationMs": 15000,
+      "narration": {
+        "text": "Tap the related video for the complete explanation and source links. Then comment with the mechanism you want unpacked next."
+      },
+      "actions": [
+        {
+          "type": "outro.show",
+          "id": "short-next",
+          "atMs": 0,
+          "durationMs": 1000,
+          "eyebrow": "CODENAME ONE · DEEP DIVE",
+          "title": "See the complete explanation",
+          "subtitle": "The related video carries the code, tradeoffs, and source links.",
+          "prompt": "Comment: Previewing Larger Fonts in the Simulator or iOS Scroll, One More Time?",
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        }
+      ]
+    }
+  ],
+  "editorial": {
+    "storyType": "visual-explainer",
+    "status": "blocked",
+    "proof": [
+      "automatic article template; requires story review"
+    ],
+    "humanBeat": "requires an article-specific human consequence",
+    "visualIdentity": "requires an article-specific recurring visual motif",
+    "bespokeVisualization": "requires a visualization authored for this article",
+    "heroJourney": {
+      "desire": "requires an article-specific desired outcome",
+      "problem": "requires an article-specific developer problem",
+      "difficulty": "requires concrete stakes and escalating difficulty",
+      "intervention": "requires a source-backed Codename One intervention",
+      "victory": "requires a proved developer transformation"
+    }
+  }
+}

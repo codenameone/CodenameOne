@@ -1,0 +1,12 @@
+Picker picker = new Picker();
+picker.setType(Display.PICKER_TYPE_DATE);
+picker.setUseLightweightPopup(true);
+picker.setDate(new Date());
+
+picker.addLightweightPopupButton("Today", () -> picker.setDate(new Date()));
+
+picker.addLightweightPopupButton("+7 Days", () -> {
+    Calendar cal = Calendar.getInstance();
+    cal.add(Calendar.DAY_OF_MONTH, 7);
+    picker.setDate(cal.getTime());
+}, Picker.LightweightPopupButtonPlacement.BELOW_SPINNER);

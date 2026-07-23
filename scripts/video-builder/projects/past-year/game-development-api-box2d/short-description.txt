@@ -1,0 +1,10 @@
+The new com.codename1.gaming package adds a game loop, sprites, pollable input, a low-latency sound pool, and rigid-body physics powered by a bundled Box2D engine, all running unchanged on every platform including iOS.
+
+Full article:
+https://www.codenameone.com/blog/game-development-api-box2d/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Game Development with Codename One
+
+#Java #CodenameOne #Shorts

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "tailMs": 0,
+  "landscape": {
+    "who-and-what": 10000,
+    "the-platform-owns-the-update": 15000,
+    "the-other-platform-has-another-migration": 16500,
+    "a-screenshot-is-one-state": 15500,
+    "build-an-answer-sheet": 18500,
+    "run-the-motion-model": 31000,
+    "compare-real-output": 16000,
+    "measure-without-worshipping-the-score": 20500,
+    "adopt-the-look-on-your-schedule": 18000,
+    "outro": 15000
+  },
+  "portrait": {
+    "short-who-and-what": 9500,
+    "short-platform-change": 15000,
+    "short-two-platforms": 16500,
+    "short-state-matrix": 15500,
+    "short-answer-sheet": 18500,
+    "short-motion-proof": 31000,
+    "short-metrics": 20500,
+    "short-victory": 18000,
+    "short-outro": 15000
+  }
+}

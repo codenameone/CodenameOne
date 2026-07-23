@@ -1,0 +1,805 @@
+{
+  "schemaVersion": 1,
+  "editorial": {
+    "storyType": "live-demo",
+    "status": "approved",
+    "topicTerms": [
+      "widgets",
+      "live activities",
+      "dynamic island"
+    ],
+    "proof": [
+      "Apple WidgetKit documentation",
+      "Android widget documentation",
+      "real SurfacesSample source",
+      "compiled Surfaces API demo"
+    ],
+    "humanBeat": "A customer wants a delivery ETA at a glance after the app process has stopped.",
+    "visualIdentity": "An orange package and its ETA escape the app and keep moving across native system surfaces.",
+    "bespokeVisualization": "The living component tree morphs into a durable layout plus dated timeline before real code drives the compiled preview.",
+    "heroJourney": {
+      "identity": "Codename One is introduced subtly as the Java native-app platform, and the topic is widgets and Live Activities.",
+      "problem": "The useful delivery moment happens after the customer closes the app.",
+      "difficulty": "No process or listener remains, and each platform imposes a different lifecycle and surface technology.",
+      "intervention": "A serializable surface layout and dated state timeline replace the assumption of a live component.",
+      "victory": "The developer tests real time, resize, Live Activity, and cold-start changes from one Java model."
+    },
+    "problemDimensions": [
+      "apis",
+      "tools",
+      "languages",
+      "debugging",
+      "hardware",
+      "simulation"
+    ],
+    "resolutionMap": [
+      {
+        "problem": "apis",
+        "solution": "one com.codename1.surfaces model",
+        "proof": "timeline and LiveActivity source"
+      },
+      {
+        "problem": "tools",
+        "solution": "one Codename One project pipeline",
+        "proof": "compiled demo module"
+      },
+      {
+        "problem": "languages",
+        "solution": "shared Java surface declarations",
+        "proof": "syntax-highlighted sample source"
+      },
+      {
+        "problem": "debugging",
+        "solution": "desktop preview with controllable time",
+        "proof": "timeline replay and resize actions"
+      },
+      {
+        "problem": "hardware",
+        "solution": "native system-surface backends",
+        "proof": "article widget and Dynamic Island captures"
+      },
+      {
+        "problem": "simulation",
+        "solution": "JavaSE surface instrumentation",
+        "proof": "compiled state and cold-start actions"
+      }
+    ]
+  },
+  "output": {
+    "frameRate": 30,
+    "landscapeWidth": 1920,
+    "landscapeHeight": 1080,
+    "portraitWidth": 1080,
+    "portraitHeight": 1920,
+    "videoBitRate": 8000000
+  },
+  "narration": {
+    "provider": "kokoro",
+    "voice": "af_heart:60,af_bella:40",
+    "language": "en-us",
+    "speed": 0.97,
+    "model": ".video-tools/kokoro/kokoro-v1.0.onnx",
+    "minimumGapMs": 250,
+    "pronunciations": {
+      "Codename One": "Codename One",
+      "API": "API",
+      "AI": "AI",
+      "APK": "APK",
+      "AR/VR": "augmented reality and virtual reality",
+      "ARKit": "A-R kit",
+      "ARCore": "A-R core",
+      "AR": "A-R",
+      "VR": "V-R",
+      "2D": "2D",
+      "3D": "3D",
+      "GPU": "GPU",
+      "GA4": "G-A four",
+      "GDPR": "G-D-P-R",
+      "CCPA": "C-C-P-A",
+      "DPI": "D-P-I",
+      "glTF": "G-L-T-F",
+      "JVM": "JVM",
+      "JIT": "JIT",
+      "AOT": "A-O-T",
+      "GC": "G-C",
+      "CI": "C-I",
+      "CSS": "CSS",
+      "iOS": "iOS",
+      "macOS": "macOS",
+      "tvOS": "tvOS",
+      "UWP": "U-W-P",
+      "NFC": "NFC",
+      "PCM": "PCM",
+      "RGBA": "RGBA",
+      "EDT": "E-D-T",
+      "ETA": "E-T-A",
+      "SRT": "SRT",
+      "VTT": "VTT",
+      "AAC": "A-A-C",
+      "H264": "H two sixty four",
+      "HTML": "HTML",
+      "IDE": "I-D-E",
+      "JS": "JS",
+      "XML": "XML",
+      "JSON": "jay son",
+      "WYSIWYG": "wizzy wig",
+      "CodeEditor": "Code Editor",
+      "RichTextArea": "Rich Text Area",
+      "AbstractEditorComponent": "Abstract Editor Component",
+      "CodeMirror": "Code Mirror",
+      "WidgetKit": "Widget Kit",
+      "ActivityKit": "Activity Kit",
+      "RemoteViews": "Remote Views",
+      "Dynamic Island": "Dynamic Island",
+      "JavaSE": "Java S-E",
+      "WidgetTimeline": "Widget Timeline",
+      "LiveActivity": "Live Activity",
+      "LiveActivityDescriptor": "Live Activity Descriptor",
+      "SurfaceDynamicText": "Surface Dynamic Text",
+      "VideoIO": "video I-O",
+      "WAVWriter": "wave writer",
+      "SVG": "SVG",
+      "SPI": "S-P-I",
+      "AnalyticsService": "Analytics Service",
+      "AnalyticsProvider": "Analytics Provider",
+      "AbstractAnalyticsProvider": "Abstract Analytics Provider",
+      "CodenameOneAnalyticsProvider": "Codename One Analytics Provider",
+      "RASP": "rasp",
+      "DeviceIntegrity": "Device Integrity",
+      "AppReview": "App Review",
+      "CarApplication": "Car Application",
+      "CarScreen": "Car Screen",
+      "CarTemplate": "Car Template",
+      "UiModeManager": "U-I Mode Manager",
+      "AndroidX": "Android X",
+      "CN.isTV()": "C-N is T-V",
+      "Display.isTV()": "Display is T-V",
+      "TARGET_OS_TV": "target O-S T-V",
+      "MapSurface": "Map Surface",
+      "MapView": "Map View",
+      "NativeMap": "Native Map",
+      "MapKit": "Map Kit",
+      "MapComponent": "Map Component",
+      "MapLibre": "Map Libre",
+      "GeneralPath": "General Path",
+      "ORM": "O-R-M",
+      "OAuth": "oh auth",
+      "OIDC": "O-I-D-C",
+      "gRPC": "G-R-P-C",
+      "GraphQL": "graph Q-L",
+      "Box2D": "box 2D",
+      "JDWP": "J-D-W-P",
+      "JUnit": "J unit",
+      "ParparVM": "par par V-M",
+      "Win32": "win thirty two",
+      "App Store Connect": "App Store Connect",
+      "cn1": "C-N one",
+      "mvn": "Maven",
+      "clang": "clang",
+      "2FA": "two F-A",
+      ".p8": "P eight",
+      ".glb": "G-L-B",
+      ".ipa": "I-P-A"
+    }
+  },
+  "id": "widgets-live-activities-dynamic-island-short",
+  "title": "The app stopped. Why is the ETA still moving?",
+  "scenes": [
+    {
+      "id": "short-who-and-what",
+      "durationMs": 10500,
+      "storyBeats": [
+        "identity"
+      ],
+      "actions": [
+        {
+          "type": "image.show",
+          "id": "brand",
+          "role": "brand",
+          "kind": "illustration",
+          "atMs": 200,
+          "path": "codename-one-logo.png",
+          "bounds": {
+            "x": 0.045,
+            "y": 0.045,
+            "width": 0.12,
+            "height": 0.04
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.18,
+              "height": 0.027
+            }
+          }
+        },
+        {
+          "type": "svg.show",
+          "id": "intro",
+          "atMs": 250,
+          "paths": {
+            "landscape": "surfaces-intro-landscape.svg",
+            "portrait": "surfaces-intro-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.49,
+            "y": 0.09,
+            "width": 0.47,
+            "height": 0.82
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.16,
+              "width": 0.88,
+              "height": 0.78
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "opening-title",
+          "role": "title",
+          "atMs": 350,
+          "text": "Your app can stop.\nThe experience can keep moving.",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.055,
+            "y": 0.24,
+            "width": 0.46,
+            "height": 0.3
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.08,
+              "width": 0.86,
+              "height": 0.24
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "Codename One builds native apps in Java from one codebase. Today: widgets, Live Activities, and Dynamic Island after the app stops.",
+          "overflow": "extend"
+        }
+      ]
+    },
+    {
+      "id": "short-the-glance",
+      "durationMs": 9500,
+      "storyBeats": [
+        "problem"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "desire",
+          "atMs": 250,
+          "paths": {
+            "landscape": "surfaces-desire-landscape.svg",
+            "portrait": "surfaces-desire-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.17,
+            "width": 0.92,
+            "height": 0.77
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.16,
+              "width": 0.88,
+              "height": 0.78
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "desire-title",
+          "atMs": 0,
+          "text": "The useful moment is a glance",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 0,
+          "text": "Imagine a delivery app. The customer wants the current ETA at a glance, without reopening the app every few seconds just to watch a number change.",
+          "overflow": "extend"
+        }
+      ]
+    },
+    {
+      "id": "short-problem-proof",
+      "durationMs": 11000,
+      "storyBeats": [
+        "difficulty"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "short-dead",
+          "atMs": 250,
+          "paths": {
+            "landscape": "dead-process-landscape.svg",
+            "portrait": "dead-process-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.06,
+            "y": 0.14,
+            "width": 0.88,
+            "height": 0.38
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.14,
+              "width": 0.88,
+              "height": 0.38
+            }
+          },
+          "role": "evidence",
+          "sourceTitle": "Keeping a widget up to date",
+          "sourceUrl": "https://developer.apple.com/documentation/widgetkit/keeping-a-widget-up-to-date"
+        },
+        {
+          "type": "svg.show",
+          "id": "short-rules",
+          "atMs": 250,
+          "paths": {
+            "landscape": "platform-rules-landscape.svg",
+            "portrait": "platform-rules-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.06,
+            "y": 0.54,
+            "width": 0.88,
+            "height": 0.38
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.54,
+              "width": 0.88,
+              "height": 0.38
+            }
+          },
+          "role": "evidence",
+          "sourceTitle": "Build a widget host",
+          "sourceUrl": "https://developer.android.com/develop/ui/views/appwidgets/host"
+        },
+        {
+          "type": "text.show",
+          "id": "short-problem-title",
+          "atMs": 0,
+          "text": "No process. Different platform rules.",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.06,
+            "y": 0.03,
+            "width": 0.88,
+            "height": 0.1
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 0,
+          "text": "The problem is that widgets live outside the running UI. Apple, Android, and desktop give them different lifecycles, layouts, update rules, and cold-start behavior.",
+          "overflow": "extend"
+        }
+      ]
+    },
+    {
+      "id": "short-data-not-ui",
+      "durationMs": 14000,
+      "storyBeats": [
+        "intervention"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "data-model",
+          "atMs": 250,
+          "paths": {
+            "landscape": "data-not-ui-landscape.svg",
+            "portrait": "data-not-ui-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.17,
+            "width": 0.92,
+            "height": 0.77
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.16,
+              "width": 0.88,
+              "height": 0.78
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "data-model",
+          "atMs": 250,
+          "durationMs": 900,
+          "effect": "morph",
+          "easing": "ease-out"
+        },
+        {
+          "type": "text.show",
+          "id": "insight-title",
+          "atMs": 0,
+          "text": "Publish data that can outlive the process",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 0,
+          "text": "Codename One changes the unit of work. Instead of exporting a live component, the app publishes a serializable surface layout and a dated timeline of state. The operating system persists and renders both.",
+          "overflow": "extend"
+        }
+      ]
+    },
+    {
+      "id": "short-timeline",
+      "durationMs": 15500,
+      "storyBeats": [
+        "proof"
+      ],
+      "composition": {
+        "landscape": "code-left-demo-right",
+        "portrait": "code-over-demo"
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "timeline-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "One timeline carries four moments",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2
+        },
+        {
+          "type": "code.show",
+          "id": "timeline-code",
+          "role": "code",
+          "atMs": 200,
+          "language": "java",
+          "path": "timeline.txt"
+        },
+        {
+          "type": "demo.mount",
+          "id": "timeline-demo",
+          "role": "demo",
+          "atMs": 250,
+          "class": "com.codename1.videobuilder.demos.SurfacesDemoScene",
+          "animated": false
+        },
+        {
+          "type": "demo.action",
+          "atMs": 3200,
+          "name": "publish",
+          "arguments": {}
+        },
+        {
+          "type": "demo.action",
+          "atMs": 7000,
+          "name": "nextTimeline",
+          "arguments": {}
+        },
+        {
+          "type": "demo.action",
+          "atMs": 10500,
+          "name": "nextTimeline",
+          "arguments": {}
+        },
+        {
+          "type": "demo.action",
+          "atMs": 14000,
+          "name": "nextTimeline",
+          "arguments": {}
+        },
+        {
+          "type": "demo.action",
+          "atMs": 15000,
+          "name": "resize",
+          "arguments": {}
+        },
+        {
+          "type": "focus.show",
+          "id": "timeline-focus",
+          "target": "timeline-code",
+          "atMs": 3500,
+          "relativeBounds": {
+            "x": 0.02,
+            "y": 0.18,
+            "width": 0.96,
+            "height": 0.66
+          },
+          "label": "four dated state maps",
+          "color": "ff9c52"
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 0,
+          "text": "This is source from the compiled sample. It publishes one layout and four dated state maps: Preparing, Out for delivery, Arriving now, and Delivered. The preview advances those entries and changes size before a device build.",
+          "overflow": "extend"
+        }
+      ]
+    },
+    {
+      "id": "short-live-activity",
+      "durationMs": 18500,
+      "storyBeats": [
+        "proof"
+      ],
+      "composition": {
+        "landscape": "code-left-demo-right",
+        "portrait": "code-over-demo"
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "live-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "Now the Live Activity changes for real",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2
+        },
+        {
+          "type": "code.show",
+          "id": "live-code",
+          "role": "code",
+          "atMs": 200,
+          "language": "java",
+          "path": "live-activity.txt"
+        },
+        {
+          "type": "demo.mount",
+          "id": "live-demo",
+          "role": "demo",
+          "atMs": 250,
+          "class": "com.codename1.videobuilder.demos.SurfacesDemoScene",
+          "animated": false
+        },
+        {
+          "type": "demo.action",
+          "atMs": 3000,
+          "name": "startActivity",
+          "arguments": {}
+        },
+        {
+          "type": "demo.action",
+          "atMs": 7000,
+          "name": "advanceActivity",
+          "arguments": {}
+        },
+        {
+          "type": "demo.action",
+          "atMs": 11000,
+          "name": "advanceActivity",
+          "arguments": {}
+        },
+        {
+          "type": "demo.action",
+          "atMs": 15000,
+          "name": "advanceActivity",
+          "arguments": {}
+        },
+        {
+          "type": "focus.show",
+          "id": "regions-focus",
+          "target": "live-code",
+          "atMs": 4000,
+          "relativeBounds": {
+            "x": 0.02,
+            "y": 0.23,
+            "width": 0.96,
+            "height": 0.62
+          },
+          "label": "compact + expanded Dynamic Island regions",
+          "color": "ff9c52"
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 0,
+          "text": "The LiveActivityDescriptor reuses the delivery layout and adds compact and expanded Dynamic Island regions. The running demo starts the activity, then sends three state updates. Progress and text change because the API changed state, not because an image moved.",
+          "overflow": "extend"
+        }
+      ]
+    },
+    {
+      "id": "short-cold-start",
+      "durationMs": 14000,
+      "storyBeats": [
+        "proof"
+      ],
+      "composition": {
+        "landscape": "code-left-demo-right",
+        "portrait": "code-over-demo"
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "cold-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "The tap crosses a cold start",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2
+        },
+        {
+          "type": "code.show",
+          "id": "cold-code",
+          "role": "code",
+          "atMs": 200,
+          "language": "java",
+          "path": "cold-start.txt"
+        },
+        {
+          "type": "demo.mount",
+          "id": "cold-demo",
+          "role": "demo",
+          "atMs": 250,
+          "class": "com.codename1.videobuilder.demos.SurfacesDemoScene",
+          "animated": false
+        },
+        {
+          "type": "demo.action",
+          "atMs": 2800,
+          "name": "publish",
+          "arguments": {}
+        },
+        {
+          "type": "demo.action",
+          "atMs": 6200,
+          "name": "tapSurface",
+          "arguments": {}
+        },
+        {
+          "type": "focus.show",
+          "id": "cold-focus",
+          "target": "cold-code",
+          "atMs": 4500,
+          "relativeBounds": {
+            "x": 0.02,
+            "y": 0.28,
+            "width": 0.96,
+            "height": 0.62
+          },
+          "label": "queued until the handler is registered",
+          "color": "7ce6ad"
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 0,
+          "text": "A dead app has no listener. The surface carries the action ID and order payload. A tap launches the app, then Codename One delivers the queued event after the handler registers, marked as a cold start.",
+          "overflow": "extend"
+        }
+      ]
+    },
+    {
+      "id": "short-victory",
+      "durationMs": 12000,
+      "storyBeats": [
+        "victory"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "victory",
+          "atMs": 250,
+          "paths": {
+            "landscape": "surfaces-victory-landscape.svg",
+            "portrait": "surfaces-victory-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.17,
+            "width": 0.92,
+            "height": 0.77
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.16,
+              "width": 0.88,
+              "height": 0.78
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "victory-title",
+          "atMs": 0,
+          "text": "The app sleeps. The experience keeps moving.",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 0,
+          "text": "The developer writes the delivery state once, tests the hard moments at the desk, and lets each platform render the experience where users already look. The package arrives even while the app sleeps.",
+          "overflow": "extend"
+        }
+      ]
+    },
+    {
+      "id": "short-outro",
+      "durationMs": 15000,
+      "storyBeats": [
+        "outro"
+      ],
+      "actions": [
+        {
+          "type": "outro.show",
+          "id": "next",
+          "atMs": 0,
+          "durationMs": 1100,
+          "eyebrow": "CODENAME ONE · SYSTEM SURFACES",
+          "title": "What should stay useful after your app closes?",
+          "subtitle": "Widgets · Live Activities · Dynamic Island · notifications · desktop",
+          "prompt": "Tell us the surface your users need next.",
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 0,
+          "text": "What should your app keep useful after it closes? Tell us which system surface would change the experience for your users.",
+          "overflow": "extend"
+        }
+      ]
+    }
+  ]
+}

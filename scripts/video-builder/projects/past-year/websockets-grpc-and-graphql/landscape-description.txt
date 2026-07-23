@@ -1,0 +1,28 @@
+A hands-on walk through the three connectivity features that landed together this week, building a live chat over the new core WebSocket API and typed clients from a GraphQL schema and a proto file.
+
+This video explains live sockets and generated typed clients through one java application stack.
+
+Full article and source material:
+https://www.codenameone.com/blog/websockets-grpc-and-graphql/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://github.com/codenameone/CodenameOne/pull/5133
+https://github.com/codenameone/CodenameOne/pull/5141
+https://github.com/codenameone/CodenameOne/pull/5099
+https://swapi.example.com/graphql
+https://api.example.com
+https://github.com/codenameone/CodenameOne/issues
+
+Chapters
+00:00 Hook
+00:25 Problem
+00:58 Mechanism
+01:25 Source
+01:51 Tradeoffs
+02:15 Result
+02:52 Outro
+
+Which part should we unpack next?
+
+Series: Codename One Native Platforms & Device APIs — part 10 of 13
+
+#Java #CodenameOne

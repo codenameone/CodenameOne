@@ -1,0 +1,29 @@
+A delivery ETA should stay useful after the app closes. See how one Java surface model becomes a widget, Live Activity, Dynamic Island presentation, Android ongoing notification, and desktop preview.
+
+The compiled sample publishes a four-entry WidgetTimeline, advances time, changes widget size, starts and updates a Live Activity, and delivers a surface action across a cold start.
+
+Full article and source material:
+https://www.codenameone.com/blog/widgets-live-activities-dynamic-island/?utm_source=youtube&utm_medium=video&utm_campaign=java-system-surfaces
+
+https://github.com/codenameone/CodenameOne/blob/master/samples/samples/SurfacesSample/SurfacesSample.java
+
+Chapters
+00:00 Who And What
+00:10 The Glance
+00:20 Outside The Process
+00:31 Every Platform Changes The Rules
+00:47 Publish Data Not A Live Ui
+01:01 One Timeline Four Moments
+01:33 Time Moves Without Java
+01:45 Native System Surfaces
+01:57 Live Activity Running
+02:16 Tap Crosses The Cold Start
+02:30 The Honest Constraint
+02:44 Experience Keeps Moving
+02:56 Outro
+
+What should your app keep useful after it closes?
+
+Series: Codename One Native Platforms & Device APIs — part 1 of 13
+
+#Java #LiveActivities #CodenameOne

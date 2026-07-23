@@ -1,0 +1,18 @@
+Biometrics b = Biometrics.getInstance();
+if (!b.canAuthenticate()) {
+    // No hardware, or no enrolled biometrics
+    return;
+}
+b.authenticate("Unlock your account").onResult((success, err) -> {
+    if (err != null) {
+        BiometricError code = ((BiometricException) err).getError();
+        switch (code) {
+            case USER_CANCELED:  return;
+            case LOCKED_OUT:     fallToPassword(); return;
+            case NOT_ENROLLED:   askToEnroll(); return;
+            default:             fallToPassword();
+        }
+    } else {
+        unlock();
+    }
+});

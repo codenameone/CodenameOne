@@ -6433,8 +6433,20 @@ public class HTML5Implementation extends CodenameOneImplementation {
     public LocationManager getLocationManager() {
         return new HTML5LocationManager();
     }
-    
-    
+
+    // Web Bluetooth backend. Constructed lazily on first use because the
+    // JSBluetooth constructor performs host-bridge round-trips (capability
+    // probe + event-callback registration) that must not run during
+    // implementation init.
+    private JSBluetooth bluetooth;
+
+    @Override
+    public com.codename1.bluetooth.Bluetooth getBluetooth() {
+        if (bluetooth == null) {
+            bluetooth = new JSBluetooth();
+        }
+        return bluetooth;
+    }
 
     private com.codename1.media.VideoIO videoIO;
     private boolean videoIOResolved;

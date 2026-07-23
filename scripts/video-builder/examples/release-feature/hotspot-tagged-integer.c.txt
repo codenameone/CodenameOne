@@ -1,0 +1,15 @@
+/* Aligned object pointers always end in a zero bit. */
+real_object    = 0x0000600001a2c3f0;  /* ...0 */
+
+/* Integer.valueOf(15): payload in the high bits. */
+tagged_integer = 0x000000000000001f;  /* ...1 */
+
+static inline JAVA_OBJECT box_int(JAVA_INT value) {
+    return (JAVA_OBJECT)(((JAVA_LONG)value << 1) | 1);
+}
+
+static inline JAVA_INT unbox_int(JAVA_OBJECT value) {
+    return (JAVA_INT)(((JAVA_LONG)value) >> 1);
+}
+
+/* The GC ignores values whose low bit is one. */

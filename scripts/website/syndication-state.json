@@ -1062,6 +1062,89 @@
       "medium": {
         "url": "https://medium.com/p/98a439a59e9c/edit",
         "syndicated_at": "2026-07-18T19:09:42+00:00"
+      },
+      "devto": {
+        "id": 4180198,
+        "url": "https://dev.to/codenameone/the-certificate-wizard-is-now-a-standalone-app-and-it-stopped-impersonating-you-229n",
+        "syndicated_at": "2026-07-19T14:21:33+00:00"
+      }
+    },
+    "2026-07-19-1200-shai-widgets-live-activities-dynamic-island": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/feed/",
+        "syndicated_at": "2026-07-19T09:01:03+00:00",
+        "account": "shai",
+        "source_slug": "widgets-live-activities-dynamic-island",
+        "scheduled_at": "2026-07-19T09:00:00+00:00"
+      }
+    },
+    "ar-vr-support-simulation": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmrrxegsc00000akl5z3t1hs3",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a5ce70d9e736d860ee36b73",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-19T15:03:49+00:00"
+      },
+      "medium": {
+        "url": "https://medium.com/p/49f089c3ab2b/edit",
+        "syndicated_at": "2026-07-19T18:45:48+00:00"
+      },
+      "devto": {
+        "id": 4188945,
+        "url": "https://dev.to/codenameone/ar-and-vr-in-java-arkit-arcore-and-a-virtual-room-you-can-debug-851",
+        "syndicated_at": "2026-07-20T15:05:14+00:00"
+      }
+    },
+    "2026-07-20-1200-shai-accessibility-semantics": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/feed/",
+        "syndicated_at": "2026-07-20T09:01:13+00:00",
+        "account": "shai",
+        "source_slug": "accessibility-semantics",
+        "scheduled_at": "2026-07-20T09:00:00+00:00"
+      }
+    },
+    "automated-store-submissions": {
+      "medium": {
+        "url": "https://medium.com/p/1b9c4cdd441c/edit",
+        "syndicated_at": "2026-07-21T08:37:40+00:00"
+      },
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmruej6n200010ahk3r2d5zp6",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a5f2fe3b742172078632466",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-21T08:38:52+00:00"
+      },
+      "devto": {
+        "id": 4198273,
+        "url": "https://dev.to/codenameone/store-submissions-as-code-app-store-google-play-and-huawei-appgallery-3131",
+        "syndicated_at": "2026-07-21T15:00:57+00:00"
+      }
+    },
+    "2026-07-21-1200-shai-codename-one-mcp-server": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/feed/",
+        "syndicated_at": "2026-07-21T09:01:05+00:00",
+        "account": "shai",
+        "source_slug": "codename-one-mcp-server",
+        "scheduled_at": "2026-07-21T09:00:00+00:00"
+      }
+    },
+    "2026-07-22-1200-codenameone-tested-port-support": {
+      "linkedin": {
+        "url": "https://www.linkedin.com/company/5041007/admin/page-posts/published/",
+        "syndicated_at": "2026-07-22T09:01:31+00:00",
+        "account": "codenameone",
+        "source_slug": "tested-port-support",
+        "scheduled_at": "2026-07-22T09:00:00+00:00"
       }
     }
   }

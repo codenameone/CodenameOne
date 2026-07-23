@@ -1,0 +1,10 @@
+The new native Windows port compiles your Java to a standalone Win32 executable through ParparVM, Direct2D, and DirectWrite. No JVM, no bundled runtime, a 5MB hello world, and both x64 and arm64 from one build.
+
+Full article:
+https://www.codenameone.com/blog/native-windows-port-no-jvm/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Native Java Ports & Performance
+
+#Java #CodenameOne #Shorts

@@ -16,7 +16,8 @@ from pathlib import Path
 
 API_ROOT = "https://api.github.com"
 GRAPHQL_URL = "https://api.github.com/graphql"
-STAR_ACCEPT = "application/vnd.github.star+json"
+STATE_RELEASE_TAG = "oss-traction-state"
+STATE_RELEASE_NAME = "OSS traction aggregate state"
 
 
 class GitHubApiError(RuntimeError):
@@ -56,7 +57,9 @@ def api_request(
             return json.load(response)
     except urllib.error.HTTPError as error:
         detail = error.read().decode("utf-8", errors="replace")
-        raise GitHubApiError(f"GitHub returned HTTP {error.code} for {url}: {detail}") from error
+        raise GitHubApiError(
+            f"GitHub returned HTTP {error.code} for {url}: {detail}"
+        ) from error
     except urllib.error.URLError as error:
         raise GitHubApiError(f"Unable to reach GitHub for {url}: {error}") from error
 
@@ -76,14 +79,133 @@ def paged_rest(path: str, token: str, *, accept: str = "application/vnd.github+j
         page += 1
 
 
-def count_windows(
-    timestamps: list[dt.datetime], now: dt.datetime, windows: tuple[int, ...] = (7, 28, 90)
-) -> dict[str, int]:
-    now = now.astimezone(dt.timezone.utc)
-    return {
-        f"last_{days}_days": sum(now - timestamp <= dt.timedelta(days=days) for timestamp in timestamps)
-        for days in windows
+def load_snapshot_history(repository: str, token: str) -> tuple[int | None, list[dict]]:
+    releases = paged_rest(f"/repos/{repository}/releases", token)
+    matches = [
+        release
+        for release in releases
+        if release.get("draft") and release.get("tag_name") == STATE_RELEASE_TAG
+    ]
+    if not matches:
+        return None, []
+    if len(matches) > 1:
+        raise GitHubApiError("Found multiple OSS traction state draft releases")
+
+    release = matches[0]
+    try:
+        state = json.loads(release.get("body") or "{}")
+        if state.get("schema_version") != 1:
+            raise ValueError("unsupported state schema")
+        snapshots = state["snapshots"]
+        release_id = int(release["id"])
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+        raise GitHubApiError(
+            f"Unable to read OSS traction draft state: {error}"
+        ) from error
+    if not isinstance(snapshots, list):
+        raise GitHubApiError("OSS traction draft state snapshots must be a list")
+    return release_id, snapshots
+
+
+def update_snapshot_history(
+    history: list[dict], report: dict, now: dt.datetime
+) -> list[dict]:
+    earliest = now.astimezone(dt.timezone.utc) - dt.timedelta(days=100)
+    retained: dict[str, dict] = {}
+    for snapshot in history:
+        try:
+            captured_at = parse_timestamp(snapshot["captured_at"])
+            stars = int(snapshot["repository_metrics"]["stars"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if earliest <= captured_at < now:
+            timestamp = captured_at.isoformat(timespec="seconds")
+            retained[timestamp] = {
+                "captured_at": timestamp,
+                "repository_metrics": {"stars": stars},
+            }
+
+    current_timestamp = parse_timestamp(report["captured_at"]).isoformat(
+        timespec="seconds"
+    )
+    retained[current_timestamp] = {
+        "captured_at": current_timestamp,
+        "repository_metrics": {
+            "stars": int(report["repository_metrics"]["stars"])
+        },
     }
+    return [retained[key] for key in sorted(retained)]
+
+
+def save_snapshot_history(
+    repository: str,
+    token: str,
+    release_id: int | None,
+    history: list[dict],
+) -> None:
+    body = json.dumps(
+        {"schema_version": 1, "snapshots": history},
+        indent=2,
+        sort_keys=True,
+    )
+    if release_id is None:
+        api_request(
+            f"{API_ROOT}/repos/{repository}/releases",
+            token,
+            method="POST",
+            payload={
+                "tag_name": STATE_RELEASE_TAG,
+                "name": STATE_RELEASE_NAME,
+                "body": body,
+                "draft": True,
+                "prerelease": False,
+            },
+        )
+        return
+    api_request(
+        f"{API_ROOT}/repos/{repository}/releases/{release_id}",
+        token,
+        method="PATCH",
+        payload={"body": body},
+    )
+
+
+def calculate_star_growth(
+    current_stars: int,
+    now: dt.datetime,
+    snapshots: list[dict],
+    windows: tuple[int, ...] = (7, 28, 90),
+) -> dict[str, dict]:
+    now = now.astimezone(dt.timezone.utc)
+    baselines: list[tuple[dt.datetime, int]] = []
+    for snapshot in snapshots:
+        try:
+            captured_at = parse_timestamp(snapshot["captured_at"])
+            stars = int(snapshot["repository_metrics"]["stars"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if captured_at < now:
+            baselines.append((captured_at, stars))
+
+    growth: dict[str, dict] = {}
+    schedule_tolerance = dt.timedelta(hours=6)
+    for days in windows:
+        target = now - dt.timedelta(days=days)
+        eligible = [item for item in baselines if item[0] <= target + schedule_tolerance]
+        key = f"last_{days}_days"
+        if not eligible:
+            growth[key] = {"available": False}
+            continue
+        captured_at, baseline_stars = max(eligible, key=lambda item: item[0])
+        elapsed_days = (now - captured_at).total_seconds() / 86400
+        growth[key] = {
+            "available": True,
+            "change": current_stars - baseline_stars,
+            "baseline_stars": baseline_stars,
+            "baseline_at": captured_at.isoformat(timespec="seconds"),
+            "period_days": round(elapsed_days, 1),
+        }
+    return growth
 
 
 def unique_logins(items: list[dict], field: str) -> int:
@@ -156,6 +278,9 @@ def collect_snapshot(
     repository_token: str,
     now: dt.datetime,
     traffic_token: str | None = None,
+    history: list[dict] | None = None,
+    history_available: bool = True,
+    history_errors: list[str] | None = None,
 ) -> dict:
     try:
         owner, name = repository.split("/", 1)
@@ -163,15 +288,6 @@ def collect_snapshot(
         raise ValueError("repository must use owner/name format") from error
     cutoff = now - dt.timedelta(days=28)
     metadata = api_request(f"{API_ROOT}/repos/{repository}", repository_token)
-
-    stargazers = paged_rest(
-        f"/repos/{repository}/stargazers", repository_token, accept=STAR_ACCEPT
-    )
-    star_times = [
-        parse_timestamp(item["starred_at"])
-        for item in stargazers
-        if isinstance(item, dict) and item.get("starred_at")
-    ]
 
     issue_candidates = paged_rest(
         "/repos/"
@@ -189,7 +305,7 @@ def collect_snapshot(
     traffic = collect_traffic(repository, traffic_token or repository_token)
 
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "captured_at": now.astimezone(dt.timezone.utc).isoformat(timespec="seconds"),
         "repository": repository,
         "repository_metrics": {
@@ -199,7 +315,14 @@ def collect_snapshot(
             "open_issues": metadata["open_issues_count"],
             "pushed_at": metadata["pushed_at"],
         },
-        "star_velocity": count_windows(star_times, now),
+        "star_growth": {
+            "source": "aggregate_snapshots",
+            "history_available": history_available,
+            "history_errors": history_errors or [],
+            "windows": calculate_star_growth(
+                metadata["stargazers_count"], now, history or []
+            ),
+        },
         "engagement_last_28_days": {
             "issues_created": len(new_issues),
             "unique_issue_authors": unique_logins(new_issues, "user"),
@@ -212,7 +335,7 @@ def collect_snapshot(
 
 def render_summary(report: dict) -> str:
     repo = report["repository_metrics"]
-    stars = report["star_velocity"]
+    growth = report["star_growth"]
     engagement = report["engagement_last_28_days"]
     traffic = report["traffic_last_14_days"]
     lines = [
@@ -223,13 +346,35 @@ def render_summary(report: dict) -> str:
         "| Metric | Value |",
         "| --- | ---: |",
         f"| Total stars | {repo['stars']} |",
-        f"| Stars, last 7 days | {stars['last_7_days']} |",
-        f"| Stars, last 28 days | {stars['last_28_days']} |",
-        f"| Stars, last 90 days | {stars['last_90_days']} |",
-        f"| New issue authors, last 28 days | {engagement['unique_issue_authors']} |",
-        f"| New discussion authors, last 28 days | {engagement['unique_discussion_authors']} |",
-        "",
     ]
+    for days in (7, 28, 90):
+        window = growth["windows"][f"last_{days}_days"]
+        if window["available"]:
+            change = f"{window['change']:+d} over {window['period_days']:.1f} days"
+        else:
+            change = "N/A (baseline not available yet)"
+        lines.append(f"| Aggregate star growth, {days}-day target | {change} |")
+    lines.extend(
+        [
+            f"| New issue authors, last 28 days | {engagement['unique_issue_authors']} |",
+            f"| New discussion authors, last 28 days | {engagement['unique_discussion_authors']} |",
+            "",
+        ]
+    )
+    if not growth["history_available"]:
+        lines.extend(
+            [
+                "Prior snapshot history was unavailable, so this run could not calculate star growth.",
+                "",
+            ]
+        )
+    elif not any(window["available"] for window in growth["windows"].values()):
+        lines.extend(
+            [
+                "This snapshot establishes the aggregate star baseline; growth appears after enough history accumulates.",
+                "",
+            ]
+        )
     views = traffic["views"]
     referrers = traffic["referrers"]
     if views["available"]:
@@ -274,8 +419,17 @@ def main(argv: list[str]) -> int:
         return 2
     now = parse_timestamp(args.now) if args.now else dt.datetime.now(dt.timezone.utc)
     try:
+        release_id, history = load_snapshot_history(args.repository, repository_token)
         report = collect_snapshot(
-            args.repository, repository_token, now, traffic_token=traffic_token
+            args.repository,
+            repository_token,
+            now,
+            traffic_token=traffic_token,
+            history=history,
+        )
+        updated_history = update_snapshot_history(history, report, now)
+        save_snapshot_history(
+            args.repository, repository_token, release_id, updated_history
         )
     except (GitHubApiError, KeyError, TypeError, ValueError) as error:
         print(f"Unable to capture OSS traction: {error}", file=sys.stderr)

@@ -1,0 +1,7 @@
+/target
+# per-arch cargo target dirs used by the containerized Linux cross-builds
+/target-*
+# built shared-library artifacts (produced by cargo build / lipo)
+*.dylib
+*.so
+*.dll

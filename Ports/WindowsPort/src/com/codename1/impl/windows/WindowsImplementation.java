@@ -405,6 +405,20 @@ public class WindowsImplementation extends CodenameOneImplementation {
         return biometrics;
     }
 
+    // Real BLE central via the in-process libcn1ble engine (btleplug -> WinRT),
+    // reached through the native WindowsBleBridge. Peripheral / L2CAP / classic
+    // report unsupported (btleplug is central-only).
+    private com.codename1.bluetooth.Bluetooth bluetooth;
+
+    @Override
+    public com.codename1.bluetooth.Bluetooth getBluetooth() {
+        if (bluetooth == null) {
+            bluetooth = new com.codename1.impl.bluetooth.NativeBluetooth(
+                    new WindowsBleBridge());
+        }
+        return bluetooth;
+    }
+
     // WinRT Geolocator-backed location. getCurrentLocation reports OUT_OF_SERVICE
     // honestly when Windows location is disabled / denied.
     private com.codename1.location.LocationManager locationManager;

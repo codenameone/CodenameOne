@@ -1,0 +1,2 @@
+mvn -pl common package -Dcodename1.platform=windows \
+    -Dcodename1.buildTarget=windows-device

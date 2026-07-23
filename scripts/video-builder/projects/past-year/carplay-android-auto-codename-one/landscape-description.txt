@@ -1,0 +1,24 @@
+Codename One now projects driver-safe app screens to Apple CarPlay and Google Android Auto through one portable template API, with simulator support and zero native wiring when unused.
+
+This video explains a portable template model for driver-safe carplay and android auto screens.
+
+Full article and source material:
+https://www.codenameone.com/blog/carplay-android-auto-codename-one/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://github.com/codenameone/CodenameOne/pull/5281
+
+Chapters
+00:00 Who And What
+00:12 The Real World Problem
+00:25 Independent Context 1
+00:41 The Change In Mechanism
+00:57 Source And Product Proof
+01:11 Canonical Captures
+01:24 Developer Victory
+01:36 Outro
+
+Which part should we unpack next?
+
+Series: Codename One Native Platforms & Device APIs — part 3 of 13
+
+#Java #CodenameOne

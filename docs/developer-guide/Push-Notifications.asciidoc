@@ -574,9 +574,6 @@ To simplify these use cases Codename One provides the https://www.codenameone.co
 To send a message to another device use:
 
 
-The "builder" style API used in the above sample was added post Codename One 3.6 to ease the addition of new Push services. If you're building against Codename one 3.6 or earlier, you should use the static `Push.sendPushMessage()` instead as shown below:
-
-
 This will send the push message "Hello World" to the device with the key `deviceKey`. The `1` argument represents the standard push message type, which you discussed <<push-message-types-section,earlier>>.
 
 ==== Sending push message from a Java or generic server

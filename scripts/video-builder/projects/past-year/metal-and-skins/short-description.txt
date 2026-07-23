@@ -1,0 +1,10 @@
+A new Metal rendering backend for iOS, a browser-hosted Skin Designer that retires the skin downloader, an iOS Reminders-style Return-as-Done flag, status-bar tap diagnostics, a simulator dark/light toggle, and a candid look at how we balance quality with the speed of a small open source company.
+
+Full article:
+https://www.codenameone.com/blog/metal-and-skins/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Codename One UI, Graphics & Media
+
+#Java #CodenameOne #Shorts

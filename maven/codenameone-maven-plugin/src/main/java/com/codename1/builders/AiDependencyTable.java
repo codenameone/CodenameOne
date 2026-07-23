@@ -181,6 +181,23 @@ public final class AiDependencyTable {
                 .androidGradle("androidx.camera:camera-video:1.3.4")
                 .description("Cross-platform camera (preview + frames + photo + video)"));
 
+        // First-class Bluetooth (com.codename1.bluetooth.*): CoreBluetooth
+        // on iOS with the two privacy strings defaulted only-if-unset via
+        // the standard entry application. Android permissions are
+        // deliberately NOT listed here -- the Android 12 permission split
+        // needs maxSdkVersion / usesPermissionFlags attributes this table
+        // cannot express, so AndroidGradleBuilder injects nuanced manifest
+        // fragments through BluetoothManifestFragments instead. The
+        // framework linking + CN1_INCLUDE_BLUETOOTH define flip likewise
+        // happen in IPhoneBuilder (iosFrameworks is documentation-only).
+        e.add(new Entry("com/codename1/bluetooth/")
+                .iosFrameworks("CoreBluetooth")
+                .iosPlist("NSBluetoothAlwaysUsageDescription",
+                         "Communicates with nearby Bluetooth accessories.")
+                .iosPlist("NSBluetoothPeripheralUsageDescription",
+                         "Communicates with nearby Bluetooth accessories.")
+                .description("Cross-platform Bluetooth (BLE central/peripheral, L2CAP, classic RFCOMM)"));
+
         // On-device Stable Diffusion: bundled Core ML model on iOS,
         // ONNX runtime on Android. Flag the >2 GB upload concern so
         // the cloud build server can abort early with a helpful

@@ -485,7 +485,7 @@ TIP: Codename One also includes a GlassPane that resides on top of the layered p
 [[insets-and-reference-components]]
 ===== Insets and reference components
 
-As of Codename One 3.7, https://www.codenameone.com/javadoc/com/codename1/ui/layouts/LayeredLayout.html[LayeredLayout] supports https://www.codenameone.com/javadoc/com/codename1/ui/layouts/LayeredLayout.LayeredLayoutConstraint.Inset.html[insets] for its children. This effectively allows you to position child components precisely where you want them, relative to their container or siblings. This functionality forms the under-pinnings of the GUI Builder's <<auto-layout-mode,Auto layout mode>>.
+https://www.codenameone.com/javadoc/com/codename1/ui/layouts/LayeredLayout.html[LayeredLayout] supports https://www.codenameone.com/javadoc/com/codename1/ui/layouts/LayeredLayout.LayeredLayoutConstraint.Inset.html[insets] for its children. This effectively allows you to position child components precisely where you want them, relative to their container or siblings. This functionality forms the under-pinnings of the GUI Builder's <<auto-layout-mode,Auto layout mode>>.
 
 As an example, suppose you wanted to position a button in the lower right corner of its container. This can be achieved with https://www.codenameone.com/javadoc/com/codename1/ui/layouts/LayeredLayout.html[LayeredLayout] as follows:
 
@@ -901,7 +901,7 @@ You can write code within the class both by using the event mechanism, by writin
 [[auto-layout-mode]]
 ==== Auto layout mode
 
-As of version 3.7, new forms created with the GUI Builder will use auto layout mode. In this mode you can move and resize your components as you see fit. You aren't constrained to the positions dictated by the form's layout manager.
+New forms created with the GUI Builder use auto layout mode. In this mode you can move and resize your components as you see fit. You aren't constrained to the positions dictated by the form's layout manager.
 
 .All forms designed in auto layout mode use `LayeredLayout`
 NOTE: Auto layout mode is built upon the inset support in LayeredLayout. Component positioning uses <<insets-and-reference-components,insets and reference components>>, not absolute positioning

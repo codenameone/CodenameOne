@@ -25,6 +25,7 @@ package com.codename1.builders;
 import org.apache.tools.ant.BuildException;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -256,6 +257,31 @@ public class LinuxNativeBuilder extends Executor {
         // copy the port's nativeSources into srcRoot, binding
         // CodenameOneImplementation to its @Concrete linux() target
         // (LinuxImplementation) during translation.
+        // First-class Bluetooth: only when the app references
+        // com.codename1.bluetooth do we compile the real (libcn1ble-backed)
+        // path of cn1_linux_ble.c and ship the library next to the binary.
+        // Otherwise the bridge stays the no-op stub and the port links
+        // standalone -- the same usage-gated approach the iOS builder takes
+        // for CoreBluetooth.
+        final boolean[] usesBluetoothHolder = {false};
+        try {
+            scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
+                @Override
+                public void usesClass(String cls) {
+                    if (cls != null && cls.startsWith("com/codename1/bluetooth/")) {
+                        usesBluetoothHolder[0] = true;
+                    }
+                }
+
+                @Override
+                public void usesClassMethod(String cls, String method) {
+                }
+            });
+        } catch (IOException ex) {
+            throw new BuildException("Failed to scan for Bluetooth usage", ex);
+        }
+        boolean usesBluetooth = usesBluetoothHolder[0];
+
         List<String> parparCmd = new ArrayList<String>();
         parparCmd.add("java");
         // 2g: the clean target's readNativeFiles loads both .m and .c (clean's
@@ -291,6 +317,22 @@ public class LinuxNativeBuilder extends Executor {
         File cmakeLists = new File(cmakeRoot, "CMakeLists.txt");
         if (!cmakeLists.exists()) {
             throw new BuildException("Translator did not emit a CMake project at " + cmakeLists.getAbsolutePath());
+        }
+
+        // Enable the libcn1ble path in cn1_linux_ble.c. Appended after the
+        // translator's add_executable so target_compile_definitions resolves
+        // ${PROJECT_NAME}. No link line is needed -- the C loads libcn1ble at
+        // runtime via dlopen -- so this only flips the #ifdef.
+        if (usesBluetooth) {
+            try {
+                java.nio.file.Files.write(cmakeLists.toPath(),
+                        ("\n# First-class Bluetooth (com.codename1.bluetooth)\n"
+                        + "target_compile_definitions(${PROJECT_NAME} PRIVATE CN1_INCLUDE_BLUETOOTH)\n")
+                                .getBytes("UTF-8"),
+                        java.nio.file.StandardOpenOption.APPEND);
+            } catch (IOException ex) {
+                throw new BuildException("Failed to enable CN1_INCLUDE_BLUETOOTH in the CMake project", ex);
+            }
         }
 
         File buildDir = new File(cmakeRoot, "build");
@@ -345,6 +387,24 @@ public class LinuxNativeBuilder extends Executor {
             linuxExecutable.setExecutable(true);
         } catch (Exception ex) {
             throw new BuildException("Failed to collect the built executable", ex);
+        }
+        // Ship libcn1ble next to the executable so the runtime dlopen in
+        // cn1_linux_ble.c finds it (it loads by the executable's own
+        // directory). The arch-keyed library is staged into the native bundle
+        // from cn1-binaries by the maven/linux build.
+        if (usesBluetooth) {
+            File bleLib = new File(nativeSources, "ble/" + arch + "/libcn1ble.so");
+            if (bleLib.isFile()) {
+                try {
+                    copy(bleLib, new File(resultDir, "libcn1ble.so"));
+                } catch (Exception ex) {
+                    throw new BuildException("Failed to bundle libcn1ble.so", ex);
+                }
+            } else {
+                log("WARNING: com.codename1.bluetooth is used but no libcn1ble.so "
+                        + "was bundled for arch " + arch + " (" + bleLib.getAbsolutePath()
+                        + "); native Bluetooth will report unavailable at runtime.");
+            }
         }
         log("Native Linux executable: " + linuxExecutable.getAbsolutePath() + " (" + arch + ")");
         return true;

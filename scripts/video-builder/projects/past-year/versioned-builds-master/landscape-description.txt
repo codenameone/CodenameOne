@@ -1,0 +1,23 @@
+Versioned builds return with a Maven-era model: pin a cloud build to a released Codename One version, or build against master to verify the current development head without waiting for a nightly package.
+
+This video explains pinning released builds while using master builds as a fast verification channel.
+
+Full article and source material:
+https://www.codenameone.com/blog/versioned-builds-master/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+
+
+Chapters
+00:00 Who And What
+00:13 The Real World Problem
+00:27 Independent Context 1
+00:45 The Change In Mechanism
+01:00 Source And Product Proof
+01:13 Canonical Captures
+01:23 Developer Victory
+
+Which part should we unpack next?
+
+Series: Build, Test & Ship Codename One Apps — part 3 of 10
+
+#Java #CodenameOne

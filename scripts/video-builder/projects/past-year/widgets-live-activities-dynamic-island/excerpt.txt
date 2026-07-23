@@ -1,0 +1,11 @@
+{
+  "liveActivities": true,
+  "kinds": [
+    {
+      "id": "delivery_status",
+      "name": "Delivery",
+      "description": "Track your order",
+      "iosFamilies": ["systemSmall", "systemMedium"]
+    }
+  ]
+}

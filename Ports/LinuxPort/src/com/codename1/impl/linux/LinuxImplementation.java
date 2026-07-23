@@ -415,6 +415,20 @@ public class LinuxImplementation extends CodenameOneImplementation {
         return biometrics;
     }
 
+    // Real BLE central via the in-process libcn1ble engine (btleplug -> BlueZ),
+    // reached through the native LinuxBleBridge. Peripheral / L2CAP / classic
+    // report unsupported (btleplug is central-only).
+    private com.codename1.bluetooth.Bluetooth bluetooth;
+
+    @Override
+    public com.codename1.bluetooth.Bluetooth getBluetooth() {
+        if (bluetooth == null) {
+            bluetooth = new com.codename1.impl.bluetooth.NativeBluetooth(
+                    new LinuxBleBridge());
+        }
+        return bluetooth;
+    }
+
     // WinRT Geolocator-backed location. getCurrentLocation reports OUT_OF_SERVICE
     // honestly when Linux location is disabled / denied.
     private com.codename1.location.LocationManager locationManager;

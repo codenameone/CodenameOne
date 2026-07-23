@@ -102,8 +102,16 @@
                         <configuration>
                             <target>
                                 <mkdir dir="${project.build.directory}/codenameone/windowsport-bundle"/>
+                                <!-- Stage the prebuilt cn1ble.dll libraries
+                                     (from cn1-binaries) into the native bundle
+                                     under ble/{arch}/, so WindowsNativeBuilder
+                                     can ship the arch-correct one next to a
+                                     Bluetooth app's exe for the runtime
+                                     LoadLibraryA in cn1_windows_ble.c. Tolerant
+                                     of an absent ble/ dir. -->
                                 <zip destfile="${project.build.directory}/codenameone/windowsport-bundle/nativewindows.jar">
                                     <fileset dir="${codename1.nativewindows.dir}"/>
+                                    <zipfileset dir="${cn1.binaries}/ble/windows" prefix="ble" erroronmissingdir="false"/>
                                 </zip>
                                 <!--
                                   WindowsPort.jar inside the bundle is the

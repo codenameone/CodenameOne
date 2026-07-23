@@ -1,0 +1,10 @@
+mvn -pl common package \
+    -Dcodename1.platform=linux \
+    -Dcodename1.buildTarget=local-linux-device cn1:build
+
+# Select the target
+linux.arch=arm64
+# Alpine uses musl instead of glibc
+linux.libc=musl
+# Keep symbols while debugging
+linux.debug=true

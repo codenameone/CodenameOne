@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "id": "release-feature",
+  "title": "Code and live UI, together",
+  "output": {
+    "frameRate": 30,
+    "landscapeWidth": 1920,
+    "landscapeHeight": 1080,
+    "portraitWidth": 1080,
+    "portraitHeight": 1920,
+    "videoBitRate": 8000000
+  },
+  "narration": {
+    "provider": "kokoro",
+    "voice": "af_heart:60,af_bella:40",
+    "language": "en-us",
+    "speed": 0.96,
+    "model": ".video-tools/kokoro/kokoro-v1.0.onnx",
+    "minimumGapMs": 250,
+    "pronunciations": {
+      "Codename One": "codename one"
+    }
+  },
+  "scenes": [
+    {
+      "id": "story-points",
+      "durationMs": 5200,
+      "narration": {
+        "text": "Start with one script. It controls the story, the code, and the live application."
+      },
+      "actions": [
+        {
+          "type": "intro.show",
+          "id": "welcome",
+          "atMs": 0,
+          "durationMs": 1050,
+          "title": "Codename One",
+          "subtitle": "Build. Explain. Ship.",
+          "bounds": {"x": 0.04, "y": 0.08, "width": 0.92, "height": 0.80},
+          "orientation": {"portrait": {"x": 0.08, "y": 0.18, "width": 0.84, "height": 0.58}}
+        },
+        {
+          "type": "bullets.show",
+          "id": "story-bullets",
+          "atMs": 900,
+          "durationMs": 2200,
+          "title": "One script drives the whole story",
+          "items": ["Narration and presentation beats", "Syntax-highlighted source code", "A real compiled Codename One demo"],
+          "bounds": {"x": 0.02, "y": 0.05, "width": 0.96, "height": 0.90},
+          "orientation": {"portrait": {"x": 0.07, "y": 0.12, "width": 0.86, "height": 0.76}}
+        },
+        {"type": "transition", "target": "story-bullets", "atMs": 900, "durationMs": 450, "effect": "wipe-up", "easing": "ease-out"},
+        {"type": "layer.hide", "target": "welcome", "atMs": 1250}
+      ]
+    },
+    {
+      "id": "pipeline-svg",
+      "durationMs": 7600,
+      "narration": {
+        "text": "The pipeline compiles the demo, renders every frame, and mixes narration generated entirely on this machine."
+      },
+      "actions": [
+        {"type": "svg.show", "id": "pipeline", "atMs": 200, "paths": {"landscape": "pipeline.svg", "portrait": "pipeline-portrait.svg"}, "bounds": {"x": 0.015, "y": 0.04, "width": 0.97, "height": 0.92}, "orientation": {"portrait": {"x": 0.06, "y": 0.08, "width": 0.88, "height": 0.84}}},
+        {"type": "transition", "target": "pipeline", "atMs": 200, "durationMs": 750, "effects": {"landscape": "wipe-left", "portrait": "wipe-up"}, "easing": "ease-out"}
+      ]
+    },
+    {
+      "id": "animated-flow",
+      "durationMs": 5600,
+      "narration": {
+        "text": "A Mermaid style flowchart can animate an idea before we show its implementation."
+      },
+      "actions": [
+        {"type": "text.show", "id": "flow-title", "atMs": 0, "text": "Explain the architecture, then show it running", "uiid": "VideoTitle", "responsive": true, "maxLines": 3, "bounds": {"x": 0.03, "y": 0.03, "width": 0.94, "height": 0.15}, "orientation": {"portrait": {"x": 0.08, "y": 0.04, "width": 0.84, "height": 0.18}}},
+        {
+          "type": "diagram.show",
+          "id": "flow",
+          "atMs": 600,
+          "durationMs": 3000,
+          "texts": {"landscape": "flowchart LR\nA[Script] --> B[Compile]\nB[Compile] --> C[Live UI]\nC[Live UI] --> D[VideoIO]", "portrait": "flowchart TD\nA[Script] --> B[Compile]\nB[Compile] --> C[Live UI]\nC[Live UI] --> D[VideoIO]"},
+          "bounds": {"x": 0.02, "y": 0.20, "width": 0.96, "height": 0.70},
+          "orientation": {"portrait": {"x": 0.08, "y": 0.25, "width": 0.84, "height": 0.66}}
+        },
+        {"type": "transition", "target": "flow", "atMs": 600, "durationMs": 700, "effect": "morph", "easing": "ease-in-out"}
+      ]
+    },
+    {
+      "id": "automation-points",
+      "durationMs": 8400,
+      "narration": {
+        "text": "The result is designed for language models and continuous integration, with repeatable local output in both orientations."
+      },
+      "actions": [
+        {
+          "type": "bullets.show",
+          "id": "automation-bullets",
+          "atMs": 200,
+          "durationMs": 2200,
+          "title": "Built for LLMs and CI",
+          "items": ["Versioned JSON with strict validation", "JavaSE-only, local and deterministic", "Portrait, landscape, CLI, and MCP"],
+          "bounds": {"x": 0.02, "y": 0.05, "width": 0.96, "height": 0.90},
+          "orientation": {"portrait": {"x": 0.07, "y": 0.12, "width": 0.86, "height": 0.76}}
+        },
+        {"type": "transition", "target": "automation-bullets", "atMs": 200, "durationMs": 650, "effect": "zoom-in", "easing": "ease-out"}
+      ]
+    },
+    {
+      "id": "code-and-demo",
+      "durationMs": 24000,
+      "composition": {
+        "portrait": "code-over-demo",
+        "landscape": "code-left-demo-right"
+      },
+      "actions": [
+        {"type": "text.show", "id": "headline", "atMs": 0, "role": "title", "text": "See the code change the live UI", "uiid": "VideoTitle"},
+        {"type": "code.show", "id": "source", "atMs": 0, "role": "code", "language": "java", "text": ""},
+        {"type": "transition", "target": "source", "atMs": 0, "durationMs": 450, "effect": "fade"},
+        {"type": "code.type", "target": "source", "atMs": 350, "durationMs": 2600, "path": "CounterDemo.java.txt"},
+        {"type": "narration.cue", "id": "source-cue", "atMs": 0, "text": "Here is application source from Codename One. The highlighted method updates the counter and animates its layout."},
+        {"type": "focus.show", "id": "code-focus", "target": "source", "atMs": 2400, "relativeBounds": {"x": 0.04, "y": 0.48, "width": 0.92, "height": 0.32}, "label": "The behavior we are about to run", "color": "50d8ff"},
+        {"type": "pointer.show", "id": "pointer", "atMs": 2700, "style": "touch", "area": "source", "x": 0.72, "y": 0.62},
+        {"type": "demo.mount", "id": "demo", "atMs": 5200, "role": "demo", "class": "com.codename1.videobuilder.demos.CounterDemoScene"},
+        {"type": "transition", "target": "demo", "atMs": 5200, "durationMs": 650, "effect": "fade", "effects": {"portrait": "fade", "landscape": "slide-left"}, "distance": 0.42},
+        {"type": "narration.cue", "id": "demo-cue", "atMs": 5600, "text": "The compiled interface slides in. The touch marker shows the exact interaction."},
+        {"type": "focus.hide", "target": "code-focus", "atMs": 5800},
+        {"type": "pointer.move", "target": "pointer", "atMs": 5900, "durationMs": 700, "area": "demo", "x": 0.5, "y": 0.58},
+        {"type": "focus.show", "id": "ui-focus", "target": "demo", "atMs": 6600, "relativeBounds": {"x": 0.18, "y": 0.35, "width": 0.64, "height": 0.34}, "label": "Live compiled UI", "color": "ffc857"},
+        {"type": "pointer.click", "target": "pointer", "atMs": 7200, "durationMs": 500},
+        {"type": "demo.action", "atMs": 7300, "name": "increment", "arguments": {"count": 1}},
+        {"type": "pointer.click", "target": "pointer", "atMs": 8200, "durationMs": 500},
+        {"type": "demo.action", "atMs": 8300, "name": "increment", "arguments": {"count": 2}},
+        {"type": "focus.hide", "target": "ui-focus", "atMs": 9200},
+        {"type": "pointer.hide", "target": "pointer", "atMs": 9400},
+        {"type": "narration.cue", "id": "replay-cue", "atMs": 12200, "text": "Quick rewind. Now watch the same interaction again in slow motion."},
+        {"type": "replay", "atMs": 14000, "fromMs": 5200, "toMs": 9000, "rewindDurationMs": 900, "rewindFps": 10, "playbackRate": 0.6, "label": "Show it again in case you missed it"}
+      ]
+    }
+  ]
+}

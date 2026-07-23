@@ -55,6 +55,15 @@ import java.util.Set;
  */
 public final class IOSNfc extends Nfc {
 
+    private static final Map<Integer, Object> REQUESTS =
+            new HashMap<Integer, Object>();
+    private static final Map<Long, IOSTag> TAGS = new HashMap<Long, IOSTag>();
+    private static int nextRequestId = 1;
+    private static volatile HostCardEmulationService hceService;
+
+    // Static initializers run in textual order, so this touch block MUST
+    // come after the field initializers above -- the sentinel calls reach
+    // takeAsync()/takeId(), which synchronize on REQUESTS.
     static {
         nativeNdefResult(-1, null);
         nativeTagDiscovered(-1, 0L, 0, null);
@@ -64,12 +73,6 @@ public final class IOSNfc extends Nfc {
         nativeHceApdu(-1, null);
         nativeHceDeactivated(0);
     }
-
-    private static final Map<Integer, Object> REQUESTS =
-            new HashMap<Integer, Object>();
-    private static final Map<Long, IOSTag> TAGS = new HashMap<Long, IOSTag>();
-    private static int nextRequestId = 1;
-    private static volatile HostCardEmulationService hceService;
 
     private final IOSNative nativeInstance;
     private final Set<NfcListener> listeners = new HashSet<NfcListener>();

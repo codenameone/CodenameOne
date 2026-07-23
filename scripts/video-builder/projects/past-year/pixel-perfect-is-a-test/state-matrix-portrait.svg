@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1100">
+<style>.title{font:700 48px sans-serif;fill:#f5f8fb}.label{font:700 29px sans-serif;fill:#f5f8fb}.body{font:25px sans-serif;fill:#c8d4e3}.small{font:21px sans-serif;fill:#8ea4ba}.card{fill:#111a27;stroke:#26384c;stroke-width:3}</style>
+
+<text x="400" y="58" class="title" text-anchor="middle">Every state counts</text>
+<g transform="translate(65 115)"><rect width="670" height="850" rx="30" class="card"/>
+<g class="label"><text x="130" y="60">Normal</text><text x="130" y="315">Pressed</text><text x="130" y="570">Selected</text></g>
+<g fill="#e8edf4"><rect x="105" y="95" width="205" height="88" rx="44"/><rect x="105" y="350" width="205" height="88" rx="44"/><rect x="105" y="605" width="205" height="88" rx="44"/></g>
+<g fill="#1c2938"><rect x="365" y="95" width="205" height="88" rx="44"/><rect x="365" y="350" width="205" height="88" rx="44"/><rect x="365" y="605" width="205" height="88" rx="44"/></g>
+<text x="207" y="225" class="small" text-anchor="middle">LIGHT</text><text x="467" y="225" class="small" text-anchor="middle">DARK</text>
+<g fill="none" stroke-width="7"><rect x="105" y="350" width="205" height="88" rx="44" stroke="#7c8da1"/><rect x="365" y="350" width="205" height="88" rx="44" stroke="#9f7aea"/><rect x="105" y="605" width="205" height="88" rx="44" stroke="#4fd1c5"/><rect x="365" y="605" width="205" height="88" rx="44" stroke="#62e6ff"/></g>
+<text x="335" y="790" class="body" text-anchor="middle">geometry · color · contrast · motion</text></g>
+<text x="400" y="1040" class="body" text-anchor="middle">a screenshot is only one cell</text>
+
+</svg>

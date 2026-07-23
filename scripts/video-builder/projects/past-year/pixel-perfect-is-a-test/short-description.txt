@@ -1,0 +1,8 @@
+Your UI can move even when your application code does not. Codename One versions native iOS and Android reference captures, then fails continuous integration when known fidelity regresses.
+
+Full article:
+https://www.codenameone.com/blog/pixel-perfect-is-a-test/?utm_source=youtube&utm_medium=short&utm_campaign=native-ui-fidelity
+
+The related landscape video shows the authentic native comparisons, compiled motion model, metrics, and complete regression pipeline.
+
+#Java #UITesting #CodenameOne #Shorts

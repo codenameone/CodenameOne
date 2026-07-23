@@ -1,0 +1,10 @@
+Versioned builds return with a Maven-era model: pin a cloud build to a released Codename One version, or build against master to verify the current development head without waiting for a nightly package.
+
+Full article:
+https://www.codenameone.com/blog/versioned-builds-master/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Build, Test & Ship Codename One Apps
+
+#Java #CodenameOne #Shorts

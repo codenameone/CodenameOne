@@ -64,6 +64,9 @@ public final class Bench {
         runBench("objectAllocation", new BenchFn() {
             public long run() { return CommonWorkloads.objectAllocation(); }
         });
+        runBench("valueEscape", new BenchFn() {
+            public long run() { return CommonWorkloads.valueEscape(); }
+        });
         runBench("hashMapChurn", new BenchFn() {
             public long run() { return CommonWorkloads.hashMapChurn(); }
         });

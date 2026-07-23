@@ -1,0 +1,10 @@
+Automated store submissions ship this week: one-click delivery to the App Store, Mac App Store, Google Play, and Huawei AppGallery, with your listing text and screenshots versioned in git and pushed with mvn cn1:metadata-push. Plus organization accounts and self service account deletion.
+
+Full article:
+https://www.codenameone.com/blog/automated-store-submissions/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Build, Test & Ship Codename One Apps
+
+#Java #CodenameOne #Shorts

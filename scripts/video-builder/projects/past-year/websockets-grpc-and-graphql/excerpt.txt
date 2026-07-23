@@ -1,0 +1,10 @@
+// Good practice although in reality all current Codename One Platforms support WebSockets
+if (!WebSocket.isSupported()) {
+    return;
+}
+WebSocket ws = WebSocket.build("wss://echo.example.com/socket")
+    .onConnect(() -> Log.p("connected"))
+    .onTextMessage(text -> addIncoming(text))
+    .onClose((code, reason) -> Log.p("closed " + code + " " + reason))
+    .onError(ex -> Log.e(ex))
+    .connect();

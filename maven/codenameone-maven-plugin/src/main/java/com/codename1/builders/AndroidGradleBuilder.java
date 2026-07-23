@@ -168,7 +168,10 @@ public class AndroidGradleBuilder extends Executor {
             "android.permission.BIND_WALLPAPER",
             "android.permission.BLUETOOTH",
             "android.permission.BLUETOOTH_ADMIN",
+            "android.permission.BLUETOOTH_ADVERTISE",
+            "android.permission.BLUETOOTH_CONNECT",
             "android.permission.BLUETOOTH_PRIVILEGED",
+            "android.permission.BLUETOOTH_SCAN",
             "android.permission.BODY_SENSORS",
             "android.permission.BROADCAST_PACKAGE_REMOVED",
             "android.permission.BROADCAST_SMS",
@@ -346,6 +349,18 @@ public class AndroidGradleBuilder extends Executor {
     private boolean usesBonjour;
     private boolean usesUsbHost;
     private boolean usesNetworkTypeListener;
+
+    // First-class Bluetooth (com.codename1.bluetooth.*). The scanner sets
+    // per-capability flags keyed on the permission-aligned package layout
+    // (le/ = central, le/server/ = advertise, classic/ = BR/EDR) so a
+    // central-only app never carries BLUETOOTH_ADVERTISE and a non-Bluetooth
+    // app sees no manifest change. Injection happens through
+    // BluetoothManifestFragments to keep the Android 12 nuances testable.
+    private boolean usesBluetooth;
+    private boolean usesBluetoothScan;
+    private boolean usesBluetoothConnect;
+    private boolean usesBluetoothPeripheral;
+    private boolean usesBluetoothClassic;
 
     private boolean integrateMoPub = false;
 
@@ -1447,6 +1462,38 @@ public class AndroidGradleBuilder extends Executor {
                     if (cls.equals("com/codename1/io/NetworkTypeListener")) {
                         usesNetworkTypeListener = true;
                     }
+
+                    // First-class Bluetooth: the package layout is
+                    // permission-aligned so class references map straight
+                    // onto the Android 12 permission split. Scan/connect
+                    // are refined by which model classes the app touches
+                    // (Scan* handles vs the GATT/stream types); the
+                    // usesClassMethod hook below catches facade-only
+                    // callers.
+                    if (cls.indexOf("com/codename1/bluetooth/") == 0) {
+                        usesBluetooth = true;
+                        if (cls.indexOf("com/codename1/bluetooth/le/server/") == 0) {
+                            usesBluetoothPeripheral = true;
+                        } else if (cls.indexOf("com/codename1/bluetooth/classic/") == 0) {
+                            usesBluetoothClassic = true;
+                            if (cls.indexOf("com/codename1/bluetooth/classic/ClassicDiscovery") == 0) {
+                                usesBluetoothScan = true;
+                            }
+                            if (cls.indexOf("com/codename1/bluetooth/classic/Rfcomm") == 0
+                                    || cls.indexOf("com/codename1/bluetooth/classic/BluetoothClassic") == 0) {
+                                usesBluetoothConnect = true;
+                            }
+                        } else if (cls.indexOf("com/codename1/bluetooth/gatt/") == 0) {
+                            usesBluetoothConnect = true;
+                        } else if (cls.indexOf("com/codename1/bluetooth/le/Scan") == 0
+                                || cls.indexOf("com/codename1/bluetooth/le/BleScan") == 0) {
+                            usesBluetoothScan = true;
+                        } else if (cls.indexOf("com/codename1/bluetooth/le/BlePeripheral") == 0
+                                || cls.indexOf("com/codename1/bluetooth/le/Connection") == 0
+                                || cls.indexOf("com/codename1/bluetooth/le/L2cap") == 0) {
+                            usesBluetoothConnect = true;
+                        }
+                    }
                 }
 
 
@@ -1461,6 +1508,37 @@ public class AndroidGradleBuilder extends Executor {
                     }
                     if (cls.indexOf("com/codename1/ui/Display") == 0 && (method.indexOf("vibrate") > -1 || method.indexOf("notifyStatusBar") > -1)) {
                         vibratePermission = true;
+                    }
+
+                    // Bluetooth facade-only callers: refine scan/connect/
+                    // peripheral flags from the invoked entry-point methods
+                    // when the app never references the model classes
+                    // directly.
+                    if (cls.indexOf("com/codename1/bluetooth/le/BluetoothLE") == 0) {
+                        if (method.indexOf("startScan") > -1) {
+                            usesBluetoothScan = true;
+                        }
+                        if (method.indexOf("openGattServer") > -1
+                                || method.indexOf("startAdvertising") > -1
+                                || method.indexOf("openL2capServer") > -1) {
+                            usesBluetoothPeripheral = true;
+                        }
+                        if (method.indexOf("getPeripheral") > -1
+                                || method.indexOf("getConnectedPeripherals") > -1
+                                || method.indexOf("getBondedPeripherals") > -1) {
+                            usesBluetoothConnect = true;
+                        }
+                    }
+                    if (cls.indexOf("com/codename1/bluetooth/classic/BluetoothClassic") == 0) {
+                        if (method.indexOf("startDiscovery") > -1
+                                || method.indexOf("requestDiscoverable") > -1) {
+                            usesBluetoothScan = true;
+                        }
+                        if (method.indexOf("connect") > -1
+                                || method.indexOf("listen") > -1
+                                || method.indexOf("createBond") > -1) {
+                            usesBluetoothConnect = true;
+                        }
                     }
 
                     // Apps that call the low-level CN/Display review entry point
@@ -1709,6 +1787,27 @@ public class AndroidGradleBuilder extends Executor {
             if (!xPermissions.contains("android.hardware.usb.host")) {
                 xPermissions = "    <uses-feature android:name=\"android.hardware.usb.host\" android:required=\"false\" />\n" + xPermissions;
             }
+        }
+
+        // First-class Bluetooth permission injection. The scanner above set
+        // per-capability flags; BluetoothManifestFragments handles the
+        // Android 12 permission split (BLUETOOTH_SCAN/CONNECT/ADVERTISE with
+        // legacy permissions capped at API 30) and quote-delimited dedup so
+        // projects migrating from the old BLE cn1lib (which merged legacy
+        // permissions via android.xpermissions) don't get duplicates.
+        // android.bluetooth.neverForLocation (default true) declares scan
+        // results are never used for location -- beacon/location apps must
+        // set it to false; android.bluetooth.required=true hides the app
+        // from devices without BLE hardware.
+        if (usesBluetooth) {
+            boolean neverForLocation = !"false".equalsIgnoreCase(
+                    request.getArg("android.bluetooth.neverForLocation", "true"));
+            boolean bleRequired = "true".equalsIgnoreCase(
+                    request.getArg("android.bluetooth.required", "false"));
+            xPermissions = BluetoothManifestFragments.inject(xPermissions,
+                    usesBluetoothScan, usesBluetoothConnect,
+                    usesBluetoothPeripheral, usesBluetoothClassic,
+                    neverForLocation, bleRequired, targetSDKVersionInt);
         }
 
         boolean useFCM = pushPermission && "fcm".equalsIgnoreCase(request.getArg("android.messagingService", "fcm"));

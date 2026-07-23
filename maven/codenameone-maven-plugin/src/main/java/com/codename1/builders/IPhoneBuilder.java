@@ -113,6 +113,8 @@ public class IPhoneBuilder extends Executor {
     private boolean usesCryptoGcm;
     private boolean usesBiometrics;
     private boolean usesNfc;
+    private boolean usesBluetooth;
+    private boolean usesBluetoothPeripheral;
     private boolean usesCn1Camera;
     private boolean usesCn1Ar;
     // Set when the app references com.codename1.car.* (Apple CarPlay support). Gates the
@@ -841,6 +843,19 @@ public class IPhoneBuilder extends Executor {
                         usesNfc = true;
                         if (cls.equals("com/codename1/nfc/HostCardEmulationService")) {
                             usesNfcHce = true;
+                        }
+                    }
+                    // First-class Bluetooth (com.codename1.bluetooth.*).
+                    // Gated on actual usage so CoreBluetooth and the
+                    // CN1Bluetooth natives are only linked/compiled for apps
+                    // that reference the API. The peripheral flag keys on
+                    // the permission-aligned le/server/ package so the
+                    // bluetooth-peripheral background mode is only ever
+                    // offered to apps that actually advertise.
+                    if (cls.indexOf("com/codename1/bluetooth/") == 0) {
+                        usesBluetooth = true;
+                        if (cls.indexOf("com/codename1/bluetooth/le/server/") == 0) {
+                            usesBluetoothPeripheral = true;
                         }
                     }
                     // Low-level camera API (com.codename1.camera.*). Gated on
@@ -2349,6 +2364,54 @@ public class IPhoneBuilder extends Executor {
                 } catch (IOException ex) {
                     throw new BuildException(
                             "Failed to enable CN1_INCLUDE_NFC", ex);
+                }
+            }
+
+            // First-class Bluetooth: weak-link CoreBluetooth and compile in
+            // the CN1Bluetooth natives only when the app references
+            // com.codename1.bluetooth.*. The NSBluetooth* privacy strings
+            // are defaulted (only-if-unset) by the AiDependencyTable entry
+            // through the standard plist application above. Background
+            // operation is opt-in through the ios.bluetooth.background hint
+            // ("central", "peripheral" or "central,peripheral"), merged into
+            // ios.background_modes so the standard UIBackgroundModes
+            // assembly (and its plistInject-conflict check) applies.
+            if (usesBluetooth) {
+                String coreBt = "CoreBluetooth.framework";
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = coreBt;
+                } else if (!addLibs.toLowerCase().contains("corebluetooth")) {
+                    addLibs = addLibs + ";" + coreBt;
+                }
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define CN1_INCLUDE_BLUETOOTH",
+                            "#define CN1_INCLUDE_BLUETOOTH");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable CN1_INCLUDE_BLUETOOTH", ex);
+                }
+                String btBackground = request.getArg("ios.bluetooth.background", "");
+                if (btBackground.length() > 0) {
+                    String modes = request.getArg("ios.background_modes", "");
+                    if (btBackground.contains("central")
+                            && !modes.contains("bluetooth-central")) {
+                        modes = modes.length() == 0 ? "bluetooth-central"
+                                : modes + ",bluetooth-central";
+                    }
+                    if (btBackground.contains("peripheral")
+                            && !modes.contains("bluetooth-peripheral")) {
+                        if (!usesBluetoothPeripheral) {
+                            log("Warning: ios.bluetooth.background requests the "
+                                    + "bluetooth-peripheral mode but the app never "
+                                    + "references com.codename1.bluetooth.le.server; "
+                                    + "adding it anyway.");
+                        }
+                        modes = modes.length() == 0 ? "bluetooth-peripheral"
+                                : modes + ",bluetooth-peripheral";
+                    }
+                    request.putArgument("ios.background_modes", modes);
                 }
             }
 

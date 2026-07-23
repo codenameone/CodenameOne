@@ -1,0 +1,28 @@
+Java 17 is the new Initializr default, generated projects ship an AGENTS.md authoring skill that any AI agent can pick up (including a workflow that lets agents drive jdb against the simulator), native themes get a runtime accent palette, plus Metal follow-ups and iOS push that no longer prompts at launch.
+
+This video explains a java 17 project that teaches coding agents how to build and debug it.
+
+Full article and source material:
+https://www.codenameone.com/blog/skills-java17-and-theme-accents/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://github.com/codenameone/CodenameOne/pull/4946
+https://github.com/codenameone/CodenameOne/tree/master/scripts/initializr/common/src/main/resources/skill
+https://github.com/codenameone/CodenameOne/pull/4884
+https://github.com/codenameone/CodenameOne/blob/master/docs/developer-guide/Native-Themes.asciidoc#accent-palette-override
+https://github.com/codenameone/CodenameOne/issues/3302
+https://github.com/codenameone/CodenameOne/pull/4924
+
+Chapters
+00:00 Hook
+00:36 Problem
+01:07 Mechanism
+01:31 Source
+02:06 Tradeoffs
+02:41 Result
+03:06 Outro
+
+Which part should we unpack next?
+
+Series: Build, Test & Ship Codename One Apps — part 10 of 10
+
+#Java #CodenameOne

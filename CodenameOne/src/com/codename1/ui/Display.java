@@ -535,6 +535,12 @@ public final class Display extends CN1Constants {
     /// Returns the SIMD API instance bound to the current implementation.
     public Simd getSimd() {
         if (simd == null) {
+            if (impl == null) {
+                // Runtime not yet initialized (e.g. plain unit tests): hand out
+                // the portable scalar fallback without caching it, so the real
+                // implementation's SIMD is still installed once init() runs.
+                return new Simd();
+            }
             Simd created = impl.createSimd();
             if (created == null) {
                 created = new Simd();
@@ -4811,6 +4817,14 @@ public final class Display extends CN1Constants {
     /// should normally use `LocalCalendarSource#getInstance()`.
     public com.codename1.calendar.LocalCalendarSource getLocalCalendarSource() {
         return impl.getLocalCalendarSource();
+    }
+
+    /// Returns the platform Bluetooth entry point. Prefer
+    /// {@link com.codename1.bluetooth.Bluetooth#getInstance()} in
+    /// application code --- it handles the fallback to a no-op stub when
+    /// the current port does not implement Bluetooth.
+    public com.codename1.bluetooth.Bluetooth getBluetooth() {
+        return impl.getBluetooth();
     }
 
     /// This method tries to invoke the device native camera to capture images.

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "ar-vr-story-visual-smoke",
+  "title": "AR and VR story visual smoke",
+  "output": {
+    "frameRate": 5,
+    "landscapeWidth": 960,
+    "landscapeHeight": 540,
+    "portraitWidth": 540,
+    "portraitHeight": 960,
+    "videoBitRate": 1800000
+  },
+  "scenes": [
+    {"id": "intro", "durationMs": 1000, "actions": [
+      {"type": "svg.show", "id": "art", "atMs": 0, "paths": {"landscape": "ar-intro-landscape.svg", "portrait": "ar-intro-portrait.svg"}}
+    ]},
+    {"id": "fragmentation", "durationMs": 1000, "actions": [
+      {"type": "svg.show", "id": "art", "atMs": 0, "paths": {"landscape": "industry-fragmentation-landscape.svg", "portrait": "industry-fragmentation-portrait.svg"}}
+    ]},
+    {"id": "stackoverflow", "durationMs": 1000, "actions": [
+      {"type": "svg.show", "id": "art", "atMs": 0, "paths": {"landscape": "evidence-stackoverflow-landscape.svg", "portrait": "evidence-stackoverflow-portrait.svg"}}
+    ]},
+    {"id": "reddit", "durationMs": 1000, "actions": [
+      {"type": "svg.show", "id": "art", "atMs": 0, "paths": {"landscape": "evidence-reddit-landscape.svg", "portrait": "evidence-reddit-portrait.svg"}}
+    ]},
+    {"id": "resolution", "durationMs": 1000, "actions": [
+      {"type": "svg.show", "id": "art", "atMs": 0, "paths": {"landscape": "resolution-map-landscape.svg", "portrait": "resolution-map-portrait.svg"}}
+    ]},
+    {"id": "ar", "durationMs": 1000, "actions": [
+      {"type": "demo.mount", "id": "demo", "atMs": 0, "animated": false,
+       "class": "com.codename1.videobuilder.demos.ARDemoScene"},
+      {"type": "demo.action", "atMs": 100, "name": "placeModel", "arguments": {}},
+      {"type": "demo.action", "atMs": 300, "name": "trackingLimited", "arguments": {}}
+    ]},
+    {"id": "vr", "durationMs": 1000, "actions": [
+      {"type": "demo.mount", "id": "demo", "atMs": 0, "animated": false,
+       "class": "com.codename1.videobuilder.demos.Media360DemoScene"},
+      {"type": "demo.action", "atMs": 100, "name": "lookRight", "arguments": {"yaw": 42}},
+      {"type": "demo.action", "atMs": 300, "name": "stereo", "arguments": {}}
+    ]}
+  ]
+}

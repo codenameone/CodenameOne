@@ -1,0 +1,13 @@
+public CoffeeRun(AssetCatalog catalog) {
+    super(loadLevel(), catalog);
+    initScene();
+    setArcadeBehavior(true);
+}
+
+@Override
+protected void onUpdate(double deltaSeconds) {
+    if (!won && overlaps(player, flag)) {
+        won = true;
+        youWin(getScore());
+    }
+}

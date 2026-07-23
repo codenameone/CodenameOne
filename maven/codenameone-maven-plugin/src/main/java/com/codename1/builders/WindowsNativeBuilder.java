@@ -25,6 +25,7 @@ package com.codename1.builders;
 import org.apache.tools.ant.BuildException;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -241,6 +242,29 @@ public class WindowsNativeBuilder extends Executor {
         // The "windows" app type makes the translator emit a standalone
         // executable CMake project (add_executable + the Win32 link set) and
         // copy the port's nativeSources (incl. the C++ COM layer) into srcRoot.
+        // First-class Bluetooth: only when the app references
+        // com.codename1.bluetooth do we compile the real (libcn1ble-backed)
+        // path of cn1_windows_ble.c and ship cn1ble.dll next to the exe --
+        // the usage-gated approach the iOS builder uses for CoreBluetooth.
+        final boolean[] usesBluetoothHolder = {false};
+        try {
+            scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
+                @Override
+                public void usesClass(String cls) {
+                    if (cls != null && cls.startsWith("com/codename1/bluetooth/")) {
+                        usesBluetoothHolder[0] = true;
+                    }
+                }
+
+                @Override
+                public void usesClassMethod(String cls, String method) {
+                }
+            });
+        } catch (IOException ex) {
+            throw new BuildException("Failed to scan for Bluetooth usage", ex);
+        }
+        boolean usesBluetooth = usesBluetoothHolder[0];
+
         List<String> parparCmd = new ArrayList<String>();
         parparCmd.add("java");
         // 2g: the clean target's readNativeFiles loads both .m and .c (clean's
@@ -280,6 +304,21 @@ public class WindowsNativeBuilder extends Executor {
         File cmakeLists = new File(cmakeRoot, "CMakeLists.txt");
         if (!cmakeLists.exists()) {
             throw new BuildException("Translator did not emit a CMake project at " + cmakeLists.getAbsolutePath());
+        }
+
+        // Enable the libcn1ble path in cn1_windows_ble.c. Appended after the
+        // translator's add_executable so target_compile_definitions resolves
+        // ${PROJECT_NAME}. No link line -- the C loads cn1ble.dll at runtime.
+        if (usesBluetooth) {
+            try {
+                java.nio.file.Files.write(cmakeLists.toPath(),
+                        ("\n# First-class Bluetooth (com.codename1.bluetooth)\n"
+                        + "target_compile_definitions(${PROJECT_NAME} PRIVATE CN1_INCLUDE_BLUETOOTH)\n")
+                                .getBytes("UTF-8"),
+                        java.nio.file.StandardOpenOption.APPEND);
+            } catch (IOException ex) {
+                throw new BuildException("Failed to enable CN1_INCLUDE_BLUETOOTH in the CMake project", ex);
+            }
         }
 
         File buildDir = new File(cmakeRoot, "build");
@@ -372,6 +411,24 @@ public class WindowsNativeBuilder extends Executor {
             copy(exe, windowsExecutable);
         } catch (Exception ex) {
             throw new BuildException("Failed to collect the built executable", ex);
+        }
+        // Ship cn1ble.dll next to the exe so the runtime LoadLibraryA in
+        // cn1_windows_ble.c finds it (it loads by the exe's own directory).
+        // The arch-keyed DLL is staged into the native bundle from cn1-binaries
+        // by the maven/windows build.
+        if (usesBluetooth) {
+            File bleLib = new File(nativeSources, "ble/" + arch + "/cn1ble.dll");
+            if (bleLib.isFile()) {
+                try {
+                    copy(bleLib, new File(resultDir, "cn1ble.dll"));
+                } catch (Exception ex) {
+                    throw new BuildException("Failed to bundle cn1ble.dll", ex);
+                }
+            } else {
+                log("WARNING: com.codename1.bluetooth is used but no cn1ble.dll was "
+                        + "bundled for arch " + arch + " (" + bleLib.getAbsolutePath()
+                        + "); native Bluetooth will report unavailable at runtime.");
+            }
         }
         // Authenticode-sign the exe (osslsigncode) when a code-signing certificate
         // is supplied; otherwise it ships unsigned (which runs, but trips SmartScreen

@@ -1,0 +1,10 @@
+Two new cross-platform visual editors ship in PR #5272. RichTextArea is a WYSIWYG HTML editor, and CodeEditor is an IDE-style editor with syntax highlighting for eight languages, async code completion and diagnostics. Both run on a shared AbstractEditorComponent that talks to two interchangeable backends.
+
+Full article:
+https://www.codenameone.com/blog/rich-text-and-code-editing/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Codename One UI, Graphics & Media
+
+#Java #CodenameOne #Shorts

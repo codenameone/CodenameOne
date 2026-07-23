@@ -1,0 +1,14 @@
+AdConfig cfg = new AdConfig().testMode(true);
+AdManager.initialize(cfg, ok -> {
+    if (!ok) {
+        return;
+    }
+    RewardedAd ad = new RewardedAd("your-rewarded-ad-unit-id");
+    ad.setAdListener(new AdListener() {
+        public void onLoaded() {
+            ad.show(reward ->
+                grantCoins(reward.getType(), reward.getAmount()));
+        }
+    });
+    ad.load();
+});

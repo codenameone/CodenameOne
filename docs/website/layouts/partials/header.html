@@ -56,8 +56,8 @@
         <div class="cn1-nav-links" id="cn1-primary-menu">
             <ul id="menu">
                 {{- range site.Menus.main }}
-                {{- if and (not .Parent) (ne .Identifier "dashboard") (ne .Identifier "create-project") }}
-                <li class="{{ if .HasChildren }}has-children{{ end }}">
+                {{- if and (not .Parent) (ne .Identifier "create-project") }}
+                <li class="{{ if eq .Identifier "dashboard" }}cn1-mobile-dashboard-item{{ else if .HasChildren }}has-children{{ end }}">
                     {{- if .HasChildren }}
                     <button class="cn1-menu-trigger" type="button" aria-expanded="false" aria-haspopup="true">
                         <span>{{- .Name -}}</span>
@@ -94,8 +94,9 @@
         </div>
         {{- range site.Menus.main }}
         {{- if eq .Identifier "dashboard" }}
-        <a class="cn1-dashboard-link" href="{{ .URL }}" title="{{ .Title | default .Name }}">
+        <a class="cn1-dashboard-link" href="{{ .URL }}" title="{{ .Title | default .Name }}" aria-label="{{ .Title | default .Name }}">
             <span>{{- .Name -}}</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>
         </a>
         {{- end }}
         {{- end }}

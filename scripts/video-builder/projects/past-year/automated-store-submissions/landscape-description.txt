@@ -1,0 +1,23 @@
+Automated store submissions ship this week: one-click delivery to the App Store, Mac App Store, Google Play, and Huawei AppGallery, with your listing text and screenshots versioned in git and pushed with mvn cn1:metadata-push. Plus organization accounts and self service account deletion.
+
+This video explains how versioned metadata turns mobile store submission into a repeatable build step.
+
+Full article and source material:
+https://www.codenameone.com/blog/automated-store-submissions/?utm_source=youtube&utm_medium=video&utm_campaign=past-year-video-library
+
+https://github.com/codenameone/CodenameOne/pull/5353
+
+Chapters
+00:00 Who And What
+00:25 Independent Context 1
+00:39 The Change In Mechanism
+00:53 Source And Product Proof
+01:07 Canonical Captures
+01:20 Developer Victory
+01:34 Outro
+
+Which part should we unpack next?
+
+Series: Build, Test & Ship Codename One Apps — part 4 of 10
+
+#Java #CodenameOne

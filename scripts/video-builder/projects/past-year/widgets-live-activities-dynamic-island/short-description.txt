@@ -1,0 +1,8 @@
+The app process stopped, but the delivery ETA keeps moving. One Java timeline can feed widgets, Live Activities, Dynamic Island, Android notifications, and desktop surfaces.
+
+Full article:
+https://www.codenameone.com/blog/widgets-live-activities-dynamic-island/?utm_source=youtube&utm_medium=short&utm_campaign=java-system-surfaces
+
+The related landscape video shows the real source, compiled timeline, Live Activity updates, and cold-start action delivery.
+
+#Java #LiveActivities #CodenameOne #Shorts

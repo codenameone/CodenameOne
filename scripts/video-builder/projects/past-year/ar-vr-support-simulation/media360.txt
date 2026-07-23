@@ -1,0 +1,4 @@
+Media360View panorama = new Media360View();
+panorama.setImage(
+    EncodedImage.create("/panorama.jpg"));
+form.add(BorderLayout.CENTER, panorama);

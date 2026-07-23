@@ -1,0 +1,11 @@
+Form form = new Form(BoxLayout.y());
+if (CN.isWatch()) {
+    form.add(new Label("Hi Watch"));
+    form.getToolbar().setVisible(false);
+} else {
+    form.add(new SpanLabel("Welcome to the full application"));
+}
+form.show();
+
+// Optional small watch-only entry root
+codename1.watchMain=com.mycompany.myapp.MyWatchMain

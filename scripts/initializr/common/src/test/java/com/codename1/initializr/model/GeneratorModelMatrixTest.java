@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.initializr.model;
 
 import com.codename1.io.Util;
@@ -12,6 +34,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 public class GeneratorModelMatrixTest extends AbstractTest {
@@ -23,6 +46,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         validateClaudeSkillBundled();
         validateJava17DefaultRegressionFixes();
         validateLegacyJava8Generation();
+        validateCoordinateGuardRejectsBrokenArtifacts();
+        validateLocaleIndependentArtifactIds();
         for (Template template : Template.values()) {
             for (IDE ide : IDE.values()) {
                 validateCombination(template, ide);
@@ -225,6 +250,61 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 "Java 8 root pom should retain the win32 module activation profile");
     }
 
+    private void validateCoordinateGuardRejectsBrokenArtifacts() throws Exception {
+        String mainClassName = "CoordinateGuardApp";
+        String packageName = "com.acme.coordinate.guard";
+        GeneratorModel model = GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, mainClassName, packageName);
+        Map<String, byte[]> entries = model.collectProjectEntries();
+        String javascriptPom = getText(entries, "javascript/pom.xml");
+
+        entries.put("javascript/pom.xml", StringUtil.replaceAll(
+                javascriptPom,
+                packageName,
+                "com.codename1.initializr"
+        ).getBytes("UTF-8"));
+        assertCoordinateGuardRejects(model, entries,
+                "Initializr application coordinates must never leak into a generated platform POM");
+
+        entries.put("javascript/pom.xml", StringUtil.replaceAll(
+                javascriptPom,
+                "1.0-SNAPSHOT",
+                "9.9-BROKEN"
+        ).getBytes("UTF-8"));
+        assertCoordinateGuardRejects(model, entries,
+                "A platform POM version that differs from the generated reactor must be rejected");
+    }
+
+    private void validateLocaleIndependentArtifactIds() throws Exception {
+        Locale originalLocale = Locale.getDefault();
+        try {
+            Locale.setDefault(new Locale("tr", "TR"));
+            String mainClassName = "IntegrityIndex";
+            String packageName = "com.acme.locale.guard";
+            byte[] zipData = createProjectZip(IDE.INTELLIJ, Template.BAREBONES, mainClassName, packageName);
+            Map<String, byte[]> entries = readZipEntries(zipData);
+            assertGeneratedPomCoordinates(entries, packageName, mainClassName);
+            assertContains(getText(entries, "javascript/pom.xml"),
+                    "<artifactId>integrityindex-javascript</artifactId>",
+                    "Artifact IDs must use locale-independent lowercase under a Turkish default locale");
+        } finally {
+            Locale.setDefault(originalLocale);
+        }
+    }
+
+    private void assertCoordinateGuardRejects(
+            GeneratorModel model,
+            Map<String, byte[]> entries,
+            String message
+    ) throws Exception {
+        boolean rejected = false;
+        try {
+            model.validateGeneratedPomCoordinates(entries);
+        } catch (IOException expected) {
+            rejected = true;
+        }
+        assertTrue(rejected, message);
+    }
+
     private void validateJava17DefaultRegressionFixes() throws Exception {
         String mainClassName = "DemoJava17Regression";
         String packageName = "com.acme.java17regression";
@@ -280,6 +360,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertGitIgnore(entries);
         assertRootPom(entries, packageName, mainClassName);
         assertCommonPom(entries, template, packageName, mainClassName, true);
+        assertGeneratedPomCoordinates(entries, packageName, mainClassName);
         assertSettings(entries, template, packageName, mainClassName, true);
         assertMainSourceFile(entries, template, packageName, mainClassName, false);
         assertThemeDefaults(entries, template);
@@ -349,12 +430,32 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertContains(readme, "mvn cn1:certificatewizard",
                 "Generated README should document the Certificate Wizard");
 
+        String buildSh = getText(entries, "build.sh");
+        assertContains(buildSh, "-Dcodename1.buildTarget=local-javascript",
+                "Generated shell build launcher should build JavaScript locally");
+        assertContains(buildSh, "function javascript_cloud",
+                "Generated shell build launcher should retain the cloud JavaScript target");
+
+        String buildBat = getText(entries, "build.bat");
+        assertContains(buildBat, "-Dcodename1.buildTarget^=local-javascript",
+                "Generated Windows build launcher should build JavaScript locally");
+        assertContains(buildBat, ":javascript_cloud",
+                "Generated Windows build launcher should retain the cloud JavaScript target");
+
+        String javascriptPom = getText(entries, "javascript/pom.xml");
+        assertContains(javascriptPom, "<codename1.defaultBuildTarget>local-javascript</codename1.defaultBuildTarget>",
+                "Generated JavaScript module should default to a local build");
+
         if (ide == IDE.INTELLIJ) {
             String workspaceXml = getText(entries, ".idea/workspace.xml");
             assertContains(workspaceXml, "<configuration name=\"Certificate Wizard\"",
                     "IntelliJ workspace should include Certificate Wizard run configuration");
             assertContains(workspaceXml, "<option value=\"cn1:certificatewizard\"",
                     "IntelliJ Certificate Wizard run configuration should launch cn1:certificatewizard");
+            assertContains(workspaceXml, "<configuration name=\"JavaScript Local Build\"",
+                    "IntelliJ workspace should include a local JavaScript build configuration");
+            assertContains(workspaceXml, "value=\"local-javascript\"",
+                    "IntelliJ local JavaScript configuration should use the local builder");
             return;
         }
         if (ide == IDE.ECLIPSE) {
@@ -362,6 +463,9 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             String launchXml = getText(entries, mainClassName + " - Certificate Wizard.launch");
             assertContains(launchXml, "cn1:certificatewizard",
                     "Eclipse launch files should include Certificate Wizard");
+            String localJavaScriptLaunch = getText(entries, mainClassName + " - Build Javascript Locally.launch");
+            assertContains(localJavaScriptLaunch, "codename1.buildTarget=local-javascript",
+                    "Eclipse launch files should include a local JavaScript build");
             return;
         }
         if (ide == IDE.NETBEANS) {
@@ -370,6 +474,11 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                     "NetBeans actions should include Certificate Wizard");
             assertContains(nbActions, "<goal>cn1:certificatewizard</goal>",
                     "NetBeans Certificate Wizard action should launch cn1:certificatewizard");
+            String nbConfiguration = getText(entries, "nb-configuration.xml");
+            assertContains(nbConfiguration, "<configuration id=\"Local JavaScript App\"",
+                    "NetBeans configurations should include a local JavaScript build");
+            assertContains(nbConfiguration, "<property name=\"codename1.buildTarget\">local-javascript</property>",
+                    "NetBeans local JavaScript configuration should use the local builder");
             return;
         }
         if (ide == IDE.VS_CODE) {
@@ -378,13 +487,17 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                     "VS Code Maven favorites should include Certificate Wizard");
             assertContains(settingsJson, "cn1:certificatewizard",
                     "VS Code Certificate Wizard favorite should launch cn1:certificatewizard");
+            assertContains(settingsJson, "Local > JavaScript Build",
+                    "VS Code Maven favorites should include a local JavaScript build");
+            assertContains(settingsJson, "-Dcodename1.buildTarget=local-javascript",
+                    "VS Code local JavaScript favorite should use the local builder");
         }
     }
 
     private void assertRootPom(Map<String, byte[]> entries, String packageName, String mainClassName) {
         String pom = getText(entries, "pom.xml");
         assertContains(pom, packageName, "Root pom should include package as groupId");
-        assertContains(pom, mainClassName.toLowerCase(), "Root pom should include app artifact/name");
+        assertContains(pom, GeneratorModel.toLowerCaseInvariant(mainClassName), "Root pom should include app artifact/name");
         assertContains(pom, "<cn1.plugin.version>7.0.258</cn1.plugin.version>", "Root pom should use current CN1 plugin version");
         assertContains(pom, "<cn1.version>7.0.258</cn1.version>", "Root pom should align CN1 runtime version with plugin version");
         assertFalse(pom.indexOf("com.example.myapp") >= 0, "Root pom still contains placeholder package");
@@ -394,7 +507,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     private void assertCommonPom(Map<String, byte[]> entries, Template template, String packageName, String mainClassName, boolean expectJava17) {
         String pom = getText(entries, "common/pom.xml");
         assertContains(pom, packageName, "Common pom should include package");
-        assertContains(pom, mainClassName.toLowerCase(), "Common pom should include app artifact");
+        assertContains(pom, GeneratorModel.toLowerCaseInvariant(mainClassName), "Common pom should include app artifact");
         assertContains(pom, "<artifactId>codenameone-javase</artifactId>", "Common pom should include codenameone-javase test dependency");
         assertContains(pom, "<artifactId>serializer</artifactId>", "Common pom should include xalan serializer for CN1 generate-gui-sources");
         assertContains(pom, "<version>2.7.3</version>", "Common pom should pin serializer version expected by CN1 plugin classpath");
@@ -406,7 +519,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertContains(pom, "<target>1.8</target>", "Common pom should use Java 8 target when legacy Java 8 is selected");
         }
         if (template == Template.GRUB) {
-            assertContains(pom, "<artifactId>" + mainClassName.toLowerCase() + "-CodeRAD</artifactId>", "Grub common pom should include local CodeRAD cn1lib dependency");
+            assertContains(pom, "<artifactId>" + GeneratorModel.toLowerCaseInvariant(mainClassName) + "-CodeRAD</artifactId>", "Grub common pom should include local CodeRAD cn1lib dependency");
             assertContains(pom, "<version>1.0-SNAPSHOT</version>", "Grub common pom should use local snapshot CodeRAD cn1lib");
         }
         if (template == Template.TWEET) {
@@ -416,6 +529,43 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         }
         assertFalse(pom.indexOf("com.example.myapp") >= 0, "Common pom still contains placeholder package");
         assertFalse(pom.indexOf("myappname") >= 0, "Common pom still contains placeholder app name");
+    }
+
+    private void assertGeneratedPomCoordinates(Map<String, byte[]> entries, String packageName, String mainClassName) {
+        String rootArtifactId = GeneratorModel.toLowerCaseInvariant(mainClassName);
+        String version = "1.0-SNAPSHOT";
+        String[] modules = new String[] {"common", "android", "ios", "javase", "javascript", "linux", "win"};
+
+        for (int i = 0; i < modules.length; i++) {
+            String module = modules[i];
+            String pom = removeWhitespace(getText(entries, module + "/pom.xml"));
+            String expectedCoordinates =
+                    "</modelVersion><parent>"
+                            + "<groupId>" + packageName + "</groupId>"
+                            + "<artifactId>" + rootArtifactId + "</artifactId>"
+                            + "<version>" + version + "</version>"
+                            + "</parent>"
+                            + "<groupId>" + packageName + "</groupId>"
+                            + "<artifactId>" + rootArtifactId + "-" + module + "</artifactId>"
+                            + "<version>" + version + "</version>";
+            assertContains(pom, expectedCoordinates,
+                    module + "/pom.xml must belong to the generated Maven reactor");
+            assertFalse(pom.indexOf("com.codename1.initializr") >= 0,
+                    module + "/pom.xml must not retain the Initializr application's groupId");
+            assertFalse(pom.indexOf("<artifactId>initializr") >= 0,
+                    module + "/pom.xml must not retain an Initializr application artifactId");
+        }
+    }
+
+    private String removeWhitespace(String content) {
+        StringBuilder out = new StringBuilder(content.length());
+        for (int i = 0; i < content.length(); i++) {
+            char c = content.charAt(i);
+            if (!Character.isWhitespace(c)) {
+                out.append(c);
+            }
+        }
+        return out.toString();
     }
 
     private void assertSettings(Map<String, byte[]> entries, Template template, String packageName, String mainClassName, boolean expectJava17) {

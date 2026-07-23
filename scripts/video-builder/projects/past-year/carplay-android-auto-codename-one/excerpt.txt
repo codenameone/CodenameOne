@@ -1,0 +1,9 @@
+class LibraryScreen extends CarScreen {
+    protected CarTemplate onCreateTemplate() {
+        return new CarListTemplate().setTitle("Library")
+            .addRow(new CarRow("Now Playing")
+                .setOnAction(ctx -> play()))
+            .addRow(new CarRow("Albums")
+                .setBrowsable(true));
+    }
+}

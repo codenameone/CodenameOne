@@ -1,0 +1,10 @@
+A visual level editor for the Codename One gaming API that saves a plain-data .game file the runtime plays, across 2D, isometric board, and 3D modes, plus a streaming engine for large open worlds. The orientation before the three hands-on tutorials.
+
+Full article:
+https://www.codenameone.com/blog/the-codename-one-game-builder/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Game Development with Codename One
+
+#Java #CodenameOne #Shorts

@@ -170,6 +170,17 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 // any passkey symbols.
 //#define CN1_INCLUDE_WEBAUTHN
 
+// CN1_INCLUDE_BLUETOOTH gates the com.codename1.bluetooth native bridge
+// (CN1Bluetooth.{h,m}: CoreBluetooth CBCentralManager / CBPeripheralManager,
+// GATT client + server, advertising and L2CAP channels). IPhoneBuilder
+// uncomments this only when the classpath scanner saw
+// com.codename1.bluetooth.*, so apps that never touch Bluetooth ship
+// without CoreBluetooth symbols and need no NSBluetoothAlwaysUsageDescription
+// privacy entry. The BLE peripheral role (CBPeripheralManager) is
+// unavailable on tvOS / watchOS; CN1Bluetooth.m compiles that section out
+// per target slice and isBlePeripheralSupported reports false there.
+//#define CN1_INCLUDE_BLUETOOTH
+
 //#define INCLUDE_CN1_BACKGROUND_FETCH
 //#define INCLUDE_FACEBOOK_CONNECT
 //#define USE_FACEBOOK_CONNECT_PODS

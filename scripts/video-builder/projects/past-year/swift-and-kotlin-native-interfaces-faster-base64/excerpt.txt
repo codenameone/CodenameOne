@@ -1,0 +1,3 @@
+mvn cn1:generate-native-interfaces \
+  -Dcn1.generateNativeInterfaces.swift=true \
+  -Dcn1.generateNativeInterfaces.kotlin=true

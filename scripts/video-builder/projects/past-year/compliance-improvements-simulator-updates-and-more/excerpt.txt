@@ -1,0 +1,1 @@
+video.setVariable(Media.VARIABLE_ANDROID_SEEK_PREVIEW_WORKAROUND, Boolean.TRUE);

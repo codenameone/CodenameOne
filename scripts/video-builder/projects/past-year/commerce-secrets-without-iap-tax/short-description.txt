@@ -1,0 +1,10 @@
+Commerce validates receipts and normalizes entitlements, while Secrets keeps credentials out of the binary. Both are designed to fail soft, stay optional, and avoid turning IAP into a Codename One royalty.
+
+Full article:
+https://www.codenameone.com/blog/commerce-secrets-without-iap-tax/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Build, Test & Ship Codename One Apps
+
+#Java #CodenameOne #Shorts

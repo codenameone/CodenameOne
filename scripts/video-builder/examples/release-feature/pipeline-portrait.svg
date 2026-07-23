@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="620" height="1100" viewBox="0 0 620 1100">
+  <rect width="620" height="1100" rx="34" fill="#171c26"/>
+  <text x="310" y="80" text-anchor="middle" font-family="sans-serif" font-size="42" font-weight="700" fill="#f3f7fb">Deterministic</text>
+  <text x="310" y="130" text-anchor="middle" font-family="sans-serif" font-size="42" font-weight="700" fill="#f3f7fb">video pipeline</text>
+  <g font-family="sans-serif" font-size="28" font-weight="700" text-anchor="middle">
+    <rect x="110" y="195" width="400" height="135" rx="24" fill="#202938" stroke="#50d8ff" stroke-width="6"/>
+    <text x="310" y="252" fill="#f3f7fb">JSON story</text>
+    <text x="310" y="292" fill="#9eabbc" font-size="22">LLM / CI</text>
+    <rect x="110" y="410" width="400" height="135" rx="24" fill="#202938" stroke="#ffc857" stroke-width="6"/>
+    <text x="310" y="467" fill="#f3f7fb">Compile demo</text>
+    <text x="310" y="507" fill="#9eabbc" font-size="22">8.0-SNAPSHOT</text>
+    <rect x="110" y="625" width="400" height="135" rx="24" fill="#202938" stroke="#50d8ff" stroke-width="6"/>
+    <text x="310" y="682" fill="#f3f7fb">Render frames</text>
+    <text x="310" y="722" fill="#9eabbc" font-size="22">VideoIO</text>
+    <rect x="110" y="840" width="400" height="135" rx="24" fill="#202938" stroke="#ffc857" stroke-width="6"/>
+    <text x="310" y="897" fill="#f3f7fb">Mix audio</text>
+    <text x="310" y="937" fill="#9eabbc" font-size="22">Local TTS</text>
+  </g>
+  <g fill="#50d8ff">
+    <rect x="305" y="330" width="10" height="52"/><polygon points="285,382 310,412 335,382"/>
+    <rect x="305" y="545" width="10" height="52"/><polygon points="285,597 310,627 335,597"/>
+    <rect x="305" y="760" width="10" height="52"/><polygon points="285,812 310,842 335,812"/>
+  </g>
+  <text x="310" y="1040" text-anchor="middle" font-family="sans-serif" font-size="22" fill="#9eabbc">Portrait and landscape from one script.</text>
+</svg>

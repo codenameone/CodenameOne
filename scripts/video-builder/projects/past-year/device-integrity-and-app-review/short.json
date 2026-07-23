@@ -1,0 +1,763 @@
+{
+  "schemaVersion": 1,
+  "editorial": {
+    "storyType": "code-and-capture",
+    "status": "approved",
+    "topicTerms": [
+      "device integrity",
+      "device attestation",
+      "RASP",
+      "in-app review"
+    ],
+    "proof": [
+      "canonical article source",
+      "independent technical documentation",
+      "article code",
+      "canonical product captures"
+    ],
+    "humanBeat": "A banking developer must react to a tampered device without trusting the device's own verdict, while every developer risks turning a badly timed rating prompt into a one-star review.",
+    "visualIdentity": "A nonce and signed token cross from device to server, while a separate feedback fork waits behind launch and time thresholds.",
+    "bespokeVisualization": "The trust decision visibly ends on the server, then the review path branches only after restraint thresholds pass.",
+    "heroJourney": {
+      "identity": "Codename One, runtime integrity, and respectful review prompts are introduced.",
+      "problem": "The client can be hostile, and user goodwill can be damaged by over-asking.",
+      "difficulty": "Attestation, root and jailbreak signals, accessibility abuse, native review APIs, fallbacks, and timing differ by platform.",
+      "intervention": "Portable core APIs expose signed tokens and RASP signals, while a scheduler and native-or-fallback review flow enforce restraint.",
+      "victory": "Security decisions move to the backend and rating prompts happen through one measured cross-platform policy."
+    },
+    "problemDimensions": [
+      "client cannot prove itself clean",
+      "platform-specific integrity APIs",
+      "rating prompt fatigue"
+    ],
+    "resolutionMap": [
+      {
+        "problem": "client cannot prove itself clean",
+        "solution": "server nonce and opaque signed token",
+        "proof": "the DeviceIntegrity Java excerpt"
+      },
+      {
+        "problem": "platform-specific integrity APIs",
+        "solution": "Play Integrity, App Attest, and RASP behind one API",
+        "proof": "the article's capability matrix"
+      },
+      {
+        "problem": "rating prompt fatigue",
+        "solution": "launch, install-age, and cooldown thresholds",
+        "proof": "the AppReview excerpt and fallback sheet"
+      }
+    ]
+  },
+  "output": {
+    "frameRate": 30,
+    "landscapeWidth": 1920,
+    "landscapeHeight": 1080,
+    "portraitWidth": 1080,
+    "portraitHeight": 1920,
+    "videoBitRate": 8000000
+  },
+  "narration": {
+    "provider": "kokoro",
+    "voice": "af_heart:60,af_bella:40",
+    "language": "en-us",
+    "speed": 0.97,
+    "model": ".video-tools/kokoro/kokoro-v1.0.onnx",
+    "minimumGapMs": 250,
+    "pronunciations": {
+      "Codename One": "Codename One",
+      "API": "API",
+      "AI": "AI",
+      "APK": "APK",
+      "AR/VR": "augmented reality and virtual reality",
+      "ARKit": "A-R kit",
+      "ARCore": "A-R core",
+      "AR": "A-R",
+      "VR": "V-R",
+      "2D": "2D",
+      "3D": "3D",
+      "GPU": "GPU",
+      "GA4": "G-A four",
+      "GDPR": "G-D-P-R",
+      "CCPA": "C-C-P-A",
+      "DPI": "D-P-I",
+      "glTF": "G-L-T-F",
+      "JVM": "JVM",
+      "JIT": "JIT",
+      "AOT": "A-O-T",
+      "GC": "G-C",
+      "CI": "C-I",
+      "CSS": "CSS",
+      "iOS": "iOS",
+      "macOS": "macOS",
+      "tvOS": "tvOS",
+      "UWP": "U-W-P",
+      "NFC": "NFC",
+      "PCM": "PCM",
+      "RGBA": "RGBA",
+      "EDT": "E-D-T",
+      "ETA": "E-T-A",
+      "SRT": "SRT",
+      "VTT": "VTT",
+      "AAC": "A-A-C",
+      "H264": "H two sixty four",
+      "HTML": "HTML",
+      "IDE": "I-D-E",
+      "JS": "JS",
+      "XML": "XML",
+      "JSON": "jay son",
+      "WYSIWYG": "wizzy wig",
+      "CodeEditor": "Code Editor",
+      "RichTextArea": "Rich Text Area",
+      "AbstractEditorComponent": "Abstract Editor Component",
+      "CodeMirror": "Code Mirror",
+      "WidgetKit": "Widget Kit",
+      "ActivityKit": "Activity Kit",
+      "RemoteViews": "Remote Views",
+      "Dynamic Island": "Dynamic Island",
+      "JavaSE": "Java S-E",
+      "WidgetTimeline": "Widget Timeline",
+      "LiveActivity": "Live Activity",
+      "LiveActivityDescriptor": "Live Activity Descriptor",
+      "SurfaceDynamicText": "Surface Dynamic Text",
+      "VideoIO": "video I-O",
+      "AudioMixer": "Audio Mixer",
+      "AppGallery": "App Gallery",
+      "FFmpeg": "F-F-M-peg",
+      "WAVWriter": "wave writer",
+      "SVG": "SVG",
+      "SPI": "S-P-I",
+      "AnalyticsService": "Analytics Service",
+      "AnalyticsProvider": "Analytics Provider",
+      "AbstractAnalyticsProvider": "Abstract Analytics Provider",
+      "CodenameOneAnalyticsProvider": "Codename One Analytics Provider",
+      "RASP": "rasp",
+      "DeviceIntegrity": "Device Integrity",
+      "AppReview": "App Review",
+      "CarApplication": "Car Application",
+      "CarScreen": "Car Screen",
+      "CarTemplate": "Car Template",
+      "CarPlay": "Car Play",
+      "Android Auto": "Android Auto",
+      "App Attest": "App Attest",
+      "Play Integrity": "Play Integrity",
+      "StoreKit": "Store Kit",
+      "Matomo": "ma-TOE-mo",
+      "Firebase": "Fire base",
+      "Frida": "FREE-da",
+      "SKU": "S-K-U",
+      "UiModeManager": "U-I Mode Manager",
+      "AndroidX": "Android X",
+      "CN.isTV()": "C-N is T-V",
+      "Display.isTV()": "Display is T-V",
+      "TARGET_OS_TV": "target O-S T-V",
+      "MapSurface": "Map Surface",
+      "MapView": "Map View",
+      "NativeMap": "Native Map",
+      "MapKit": "Map Kit",
+      "MapComponent": "Map Component",
+      "MapLibre": "Map Libre",
+      "GeneralPath": "General Path",
+      "ORM": "O-R-M",
+      "OAuth": "oh auth",
+      "OIDC": "O-I-D-C",
+      "gRPC": "G-R-P-C",
+      "GraphQL": "graph Q-L",
+      "Box2D": "box 2D",
+      "JDWP": "J-D-W-P",
+      "JUnit": "J unit",
+      "ParparVM": "par par V-M",
+      "Win32": "win thirty two",
+      "App Store Connect": "App Store Connect",
+      "cn1": "C-N one",
+      "mvn": "Maven",
+      "clang": "clang",
+      "2FA": "two F-A",
+      ".p8": "P eight",
+      ".glb": "G-L-B",
+      ".ipa": "I-P-A"
+    }
+  },
+  "id": "device-integrity-and-app-review-short",
+  "title": "Trust needs a server and timing needs restraint",
+  "scenes": [
+    {
+      "id": "short-who-and-what",
+      "durationMs": 14000,
+      "storyBeats": [
+        "identity"
+      ],
+      "actions": [
+        {
+          "type": "image.show",
+          "id": "brand",
+          "role": "brand",
+          "kind": "illustration",
+          "atMs": 150,
+          "path": "codename-one-logo.png",
+          "bounds": {
+            "x": 0.045,
+            "y": 0.04,
+            "width": 0.12,
+            "height": 0.04
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.18,
+              "height": 0.027
+            }
+          }
+        },
+        {
+          "type": "svg.show",
+          "id": "opening-motif",
+          "atMs": 200,
+          "paths": {
+            "landscape": "opening-landscape.svg",
+            "portrait": "opening-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.58,
+            "y": 0.13,
+            "width": 0.38,
+            "height": 0.74
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.2,
+              "width": 0.89,
+              "height": 0.73
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "opening-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "Trust needs a server\nand timing needs restraint",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.055,
+            "y": 0.23,
+            "width": 0.49,
+            "height": 0.34
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.06,
+              "width": 0.86,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "opening-voice",
+          "atMs": 650,
+          "text": "Codename One builds native apps in Java from one codebase. Today, Device Integrity raises the cost of a hostile runtime, while App Review waits for a moment that deserves a rating request.",
+          "caption": "Codename One builds native apps in Java from one codebase. Today, Device Integrity raises the cost of a hostile runtime, while App Review waits for a moment that deserves a rating request."
+        }
+      ]
+    },
+    {
+      "id": "short-real-world-problem",
+      "durationMs": 16000,
+      "storyBeats": [
+        "problem"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "problem-motif",
+          "atMs": 200,
+          "paths": {
+            "landscape": "problem-landscape.svg",
+            "portrait": "problem-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.16,
+            "width": 0.92,
+            "height": 0.79
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.14,
+              "width": 0.89,
+              "height": 0.82
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "problem-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "The app cannot certify itself",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-b57945d021ae",
+          "atMs": 250,
+          "text": "A compromised device can lie about local checks, so attestation only matters when a server verifies the signed token. A review prompt has the opposite problem: technically easy, but harmful when asked too often or at the wrong moment.",
+          "caption": "A compromised device can lie about local checks, so attestation only matters when a server verifies the signed token. A review prompt has the opposite problem: technically easy, but harmful when asked too often or at the wrong moment."
+        }
+      ]
+    },
+    {
+      "id": "short-independent-context",
+      "durationMs": 20500,
+      "storyBeats": [
+        "difficulty"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "short-evidence-1",
+          "atMs": 200,
+          "paths": {
+            "landscape": "evidence-1-landscape.svg",
+            "portrait": "evidence-1-landscape.svg"
+          },
+          "bounds": {
+            "x": 0.05,
+            "y": 0.08,
+            "width": 0.9,
+            "height": 0.4
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.07,
+              "width": 0.89,
+              "height": 0.42
+            }
+          },
+          "role": "evidence",
+          "sourceTitle": "Google Play Integrity",
+          "sourceUrl": "https://developer.android.com/google/play/integrity"
+        },
+        {
+          "type": "svg.show",
+          "id": "short-evidence-2",
+          "atMs": 200,
+          "paths": {
+            "landscape": "evidence-2-landscape.svg",
+            "portrait": "evidence-2-landscape.svg"
+          },
+          "bounds": {
+            "x": 0.05,
+            "y": 0.53,
+            "width": 0.9,
+            "height": 0.4
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.53,
+              "width": 0.89,
+              "height": 0.42
+            }
+          },
+          "role": "evidence",
+          "sourceTitle": "Apple App Attest",
+          "sourceUrl": "https://developer.apple.com/documentation/devicecheck/establishing-your-app-s-integrity"
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-e67d42c57561",
+          "atMs": 250,
+          "text": "The outside documentation exposes both sides of the same problem: Google's flow binds an integrity token to a request and expects server-side decoding and policy decisions. Apple's App Attest service lets a server validate that requests came from a genuine app instance on a genuine Apple device.",
+          "caption": "The outside documentation exposes both sides of the same problem: Google's flow binds an integrity token to a request and expects server-side decoding and policy decisions. Apple's App Attest service lets a server validate that requests came from a genuine app instance on a genuine Apple device."
+        }
+      ]
+    },
+    {
+      "id": "short-change-in-mechanism",
+      "durationMs": 16000,
+      "storyBeats": [
+        "intervention"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "solution-motif",
+          "atMs": 200,
+          "paths": {
+            "landscape": "solution-landscape.svg",
+            "portrait": "solution-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.16,
+            "width": 0.92,
+            "height": 0.79
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.14,
+              "width": 0.89,
+              "height": 0.82
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "solution-motif",
+          "atMs": 200,
+          "durationMs": 1000,
+          "effect": "morph",
+          "easing": "ease-out"
+        },
+        {
+          "type": "text.show",
+          "id": "intervention-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "Put each decision on the right side",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-ac8f116943da",
+          "atMs": 250,
+          "text": "Device Integrity gathers platform tokens and defense-in-depth signals but leaves allow or block to your backend. App Review owns thresholds, persistence, native prompts, and a feedback fallback without making the application branch by platform.",
+          "caption": "Device Integrity gathers platform tokens and defense-in-depth signals but leaves allow or block to your backend. App Review owns thresholds, persistence, native prompts, and a feedback fallback without making the application branch by platform."
+        }
+      ]
+    },
+    {
+      "id": "short-source-and-product-proof",
+      "durationMs": 14500,
+      "storyBeats": [
+        "proof"
+      ],
+      "composition": {
+        "landscape": "code-left-demo-right",
+        "portrait": "code-over-demo"
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "proof-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "Opaque token out; server verdict back",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "code.show",
+          "id": "source-code",
+          "role": "code",
+          "atMs": 250,
+          "language": "java",
+          "path": "excerpt.txt",
+          "bounds": {
+            "x": 0.035,
+            "y": 0.17,
+            "width": 0.48,
+            "height": 0.72
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.15,
+              "width": 0.89,
+              "height": 0.35
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "proof-capture",
+          "role": "proof",
+          "kind": "capture",
+          "atMs": 450,
+          "path": "capture-1.png",
+          "bounds": {
+            "x": 0.55,
+            "y": 0.17,
+            "width": 0.42,
+            "height": 0.72
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.54,
+              "width": 0.89,
+              "height": 0.38
+            }
+          }
+        },
+        {
+          "type": "focus.show",
+          "id": "source-focus",
+          "target": "source-code",
+          "atMs": 4000,
+          "relativeBounds": {
+            "x": 0.02,
+            "y": 0.08,
+            "width": 0.96,
+            "height": 0.5
+          },
+          "label": "Put each decision on the right side",
+          "color": "50d8ff"
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-c4473013f2bf",
+          "atMs": 250,
+          "text": "The Java code fetches a nonce, requests the platform token, and forwards it without interpreting it. The review scheduler separately encodes launches, age, and cooldown as policy rather than scattered prompt calls.",
+          "caption": "The Java code fetches a nonce, requests the platform token, and forwards it without interpreting it. The review scheduler separately encodes launches, age, and cooldown as policy rather than scattered prompt calls."
+        }
+      ]
+    },
+    {
+      "id": "short-canonical-captures",
+      "durationMs": 12000,
+      "storyBeats": [
+        "proof"
+      ],
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "captures-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "What changes in the actual workflow",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "canonical-capture-1",
+          "role": "proof",
+          "kind": "capture",
+          "atMs": 250,
+          "path": "capture-1.png",
+          "bounds": {
+            "x": 0.035,
+            "y": 0.19,
+            "width": 0.44,
+            "height": 0.68
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.16,
+              "width": 0.88,
+              "height": 0.25
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "canonical-capture-2",
+          "role": "proof",
+          "kind": "capture",
+          "atMs": 600,
+          "path": "capture-2.jpg",
+          "bounds": {
+            "x": 0.52,
+            "y": 0.19,
+            "width": 0.44,
+            "height": 0.32
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.43,
+              "width": 0.88,
+              "height": 0.25
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "canonical-capture-1",
+          "atMs": 250,
+          "durationMs": 850,
+          "effects": {
+            "landscape": "slide-right",
+            "portrait": "slide-up"
+          },
+          "easing": "ease-out"
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-7225d49af6c7",
+          "atMs": 250,
+          "text": "This is the shipped fallback rating sheet for platforms without a native prompt. High ratings can continue to the store; lower ratings can reach a feedback listener instead of being discarded.",
+          "caption": "This is the shipped fallback rating sheet for platforms without a native prompt. High ratings can continue to the store; lower ratings can reach a feedback listener instead of being discarded."
+        }
+      ]
+    },
+    {
+      "id": "short-developer-victory",
+      "durationMs": 11500,
+      "storyBeats": [
+        "victory"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "victory-motif",
+          "atMs": 200,
+          "paths": {
+            "landscape": "victory-landscape.svg",
+            "portrait": "victory-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.16,
+            "width": 0.92,
+            "height": 0.79
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.14,
+              "width": 0.89,
+              "height": 0.82
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "victory-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "Higher attack cost, lower user annoyance",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-0470fbdca133",
+          "atMs": 250,
+          "text": "The developer gains one portable integrity surface and one restrained review policy, while keeping security decisions off the untrusted client and avoiding prompt spam.",
+          "caption": "The developer gains one portable integrity surface and one restrained review policy, while keeping security decisions off the untrusted client and avoiding prompt spam."
+        }
+      ]
+    },
+    {
+      "id": "short-outro",
+      "durationMs": 15000,
+      "storyBeats": [
+        "outro"
+      ],
+      "actions": [
+        {
+          "type": "outro.show",
+          "id": "next",
+          "atMs": 0,
+          "durationMs": 1100,
+          "eyebrow": "CODENAME ONE · ENGINEERING STORY",
+          "title": "Which decision belongs on your server?",
+          "subtitle": "Source, captions, and the full article are linked below.",
+          "prompt": "Tell us whether attestation, RASP, or review timing needs a deeper demo.",
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-1f9ce9b602fb",
+          "atMs": 250,
+          "text": "Tell us whether attestation, RASP, or review timing needs a deeper demo.",
+          "caption": "Tell us whether attestation, RASP, or review timing needs a deeper demo."
+        }
+      ]
+    }
+  ]
+}

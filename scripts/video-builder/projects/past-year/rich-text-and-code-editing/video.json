@@ -1,0 +1,802 @@
+{
+  "schemaVersion": 1,
+  "editorial": {
+    "storyType": "code-and-capture",
+    "status": "approved",
+    "topicTerms": [
+      "CodeEditor",
+      "RichTextArea",
+      "syntax highlighting",
+      "rich text",
+      "code editing"
+    ],
+    "proof": [
+      "canonical article source",
+      "independent technical documentation",
+      "article code",
+      "canonical product captures"
+    ],
+    "humanBeat": "A developer needs real keyboard behavior, formatting, completion, and diagnostics without rebuilding an editor for every mobile and desktop port.",
+    "visualIdentity": "Two visibly different editors meet at a semantic command channel, then fan out to bundled web-view and optional native engines.",
+    "bespokeVisualization": "Rich text and code remain separate products above one command, query, and event bridge.",
+    "heroJourney": {
+      "identity": "Codename One and portable visual editing are introduced.",
+      "problem": "A text area does not provide the keyboard, selection, formatting, language, and diagnostic behavior users expect from an editor.",
+      "difficulty": "Input methods, focus, virtual keyboards, syntax grammars, completion, HTML, and native peers vary across targets.",
+      "intervention": "AbstractEditorComponent defines semantic commands, queries, and events for interchangeable editor engines.",
+      "victory": "The developer uses CodeEditor or RichTextArea while the same Java API reaches iOS, Android, desktop, and web."
+    },
+    "problemDimensions": [
+      "platform input behavior",
+      "two different content models",
+      "optional engine weight"
+    ],
+    "resolutionMap": [
+      {
+        "problem": "platform input behavior",
+        "solution": "a bundled web-view engine with an optional native peer",
+        "proof": "the two-backend architecture and real editor captures"
+      },
+      {
+        "problem": "two different content models",
+        "solution": "semantic commands, queries, and events",
+        "proof": "CodeEditor and RichTextArea share AbstractEditorComponent"
+      },
+      {
+        "problem": "optional engine weight",
+        "solution": "bundle CodeMirror assets only when CodeEditor is used",
+        "proof": "the API-use build scan described in the article"
+      }
+    ]
+  },
+  "output": {
+    "frameRate": 30,
+    "landscapeWidth": 1920,
+    "landscapeHeight": 1080,
+    "portraitWidth": 1080,
+    "portraitHeight": 1920,
+    "videoBitRate": 8000000
+  },
+  "narration": {
+    "provider": "kokoro",
+    "voice": "af_heart:60,af_bella:40",
+    "language": "en-us",
+    "speed": 0.97,
+    "model": ".video-tools/kokoro/kokoro-v1.0.onnx",
+    "minimumGapMs": 250,
+    "pronunciations": {
+      "Codename One": "Codename One",
+      "API": "API",
+      "AI": "AI",
+      "APK": "APK",
+      "AR/VR": "augmented reality and virtual reality",
+      "ARKit": "A-R kit",
+      "ARCore": "A-R core",
+      "AR": "A-R",
+      "VR": "V-R",
+      "2D": "2D",
+      "3D": "3D",
+      "GPU": "GPU",
+      "GA4": "G-A four",
+      "GDPR": "G-D-P-R",
+      "CCPA": "C-C-P-A",
+      "DPI": "D-P-I",
+      "glTF": "G-L-T-F",
+      "JVM": "JVM",
+      "JIT": "JIT",
+      "AOT": "A-O-T",
+      "GC": "G-C",
+      "CI": "C-I",
+      "CSS": "CSS",
+      "iOS": "iOS",
+      "macOS": "macOS",
+      "tvOS": "tvOS",
+      "UWP": "U-W-P",
+      "NFC": "NFC",
+      "PCM": "PCM",
+      "RGBA": "RGBA",
+      "EDT": "E-D-T",
+      "ETA": "E-T-A",
+      "SRT": "SRT",
+      "VTT": "VTT",
+      "AAC": "A-A-C",
+      "H264": "H two sixty four",
+      "HTML": "HTML",
+      "IDE": "I-D-E",
+      "JS": "JS",
+      "XML": "XML",
+      "JSON": "jay son",
+      "WYSIWYG": "wizzy wig",
+      "CodeEditor": "Code Editor",
+      "RichTextArea": "Rich Text Area",
+      "AbstractEditorComponent": "Abstract Editor Component",
+      "CodeMirror": "Code Mirror",
+      "WidgetKit": "Widget Kit",
+      "ActivityKit": "Activity Kit",
+      "RemoteViews": "Remote Views",
+      "Dynamic Island": "Dynamic Island",
+      "JavaSE": "Java S-E",
+      "WidgetTimeline": "Widget Timeline",
+      "LiveActivity": "Live Activity",
+      "LiveActivityDescriptor": "Live Activity Descriptor",
+      "SurfaceDynamicText": "Surface Dynamic Text",
+      "VideoIO": "video I-O",
+      "AudioMixer": "Audio Mixer",
+      "AppGallery": "App Gallery",
+      "FFmpeg": "F-F-M-peg",
+      "WAVWriter": "wave writer",
+      "SVG": "SVG",
+      "SPI": "S-P-I",
+      "AnalyticsService": "Analytics Service",
+      "AnalyticsProvider": "Analytics Provider",
+      "AbstractAnalyticsProvider": "Abstract Analytics Provider",
+      "CodenameOneAnalyticsProvider": "Codename One Analytics Provider",
+      "RASP": "rasp",
+      "DeviceIntegrity": "Device Integrity",
+      "AppReview": "App Review",
+      "CarApplication": "Car Application",
+      "CarScreen": "Car Screen",
+      "CarTemplate": "Car Template",
+      "CarPlay": "Car Play",
+      "Android Auto": "Android Auto",
+      "App Attest": "App Attest",
+      "Play Integrity": "Play Integrity",
+      "StoreKit": "Store Kit",
+      "Matomo": "ma-TOE-mo",
+      "Firebase": "Fire base",
+      "Frida": "FREE-da",
+      "SKU": "S-K-U",
+      "UiModeManager": "U-I Mode Manager",
+      "AndroidX": "Android X",
+      "CN.isTV()": "C-N is T-V",
+      "Display.isTV()": "Display is T-V",
+      "TARGET_OS_TV": "target O-S T-V",
+      "MapSurface": "Map Surface",
+      "MapView": "Map View",
+      "NativeMap": "Native Map",
+      "MapKit": "Map Kit",
+      "MapComponent": "Map Component",
+      "MapLibre": "Map Libre",
+      "GeneralPath": "General Path",
+      "ORM": "O-R-M",
+      "OAuth": "oh auth",
+      "OIDC": "O-I-D-C",
+      "gRPC": "G-R-P-C",
+      "GraphQL": "graph Q-L",
+      "Box2D": "box 2D",
+      "JDWP": "J-D-W-P",
+      "JUnit": "J unit",
+      "ParparVM": "par par V-M",
+      "Win32": "win thirty two",
+      "App Store Connect": "App Store Connect",
+      "cn1": "C-N one",
+      "mvn": "Maven",
+      "clang": "clang",
+      "2FA": "two F-A",
+      ".p8": "P eight",
+      ".glb": "G-L-B",
+      ".ipa": "I-P-A"
+    }
+  },
+  "id": "rich-text-and-code-editing",
+  "title": "Rich Text And Code Editing: RichTextArea And A Syntax-Highlighting CodeEditor",
+  "scenes": [
+    {
+      "id": "who-and-what",
+      "durationMs": 13000,
+      "storyBeats": [
+        "identity"
+      ],
+      "actions": [
+        {
+          "type": "image.show",
+          "id": "brand",
+          "role": "brand",
+          "kind": "illustration",
+          "atMs": 150,
+          "path": "codename-one-logo.png",
+          "bounds": {
+            "x": 0.045,
+            "y": 0.04,
+            "width": 0.12,
+            "height": 0.04
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.18,
+              "height": 0.027
+            }
+          }
+        },
+        {
+          "type": "svg.show",
+          "id": "opening-motif",
+          "atMs": 200,
+          "paths": {
+            "landscape": "opening-landscape.svg",
+            "portrait": "opening-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.58,
+            "y": 0.13,
+            "width": 0.38,
+            "height": 0.74
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.2,
+              "width": 0.89,
+              "height": 0.73
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "opening-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "Text input becomes a product\nlong before it becomes an editor",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.055,
+            "y": 0.23,
+            "width": 0.49,
+            "height": 0.34
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.06,
+              "width": 0.86,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "opening-voice",
+          "atMs": 650,
+          "text": "Codename One builds native apps in Java from one codebase. Today, rich text and syntax-aware code editing share one portable contract without pretending they are the same editor.",
+          "caption": "Codename One builds native apps in Java from one codebase. Today, rich text and syntax-aware code editing share one portable contract without pretending they are the same editor."
+        }
+      ]
+    },
+    {
+      "id": "the-real-world-problem",
+      "durationMs": 17500,
+      "storyBeats": [
+        "problem"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "problem-motif",
+          "atMs": 200,
+          "paths": {
+            "landscape": "problem-landscape.svg",
+            "portrait": "problem-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.16,
+            "width": 0.92,
+            "height": 0.79
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.14,
+              "width": 0.89,
+              "height": 0.82
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "problem-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "A text area is not an editor",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-e81dafad24f5",
+          "atMs": 250,
+          "text": "Real editing means composition input, focus, selection, undo, formatting, syntax, diagnostics, completion, and correct virtual-keyboard behavior. Reimplementing those details per platform turns two components into a permanent porting project.",
+          "caption": "Real editing means composition input, focus, selection, undo, formatting, syntax, diagnostics, completion, and correct virtual-keyboard behavior. Reimplementing those details per platform turns two components into a permanent porting project."
+        }
+      ]
+    },
+    {
+      "id": "independent-context-1",
+      "durationMs": 9500,
+      "storyBeats": [
+        "difficulty"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "evidence-1",
+          "atMs": 200,
+          "paths": {
+            "landscape": "evidence-1-landscape.svg",
+            "portrait": "evidence-1-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.16,
+            "width": 0.92,
+            "height": 0.79
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.14,
+              "width": 0.89,
+              "height": 0.82
+            }
+          },
+          "role": "evidence",
+          "sourceTitle": "MDN contenteditable",
+          "sourceUrl": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/contenteditable"
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-88e688421aa6",
+          "atMs": 250,
+          "text": "The web platform exposes editable content, selection, and input behavior rather than treating formatted editing as plain string entry.",
+          "caption": "The web platform exposes editable content, selection, and input behavior rather than treating formatted editing as plain string entry."
+        }
+      ]
+    },
+    {
+      "id": "independent-context-2",
+      "durationMs": 8500,
+      "storyBeats": [
+        "difficulty"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "evidence-2",
+          "atMs": 200,
+          "paths": {
+            "landscape": "evidence-2-landscape.svg",
+            "portrait": "evidence-2-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.16,
+            "width": 0.92,
+            "height": 0.79
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.14,
+              "width": 0.89,
+              "height": 0.82
+            }
+          },
+          "role": "evidence",
+          "sourceTitle": "CodeMirror System Guide",
+          "sourceUrl": "https://codemirror.net/docs/guide/"
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-fe3d716b10d7",
+          "atMs": 250,
+          "text": "CodeMirror documents an extensible editor architecture for language support, editing behavior, and asynchronous integrations.",
+          "caption": "CodeMirror documents an extensible editor architecture for language support, editing behavior, and asynchronous integrations."
+        }
+      ]
+    },
+    {
+      "id": "the-change-in-mechanism",
+      "durationMs": 18500,
+      "storyBeats": [
+        "intervention"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "solution-motif",
+          "atMs": 200,
+          "paths": {
+            "landscape": "solution-landscape.svg",
+            "portrait": "solution-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.16,
+            "width": 0.92,
+            "height": 0.79
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.14,
+              "width": 0.89,
+              "height": 0.82
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "solution-motif",
+          "atMs": 200,
+          "durationMs": 1000,
+          "effect": "morph",
+          "easing": "ease-out"
+        },
+        {
+          "type": "text.show",
+          "id": "intervention-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "Share intent, not pixels",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-307ff476b5f3",
+          "atMs": 250,
+          "text": "RichTextArea and CodeEditor send semantic commands, queries, and events through AbstractEditorComponent. The bundled engine uses each platform's web view; a port can replace it with a native peer, and an application can point CodeEditor at a richer hosted engine.",
+          "caption": "RichTextArea and CodeEditor send semantic commands, queries, and events through AbstractEditorComponent. The bundled engine uses each platform's web view; a port can replace it with a native peer, and an application can point CodeEditor at a richer hosted engine."
+        }
+      ]
+    },
+    {
+      "id": "source-and-product-proof",
+      "durationMs": 14500,
+      "storyBeats": [
+        "proof"
+      ],
+      "composition": {
+        "landscape": "code-left-demo-right",
+        "portrait": "code-over-demo"
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "proof-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "Completion can wait without freezing the editor",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "code.show",
+          "id": "source-code",
+          "role": "code",
+          "atMs": 250,
+          "language": "java",
+          "path": "excerpt.txt",
+          "bounds": {
+            "x": 0.035,
+            "y": 0.17,
+            "width": 0.48,
+            "height": 0.72
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.15,
+              "width": 0.89,
+              "height": 0.35
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "proof-capture",
+          "role": "proof",
+          "kind": "capture",
+          "atMs": 450,
+          "path": "capture-1.png",
+          "bounds": {
+            "x": 0.55,
+            "y": 0.17,
+            "width": 0.42,
+            "height": 0.72
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.54,
+              "width": 0.89,
+              "height": 0.38
+            }
+          }
+        },
+        {
+          "type": "focus.show",
+          "id": "source-focus",
+          "target": "source-code",
+          "atMs": 4000,
+          "relativeBounds": {
+            "x": 0.02,
+            "y": 0.08,
+            "width": 0.96,
+            "height": 0.5
+          },
+          "label": "Share intent, not pixels",
+          "color": "50d8ff"
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-7b709d48dfaf",
+          "atMs": 250,
+          "text": "The Java API selects a language and theme, then delivers completion results asynchronously. Rich text uses the same bridge for HTML and formatting commands while keeping its own content model and toolbar.",
+          "caption": "The Java API selects a language and theme, then delivers completion results asynchronously. Rich text uses the same bridge for HTML and formatting commands while keeping its own content model and toolbar."
+        }
+      ]
+    },
+    {
+      "id": "canonical-captures",
+      "durationMs": 16500,
+      "storyBeats": [
+        "proof"
+      ],
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "captures-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "What changes in the actual workflow",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "canonical-capture-1",
+          "role": "proof",
+          "kind": "capture",
+          "atMs": 250,
+          "path": "capture-1.png",
+          "bounds": {
+            "x": 0.035,
+            "y": 0.19,
+            "width": 0.44,
+            "height": 0.68
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.16,
+              "width": 0.88,
+              "height": 0.25
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "canonical-capture-2",
+          "role": "proof",
+          "kind": "capture",
+          "atMs": 600,
+          "path": "capture-2.png",
+          "bounds": {
+            "x": 0.52,
+            "y": 0.19,
+            "width": 0.44,
+            "height": 0.32
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.43,
+              "width": 0.88,
+              "height": 0.25
+            }
+          }
+        },
+        {
+          "type": "image.show",
+          "id": "canonical-capture-3",
+          "role": "proof",
+          "kind": "capture",
+          "atMs": 950,
+          "path": "capture-3.png",
+          "bounds": {
+            "x": 0.52,
+            "y": 0.55,
+            "width": 0.44,
+            "height": 0.32
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.7,
+              "width": 0.88,
+              "height": 0.25
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "canonical-capture-1",
+          "atMs": 250,
+          "durationMs": 850,
+          "effects": {
+            "landscape": "slide-right",
+            "portrait": "slide-up"
+          },
+          "easing": "ease-out"
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-b4c6620f2566",
+          "atMs": 250,
+          "text": "These are the shipped components: Java highlighting, line numbers, completion, a dark theme, and a WYSIWYG toolbar editing real HTML. The Playground already uses CodeEditor, so the component is exercised by an actual product.",
+          "caption": "These are the shipped components: Java highlighting, line numbers, completion, a dark theme, and a WYSIWYG toolbar editing real HTML. The Playground already uses CodeEditor, so the component is exercised by an actual product."
+        }
+      ]
+    },
+    {
+      "id": "developer-victory",
+      "durationMs": 13500,
+      "storyBeats": [
+        "victory"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "victory-motif",
+          "atMs": 200,
+          "paths": {
+            "landscape": "victory-landscape.svg",
+            "portrait": "victory-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.16,
+            "width": 0.92,
+            "height": 0.79
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.055,
+              "y": 0.14,
+              "width": 0.89,
+              "height": 0.82
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "victory-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "Use the editor the screen needs",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.13
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.88,
+              "height": 0.12
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-140ddbfad8f6",
+          "atMs": 250,
+          "text": "The developer gets rich text or code-specific behavior from one Java API, carries no CodeMirror payload when it is unused, and keeps a route to a richer or native engine when the product needs one.",
+          "caption": "The developer gets rich text or code-specific behavior from one Java API, carries no CodeMirror payload when it is unused, and keeps a route to a richer or native engine when the product needs one."
+        }
+      ]
+    },
+    {
+      "id": "outro",
+      "durationMs": 15000,
+      "storyBeats": [
+        "outro"
+      ],
+      "actions": [
+        {
+          "type": "outro.show",
+          "id": "next",
+          "atMs": 0,
+          "durationMs": 1100,
+          "eyebrow": "CODENAME ONE · ENGINEERING STORY",
+          "title": "Which editor behavior should we stress next?",
+          "subtitle": "Source, captions, and the full article are linked below.",
+          "prompt": "Choose completion, diagnostics, mobile keyboards, or rich-text persistence.",
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "cue-e16d3c37be9e",
+          "atMs": 250,
+          "text": "Choose completion, diagnostics, mobile keyboards, or rich-text persistence.",
+          "caption": "Choose completion, diagnostics, mobile keyboards, or rich-text persistence."
+        }
+      ]
+    }
+  ]
+}

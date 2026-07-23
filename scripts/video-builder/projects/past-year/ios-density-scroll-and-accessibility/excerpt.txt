@@ -1,0 +1,2 @@
+UIManager.getInstance().zoomFonts(1.2f); // 20% larger
+UIManager.getInstance().zoomFonts(0.8f); // 20% smaller

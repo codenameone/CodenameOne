@@ -1,0 +1,850 @@
+{
+  "schemaVersion": 1,
+  "id": "ar-vr-support-simulation",
+  "title": "AR And VR In Java: ARKit, ARCore, And A Virtual Room You Can Debug",
+  "editorial": {
+    "storyType": "live-demo",
+    "status": "approved",
+    "proof": [
+      "independent Stack Overflow and Reddit complaints",
+      "official ARCore emulator requirements",
+      "compiled JavaSE AR session",
+      "compiled Media360View"
+    ],
+    "humanBeat": "A developer loses the normal edit-run-debug loop because two SDKs and a physical room become part of every test.",
+    "visualIdentity": "Two platform lanes multiply the work, then collapse into one Java lane whose state changes are visible in a running simulator.",
+    "bespokeVisualization": "A sourced evidence wall establishes the split before a problem-to-resolution map closes every row with code and live state.",
+    "heroJourney": {
+      "identity": "Codename One is introduced as a native-app Java platform and the topic is augmented and virtual reality.",
+      "problem": "AR development splits across APIs, languages, tools, devices, sensors, and physical environments.",
+      "difficulty": "Independent developers describe simulation and debugging as unavailable, fragile, or effectively impossible in common loops.",
+      "intervention": "The Codename One AR API and JavaSE simulation collapse duplicated application work into one Java development loop.",
+      "victory": "The developer ships through native ARKit and ARCore backends while reproducing difficult states at the desk."
+    },
+    "problemDimensions": [
+      "apis",
+      "tools",
+      "languages",
+      "debugging",
+      "hardware",
+      "simulation"
+    ],
+    "resolutionMap": [
+      {
+        "problem": "apis",
+        "solution": "one com.codename1.ar API",
+        "proof": "excerpt.txt and native backend diagram"
+      },
+      {
+        "problem": "tools",
+        "solution": "one Codename One project and build pipeline",
+        "proof": "compiled demo module"
+      },
+      {
+        "problem": "languages",
+        "solution": "shared Java application code",
+        "proof": "syntax-highlighted Java source"
+      },
+      {
+        "problem": "debugging",
+        "solution": "breakpoints in the JavaSE process",
+        "proof": "live tracking state transitions"
+      },
+      {
+        "problem": "hardware",
+        "solution": "AR.isSupported and native backend selection",
+        "proof": "source API and native target diagram"
+      },
+      {
+        "problem": "simulation",
+        "solution": "virtual room state as controllable input",
+        "proof": "compiled JavaSE AR backend actions"
+      }
+    ]
+  },
+  "output": {
+    "frameRate": 30,
+    "landscapeWidth": 1920,
+    "landscapeHeight": 1080,
+    "portraitWidth": 1080,
+    "portraitHeight": 1920,
+    "videoBitRate": 8000000
+  },
+  "narration": {
+    "provider": "kokoro",
+    "voice": "af_heart:60,af_bella:40",
+    "language": "en-us",
+    "speed": 0.97,
+    "model": ".video-tools/kokoro/kokoro-v1.0.onnx",
+    "minimumGapMs": 250,
+    "pronunciations": {
+      "Codename One": "Codename One",
+      "API": "API",
+      "AI": "AI",
+      "APK": "APK",
+      "AR/VR": "augmented reality and virtual reality",
+      "ARKit": "A-R kit",
+      "ARCore": "A-R core",
+      "AR": "A-R",
+      "VR": "V-R",
+      "2D": "2D",
+      "3D": "3D",
+      "GPU": "GPU",
+      "GA4": "G-A four",
+      "GDPR": "G-D-P-R",
+      "CCPA": "C-C-P-A",
+      "DPI": "D-P-I",
+      "glTF": "G-L-T-F",
+      "JVM": "JVM",
+      "JIT": "JIT",
+      "AOT": "A-O-T",
+      "GC": "G-C",
+      "CI": "C-I",
+      "CSS": "CSS",
+      "iOS": "iOS",
+      "macOS": "macOS",
+      "tvOS": "tvOS",
+      "UWP": "U-W-P",
+      "NFC": "NFC",
+      "PCM": "PCM",
+      "RGBA": "RGBA",
+      "EDT": "EDT",
+      "SRT": "SRT",
+      "VTT": "VTT",
+      "AAC": "A-A-C",
+      "H264": "H two sixty four",
+      "HTML": "HTML",
+      "IDE": "I-D-E",
+      "JS": "JS",
+      "XML": "XML",
+      "JSON": "jay son",
+      "WYSIWYG": "wizzy wig",
+      "CodeEditor": "Code Editor",
+      "RichTextArea": "Rich Text Area",
+      "AbstractEditorComponent": "Abstract Editor Component",
+      "CodeMirror": "Code Mirror",
+      "VideoIO": "video I-O",
+      "WAVWriter": "wave writer",
+      "SVG": "SVG",
+      "SPI": "S-P-I",
+      "AnalyticsService": "Analytics Service",
+      "AnalyticsProvider": "Analytics Provider",
+      "AbstractAnalyticsProvider": "Abstract Analytics Provider",
+      "CodenameOneAnalyticsProvider": "Codename One Analytics Provider",
+      "RASP": "rasp",
+      "DeviceIntegrity": "Device Integrity",
+      "AppReview": "App Review",
+      "CarApplication": "Car Application",
+      "CarScreen": "Car Screen",
+      "CarTemplate": "Car Template",
+      "UiModeManager": "U-I Mode Manager",
+      "AndroidX": "Android X",
+      "CN.isTV()": "C-N is T-V",
+      "Display.isTV()": "Display is T-V",
+      "TARGET_OS_TV": "target O-S T-V",
+      "MapSurface": "Map Surface",
+      "MapView": "Map View",
+      "NativeMap": "Native Map",
+      "MapKit": "Map Kit",
+      "MapComponent": "Map Component",
+      "MapLibre": "Map Libre",
+      "GeneralPath": "General Path",
+      "ORM": "O-R-M",
+      "OAuth": "oh auth",
+      "OIDC": "O-I-D-C",
+      "gRPC": "G-R-P-C",
+      "GraphQL": "graph Q-L",
+      "Box2D": "box 2D",
+      "JDWP": "J-D-W-P",
+      "JUnit": "J unit",
+      "ParparVM": "par par V-M",
+      "Win32": "win thirty two",
+      "App Store Connect": "App Store Connect",
+      "cn1": "C-N one",
+      "mvn": "Maven",
+      "clang": "clang",
+      "2FA": "two F-A",
+      ".p8": "P eight",
+      ".glb": "G-L-B",
+      ".ipa": "I-P-A"
+    }
+  },
+  "scenes": [
+    {
+      "id": "who-and-what",
+      "durationMs": 14000,
+      "storyBeats": [
+        "identity"
+      ],
+      "actions": [
+        {
+          "type": "image.show",
+          "id": "brand-mark",
+          "role": "brand",
+          "kind": "illustration",
+          "atMs": 250,
+          "path": "codename-one-logo.png",
+          "bounds": {
+            "x": 0.045,
+            "y": 0.045,
+            "width": 0.12,
+            "height": 0.04
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.025,
+              "width": 0.18,
+              "height": 0.027
+            }
+          }
+        },
+        {
+          "type": "svg.show",
+          "id": "welcome-graphic",
+          "atMs": 150,
+          "paths": {
+            "landscape": "ar-intro-landscape.svg",
+            "portrait": "ar-intro-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.58,
+            "y": 0.09,
+            "width": 0.37,
+            "height": 0.8
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.12,
+              "y": 0.39,
+              "width": 0.76,
+              "height": 0.48
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "welcome-graphic",
+          "atMs": 150,
+          "durationMs": 900,
+          "effect": "morph",
+          "easing": "ease-out"
+        },
+        {
+          "type": "text.show",
+          "id": "splash-title",
+          "role": "title",
+          "atMs": 350,
+          "text": "Augmented reality\nand virtual reality",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 3,
+          "bounds": {
+            "x": 0.055,
+            "y": 0.22,
+            "width": 0.5,
+            "height": 0.3
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.07,
+              "y": 0.09,
+              "width": 0.86,
+              "height": 0.23
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "splash-promise",
+          "atMs": 800,
+          "text": "Native apps in Java · one codebase",
+          "uiid": "VideoBody",
+          "bounds": {
+            "x": 0.06,
+            "y": 0.61,
+            "width": 0.46,
+            "height": 0.07
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.12,
+              "y": 0.32,
+              "width": 0.76,
+              "height": 0.05
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "Codename One lets developers build native apps in Java from one codebase. Today, we are looking at why augmented reality and virtual reality development is unusually hard.",
+          "overflow": "extend"
+        }
+      ]
+    },
+    {
+      "id": "one-feature-two-worlds",
+      "durationMs": 18000,
+      "storyBeats": [
+        "problem"
+      ],
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "fragment-title",
+          "atMs": 0,
+          "text": "One feature. Two development worlds.",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.025,
+            "width": 0.92,
+            "height": 0.14
+          }
+        },
+        {
+          "type": "svg.show",
+          "id": "fragmentation",
+          "atMs": 450,
+          "paths": {
+            "landscape": "industry-fragmentation-landscape.svg",
+            "portrait": "industry-fragmentation-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.035,
+            "y": 0.19,
+            "width": 0.93,
+            "height": 0.75
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.18,
+              "width": 0.88,
+              "height": 0.76
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "Before any framework enters the picture, a basic augmented reality feature already splits. ARKit and ARCore expose different APIs, live in different toolchains, and pull developers toward different languages and build environments.",
+          "overflow": "extend"
+        }
+      ]
+    },
+    {
+      "id": "the-simulator-problem",
+      "durationMs": 13000,
+      "storyBeats": [
+        "difficulty"
+      ],
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "sim-problem-title",
+          "atMs": 0,
+          "text": "Even the feedback loop depends on hardware",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.025,
+            "width": 0.92,
+            "height": 0.14
+          }
+        },
+        {
+          "type": "svg.show",
+          "id": "stackoverflow-proof",
+          "role": "evidence",
+          "kind": "capture",
+          "atMs": 450,
+          "paths": {
+            "landscape": "evidence-stackoverflow-landscape.svg",
+            "portrait": "evidence-stackoverflow-portrait.svg"
+          },
+          "sourceTitle": "Is it possible to run ARKit in Simulator?",
+          "sourceUrl": "https://stackoverflow.com/questions/45034240/is-it-possible-to-run-arkit-in-simulator/45034297",
+          "bounds": {
+            "x": 0.06,
+            "y": 0.2,
+            "width": 0.88,
+            "height": 0.72
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.18,
+              "width": 0.84,
+              "height": 0.76
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "The camera, gyroscope, accelerometer, and physical room are part of the program. That is why a normal simulator cannot simply invent the state that ARKit expects.",
+          "overflow": "extend"
+        }
+      ]
+    },
+    {
+      "id": "debugging-on-two-devices",
+      "durationMs": 16500,
+      "storyBeats": [
+        "difficulty"
+      ],
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "debug-title",
+          "atMs": 0,
+          "text": "A bug can belong to one device, one room, one moment",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.025,
+            "width": 0.92,
+            "height": 0.14
+          }
+        },
+        {
+          "type": "svg.show",
+          "id": "reddit-proof",
+          "role": "evidence",
+          "kind": "capture",
+          "atMs": 450,
+          "paths": {
+            "landscape": "evidence-reddit-landscape.svg",
+            "portrait": "evidence-reddit-portrait.svg"
+          },
+          "sourceTitle": "ARKit 3 with AR Foundation in Unity3D",
+          "sourceUrl": "https://www.reddit.com/r/augmentedreality/comments/by4v4p/arkit_3_with_ar_foundation_in_unity3d_getting/",
+          "bounds": {
+            "x": 0.06,
+            "y": 0.2,
+            "width": 0.88,
+            "height": 0.72
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.18,
+              "width": 0.84,
+              "height": 0.76
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "Now reproduce that failure twice: once through the iOS device loop and once through the Android device loop. Tracking loss, changing planes, lighting, and image detection can disappear before a debugger catches them.",
+          "overflow": "extend"
+        }
+      ]
+    },
+    {
+      "id": "simulation-is-an-environment",
+      "durationMs": 16000,
+      "storyBeats": [
+        "difficulty"
+      ],
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "environment-title",
+          "atMs": 0,
+          "text": "Simulation is not a checkbox",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.025,
+            "width": 0.92,
+            "height": 0.14
+          }
+        },
+        {
+          "type": "svg.show",
+          "id": "google-proof",
+          "role": "evidence",
+          "kind": "capture",
+          "atMs": 450,
+          "paths": {
+            "landscape": "evidence-arcore-landscape.svg",
+            "portrait": "evidence-arcore-portrait.svg"
+          },
+          "sourceTitle": "Run AR apps in Android Emulator",
+          "sourceUrl": "https://developers.google.com/ar/develop/java/emulator",
+          "bounds": {
+            "x": 0.06,
+            "y": 0.2,
+            "width": 0.88,
+            "height": 0.72
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.18,
+              "width": 0.84,
+              "height": 0.76
+            }
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "Even a supported emulator brings its own system image, virtual camera, AR services, and architecture requirements. The setup is another environment to maintain before application code can be tested.",
+          "overflow": "extend"
+        }
+      ]
+    },
+    {
+      "id": "one-development-loop",
+      "durationMs": 20000,
+      "storyBeats": [
+        "intervention"
+      ],
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "resolution-title",
+          "atMs": 0,
+          "text": "Now collapse the duplicated work",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.025,
+            "width": 0.92,
+            "height": 0.14
+          }
+        },
+        {
+          "type": "svg.show",
+          "id": "resolution-map",
+          "atMs": 350,
+          "paths": {
+            "landscape": "resolution-map-landscape.svg",
+            "portrait": "resolution-map-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.04,
+            "y": 0.18,
+            "width": 0.92,
+            "height": 0.77
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.06,
+              "y": 0.17,
+              "width": 0.88,
+              "height": 0.79
+            }
+          }
+        },
+        {
+          "type": "transition",
+          "target": "resolution-map",
+          "atMs": 350,
+          "durationMs": 900,
+          "effect": "morph",
+          "easing": "ease-out"
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "This is where the Codename One augmented reality API changes the shape of the work. One Java API fronts the native iOS and Android backends, while the JavaSE simulator keeps the same application logic inside a desktop debug loop.",
+          "overflow": "extend"
+        }
+      ]
+    },
+    {
+      "id": "run-the-same-ar-code",
+      "durationMs": 28500,
+      "storyBeats": [
+        "proof"
+      ],
+      "composition": {
+        "landscape": "code-left-demo-right",
+        "portrait": "code-over-demo"
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "running-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "The sample is running, not posing for a screenshot",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2
+        },
+        {
+          "type": "code.show",
+          "id": "ar-code",
+          "role": "code",
+          "atMs": 200,
+          "language": "java",
+          "path": "excerpt.txt"
+        },
+        {
+          "type": "demo.mount",
+          "id": "ar-running",
+          "role": "demo",
+          "atMs": 250,
+          "class": "com.codename1.videobuilder.demos.ARDemoScene",
+          "animated": false
+        },
+        {
+          "type": "demo.action",
+          "atMs": 3100,
+          "name": "placeModel",
+          "arguments": {}
+        },
+        {
+          "type": "demo.action",
+          "atMs": 6750,
+          "name": "scaleModel",
+          "arguments": {
+            "scale": 1.8
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 10000,
+          "name": "moveModel",
+          "arguments": {
+            "x": 0.24
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 13000,
+          "name": "trackingLimited",
+          "arguments": {}
+        },
+        {
+          "type": "demo.action",
+          "atMs": 16000,
+          "name": "trackingNormal",
+          "arguments": {}
+        },
+        {
+          "type": "focus.show",
+          "id": "ar-focus",
+          "target": "ar-code",
+          "atMs": 4500,
+          "relativeBounds": {
+            "x": 0.02,
+            "y": 0.34,
+            "width": 0.96,
+            "height": 0.6
+          },
+          "label": "same Java handler on iOS, Android and JavaSE",
+          "color": "50d8ff"
+        },
+        {
+          "type": "replay",
+          "atMs": 19000,
+          "fromMs": 12200,
+          "toMs": 16600,
+          "rewindDurationMs": 520,
+          "rewindFps": 9,
+          "playbackRate": 0.58,
+          "label": "Again: force the failure, then recover"
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "Here is the compiled sample. The code creates a session, places an anchored model, changes the model, forces degraded tracking, and restores it. Those are application and simulator state changes, not motion applied to a picture.",
+          "overflow": "extend"
+        },
+        {
+          "type": "narration.cue",
+          "id": "replay-voice",
+          "atMs": 17200,
+          "text": "Now watch the failure itself. The simulator reports limited tracking, rewinds the state change, and plays the recovery again slowly enough to inspect.",
+          "overflow": "extend"
+        }
+      ]
+    },
+    {
+      "id": "the-vr-side-runs-too",
+      "durationMs": 18500,
+      "storyBeats": [
+        "proof",
+        "victory"
+      ],
+      "composition": {
+        "landscape": "code-left-demo-right",
+        "portrait": "code-over-demo"
+      },
+      "actions": [
+        {
+          "type": "text.show",
+          "id": "vr-title",
+          "role": "title",
+          "atMs": 0,
+          "text": "Virtual reality stays in the same Java project",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2
+        },
+        {
+          "type": "code.show",
+          "id": "vr-code",
+          "role": "code",
+          "atMs": 150,
+          "language": "java",
+          "path": "media360.txt"
+        },
+        {
+          "type": "demo.mount",
+          "id": "vr-running",
+          "role": "demo",
+          "atMs": 200,
+          "class": "com.codename1.videobuilder.demos.Media360DemoScene",
+          "animated": false
+        },
+        {
+          "type": "demo.action",
+          "atMs": 3500,
+          "name": "lookRight",
+          "arguments": {
+            "yaw": 42
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 6500,
+          "name": "lookUp",
+          "arguments": {
+            "pitch": 18
+          }
+        },
+        {
+          "type": "demo.action",
+          "atMs": 9500,
+          "name": "stereo",
+          "arguments": {}
+        },
+        {
+          "type": "demo.action",
+          "atMs": 13000,
+          "name": "recenter",
+          "arguments": {}
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "The virtual reality side is also live. Media360View changes its yaw, pitch, and stereo state through the component API. The same Java project now covers native augmented reality and portable panorama viewing.",
+          "overflow": "extend"
+        }
+      ]
+    },
+    {
+      "id": "what-the-developer-gets-back",
+      "durationMs": 18500,
+      "storyBeats": [
+        "victory"
+      ],
+      "actions": [
+        {
+          "type": "svg.show",
+          "id": "portable-proof",
+          "atMs": 250,
+          "paths": {
+            "landscape": "portable-landscape.svg",
+            "portrait": "portable-portrait.svg"
+          },
+          "bounds": {
+            "x": 0.05,
+            "y": 0.1,
+            "width": 0.9,
+            "height": 0.8
+          },
+          "orientation": {
+            "portrait": {
+              "x": 0.08,
+              "y": 0.1,
+              "width": 0.84,
+              "height": 0.8
+            }
+          }
+        },
+        {
+          "type": "text.show",
+          "id": "victory-title",
+          "atMs": 0,
+          "text": "One codebase. Native backends. A desktop debug loop.",
+          "uiid": "VideoTitle",
+          "responsive": true,
+          "maxLines": 2,
+          "bounds": {
+            "x": 0.04,
+            "y": 0.02,
+            "width": 0.92,
+            "height": 0.14
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "The APIs, languages, tools, debugging loop, simulation states, and hardware checks no longer become six separate application problems. The developer works in one Java codebase, then ships through the native ARKit and ARCore backends.",
+          "overflow": "extend"
+        }
+      ]
+    },
+    {
+      "id": "outro",
+      "durationMs": 18000,
+      "storyBeats": [
+        "outro"
+      ],
+      "actions": [
+        {
+          "type": "outro.show",
+          "id": "next",
+          "atMs": 0,
+          "durationMs": 1100,
+          "eyebrow": "CODENAME ONE · AUGMENTED + VIRTUAL REALITY",
+          "title": "Build the experience once. Test the hard states at your desk.",
+          "subtitle": "One Java API · native ARKit and ARCore · JavaSE simulation · Media360View",
+          "prompt": "Which AR debugging state costs your team the most time?",
+          "bounds": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          }
+        },
+        {
+          "type": "narration.cue",
+          "id": "voice",
+          "atMs": 650,
+          "text": "That is the practical change: one portable implementation, native augmented reality on both mobile platforms, and hard-to-reproduce room states available at the desk. Which augmented reality debugging state costs your team the most time?",
+          "overflow": "extend"
+        }
+      ]
+    }
+  ]
+}

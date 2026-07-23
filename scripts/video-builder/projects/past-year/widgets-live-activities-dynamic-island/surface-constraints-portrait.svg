@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1200" viewBox="0 0 900 1200">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#081321"/><stop offset="1" stop-color="#102b42"/></linearGradient>
+  <filter id="glow"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect width="100%" height="100%" rx="36" fill="url(#bg)"/>
+
+<text x="450" y="90" fill="#f5f8fb" font-family="Arial, sans-serif" font-size="29" font-weight="700" text-anchor="middle">SYSTEM SURFACES HAVE RULES</text>
+<rect x="95" y="160" width="710" height="820" rx="55" fill="#12253a" stroke="#425b72" stroke-width="4"/>
+<g>
+<rect x="145" y="220" width="610" height="150" rx="28" fill="#142438" stroke="#425b72" stroke-width="3"/>
+<rect x="169" y="244" width="12" height="102" rx="6" fill="#ff8a34"/>
+<text x="207" y="286" fill="#f5f8fb" font-family="Arial, sans-serif" font-size="32" font-weight="700" text-anchor="start">Text + images</text>
+<text x="207" y="332" fill="#9fb5c8" font-family="Arial, sans-serif" font-size="23" font-weight="400" text-anchor="start">serializable</text>
+</g>
+<g>
+<rect x="145" y="410" width="610" height="150" rx="28" fill="#142438" stroke="#425b72" stroke-width="3"/>
+<rect x="169" y="434" width="12" height="102" rx="6" fill="#50d8ff"/>
+<text x="207" y="476" fill="#f5f8fb" font-family="Arial, sans-serif" font-size="32" font-weight="700" text-anchor="start">Rows + columns</text>
+<text x="207" y="522" fill="#9fb5c8" font-family="Arial, sans-serif" font-size="23" font-weight="400" text-anchor="start">portable layout</text>
+</g>
+<g>
+<rect x="145" y="600" width="610" height="150" rx="28" fill="#142438" stroke="#425b72" stroke-width="3"/>
+<rect x="169" y="624" width="12" height="102" rx="6" fill="#7ce6ad"/>
+<text x="207" y="666" fill="#f5f8fb" font-family="Arial, sans-serif" font-size="32" font-weight="700" text-anchor="start">Progress + actions</text>
+<text x="207" y="712" fill="#9fb5c8" font-family="Arial, sans-serif" font-size="23" font-weight="400" text-anchor="start">native behavior</text>
+</g>
+<rect x="210" y="815" width="480" height="92" rx="30" fill="#06101b" stroke="#ff8a34" stroke-width="4"/>
+<text x="450" y="875" fill="#ffb073" font-family="Arial, sans-serif" font-size="26" font-weight="700" text-anchor="middle">COMMON SYSTEM FLOOR</text>
+
+</svg>

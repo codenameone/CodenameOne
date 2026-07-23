@@ -119,7 +119,7 @@ echo   linux_device
 echo     Builds a native Linux app ^(ELF^, no JVM^).
 echo   javascript
 echo     Builds as a web app.
-echo     *Javascript builds are an Enterprise user feature
+echo     *JavaScript builds are available to all users.
 
 goto :EOF
 :settings

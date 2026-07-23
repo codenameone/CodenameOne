@@ -1,0 +1,10 @@
+Codename One Settings now launches as a standalone Maven-distributed desktop tool for project identity, build hints, themes, and extensions. Accounts, signing, and build monitoring moved to the tools that own those jobs.
+
+Full article:
+https://www.codenameone.com/blog/standalone-codename-one-settings/?utm_source=youtube&utm_medium=short&utm_campaign=past-year-video-library
+
+Watch the related video for the complete mechanism, source links, and limitations.
+
+Series: Build, Test & Ship Codename One Apps
+
+#Java #CodenameOne #Shorts
