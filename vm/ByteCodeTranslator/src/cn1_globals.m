@@ -946,6 +946,9 @@ static _Atomic JAVA_BOOLEAN gcMarkOverflowSeen = JAVA_FALSE;
 // walks the page registry and its slots before their definitions.
 static inline JAVA_OBJECT cn1BibopSlot(CN1BibopPage* p, int i);
 static CN1BibopPage* _Atomic bibopAllPages;
+#ifdef CN1_GRACE_AUDIT
+static void cn1GraceAuditPreSweep(CODENAME_ONE_THREAD_STATE);
+#endif
 #endif
 #ifdef CN1_BIBOP_VALIDATE
 // Belt diagnostic: while set, gcMarkObject logs the class of each newly-marked object
@@ -1283,29 +1286,48 @@ void codenameOneGCMark() {
     // dangling child -> the intermittent Property->Double / container->content crash. Drain
     // every fresh NON-LEAF object here so a surviving grace object's subtree survives
     // WITH it. Primitive arrays and other leaf classes have no subtree and are left to
-    // the sweep's normal one-cycle grace. The alternating dirty-page stacks prevent a
-    // page allocated into during this mark from corrupting the stack being consumed.
+    // the sweep's normal one-cycle grace.
+    //
+    // Walk the FULL page registry, pruned by gcAllocedSinceSweep. The invariant is
+    // exact: a mark==-1 slot can only exist on a page allocated into since that
+    // page's last sweep (the sweep converts every -1 it sees to V), and EVERY
+    // allocation path sets the flag before the mark-start thread sync publishes it
+    // -- so a flag-FALSE page provably holds no fresh slot and is skipped without
+    // touching its slots. The flag is read with a relaxed atomic (its writers
+    // mirror this; same machine code as the old plain access): pre-mark stores
+    // are ordered ahead of this pass by the mark-start thread pause, a store
+    // this read can still miss is by definition a during-mark allocation (SATB
+    // covers its links this cycle), and only the sweep -- never a phase running
+    // concurrently with mutators or with this pass -- clears the flag, so a
+    // missed store is re-observed next cycle. This
+    // replaced a queue-of-fresh-pages scheme (issue 5425): queue-once-per-epoch
+    // dedup left every allocation AFTER the queue was consumed (rest of the mark
+    // plus the whole unbarriered inter-cycle window) untraced when the page was
+    // not re-queued the next epoch, and the sweep then freed objects reachable
+    // only through those untraced fresh objects -> user-visible heap corruption.
     {
-        for(int lane = 0 ; lane < 2 ; lane++) {
-            CN1BibopPage* gp = atomic_exchange_explicit(&bibopFreshPages[lane],
-                                                         (CN1BibopPage*)0,
-                                                         memory_order_acquire);
-            while(gp != 0) {
-#ifdef CN1_GC_INSTRUMENT
-                atomic_fetch_add_explicit(&cn1BibopFreshPagesScanned, 1,
-                                          memory_order_relaxed);
-#endif
-                int gn = atomic_load_explicit(&gp->bumpIndex, memory_order_acquire);
-                for(int gi = 0 ; gi < gn ; gi++) {
-                    JAVA_OBJECT go = cn1BibopSlot(gp, gi);
-                    if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_ACQUIRE) == -1
-                       && go->__codenameOneParentClsReference != 0
-                       && go->__codenameOneParentClsReference->markFunction != 0) {
-                        gcMarkObject(d, go, JAVA_FALSE);
-                    }
-                }
-                gp = gp->nextFresh[lane];
+        CN1BibopPage* gp = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
+        while(gp != 0) {
+#ifndef CN1_BIBOP_NO_FASTSWEEP
+            if(__atomic_load_n(&gp->gcAllocedSinceSweep, __ATOMIC_RELAXED) == JAVA_FALSE) {
+                gp = atomic_load_explicit(&gp->nextAll, memory_order_acquire);
+                continue;
             }
+#endif
+#ifdef CN1_GC_INSTRUMENT
+            atomic_fetch_add_explicit(&cn1BibopFreshPagesScanned, 1,
+                                      memory_order_relaxed);
+#endif
+            int gn = atomic_load_explicit(&gp->bumpIndex, memory_order_acquire);
+            for(int gi = 0 ; gi < gn ; gi++) {
+                JAVA_OBJECT go = cn1BibopSlot(gp, gi);
+                if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_ACQUIRE) == -1
+                   && go->__codenameOneParentClsReference != 0
+                   && go->__codenameOneParentClsReference->markFunction != 0) {
+                    gcMarkObject(d, go, JAVA_FALSE);
+                }
+            }
+            gp = atomic_load_explicit(&gp->nextAll, memory_order_acquire);
         }
         gcMarkDrain(d);
     }
@@ -1365,6 +1387,11 @@ void codenameOneGCMark() {
         }
         if(n > 0) gcMarkDrain(d);
     }
+#if defined(CN1_GRACE_AUDIT) && !defined(CN1_DISABLE_BIBOP)
+    // QA builds only: right before the sweep, verify the grace pass reached every
+    // pre-mark fresh object; trace and report anything it missed (issue 5425).
+    cn1GraceAuditPreSweep(d);
+#endif
 #if CN1_ADOPT_POLICY != 0 && !defined(CN1_DISABLE_BIBOP)
     // Marking (incl. grace, belt and SATB) is fully done. Register the objects matured
     // this cycle into allObjectsInHeap now -- single-threaded, locked, before the sweep.
@@ -1886,7 +1913,6 @@ static signed char cn1BibopSizeToClass[CN1_BIBOP_MAX_OBJECT + 1];
 // struct CN1BibopPage is defined in cn1_globals.h (shared with the inlined bump).
 
 static CN1BibopPage* _Atomic bibopAllPages = 0;   // registry head (atomic)
-CN1BibopPage* _Atomic bibopFreshPages[2];         // alternating epoch stacks
 static _Atomic long long bibopAllPagesCount = 0;  // grow-only registration count
 static CN1BibopPage* bibopFreePool = 0;           // bibopMutex
 static CN1BibopPage* bibopPartialPool[CN1_BIBOP_NUM_CLASSES]; // bibopMutex
@@ -1961,39 +1987,26 @@ static void cn1BibopFormatPage(CN1BibopPage* p, int ci) {
     p->freeList = 0;
     p->freeCount = 0;
     p->owned = JAVA_FALSE;
-    p->nextFresh[0] = 0;
-    p->nextFresh[1] = 0;
 #ifndef CN1_BIBOP_NO_FASTSWEEP
-    p->gcAllocedSinceSweep = JAVA_FALSE;
+    // Relaxed atomic, not plain: the acquire-path format (cn1BibopAcquirePage)
+    // reformats a FREE-pool page that is already in the registry, on a mutator
+    // thread, possibly while the grace pass concurrently reads this flag. The
+    // store is value-identical (the sweep already reset the flag before pooling
+    // the page) so any interleaving reads FALSE; the atomic just keeps the
+    // concurrent read/write pair well-defined. The new-page path formats before
+    // registry insertion, where nothing can observe the page.
+    __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_FALSE, __ATOMIC_RELAXED);
     p->gcNeedsReclaim = JAVA_FALSE;
     p->gcHasMonitors = JAVA_FALSE;
     p->gcHasAdopted = JAVA_FALSE;
     atomic_store_explicit(&p->gcLastMarkedEpoch, 0, memory_order_relaxed);
     p->gcGraceEpoch = 0;
 #endif
-    atomic_store_explicit(&p->gcFreshEpoch[0], 0, memory_order_relaxed);
-    atomic_store_explicit(&p->gcFreshEpoch[1], 0, memory_order_relaxed);
-}
-
-// Queue a page only on its first allocation in a GC epoch. The grace pass can
-// now walk pages that actually received fresh objects instead of rescanning the
-// grow-only registry on every collection.
-void cn1BibopNoteFreshAllocation(CN1BibopPage* page, int epoch) {
-    int lane = epoch & 1;
-    int seen = atomic_load_explicit(&page->gcFreshEpoch[lane], memory_order_relaxed);
-    while(seen != epoch) {
-        if(atomic_compare_exchange_weak_explicit(&page->gcFreshEpoch[lane], &seen, epoch,
-                                                  memory_order_acq_rel,
-                                                  memory_order_relaxed)) {
-            CN1BibopPage* head = atomic_load_explicit(&bibopFreshPages[lane], memory_order_relaxed);
-            do {
-                page->nextFresh[lane] = head;
-            } while(!atomic_compare_exchange_weak_explicit(&bibopFreshPages[lane], &head, page,
-                                                            memory_order_release,
-                                                            memory_order_relaxed));
-            return;
-        }
-    }
+#ifdef CN1_GRACE_AUDIT
+    // Same registry-visible reformat race as the flag above: the GC thread reads
+    // and rewrites this field during marking in audit builds.
+    __atomic_store_n(&p->gcAuditSnapshot, 0, __ATOMIC_RELAXED);
+#endif
 }
 
 void cn1BibopBeginGcCycle(void) {
@@ -2005,6 +2018,29 @@ void cn1BibopBeginGcCycle(void) {
     // sustained allocator.
     bibopCycleAllocatedBytes = atomic_exchange_explicit(&bibopBytesSinceGc, 0,
                                                          memory_order_acq_rel);
+#ifdef CN1_GRACE_AUDIT
+    // QA builds only: snapshot every page's cursor at mark start. Slots below the
+    // snapshot existed before the grace pass ran, so a complete grace pass must
+    // have traced every one of them that is still fresh at pre-sweep time.
+    // Mutators are still running here, so a snapshot may trail a page's true
+    // cursor by the allocations racing mark start. That is INTENTIONAL
+    // under-approximation: boundary slots are during-mark allocations -- the
+    // class the grace guarantee does not cover this cycle (SATB + the sticky
+    // dirty flag cover them) -- and excluding them keeps the audit free of
+    // false positives. The audited set still spans every clearly-pre-mark slot,
+    // which is exactly the population the issue-5425 bug dropped; snapshotting
+    // later (after the pause) would widen coverage by only those boundary slots
+    // while making benign mid-mark allocations report as misses.
+    {
+        CN1BibopPage* ap = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
+        while(ap != 0) {
+            __atomic_store_n(&ap->gcAuditSnapshot,
+                             atomic_load_explicit(&ap->bumpIndex, memory_order_acquire),
+                             __ATOMIC_RELAXED);
+            ap = atomic_load_explicit(&ap->nextAll, memory_order_acquire);
+        }
+    }
+#endif
 }
 
 // Raw 64KB page memory comes from large arenas -- one posix_memalign per
@@ -2493,13 +2529,9 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
                 // publish the new cursor with release AFTER the slot (incl. its
                 // mark) is fully initialized.
                 atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
-                int epoch = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
-                if(atomic_load_explicit(&p->gcFreshEpoch[epoch & 1], memory_order_relaxed)
-                   != epoch) {
-                    cn1BibopNoteFreshAllocation(p, epoch);
-                }
 #ifndef CN1_BIBOP_NO_FASTSWEEP
-                p->gcAllocedSinceSweep = JAVA_TRUE;
+                // relaxed: concurrently read by the grace pass (see cn1BibopFastAlloc)
+                __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
 #endif
                 CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
                 return o;
@@ -2515,13 +2547,9 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
     }
     // free-list slot path
     cn1BibopInitSlot(threadStateData, o, size, parent);
-    int epoch = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
-    if(atomic_load_explicit(&p->gcFreshEpoch[epoch & 1], memory_order_relaxed)
-       != epoch) {
-        cn1BibopNoteFreshAllocation(p, epoch);
-    }
 #ifndef CN1_BIBOP_NO_FASTSWEEP
-    p->gcAllocedSinceSweep = JAVA_TRUE;
+    // relaxed: concurrently read by the grace pass (see cn1BibopFastAlloc)
+    __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
 #endif
     CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
     return o;
@@ -2934,6 +2962,48 @@ static void cn1BibopSweep(CODENAME_ONE_THREAD_STATE) {
     cn1BibopAdaptAfterSweep(occupiedBytes, liveBytes, reclaimedBytes,
                             classSlots, classLive);
 }
+
+#ifdef CN1_GRACE_AUDIT
+// QA builds only (grace-completeness gate, born from issue 5425): walk the FULL
+// page registry right before the sweep, ignoring every pruning heuristic, and
+// trace any slot that (a) existed before the grace pass ran (below the
+// mark-start snapshot) and (b) is still fresh (gcMark == -1) with a published
+// non-leaf class. missedFresh counts fresh objects the grace pass did not visit
+// (small counts can be benign: a free-list slot re-allocated mid-mark below the
+// snapshot after the grace pass ran is SATB-covered this cycle and re-traced
+// next cycle). doomedChildren counts objects that became newly marked ONLY by
+// tracing them -- ANY nonzero value is a collector bug: without this pass the
+// sweep frees those children while a surviving fresh object still references
+// them (dangling reference -> heap corruption).
+static void cn1GraceAuditPreSweep(CODENAME_ONE_THREAD_STATE) {
+    long missedFresh = 0;
+    long beforeFresh = gcMarkNewObjectCount;
+    CN1BibopPage* gp = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
+    while(gp != 0) {
+        int gn = __atomic_load_n(&gp->gcAuditSnapshot, __ATOMIC_RELAXED);
+        int bi = atomic_load_explicit(&gp->bumpIndex, memory_order_acquire);
+        if(gn > bi) gn = bi;   // page was reformatted mid-cycle; stale snapshot
+        for(int gi = 0 ; gi < gn ; gi++) {
+            JAVA_OBJECT go = cn1BibopSlot(gp, gi);
+            if(__atomic_load_n(&go->__codenameOneGcMark, __ATOMIC_ACQUIRE) == -1
+               && go->__codenameOneParentClsReference != 0
+               && go->__codenameOneParentClsReference->markFunction != 0) {
+                missedFresh++;
+                gcMarkObject(threadStateData, go, JAVA_FALSE);
+            }
+        }
+        gp = atomic_load_explicit(&gp->nextAll, memory_order_acquire);
+    }
+    long freshMarked = gcMarkNewObjectCount - beforeFresh;
+    gcMarkDrain(threadStateData);
+    long recovered = gcMarkNewObjectCount - beforeFresh - freshMarked;
+    if(missedFresh > 0 || recovered > 0) {
+        fprintf(stderr, "[GRACE-AUDIT] epoch=%d missedFresh=%ld doomedChildren=%ld\n",
+                currentGcMarkValue, missedFresh, recovered);
+        fflush(stderr);
+    }
+}
+#endif
 
 // (The overflow-rescan helpers cn1BibopRescanStart / cn1BibopRescanStep live
 // further down, next to gcMarkDrain, because they use the mark worklist.)

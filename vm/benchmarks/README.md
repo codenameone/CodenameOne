@@ -77,12 +77,51 @@ by the host JVM. The harness additionally requires runtime evidence that:
 - the BiBOP-only allocator thread graduated to the high-throughput pacing tier;
 - the 24 MiB baseline trigger grew under sustained survival;
 - a survivor-heavy size class activated the bounded legacy bypass/reprobe path;
-- grace marking used the fresh-page set rather than the grow-only page registry.
+- grace marking slot-scanned only pages flagged `gcAllocedSinceSweep` rather
+  than every slot of the grow-only page registry.
 
 It then measures best wall time and per-process peak RSS for the production
 adaptive collector against the legacy collector and a no-pacing diagnostic build.
 Those compile-time variants are QA controls only; applications ship one collector
 with the adaptive behavior enabled, not user-selectable GC flags.
+
+## Grace-completeness audit (`-DCN1_GRACE_AUDIT`)
+
+The concurrent collector gives fresh (`gcMark == -1`) BiBOP objects one cycle
+of sweep grace, so an object reachable ONLY through a surviving fresh object
+must be traced by the mark's grace pass or the sweep frees it while it is
+still referenced (the issue-5425 dictionary corruption). `-DCN1_GRACE_AUDIT`
+compiles in a QA-only pre-sweep pass that snapshots every page's bump cursor
+at mark start and, right before the sweep, full-walks the registry tracing
+any pre-snapshot slot that is still fresh. A cycle in which the grace pass
+missed nothing prints nothing -- **silence is success**. A cycle with a miss
+prints one `[GRACE-AUDIT]` line reporting:
+
+- `missedFresh` — fresh slots the grace pass did not visit. Small counts can
+  be benign (a free-list slot re-allocated mid-mark, below the snapshot, after
+  the grace pass ran — SATB covers its links this cycle and the sticky
+  `gcAllocedSinceSweep` flag re-traces it next cycle).
+- `doomedChildren` — objects that became marked ONLY by tracing those missed
+  slots. **Any nonzero value is a collector bug**: without the audit pass the
+  sweep would free each of them while a surviving object still references it.
+
+`GraceAudit` is the driver shaped to break queue/dedup-based grace schemes:
+`System.gc()` is asynchronous, so a single thread allocates dropped fresh
+nodes (each holding the only reference to an older object) WHILE the mark
+runs, then goes quiet across the next cycle. Gate:
+
+```bash
+./translate-and-build.sh GraceAudit target/grace-audit -DCN1_GRACE_AUDIT
+./target/grace-audit    # PASS: no line reports doomedChildren != 0
+                        # (an empty stderr is a fully clean run; benign
+                        #  missedFresh-only lines may still appear)
+```
+
+The fresh-page-stack grace scheme this audit was written against reported
+100-370 missed slots and 100-250 doomed children per cycle; the
+`gcAllocedSinceSweep`-pruned registry walk reports zero doomed across the
+suite. `StormAB` (sustained single-thread storm) and `LoadLoop` (repeated
+dictionary build/drop) are the matching wall-time/RSS A/B drivers.
 
 `ClinitThrow` is a standalone liveness reproducer (not byte-identical to the
 host JVM by design — ParparVM's initialization-failure semantics differ): a
