@@ -1,7 +1,7 @@
 == Push notifications
 
 [[push-notifications-section,Codename One Push Notifications]]
-Codename One push uses a typed message envelope and an explicit client binding. Your main application class doesn't implement a push interface. The same application code receives messages from Android, iOS, Huawei devices, Windows, and supported web browsers.
+Codename One push uses a typed message envelope and an explicit client binding. Your main application class doesn't implement a push interface. The same application code receives messages from Android, iOS, Huawei devices, and supported web browsers.
 
 You can use the managed BuildCloud service or install a custom native transport. A custom transport is a low-level escape hatch: it bypasses BuildCloud registration and delivery completely, so your server owns tokens, credentials, targeting, quotas, retries, and provider errors.
 
@@ -14,6 +14,8 @@ Open the Codename One Console and select *Push*. Create an application, then com
 * *Huawei*: save the AppGallery Connect application ID and client secret. Add `agconnect-services.json` to the project and set `android.messagingService=huawei`.
 * *Windows / WNS*: save the Package SID and client secret associated with the Store identity.
 * *Web Push*: save the VAPID public and private keys and subject.
+
+The managed backend includes WNS delivery for explicit Windows targets. It doesn't revive or generate bindings for the unsupported UWP port.
 
 Credentials are encrypted in the BuildCloud secrets vault and are write-only. The setup UI shows whether each provider is configured but never reads a secret back. Rotate a credential by saving its replacement.
 

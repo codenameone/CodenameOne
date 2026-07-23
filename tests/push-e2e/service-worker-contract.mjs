@@ -37,8 +37,12 @@ async function pushScenario(envelope, windows) {
     };
     vm.createContext(sandbox);
     vm.runInContext(source, sandbox, {filename: 'sw.js'});
+    assert.equal(typeof handlers.push, 'function',
+            'service worker must register a push event handler');
     let completion;
     handlers.push({data: {json: () => envelope}, waitUntil: value => { completion = value; }});
+    assert.equal(typeof completion?.then, 'function',
+            'push handler must pass asynchronous work to event.waitUntil()');
     await completion;
     return {posted, notifications};
 }

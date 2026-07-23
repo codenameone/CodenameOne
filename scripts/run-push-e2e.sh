@@ -19,6 +19,11 @@ while IFS= read -r scenario; do
     required_events="$(jq -c '.requiredEvents' <<<"${scenario}")"
     while IFS= read -r provider; do
         target="$(jq -r --arg provider "${provider}" '.[$provider]' "${PUSH_TARGETS_FILE}")"
+        if [[ -z "${target}" || "${target}" == "null" ]]; then
+            echo "FAIL ${scenario_id}/${provider}: target token is missing" >&2
+            failures=$((failures + 1))
+            continue
+        fi
         request="$(jq -n --arg app "${PUSH_APP_ID}" --arg provider "${provider}" \
             --arg target "${target}" --argjson message "${message}" \
             '{appId:$app,targets:[{provider:$provider,token:$target}],message:$message}')"

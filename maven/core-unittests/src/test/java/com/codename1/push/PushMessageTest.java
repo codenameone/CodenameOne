@@ -61,6 +61,15 @@ class PushMessageTest {
     }
 
     @Test
+    void acceptsFutureAdditiveEnvelopeSchemas() throws Exception {
+        PushMessage message = PushMessage.parse(
+                "{\"schema\":4,\"body\":\"future\",\"futureOption\":\"preserved\"}");
+
+        assertEquals("future", message.getBody());
+        assertEquals("preserved", message.toMap().get("futureOption"));
+    }
+
+    @Test
     @SuppressWarnings({"rawtypes", "unchecked"})
     void nestedEnvelopeValuesAreImmutableCopies() {
         Map<String, Object> surface = new LinkedHashMap<String, Object>();
