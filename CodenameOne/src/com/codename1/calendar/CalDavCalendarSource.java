@@ -81,6 +81,7 @@ public class CalDavCalendarSource extends CalendarSource {
 
     @Override
     public AsyncResource<CalendarPage<CalendarInfo>> listCalendars(final CalendarInfo.ContentType type, String pageToken) {
+        final CalendarInfo.ContentType requestedType = type == null ? CalendarInfo.ContentType.EVENTS : type;
         final AsyncResource<CalendarPage<CalendarInfo>> out = new AsyncResource<CalendarPage<CalendarInfo>>();
         String body = "<?xml version=\"1.0\"?><propfind xmlns=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\" " + "xmlns:cs=\"http://calendarserver.org/ns/\"><prop><displayname/><resourcetype/" + "><c:supported-calendar-component-set/><cs:getctag/><sync-token/></prop></propfind>";
         request("PROPFIND", homeUrl, body, "application/xml", headers("Depth", "1")).ready(new SuccessCallback<CalendarHttpResponse>() {
@@ -96,10 +97,10 @@ public class CalDavCalendarSource extends CalendarSource {
                     }
                     boolean events = components == null || components.toUpperCase().indexOf("VEVENT") >= 0;
                     boolean tasks = components != null && components.toUpperCase().indexOf("VTODO") >= 0;
-                    if ((type == CalendarInfo.ContentType.EVENTS && !events) || (type == CalendarInfo.ContentType.TASKS && !tasks)) {
+                    if ((requestedType == CalendarInfo.ContentType.EVENTS && !events) || (requestedType == CalendarInfo.ContentType.TASKS && !tasks)) {
                         continue;
                     }
-                    items.add(new CalendarInfo().setId(resolve(href)).setSourceId(getId()).setName(xmlValue(response, "displayname")).setContentType(type).setCapabilities(getCapabilities()).putProviderData("ctag", xmlValue(response, "getctag")).putProviderData("syncToken", xmlValue(response, "sync-token")));
+                    items.add(new CalendarInfo().setId(resolve(href)).setSourceId(getId()).setName(xmlValue(response, "displayname")).setContentType(requestedType).setCapabilities(getCapabilities()).putProviderData("ctag", xmlValue(response, "getctag")).putProviderData("syncToken", xmlValue(response, "sync-token")));
                 }
                 out.complete(new CalendarPage<CalendarInfo>(items, null, null));
             }

@@ -188,6 +188,29 @@ class CalendarIntegrationTest {
     }
 
     @Test
+    void calDavDefaultsNullContentTypeToEventCalendars() {
+        RecordingTransport transport = new RecordingTransport();
+        transport.add(207, "<?xml version=\"1.0\"?>"
+                + "<d:multistatus xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\">"
+                + "<d:response><d:href>/events/</d:href><d:propstat><d:prop>"
+                + "<d:displayname>Events</d:displayname><d:resourcetype><d:collection/><c:calendar></c:calendar></d:resourcetype>"
+                + "<c:supported-calendar-component-set><c:comp name=\"VEVENT\"/></c:supported-calendar-component-set>"
+                + "</d:prop></d:propstat></d:response>"
+                + "<d:response><d:href>/tasks/</d:href><d:propstat><d:prop>"
+                + "<d:displayname>Tasks</d:displayname><d:resourcetype><d:collection/><c:calendar></c:calendar></d:resourcetype>"
+                + "<c:supported-calendar-component-set><c:comp name=\"VTODO\"/></c:supported-calendar-component-set>"
+                + "</d:prop></d:propstat></d:response></d:multistatus>", null);
+        CalDavCalendarSource source = new CalDavCalendarSource("work", "Work", "https://dav.example.com/",
+                CalDavAuthentication.digest("user", "pass"), transport);
+
+        CalendarPage<CalendarInfo> page = source.listCalendars(null, null).get();
+
+        assertEquals(1, page.getItems().size());
+        assertEquals("Events", page.getItems().get(0).getName());
+        assertEquals(CalendarInfo.ContentType.EVENTS, page.getItems().get(0).getContentType());
+    }
+
+    @Test
     void offlineQueueAppliesMutationsOnlyWhenSyncIsCalled() throws Exception {
         MemoryCalendarCache cache=new MemoryCalendarCache();
         InMemorySource source=new InMemorySource();
