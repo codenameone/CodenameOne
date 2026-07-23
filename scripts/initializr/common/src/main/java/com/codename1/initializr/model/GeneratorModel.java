@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.initializr.model;
 
 import com.codename1.components.ToastBar;
@@ -223,7 +245,98 @@ public class GeneratorModel {
         copyZipEntriesToMap(template.CSS, mergedEntries, ZipEntryType.TEMPLATE_CSS);
         copyZipEntriesToMap(template.SOURCE_ZIP, mergedEntries, ZipEntryType.TEMPLATE_SOURCE);
         addLocalizationEntries(mergedEntries);
+        validateGeneratedPomCoordinates(mergedEntries);
         return mergedEntries;
+    }
+
+    /// Refuses to publish a generated download when one of the embedded module POMs
+    /// still points at the Initializr application itself, or otherwise drifts from
+    /// the generated root project's Maven coordinates. This is intentionally a
+    /// runtime guard in addition to the tests: common.zip is a committed binary
+    /// artifact, so a bad manual rebuild must fail closed instead of reaching users.
+    void validateGeneratedPomCoordinates(Map<String, byte[]> entries) throws IOException {
+        String rootArtifactId = appName.toLowerCase();
+        String version = "1.0-SNAPSHOT";
+
+        String rootPom = normalizedPom(entries, "pom.xml");
+        requirePomFragment(
+                "pom.xml",
+                rootPom,
+                "</modelVersion><groupId>" + packageName + "</groupId>"
+                        + "<artifactId>" + rootArtifactId + "</artifactId>"
+                        + "<version>" + version + "</version>",
+                "root project coordinates " + packageName + ":" + rootArtifactId + ":" + version
+        );
+        requirePomFragment(
+                "pom.xml",
+                rootPom,
+                "<cn1app.name>" + rootArtifactId + "</cn1app.name>",
+                "cn1app.name " + rootArtifactId
+        );
+
+        validateModulePomCoordinates(entries, "common", rootArtifactId + "-common", false, version);
+
+        String[] platforms = new String[] {"android", "ios", "javase", "javascript", "linux", "win"};
+        for (int i = 0; i < platforms.length; i++) {
+            String platform = platforms[i];
+            validateModulePomCoordinates(entries, platform, rootArtifactId + "-" + platform, true, version);
+        }
+    }
+
+    private void validateModulePomCoordinates(
+            Map<String, byte[]> entries,
+            String module,
+            String moduleArtifactId,
+            boolean requireCommonDependency,
+            String version
+    ) throws IOException {
+        String path = module + "/pom.xml";
+        String pom = normalizedPom(entries, path);
+        String expectedCoordinates =
+                "</modelVersion><parent>"
+                        + "<groupId>" + packageName + "</groupId>"
+                        + "<artifactId>" + appName.toLowerCase() + "</artifactId>"
+                        + "<version>" + version + "</version>"
+                        + "</parent>"
+                        + "<groupId>" + packageName + "</groupId>"
+                        + "<artifactId>" + moduleArtifactId + "</artifactId>"
+                        + "<version>" + version + "</version>";
+        requirePomFragment(path, pom, expectedCoordinates,
+                "module coordinates " + packageName + ":" + moduleArtifactId + ":" + version);
+
+        if (requireCommonDependency) {
+            requirePomFragment(
+                    path,
+                    pom,
+                    "<dependency><groupId>${project.groupId}</groupId>"
+                            + "<artifactId>${cn1app.name}-common</artifactId>"
+                            + "<version>${project.version}</version>",
+                    "dependency on the generated common module"
+            );
+        }
+    }
+
+    private String normalizedPom(Map<String, byte[]> entries, String path) throws IOException {
+        byte[] data = entries.get(path);
+        if (data == null) {
+            throw new IOException("Refusing to generate project: missing " + path);
+        }
+        String content = StringUtil.newString(data);
+        StringBuilder out = new StringBuilder(content.length());
+        for (int i = 0; i < content.length(); i++) {
+            char c = content.charAt(i);
+            if (!Character.isWhitespace(c)) {
+                out.append(c);
+            }
+        }
+        return out.toString();
+    }
+
+    private void requirePomFragment(String path, String pom, String expected, String description) throws IOException {
+        if (pom.indexOf(expected) < 0) {
+            throw new IOException("Refusing to generate project: " + path
+                    + " does not declare the expected " + description);
+        }
     }
 
     /// Writes the collected entries as a STORED (uncompressed) zip. STORED rather
