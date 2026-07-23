@@ -4814,7 +4814,8 @@ public final class Display extends CN1Constants {
     }
 
     /// Returns the active port's local device-calendar source. Applications
-    /// should normally use `LocalCalendarSource#getInstance()`.
+    /// should normally use
+    /// {@link com.codename1.calendar.LocalCalendarSource#getInstance()}.
     public com.codename1.calendar.LocalCalendarSource getLocalCalendarSource() {
         return impl.getLocalCalendarSource();
     }

@@ -204,6 +204,9 @@ final class JavaSECalendarSource extends LocalCalendarSource {
     public synchronized AsyncResource<List<FreeBusyInterval>> queryFreeBusy(List<String> ids, Instant start, Instant end) {
         List<FreeBusyInterval> out = new ArrayList<FreeBusyInterval>();
         for (CalendarEvent event : events.values()) {
+            if (ids != null && !ids.isEmpty() && !ids.contains(event.getCalendarId())) {
+                continue;
+            }
             if (event.getAvailability() != CalendarEvent.Availability.FREE
                     && event.getStart() != null && event.getEnd() != null
                     && !event.getStart().isAllDay() && !event.getEnd().isAllDay()

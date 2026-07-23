@@ -117,6 +117,25 @@ class JavaSECalendarSourceTest {
     }
 
     @Test
+    void freeBusyHonorsTheCalendarIdScope() {
+        JavaSECalendarSource source = new JavaSECalendarSource();
+        source.saveEvent(timedEvent("in-scope", "sim-events"), CalendarMutationScope.ALL).get();
+        source.saveEvent(timedEvent("out-of-scope", "sim-other"), CalendarMutationScope.ALL).get();
+
+        Instant start = Instant.parse("2026-07-01T00:00:00Z");
+        Instant end = Instant.parse("2026-07-02T00:00:00Z");
+        assertEquals(2, source.queryFreeBusy(null, start, end).get().size());
+        assertEquals(1, source.queryFreeBusy(java.util.Collections.singletonList("sim-events"), start, end).get().size());
+        assertEquals(0, source.queryFreeBusy(java.util.Collections.singletonList("sim-missing"), start, end).get().size());
+    }
+
+    private static CalendarEvent timedEvent(String title, String calendarId) {
+        return new CalendarEvent().setTitle(title).setCalendarId(calendarId)
+                .setStart(CalendarDateTime.instant(Instant.parse("2026-07-01T10:00:00Z"), java.time.ZoneId.of("UTC")))
+                .setEnd(CalendarDateTime.instant(Instant.parse("2026-07-01T11:00:00Z"), java.time.ZoneId.of("UTC")));
+    }
+
+    @Test
     void repeatedSavesAdvanceTheVersionToken() {
         JavaSECalendarSource source = new JavaSECalendarSource();
         CalendarEvent event = source.saveEvent(new CalendarEvent().setTitle("v1"), CalendarMutationScope.ALL).get();
