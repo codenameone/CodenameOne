@@ -1907,11 +1907,13 @@ public class AndroidGradleBuilder extends Executor {
             }
             if (!request.getArg("gradleDependencies", "").contains("com.huawei.hms:push")) {
                 request.putArgument("gradleDependencies", request.getArg("gradleDependencies", "")
-                        + "\n" + compile + " 'com.huawei.hms:push:6.3.0.302'\n");
+                        + "\n" + compile + " 'com.huawei.hms:push:"
+                        + request.getArg("android.hms.pushVersion", "6.3.0.302") + "'\n");
             }
             additionalMembers += "\n    @Override public void registerForPush(String ignored) {\n"
                     + "        final android.app.Activity activity = this;\n"
                     + "        new Thread(new Runnable() { public void run() { try {\n"
+                    + "            // Push Kit derives the app id from native/android/agconnect-services.json.\n"
                     + "            String appId = com.huawei.agconnect.config.AGConnectServicesConfig.fromContext(activity).getString(\"client/app_id\");\n"
                     + "            final String token = com.huawei.hms.aaid.HmsInstanceId.getInstance(activity).getToken(appId, \"HCM\");\n"
                     + "            if (token != null && token.length() > 0) { com.codename1.io.Preferences.set(\"push_key\", \"cn1-hms-\" + token);\n"

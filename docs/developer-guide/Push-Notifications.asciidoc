@@ -28,6 +28,9 @@ Credentials are encrypted in the BuildCloud secrets vault and are write-only. Th
 
 Cloud builds detect `PushClient` usage and generate the typed native bootstrap automatically. Android uses FCM unless `android.messagingService=huawei` selects Huawei Push Kit. iOS enables push support automatically when `PushClient` is referenced; set `ios.includePush=false` only when an installed custom-provider adapter intentionally owns registration.
 
+Huawei Push Kit requires this typed `PushClient` flow. The deprecated classic
+push API never supported Huawei device IDs.
+
 The Console displays an application key. This key identifies an application during device registration; it isn't a server API key and doesn't authorize sending messages. Keep send API keys on your server.
 
 .Provider Settings explains each credential and links to the provider console
@@ -44,7 +47,12 @@ include::../demos/common/src/main/java/com/codename1/demos/push/PushNotification
 
 Registration is asynchronous. With managed delivery, the framework registers the native token with BuildCloud automatically. `PushSubscription` exposes the transport identifier, opaque native token, platform, expiry, and capability list for diagnostics. Application code shouldn't parse or persist the token.
 
-The managed subscription registry is a database-backed Pro feature. Free and Basic applications can provide a `PushRegistrationSink` without installing a custom-provider adapter; the normal native provider remains active, while the sink sends registration material to the application's own server. That server can address explicit targets through the send API within the plan quota.
+Managed registration and explicit-target delivery are available on every plan.
+Server-assigned external identities, tags, saved segments, templates, campaign
+history, and analytics are database-backed Pro features. Free and Basic
+applications can also provide a `PushRegistrationSink` without installing a
+custom-provider adapter when they want to mirror registration material to their
+own server.
 
 Callbacks are delivered on the Codename One EDT. A notification received while the app is foregrounded is delivered directly. A notification tapped from a system tray is delivered after the application becomes ready. Silent/background execution remains subject to each OS's power and scheduling rules.
 
@@ -144,7 +152,12 @@ Push allowance is owned by the organization. The monthly allowance is multiplied
 |Enterprise |10,000,000 |3,000 |100,000
 |===
 
-Limits apply across all applications and API keys in the organization. The API rejects an admission atomically when either the monthly allowance or rate window would be exceeded. Large campaigns are paced by the durable queue and bounded provider concurrency.
+Limits apply across all applications and API keys in the organization. Hot
+admission counters are cached per server and flushed in batches. They can
+slightly under-count after failover or simultaneous admission on multiple
+servers; this is intentional so quota bookkeeping never puts a database lock in
+the delivery hot path. Large campaigns are paced by the durable queue and
+bounded provider concurrency.
 
 === Widgets and live surfaces
 
@@ -155,7 +168,7 @@ A push can publish widget content or update a live activity before the regular l
 include::../demos/common/src/main/snippets/developer-guide/push-notifications.json[tag=push-notifications-json-004,indent=0]
 ----
 
-For a live activity use `live-update` or `live-end` with `id`, serialized `state`, and optional `dismissImmediately`. Unsupported surfaces are ignored. Surface updates remain subject to native OS delivery policy, so applications must also refresh stale state during foreground activation.
+For a live activity use `live-update` or `live-end` with `id`, serialized `state`, and optional `dismissImmediately`. Unsupported surfaces are ignored. A surface command runs when the Codename One runtime receives the envelope. On platforms that don't start application code for a background push, the native queue preserves the command and applies it on the next start or resume. Applications must therefore refresh stale surface state during foreground activation too.
 
 === Install a custom native push adapter
 
@@ -178,7 +191,7 @@ Hosted CI has no installed application, OS push daemon, permission state, or phy
 * token rotation, reinstall, expiry, logout, and multiple installations per user;
 * silent delivery and simulated constrained-state replay;
 * collapse keys, TTL expiry, Unicode, maximum payloads, images, and provider errors;
-* widget and live-activity updates while the main UI isn't running;
+* queued widget and live-activity updates replayed at the native/runtime seam;
 * retry idempotency, dead-letter behavior, quota boundaries, and rate limiting.
 
 The JavaScript contract executes the real service-worker source with mocked browser clients and notification APIs. BuildCloud has a separate local suite using mocked provider HTTP responses for compatibility translation, credentials, quota/rate accounting, durable queue behavior, retries, and automations. Physical-device sends are optional release diagnostics rather than a CI or nightly requirement. Provider acceptance isn't proof of device delivery.

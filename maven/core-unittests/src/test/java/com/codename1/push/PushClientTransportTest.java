@@ -25,6 +25,7 @@ package com.codename1.push;
 
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Preferences;
+import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.surfaces.Surfaces;
@@ -38,6 +39,8 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PushClientTransportTest extends UITestBase {
+    private PushClient activeClient;
+
     @BeforeEach
     void clearManagedRegistrationState() {
         Preferences.delete("push_v3_subscription");
@@ -46,6 +49,11 @@ class PushClientTransportTest extends UITestBase {
 
     @AfterEach
     void restoreManagedRegistrationState() {
+        if (activeClient != null && PushClient.getActiveCallback() != null) {
+            activeClient.unregister();
+        }
+        activeClient = null;
+        CodenameOneImplementation.setPushCallback(null);
         Preferences.delete("push_v3_subscription");
         implementation.clearQueuedRequests();
     }
@@ -55,8 +63,8 @@ class PushClientTransportTest extends UITestBase {
         FakeTransport transport = new FakeTransport();
         RecordingListener listener = new RecordingListener();
         RecordingSink sink = new RecordingSink();
-        PushClient client = PushClient.builder("custom-app")
-                .listener(listener).registrationSink(sink).transport(transport).build();
+        PushClient client = track(PushClient.builder("custom-app")
+                .listener(listener).registrationSink(sink).transport(transport).build());
 
         client.register();
         assertNotNull(client.getSubscription());
@@ -71,6 +79,7 @@ class PushClientTransportTest extends UITestBase {
         assertEquals("background", listener.message.getData().get("state"));
 
         client.unregister();
+        activeClient = null;
         assertSame(sink.registered, sink.unregistered);
         assertNull(client.getSubscription());
         assertNull(PushClient.getActiveCallback());
@@ -83,7 +92,7 @@ class PushClientTransportTest extends UITestBase {
     }
 
     @FormTest
-    void managedUnregisterDeletesPersistedSubscriptionAfterRestart() {
+    void managedUnregisterRetainsPersistedSubscriptionUntilServerConfirmation() {
         Preferences.set("push_v3_subscription", "persisted-subscription");
         PushClient client = PushClient.builder("managed-app")
                 .listener(new RecordingListener()).build();
@@ -95,7 +104,8 @@ class PushClientTransportTest extends UITestBase {
         assertEquals("DELETE", requests.get(0).getHttpMethod());
         assertTrue(requests.get(0).getUrl().endsWith(
                 "/subscriptions/persisted-subscription"));
-        assertNull(Preferences.get("push_v3_subscription", null));
+        assertEquals("persisted-subscription",
+                Preferences.get("push_v3_subscription", null));
     }
 
     @FormTest
@@ -108,14 +118,62 @@ class PushClientTransportTest extends UITestBase {
                     + "\"surface\":{\"operation\":\"widget\",\"kind\":\"orders\","
                     + "\"timeline\":\"{\\\"revision\\\":7}\"}}";
             RecordingListener listener = new RecordingListener();
-            PushClient.builder("custom-app").listener(listener)
-                    .registrationSink(new RecordingSink()).transport(transport).build().register();
+            PushClient client = track(PushClient.builder("custom-app").listener(listener)
+                    .registrationSink(new RecordingSink()).transport(transport).build());
+            client.register();
             assertEquals("cold-1", listener.message.getId());
             assertEquals("orders", bridge.widgetKind);
             assertEquals("{\"revision\":7}", bridge.widgetTimeline);
         } finally {
             Surfaces.setBridge(null);
         }
+    }
+
+    @FormTest
+    void webDeviceIdRoundTripsWithoutDroppingTheFirstBase64Character() throws Exception {
+        RecordingListener listener = new RecordingListener();
+        PushClient client = track(PushClient.builder("custom-app").listener(listener)
+                .registrationSink(new RecordingSink()).transport(new FakeTransport()).build());
+        client.register();
+        String nativeToken = "{\"endpoint\":\"https://push.example/subscription\","
+                + "\"keys\":{\"p256dh\":\"abc\",\"auth\":\"def\"}}";
+
+        PushClient.getActiveCallback().registeredForPush("cn1-web-"
+                + com.codename1.util.Base64.encodeUrlSafe(nativeToken.getBytes("UTF-8")));
+
+        assertEquals(nativeToken, listener.registration.getToken());
+        assertEquals("web", listener.registration.getTransportId());
+    }
+
+    @FormTest
+    void pushReceivedBeforeRegistrationIsReplayedWhenClientActivates() {
+        PushClient.dispatch("{\"schema\":3,\"id\":\"startup-race\",\"silent\":true}");
+        RecordingListener listener = new RecordingListener();
+        PushClient client = track(PushClient.builder("custom-app").listener(listener)
+                .registrationSink(new RecordingSink()).transport(new FakeTransport()).build());
+
+        client.register();
+
+        assertNotNull(listener.message);
+        assertEquals("startup-race", listener.message.getId());
+    }
+
+    @FormTest
+    void unsupportedTransportDoesNotReplaceTheGlobalPushBinding() {
+        RecordingListener listener = new RecordingListener();
+        PushClient client = PushClient.builder("custom-app").listener(listener)
+                .registrationSink(new RecordingSink()).transport(new UnsupportedTransport()).build();
+
+        client.register();
+
+        assertNull(PushClient.getActiveCallback());
+        assertNotNull(listener.error);
+        assertEquals("unsupported_transport", listener.error.getCode());
+    }
+
+    private PushClient track(PushClient client) {
+        activeClient = client;
+        return client;
     }
 
     private static final class FakeTransport implements PushTransport {
@@ -128,6 +186,13 @@ class PushClientTransportTest extends UITestBase {
             if (pending != null) PushClient.dispatch(pending);
         }
         public void unregister(Callback value) { value.unregistered(); }
+    }
+
+    private static final class UnsupportedTransport implements PushTransport {
+        public String getId() { return "unsupported"; }
+        public boolean isSupported() { return false; }
+        public void register(Callback value) { fail("unsupported transport must not register"); }
+        public void unregister(Callback value) {}
     }
 
     private static final class RecordingBridge implements SurfaceBridge {

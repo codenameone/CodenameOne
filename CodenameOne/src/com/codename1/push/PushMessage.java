@@ -177,7 +177,11 @@ public final class PushMessage {
         }
 
         public Builder data(String key, Object value) {
-            data.put(key, value);
+            if (value == null) {
+                data.remove(key);
+            } else {
+                data.put(key, value);
+            }
             return this;
         }
         public Builder platform(String platformId, Map<String, Object> options) {
@@ -207,6 +211,8 @@ public final class PushMessage {
         public PushMessage build() {
             if (!data.isEmpty()) {
                 values.put("data", new LinkedHashMap<String, Object>(data));
+            } else {
+                values.remove("data");
             }
             if (!platform.isEmpty()) {
                 values.put("platform", new LinkedHashMap<String, Object>(platform));

@@ -34,13 +34,17 @@ import com.codename1.ui.Display;
 import com.codename1.surfaces.Surfaces;
 import com.codename1.surfaces.LiveActivity;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /// Explicit v3 client binding. The application main class does not implement `PushCallback`.
 public final class PushClient {
-    private static PushClient active;
+    private static final int MAX_PENDING_MESSAGES = 100;
+    private static final List<String> pendingMessages = new ArrayList<String>();
+    private static volatile PushClient active;
 
     private final String appId;
     private final PushListener listener;
@@ -61,12 +65,28 @@ public final class PushClient {
     }
 
     public void register() {
-        active = this;
-        CodenameOneImplementation.setPushCallback(compatibilityCallback);
+        if (transport != null && !transport.isSupported()) {
+            fireError(new PushError("unsupported_transport",
+                    transport.getId() + " is unavailable", false));
+            return;
+        }
+        while (true) {
+            List<String> replay;
+            synchronized (pendingMessages) {
+                if (pendingMessages.isEmpty()) {
+                    active = this;
+                    CodenameOneImplementation.setPushCallback(compatibilityCallback);
+                    break;
+                }
+                replay = new ArrayList<String>(pendingMessages);
+                pendingMessages.clear();
+            }
+            for (String message : replay) {
+                receive(message);
+            }
+        }
         if (transport == null) {
             Display.getInstance().registerPush();
-        } else if (!transport.isSupported()) {
-            fireError(new PushError("unsupported_transport", transport.getId() + " is unavailable", false));
         } else {
             transport.register(new TransportCallback());
         }
@@ -94,11 +114,27 @@ public final class PushClient {
         return active == null ? null : active.compatibilityCallback;
     }
 
+    /// Returns true when a v3 binding can receive a native push immediately.
+    public static boolean hasActiveClient() {
+        return active != null;
+    }
+
     /// Native/custom transport entry point for an encoded v3 envelope.
     public static void dispatch(String envelopeJson) {
-        if (active != null) {
-            active.receive(envelopeJson);
+        PushClient client = active;
+        if (client == null) {
+            synchronized (pendingMessages) {
+                client = active;
+                if (client == null) {
+                    if (pendingMessages.size() == MAX_PENDING_MESSAGES) {
+                        pendingMessages.remove(0);
+                    }
+                    pendingMessages.add(envelopeJson);
+                    return;
+                }
+            }
         }
+        client.receive(envelopeJson);
     }
 
     private void registered(final PushSubscription value) {
@@ -220,17 +256,34 @@ public final class PushClient {
     }
 
     private void unregisterManaged() {
-        String id = Preferences.get("push_v3_subscription", null);
+        final String id = Preferences.get("push_v3_subscription", null);
         if (id == null) {
             return;
         }
-        ConnectionRequest request = new ConnectionRequest();
+        ConnectionRequest request = new ConnectionRequest() {
+            private void removePersistedId() {
+                if (id.equals(Preferences.get("push_v3_subscription", null))) {
+                    Preferences.delete("push_v3_subscription");
+                }
+            }
+
+            @Override
+            protected void postResponse() {
+                removePersistedId();
+            }
+
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+                if (code == 404) {
+                    removePersistedId();
+                }
+            }
+        };
         request.setUrl(endpoint("/subscriptions/") + id);
         request.setHttpMethod("DELETE");
         request.addRequestHeader("X-CN1-Push-App", appId);
         request.setFailSilently(true);
         NetworkManager.getInstance().addToQueue(request);
-        Preferences.delete("push_v3_subscription");
     }
 
     private static String endpoint(String suffix) {
@@ -278,7 +331,8 @@ public final class PushClient {
 
         @Override
         public void pushRegistrationError(String error, int errorCode) {
-            fireError(new PushError("registration_" + errorCode, error, errorCode == 1));
+            String code = errorCode == 1 ? "registration_server" : "registration_native";
+            fireError(new PushError(code, error, errorCode == 1));
         }
     }
 
@@ -307,7 +361,7 @@ public final class PushClient {
     private static String nativeToken(String deviceId) {
         if (deviceId != null && deviceId.startsWith("cn1-web-")) {
             try {
-                return new String(com.codename1.util.Base64.decodeUrlSafe(deviceId.substring(9)),
+                return new String(com.codename1.util.Base64.decodeUrlSafe(deviceId.substring(8)),
                         "UTF-8");
             } catch (Exception error) {
                 return deviceId;
