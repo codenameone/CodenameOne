@@ -169,7 +169,7 @@ public final class CalendarSyncEngine {
     }
 
     private synchronized void clearSync(AsyncResource<CalendarSyncResult> completed) {
-        if (syncInFlight == completed) {
+        if (syncInFlight == completed) { //NOPMD CompareObjectsWithEquals
             syncInFlight = null;
         }
     }

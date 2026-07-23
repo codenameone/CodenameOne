@@ -47,7 +47,7 @@ public final class CalendarManager {
             throw new IllegalArgumentException("source required");
         }
         CalendarSource existing = sources.get(source.getId());
-        if (existing != null && existing != source) {
+        if (existing != null && existing != source) { //NOPMD CompareObjectsWithEquals
             throw new IllegalArgumentException("A calendar source with id '" + source.getId() + "' is already registered");
         }
         sources.put(source.getId(), source);
@@ -69,7 +69,7 @@ public final class CalendarManager {
     public synchronized LocalCalendarSource getLocalSource() {
         LocalCalendarSource local = LocalCalendarSource.getInstance();
         CalendarSource existing = sources.get(local.getId());
-        if (existing != null && existing != local) {
+        if (existing != null && existing != local) { //NOPMD CompareObjectsWithEquals
             throw new IllegalStateException("A calendar source with id '" + local.getId() + "' is already registered");
         }
         sources.put(local.getId(), local);

@@ -95,7 +95,7 @@ public final class OidcCalendarTokenProvider implements CalendarTokenProvider {
                 started = client.refresh(current.getRefreshToken());
             } catch (Throwable error) {
                 synchronized (this) {
-                    if (refreshInFlight == operation) {
+                    if (refreshInFlight == operation) { //NOPMD CompareObjectsWithEquals
                         refreshInFlight = null;
                     }
                 }

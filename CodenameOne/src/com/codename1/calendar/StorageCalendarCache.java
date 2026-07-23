@@ -60,7 +60,7 @@ public class StorageCalendarCache implements CalendarCache {
         Object second = storage.readObject(key(sourceId, 1));
         Map newest = newer(first, second);
         long generation = newest == null ? 1L : number(newest.get("generation")) + 1L;
-        int slot = newest == first ? 1 : 0;
+        int slot = newest == first ? 1 : 0; //NOPMD CompareObjectsWithEquals
         Map<String, Object> wrapper = new HashMap<String, Object>();
         wrapper.put("generation", Long.valueOf(generation));
         wrapper.put("state", new HashMap<String, Object>(state));
