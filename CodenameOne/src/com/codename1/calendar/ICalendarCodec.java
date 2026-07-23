@@ -1,0 +1,783 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.calendar;
+
+import com.codename1.util.StringUtil;
+import java.time.DateTimeException;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Reads and writes the interoperable portion of RFC 5545 used by events,
+/// tasks, CalDAV, and file import/export. Unknown X-properties are preserved
+/// in provider data so a read/write cycle doesn't silently discard extensions.
+public final class ICalendarCodec {
+
+    private static final String CRLF = "\r\n";
+
+    private ICalendarCodec() {
+    }
+
+    public static String writeEvent(CalendarEvent event) {
+        StringBuilder out = beginCalendar();
+        append(out, "BEGIN:VEVENT");
+        writeCommon(out, event.getId(), event.getTitle(), event.getDescription(), event.getLocation(), event.getStart(), event.getEnd(), event.getRecurrence(), event.getProviderData(), false);
+        if (event.getUrl() != null) {
+            append(out, "URL:" + escape(event.getUrl()));
+        }
+        append(out, "STATUS:" + (event.getStatus() == CalendarEvent.Status.CANCELED
+                ? "CANCELLED" : event.getStatus().name()));
+        append(out, "TRANSP:" + (event.getAvailability() == CalendarEvent.Availability.FREE ? "TRANSPARENT" : "OPAQUE"));
+        append(out, "CLASS:" + event.getPrivacy().name());
+        for (CalendarAttendee attendee : event.getAttendees()) {
+            writeAttendee(out, attendee);
+        }
+        for (CalendarAttachment attachment : event.getAttachments()) {
+            writeAttachment(out, attachment);
+        }
+        if (event.getConference() != null && event.getConference().getJoinUrl() != null) {
+            append(out, "CONFERENCE;VALUE=URI:" + escape(event.getConference().getJoinUrl()));
+        }
+        for (CalendarAlarm alarm : event.getAlarms()) {
+            writeAlarm(out, alarm);
+        }
+        append(out, "END:VEVENT");
+        return endCalendar(out);
+    }
+
+    public static String writeTask(CalendarTask task) {
+        StringBuilder out = beginCalendar();
+        append(out, "BEGIN:VTODO");
+        writeCommon(out, task.getId(), task.getTitle(), task.getDescription(), task.getLocation(), task.getStart(), task.getDue(), task.getRecurrence(), task.getProviderData(), true);
+        append(out, "STATUS:" + (task.isCompleted() ? "COMPLETED" : "NEEDS-ACTION"));
+        if (task.getCompletionTime() != null) {
+            append(out, "COMPLETED:" + utc(task.getCompletionTime()));
+        }
+        if (task.getPriority() > 0) {
+            append(out, "PRIORITY:" + task.getPriority());
+        }
+        for (CalendarAttachment attachment : task.getAttachments()) {
+            writeAttachment(out, attachment);
+        }
+        for (CalendarAlarm alarm : task.getAlarms()) {
+            writeAlarm(out, alarm);
+        }
+        append(out, "END:VTODO");
+        return endCalendar(out);
+    }
+
+    public static CalendarEvent readEvent(String text) throws CalendarException {
+        Component component = component(text, "VEVENT");
+        CalendarEvent out = new CalendarEvent();
+        readCommon(component, out, null);
+        out.setUrl(value(component, "URL"));
+        String status = value(component, "STATUS");
+        out.setStatus("CANCELLED".equalsIgnoreCase(status) ? CalendarEvent.Status.CANCELED
+                : enumValue(CalendarEvent.Status.class, status, CalendarEvent.Status.CONFIRMED));
+        if ("TRANSPARENT".equalsIgnoreCase(value(component, "TRANSP"))) {
+            out.setAvailability(CalendarEvent.Availability.FREE);
+        }
+        out.setPrivacy(enumValue(CalendarEvent.Privacy.class, value(component, "CLASS"), CalendarEvent.Privacy.DEFAULT));
+        for (Property property : component.all("ATTENDEE")) {
+            out.addAttendee(readAttendee(property));
+        }
+        for (Property property : component.all("ATTACH")) {
+            out.addAttachment(readAttachment(property));
+        }
+        Property conference = component.first("CONFERENCE");
+        if (conference != null) {
+            out.setConference(new CalendarConference().setJoinUrl(unescape(conference.value)));
+        }
+        for (Component alarm : component.children) {
+            if ("VALARM".equals(alarm.name)) {
+                out.addAlarm(readAlarm(alarm));
+            }
+        }
+        for (Property property : component.properties) {
+            if (property.name.startsWith("X-")) {
+                out.putProviderData(property.name, unescape(property.value));
+            }
+        }
+        return out;
+    }
+
+    public static CalendarTask readTask(String text) throws CalendarException {
+        Component component = component(text, "VTODO");
+        CalendarTask out = new CalendarTask();
+        readCommon(component, null, out);
+        out.setCompleted("COMPLETED".equalsIgnoreCase(value(component, "STATUS")));
+        String completed = value(component, "COMPLETED");
+        if (completed != null) {
+            out.setCompletionTime(parseDateTime(completed, null).getDateTime().toInstant());
+        }
+        String priority = value(component, "PRIORITY");
+        if (priority != null) {
+            try {
+                out.setPriority(Integer.parseInt(priority));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        for (Property property : component.all("ATTACH")) {
+            out.addAttachment(readAttachment(property));
+        }
+        for (Component alarm : component.children) {
+            if ("VALARM".equals(alarm.name)) {
+                out.addAlarm(readAlarm(alarm));
+            }
+        }
+        for (Property property : component.properties) {
+            if (property.name.startsWith("X-")) {
+                out.putProviderData(property.name, unescape(property.value));
+            }
+        }
+        return out;
+    }
+
+    /// Serializes a recurrence rule without the {@code RRULE:} prefix.
+    public static String writeRecurrenceRule(CalendarRecurrenceRule rule) {
+        if (rule == null || rule.getFrequency() == null) {
+            throw new IllegalArgumentException("frequency required");
+        }
+        return recurrence(rule);
+    }
+
+    /// Parses a recurrence rule with or without an {@code RRULE:} prefix.
+    public static CalendarRecurrenceRule readRecurrenceRule(String value) throws CalendarException {
+        if (startsWithIgnoreCase(value, "RRULE:")) {
+            value = value.substring(6);
+        }
+        return parseRecurrence(value);
+    }
+
+    private static void readCommon(Component component, CalendarEvent event, CalendarTask task) throws CalendarException {
+        String id = value(component, "UID");
+        String title = value(component, "SUMMARY");
+        String description = value(component, "DESCRIPTION");
+        String location = value(component, "LOCATION");
+        Property start = component.first("DTSTART");
+        Property end = component.first(event == null ? "DUE" : "DTEND");
+        CalendarDateTime startValue = start == null ? null : parseDateTime(start.value, start.params.get("TZID"));
+        CalendarDateTime endValue = end == null ? null : parseDateTime(end.value, end.params.get("TZID"));
+        CalendarRecurrenceRule recurrence = parseRecurrence(value(component, "RRULE"));
+        if (event != null) {
+            event.setId(id).setTitle(title).setDescription(description).setLocation(location).setStart(startValue).setEnd(endValue).setRecurrence(recurrence);
+        } else {
+            task.setId(id).setTitle(title).setDescription(description).setLocation(location).setStart(startValue).setDue(endValue).setRecurrence(recurrence);
+        }
+    }
+
+    private static void writeCommon(StringBuilder out, String id, String title, String description, String location, CalendarDateTime start, CalendarDateTime end, CalendarRecurrenceRule recurrence, Map<String, String> extensions, boolean task) {
+        append(out, "UID:" + escape(id == null ? String.valueOf(System.currentTimeMillis()) + "@codenameone" : id));
+        append(out, "DTSTAMP:" + utc(Instant.now()));
+        if (title != null) {
+            append(out, "SUMMARY:" + escape(title));
+        }
+        if (description != null) {
+            append(out, "DESCRIPTION:" + escape(description));
+        }
+        if (location != null) {
+            append(out, "LOCATION:" + escape(location));
+        }
+        if (start != null) {
+            writeDateTime(out, "DTSTART", start);
+        }
+        if (end != null) {
+            writeDateTime(out, task ? "DUE" : "DTEND", end);
+        }
+        if (recurrence != null) {
+            append(out, "RRULE:" + recurrence(recurrence));
+        }
+        for (Map.Entry<String, String> entry : extensions.entrySet()) {
+            String key = asciiUpper(entry.getKey());
+            if (key.startsWith("X-")) {
+                append(out, key + ":" + escape(entry.getValue()));
+            }
+        }
+    }
+
+    private static void writeDateTime(StringBuilder out, String name, CalendarDateTime value) {
+        if (value.isAllDay()) {
+            LocalDate date = value.getDate();
+            append(out, name + ";VALUE=DATE:" + digits(date));
+        } else {
+            ZonedDateTime dateTime = value.getDateTime();
+            String zone = dateTime.getZone().getId();
+            if (isUtc(dateTime.getZone())) {
+                append(out, name + ":" + utc(dateTime.toInstant()));
+            } else {
+                append(out, name + ";TZID=" + zone + ":" + local(dateTime.toInstant(), dateTime.getZone()));
+            }
+        }
+    }
+
+    private static String recurrence(CalendarRecurrenceRule rule) {
+        StringBuilder out = new StringBuilder("FREQ=").append(rule.getFrequency().name());
+        if (rule.getInterval() != 1) {
+            out.append(";INTERVAL=").append(rule.getInterval());
+        }
+        if (rule.getCount() != null) {
+            out.append(";COUNT=").append(rule.getCount());
+        }
+        if (rule.getUntil() != null) {
+            out.append(";UNTIL=").append(formatRecurrenceUntil(rule.getUntil()));
+        }
+        appendNumbers(out, "BYDAY", rule.getDaysOfWeek(), true);
+        appendNumbers(out, "BYMONTHDAY", rule.getDaysOfMonth(), false);
+        appendNumbers(out, "BYMONTH", rule.getMonths(), false);
+        return out.toString();
+    }
+
+    private static CalendarRecurrenceRule parseRecurrence(String value) throws CalendarException {
+        if (value == null) {
+            return null;
+        }
+        CalendarRecurrenceRule out = new CalendarRecurrenceRule();
+        String[] parts = CalendarDateUtil.split(value, ';');
+        for (String part : parts) {
+            int equals = part.indexOf('=');
+            if (equals < 1) {
+                continue;
+            }
+            String key = asciiUpper(part.substring(0, equals));
+            String data = part.substring(equals + 1);
+            try {
+                if ("FREQ".equals(key)) {
+                    out.setFrequency(CalendarRecurrenceRule.Frequency.valueOf(asciiUpper(data)));
+                } else if ("INTERVAL".equals(key)) {
+                    out.setInterval(Integer.parseInt(data));
+                } else if ("COUNT".equals(key)) {
+                    out.setCount(Integer.valueOf(data));
+                } else if ("UNTIL".equals(key)) {
+                    out.setUntil(parseDateTime(data, null));
+                } else if ("BYDAY".equals(key)) {
+                    for (String item : CalendarDateUtil.split(data, ',')) {
+                        out.addDayOfWeek(day(item));
+                    }
+                } else if ("BYMONTHDAY".equals(key)) {
+                    for (String item : CalendarDateUtil.split(data, ',')) {
+                        out.addDayOfMonth(Integer.parseInt(item));
+                    }
+                } else if ("BYMONTH".equals(key)) {
+                    for (String item : CalendarDateUtil.split(data, ',')) {
+                        out.addMonth(Integer.parseInt(item));
+                    }
+                }
+            } catch (IllegalArgumentException ex) {
+                throw new CalendarException(CalendarError.MALFORMED_RESPONSE, "Invalid recurrence rule: " + value, ex);
+            }
+        }
+        if (out.getFrequency() == null) {
+            throw new CalendarException(CalendarError.MALFORMED_RESPONSE, "RRULE has no frequency");
+        }
+        return out;
+    }
+
+    private static void writeAttendee(StringBuilder out, CalendarAttendee attendee) {
+        StringBuilder line = new StringBuilder("ATTENDEE");
+        if (attendee.getName() != null) {
+            line.append(";CN=").append(quote(attendee.getName()));
+        }
+        line.append(";ROLE=").append(attendee.getRole() == CalendarAttendee.Role.OPTIONAL ? "OPT-PARTICIPANT" : attendee.getRole() == CalendarAttendee.Role.RESOURCE ? "NON-PARTICIPANT" : "REQ-PARTICIPANT");
+        line.append(";PARTSTAT=").append(attendee.getResponse() == CalendarAttendee.Response.NONE
+                ? "NEEDS-ACTION" : attendee.getResponse().name().replace('_', '-'));
+        line.append(':');
+        String uri = attendee.getUri() != null ? attendee.getUri() : attendee.getEmail();
+        if (uri != null && uri.indexOf(':') < 0) {
+            uri = "mailto:" + uri;
+        }
+        line.append(uri == null ? "" : uri);
+        append(out, line.toString());
+    }
+
+    private static CalendarAttendee readAttendee(Property property) {
+        String uri = unescape(property.value);
+        String email = uri;
+        if (startsWithIgnoreCase(email, "mailto:")) {
+            email = email.substring(7);
+        }
+        CalendarAttendee out = new CalendarAttendee().setUri(uri).setEmail(email).setName(property.params.get("CN"));
+        String role = property.params.get("ROLE");
+        if ("OPT-PARTICIPANT".equals(role)) {
+            out.setRole(CalendarAttendee.Role.OPTIONAL);
+        } else if ("NON-PARTICIPANT".equals(role)) {
+            out.setRole(CalendarAttendee.Role.RESOURCE);
+        }
+        String response = property.params.get("PARTSTAT");
+        if (response != null) {
+            try {
+                out.setResponse(CalendarAttendee.Response.valueOf(response.replace('-', '_')));
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return out;
+    }
+
+    private static void writeAlarm(StringBuilder out, CalendarAlarm alarm) {
+        append(out, "BEGIN:VALARM");
+        append(out, "ACTION:" + (alarm.getMethod() == CalendarAlarm.Method.EMAIL ? "EMAIL" : alarm.getMethod() == CalendarAlarm.Method.AUDIO ? "AUDIO" : "DISPLAY"));
+        if (alarm.getTimeBefore() != null) {
+            long seconds = alarm.getTimeBefore().getSeconds();
+            if (seconds < 0) {
+                throw new IllegalArgumentException("timeBefore must be a non-negative duration");
+            }
+            // iCalendar triggers are whole seconds; round sub-second values
+            // instead of failing an export queued long after the value was set.
+            if (alarm.getTimeBefore().getNano() >= 500000000) {
+                seconds++;
+            }
+            append(out, "TRIGGER:-" + Duration.ofSeconds(seconds));
+        } else if (alarm.getAbsoluteTime() != null) {
+            append(out, "TRIGGER;VALUE=DATE-TIME:" + utc(alarm.getAbsoluteTime()));
+        }
+        append(out, "END:VALARM");
+    }
+
+    private static CalendarAlarm readAlarm(Component component) throws CalendarException {
+        String action = value(component, "ACTION");
+        String trigger = value(component, "TRIGGER");
+        CalendarAlarm out = new CalendarAlarm();
+        if ("EMAIL".equals(action)) {
+            out.setMethod(CalendarAlarm.Method.EMAIL);
+        } else if ("AUDIO".equals(action)) {
+            out.setMethod(CalendarAlarm.Method.AUDIO);
+        }
+        if (trigger != null && trigger.startsWith("-P")) {
+            try {
+                out.setTimeBefore(Duration.parse(trigger.substring(1)));
+            } catch (DateTimeException ignored) {
+            }
+        } else if (trigger != null && (trigger.startsWith("P") || trigger.startsWith("+P"))) {
+            try {
+                Duration offset = Duration.parse(trigger.charAt(0) == '+' ? trigger.substring(1) : trigger);
+                if (offset.compareTo(Duration.ofSeconds(0)) == 0) {
+                    out.setTimeBefore(offset);
+                }
+            } catch (DateTimeException ignored) {
+            }
+        } else if (trigger != null) {
+            out.setAbsoluteTime(parseDateTime(trigger, null).getDateTime().toInstant());
+        }
+        if (out.getTimeBefore() == null && out.getAbsoluteTime() == null) {
+            // An alarm without a mappable trigger would re-serialize as a
+            // VALARM missing its required TRIGGER property; drop it instead.
+            return null;
+        }
+        return out;
+    }
+
+    private static void writeAttachment(StringBuilder out, CalendarAttachment attachment) {
+        if (attachment.getUri() == null) {
+            return;
+        }
+        StringBuilder line = new StringBuilder("ATTACH");
+        if (attachment.getMimeType() != null) {
+            line.append(";FMTTYPE=").append(attachment.getMimeType());
+        }
+        line.append(':').append(escape(attachment.getUri()));
+        append(out, line.toString());
+    }
+
+    private static CalendarAttachment readAttachment(Property property) {
+        return new CalendarAttachment().setUri(unescape(property.value)).setMimeType(property.params.get("FMTTYPE"));
+    }
+
+    private static Component component(String input, String wanted) throws CalendarException {
+        if (input == null) {
+            throw new CalendarException(CalendarError.MALFORMED_RESPONSE, "Calendar data is null");
+        }
+        List<String> lines = unfold(input);
+        Component root = new Component("ROOT");
+        Component current = root;
+        List<Component> stack = new ArrayList<Component>();
+        for (String line : lines) {
+            if (line.startsWith("BEGIN:")) {
+                Component child = new Component(asciiUpper(line.substring(6)));
+                current.children.add(child);
+                stack.add(current);
+                current = child;
+            } else if (line.startsWith("END:")) {
+                if (!stack.isEmpty()) {
+                    current = stack.remove(stack.size() - 1);
+                }
+            } else {
+                int colon = colon(line);
+                if (colon < 0) {
+                    continue;
+                }
+                String left = line.substring(0, colon);
+                String data = line.substring(colon + 1);
+                List<String> fields = splitParameters(left);
+                Property property = new Property(asciiUpper(fields.get(0)), data);
+                for (int i = 1; i < fields.size(); i++) {
+                    int equals = fields.get(i).indexOf('=');
+                    if (equals > 0) {
+                        property.params.put(asciiUpper(fields.get(i).substring(0, equals)), unquote(fields.get(i).substring(equals + 1)));
+                    }
+                }
+                current.properties.add(property);
+            }
+        }
+        Component found = find(root, wanted);
+        if (found == null) {
+            throw new CalendarException(CalendarError.MALFORMED_RESPONSE, "No " + wanted + " component found");
+        }
+        return found;
+    }
+
+    private static Component find(Component component, String name) {
+        if (name.equals(component.name)) {
+            return component;
+        }
+        for (Component child : component.children) {
+            Component result = find(child, name);
+            if (result != null) {
+                return result;
+            }
+        }
+        return null;
+    }
+
+    private static CalendarDateTime parseDateTime(String value, String zone) throws CalendarException {
+        try {
+            if (value.length() == 8) {
+                return CalendarDateTime.allDay(CalendarDateUtil.parseDate(
+                        value.substring(0, 4) + "-" + value.substring(4, 6)
+                        + "-" + value.substring(6, 8)));
+            }
+            boolean zulu = value.endsWith("Z");
+            String timeZone = zulu || zone == null ? "UTC" : zone;
+            ZoneId zoneId = CalendarDateUtil.zoneId(timeZone);
+            return CalendarDateTime.instant(CalendarDateUtil.parseDateTime(value, zoneId), zoneId);
+        } catch (IllegalArgumentException ex) {
+            throw new CalendarException(CalendarError.MALFORMED_RESPONSE, "Invalid calendar date: " + value, ex);
+        }
+    }
+
+    private static List<String> unfold(String input) {
+        String normalized = input.replace("\r\n", "\n").replace('\r', '\n');
+        String[] raw = CalendarDateUtil.split(normalized, '\n');
+        List<String> out = new ArrayList<String>();
+        for (String line : raw) {
+            if ((line.startsWith(" ") || line.startsWith("\t")) && !out.isEmpty()) {
+                int last = out.size() - 1;
+                out.set(last, out.get(last) + line.substring(1));
+            } else if (line.length() > 0) {
+                out.add(line);
+            }
+        }
+        return out;
+    }
+
+    private static void append(StringBuilder out, String line) {
+        byte[] bytes = StringUtil.getBytes(line);
+        if (bytes.length <= 75) {
+            out.append(line).append(CRLF);
+            return;
+        }
+        int start = 0;
+        int chars = line.length();
+        while (start < chars) {
+            int end = Math.min(chars, start + 72);
+            while (end > start && utf8Length(line.substring(start, end)) > 74) {
+                end--;
+            }
+            // Never fold between a surrogate pair: each half would encode as
+            // a replacement character and permanently corrupt the text.
+            while (end > start + 1 && end < chars && Character.isLowSurrogate(line.charAt(end))) {
+                end--;
+            }
+            if (start > 0) {
+                out.append(' ');
+            }
+            out.append(line.substring(start, end)).append(CRLF);
+            start = end;
+        }
+    }
+
+    private static int utf8Length(String value) {
+        try {
+            return value.getBytes("UTF-8").length;
+        } catch (java.io.UnsupportedEncodingException ex) {
+            return value.length();
+        }
+    }
+
+    private static String escape(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "\\n");
+    }
+
+    private static String unescape(String value) {
+        if (value == null) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder();
+        boolean slash = false;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (slash) {
+                out.append(c == 'n' || c == 'N' ? '\n' : c);
+                slash = false;
+            } else if (c == '\\') {
+                slash = true;
+            } else {
+                out.append(c);
+            }
+        }
+        if (slash) {
+            out.append('\\');
+        }
+        return out.toString();
+    }
+
+    private static String quote(String value) {
+        // RFC 5545 forbids a raw double quote inside a quoted parameter value;
+        // RFC 6868 caret encoding represents it (and caret/newline) portably
+        // and keeps the emitted line parseable by colon()/splitParameters().
+        return '"' + value.replace("^", "^^").replace("\"", "^'").replace("\n", "^n") + '"';
+    }
+
+    private static String unquote(String value) {
+        if (value.length() > 1 && value.charAt(0) == '"' && value.charAt(value.length() - 1) == '"') {
+            return caretDecode(value.substring(1, value.length() - 1));
+        }
+        return caretDecode(value);
+    }
+
+    private static String caretDecode(String value) {
+        if (value.indexOf('^') < 0) {
+            return value;
+        }
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '^' && i + 1 < value.length()) {
+                char next = value.charAt(i + 1);
+                if (next == '^') {
+                    out.append('^');
+                    i++;
+                    continue;
+                }
+                if (next == '\'') {
+                    out.append('"');
+                    i++;
+                    continue;
+                }
+                if (next == 'n' || next == 'N') {
+                    out.append('\n');
+                    i++;
+                    continue;
+                }
+            }
+            out.append(c);
+        }
+        return out.toString();
+    }
+
+    private static int colon(String value) {
+        boolean quoted = false;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c == '"') {
+                quoted = !quoted;
+            } else if (c == ':' && !quoted) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static List<String> splitParameters(String value) {
+        List<String> out = new ArrayList<String>();
+        int start = 0;
+        boolean quoted = false;
+        boolean escaped = false;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (escaped) {
+                escaped = false;
+            } else if (c == '\\') {
+                escaped = true;
+            } else if (c == '"') {
+                quoted = !quoted;
+            } else if (c == ';' && !quoted) {
+                out.add(value.substring(start, i));
+                start = i + 1;
+            }
+        }
+        out.add(value.substring(start));
+        return out;
+    }
+
+    private static String value(Component component, String name) {
+        Property property = component.first(name);
+        return property == null ? null : unescape(property.value);
+    }
+
+    private static String digits(LocalDate date) {
+        return pad(date.getYear(), 4) + pad(date.getMonthValue(), 2) + pad(date.getDayOfMonth(), 2);
+    }
+
+    private static String pad(int value, int count) {
+        String s = String.valueOf(value);
+        while (s.length() < count) {
+            s = "0" + s;
+        }
+        return s;
+    }
+
+    private static String utc(Instant value) {
+        return format(value, ZoneOffset.UTC) + "Z";
+    }
+
+    private static String local(Instant value, ZoneId zone) {
+        return format(value, zone);
+    }
+
+    private static boolean isUtc(ZoneId zone) {
+        String id = zone.getId();
+        return ZoneOffset.UTC.equals(zone) || "UTC".equals(id) || "GMT".equals(id)
+                || "Etc/UTC".equals(id) || "Etc/GMT".equals(id);
+    }
+
+    private static String format(Instant value, ZoneId zone) {
+        return CalendarDateUtil.formatBasic(value, zone);
+    }
+
+    private static String formatRecurrenceUntil(CalendarDateTime value) {
+        return value.isAllDay() ? digits(value.getDate()) : utc(value.getDateTime().toInstant());
+    }
+
+    private static int day(String value) {
+        String v = value.length() > 2 ? value.substring(value.length() - 2) : value;
+        String[] days = { "MO", "TU", "WE", "TH", "FR", "SA", "SU" };
+        for (int i = 0; i < days.length; i++) {
+            if (days[i].equals(v)) {
+                return i + 1;
+            }
+        }
+        throw new IllegalArgumentException(value);
+    }
+
+    private static void appendNumbers(StringBuilder out, String name, List<Integer> values, boolean weekdays) {
+        if (values.isEmpty()) {
+            return;
+        }
+        out.append(';').append(name).append('=');
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) {
+                out.append(',');
+            }
+            int v = values.get(i).intValue();
+            out.append(weekdays ? new String[] { "MO", "TU", "WE", "TH", "FR", "SA", "SU" }[v - 1] : String.valueOf(v));
+        }
+    }
+
+    private static StringBuilder beginCalendar() {
+        return new StringBuilder("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Codename One//Calendar API//EN\r\nCALSCALE:GREGORIAN\r\n");
+    }
+
+    private static String endCalendar(StringBuilder out) {
+        return out.append("END:VCALENDAR\r\n").toString();
+    }
+
+    private static boolean startsWithIgnoreCase(String value, String prefix) {
+        return value != null && value.length() >= prefix.length()
+                && value.regionMatches(true, 0, prefix, 0, prefix.length());
+    }
+
+    private static String asciiUpper(String value) {
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            out.append(c >= 'a' && c <= 'z' ? (char) (c - ('a' - 'A')) : c);
+        }
+        return out.toString();
+    }
+
+    private static <E extends Enum<E>> E enumValue(Class<E> type, String value, E fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        try {
+            return Enum.valueOf(type, asciiUpper(value).replace('-', '_'));
+        } catch (IllegalArgumentException ex) {
+            return fallback;
+        }
+    }
+
+    private static final class Component {
+
+        final String name;
+
+        final List<Property> properties = new ArrayList<Property>();
+
+        final List<Component> children = new ArrayList<Component>();
+
+        Component(String name) {
+            this.name = name;
+        }
+
+        Property first(String propertyName) {
+            for (Property p : properties) {
+                if (propertyName.equals(p.name)) {
+                    return p;
+                }
+            }
+            return null;
+        }
+
+        List<Property> all(String propertyName) {
+            List<Property> out = new ArrayList<Property>();
+            for (Property p : properties) {
+                if (propertyName.equals(p.name)) {
+                    out.add(p);
+                }
+            }
+            return out;
+        }
+    }
+
+    private static final class Property {
+
+        final String name;
+
+        final String value;
+
+        final Map<String, String> params = new HashMap<String, String>();
+
+        Property(String name, String value) {
+            this.name = name;
+            this.value = value;
+        }
+    }
+}

@@ -1,0 +1,190 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.calendar;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.Util;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.StringUtil;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
+
+/// Default asynchronous transport backed by Codename One networking.
+public class DefaultCalendarHttpTransport implements CalendarHttpTransport {
+
+    @Override
+    public AsyncResource<CalendarHttpResponse> execute(final CalendarHttpRequest spec) {
+        final AsyncResource<CalendarHttpResponse> out = new AsyncResource<CalendarHttpResponse>();
+        ConnectionRequest request = new ConnectionRequest() {
+
+            private final Map<String, String> responseHeaders = new HashMap<String, String>();
+
+            private boolean finished;
+
+            @Override
+            protected void readHeaders(Object connection) throws IOException {
+                capture(connection);
+            }
+
+            @Override
+            protected void readErrorCodeHeaders(Object connection) throws IOException {
+                capture(connection);
+            }
+
+            private void capture(Object c) throws IOException {
+                // Redirect hops call this once per response; reset so headers from
+                // an intermediate 3xx are never attributed to the final response.
+                responseHeaders.clear();
+                String[] names = { "ETag", "WWW-Authenticate", "Location", "Retry-After", "Sync-Token" };
+                for (String name : names) {
+                    String value = getHeader(c, name);
+                    if (value != null) {
+                        responseHeaders.put(name, value);
+                    }
+                }
+            }
+
+            @Override
+            public boolean onRedirect(String redirectUrl) {
+                if (sameOrigin(spec.getUrl(), redirectUrl)) {
+                    return false;
+                }
+                // Following would re-send the Authorization header to a different
+                // host, leaking the user's credentials or token.
+                errorOnce(new CalendarException(CalendarError.NETWORK,
+                        "Refusing to follow cross-origin redirect"));
+                return true;
+            }
+
+            @Override
+            protected void readResponse(InputStream input) throws IOException {
+                byte[] bytes = input == null ? new byte[0] : Util.readInputStream(input);
+                String body = StringUtil.newString(bytes);
+                completeOnce(new CalendarHttpResponse(getResponseCode(), body, responseHeaders));
+            }
+
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+                // readResponse() handles error responses too.  Completing here
+                // would race with that callback and loses the response body,
+                // since ConnectionRequest hasn't read it yet.
+            }
+
+            @Override
+            protected void handleException(Exception error) {
+                errorOnce(new CalendarException(CalendarError.NETWORK, error.getMessage(), error));
+            }
+
+            private synchronized void completeOnce(CalendarHttpResponse response) {
+                if (!finished) {
+                    finished = true;
+                    out.complete(response);
+                }
+            }
+
+            private synchronized void errorOnce(Throwable error) {
+                if (!finished) {
+                    finished = true;
+                    out.error(error);
+                }
+            }
+        };
+        request.setUrl(spec.getUrl());
+        request.setReadResponseForErrors(true);
+        request.setPost(!"GET".equals(spec.getMethod()) && !"DELETE".equals(spec.getMethod()));
+        request.setHttpMethod(spec.getMethod());
+        for (Map.Entry<String, String> h : spec.getHeaders().entrySet()) {
+            request.addRequestHeader(h.getKey(), h.getValue());
+        }
+        if (spec.getBody() != null) {
+            request.setRequestBody(spec.getBody());
+        }
+        NetworkManager.getInstance().addToQueue(request);
+        return out;
+    }
+
+    static boolean sameOrigin(String a, String b) {
+        return origin(a).equals(origin(b));
+    }
+
+    // Locale-independent lowering: default-locale toLowerCase() would map
+    // 'I' to a dotless i under Turkish locales and break host comparison.
+    private static String asciiLowerCase(String value) {
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            out.append(c >= 'A' && c <= 'Z' ? (char) (c + ('a' - 'A')) : c);
+        }
+        return out.toString();
+    }
+
+    private static String origin(String url) {
+        if (url == null) {
+            return "";
+        }
+        int schemeEnd = url.indexOf("://");
+        if (schemeEnd < 0) {
+            return url;
+        }
+        String scheme = asciiLowerCase(url.substring(0, schemeEnd));
+        String rest = url.substring(schemeEnd + 3);
+        int pathStart = rest.length();
+        for (int i = 0; i < rest.length(); i++) {
+            char c = rest.charAt(i);
+            if (c == '/' || c == '?' || c == '#') {
+                pathStart = i;
+                break;
+            }
+        }
+        String authority = rest.substring(0, pathStart);
+        int at = authority.lastIndexOf('@');
+        if (at >= 0) {
+            authority = authority.substring(at + 1);
+        }
+        authority = asciiLowerCase(authority);
+        String host = authority;
+        String port = null;
+        if (authority.startsWith("[")) {
+            int close = authority.indexOf(']');
+            if (close >= 0) {
+                host = authority.substring(0, close + 1);
+                if (close + 1 < authority.length() && authority.charAt(close + 1) == ':') {
+                    port = authority.substring(close + 2);
+                }
+            }
+        } else {
+            int colon = authority.indexOf(':');
+            if (colon >= 0) {
+                host = authority.substring(0, colon);
+                port = authority.substring(colon + 1);
+            }
+        }
+        if (port == null || port.length() == 0) {
+            port = "https".equals(scheme) ? "443" : "80";
+        }
+        return scheme + "://" + host + ":" + port;
+    }
+}

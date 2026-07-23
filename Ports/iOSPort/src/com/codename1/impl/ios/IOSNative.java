@@ -54,6 +54,17 @@ public final class IOSNative {
     /// source of truth on the Java side since the build flag only
     /// affects native compilation.
     native boolean isMetalRendering();
+    native boolean calendarSupported();
+    native int calendarAuthorizationStatus(int entityType);
+    native boolean calendarRequestAccess(int entityType, boolean writeOnly);
+    native String calendarList(int entityType);
+    native String calendarEvents(String calendarId, long startTime, long endTime);
+    native String calendarEvent(String calendarId, String eventId);
+    native String calendarSaveEvent(String eventJson, int mutationScope);
+    native boolean calendarDeleteEvent(String eventId, int mutationScope);
+    native String calendarTasks(String calendarId);
+    native String calendarSaveTask(String taskJson);
+    native boolean calendarDeleteTask(String taskId);
     static native void deinitializeVM();
     native boolean isPainted();
     native int getDisplayWidth();

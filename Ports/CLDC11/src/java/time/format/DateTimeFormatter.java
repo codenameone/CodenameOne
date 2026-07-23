@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package java.time.format;
 
 import java.text.ParseException;
@@ -141,7 +163,8 @@ public final class DateTimeFormatter {
             throw new DateTimeParseException("Formatter does not produce LocalDateTime", text, 0);
         }
         int t = text.indexOf('T');
-        return LocalDateTime.of(parseLocalDate(text.substring(0, t)), parseLocalTime(text.substring(t + 1)));
+        return LocalDateTime.of((LocalDate) ISO_LOCAL_DATE.parse(text.substring(0, t)),
+                (LocalTime) ISO_LOCAL_TIME.parse(text.substring(t + 1)));
     }
 
     OffsetDateTime parseOffsetDateTime(String text) {
@@ -156,7 +179,7 @@ public final class DateTimeFormatter {
         if (text.endsWith("Z")) {
             idx = text.length() - 1;
         }
-        LocalDateTime ldt = parseLocalDateTime(text.substring(0, idx));
+        LocalDateTime ldt = (LocalDateTime) ISO_LOCAL_DATE_TIME.parse(text.substring(0, idx));
         ZoneOffset offset = text.endsWith("Z") ? ZoneOffset.UTC : ZoneOffset.of(text.substring(idx));
         return OffsetDateTime.of(ldt, offset);
     }
@@ -174,7 +197,7 @@ public final class DateTimeFormatter {
         if (text.indexOf('Z') > 0 && (offsetIdx < 0 || text.indexOf('Z') < zoneStart)) {
             offsetIdx = text.indexOf('Z');
         }
-        LocalDateTime ldt = parseLocalDateTime(text.substring(0, offsetIdx));
+        LocalDateTime ldt = (LocalDateTime) ISO_LOCAL_DATE_TIME.parse(text.substring(0, offsetIdx));
         ZoneOffset offset = text.charAt(offsetIdx) == 'Z' ? ZoneOffset.UTC : ZoneOffset.of(text.substring(offsetIdx, zoneStart));
         ZoneId zone = ZoneId.of(text.substring(zoneStart + 1, text.length() - 1));
         return ZonedDateTime.ofInstant(ldt.toInstant(offset), zone);

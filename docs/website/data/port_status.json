@@ -378,6 +378,13 @@
       "tests": ["CameraApiTest"]
     },
     {
+      "id": "calendar-integration",
+      "category": "Platform-dependent APIs",
+      "name": "Calendar integration",
+      "description": "Checks portable calendar data and local-source capability discovery without requesting access to user data.",
+      "tests": ["CalendarApiTest"]
+    },
+    {
       "id": "mutable-images",
       "category": "Media and graphics",
       "name": "Mutable image readback",

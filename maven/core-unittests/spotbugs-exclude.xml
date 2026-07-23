@@ -160,6 +160,21 @@
     </Match>
 
     <!--
+    Calendar providers use the same one-shot AsyncResource callback idiom as
+    the identity and AI packages above. Named static callback classes would
+    add boilerplate and fields for every captured request without changing the
+    lifetime of these callbacks.
+    -->
+    <Match>
+        <Class name="~com\.codename1\.calendar\..*" />
+        <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON" />
+    </Match>
+    <Match>
+        <Class name="~com\.codename1\.calendar\.DefaultCalendarHttpTransport\$.*" />
+        <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS" />
+    </Match>
+
+    <!--
     The AI package and ChatView use a lot of anonymous Runnable /
     StreamingListener / SuccessCallback subclasses to bridge
     network-thread events back onto the EDT via callSerially.

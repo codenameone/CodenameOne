@@ -137,6 +137,48 @@ class MacNativeBuilderEntitlementsTest {
                 "Explicit opt-out should win over the auto-detection");
     }
 
+    @Test
+    void calendarPrivacyHintAddsSandboxCalendarEntitlement(@TempDir Path tmp) throws IOException {
+        BuildRequest req = new BuildRequest();
+        req.setMainClass("MyApp");
+        req.putArgument("macNative.enabled", "true");
+        req.putArgument("macNative.distribution", "appStore");
+        req.putArgument("macNative.teamId", "ABCDEFG123");
+        req.putArgument("ios.NSCalendarsFullAccessUsageDescription", "Schedule events");
+
+        String body = writeEntitlements(req, tmp, "MyApp");
+
+        assertTrue(body.contains("com.apple.security.personal-information.calendars"));
+    }
+
+    @Test
+    void writeOnlyCalendarPrivacyHintAddsSandboxCalendarEntitlement(@TempDir Path tmp) throws IOException {
+        BuildRequest req = new BuildRequest();
+        req.setMainClass("MyApp");
+        req.putArgument("macNative.enabled", "true");
+        req.putArgument("macNative.distribution", "appStore");
+        req.putArgument("macNative.teamId", "ABCDEFG123");
+        req.putArgument("ios.NSCalendarsWriteOnlyAccessUsageDescription", "Add events");
+
+        String body = writeEntitlements(req, tmp, "MyApp");
+
+        assertTrue(body.contains("com.apple.security.personal-information.calendars"));
+    }
+
+    @Test
+    void remindersPrivacyHintAddsSandboxCalendarEntitlement(@TempDir Path tmp) throws IOException {
+        BuildRequest req = new BuildRequest();
+        req.setMainClass("MyApp");
+        req.putArgument("macNative.enabled", "true");
+        req.putArgument("macNative.distribution", "appStore");
+        req.putArgument("macNative.teamId", "ABCDEFG123");
+        req.putArgument("ios.NSRemindersFullAccessUsageDescription", "Track tasks");
+
+        String body = writeEntitlements(req, tmp, "MyApp");
+
+        assertTrue(body.contains("com.apple.security.personal-information.calendars"));
+    }
+
     // ------------------------------------------------------------------
     // Helper
     // ------------------------------------------------------------------

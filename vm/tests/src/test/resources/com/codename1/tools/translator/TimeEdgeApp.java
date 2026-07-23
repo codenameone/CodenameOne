@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -7,6 +29,7 @@ import java.time.Period;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
 
 public class TimeEdgeApp {
     private static String two(int value) {
@@ -37,6 +60,13 @@ public class TimeEdgeApp {
         ZonedDateTime berlinSummer = ZonedDateTime.ofInstant(Instant.parse("2020-06-01T10:15:30Z"), ZoneId.of("Europe/Berlin"));
 
         Duration duration = Duration.ofMillis(90061).plus(Duration.ofSeconds(5));
+        String durationParseError;
+        try {
+            Duration.parse("invalid");
+            durationParseError = "missing";
+        } catch (DateTimeParseException ex) {
+            durationParseError = ex.getParsedString() + ":" + ex.getErrorIndex();
+        }
         Period period = Period.of(1, 1, 1);
         LocalDate periodTarget = LocalDate.of(2019, 1, 31).plusYears(period.getYears()).plusMonths(period.getMonths()).plusDays(period.getDays());
         LocalDateTime utcLocal = LocalDateTime.ofInstant(baseInstant, ZoneOffset.UTC);
@@ -55,7 +85,18 @@ public class TimeEdgeApp {
         result.append(duration.toMillis()).append('|');
         result.append(periodTarget).append('|');
         result.append(LocalTime.of(23, 59, 59).plusSeconds(2)).append('|');
-        result.append(localDateTimeString(utcLocal));
+        result.append(localDateTimeString(utcLocal)).append('|');
+        result.append(durationParseError).append('|');
+        result.append(Duration.ofMillis(500)).append('|');
+        result.append(Duration.ofMillis(-500)).append('|');
+        result.append(Duration.parse(Duration.ofMillis(500).toString()).toMillis()).append('|');
+        result.append(Duration.parse(Duration.ofMillis(-500).toString()).toMillis()).append('|');
+        result.append(Duration.ofMinutes(15)).append('|');
+        result.append(Duration.ofSeconds(7384)).append('|');
+        result.append(Duration.ofSeconds(-7384)).append('|');
+        result.append(Duration.ofSeconds(-60, 1)).append('|');
+        result.append(Duration.parse("P1DT2H3M4.5S").toMillis()).append('|');
+        result.append(Duration.parse("-P1DT1H1M").toMillis());
         return result.toString();
     }
 

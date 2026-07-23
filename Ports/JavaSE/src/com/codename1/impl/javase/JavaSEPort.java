@@ -14849,6 +14849,7 @@ public class JavaSEPort extends CodenameOneImplementation {
     private JavaSEBiometrics biometrics;
     private JavaSESecureStorage secureStorage;
     private JavaSENfc nfc;
+    private JavaSECalendarSource calendarSource;
     private com.codename1.bluetooth.Bluetooth bluetooth;
     private boolean biometricsBuildHintsInstalled;
     private boolean nfcBuildHintsInstalled;
@@ -14878,6 +14879,17 @@ public class JavaSEPort extends CodenameOneImplementation {
             nfc = new JavaSENfc();
         }
         return nfc;
+    }
+
+    @Override
+    public com.codename1.calendar.LocalCalendarSource getLocalCalendarSource() {
+        if (!isSimulator()) {
+            return null;
+        }
+        if (calendarSource == null) {
+            calendarSource = new JavaSECalendarSource();
+        }
+        return calendarSource;
     }
 
     @Override

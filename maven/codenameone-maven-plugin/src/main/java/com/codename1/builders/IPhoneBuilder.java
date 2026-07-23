@@ -147,6 +147,9 @@ public class IPhoneBuilder extends Executor {
     private boolean usesWifiInfo;
     private boolean usesWifiHotspotConfig;
     private boolean usesBonjour;
+    private boolean usesCalendarApi;
+    private boolean usesCalendarEventApi;
+    private boolean usesCalendarTaskApi;
     private String firstBonjourType;
                                   // so we need to store the main class name for later here.
     // Map will be used for Xcode 8 privacy usage descriptions.  Don't need it yet
@@ -799,6 +802,9 @@ public class IPhoneBuilder extends Executor {
                 public void usesClass(String cls) {
                     if (cls == null) return;
                     aiAcc.consume(cls);
+                    if (cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0) {
+                        usesCalendarApi = true;
+                    }
                     if (!usesLocalNotifications && cls.indexOf("com/codename1/notifications/LocalNotification") == 0) {
                         usesLocalNotifications = true;
                     }
@@ -921,6 +927,25 @@ public class IPhoneBuilder extends Executor {
 
                 @Override
                 public void usesClassMethod(String cls, String method) {
+                    if (cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0
+                            || (cls.indexOf("com/codename1/calendar/CalendarManager") == 0
+                            && (method.indexOf("getLocalSource") >= 0
+                            || method.indexOf("getSources") >= 0))
+                            || (cls.indexOf("com/codename1/ui/Display") == 0
+                            && method.indexOf("getLocalCalendarSource") >= 0)) {
+                        usesCalendarApi = true;
+                    }
+                    if (cls.indexOf("com/codename1/calendar/CalendarSource") == 0
+                            || cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0) {
+                        if (method.indexOf("Task") >= 0 || method.indexOf("Tasks") >= 0) {
+                            usesCalendarTaskApi = true;
+                        }
+                        if (method.indexOf("Event") >= 0 || method.indexOf("Events") >= 0
+                                || method.indexOf("FreeBusy") >= 0
+                                || method.indexOf("Invitation") >= 0) {
+                            usesCalendarEventApi = true;
+                        }
+                    }
                     if (cls.equals("com/codename1/io/wifi/WiFi")
                             && (method.indexOf("connect") > -1
                                 || method.indexOf("disconnect") > -1)) {
@@ -940,6 +965,40 @@ public class IPhoneBuilder extends Executor {
             throw new BuildException("Failed to scan project classes for permissions.", ex);
         }
         stopwatch.split("Scan Classes");
+
+        if (usesCalendarApi) {
+            // An unqualified local-source lookup defaults to event access. Task
+            // methods, or an explicit reminder privacy hint, opt into reminders.
+            boolean includeTasks = usesCalendarTaskApi
+                    || request.getArg("ios.NSRemindersFullAccessUsageDescription", null) != null
+                    || request.getArg("ios.NSRemindersUsageDescription", null) != null;
+            boolean includeEvents = usesCalendarEventApi || !includeTasks;
+            if (includeEvents) {
+                String calendarDescription = request.getArg("ios.NSCalendarsFullAccessUsageDescription",
+                        "This app uses your calendars to read and schedule events.");
+                String calendarWriteDescription = request.getArg("ios.NSCalendarsWriteOnlyAccessUsageDescription",
+                        "This app uses your calendar to schedule events.");
+                privacyUsageDescriptions.put("NSCalendarsFullAccessUsageDescription", calendarDescription);
+                privacyUsageDescriptions.put("NSCalendarsWriteOnlyAccessUsageDescription", calendarWriteDescription);
+                // Retain the pre-iOS-17 key when an app supports older releases.
+                privacyUsageDescriptions.put("NSCalendarsUsageDescription",
+                        request.getArg("ios.NSCalendarsUsageDescription", calendarDescription));
+                request.putArgument("ios.NSCalendarsFullAccessUsageDescription", calendarDescription);
+                request.putArgument("ios.NSCalendarsWriteOnlyAccessUsageDescription", calendarWriteDescription);
+                request.putArgument("ios.NSCalendarsUsageDescription",
+                        request.getArg("ios.NSCalendarsUsageDescription", calendarDescription));
+            }
+            if (includeTasks) {
+                String remindersDescription = request.getArg("ios.NSRemindersFullAccessUsageDescription",
+                        "This app uses your reminders to read and schedule tasks.");
+                privacyUsageDescriptions.put("NSRemindersFullAccessUsageDescription", remindersDescription);
+                privacyUsageDescriptions.put("NSRemindersUsageDescription",
+                        request.getArg("ios.NSRemindersUsageDescription", remindersDescription));
+                request.putArgument("ios.NSRemindersFullAccessUsageDescription", remindersDescription);
+                request.putArgument("ios.NSRemindersUsageDescription",
+                        request.getArg("ios.NSRemindersUsageDescription", remindersDescription));
+            }
+        }
 
         // External surfaces: parse the build-time kinds manifest (surfaces.json in the project
         // resources, delivered alongside .ios.appext archives in resDir) and resolve the app
@@ -2213,6 +2272,20 @@ public class IPhoneBuilder extends Executor {
                     addLibs = "LocalAuthentication.framework";
                 } else if (!addLibs.toLowerCase().contains("localauthentication")) {
                     addLibs = addLibs + ";LocalAuthentication.framework";
+                }
+            }
+            if (usesCalendarApi) {
+                try {
+                    replaceInFile(new File(buildinRes, "IOSNative.m"),
+                            "//#define CN1_USE_CALENDAR", "#define CN1_USE_CALENDAR");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable CN1_USE_CALENDAR", ex);
+                }
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = "EventKit.framework";
+                } else if (!addLibs.toLowerCase().contains("eventkit")) {
+                    addLibs = addLibs + ";EventKit.framework";
                 }
             }
 

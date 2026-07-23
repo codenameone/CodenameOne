@@ -1,3 +1,26 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
 package com.codenameone.examples.hellocodenameone.tests;
 
 import java.time.Clock;
@@ -56,6 +79,16 @@ public class TimeApiTest extends BaseTest {
             assertEqual("Sat Feb 29 2020 23:45", localized);
 
             assertEqual(95061L, Duration.ofMillis(90061).plus(Duration.ofSeconds(5)).toMillis());
+            assertEqual("PT0.5S", Duration.ofMillis(500).toString());
+            assertEqual("PT-0.5S", Duration.ofMillis(-500).toString());
+            assertEqual(Duration.ofMillis(500), Duration.parse(Duration.ofMillis(500).toString()));
+            assertEqual(Duration.ofMillis(-500), Duration.parse(Duration.ofMillis(-500).toString()));
+            assertEqual("PT15M", Duration.ofMinutes(15).toString());
+            assertEqual("PT2H3M4S", Duration.ofSeconds(7384).toString());
+            assertEqual("PT-2H-3M-4S", Duration.ofSeconds(-7384).toString());
+            assertEqual("PT-59.999999999S", Duration.ofSeconds(-60, 1).toString());
+            assertEqual(Duration.ofSeconds(7384), Duration.parse("P0DT2H3M4S"));
+            assertEqual(Duration.ofSeconds(-90060), Duration.parse("-P1DT1H1M"));
             Period period = Period.of(1, 1, 1);
             assertEqual("2020-03-01", LocalDate.of(2019, 1, 31).plusYears(period.getYears()).plusMonths(period.getMonths()).plusDays(period.getDays()).toString());
             assertEqual("00:00:01", LocalTime.of(23, 59, 59).plusSeconds(2).toString());

@@ -4813,6 +4813,13 @@ public final class Display extends CN1Constants {
         return impl.getNfc();
     }
 
+    /// Returns the active port's local device-calendar source. Applications
+    /// should normally use
+    /// {@link com.codename1.calendar.LocalCalendarSource#getInstance()}.
+    public com.codename1.calendar.LocalCalendarSource getLocalCalendarSource() {
+        return impl.getLocalCalendarSource();
+    }
+
     /// Returns the platform Bluetooth entry point. Prefer
     /// {@link com.codename1.bluetooth.Bluetooth#getInstance()} in
     /// application code --- it handles the fallback to a no-op stub when

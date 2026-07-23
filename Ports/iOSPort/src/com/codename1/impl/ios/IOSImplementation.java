@@ -131,6 +131,7 @@ import com.codename1.ui.plaf.DefaultLookAndFeel;
  * @author Shai Almog
  */
 public class IOSImplementation extends CodenameOneImplementation {
+    private IOSCalendarSource calendarSource;
     // Flag to indicate if the current openGallery process is selecting multiple files
     private boolean disableUIWebView=true;
     private static boolean gallerySelectMultiple;
@@ -4591,6 +4592,14 @@ public class IOSImplementation extends CodenameOneImplementation {
             nfc = new IOSNfc(nativeInstance);
         }
         return nfc;
+    }
+
+    @Override
+    public com.codename1.calendar.LocalCalendarSource getLocalCalendarSource() {
+        if (calendarSource == null) {
+            calendarSource = new IOSCalendarSource(nativeInstance);
+        }
+        return calendarSource;
     }
 
     @Override

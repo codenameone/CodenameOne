@@ -231,6 +231,7 @@ import org.xml.sax.SAXException;
 //import android.webkit.JavascriptInterface;
 
 public class AndroidImplementation extends CodenameOneImplementation implements IntentResultListener {
+    private AndroidCalendarSource calendarSource;
     public static final Thread.UncaughtExceptionHandler exceptionHandler = new Thread.UncaughtExceptionHandler() {
         @Override
         public void uncaughtException(Thread t, Throwable e) {
@@ -8327,6 +8328,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return new String[]{};
         }
         return AndroidContactsManager.getInstance().getContacts(getContext(), withNumbers);
+    }
+
+    @Override
+    public com.codename1.calendar.LocalCalendarSource getLocalCalendarSource() {
+        if (calendarSource == null) {
+            calendarSource = new AndroidCalendarSource(getContext());
+        }
+        return calendarSource;
     }
 
     @Override
