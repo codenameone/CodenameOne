@@ -48,11 +48,12 @@ public final class ICalendarCodec {
     public static String writeEvent(CalendarEvent event) {
         StringBuilder out = beginCalendar();
         append(out, "BEGIN:VEVENT");
-        writeCommon(out, event.getId(), event.getTitle(), event.getDescription(), event.getLocation(), event.getStart(), event.getEnd(), event.getRecurrence(), event.getProviderData());
+        writeCommon(out, event.getId(), event.getTitle(), event.getDescription(), event.getLocation(), event.getStart(), event.getEnd(), event.getRecurrence(), event.getProviderData(), false);
         if (event.getUrl() != null) {
             append(out, "URL:" + escape(event.getUrl()));
         }
-        append(out, "STATUS:" + event.getStatus().name());
+        append(out, "STATUS:" + (event.getStatus() == CalendarEvent.Status.CANCELED
+                ? "CANCELLED" : event.getStatus().name()));
         append(out, "TRANSP:" + (event.getAvailability() == CalendarEvent.Availability.FREE ? "TRANSPARENT" : "OPAQUE"));
         append(out, "CLASS:" + event.getPrivacy().name());
         for (CalendarAttendee attendee : event.getAttendees()) {
@@ -74,7 +75,7 @@ public final class ICalendarCodec {
     public static String writeTask(CalendarTask task) {
         StringBuilder out = beginCalendar();
         append(out, "BEGIN:VTODO");
-        writeCommon(out, task.getId(), task.getTitle(), task.getDescription(), task.getLocation(), task.getStart(), task.getDue(), task.getRecurrence(), task.getProviderData());
+        writeCommon(out, task.getId(), task.getTitle(), task.getDescription(), task.getLocation(), task.getStart(), task.getDue(), task.getRecurrence(), task.getProviderData(), true);
         append(out, "STATUS:" + (task.isCompleted() ? "COMPLETED" : "NEEDS-ACTION"));
         if (task.getCompletionTime() != null) {
             append(out, "COMPLETED:" + utc(task.getCompletionTime()));
@@ -97,7 +98,9 @@ public final class ICalendarCodec {
         CalendarEvent out = new CalendarEvent();
         readCommon(component, out, null);
         out.setUrl(value(component, "URL"));
-        out.setStatus(enumValue(CalendarEvent.Status.class, value(component, "STATUS"), CalendarEvent.Status.CONFIRMED));
+        String status = value(component, "STATUS");
+        out.setStatus("CANCELLED".equalsIgnoreCase(status) ? CalendarEvent.Status.CANCELED
+                : enumValue(CalendarEvent.Status.class, status, CalendarEvent.Status.CONFIRMED));
         if ("TRANSPARENT".equalsIgnoreCase(value(component, "TRANSP"))) {
             out.setAvailability(CalendarEvent.Availability.FREE);
         }
@@ -119,7 +122,7 @@ public final class ICalendarCodec {
         }
         for (Property property : component.properties) {
             if (property.name.startsWith("X-")) {
-                out.putProviderData(property.name, property.value);
+                out.putProviderData(property.name, unescape(property.value));
             }
         }
         return out;
@@ -151,7 +154,7 @@ public final class ICalendarCodec {
         }
         for (Property property : component.properties) {
             if (property.name.startsWith("X-")) {
-                out.putProviderData(property.name, property.value);
+                out.putProviderData(property.name, unescape(property.value));
             }
         }
         return out;
@@ -167,7 +170,7 @@ public final class ICalendarCodec {
 
     /// Parses a recurrence rule with or without an {@code RRULE:} prefix.
     public static CalendarRecurrenceRule readRecurrenceRule(String value) throws CalendarException {
-        if (value != null && value.toUpperCase().startsWith("RRULE:")) {
+        if (startsWithIgnoreCase(value, "RRULE:")) {
             value = value.substring(6);
         }
         return parseRecurrence(value);
@@ -190,7 +193,7 @@ public final class ICalendarCodec {
         }
     }
 
-    private static void writeCommon(StringBuilder out, String id, String title, String description, String location, CalendarDateTime start, CalendarDateTime end, CalendarRecurrenceRule recurrence, Map<String, String> extensions) {
+    private static void writeCommon(StringBuilder out, String id, String title, String description, String location, CalendarDateTime start, CalendarDateTime end, CalendarRecurrenceRule recurrence, Map<String, String> extensions, boolean task) {
         append(out, "UID:" + escape(id == null ? String.valueOf(System.currentTimeMillis()) + "@codenameone" : id));
         append(out, "DTSTAMP:" + utc(Instant.now()));
         if (title != null) {
@@ -206,20 +209,17 @@ public final class ICalendarCodec {
             writeDateTime(out, "DTSTART", start);
         }
         if (end != null) {
-            writeDateTime(out, endName(out), end);
+            writeDateTime(out, task ? "DUE" : "DTEND", end);
         }
         if (recurrence != null) {
             append(out, "RRULE:" + recurrence(recurrence));
         }
         for (Map.Entry<String, String> entry : extensions.entrySet()) {
-            if (entry.getKey().toUpperCase().startsWith("X-")) {
-                append(out, entry.getKey().toUpperCase() + ":" + escape(entry.getValue()));
+            String key = asciiUpper(entry.getKey());
+            if (key.startsWith("X-")) {
+                append(out, key + ":" + escape(entry.getValue()));
             }
         }
-    }
-
-    private static String endName(StringBuilder out) {
-        return out.toString().indexOf("BEGIN:VTODO") >= 0 ? "DUE" : "DTEND";
     }
 
     private static void writeDateTime(StringBuilder out, String name, CalendarDateTime value) {
@@ -229,7 +229,7 @@ public final class ICalendarCodec {
         } else {
             ZonedDateTime dateTime = value.getDateTime();
             String zone = dateTime.getZone().getId();
-            if (ZoneOffset.UTC.equals(dateTime.getZone())) {
+            if (isUtc(dateTime.getZone())) {
                 append(out, name + ":" + utc(dateTime.toInstant()));
             } else {
                 append(out, name + ";TZID=" + zone + ":" + local(dateTime.toInstant(), dateTime.getZone()));
@@ -265,11 +265,11 @@ public final class ICalendarCodec {
             if (equals < 1) {
                 continue;
             }
-            String key = part.substring(0, equals).toUpperCase();
+            String key = asciiUpper(part.substring(0, equals));
             String data = part.substring(equals + 1);
             try {
                 if ("FREQ".equals(key)) {
-                    out.setFrequency(CalendarRecurrenceRule.Frequency.valueOf(data.toUpperCase()));
+                    out.setFrequency(CalendarRecurrenceRule.Frequency.valueOf(asciiUpper(data)));
                 } else if ("INTERVAL".equals(key)) {
                     out.setInterval(Integer.parseInt(data));
                 } else if ("COUNT".equals(key)) {
@@ -305,7 +305,8 @@ public final class ICalendarCodec {
             line.append(";CN=").append(quote(attendee.getName()));
         }
         line.append(";ROLE=").append(attendee.getRole() == CalendarAttendee.Role.OPTIONAL ? "OPT-PARTICIPANT" : attendee.getRole() == CalendarAttendee.Role.RESOURCE ? "NON-PARTICIPANT" : "REQ-PARTICIPANT");
-        line.append(";PARTSTAT=").append(attendee.getResponse().name().replace('_', '-'));
+        line.append(";PARTSTAT=").append(attendee.getResponse() == CalendarAttendee.Response.NONE
+                ? "NEEDS-ACTION" : attendee.getResponse().name().replace('_', '-'));
         line.append(':');
         String uri = attendee.getUri() != null ? attendee.getUri() : attendee.getEmail();
         if (uri != null && uri.indexOf(':') < 0) {
@@ -318,7 +319,7 @@ public final class ICalendarCodec {
     private static CalendarAttendee readAttendee(Property property) {
         String uri = unescape(property.value);
         String email = uri;
-        if (email != null && email.toLowerCase().startsWith("mailto:")) {
+        if (startsWithIgnoreCase(email, "mailto:")) {
             email = email.substring(7);
         }
         CalendarAttendee out = new CalendarAttendee().setUri(uri).setEmail(email).setName(property.params.get("CN"));
@@ -367,6 +368,14 @@ public final class ICalendarCodec {
                 out.setTimeBefore(Duration.parse(trigger.substring(1)));
             } catch (DateTimeException ignored) {
             }
+        } else if (trigger != null && (trigger.startsWith("P") || trigger.startsWith("+P"))) {
+            try {
+                Duration offset = Duration.parse(trigger.charAt(0) == '+' ? trigger.substring(1) : trigger);
+                if (offset.compareTo(Duration.ofSeconds(0)) == 0) {
+                    out.setTimeBefore(offset);
+                }
+            } catch (DateTimeException ignored) {
+            }
         } else if (trigger != null) {
             out.setAbsoluteTime(parseDateTime(trigger, null).getDateTime().toInstant());
         }
@@ -399,7 +408,7 @@ public final class ICalendarCodec {
         List<Component> stack = new ArrayList<Component>();
         for (String line : lines) {
             if (line.startsWith("BEGIN:")) {
-                Component child = new Component(line.substring(6).toUpperCase());
+                Component child = new Component(asciiUpper(line.substring(6)));
                 current.children.add(child);
                 stack.add(current);
                 current = child;
@@ -414,12 +423,12 @@ public final class ICalendarCodec {
                 }
                 String left = line.substring(0, colon);
                 String data = line.substring(colon + 1);
-                String[] fields = CalendarDateUtil.split(left, ';');
-                Property property = new Property(fields[0].toUpperCase(), data);
-                for (int i = 1; i < fields.length; i++) {
-                    int equals = fields[i].indexOf('=');
+                List<String> fields = splitParameters(left);
+                Property property = new Property(asciiUpper(fields.get(0)), data);
+                for (int i = 1; i < fields.size(); i++) {
+                    int equals = fields.get(i).indexOf('=');
                     if (equals > 0) {
-                        property.params.put(fields[i].substring(0, equals).toUpperCase(), unquote(fields[i].substring(equals + 1)));
+                        property.params.put(asciiUpper(fields.get(i).substring(0, equals)), unquote(fields.get(i).substring(equals + 1)));
                     }
                 }
                 current.properties.add(property);
@@ -448,11 +457,13 @@ public final class ICalendarCodec {
     private static CalendarDateTime parseDateTime(String value, String zone) throws CalendarException {
         try {
             if (value.length() == 8) {
-                return CalendarDateTime.allDay(LocalDate.of(Integer.parseInt(value.substring(0, 4)), Integer.parseInt(value.substring(4, 6)), Integer.parseInt(value.substring(6, 8))));
+                return CalendarDateTime.allDay(CalendarDateUtil.parseDate(
+                        value.substring(0, 4) + "-" + value.substring(4, 6)
+                        + "-" + value.substring(6, 8)));
             }
             boolean zulu = value.endsWith("Z");
             String timeZone = zulu || zone == null ? "UTC" : zone;
-            ZoneId zoneId = ZoneId.of(timeZone);
+            ZoneId zoneId = CalendarDateUtil.zoneId(timeZone);
             return CalendarDateTime.instant(CalendarDateUtil.parseDateTime(value, zoneId), zoneId);
         } catch (IllegalArgumentException ex) {
             throw new CalendarException(CalendarError.MALFORMED_RESPONSE, "Invalid calendar date: " + value, ex);
@@ -554,6 +565,28 @@ public final class ICalendarCodec {
         return -1;
     }
 
+    private static List<String> splitParameters(String value) {
+        List<String> out = new ArrayList<String>();
+        int start = 0;
+        boolean quoted = false;
+        boolean escaped = false;
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (escaped) {
+                escaped = false;
+            } else if (c == '\\') {
+                escaped = true;
+            } else if (c == '"') {
+                quoted = !quoted;
+            } else if (c == ';' && !quoted) {
+                out.add(value.substring(start, i));
+                start = i + 1;
+            }
+        }
+        out.add(value.substring(start));
+        return out;
+    }
+
     private static String value(Component component, String name) {
         Property property = component.first(name);
         return property == null ? null : unescape(property.value);
@@ -577,6 +610,12 @@ public final class ICalendarCodec {
 
     private static String local(Instant value, ZoneId zone) {
         return format(value, zone);
+    }
+
+    private static boolean isUtc(ZoneId zone) {
+        String id = zone.getId();
+        return ZoneOffset.UTC.equals(zone) || "UTC".equals(id) || "GMT".equals(id)
+                || "Etc/UTC".equals(id) || "Etc/GMT".equals(id);
     }
 
     private static String format(Instant value, ZoneId zone) {
@@ -620,12 +659,26 @@ public final class ICalendarCodec {
         return out.append("END:VCALENDAR\r\n").toString();
     }
 
+    private static boolean startsWithIgnoreCase(String value, String prefix) {
+        return value != null && value.length() >= prefix.length()
+                && value.regionMatches(true, 0, prefix, 0, prefix.length());
+    }
+
+    private static String asciiUpper(String value) {
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            out.append(c >= 'a' && c <= 'z' ? (char) (c - ('a' - 'A')) : c);
+        }
+        return out.toString();
+    }
+
     private static <E extends Enum<E>> E enumValue(Class<E> type, String value, E fallback) {
         if (value == null) {
             return fallback;
         }
         try {
-            return Enum.valueOf(type, value.toUpperCase().replace('-', '_'));
+            return Enum.valueOf(type, asciiUpper(value).replace('-', '_'));
         } catch (IllegalArgumentException ex) {
             return fallback;
         }

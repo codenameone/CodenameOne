@@ -23,6 +23,7 @@
 package com.codename1.calendar;
 
 import com.codename1.security.Hash;
+import com.codename1.security.SecureRandom;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.Base64;
 import com.codename1.util.StringUtil;
@@ -91,14 +92,19 @@ public abstract class CalDavAuthentication {
 
         private int nonceCount;
 
+        private String countedNonce;
+
         Digest(String username, String password) {
+            if (!headerSafe(username)) {
+                throw new IllegalArgumentException("username contains an invalid header character");
+            }
             this.username = username;
             this.password = password;
         }
 
         @Override
         public synchronized AsyncResource<String> authorization(String method, String uri, String challenge, boolean forceRefresh) {
-            if (challenge == null || !challenge.toLowerCase().startsWith("digest ")) {
+            if (challenge == null || !asciiLower(challenge).startsWith("digest ")) {
                 return complete(null);
             }
             Map<String, String> p = parse(challenge.substring(7));
@@ -109,19 +115,34 @@ public abstract class CalDavAuthentication {
             if (realm == null || nonce == null) {
                 return failed(new CalendarException(CalendarError.AUTHENTICATION_REQUIRED, "Invalid Digest challenge"));
             }
+            if (!headerSafe(realm) || !headerSafe(nonce) || !headerSafe(opaque)) {
+                return failed(new CalendarException(CalendarError.AUTHENTICATION_REQUIRED, "Unsafe Digest challenge"));
+            }
+            if (p.get("qop") != null && qop == null) {
+                return failed(new CalendarException(CalendarError.NOT_SUPPORTED, "Digest qop is not supported"));
+            }
             String algorithm = p.get("algorithm");
-            if (algorithm != null && !"MD5".equalsIgnoreCase(algorithm) && !"MD5-sess".equalsIgnoreCase(algorithm)) {
+            boolean sha256 = "SHA-256".equalsIgnoreCase(algorithm) || "SHA-256-sess".equalsIgnoreCase(algorithm);
+            boolean session = "MD5-sess".equalsIgnoreCase(algorithm) || "SHA-256-sess".equalsIgnoreCase(algorithm);
+            if (algorithm != null && !"MD5".equalsIgnoreCase(algorithm)
+                    && !"MD5-sess".equalsIgnoreCase(algorithm) && !sha256) {
                 return failed(new CalendarException(CalendarError.NOT_SUPPORTED, "Digest algorithm " + algorithm + " is not supported"));
             }
-            String nc = hex(++nonceCount, 8);
-            String cnonce = md5(String.valueOf(System.currentTimeMillis()) + ":" + nonceCount).substring(0, 16);
-            String ha1 = md5(username + ":" + realm + ":" + password);
-            if ("MD5-sess".equalsIgnoreCase(algorithm)) {
-                ha1 = md5(ha1 + ":" + nonce + ":" + cnonce);
+            if (!nonce.equals(countedNonce)) {
+                countedNonce = nonce;
+                nonceCount = 0;
             }
-            String ha2 = md5(method + ":" + uri);
-            String response = qop == null ? md5(ha1 + ":" + nonce + ":" + ha2) : md5(ha1 + ":" + nonce + ":" + nc + ":" + cnonce + ":" + qop + ":" + ha2);
-            StringBuilder out = new StringBuilder("Digest username=\"").append(escape(username)).append("\", realm=\"").append(escape(realm)).append("\", nonce=\"").append(escape(nonce)).append("\", uri=\"").append(escape(uri)).append("\", response=\"").append(response).append('"');
+            String nc = hex(++nonceCount, 8);
+            String cnonce = hex(SecureRandom.bytes(16));
+            String hash = sha256 ? Hash.SHA256 : Hash.MD5;
+            String digestUri = originForm(uri);
+            String ha1 = hashHex(hash, username + ":" + realm + ":" + password);
+            if (session) {
+                ha1 = hashHex(hash, ha1 + ":" + nonce + ":" + cnonce);
+            }
+            String ha2 = hashHex(hash, method + ":" + digestUri);
+            String response = qop == null ? hashHex(hash, ha1 + ":" + nonce + ":" + ha2) : hashHex(hash, ha1 + ":" + nonce + ":" + nc + ":" + cnonce + ":" + qop + ":" + ha2);
+            StringBuilder out = new StringBuilder("Digest username=\"").append(escape(username)).append("\", realm=\"").append(escape(realm)).append("\", nonce=\"").append(escape(nonce)).append("\", uri=\"").append(escape(digestUri)).append("\", response=\"").append(response).append('"');
             if (algorithm != null) {
                 out.append(", algorithm=").append(algorithm);
             }
@@ -130,6 +151,8 @@ public abstract class CalDavAuthentication {
             }
             if (qop != null) {
                 out.append(", qop=").append(qop).append(", nc=").append(nc).append(", cnonce=\"").append(cnonce).append('"');
+            } else if (session) {
+                out.append(", cnonce=\"").append(cnonce).append('"');
             }
             return complete(out.toString());
         }
@@ -146,7 +169,7 @@ public abstract class CalDavAuthentication {
             if (eq < 0) {
                 break;
             }
-            String key = value.substring(i, eq).trim().toLowerCase();
+            String key = asciiLower(value.substring(i, eq).trim());
             i = eq + 1;
             String data;
             if (i < value.length() && value.charAt(i) == '"') {
@@ -188,13 +211,40 @@ public abstract class CalDavAuthentication {
         return null;
     }
 
-    private static String md5(String value) {
-        Hash hash = Hash.create(Hash.MD5);
+    private static String hashHex(String algorithm, String value) {
+        Hash hash = Hash.create(algorithm);
         hash.update(StringUtil.getBytes(value));
-        byte[] bytes = hash.digest();
+        return hex(hash.digest());
+    }
+
+    private static String hex(byte[] bytes) {
         StringBuilder out = new StringBuilder();
         for (byte b : bytes) {
             out.append(hex(b & 255, 2));
+        }
+        return out.toString();
+    }
+
+    private static String originForm(String uri) {
+        int scheme = uri.indexOf("://");
+        String result = uri;
+        if (scheme >= 0) {
+            int slash = uri.indexOf('/', scheme + 3);
+            result = slash < 0 ? "/" : uri.substring(slash);
+        }
+        int fragment = result.indexOf('#');
+        return fragment < 0 ? result : result.substring(0, fragment);
+    }
+
+    private static boolean headerSafe(String value) {
+        return value == null || value.indexOf('\r') < 0 && value.indexOf('\n') < 0;
+    }
+
+    private static String asciiLower(String value) {
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            out.append(c >= 'A' && c <= 'Z' ? (char) (c + ('a' - 'A')) : c);
         }
         return out.toString();
     }

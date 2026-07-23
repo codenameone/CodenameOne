@@ -54,7 +54,7 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
 
     @Override
     public CalendarCapabilities getCapabilities() {
-        return CalendarCapabilities.of(CalendarCapability.READ_CALENDARS, CalendarCapability.MANAGE_CALENDARS, CalendarCapability.READ_EVENTS, CalendarCapability.WRITE_EVENTS, CalendarCapability.DELETE_EVENTS, CalendarCapability.READ_TASKS, CalendarCapability.WRITE_TASKS, CalendarCapability.DELETE_TASKS, CalendarCapability.RECURRENCE, CalendarCapability.ATTENDEES_READ, CalendarCapability.ATTENDEES_WRITE, CalendarCapability.RESPOND_TO_INVITATIONS, CalendarCapability.ALARMS, CalendarCapability.FREE_BUSY, CalendarCapability.ATTACHMENTS, CalendarCapability.CONFERENCING, CalendarCapability.DELTA_SYNC, CalendarCapability.OFFLINE_MUTATIONS);
+        return CalendarCapabilities.of(CalendarCapability.READ_CALENDARS, CalendarCapability.MANAGE_CALENDARS, CalendarCapability.READ_EVENTS, CalendarCapability.WRITE_EVENTS, CalendarCapability.DELETE_EVENTS, CalendarCapability.READ_TASKS, CalendarCapability.WRITE_TASKS, CalendarCapability.DELETE_TASKS, CalendarCapability.RECURRENCE, CalendarCapability.ATTENDEES_READ, CalendarCapability.ATTENDEES_WRITE, CalendarCapability.RESPOND_TO_INVITATIONS, CalendarCapability.ALARMS, CalendarCapability.FREE_BUSY, CalendarCapability.ATTACHMENTS, CalendarCapability.CONFERENCING, CalendarCapability.OFFLINE_MUTATIONS);
     }
 
     @Override
@@ -102,6 +102,19 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
     }
 
     @Override
+    public AsyncResource<Boolean> deleteCalendar(CalendarInfo calendar) {
+        if (calendar == null || calendar.getId() == null) {
+            return fail(new AsyncResource<Boolean>(), "calendar and id required");
+        }
+        final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        String url = calendar.getContentType() == CalendarInfo.ContentType.TASKS
+                ? GRAPH + "/me/todo/lists/" + e(calendar.getId())
+                : GRAPH + "/me/calendars/" + e(calendar.getId());
+        json("DELETE", url, null, null).ready(done(out)).except(error(out));
+        return out;
+    }
+
+    @Override
     public AsyncResource<CalendarPage<CalendarEvent>> queryEvents(CalendarQuery query) {
         final AsyncResource<CalendarPage<CalendarEvent>> out = new AsyncResource<CalendarPage<CalendarEvent>>();
         if (query == null || query.getCalendarId() == null) {
@@ -110,15 +123,19 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
         String url;
         if (query.getPageToken() != null) {
             url = query.getPageToken();
-        } else if (query.getSyncToken() != null) {
-            url = query.getSyncToken();
         } else {
-            StringBuilder b = new StringBuilder(GRAPH).append("/me/calendars/").append(e(query.getCalendarId())).append("/events/delta?$top=").append(query.getPageSize());
-            if (query.getStartTime() != null) {
-                b.append("&startDateTime=").append(e(iso(query.getStartTime())));
+            if (query.getSyncToken() != null) {
+                return fail(out, "Microsoft Graph v1.0 does not support delta tokens for arbitrary calendars");
             }
-            if (query.getEndTime() != null) {
-                b.append("&endDateTime=").append(e(iso(query.getEndTime())));
+            boolean range = query.getStartTime() != null || query.getEndTime() != null;
+            StringBuilder b = new StringBuilder(GRAPH).append("/me/calendars/")
+                    .append(e(query.getCalendarId())).append(range ? "/calendarView?" : "/events?$top=" + query.getPageSize());
+            if (range) {
+                long now = System.currentTimeMillis();
+                Instant start = query.getStartTime() == null ? Instant.ofEpochMilli(now - 315360000000L) : query.getStartTime();
+                Instant end = query.getEndTime() == null ? Instant.ofEpochMilli(now + 315360000000L) : query.getEndTime();
+                b.append("startDateTime=").append(e(iso(start))).append("&endDateTime=").append(e(iso(end)))
+                        .append("&$top=").append(query.getPageSize());
             }
             url = b.toString();
         }
@@ -136,7 +153,7 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
                     out.error(ex);
                     return;
                 }
-                out.complete(new CalendarPage<CalendarEvent>(items, string(root, "@odata.nextLink"), string(root, "@odata.deltaLink")));
+                out.complete(new CalendarPage<CalendarEvent>(items, string(root, "@odata.nextLink"), null));
             }
         }).except(error(out));
         return out;
@@ -200,6 +217,11 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
     @Override
     public AsyncResource<CalendarEvent> respondToEvent(final String calendarId, final String eventId, CalendarAttendee.Response response, String comment) {
         final AsyncResource<CalendarEvent> out = new AsyncResource<CalendarEvent>();
+        if (response != CalendarAttendee.Response.ACCEPTED
+                && response != CalendarAttendee.Response.DECLINED
+                && response != CalendarAttendee.Response.TENTATIVE) {
+            return fail(out, "response must be ACCEPTED, DECLINED, or TENTATIVE");
+        }
         String action = response == CalendarAttendee.Response.ACCEPTED ? "accept" : response == CalendarAttendee.Response.DECLINED ? "decline" : "tentativelyAccept";
         Map<String, Object> body = new HashMap<String, Object>();
         body.put("comment", comment);
@@ -223,31 +245,40 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
     @Override
     public AsyncResource<List<FreeBusyInterval>> queryFreeBusy(List<String> ids, Instant start, Instant end) {
         final AsyncResource<List<FreeBusyInterval>> out = new AsyncResource<List<FreeBusyInterval>>();
-        Map<String, Object> body = new HashMap<String, Object>();
-        body.put("schedules", ids);
-        body.put("startTime", dateMap(CalendarDateTime.instant(start, ZoneId.of("UTC"))));
-        body.put("endTime", dateMap(CalendarDateTime.instant(end, ZoneId.of("UTC"))));
-        body.put("availabilityViewInterval", Integer.valueOf(30));
-        json("POST", GRAPH + "/me/calendar/getSchedule", body, null).ready(new SuccessCallback<Map<String, Object>>() {
+        if (ids == null || start == null || end == null) {
+            return fail(out, "calendar ids, start, and end required");
+        }
+        collectFreeBusy(ids, 0, start, end, null, new ArrayList<FreeBusyInterval>(), out);
+        return out;
+    }
 
+    private void collectFreeBusy(final List<String> ids, final int index, final Instant start,
+            final Instant end, String pageToken, final List<FreeBusyInterval> result,
+            final AsyncResource<List<FreeBusyInterval>> out) {
+        if (index >= ids.size()) {
+            out.complete(result);
+            return;
+        }
+        CalendarQuery query = new CalendarQuery().setCalendarId(ids.get(index)).setStartTime(start)
+                .setEndTime(end).setPageSize(1000).setPageToken(pageToken);
+        queryEvents(query).ready(new SuccessCallback<CalendarPage<CalendarEvent>>() {
             @Override
-            public void onSucess(Map<String, Object> root) {
-                List<FreeBusyInterval> items = new ArrayList<FreeBusyInterval>();
-                try {
-                    for (Map<String, Object> s : maps(root.get("value"))) {
-                        for (Map<String, Object> i : maps(s.get("scheduleItems"))) {
-                            CalendarEvent.Availability a = "free".equals(string(i, "status")) ? CalendarEvent.Availability.FREE : CalendarEvent.Availability.BUSY;
-                            items.add(new FreeBusyInterval(graphDate(map(i.get("start"))).getDateTime().toInstant(), graphDate(map(i.get("end"))).getDateTime().toInstant(), a));
-                        }
+            public void onSucess(CalendarPage<CalendarEvent> page) {
+                for (CalendarEvent event : page.getItems()) {
+                    if (event.getAvailability() != CalendarEvent.Availability.FREE
+                            && event.getStart() != null && event.getEnd() != null
+                            && !event.getStart().isAllDay() && !event.getEnd().isAllDay()) {
+                        result.add(new FreeBusyInterval(event.getStart().getDateTime().toInstant(),
+                                event.getEnd().getDateTime().toInstant(), event.getAvailability()));
                     }
-                } catch (CalendarException ex) {
-                    out.error(ex);
-                    return;
                 }
-                out.complete(items);
+                if (page.getNextPageToken() != null) {
+                    collectFreeBusy(ids, index, start, end, page.getNextPageToken(), result, out);
+                } else {
+                    collectFreeBusy(ids, index + 1, start, end, null, result, out);
+                }
             }
         }).except(error(out));
-        return out;
     }
 
     @Override
@@ -333,7 +364,8 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
     }
 
     private CalendarInfo calendar(Map<String, Object> m, CalendarInfo.ContentType type) {
-        return new CalendarInfo().setId(string(m, "id")).setSourceId(getId()).setName(string(m, type == CalendarInfo.ContentType.TASKS ? "displayName" : "name")).setOwner(string(map(m.get("owner")), "address")).setReadOnly(!bool(m, "canEdit")).setPrimary(bool(m, "isDefaultCalendar")).setContentType(type).setCapabilities(getCapabilities());
+        boolean taskList = type == CalendarInfo.ContentType.TASKS;
+        return new CalendarInfo().setId(string(m, "id")).setSourceId(getId()).setName(string(m, taskList ? "displayName" : "name")).setOwner(string(map(m.get("owner")), "address")).setReadOnly(taskList ? !bool(m, "isOwner") : !bool(m, "canEdit")).setPrimary(bool(m, "isDefaultCalendar")).setContentType(type).setCapabilities(getCapabilities());
     }
 
     private CalendarEvent event(Map<String, Object> m, String calendarId) throws CalendarException {
@@ -415,6 +447,9 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
             m.put("isOnlineMeeting", Boolean.TRUE);
             m.put("onlineMeetingProvider", e.getConference().getProvider() == null ? "teamsForBusiness" : e.getConference().getProvider());
         }
+        if (e.getId() == null && e.getProviderData().get("cn1.mutationId") != null) {
+            m.put("transactionId", e.getProviderData().get("cn1.mutationId"));
+        }
         return m;
     }
 
@@ -465,7 +500,7 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
         }
         String timeZone = zone == null ? "UTC" : zone;
         try {
-            ZoneId zoneId = ZoneId.of(timeZone);
+            ZoneId zoneId = CalendarDateUtil.zoneId(timeZone);
             return CalendarDateTime.instant(CalendarDateUtil.parseDateTime(date, zoneId), zoneId);
         } catch (IllegalArgumentException ex) {
             throw new CalendarException(CalendarError.MALFORMED_RESPONSE, "Invalid Graph date: " + date, ex);
@@ -590,14 +625,15 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
         return out;
     }
 
-    private static CalendarRecurrenceRule readGraphRecurrence(Map<String, Object> recurrence) {
+    private static CalendarRecurrenceRule readGraphRecurrence(Map<String, Object> recurrence)
+            throws CalendarException {
         if (recurrence.isEmpty()) {
             return null;
         }
         Map<String, Object> pattern = map(recurrence.get("pattern"));
         Map<String, Object> range = map(recurrence.get("range"));
         String type = string(pattern, "type");
-        CalendarRecurrenceRule.Frequency frequency = "daily".equals(type) ? CalendarRecurrenceRule.Frequency.DAILY : "weekly".equals(type) ? CalendarRecurrenceRule.Frequency.WEEKLY : type != null && type.toLowerCase().indexOf("yearly") >= 0 ? CalendarRecurrenceRule.Frequency.YEARLY : CalendarRecurrenceRule.Frequency.MONTHLY;
+        CalendarRecurrenceRule.Frequency frequency = "daily".equals(type) ? CalendarRecurrenceRule.Frequency.DAILY : "weekly".equals(type) ? CalendarRecurrenceRule.Frequency.WEEKLY : containsIgnoreCase(type, "yearly") ? CalendarRecurrenceRule.Frequency.YEARLY : CalendarRecurrenceRule.Frequency.MONTHLY;
         Integer interval = integer(pattern, "interval");
         CalendarRecurrenceRule out = new CalendarRecurrenceRule().setFrequency(frequency).setInterval(Math.max(1, interval == null ? 1 : interval.intValue()));
         for (Object day : list(pattern.get("daysOfWeek"))) {
@@ -617,7 +653,12 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
         }
         String end = string(range, "endDate");
         if (end != null) {
-            out.setUntil(CalendarDateTime.allDay(parseDate(end)));
+            try {
+                out.setUntil(CalendarDateTime.allDay(CalendarDateUtil.parseDate(end)));
+            } catch (IllegalArgumentException ex) {
+                throw new CalendarException(CalendarError.MALFORMED_RESPONSE,
+                        "Invalid Graph recurrence date: " + end, ex);
+            }
         }
         return out;
     }
@@ -663,22 +704,32 @@ public class MicrosoftCalendarSource extends OAuthCalendarSource {
         return value == null ? null : value.getDateTime().toLocalDateTime().toLocalDate();
     }
 
-    private static LocalDate parseDate(String value) {
-        return LocalDate.parse(value);
-    }
-
-    private static int graphDay(String value) {
+    private static int graphDay(String value) throws CalendarException {
         String[] days = { "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday" };
         for (int i = 0; i < days.length; i++) {
             if (days[i].equalsIgnoreCase(value)) {
                 return i + 1;
             }
         }
-        return 1;
+        throw new CalendarException(CalendarError.MALFORMED_RESPONSE,
+                "Invalid Graph recurrence weekday: " + value);
     }
 
     private static String graphDay(int value) {
         return new String[] { "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday" }[value - 1];
+    }
+
+    private static boolean containsIgnoreCase(String value, String target) {
+        if (value == null) {
+            return false;
+        }
+        int limit = value.length() - target.length();
+        for (int i = 0; i <= limit; i++) {
+            if (value.regionMatches(true, i, target, 0, target.length())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @SuppressWarnings("unchecked")

@@ -86,7 +86,11 @@ public class TimeEdgeApp {
         result.append(periodTarget).append('|');
         result.append(LocalTime.of(23, 59, 59).plusSeconds(2)).append('|');
         result.append(localDateTimeString(utcLocal)).append('|');
-        result.append(durationParseError);
+        result.append(durationParseError).append('|');
+        result.append(Duration.ofMillis(500)).append('|');
+        result.append(Duration.ofMillis(-500)).append('|');
+        result.append(Duration.parse(Duration.ofMillis(500).toString()).toMillis()).append('|');
+        result.append(Duration.parse(Duration.ofMillis(-500).toString()).toMillis());
         return result.toString();
     }
 

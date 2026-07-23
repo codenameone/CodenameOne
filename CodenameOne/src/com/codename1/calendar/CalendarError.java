@@ -34,6 +34,7 @@ public enum CalendarError {
     READ_ONLY,
     CONFLICT,
     RATE_LIMITED,
+    SYNC_TOKEN_EXPIRED,
     NETWORK,
     CANCELED,
     MALFORMED_RESPONSE,

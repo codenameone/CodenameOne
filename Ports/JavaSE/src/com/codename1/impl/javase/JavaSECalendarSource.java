@@ -30,6 +30,8 @@ import com.codename1.calendar.CalendarCapability;
 import com.codename1.calendar.CalendarChange;
 import com.codename1.calendar.CalendarDateTime;
 import com.codename1.calendar.CalendarEvent;
+import com.codename1.calendar.CalendarError;
+import com.codename1.calendar.CalendarException;
 import com.codename1.calendar.CalendarInfo;
 import com.codename1.calendar.CalendarModelCodec;
 import com.codename1.calendar.CalendarMutationScope;
@@ -109,7 +111,10 @@ final class JavaSECalendarSource extends LocalCalendarSource {
                 ? ZonedDateTime.of(value.getDate().atTime(0, 0), ZoneOffset.UTC).toInstant()
                 : value.getDateTime().toInstant();
     }
-    public synchronized AsyncResource<CalendarEvent> getEvent(String calendarId, String id) { return completed(copyEvent(events.get(id))); }
+    public synchronized AsyncResource<CalendarEvent> getEvent(String calendarId, String id) {
+        CalendarEvent event = events.get(id);
+        return event == null ? missing("Event not found") : completed(copyEvent(event));
+    }
     public synchronized AsyncResource<CalendarEvent> saveEvent(CalendarEvent event, CalendarMutationScope scope) {
         CalendarEvent saved = copyEvent(event);
         boolean created = saved.getId() == null;
@@ -146,7 +151,10 @@ final class JavaSECalendarSource extends LocalCalendarSource {
         for (CalendarTask task : tasks.values()) if (query == null || query.getCalendarId() == null || query.getCalendarId().equals(task.getCalendarId())) out.add(copyTask(task));
         return completed(new CalendarPage<CalendarTask>(out, null, String.valueOf(nextId)));
     }
-    public synchronized AsyncResource<CalendarTask> getTask(String calendarId, String id) { return completed(copyTask(tasks.get(id))); }
+    public synchronized AsyncResource<CalendarTask> getTask(String calendarId, String id) {
+        CalendarTask task = tasks.get(id);
+        return task == null ? missing("Task not found") : completed(copyTask(task));
+    }
     public synchronized AsyncResource<CalendarTask> saveTask(CalendarTask task, CalendarMutationScope scope) {
         CalendarTask saved = copyTask(task);
         boolean created = saved.getId() == null;
@@ -168,5 +176,10 @@ final class JavaSECalendarSource extends LocalCalendarSource {
     }
     private static CalendarTask copyTask(CalendarTask task) {
         return task == null ? null : CalendarModelCodec.decodeTask(CalendarModelCodec.encodeTask(task));
+    }
+    private static <T> AsyncResource<T> missing(String message) {
+        AsyncResource<T> out = new AsyncResource<T>();
+        out.error(new CalendarException(CalendarError.NOT_FOUND, message));
+        return out;
     }
 }

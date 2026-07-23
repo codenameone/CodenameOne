@@ -84,6 +84,7 @@ class WindowsNativeBuilderArchTest {
 
         request.putArgument("windows.calendar.restrictedCapability", "true");
         String withOptIn = (String)method.invoke(builder, request, "x64", null);
-        assertTrue(withOptIn.contains("<rescap:Capability Name=\"appointments\"/>"));
+        assertTrue(withOptIn.contains("<uap:Capability Name=\"appointments\"/>"));
+        assertFalse(withOptIn.contains("<rescap:Capability Name=\"appointments\"/>"));
     }
 }

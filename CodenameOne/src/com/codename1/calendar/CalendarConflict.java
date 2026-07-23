@@ -22,7 +22,11 @@
  */
 package com.codename1.calendar;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 
 /// A queued local mutation that conflicts with the provider version.
 public final class CalendarConflict {
@@ -40,8 +44,8 @@ public final class CalendarConflict {
 
     CalendarConflict(String mutationId, Map<String, Object> local, Map<String, Object> remote) {
         this.mutationId = mutationId;
-        this.local = local;
-        this.remote = remote;
+        this.local = immutableMap(local);
+        this.remote = immutableMap(remote);
     }
 
     public String getMutationId() {
@@ -54,5 +58,33 @@ public final class CalendarConflict {
 
     public Map<String, Object> getRemote() {
         return remote;
+    }
+
+    private static Map<String, Object> immutableMap(Map source) {
+        if (source == null) {
+            return null;
+        }
+        Map<String, Object> copy = new HashMap<String, Object>();
+        for (Object key : source.keySet()) {
+            copy.put(String.valueOf(key), immutableValue(source.get(key)));
+        }
+        return Collections.unmodifiableMap(copy);
+    }
+
+    private static Object immutableValue(Object value) {
+        if (value instanceof Map) {
+            return immutableMap((Map) value);
+        }
+        if (value instanceof List) {
+            List<Object> copy = new ArrayList<Object>();
+            for (Object item : (List) value) {
+                copy.add(immutableValue(item));
+            }
+            return Collections.unmodifiableList(copy);
+        }
+        if (value instanceof byte[]) {
+            return ((byte[]) value).clone();
+        }
+        return value;
     }
 }

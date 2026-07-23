@@ -26,8 +26,10 @@ import com.codename1.util.AsyncResource;
 import com.codename1.util.SuccessCallback;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /// Opt-in local-first mutation queue. It deliberately does not own credentials
 /// or silently schedule work; applications call `sync()` or connect it to a
@@ -43,6 +45,8 @@ public final class CalendarSyncEngine {
     private Map<String, Object> state;
 
     private long nextId;
+
+    private AsyncResource<CalendarSyncResult> syncInFlight;
 
     public CalendarSyncEngine(CalendarSource source, CalendarCache cache) throws CalendarException {
         if (source == null || cache == null) {
@@ -106,6 +110,14 @@ public final class CalendarSyncEngine {
         mutation.put("itemId", itemId);
         mutation.put("version", version);
         mutation.put("payload", payload);
+        if (payload != null && itemId == null) {
+            Map providerData = (Map) payload.get("providerData");
+            if (providerData == null) {
+                providerData = new HashMap();
+                payload.put("providerData", providerData);
+            }
+            providerData.put("cn1.mutationId", id);
+        }
         mutation.put("scope", (scope == null ? CalendarMutationScope.ALL : scope).name());
         mutations().add(mutation);
         persist();
@@ -116,11 +128,32 @@ public final class CalendarSyncEngine {
         return mutations().size();
     }
 
-    public AsyncResource<CalendarSyncResult> sync() {
+    public synchronized AsyncResource<CalendarSyncResult> sync() {
+        if (syncInFlight != null) {
+            return syncInFlight;
+        }
         final AsyncResource<CalendarSyncResult> out = new AsyncResource<CalendarSyncResult>();
+        syncInFlight = out;
+        out.ready(new SuccessCallback<CalendarSyncResult>() {
+            @Override
+            public void onSucess(CalendarSyncResult value) {
+                clearSync(out);
+            }
+        }).except(new SuccessCallback<Throwable>() {
+            @Override
+            public void onSucess(Throwable error) {
+                clearSync(out);
+            }
+        });
         final CalendarSyncResult result = new CalendarSyncResult();
         syncNext(out, result);
         return out;
+    }
+
+    private synchronized void clearSync(AsyncResource<CalendarSyncResult> completed) {
+        if (syncInFlight == completed) {
+            syncInFlight = null;
+        }
     }
 
     private void syncNext(final AsyncResource<CalendarSyncResult> out, final CalendarSyncResult result) {
@@ -215,6 +248,23 @@ public final class CalendarSyncEngine {
 
             @Override
             public void onSucess(Throwable error) {
+                if (error instanceof CalendarException
+                        && ((CalendarException) error).getError() == CalendarError.NOT_FOUND) {
+                    synchronized (CalendarSyncEngine.this) {
+                        mutation.put("paused", Boolean.TRUE);
+                        mutation.put("remote", null);
+                        try {
+                            persist();
+                        } catch (CalendarException ex) {
+                            out.error(ex);
+                            return;
+                        }
+                    }
+                    result.addConflict(new CalendarConflict(string(mutation, "id"),
+                            (Map) mutation.get("payload"), null));
+                    syncNext(out, result);
+                    return;
+                }
                 out.error(error);
             }
         });
@@ -229,6 +279,11 @@ public final class CalendarSyncEngine {
             mutations().remove(found);
         } else {
             Map remote = (Map) found.get("remote");
+            if (remote == null && string(found, "type").startsWith("delete")) {
+                mutations().remove(found);
+                persist();
+                return;
+            }
             if (resolution == CalendarConflict.Resolution.MERGED) {
                 if (merged == null) {
                     throw new IllegalArgumentException("merged value required");
@@ -237,6 +292,18 @@ public final class CalendarSyncEngine {
             }
             if (remote != null) {
                 found.put("version", remote.get("version"));
+                Map payload = (Map) found.get("payload");
+                if (payload != null) {
+                    payload.put("version", remote.get("version"));
+                }
+            } else {
+                found.put("itemId", null);
+                found.put("version", null);
+                Map payload = (Map) found.get("payload");
+                if (payload != null) {
+                    payload.put("id", null);
+                    payload.put("version", null);
+                }
             }
             found.remove("paused");
             found.remove("remote");
@@ -245,13 +312,25 @@ public final class CalendarSyncEngine {
     }
 
     private Map<String, Object> firstRunnableMutation() {
+        Set<String> blocked = new HashSet<String>();
         for (Object value : mutations()) {
             Map<String, Object> m = (Map<String, Object>) value;
-            if (!Boolean.TRUE.equals(m.get("paused"))) {
+            String key = mutationKey(m);
+            if (Boolean.TRUE.equals(m.get("paused"))) {
+                blocked.add(key);
+                continue;
+            }
+            if (!blocked.contains(key)) {
                 return m;
             }
         }
         return null;
+    }
+
+    private static String mutationKey(Map<String, Object> mutation) {
+        Object item = mutation.get("itemId");
+        return String.valueOf(mutation.get("calendarId")) + "\n"
+                + (item == null ? String.valueOf(mutation.get("id")) : String.valueOf(item));
     }
 
     private Map<String, Object> find(String id) {

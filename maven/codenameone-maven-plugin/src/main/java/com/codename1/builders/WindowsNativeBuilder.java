@@ -905,10 +905,11 @@ public class WindowsNativeBuilder extends Executor {
           .append("  </Applications>\n")
           .append("  <Capabilities>\n")
           .append("    <rescap:Capability Name=\"runFullTrust\"/>\n");
-        // Windows calendar access is a restricted store capability. It must
-        // remain an explicit opt-in even when LocalCalendarSource is present.
+        // Keep this opt-in because the built-in Win32 source is unavailable
+        // and only application-supplied native integrations need the package
+        // capability. "appointments" belongs to the UAP namespace.
         if ("true".equalsIgnoreCase(request.getArg("windows.calendar.restrictedCapability", "false"))) {
-            sb.append("    <rescap:Capability Name=\"appointments\"/>\n");
+            sb.append("    <uap:Capability Name=\"appointments\"/>\n");
         }
         sb.append("  </Capabilities>\n")
           .append("</Package>\n");

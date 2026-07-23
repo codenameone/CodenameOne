@@ -1499,10 +1499,16 @@ public class AndroidGradleBuilder extends Executor {
 
                 @Override
                 public void usesClassMethod(String cls, String method) {
-                    if (cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0) {
-                        // getInstance() is deliberately the builder signal.  Local
-                        // calendar access is runtime capability-gated, but Android
-                        // still requires both dangerous permissions in the manifest.
+                    if (cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0
+                            || (cls.indexOf("com/codename1/calendar/CalendarManager") == 0
+                            && (method.indexOf("getLocalSource") >= 0
+                            || method.indexOf("getSources") >= 0))
+                            || (cls.indexOf("com/codename1/ui/Display") == 0
+                            && method.indexOf("getLocalCalendarSource") >= 0)) {
+                        // Local calendar access is runtime capability-gated, but
+                        // Android still requires both dangerous permissions in
+                        // the manifest. Recognize every public local-source entry
+                        // point, including CalendarManager's typed facade.
                         calendarReadPermission = true;
                         calendarWritePermission = true;
                     }

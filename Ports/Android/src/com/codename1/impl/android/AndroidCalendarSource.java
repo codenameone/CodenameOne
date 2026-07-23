@@ -36,9 +36,11 @@ import android.os.Looper;
 import android.provider.CalendarContract.Attendees;
 import android.provider.CalendarContract.Calendars;
 import android.provider.CalendarContract.Events;
+import android.provider.CalendarContract.Instances;
 import android.provider.CalendarContract.Reminders;
 import android.support.v4.content.ContextCompat;
 import com.codename1.calendar.*;
+import com.codename1.ui.Display;
 import com.codename1.util.AsyncResource;
 import java.time.Duration;
 import java.time.Instant;
@@ -56,6 +58,10 @@ final class AndroidCalendarSource extends LocalCalendarSource {
             Events.DESCRIPTION, Events.EVENT_LOCATION, Events.DTSTART, Events.DTEND, Events.DURATION,
             Events.EVENT_TIMEZONE, Events.ALL_DAY, Events.RRULE, Events.STATUS, Events.AVAILABILITY,
             Events.DIRTY};
+    private static final String[] INSTANCE_COLUMNS = {Instances.EVENT_ID, Instances.CALENDAR_ID,
+            Instances.TITLE, Instances.DESCRIPTION, Instances.EVENT_LOCATION, Instances.BEGIN,
+            Instances.END, Instances.DURATION, Instances.EVENT_TIMEZONE, Instances.ALL_DAY,
+            Instances.RRULE, Instances.STATUS, Instances.AVAILABILITY, Events.DIRTY};
     private final Context context;
     private final CalendarCapabilities capabilities=CalendarCapabilities.of(CalendarCapability.READ_CALENDARS,
             CalendarCapability.READ_EVENTS,CalendarCapability.WRITE_EVENTS,CalendarCapability.DELETE_EVENTS,
@@ -84,39 +90,67 @@ final class AndroidCalendarSource extends LocalCalendarSource {
         if(!read||!write)return value(CalendarAuthorizationStatus.DENIED);
         return value(access==CalendarAccess.EVENTS_WRITE_ONLY?CalendarAuthorizationStatus.WRITE_ONLY:CalendarAuthorizationStatus.FULL);
     }
-    public AsyncResource<CalendarPage<CalendarInfo>>listCalendars(CalendarInfo.ContentType type,String token){
+    public AsyncResource<CalendarPage<CalendarInfo>>listCalendars(final CalendarInfo.ContentType type,String token){
         if(type==CalendarInfo.ContentType.TASKS)return value(new CalendarPage<CalendarInfo>(new ArrayList<CalendarInfo>(),null,null));
         if(!granted(Manifest.permission.READ_CALENDAR))return failed(CalendarError.PERMISSION_DENIED,"Calendar read permission is required");
-        List<CalendarInfo>items=new ArrayList<CalendarInfo>();Cursor c=null;
-        try{c=resolver().query(Calendars.CONTENT_URI,new String[]{Calendars._ID,Calendars.CALENDAR_DISPLAY_NAME,Calendars.ACCOUNT_NAME,Calendars.CALENDAR_COLOR,Calendars.CALENDAR_TIME_ZONE,Calendars.IS_PRIMARY,Calendars.CALENDAR_ACCESS_LEVEL},null,null,null);
-            while(c!=null&&c.moveToNext())items.add(new CalendarInfo().setId(String.valueOf(c.getLong(0))).setSourceId(getId()).setName(c.getString(1)).setAccountId(c.getString(2)).setOwner(c.getString(2)).setColor(c.getInt(3)).setTimeZone(c.getString(4)==null?null:ZoneId.of(c.getString(4))).setPrimary(c.getInt(5)!=0).setReadOnly(c.getInt(6)<Calendars.CAL_ACCESS_CONTRIBUTOR).setCapabilities(capabilities));
-            return value(new CalendarPage<CalendarInfo>(items,null,String.valueOf(System.currentTimeMillis())));
-        }catch(Throwable ex){return failure(ex);}finally{if(c!=null)c.close();}
+        return background(new BlockingOperation<CalendarPage<CalendarInfo>>(){
+            public CalendarPage<CalendarInfo>run(){List<CalendarInfo>items=new ArrayList<CalendarInfo>();Cursor c=null;
+                try{c=resolver().query(Calendars.CONTENT_URI,new String[]{Calendars._ID,Calendars.CALENDAR_DISPLAY_NAME,Calendars.ACCOUNT_NAME,Calendars.CALENDAR_COLOR,Calendars.CALENDAR_TIME_ZONE,Calendars.IS_PRIMARY,Calendars.CALENDAR_ACCESS_LEVEL},null,null,null);
+                    while(c!=null&&c.moveToNext())items.add(new CalendarInfo().setId(String.valueOf(c.getLong(0))).setSourceId(getId()).setName(c.getString(1)).setAccountId(c.getString(2)).setOwner(c.getString(2)).setColor(c.getInt(3)).setTimeZone(c.getString(4)==null?null:ZoneId.of(c.getString(4))).setPrimary(c.getInt(5)!=0).setReadOnly(c.getInt(6)<Calendars.CAL_ACCESS_CONTRIBUTOR).setContentType(type).setCapabilities(capabilities));
+                    return new CalendarPage<CalendarInfo>(items,null,String.valueOf(System.currentTimeMillis()));
+                }finally{if(c!=null)c.close();}}
+        });
     }
-    public AsyncResource<CalendarPage<CalendarEvent>> queryEvents(CalendarQuery query) {
+    public AsyncResource<CalendarPage<CalendarEvent>> queryEvents(final CalendarQuery query) {
         if (!granted(Manifest.permission.READ_CALENDAR)) {
             return failed(CalendarError.PERMISSION_DENIED, "Calendar read permission is required");
         }
+        return background(new BlockingOperation<CalendarPage<CalendarEvent>>() {
+            public CalendarPage<CalendarEvent> run() throws CalendarException {
+                return queryEventsBlocking(query);
+            }
+        });
+    }
+
+    private CalendarPage<CalendarEvent> queryEventsBlocking(CalendarQuery query)
+            throws CalendarException {
         List<CalendarEvent> items = new ArrayList<CalendarEvent>();
         StringBuilder where = new StringBuilder("1=1");
         List<String> args = new ArrayList<String>();
+        boolean expandInstances = query != null
+                && (query.getStartTime() != null || query.getEndTime() != null);
+        String calendarColumn = expandInstances ? Instances.CALENDAR_ID : Events.CALENDAR_ID;
         if (query != null && query.getCalendarId() != null) {
-            where.append(" AND ").append(Events.CALENDAR_ID).append("=?");
+            where.append(" AND ").append(calendarColumn).append("=?");
             args.add(query.getCalendarId());
         }
-        if (query != null && query.getStartTime() != null) {
+        where.append(" AND ").append(Events.DELETED).append("=0");
+        if (!expandInstances && query != null && query.getStartTime() != null) {
             where.append(" AND (").append(Events.DTEND).append(" IS NULL OR ")
                     .append(Events.DTEND).append(">=?)");
             args.add(String.valueOf(query.getStartTime().toEpochMilli()));
         }
-        if (query != null && query.getEndTime() != null) {
+        if (!expandInstances && query != null && query.getEndTime() != null) {
             where.append(" AND ").append(Events.DTSTART).append("<=?");
             args.add(String.valueOf(query.getEndTime().toEpochMilli()));
         }
         Cursor c = null;
         try {
-            c = resolver().query(Events.CONTENT_URI, EVENT_COLUMNS, where.toString(),
-                    args.toArray(new String[args.size()]), Events.DTSTART + " ASC");
+            Uri uri = Events.CONTENT_URI;
+            String[] columns = EVENT_COLUMNS;
+            String sort = Events.DTSTART + " ASC";
+            if (expandInstances) {
+                long begin = query.getStartTime() == null ? 0L : query.getStartTime().toEpochMilli();
+                long end = query.getEndTime() == null ? Long.MAX_VALUE : query.getEndTime().toEpochMilli();
+                Uri.Builder builder = Instances.CONTENT_URI.buildUpon();
+                ContentUris.appendId(builder, begin);
+                ContentUris.appendId(builder, end);
+                uri = builder.build();
+                columns = INSTANCE_COLUMNS;
+                sort = Instances.BEGIN + " ASC";
+            }
+            c = resolver().query(uri, columns, where.toString(),
+                    args.toArray(new String[args.size()]), sort);
             while (c != null && c.moveToNext()) {
                 long startMillis = c.getLong(5);
                 long endMillis = eventEndMillis(startMillis,
@@ -127,55 +161,66 @@ final class AndroidCalendarSource extends LocalCalendarSource {
                 }
                 items.add(event(c, startMillis, endMillis));
             }
-            return value(new CalendarPage<CalendarEvent>(items, null, String.valueOf(System.currentTimeMillis())));
-        } catch (Throwable ex) {
-            return failure(ex);
+            return new CalendarPage<CalendarEvent>(items, null,
+                    String.valueOf(System.currentTimeMillis()));
         } finally {
             if (c != null) {
                 c.close();
             }
         }
     }
-    public AsyncResource<CalendarEvent> getEvent(String calendarId, String eventId) {
+    public AsyncResource<CalendarEvent> getEvent(final String calendarId, final String eventId) {
         if (!granted(Manifest.permission.READ_CALENDAR)) {
             return failed(CalendarError.PERMISSION_DENIED, "Calendar read permission is required");
         }
         if (eventId == null) {
             return failed(CalendarError.INVALID_ARGUMENT, "eventId required");
         }
-        String selection = Events._ID + "=?";
-        List<String> args = new ArrayList<String>();
-        args.add(eventId);
-        if (calendarId != null) {
-            selection += " AND " + Events.CALENDAR_ID + "=?";
-            args.add(calendarId);
-        }
-        Cursor c = null;
-        try {
-            c = resolver().query(Events.CONTENT_URI, EVENT_COLUMNS, selection,
-                    args.toArray(new String[args.size()]), null);
-            if (c != null && c.moveToFirst()) {
-                return value(event(c, c.getLong(5), eventEndMillis(c.getLong(5),
-                        c.isNull(6) ? null : Long.valueOf(c.getLong(6)), c.getString(7))));
+        return background(new BlockingOperation<CalendarEvent>() {
+            public CalendarEvent run() throws CalendarException {
+                String selection = Events._ID + "=?";
+                List<String> args = new ArrayList<String>();
+                args.add(eventId);
+                if (calendarId != null) {
+                    selection += " AND " + Events.CALENDAR_ID + "=?";
+                    args.add(calendarId);
+                }
+                Cursor c = null;
+                try {
+                    c = resolver().query(Events.CONTENT_URI, EVENT_COLUMNS, selection,
+                            args.toArray(new String[args.size()]), null);
+                    if (c != null && c.moveToFirst()) {
+                        return event(c, c.getLong(5), eventEndMillis(c.getLong(5),
+                                c.isNull(6) ? null : Long.valueOf(c.getLong(6)), c.getString(7)));
+                    }
+                    throw new CalendarException(CalendarError.NOT_FOUND, "Event not found");
+                } finally {
+                    if (c != null) {
+                        c.close();
+                    }
+                }
             }
-            return failed(CalendarError.NOT_FOUND, "Event not found");
-        } catch (Throwable ex) {
-            return failure(ex);
-        } finally {
-            if (c != null) {
-                c.close();
-            }
-        }
+        });
     }
-    public AsyncResource<CalendarEvent>saveEvent(CalendarEvent event,CalendarMutationScope scope){
+    public AsyncResource<CalendarEvent>saveEvent(final CalendarEvent event,CalendarMutationScope scope){
         if(!granted(Manifest.permission.WRITE_CALENDAR))return failed(CalendarError.PERMISSION_DENIED,"Calendar write permission is required");if(event==null||event.getCalendarId()==null)return failed(CalendarError.INVALID_ARGUMENT,"event and calendarId required");
-        ContentValues v=new ContentValues();v.put(Events.CALENDAR_ID,Long.valueOf(event.getCalendarId()));v.put(Events.TITLE,event.getTitle());v.put(Events.DESCRIPTION,event.getDescription());v.put(Events.EVENT_LOCATION,event.getLocation());if(event.getStart()!=null){v.put(Events.ALL_DAY,Integer.valueOf(event.getStart().isAllDay()?1:0));v.put(Events.DTSTART,Long.valueOf(millis(event.getStart())));v.put(Events.EVENT_TIMEZONE,event.getStart().isAllDay()?"UTC":event.getStart().getDateTime().getZone().getId());}if(event.getEnd()!=null)v.put(Events.DTEND,Long.valueOf(millis(event.getEnd())));if(event.getRecurrence()!=null)v.put(Events.RRULE,ICalendarCodec.writeRecurrenceRule(event.getRecurrence()));
-        boolean create=event.getId()==null;try{if(create){Uri uri=resolver().insert(Events.CONTENT_URI,v);event.setId(String.valueOf(ContentUris.parseId(uri)));}else resolver().update(ContentUris.withAppendedId(Events.CONTENT_URI,Long.parseLong(event.getId())),v,null,null);replaceDetails(event);event.setSourceId(getId()).setVersion(String.valueOf(System.currentTimeMillis()));fireChange(new CalendarChange(getId(),event.getCalendarId(),event.getId(),CalendarChange.EntityType.EVENT,create?CalendarChange.ChangeType.CREATED:CalendarChange.ChangeType.UPDATED));return value(event);}catch(Throwable ex){return failure(ex);}
+        if(event.getRecurrence()!=null&&(event.getStart()==null||event.getEnd()==null))return failed(CalendarError.INVALID_ARGUMENT,"Recurring events require start and end");
+        if(event.getRecurrence()!=null&&millis(event.getEnd())<millis(event.getStart()))return failed(CalendarError.INVALID_ARGUMENT,"Event end must not precede start");
+        return background(new BlockingOperation<CalendarEvent>(){public CalendarEvent run(){
+            ContentValues v=new ContentValues();v.put(Events.CALENDAR_ID,Long.valueOf(event.getCalendarId()));v.put(Events.TITLE,event.getTitle());v.put(Events.DESCRIPTION,event.getDescription());v.put(Events.EVENT_LOCATION,event.getLocation());if(event.getStart()!=null){v.put(Events.ALL_DAY,Integer.valueOf(event.getStart().isAllDay()?1:0));v.put(Events.DTSTART,Long.valueOf(millis(event.getStart())));v.put(Events.EVENT_TIMEZONE,event.getStart().isAllDay()?"UTC":event.getStart().getDateTime().getZone().getId());}
+            if(event.getRecurrence()!=null){long durationMillis=millis(event.getEnd())-millis(event.getStart());v.putNull(Events.DTEND);v.put(Events.DURATION,providerDuration(durationMillis));v.put(Events.RRULE,ICalendarCodec.writeRecurrenceRule(event.getRecurrence()));}else{v.putNull(Events.DURATION);v.putNull(Events.RRULE);if(event.getEnd()!=null)v.put(Events.DTEND,Long.valueOf(millis(event.getEnd())));}
+            boolean create=event.getId()==null;if(create){Uri uri=resolver().insert(Events.CONTENT_URI,v);event.setId(String.valueOf(ContentUris.parseId(uri)));}else resolver().update(ContentUris.withAppendedId(Events.CONTENT_URI,Long.parseLong(event.getId())),v,null,null);replaceDetails(event);event.setSourceId(getId()).setVersion(String.valueOf(System.currentTimeMillis()));fireChange(new CalendarChange(getId(),event.getCalendarId(),event.getId(),CalendarChange.EntityType.EVENT,create?CalendarChange.ChangeType.CREATED:CalendarChange.ChangeType.UPDATED));return event;}});
     }
-    public AsyncResource<Boolean>deleteEvent(String calendarId,String eventId,CalendarMutationScope scope,String version){
-        if(!granted(Manifest.permission.WRITE_CALENDAR))return failed(CalendarError.PERMISSION_DENIED,"Calendar write permission is required");try{boolean deleted=resolver().delete(ContentUris.withAppendedId(Events.CONTENT_URI,Long.parseLong(eventId)),null,null)>0;if(deleted)fireChange(new CalendarChange(getId(),calendarId,eventId,CalendarChange.EntityType.EVENT,CalendarChange.ChangeType.DELETED));return value(Boolean.valueOf(deleted));}catch(Throwable ex){return failure(ex);}
+    public AsyncResource<Boolean>deleteEvent(final String calendarId,final String eventId,CalendarMutationScope scope,String version){
+        if(!granted(Manifest.permission.WRITE_CALENDAR))return failed(CalendarError.PERMISSION_DENIED,"Calendar write permission is required");if(eventId==null)return failed(CalendarError.INVALID_ARGUMENT,"eventId required");return background(new BlockingOperation<Boolean>(){public Boolean run(){boolean deleted=resolver().delete(ContentUris.withAppendedId(Events.CONTENT_URI,Long.parseLong(eventId)),null,null)>0;if(deleted)fireChange(new CalendarChange(getId(),calendarId,eventId,CalendarChange.EntityType.EVENT,CalendarChange.ChangeType.DELETED));return Boolean.valueOf(deleted);}});
     }
-    public AsyncResource<List<FreeBusyInterval>>queryFreeBusy(List<String>ids,Instant start,Instant end){List<FreeBusyInterval>out=new ArrayList<FreeBusyInterval>();for(CalendarEvent event:queryEvents(new CalendarQuery().setStartTime(start).setEndTime(end)).get().getItems())if(event.getAvailability()!=CalendarEvent.Availability.FREE&&!event.getStart().isAllDay())out.add(new FreeBusyInterval(event.getStart().getDateTime().toInstant(),event.getEnd().getDateTime().toInstant(),event.getAvailability()));return value(out);}
+    public AsyncResource<List<FreeBusyInterval>>queryFreeBusy(List<String>ids,Instant start,Instant end){
+        final AsyncResource<List<FreeBusyInterval>>result=new AsyncResource<List<FreeBusyInterval>>();
+        queryEvents(new CalendarQuery().setStartTime(start).setEndTime(end)).ready(new com.codename1.util.SuccessCallback<CalendarPage<CalendarEvent>>(){
+            public void onSucess(CalendarPage<CalendarEvent>page){List<FreeBusyInterval>out=new ArrayList<FreeBusyInterval>();for(CalendarEvent event:page.getItems())if(event.getAvailability()!=CalendarEvent.Availability.FREE&&event.getStart()!=null&&event.getEnd()!=null&&!event.getStart().isAllDay()&&!event.getEnd().isAllDay())out.add(new FreeBusyInterval(event.getStart().getDateTime().toInstant(),event.getEnd().getDateTime().toInstant(),event.getAvailability()));result.complete(out);}
+        }).except(new com.codename1.util.SuccessCallback<Throwable>(){public void onSucess(Throwable error){result.error(error);}});
+        return result;
+    }
 
     private void readDetails(CalendarEvent event){Cursor c=null;try{c=resolver().query(Attendees.CONTENT_URI,new String[]{Attendees.ATTENDEE_NAME,Attendees.ATTENDEE_EMAIL,Attendees.ATTENDEE_TYPE,Attendees.ATTENDEE_STATUS},Attendees.EVENT_ID+"=?",new String[]{event.getId()},null);while(c!=null&&c.moveToNext()){CalendarAttendee a=new CalendarAttendee().setName(c.getString(0)).setEmail(c.getString(1));if(c.getInt(2)==Attendees.TYPE_OPTIONAL)a.setRole(CalendarAttendee.Role.OPTIONAL);else if(c.getInt(2)==Attendees.TYPE_RESOURCE)a.setRole(CalendarAttendee.Role.RESOURCE);int s=c.getInt(3);a.setResponse(s==Attendees.ATTENDEE_STATUS_ACCEPTED?CalendarAttendee.Response.ACCEPTED:s==Attendees.ATTENDEE_STATUS_DECLINED?CalendarAttendee.Response.DECLINED:s==Attendees.ATTENDEE_STATUS_TENTATIVE?CalendarAttendee.Response.TENTATIVE:CalendarAttendee.Response.NEEDS_ACTION);event.addAttendee(a);}}finally{if(c!=null)c.close();}try{c=resolver().query(Reminders.CONTENT_URI,new String[]{Reminders.MINUTES,Reminders.METHOD},Reminders.EVENT_ID+"=?",new String[]{event.getId()},null);while(c!=null&&c.moveToNext())event.addAlarm(new CalendarAlarm().setTimeBefore(Duration.ofMinutes(c.getInt(0))).setMethod(c.getInt(1)==Reminders.METHOD_EMAIL?CalendarAlarm.Method.EMAIL:CalendarAlarm.Method.ALERT));}finally{if(c!=null)c.close();}}
     private void replaceDetails(CalendarEvent event){resolver().delete(Reminders.CONTENT_URI,Reminders.EVENT_ID+"=?",new String[]{event.getId()});for(CalendarAlarm alarm:event.getAlarms())if(alarm.getTimeBefore()!=null){ContentValues v=new ContentValues();v.put(Reminders.EVENT_ID,Long.valueOf(event.getId()));v.put(Reminders.MINUTES,Long.valueOf(alarm.getTimeBefore().getSeconds()/60L));v.put(Reminders.METHOD,Integer.valueOf(alarm.getMethod()==CalendarAlarm.Method.EMAIL?Reminders.METHOD_EMAIL:Reminders.METHOD_ALERT));resolver().insert(Reminders.CONTENT_URI,v);}resolver().delete(Attendees.CONTENT_URI,Attendees.EVENT_ID+"=?",new String[]{event.getId()});for(CalendarAttendee a:event.getAttendees()){ContentValues v=new ContentValues();v.put(Attendees.EVENT_ID,Long.valueOf(event.getId()));v.put(Attendees.ATTENDEE_NAME,a.getName());v.put(Attendees.ATTENDEE_EMAIL,a.getEmail());v.put(Attendees.ATTENDEE_TYPE,Integer.valueOf(a.getRole()==CalendarAttendee.Role.OPTIONAL?Attendees.TYPE_OPTIONAL:a.getRole()==CalendarAttendee.Role.RESOURCE?Attendees.TYPE_RESOURCE:Attendees.TYPE_REQUIRED));resolver().insert(Attendees.CONTENT_URI,v);}}
@@ -281,5 +326,15 @@ final class AndroidCalendarSource extends LocalCalendarSource {
         }
         return sign * millis;
     }
-    private static <T>AsyncResource<T>value(T value){AsyncResource<T>out=new AsyncResource<T>();out.complete(value);return out;}private static <T>AsyncResource<T>failed(CalendarError type,String message){AsyncResource<T>out=new AsyncResource<T>();out.error(new CalendarException(type,message));return out;}private static <T>AsyncResource<T>failure(Throwable error){AsyncResource<T>out=new AsyncResource<T>();out.error(error instanceof CalendarException?error:new CalendarException(CalendarError.UNKNOWN,error.getMessage(),error));return out;}
+    private static String providerDuration(long durationMillis) {
+        long seconds = durationMillis / 1000L;
+        if (durationMillis % 1000L != 0L) {
+            seconds++;
+        }
+        return "P" + seconds + "S";
+    }
+    private interface BlockingOperation<T>{T run()throws Exception;}
+    private static <T>AsyncResource<T>background(final BlockingOperation<T>operation){final AsyncResource<T>out=new AsyncResource<T>();Display.getInstance().scheduleBackgroundTask(new Runnable(){public void run(){try{out.complete(operation.run());}catch(Throwable error){out.error(calendarFailure(error));}}});return out;}
+    private static Throwable calendarFailure(Throwable error){return error instanceof CalendarException?error:new CalendarException(CalendarError.UNKNOWN,error.getMessage(),error);}
+    private static <T>AsyncResource<T>value(T value){AsyncResource<T>out=new AsyncResource<T>();out.complete(value);return out;}private static <T>AsyncResource<T>failed(CalendarError type,String message){AsyncResource<T>out=new AsyncResource<T>();out.error(new CalendarException(type,message));return out;}private static <T>AsyncResource<T>failure(Throwable error){AsyncResource<T>out=new AsyncResource<T>();out.error(calendarFailure(error));return out;}
 }

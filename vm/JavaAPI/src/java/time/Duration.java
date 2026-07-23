@@ -205,14 +205,17 @@ public final class Duration implements Comparable<Duration> {
 
     public String toString() {
         StringBuffer sb = new StringBuffer("PT");
-        long absSeconds = Math.abs(seconds);
-        if (seconds < 0 && absSeconds > 0) {
-            sb.append('-');
+        boolean negative = seconds < 0;
+        long displayedSeconds = negative && nanos != 0 ? seconds + 1L : seconds;
+        int displayedNanos = negative && nanos != 0 ? 1000000000 - nanos : nanos;
+        if (negative && displayedSeconds == 0L) {
+            sb.append("-0");
+        } else {
+            sb.append(displayedSeconds);
         }
-        sb.append(absSeconds);
-        if (nanos != 0) {
+        if (displayedNanos != 0) {
             sb.append('.');
-            String frac = String.valueOf(1000000000L + nanos).substring(1);
+            String frac = String.valueOf(1000000000L + displayedNanos).substring(1);
             while (frac.endsWith("0")) {
                 frac = frac.substring(0, frac.length() - 1);
             }

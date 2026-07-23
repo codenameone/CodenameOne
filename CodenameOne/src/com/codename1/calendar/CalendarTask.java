@@ -192,6 +192,16 @@ public class CalendarTask {
         return Collections.unmodifiableList(alarms);
     }
 
+    public CalendarTask removeAlarm(CalendarAlarm v) {
+        alarms.remove(v);
+        return this;
+    }
+
+    public CalendarTask clearAlarms() {
+        alarms.clear();
+        return this;
+    }
+
     public CalendarTask addAttachment(CalendarAttachment v) {
         if (v != null) {
             attachments.add(v);
@@ -203,6 +213,16 @@ public class CalendarTask {
         return Collections.unmodifiableList(attachments);
     }
 
+    public CalendarTask removeAttachment(CalendarAttachment v) {
+        attachments.remove(v);
+        return this;
+    }
+
+    public CalendarTask clearAttachments() {
+        attachments.clear();
+        return this;
+    }
+
     public CalendarTask putProviderData(String k, String v) {
         if (k != null) {
             providerData.put(k, v);
@@ -212,5 +232,15 @@ public class CalendarTask {
 
     public Map<String, String> getProviderData() {
         return Collections.unmodifiableMap(providerData);
+    }
+
+    public CalendarTask removeProviderData(String key) {
+        providerData.remove(key);
+        return this;
+    }
+
+    public CalendarTask clearProviderData() {
+        providerData.clear();
+        return this;
     }
 }

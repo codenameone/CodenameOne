@@ -129,10 +129,13 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/calendar/C
 
 === Permissions and build hints
 
-Referencing `LocalCalendarSource` is the builder signal for local calendar
-integration. Android builds add `READ_CALENDAR` and `WRITE_CALENDAR`; iOS and
-Mac Catalyst builds add EventKit and calendar/reminder privacy strings. You
-can replace the default user-facing strings with:
+Calling `LocalCalendarSource.getInstance()`,
+`CalendarManager.getLocalSource()`, `CalendarManager.getSources()`, or
+`Display.getLocalCalendarSource()` is the builder signal for local calendar
+integration. Android builds add
+`READ_CALENDAR` and `WRITE_CALENDAR`; iOS and Mac Catalyst builds add EventKit
+and calendar/reminder privacy strings. You can replace the default user-facing
+strings with:
 
 ----
 ios.NSCalendarsFullAccessUsageDescription=Explain why events are needed
@@ -140,10 +143,9 @@ ios.NSCalendarsWriteOnlyAccessUsageDescription=Explain why creating events is ne
 ios.NSRemindersFullAccessUsageDescription=Explain why reminders are needed
 ----
 
-Windows calendar access is a restricted package capability that requires an
-explicit opt-in. The built-in Win32 source currently reports unavailable, but
-an application-supplied native integration can request the MSIX capability
-after it has been approved. Opt in with:
+The built-in Win32 source currently reports unavailable. An
+application-supplied native integration can explicitly opt into the standard
+MSIX `uap:appointments` capability with:
 
 ----
 windows.msix=true

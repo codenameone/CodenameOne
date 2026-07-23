@@ -42,6 +42,8 @@ public class DefaultCalendarHttpTransport implements CalendarHttpTransport {
 
             private final Map<String, String> responseHeaders = new HashMap<String, String>();
 
+            private boolean finished;
+
             @Override
             protected void readHeaders(Object connection) throws IOException {
                 capture(connection);
@@ -64,24 +66,39 @@ public class DefaultCalendarHttpTransport implements CalendarHttpTransport {
 
             @Override
             protected void readResponse(InputStream input) throws IOException {
-                byte[] bytes = Util.readInputStream(input);
+                byte[] bytes = input == null ? new byte[0] : Util.readInputStream(input);
                 String body = StringUtil.newString(bytes);
-                out.complete(new CalendarHttpResponse(getResponseCode(), body, responseHeaders));
+                completeOnce(new CalendarHttpResponse(getResponseCode(), body, responseHeaders));
             }
 
             @Override
             protected void handleErrorResponseCode(int code, String message) {
-                byte[] bytes = getResponseData();
-                String body = bytes == null ? null : StringUtil.newString(bytes);
-                out.complete(new CalendarHttpResponse(code, body, responseHeaders));
+                // readResponse() handles error responses too.  Completing here
+                // would race with that callback and loses the response body,
+                // since ConnectionRequest hasn't read it yet.
             }
 
             @Override
             protected void handleException(Exception error) {
-                out.error(new CalendarException(CalendarError.NETWORK, error.getMessage(), error));
+                errorOnce(new CalendarException(CalendarError.NETWORK, error.getMessage(), error));
+            }
+
+            private synchronized void completeOnce(CalendarHttpResponse response) {
+                if (!finished) {
+                    finished = true;
+                    out.complete(response);
+                }
+            }
+
+            private synchronized void errorOnce(Throwable error) {
+                if (!finished) {
+                    finished = true;
+                    out.error(error);
+                }
             }
         };
         request.setUrl(spec.getUrl());
+        request.setReadResponseForErrors(true);
         request.setPost(!"GET".equals(spec.getMethod()) && !"DELETE".equals(spec.getMethod()));
         request.setHttpMethod(spec.getMethod());
         for (Map.Entry<String, String> h : spec.getHeaders().entrySet()) {

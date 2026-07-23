@@ -29,6 +29,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.time.DateTimeException;
 import java.time.format.DateTimeFormatter;
 
 final class CalendarDateUtil {
@@ -70,18 +71,73 @@ final class CalendarDateUtil {
     }
 
     static Instant parseDateTime(String value, ZoneId defaultZone) {
-        String normalized = normalizeDateTime(value);
-        if (normalized.endsWith("Z") || normalized.endsWith("z")) {
-            return Instant.parse(normalized.substring(0, normalized.length() - 1) + "Z");
+        try {
+            String normalized = normalizeDateTime(value);
+            if (normalized.endsWith("Z") || normalized.endsWith("z")) {
+                return Instant.parse(normalized.substring(0, normalized.length() - 1) + "Z");
+            }
+            int timeSeparator = normalized.indexOf('T');
+            int plus = normalized.lastIndexOf('+');
+            int minus = normalized.lastIndexOf('-');
+            if (plus > timeSeparator || minus > timeSeparator) {
+                return OffsetDateTime.parse(normalized).toInstant();
+            }
+            ZoneId zone = defaultZone == null ? ZoneOffset.UTC : defaultZone;
+            return ZonedDateTime.of(LocalDateTime.parse(normalized), zone).toInstant();
+        } catch (DateTimeException ex) {
+            throw new IllegalArgumentException("Invalid date: " + value, ex);
         }
-        int timeSeparator = normalized.indexOf('T');
-        int plus = normalized.lastIndexOf('+');
-        int minus = normalized.lastIndexOf('-');
-        if (plus > timeSeparator || minus > timeSeparator) {
-            return OffsetDateTime.parse(normalized).toInstant();
+    }
+
+    static ZoneId zoneId(String value) {
+        String mapped = windowsTimeZone(value);
+        try {
+            return ZoneId.of(mapped);
+        } catch (DateTimeException ex) {
+            throw new IllegalArgumentException("Invalid time zone: " + value, ex);
         }
-        ZoneId zone = defaultZone == null ? ZoneOffset.UTC : defaultZone;
-        return ZonedDateTime.of(LocalDateTime.parse(normalized), zone).toInstant();
+    }
+
+    static LocalDate parseDate(String value) {
+        try {
+            return LocalDate.parse(value);
+        } catch (DateTimeException ex) {
+            throw new IllegalArgumentException("Invalid date: " + value, ex);
+        }
+    }
+
+    private static String windowsTimeZone(String value) {
+        if ("Pacific Standard Time".equals(value)) {
+            return "America/Los_Angeles";
+        }
+        if ("Mountain Standard Time".equals(value)) {
+            return "America/Denver";
+        }
+        if ("Central Standard Time".equals(value)) {
+            return "America/Chicago";
+        }
+        if ("Eastern Standard Time".equals(value)) {
+            return "America/New_York";
+        }
+        if ("GMT Standard Time".equals(value)) {
+            return "Europe/London";
+        }
+        if ("W. Europe Standard Time".equals(value)) {
+            return "Europe/Berlin";
+        }
+        if ("Israel Standard Time".equals(value)) {
+            return "Asia/Jerusalem";
+        }
+        if ("India Standard Time".equals(value)) {
+            return "Asia/Kolkata";
+        }
+        if ("Tokyo Standard Time".equals(value)) {
+            return "Asia/Tokyo";
+        }
+        if ("AUS Eastern Standard Time".equals(value)) {
+            return "Australia/Sydney";
+        }
+        return value;
     }
 
     static Instant allDayInstant(LocalDate date) {

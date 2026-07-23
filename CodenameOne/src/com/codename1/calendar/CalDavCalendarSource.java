@@ -95,8 +95,8 @@ public class CalDavCalendarSource extends CalendarSource {
                     if (href == null || xmlElement(response, "calendar") == null) {
                         continue;
                     }
-                    boolean events = components == null || components.toUpperCase().indexOf("VEVENT") >= 0;
-                    boolean tasks = components != null && components.toUpperCase().indexOf("VTODO") >= 0;
+                    boolean events = components == null || containsIgnoreCase(components, "VEVENT");
+                    boolean tasks = containsIgnoreCase(components, "VTODO");
                     if ((requestedType == CalendarInfo.ContentType.EVENTS && !events) || (requestedType == CalendarInfo.ContentType.TASKS && !tasks)) {
                         continue;
                     }
@@ -123,13 +123,16 @@ public class CalDavCalendarSource extends CalendarSource {
                 try {
                     for (String response : elements(r.getBody(), "response")) {
                         String data = xmlValue(response, "calendar-data");
-                        if (data == null) {
+                        String href = xmlValue(response, "href");
+                        if (data == null || href == null) {
                             continue;
                         }
                         CalendarEvent event = ICalendarCodec.readEvent(data).setCalendarId(query.getCalendarId()).setSourceId(getId()).setVersion(xmlValue(response, "getetag"));
-                        if (event.getId() == null) {
-                            event.setId(xmlValue(response, "href"));
+                        String uid = event.getId();
+                        if (uid != null) {
+                            event.putProviderData("caldav.uid", uid);
                         }
+                        event.setId(resolve(href));
                         items.add(event);
                     }
                 } catch (CalendarException ex) {
@@ -143,7 +146,7 @@ public class CalDavCalendarSource extends CalendarSource {
     }
 
     @Override
-    public AsyncResource<CalendarEvent> getEvent(final String calendarId, String eventId) {
+    public AsyncResource<CalendarEvent> getEvent(final String calendarId, final String eventId) {
         final AsyncResource<CalendarEvent> out = new AsyncResource<CalendarEvent>();
         request("GET", resource(calendarId, eventId), null, null, null).ready(new SuccessCallback<CalendarHttpResponse>() {
 
@@ -151,6 +154,10 @@ public class CalDavCalendarSource extends CalendarSource {
             public void onSucess(CalendarHttpResponse r) {
                 try {
                     CalendarEvent event = ICalendarCodec.readEvent(r.getBody()).setCalendarId(calendarId).setSourceId(getId()).setVersion(r.getHeader("ETag"));
+                    if (event.getId() != null) {
+                        event.putProviderData("caldav.uid", event.getId());
+                    }
+                    event.setId(resource(calendarId, eventId));
                     out.complete(event);
                 } catch (CalendarException ex) {
                     out.error(ex);
@@ -167,15 +174,18 @@ public class CalDavCalendarSource extends CalendarSource {
             return fail(out, "event and calendarId required");
         }
         final boolean create = event.getId() == null;
-        if (create) {
-            event.setId(String.valueOf(System.currentTimeMillis()) + "@codenameone");
-        }
+        final String uid = createUid(event.getProviderData());
+        final String resourceUrl = create ? resource(event.getCalendarId(), uid) : resource(event.getCalendarId(), event.getId());
         Map<String, String> h = version(event.getVersion(), create);
-        request("PUT", resource(event.getCalendarId(), event.getId()), ICalendarCodec.writeEvent(event), "text/calendar; charset=utf-8", h).ready(new SuccessCallback<CalendarHttpResponse>() {
+        String resourceId = event.getId();
+        event.setId(uid);
+        String data = ICalendarCodec.writeEvent(event);
+        event.setId(resourceId);
+        request("PUT", resourceUrl, data, "text/calendar; charset=utf-8", h).ready(new SuccessCallback<CalendarHttpResponse>() {
 
             @Override
             public void onSucess(CalendarHttpResponse r) {
-                event.setVersion(r.getHeader("ETag"));
+                event.setId(resourceUrl).setVersion(r.getHeader("ETag")).putProviderData("caldav.uid", uid);
                 out.complete(event);
                 fireChange(new CalendarChange(getId(), event.getCalendarId(), event.getId(), CalendarChange.EntityType.EVENT, create ? CalendarChange.ChangeType.CREATED : CalendarChange.ChangeType.UPDATED));
             }
@@ -212,13 +222,16 @@ public class CalDavCalendarSource extends CalendarSource {
                 try {
                     for (String response : elements(r.getBody(), "response")) {
                         String data = xmlValue(response, "calendar-data");
-                        if (data == null) {
+                        String href = xmlValue(response, "href");
+                        if (data == null || href == null) {
                             continue;
                         }
                         CalendarTask task = ICalendarCodec.readTask(data).setCalendarId(query.getCalendarId()).setSourceId(getId()).setVersion(xmlValue(response, "getetag"));
-                        if (task.getId() == null) {
-                            task.setId(xmlValue(response, "href"));
+                        String uid = task.getId();
+                        if (uid != null) {
+                            task.putProviderData("caldav.uid", uid);
                         }
+                        task.setId(resolve(href));
                         items.add(task);
                     }
                 } catch (CalendarException ex) {
@@ -232,14 +245,18 @@ public class CalDavCalendarSource extends CalendarSource {
     }
 
     @Override
-    public AsyncResource<CalendarTask> getTask(final String calendarId, String taskId) {
+    public AsyncResource<CalendarTask> getTask(final String calendarId, final String taskId) {
         final AsyncResource<CalendarTask> out = new AsyncResource<CalendarTask>();
         request("GET", resource(calendarId, taskId), null, null, null).ready(new SuccessCallback<CalendarHttpResponse>() {
 
             @Override
             public void onSucess(CalendarHttpResponse r) {
                 try {
-                    out.complete(ICalendarCodec.readTask(r.getBody()).setCalendarId(calendarId).setSourceId(getId()).setVersion(r.getHeader("ETag")));
+                    CalendarTask task = ICalendarCodec.readTask(r.getBody()).setCalendarId(calendarId).setSourceId(getId()).setVersion(r.getHeader("ETag"));
+                    if (task.getId() != null) {
+                        task.putProviderData("caldav.uid", task.getId());
+                    }
+                    out.complete(task.setId(resource(calendarId, taskId)));
                 } catch (CalendarException ex) {
                     out.error(ex);
                 }
@@ -255,14 +272,17 @@ public class CalDavCalendarSource extends CalendarSource {
             return fail(out, "task and calendarId required");
         }
         final boolean create = task.getId() == null;
-        if (create) {
-            task.setId(String.valueOf(System.currentTimeMillis()) + "@codenameone");
-        }
-        request("PUT", resource(task.getCalendarId(), task.getId()), ICalendarCodec.writeTask(task), "text/calendar; charset=utf-8", version(task.getVersion(), create)).ready(new SuccessCallback<CalendarHttpResponse>() {
+        final String uid = createUid(task.getProviderData());
+        final String resourceUrl = create ? resource(task.getCalendarId(), uid) : resource(task.getCalendarId(), task.getId());
+        String resourceId = task.getId();
+        task.setId(uid);
+        String data = ICalendarCodec.writeTask(task);
+        task.setId(resourceId);
+        request("PUT", resourceUrl, data, "text/calendar; charset=utf-8", version(task.getVersion(), create)).ready(new SuccessCallback<CalendarHttpResponse>() {
 
             @Override
             public void onSucess(CalendarHttpResponse r) {
-                task.setVersion(r.getHeader("ETag"));
+                task.setId(resourceUrl).setVersion(r.getHeader("ETag")).putProviderData("caldav.uid", uid);
                 out.complete(task);
                 fireChange(new CalendarChange(getId(), task.getCalendarId(), task.getId(), CalendarChange.EntityType.TASK, create ? CalendarChange.ChangeType.CREATED : CalendarChange.ChangeType.UPDATED));
             }
@@ -328,8 +348,55 @@ public class CalDavCalendarSource extends CalendarSource {
 
     private static CalendarException httpError(CalendarHttpResponse r) {
         int code = r.getStatusCode();
-        CalendarError type = code == 401 ? CalendarError.AUTHENTICATION_REQUIRED : code == 403 ? CalendarError.PERMISSION_DENIED : code == 404 ? CalendarError.NOT_FOUND : code == 409 || code == 412 ? CalendarError.CONFLICT : code == 429 ? CalendarError.RATE_LIMITED : code >= 500 ? CalendarError.NETWORK : CalendarError.INVALID_ARGUMENT;
-        return new CalendarException(type, "CalDAV server returned HTTP " + code + (r.getBody() == null ? "" : ": " + r.getBody()), code, null);
+        boolean invalidSyncToken = code == 410 || code == 403
+                && containsIgnoreCase(r.getBody(), "valid-sync-token");
+        CalendarError type = code == 401 ? CalendarError.AUTHENTICATION_REQUIRED
+                : invalidSyncToken ? CalendarError.SYNC_TOKEN_EXPIRED
+                : code == 403 ? CalendarError.PERMISSION_DENIED
+                : code == 404 ? CalendarError.NOT_FOUND
+                : code == 409 || code == 412 ? CalendarError.CONFLICT
+                : code == 429 ? CalendarError.RATE_LIMITED
+                : code >= 500 ? CalendarError.NETWORK : CalendarError.INVALID_ARGUMENT;
+        return new CalendarException(type, "CalDAV server returned HTTP " + code,
+                code, r.getBody(), null);
+    }
+
+    private static String createUid(Map<String, String> providerData) {
+        String uid = providerData.get("caldav.uid");
+        if (uid != null) {
+            return uid;
+        }
+        String mutationId = providerData.get("cn1.mutationId");
+        return mutationId == null ? String.valueOf(System.currentTimeMillis()) + "@codenameone"
+                : mutationId + "@codenameone";
+    }
+
+    private static boolean containsIgnoreCase(String value, String target) {
+        if (value == null) {
+            return false;
+        }
+        int limit = value.length() - target.length();
+        for (int i = 0; i <= limit; i++) {
+            if (value.regionMatches(true, i, target, 0, target.length())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean endsWithIgnoreCase(String value, String suffix) {
+        return value != null && value.length() >= suffix.length()
+                && value.regionMatches(true, value.length() - suffix.length(),
+                suffix, 0, suffix.length());
+    }
+
+    private static String asciiLower(String value) {
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            out.append(c >= 'A' && c <= 'Z' ? (char) (c + ('a' - 'A')) : c);
+        }
+        return out.toString();
     }
 
     private String resolve(String href) {
@@ -347,7 +414,7 @@ public class CalDavCalendarSource extends CalendarSource {
             return id;
         }
         String base = calendarId.endsWith("/") ? calendarId : calendarId + "/";
-        return base + safe(id) + (id.toLowerCase().endsWith(".ics") ? "" : ".ics");
+        return base + safe(id) + (endsWithIgnoreCase(id, ".ics") ? "" : ".ics");
     }
 
     private static String safe(String value) {
@@ -406,8 +473,8 @@ public class CalDavCalendarSource extends CalendarSource {
         if (source == null) {
             return null;
         }
-        String lower = source.toLowerCase();
-        int open = findElement(lower, local.toLowerCase(), 0);
+        String lower = asciiLower(source);
+        int open = findElement(lower, asciiLower(local), 0);
         if (open < 0) {
             return null;
         }
@@ -416,12 +483,15 @@ public class CalDavCalendarSource extends CalendarSource {
             return null;
         }
         String tag = source.substring(open + 1, gt).trim();
+        if (tag.endsWith("/")) {
+            return "";
+        }
         int space = tag.indexOf(' ');
         if (space >= 0) {
             tag = tag.substring(0, space);
         }
         String close = "</" + tag + ">";
-        int end = lower.indexOf(close.toLowerCase(), gt + 1);
+        int end = lower.indexOf(asciiLower(close), gt + 1);
         return end < 0 ? null : source.substring(gt + 1, end);
     }
 
@@ -430,10 +500,10 @@ public class CalDavCalendarSource extends CalendarSource {
         if (source == null) {
             return out;
         }
-        String lower = source.toLowerCase();
+        String lower = asciiLower(source);
         int from = 0;
         while (true) {
-            int open = findElement(lower, local.toLowerCase(), from);
+            int open = findElement(lower, asciiLower(local), from);
             if (open < 0) {
                 break;
             }
@@ -442,12 +512,17 @@ public class CalDavCalendarSource extends CalendarSource {
                 break;
             }
             String tag = source.substring(open + 1, gt).trim();
+            if (tag.endsWith("/")) {
+                out.add("");
+                from = gt + 1;
+                continue;
+            }
             int space = tag.indexOf(' ');
             if (space >= 0) {
                 tag = tag.substring(0, space);
             }
             String close = "</" + tag + ">";
-            int end = lower.indexOf(close.toLowerCase(), gt + 1);
+            int end = lower.indexOf(asciiLower(close), gt + 1);
             if (end < 0) {
                 break;
             }
@@ -458,24 +533,52 @@ public class CalDavCalendarSource extends CalendarSource {
     }
 
     private static int findElement(String source, String local, int from) {
-        int plain = source.indexOf("<" + local, from);
-        int prefixed = source.indexOf(":" + local, from);
-        if (prefixed >= 0) {
-            prefixed = source.lastIndexOf('<', prefixed);
+        int position = from;
+        while (position < source.length()) {
+            int open = source.indexOf('<', position);
+            if (open < 0 || open + 1 >= source.length()) {
+                return -1;
+            }
+            int start = open + 1;
+            char first = source.charAt(start);
+            if (first == '/' || first == '!' || first == '?') {
+                position = start + 1;
+                continue;
+            }
+            int end = start;
+            while (end < source.length()) {
+                char c = source.charAt(end);
+                if (c == ' ' || c == '\t' || c == '\r' || c == '\n'
+                        || c == '>' || c == '/') {
+                    break;
+                }
+                end++;
+            }
+            String qualified = source.substring(start, end);
+            int colon = qualified.lastIndexOf(':');
+            String name = colon < 0 ? qualified : qualified.substring(colon + 1);
+            if (local.equals(name)) {
+                return open;
+            }
+            position = end + 1;
         }
-        if (plain < 0) {
-            return prefixed;
-        }
-        if (prefixed < 0) {
-            return plain;
-        }
-        return Math.min(plain, prefixed);
+        return -1;
     }
 
     private static String stripTags(String value) {
         StringBuilder out = new StringBuilder();
         boolean tag = false;
         for (int i = 0; i < value.length(); i++) {
+            if (!tag && value.startsWith("<![CDATA[", i)) {
+                int end = value.indexOf("]]>", i + 9);
+                if (end < 0) {
+                    out.append(value.substring(i + 9));
+                    break;
+                }
+                out.append(value.substring(i + 9, end));
+                i = end + 2;
+                continue;
+            }
             char c = value.charAt(i);
             if (c == '<') {
                 tag = true;

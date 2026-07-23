@@ -43,6 +43,8 @@ public final class OidcCalendarTokenProvider implements CalendarTokenProvider {
 
     private TokenListener listener;
 
+    private AsyncResource<OidcTokens> refreshInFlight;
+
     public OidcCalendarTokenProvider(OidcClient client, OidcTokens initialTokens) {
         if (client == null) {
             throw new IllegalArgumentException("client required");
@@ -64,33 +66,77 @@ public final class OidcCalendarTokenProvider implements CalendarTokenProvider {
     public AsyncResource<CalendarAuthToken> getToken(String[] scopes, boolean forceRefresh) {
         final AsyncResource<CalendarAuthToken> out = new AsyncResource<CalendarAuthToken>();
         final OidcTokens current;
+        final AsyncResource<OidcTokens> refresh;
+        boolean startRefresh = false;
         synchronized (this) {
             current = tokens;
+            if (current == null) {
+                out.error(new CalendarException(CalendarError.AUTHENTICATION_REQUIRED, "No OAuth tokens supplied"));
+                return out;
+            }
+            if (!forceRefresh && !current.isExpiringWithin(90)) {
+                out.complete(convert(current));
+                return out;
+            }
+            if (current.getRefreshToken() == null) {
+                out.error(new CalendarException(CalendarError.AUTHENTICATION_REQUIRED, "OAuth token expired and has no refresh token"));
+                return out;
+            }
+            if (refreshInFlight == null) {
+                refreshInFlight = new AsyncResource<OidcTokens>();
+                startRefresh = true;
+            }
+            refresh = refreshInFlight;
         }
-        if (current == null) {
-            out.error(new CalendarException(CalendarError.AUTHENTICATION_REQUIRED, "No OAuth tokens supplied"));
-            return out;
+        if (startRefresh) {
+            final AsyncResource<OidcTokens> operation = refresh;
+            final AsyncResource<OidcTokens> started;
+            try {
+                started = client.refresh(current.getRefreshToken());
+            } catch (Throwable error) {
+                synchronized (this) {
+                    if (refreshInFlight == operation) {
+                        refreshInFlight = null;
+                    }
+                }
+                operation.error(error);
+                return mapped(operation, out);
+            }
+            started.ready(new SuccessCallback<OidcTokens>() {
+
+                @Override
+                public void onSucess(OidcTokens fresh) {
+                    TokenListener currentListener;
+                    synchronized (OidcCalendarTokenProvider.this) {
+                        tokens = fresh;
+                        refreshInFlight = null;
+                        currentListener = listener;
+                    }
+                    if (currentListener != null) {
+                        currentListener.tokensUpdated(fresh);
+                    }
+                    operation.complete(fresh);
+                }
+            }).except(new SuccessCallback<Throwable>() {
+
+                @Override
+                public void onSucess(Throwable error) {
+                    synchronized (OidcCalendarTokenProvider.this) {
+                        refreshInFlight = null;
+                    }
+                    operation.error(error);
+                }
+            });
         }
-        if (!forceRefresh && !current.isExpiringWithin(90)) {
-            out.complete(convert(current));
-            return out;
-        }
-        if (current.getRefreshToken() == null) {
-            out.error(new CalendarException(CalendarError.AUTHENTICATION_REQUIRED, "OAuth token expired and has no refresh token"));
-            return out;
-        }
-        client.refresh(current.getRefreshToken()).ready(new SuccessCallback<OidcTokens>() {
+        return mapped(refresh, out);
+    }
+
+    private AsyncResource<CalendarAuthToken> mapped(AsyncResource<OidcTokens> refresh,
+            final AsyncResource<CalendarAuthToken> out) {
+        refresh.ready(new SuccessCallback<OidcTokens>() {
 
             @Override
             public void onSucess(OidcTokens fresh) {
-                TokenListener currentListener;
-                synchronized (OidcCalendarTokenProvider.this) {
-                    tokens = fresh;
-                    currentListener = listener;
-                }
-                if (currentListener != null) {
-                    currentListener.tokensUpdated(fresh);
-                }
                 out.complete(convert(fresh));
             }
         }).except(new SuccessCallback<Throwable>() {

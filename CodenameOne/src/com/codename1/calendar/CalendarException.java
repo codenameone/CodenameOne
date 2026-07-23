@@ -29,18 +29,26 @@ public class CalendarException extends Exception {
 
     private final int responseCode;
 
+    private final String responseBody;
+
     public CalendarException(CalendarError error, String message) {
-        this(error, message, 0, null);
+        this(error, message, 0, null, null);
     }
 
     public CalendarException(CalendarError error, String message, Throwable cause) {
-        this(error, message, 0, cause);
+        this(error, message, 0, null, cause);
     }
 
     public CalendarException(CalendarError error, String message, int responseCode, Throwable cause) {
+        this(error, message, responseCode, null, cause);
+    }
+
+    public CalendarException(CalendarError error, String message, int responseCode,
+            String responseBody, Throwable cause) {
         super(message, cause);
         this.error = error == null ? CalendarError.UNKNOWN : error;
         this.responseCode = responseCode;
+        this.responseBody = responseBody;
     }
 
     public CalendarError getError() {
@@ -49,5 +57,11 @@ public class CalendarException extends Exception {
 
     public int getResponseCode() {
         return responseCode;
+    }
+
+    /// Returns the provider response body for an HTTP failure, if one was
+    /// available. This is kept separate from the user-facing exception message.
+    public String getResponseBody() {
+        return responseBody;
     }
 }

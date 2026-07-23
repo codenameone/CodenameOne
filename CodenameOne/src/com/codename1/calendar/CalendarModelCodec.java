@@ -40,6 +40,7 @@ public final class CalendarModelCodec {
 
     public static Map<String, Object> encodeEvent(CalendarEvent e) {
         Map<String, Object> m = common(e.getId(), e.getCalendarId(), e.getSourceId(), e.getVersion(), e.getTitle(), e.getDescription(), e.getLocation());
+        m.put("codecVersion", Integer.valueOf(1));
         put(m, "url", e.getUrl());
         put(m, "recurringEventId", e.getRecurringEventId());
         put(m, "start", encodeDateTime(e.getStart()));
@@ -96,6 +97,7 @@ public final class CalendarModelCodec {
 
     public static Map<String, Object> encodeTask(CalendarTask t) {
         Map<String, Object> m = common(t.getId(), t.getCalendarId(), t.getSourceId(), t.getVersion(), t.getTitle(), t.getDescription(), t.getLocation());
+        m.put("codecVersion", Integer.valueOf(1));
         put(m, "start", encodeDateTime(t.getStart()));
         put(m, "due", encodeDateTime(t.getDue()));
         put(m, "recurrence", encodeRecurrence(t.getRecurrence()));

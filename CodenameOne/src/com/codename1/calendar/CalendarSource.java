@@ -81,6 +81,17 @@ public abstract class CalendarSource {
         return unsupported("Deleting calendars");
     }
 
+    /// Deletes a calendar or task list. Sources that expose both use the
+    /// content type to select the correct provider endpoint.
+    public AsyncResource<Boolean> deleteCalendar(CalendarInfo calendar) {
+        if (calendar == null || calendar.getId() == null) {
+            AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+            out.error(new CalendarException(CalendarError.INVALID_ARGUMENT, "calendar and id required"));
+            return out;
+        }
+        return deleteCalendar(calendar.getId());
+    }
+
     public AsyncResource<CalendarPage<CalendarEvent>> queryEvents(CalendarQuery query) {
         return unsupported("Querying events");
     }

@@ -56,7 +56,7 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
 
     @Override
     public CalendarCapabilities getCapabilities() {
-        return CalendarCapabilities.of(CalendarCapability.READ_CALENDARS, CalendarCapability.MANAGE_CALENDARS, CalendarCapability.READ_EVENTS, CalendarCapability.WRITE_EVENTS, CalendarCapability.DELETE_EVENTS, CalendarCapability.READ_TASKS, CalendarCapability.WRITE_TASKS, CalendarCapability.DELETE_TASKS, CalendarCapability.RECURRENCE, CalendarCapability.ATTENDEES_READ, CalendarCapability.ATTENDEES_WRITE, CalendarCapability.RESPOND_TO_INVITATIONS, CalendarCapability.ALARMS, CalendarCapability.FREE_BUSY, CalendarCapability.ATTACHMENTS, CalendarCapability.CONFERENCING, CalendarCapability.DELTA_SYNC, CalendarCapability.OFFLINE_MUTATIONS);
+        return CalendarCapabilities.of(CalendarCapability.READ_CALENDARS, CalendarCapability.MANAGE_CALENDARS, CalendarCapability.READ_EVENTS, CalendarCapability.WRITE_EVENTS, CalendarCapability.DELETE_EVENTS, CalendarCapability.READ_TASKS, CalendarCapability.WRITE_TASKS, CalendarCapability.DELETE_TASKS, CalendarCapability.RECURRENCE, CalendarCapability.ATTENDEES_READ, CalendarCapability.ATTENDEES_WRITE, CalendarCapability.ALARMS, CalendarCapability.FREE_BUSY, CalendarCapability.ATTACHMENTS, CalendarCapability.CONFERENCING, CalendarCapability.DELTA_SYNC, CalendarCapability.OFFLINE_MUTATIONS);
     }
 
     @Override
@@ -71,8 +71,13 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
             @Override
             public void onSucess(Map<String, Object> root) {
                 List<CalendarInfo> result = new ArrayList<CalendarInfo>();
-                for (Map<String, Object> item : maps(root.get("items"))) {
-                    result.add(calendar(item, type));
+                try {
+                    for (Map<String, Object> item : maps(root.get("items"))) {
+                        result.add(calendar(item, type));
+                    }
+                } catch (CalendarException ex) {
+                    out.error(ex);
+                    return;
                 }
                 out.complete(new CalendarPage<CalendarInfo>(result, string(root, "nextPageToken"), null));
             }
@@ -97,7 +102,11 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
 
             @Override
             public void onSucess(Map<String, Object> value) {
-                out.complete(calendar(value, type));
+                try {
+                    out.complete(calendar(value, type));
+                } catch (CalendarException ex) {
+                    out.error(ex);
+                }
             }
         }).except(error(out));
         return out;
@@ -117,6 +126,24 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
     }
 
     @Override
+    public AsyncResource<Boolean> deleteCalendar(CalendarInfo calendar) {
+        if (calendar == null || calendar.getId() == null) {
+            return fail(new AsyncResource<Boolean>(), CalendarError.INVALID_ARGUMENT, "calendar and id required");
+        }
+        final AsyncResource<Boolean> out = new AsyncResource<Boolean>();
+        String url = calendar.getContentType() == CalendarInfo.ContentType.TASKS
+                ? TASKS_API + "/users/@me/lists/" + e(calendar.getId())
+                : CALENDAR_API + "/calendars/" + e(calendar.getId());
+        json("DELETE", url, null, null).ready(new SuccessCallback<Map<String, Object>>() {
+            @Override
+            public void onSucess(Map<String, Object> ignored) {
+                out.complete(Boolean.TRUE);
+            }
+        }).except(error(out));
+        return out;
+    }
+
+    @Override
     public AsyncResource<CalendarPage<CalendarEvent>> queryEvents(CalendarQuery query) {
         final AsyncResource<CalendarPage<CalendarEvent>> out = new AsyncResource<CalendarPage<CalendarEvent>>();
         if (query == null || query.getCalendarId() == null) {
@@ -124,16 +151,19 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
         }
         StringBuilder url = new StringBuilder(CALENDAR_API).append("/calendars/").append(e(query.getCalendarId())).append("/events?maxResults=").append(query.getPageSize());
         param(url, "pageToken", query.getPageToken());
-        param(url, "syncToken", query.getSyncToken());
-        param(url, "q", query.getText());
-        if (query.getStartTime() != null) {
-            param(url, "timeMin", iso(query.getStartTime()));
-        }
-        if (query.getEndTime() != null) {
-            param(url, "timeMax", iso(query.getEndTime()));
+        if (query.getSyncToken() != null) {
+            param(url, "syncToken", query.getSyncToken());
+        } else {
+            param(url, "q", query.getText());
+            if (query.getStartTime() != null) {
+                param(url, "timeMin", iso(query.getStartTime()));
+            }
+            if (query.getEndTime() != null) {
+                param(url, "timeMax", iso(query.getEndTime()));
+            }
         }
         param(url, "singleEvents", String.valueOf(query.isExpandRecurrences()));
-        param(url, "showDeleted", String.valueOf(query.isIncludeDeleted()));
+        param(url, "showDeleted", String.valueOf(query.getSyncToken() != null || query.isIncludeDeleted()));
         final String calendarId = query.getCalendarId();
         json("GET", url.toString(), null, null).ready(new SuccessCallback<Map<String, Object>>() {
 
@@ -183,19 +213,40 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
             url += "?conferenceDataVersion=1";
         }
         Map<String, String> headers = version(event.getVersion());
-        json(event.getId() == null ? "POST" : "PUT", url, eventMap(event), headers).ready(new SuccessCallback<Map<String, Object>>() {
+        final boolean create = event.getId() == null;
+        final String idempotentId = create ? googleEventId(event.getProviderData().get("cn1.mutationId")) : null;
+        Map<String, Object> body = eventMap(event);
+        if (idempotentId != null) {
+            body.put("id", idempotentId);
+        }
+        json(create ? "POST" : "PUT", url, body, headers).ready(new SuccessCallback<Map<String, Object>>() {
 
             @Override
             public void onSucess(Map<String, Object> value) {
                 try {
                     CalendarEvent saved = event(value, event.getCalendarId());
                     out.complete(saved);
-                    fireChange(new CalendarChange(getId(), saved.getCalendarId(), saved.getId(), CalendarChange.EntityType.EVENT, event.getId() == null ? CalendarChange.ChangeType.CREATED : CalendarChange.ChangeType.UPDATED));
+                    fireChange(new CalendarChange(getId(), saved.getCalendarId(), saved.getId(), CalendarChange.EntityType.EVENT, create ? CalendarChange.ChangeType.CREATED : CalendarChange.ChangeType.UPDATED));
                 } catch (CalendarException ex) {
                     out.error(ex);
                 }
             }
-        }).except(error(out));
+        }).except(new SuccessCallback<Throwable>() {
+            @Override
+            public void onSucess(Throwable error) {
+                if (idempotentId != null && error instanceof CalendarException
+                        && ((CalendarException) error).getError() == CalendarError.CONFLICT) {
+                    getEvent(event.getCalendarId(), idempotentId).ready(new SuccessCallback<CalendarEvent>() {
+                        @Override
+                        public void onSucess(CalendarEvent existing) {
+                            out.complete(existing);
+                        }
+                    }).except(error(out));
+                    return;
+                }
+                out.error(error);
+            }
+        });
         return out;
     }
 
@@ -215,15 +266,7 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
 
     @Override
     public AsyncResource<CalendarEvent> respondToEvent(final String calendarId, final String eventId, CalendarAttendee.Response response, String comment) {
-        final AsyncResource<CalendarEvent> out = new AsyncResource<CalendarEvent>();
-        getEvent(calendarId, eventId).ready(new SuccessCallback<CalendarEvent>() {
-
-            @Override
-            public void onSucess(CalendarEvent value) {
-                out.error(new CalendarException(CalendarError.NOT_SUPPORTED, "Use saveEvent() after updating the self attendee response"));
-            }
-        }).except(error(out));
-        return out;
+        return unsupported("Responding to Google invitations");
     }
 
     @Override
@@ -346,10 +389,16 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
         return out;
     }
 
-    private CalendarInfo calendar(Map<String, Object> m, CalendarInfo.ContentType type) {
+    private CalendarInfo calendar(Map<String, Object> m, CalendarInfo.ContentType type)
+            throws CalendarException {
         String name = string(m, type == CalendarInfo.ContentType.TASKS ? "title" : "summary");
         String zone = string(m, "timeZone");
-        return new CalendarInfo().setId(string(m, "id")).setSourceId(getId()).setName(name).setOwner(string(m, "summaryOverride")).setTimeZone(zone == null ? null : ZoneId.of(zone)).setPrimary(bool(m, "primary")).setReadOnly("reader".equals(string(m, "accessRole"))).setContentType(type).setCapabilities(getCapabilities());
+        try {
+            return new CalendarInfo().setId(string(m, "id")).setSourceId(getId()).setName(name).setOwner(string(m, "summaryOverride")).setTimeZone(zone == null ? null : CalendarDateUtil.zoneId(zone)).setPrimary(bool(m, "primary")).setReadOnly("reader".equals(string(m, "accessRole"))).setContentType(type).setCapabilities(getCapabilities());
+        } catch (IllegalArgumentException ex) {
+            throw new CalendarException(CalendarError.MALFORMED_RESPONSE,
+                    "Invalid provider time zone: " + zone, ex);
+        }
     }
 
     private CalendarEvent event(Map<String, Object> m, String calendarId) throws CalendarException {
@@ -411,7 +460,8 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
         m.put("location", e.getLocation());
         m.put("start", googleDate(e.getStart()));
         m.put("end", googleDate(e.getEnd()));
-        m.put("status", e.getStatus().name().toLowerCase());
+        m.put("status", e.getStatus() == CalendarEvent.Status.CANCELED ? "cancelled"
+                : e.getStatus() == CalendarEvent.Status.TENTATIVE ? "tentative" : "confirmed");
         m.put("transparency", e.getAvailability() == CalendarEvent.Availability.FREE ? "transparent" : "opaque");
         List<Map<String, Object>> attendees = new ArrayList<Map<String, Object>>();
         for (CalendarAttendee a : e.getAttendees()) {
@@ -419,7 +469,7 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
             x.put("email", a.getEmail());
             x.put("displayName", a.getName());
             x.put("optional", Boolean.valueOf(a.getRole() == CalendarAttendee.Role.OPTIONAL));
-            x.put("responseStatus", lowerCamel(a.getResponse().name()));
+            x.put("responseStatus", googleAttendeeResponse(a.getResponse()));
             attendees.add(x);
         }
         m.put("attendees", attendees);
@@ -453,7 +503,8 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
         String due = string(m, "due");
         String completed = string(m, "completed");
         if (due != null) {
-            out.setDue(CalendarDateTime.instant(parseIso(due), ZoneId.of("UTC")));
+            out.setDue(CalendarDateTime.allDay(
+                    java.time.ZonedDateTime.ofInstant(parseIso(due), ZoneId.of("UTC")).toLocalDateTime().toLocalDate()));
         }
         if (completed != null) {
             out.setCompletionTime(parseIso(completed));
@@ -466,8 +517,10 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
         m.put("title", t.getTitle());
         m.put("notes", t.getDescription());
         m.put("status", t.isCompleted() ? "completed" : "needsAction");
-        if (t.getDue() != null && !t.getDue().isAllDay()) {
-            m.put("due", iso(t.getDue().getDateTime().toInstant()));
+        if (t.getDue() != null) {
+            Instant due = t.getDue().isAllDay() ? CalendarDateUtil.allDayInstant(t.getDue().getDate())
+                    : t.getDue().getDateTime().toInstant();
+            m.put("due", iso(due));
         }
         if (t.isCompleted() && t.getCompletionTime() != null) {
             m.put("completed", iso(t.getCompletionTime()));
@@ -479,11 +532,17 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
         String date = string(m, "date");
         String dateTime = string(m, "dateTime");
         String zone = string(m, "timeZone");
-        if (date != null) {
-            return CalendarDateTime.allDay(LocalDate.parse(date));
-        }
-        if (dateTime != null) {
-            return CalendarDateTime.instant(parseIso(dateTime), ZoneId.of(zone == null ? "UTC" : zone));
+        try {
+            if (date != null) {
+                return CalendarDateTime.allDay(CalendarDateUtil.parseDate(date));
+            }
+            if (dateTime != null) {
+                return CalendarDateTime.instant(parseIso(dateTime),
+                        CalendarDateUtil.zoneId(zone == null ? "UTC" : zone));
+            }
+        } catch (IllegalArgumentException ex) {
+            throw new CalendarException(CalendarError.MALFORMED_RESPONSE,
+                    "Invalid provider date or time zone", ex);
         }
         return null;
     }
@@ -594,10 +653,29 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
         return CalendarAttendee.Response.NONE;
     }
 
-    private static String lowerCamel(String v) {
-        String s = v.toLowerCase();
-        int p = s.indexOf('_');
-        return p < 0 ? s : s.substring(0, p) + Character.toUpperCase(s.charAt(p + 1)) + s.substring(p + 2);
+    private static String googleAttendeeResponse(CalendarAttendee.Response response) {
+        if (response == CalendarAttendee.Response.ACCEPTED) {
+            return "accepted";
+        }
+        if (response == CalendarAttendee.Response.DECLINED) {
+            return "declined";
+        }
+        if (response == CalendarAttendee.Response.TENTATIVE) {
+            return "tentative";
+        }
+        return "needsAction";
+    }
+
+    private static String googleEventId(String mutationId) {
+        if (mutationId == null) {
+            return null;
+        }
+        long hash = 1469598103934665603L;
+        for (int i = 0; i < mutationId.length(); i++) {
+            hash ^= mutationId.charAt(i);
+            hash *= 1099511628211L;
+        }
+        return "cn1" + Long.toHexString(hash);
     }
 
     private static <T> SuccessCallback<Throwable> error(final AsyncResource<T> out) {

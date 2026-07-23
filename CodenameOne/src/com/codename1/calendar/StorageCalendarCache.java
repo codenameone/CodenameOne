@@ -40,7 +40,10 @@ public class StorageCalendarCache implements CalendarCache {
 
     @Override
     public Map<String, Object> load(String sourceId) throws CalendarException {
-        Object value = Storage.getInstance().readObject(prefix + sourceId);
+        Object first = Storage.getInstance().readObject(key(sourceId, 0));
+        Object second = Storage.getInstance().readObject(key(sourceId, 1));
+        Map wrapper = newer(first, second);
+        Object value = wrapper == null ? Storage.getInstance().readObject(prefix + sourceId) : wrapper.get("state");
         if (value == null) {
             return new HashMap<String, Object>();
         }
@@ -52,7 +55,17 @@ public class StorageCalendarCache implements CalendarCache {
 
     @Override
     public void store(String sourceId, Map<String, Object> state) throws CalendarException {
-        if (!Storage.getInstance().writeObject(prefix + sourceId, state)) {
+        Storage storage = Storage.getInstance();
+        Object first = storage.readObject(key(sourceId, 0));
+        Object second = storage.readObject(key(sourceId, 1));
+        Map newest = newer(first, second);
+        long generation = newest == null ? 1L : number(newest.get("generation")) + 1L;
+        int slot = newest == first ? 1 : 0;
+        Map<String, Object> wrapper = new HashMap<String, Object>();
+        wrapper.put("generation", Long.valueOf(generation));
+        wrapper.put("state", new HashMap<String, Object>(state));
+        if (!storage.writeObject(key(sourceId, slot), wrapper)) {
+            storage.clearCache();
             throw new CalendarException(CalendarError.STORAGE, "Unable to write calendar cache");
         }
     }
@@ -60,5 +73,30 @@ public class StorageCalendarCache implements CalendarCache {
     @Override
     public void clear(String sourceId) {
         Storage.getInstance().deleteStorageFile(prefix + sourceId);
+        Storage.getInstance().deleteStorageFile(key(sourceId, 0));
+        Storage.getInstance().deleteStorageFile(key(sourceId, 1));
+    }
+
+    private String key(String sourceId, int slot) {
+        return prefix + sourceId + "-" + slot;
+    }
+
+    private static Map newer(Object first, Object second) {
+        Map a = wrapper(first);
+        Map b = wrapper(second);
+        return a == null ? b : b == null ? a
+                : number(a.get("generation")) >= number(b.get("generation")) ? a : b;
+    }
+
+    private static Map wrapper(Object value) {
+        if (!(value instanceof Map)) {
+            return null;
+        }
+        Map map = (Map) value;
+        return map.get("state") instanceof Map && map.get("generation") instanceof Number ? map : null;
+    }
+
+    private static long number(Object value) {
+        return value instanceof Number ? ((Number) value).longValue() : 0L;
     }
 }

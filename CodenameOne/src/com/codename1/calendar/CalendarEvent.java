@@ -242,6 +242,16 @@ public class CalendarEvent {
         return Collections.unmodifiableList(attendees);
     }
 
+    public CalendarEvent removeAttendee(CalendarAttendee v) {
+        attendees.remove(v);
+        return this;
+    }
+
+    public CalendarEvent clearAttendees() {
+        attendees.clear();
+        return this;
+    }
+
     public CalendarEvent addAlarm(CalendarAlarm v) {
         if (v != null) {
             alarms.add(v);
@@ -251,6 +261,16 @@ public class CalendarEvent {
 
     public List<CalendarAlarm> getAlarms() {
         return Collections.unmodifiableList(alarms);
+    }
+
+    public CalendarEvent removeAlarm(CalendarAlarm v) {
+        alarms.remove(v);
+        return this;
+    }
+
+    public CalendarEvent clearAlarms() {
+        alarms.clear();
+        return this;
     }
 
     public CalendarEvent addAttachment(CalendarAttachment v) {
@@ -264,6 +284,16 @@ public class CalendarEvent {
         return Collections.unmodifiableList(attachments);
     }
 
+    public CalendarEvent removeAttachment(CalendarAttachment v) {
+        attachments.remove(v);
+        return this;
+    }
+
+    public CalendarEvent clearAttachments() {
+        attachments.clear();
+        return this;
+    }
+
     public CalendarEvent putProviderData(String k, String v) {
         if (k != null) {
             providerData.put(k, v);
@@ -273,5 +303,15 @@ public class CalendarEvent {
 
     public Map<String, String> getProviderData() {
         return Collections.unmodifiableMap(providerData);
+    }
+
+    public CalendarEvent removeProviderData(String key) {
+        providerData.remove(key);
+        return this;
+    }
+
+    public CalendarEvent clearProviderData() {
+        providerData.clear();
+        return this;
     }
 }

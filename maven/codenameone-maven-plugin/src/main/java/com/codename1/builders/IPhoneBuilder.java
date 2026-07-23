@@ -148,6 +148,8 @@ public class IPhoneBuilder extends Executor {
     private boolean usesWifiHotspotConfig;
     private boolean usesBonjour;
     private boolean usesCalendarApi;
+    private boolean usesCalendarEventApi;
+    private boolean usesCalendarTaskApi;
     private String firstBonjourType;
                                   // so we need to store the main class name for later here.
     // Map will be used for Xcode 8 privacy usage descriptions.  Don't need it yet
@@ -925,6 +927,25 @@ public class IPhoneBuilder extends Executor {
 
                 @Override
                 public void usesClassMethod(String cls, String method) {
+                    if (cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0
+                            || (cls.indexOf("com/codename1/calendar/CalendarManager") == 0
+                            && (method.indexOf("getLocalSource") >= 0
+                            || method.indexOf("getSources") >= 0))
+                            || (cls.indexOf("com/codename1/ui/Display") == 0
+                            && method.indexOf("getLocalCalendarSource") >= 0)) {
+                        usesCalendarApi = true;
+                    }
+                    if (cls.indexOf("com/codename1/calendar/CalendarSource") == 0
+                            || cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0) {
+                        if (method.indexOf("Task") >= 0 || method.indexOf("Tasks") >= 0) {
+                            usesCalendarTaskApi = true;
+                        }
+                        if (method.indexOf("Event") >= 0 || method.indexOf("Events") >= 0
+                                || method.indexOf("FreeBusy") >= 0
+                                || method.indexOf("Invitation") >= 0) {
+                            usesCalendarEventApi = true;
+                        }
+                    }
                     if (cls.equals("com/codename1/io/wifi/WiFi")
                             && (method.indexOf("connect") > -1
                                 || method.indexOf("disconnect") > -1)) {
@@ -946,27 +967,37 @@ public class IPhoneBuilder extends Executor {
         stopwatch.split("Scan Classes");
 
         if (usesCalendarApi) {
-            String calendarDescription = request.getArg("ios.NSCalendarsFullAccessUsageDescription",
-                    "This app uses your calendars to read and schedule events.");
-            String calendarWriteDescription = request.getArg("ios.NSCalendarsWriteOnlyAccessUsageDescription",
-                    "This app uses your calendar to schedule events.");
-            String remindersDescription = request.getArg("ios.NSRemindersFullAccessUsageDescription",
-                    "This app uses your reminders to read and schedule tasks.");
-            privacyUsageDescriptions.put("NSCalendarsFullAccessUsageDescription", calendarDescription);
-            privacyUsageDescriptions.put("NSCalendarsWriteOnlyAccessUsageDescription", calendarWriteDescription);
-            privacyUsageDescriptions.put("NSRemindersFullAccessUsageDescription", remindersDescription);
-            // Retain the pre-iOS-17 keys when an app supports older releases.
-            privacyUsageDescriptions.put("NSCalendarsUsageDescription",
-                    request.getArg("ios.NSCalendarsUsageDescription", calendarDescription));
-            privacyUsageDescriptions.put("NSRemindersUsageDescription",
-                    request.getArg("ios.NSRemindersUsageDescription", remindersDescription));
-            request.putArgument("ios.NSCalendarsFullAccessUsageDescription", calendarDescription);
-            request.putArgument("ios.NSCalendarsWriteOnlyAccessUsageDescription", calendarWriteDescription);
-            request.putArgument("ios.NSRemindersFullAccessUsageDescription", remindersDescription);
-            request.putArgument("ios.NSCalendarsUsageDescription",
-                    request.getArg("ios.NSCalendarsUsageDescription", calendarDescription));
-            request.putArgument("ios.NSRemindersUsageDescription",
-                    request.getArg("ios.NSRemindersUsageDescription", remindersDescription));
+            // An unqualified local-source lookup defaults to event access. Task
+            // methods, or an explicit reminder privacy hint, opt into reminders.
+            boolean includeTasks = usesCalendarTaskApi
+                    || request.getArg("ios.NSRemindersFullAccessUsageDescription", null) != null
+                    || request.getArg("ios.NSRemindersUsageDescription", null) != null;
+            boolean includeEvents = usesCalendarEventApi || !includeTasks;
+            if (includeEvents) {
+                String calendarDescription = request.getArg("ios.NSCalendarsFullAccessUsageDescription",
+                        "This app uses your calendars to read and schedule events.");
+                String calendarWriteDescription = request.getArg("ios.NSCalendarsWriteOnlyAccessUsageDescription",
+                        "This app uses your calendar to schedule events.");
+                privacyUsageDescriptions.put("NSCalendarsFullAccessUsageDescription", calendarDescription);
+                privacyUsageDescriptions.put("NSCalendarsWriteOnlyAccessUsageDescription", calendarWriteDescription);
+                // Retain the pre-iOS-17 key when an app supports older releases.
+                privacyUsageDescriptions.put("NSCalendarsUsageDescription",
+                        request.getArg("ios.NSCalendarsUsageDescription", calendarDescription));
+                request.putArgument("ios.NSCalendarsFullAccessUsageDescription", calendarDescription);
+                request.putArgument("ios.NSCalendarsWriteOnlyAccessUsageDescription", calendarWriteDescription);
+                request.putArgument("ios.NSCalendarsUsageDescription",
+                        request.getArg("ios.NSCalendarsUsageDescription", calendarDescription));
+            }
+            if (includeTasks) {
+                String remindersDescription = request.getArg("ios.NSRemindersFullAccessUsageDescription",
+                        "This app uses your reminders to read and schedule tasks.");
+                privacyUsageDescriptions.put("NSRemindersFullAccessUsageDescription", remindersDescription);
+                privacyUsageDescriptions.put("NSRemindersUsageDescription",
+                        request.getArg("ios.NSRemindersUsageDescription", remindersDescription));
+                request.putArgument("ios.NSRemindersFullAccessUsageDescription", remindersDescription);
+                request.putArgument("ios.NSRemindersUsageDescription",
+                        request.getArg("ios.NSRemindersUsageDescription", remindersDescription));
+            }
         }
 
         // External surfaces: parse the build-time kinds manifest (surfaces.json in the project
