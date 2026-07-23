@@ -675,7 +675,20 @@ public class GoogleCalendarSource extends OAuthCalendarSource {
             hash ^= mutationId.charAt(i);
             hash *= 1099511628211L;
         }
-        return "cn1" + Long.toHexString(hash);
+        return "cn1" + longToHexString(hash);
+    }
+
+    private static String longToHexString(long value) {
+        int high = (int) (value >>> 32);
+        String lowHex = Integer.toHexString((int) value);
+        if (high == 0) {
+            return lowHex;
+        }
+        StringBuilder hex = new StringBuilder(Integer.toHexString(high));
+        for (int i = lowHex.length(); i < 8; i++) {
+            hex.append('0');
+        }
+        return hex.append(lowHex).toString();
     }
 
     private static <T> SuccessCallback<Throwable> error(final AsyncResource<T> out) {

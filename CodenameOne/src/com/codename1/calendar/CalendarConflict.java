@@ -65,8 +65,9 @@ public final class CalendarConflict {
             return null;
         }
         Map<String, Object> copy = new HashMap<String, Object>();
-        for (Object key : source.keySet()) {
-            copy.put(String.valueOf(key), immutableValue(source.get(key)));
+        for (Object entryObject : source.entrySet()) {
+            Map.Entry entry = (Map.Entry) entryObject;
+            copy.put(String.valueOf(entry.getKey()), immutableValue(entry.getValue()));
         }
         return Collections.unmodifiableMap(copy);
     }
