@@ -828,7 +828,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /** Receives the managed typed envelope from FCM without applying legacy push decoding. */
     public static void handleV3Push(final String envelope, Context context,
             boolean appRunning, Class appStubClass) {
-        if (appRunning && Display.isInitialized()) {
+        if (appRunning && Display.isInitialized()
+                && com.codename1.push.PushClient.hasActiveClient()) {
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
                     com.codename1.push.PushClient.dispatch(envelope);

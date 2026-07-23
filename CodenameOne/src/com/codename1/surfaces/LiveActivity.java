@@ -92,6 +92,8 @@ public final class LiveActivity {
     }
 
     /// Push-framework entry point that ends an already-running native activity by id.
+    /// `finalStateJson` may be null to keep the last published state, matching the
+    /// `SurfaceBridge` contract.
     public static void endRemote(String id, String finalStateJson, boolean dismissImmediately) {
         SurfaceBridge b = Surfaces.bridgeInternal();
         if (b != null && id != null) {

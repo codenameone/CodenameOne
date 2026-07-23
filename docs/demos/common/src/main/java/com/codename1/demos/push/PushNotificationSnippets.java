@@ -83,10 +83,11 @@ public class PushNotificationSnippets {
         return message;
     }
 
-    public PushClient createCustomClient() {
+    public PushClient createCustomClient(PushTransport companyTransport,
+            PushListener listener) {
         // tag::push-notifications-java-003[]
-        PushTransport companyTransport = null; // Supplied by the native CN1Lib.
-        PushListener listener = null; // The application's normal listener.
+        // companyTransport is supplied by the native CN1Lib.
+        // listener is the application's normal, non-null PushListener.
         PushClient client = PushClient.builder("private-app-id")
                 .transport(companyTransport)
                 .registrationSink(new PushRegistrationSink() {

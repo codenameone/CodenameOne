@@ -96,21 +96,34 @@ function deliverV3Push(obj) {
                   target = windowClients[i];
               }
           }
-          if (target !== null) {
+          var visualInBackground = includesVisualPush(obj)
+                  && (target === null || !target.focused);
+          if (target !== null && !visualInBackground) {
               target.postMessage({type: 'push', data: obj, visual: false});
           }
-          if (includesVisualPush(obj) && (target === null || !target.focused)) {
+          if (visualInBackground) {
               return self.registration.showNotification(getNotificationTitle(obj), buildNotification(obj));
           }
       });
 }
 
+function safeV3Destination(data) {
+    if (!isV3Push(data) || !data.deepLink) {
+        return urlToOpen[0];
+    }
+    try {
+        var destination = new URL(data.deepLink, urlToOpen[0]);
+        var serviceWorkerOrigin = new URL(self.location.href).origin;
+        return destination.origin === serviceWorkerOrigin ? destination.href : urlToOpen[0];
+    } catch (error) {
+        return urlToOpen[0];
+    }
+}
+
 self.addEventListener('notificationclick', function(event) {
   const clickedNotification = event.notification;
   clickedNotification.close();
-  
-  // Do something as the result of the notification click
-  //const promiseChain = 
+  var openedWindow = false;
 
   const promiseChain = clients.matchAll({
     type: 'window',
@@ -136,16 +149,18 @@ self.addEventListener('notificationclick', function(event) {
           data.action = event.action;
       }
       pendingPushes.push({type: 'push', data: data, 'visual' : true});
-      var destination = isV3Push(data) && data.deepLink ? data.deepLink : urlToOpen[0];
-      return clients.openWindow(destination);
+      openedWindow = true;
+      return clients.openWindow(safeV3Destination(data));
     }
   }).then((windowClient) => {
-      console.log("Posting push event on click "+event.notification.data);
-      var data = event.notification.data;
-      if (event.action) {
-          data.action = event.action;
+      if (!openedWindow && windowClient) {
+          console.log("Posting push event on click "+event.notification.data);
+          var data = event.notification.data;
+          if (event.action) {
+              data.action = event.action;
+          }
+          windowClient.postMessage({type: 'push', data: data, 'visual' : true});
       }
-      windowClient.postMessage({type: 'push', data: data, 'visual' : true});
   });
 
   
@@ -159,7 +174,7 @@ self.addEventListener('message', function(event){
         return;
     }
     if (pendingPushes.length > 0) {
-        var tmp = pendingPushes.slice();
+        var tmp = pendingPushes.splice(0, pendingPushes.length);
         const promiseChain = clients.matchAll({
             type: 'window',
             includeUncontrolled: true

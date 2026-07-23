@@ -101,4 +101,15 @@ class PushMessageTest {
         assertTrue(message.getPlatformOptions().isEmpty());
         assertTrue(message.getSurface().isEmpty());
     }
+
+    @Test
+    void nullDataValueRemovesAnExistingEntry() {
+        PushMessage.Builder builder = PushMessage.builder().data("temporary", "value");
+        builder.build();
+
+        PushMessage message = builder.data("temporary", null).build();
+
+        assertTrue(message.getData().isEmpty());
+        assertTrue(!message.toMap().containsKey("data"));
+    }
 }
