@@ -34,6 +34,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 public class GeneratorModelMatrixTest extends AbstractTest {
@@ -45,6 +46,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         validateClaudeSkillBundled();
         validateJava17DefaultRegressionFixes();
         validateLegacyJava8Generation();
+        validateCoordinateGuardRejectsBrokenArtifacts();
+        validateLocaleIndependentArtifactIds();
         for (Template template : Template.values()) {
             for (IDE ide : IDE.values()) {
                 validateCombination(template, ide);
@@ -247,6 +250,61 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 "Java 8 root pom should retain the win32 module activation profile");
     }
 
+    private void validateCoordinateGuardRejectsBrokenArtifacts() throws Exception {
+        String mainClassName = "CoordinateGuardApp";
+        String packageName = "com.acme.coordinate.guard";
+        GeneratorModel model = GeneratorModel.create(IDE.INTELLIJ, Template.BAREBONES, mainClassName, packageName);
+        Map<String, byte[]> entries = model.collectProjectEntries();
+        String javascriptPom = getText(entries, "javascript/pom.xml");
+
+        entries.put("javascript/pom.xml", StringUtil.replaceAll(
+                javascriptPom,
+                packageName,
+                "com.codename1.initializr"
+        ).getBytes("UTF-8"));
+        assertCoordinateGuardRejects(model, entries,
+                "Initializr application coordinates must never leak into a generated platform POM");
+
+        entries.put("javascript/pom.xml", StringUtil.replaceAll(
+                javascriptPom,
+                "1.0-SNAPSHOT",
+                "9.9-BROKEN"
+        ).getBytes("UTF-8"));
+        assertCoordinateGuardRejects(model, entries,
+                "A platform POM version that differs from the generated reactor must be rejected");
+    }
+
+    private void validateLocaleIndependentArtifactIds() throws Exception {
+        Locale originalLocale = Locale.getDefault();
+        try {
+            Locale.setDefault(new Locale("tr", "TR"));
+            String mainClassName = "IntegrityIndex";
+            String packageName = "com.acme.locale.guard";
+            byte[] zipData = createProjectZip(IDE.INTELLIJ, Template.BAREBONES, mainClassName, packageName);
+            Map<String, byte[]> entries = readZipEntries(zipData);
+            assertGeneratedPomCoordinates(entries, packageName, mainClassName);
+            assertContains(getText(entries, "javascript/pom.xml"),
+                    "<artifactId>integrityindex-javascript</artifactId>",
+                    "Artifact IDs must use locale-independent lowercase under a Turkish default locale");
+        } finally {
+            Locale.setDefault(originalLocale);
+        }
+    }
+
+    private void assertCoordinateGuardRejects(
+            GeneratorModel model,
+            Map<String, byte[]> entries,
+            String message
+    ) throws Exception {
+        boolean rejected = false;
+        try {
+            model.validateGeneratedPomCoordinates(entries);
+        } catch (IOException expected) {
+            rejected = true;
+        }
+        assertTrue(rejected, message);
+    }
+
     private void validateJava17DefaultRegressionFixes() throws Exception {
         String mainClassName = "DemoJava17Regression";
         String packageName = "com.acme.java17regression";
@@ -302,6 +360,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         assertGitIgnore(entries);
         assertRootPom(entries, packageName, mainClassName);
         assertCommonPom(entries, template, packageName, mainClassName, true);
+        assertGeneratedPomCoordinates(entries, packageName, mainClassName);
         assertSettings(entries, template, packageName, mainClassName, true);
         assertMainSourceFile(entries, template, packageName, mainClassName, false);
         assertThemeDefaults(entries, template);
@@ -438,7 +497,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     private void assertRootPom(Map<String, byte[]> entries, String packageName, String mainClassName) {
         String pom = getText(entries, "pom.xml");
         assertContains(pom, packageName, "Root pom should include package as groupId");
-        assertContains(pom, mainClassName.toLowerCase(), "Root pom should include app artifact/name");
+        assertContains(pom, GeneratorModel.toLowerCaseInvariant(mainClassName), "Root pom should include app artifact/name");
         assertContains(pom, "<cn1.plugin.version>7.0.258</cn1.plugin.version>", "Root pom should use current CN1 plugin version");
         assertContains(pom, "<cn1.version>7.0.258</cn1.version>", "Root pom should align CN1 runtime version with plugin version");
         assertFalse(pom.indexOf("com.example.myapp") >= 0, "Root pom still contains placeholder package");
@@ -448,7 +507,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     private void assertCommonPom(Map<String, byte[]> entries, Template template, String packageName, String mainClassName, boolean expectJava17) {
         String pom = getText(entries, "common/pom.xml");
         assertContains(pom, packageName, "Common pom should include package");
-        assertContains(pom, mainClassName.toLowerCase(), "Common pom should include app artifact");
+        assertContains(pom, GeneratorModel.toLowerCaseInvariant(mainClassName), "Common pom should include app artifact");
         assertContains(pom, "<artifactId>codenameone-javase</artifactId>", "Common pom should include codenameone-javase test dependency");
         assertContains(pom, "<artifactId>serializer</artifactId>", "Common pom should include xalan serializer for CN1 generate-gui-sources");
         assertContains(pom, "<version>2.7.3</version>", "Common pom should pin serializer version expected by CN1 plugin classpath");
@@ -460,7 +519,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
             assertContains(pom, "<target>1.8</target>", "Common pom should use Java 8 target when legacy Java 8 is selected");
         }
         if (template == Template.GRUB) {
-            assertContains(pom, "<artifactId>" + mainClassName.toLowerCase() + "-CodeRAD</artifactId>", "Grub common pom should include local CodeRAD cn1lib dependency");
+            assertContains(pom, "<artifactId>" + GeneratorModel.toLowerCaseInvariant(mainClassName) + "-CodeRAD</artifactId>", "Grub common pom should include local CodeRAD cn1lib dependency");
             assertContains(pom, "<version>1.0-SNAPSHOT</version>", "Grub common pom should use local snapshot CodeRAD cn1lib");
         }
         if (template == Template.TWEET) {
@@ -470,6 +529,43 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         }
         assertFalse(pom.indexOf("com.example.myapp") >= 0, "Common pom still contains placeholder package");
         assertFalse(pom.indexOf("myappname") >= 0, "Common pom still contains placeholder app name");
+    }
+
+    private void assertGeneratedPomCoordinates(Map<String, byte[]> entries, String packageName, String mainClassName) {
+        String rootArtifactId = GeneratorModel.toLowerCaseInvariant(mainClassName);
+        String version = "1.0-SNAPSHOT";
+        String[] modules = new String[] {"common", "android", "ios", "javase", "javascript", "linux", "win"};
+
+        for (int i = 0; i < modules.length; i++) {
+            String module = modules[i];
+            String pom = removeWhitespace(getText(entries, module + "/pom.xml"));
+            String expectedCoordinates =
+                    "</modelVersion><parent>"
+                            + "<groupId>" + packageName + "</groupId>"
+                            + "<artifactId>" + rootArtifactId + "</artifactId>"
+                            + "<version>" + version + "</version>"
+                            + "</parent>"
+                            + "<groupId>" + packageName + "</groupId>"
+                            + "<artifactId>" + rootArtifactId + "-" + module + "</artifactId>"
+                            + "<version>" + version + "</version>";
+            assertContains(pom, expectedCoordinates,
+                    module + "/pom.xml must belong to the generated Maven reactor");
+            assertFalse(pom.indexOf("com.codename1.initializr") >= 0,
+                    module + "/pom.xml must not retain the Initializr application's groupId");
+            assertFalse(pom.indexOf("<artifactId>initializr") >= 0,
+                    module + "/pom.xml must not retain an Initializr application artifactId");
+        }
+    }
+
+    private String removeWhitespace(String content) {
+        StringBuilder out = new StringBuilder(content.length());
+        for (int i = 0; i < content.length(); i++) {
+            char c = content.charAt(i);
+            if (!Character.isWhitespace(c)) {
+                out.append(c);
+            }
+        }
+        return out.toString();
     }
 
     private void assertSettings(Map<String, byte[]> entries, Template template, String packageName, String mainClassName, boolean expectJava17) {

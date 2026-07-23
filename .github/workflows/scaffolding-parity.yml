@@ -1,8 +1,8 @@
-name: Scaffolding settings parity
+name: Scaffolding artifact integrity
 
-# Guards that the two project-scaffolding paths -- the Maven archetype
-# (maven/cn1app-archetype) and the initializr (scripts/initializr, via the embedded
-# common.zip) -- ship the SAME build-hint properties in codenameone_settings.properties.
+# Guards the committed common.zip that is shipped by the Initializr. The checks
+# validate both its Maven reactor coordinates and settings parity with the Maven
+# archetype, so a malformed binary scaffold cannot reach project downloads.
 #
 # A newly generated project must look identical regardless of which path produced it.
 # This caught a real drift: the iOS/Android on-device-debug hints (ios.onDeviceDebug,
@@ -19,6 +19,7 @@ on:
       - 'scripts/initializr/common/src/main/resources/common.zip'
       - 'maven/integration-tests/scaffolding-settings-parity-test.sh'
       - 'maven/integration-tests/normalize_cn1_settings.py'
+      - 'maven/integration-tests/validate_initializr_pom_coordinates.py'
       - '.github/workflows/scaffolding-parity.yml'
   push:
     branches: [ master ]
@@ -27,6 +28,7 @@ on:
       - 'scripts/initializr/common/src/main/resources/common.zip'
       - 'maven/integration-tests/scaffolding-settings-parity-test.sh'
       - 'maven/integration-tests/normalize_cn1_settings.py'
+      - 'maven/integration-tests/validate_initializr_pom_coordinates.py'
       - '.github/workflows/scaffolding-parity.yml'
 
 concurrency:
@@ -34,10 +36,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  scaffolding-parity:
+  scaffolding-integrity:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
+      - name: Validate Initializr embedded Maven coordinates
+        run: python3 maven/integration-tests/validate_initializr_pom_coordinates.py
       - name: Compare archetype vs initializr codenameone_settings.properties
         run: bash maven/integration-tests/scaffolding-settings-parity-test.sh
