@@ -1290,7 +1290,6 @@ const int currentCodenameOneCallStackOffset = threadStateData->callStackOffset;
 
 typedef struct CN1BibopPage {
     struct CN1BibopPage* _Atomic nextAll; // append-only global registry chain
-    struct CN1BibopPage* nextFresh[2];    // alternating per-GC fresh-page stack links
     struct CN1BibopPage* nextPool;        // FREE/PARTIAL pool / SWEEP stack link
     int classIndex;
     int slotSize;
@@ -1335,7 +1334,9 @@ typedef struct CN1BibopPage {
                                           //  idempotent across parallel markers)
     int gcGraceEpoch;                     // upper bound on survivor epochs as of the last
                                           //  full walk (GC-thread only)
-    _Atomic int gcFreshEpoch[2];          // queued once on each alternating epoch stack
+#ifdef CN1_GRACE_AUDIT
+    int gcAuditSnapshot;                  // QA builds only: bumpIndex at mark start
+#endif
 } CN1BibopPage;
 
 // Per-thread current page per size class; defined in cn1_globals.m. Touched only
@@ -1343,11 +1344,10 @@ typedef struct CN1BibopPage {
 extern __thread CN1BibopPage* bibopCurrent[CN1_BIBOP_NUM_CLASSES];
 extern _Atomic long bibopBytesSinceGc;
 extern _Atomic long bibopGcTriggerBytes;
-// Atomic mirror of currentGcMarkValue for mutator-side adaptive/fresh-page
+// Atomic mirror of currentGcMarkValue for mutator-side adaptive-policy
 // decisions. currentGcMarkValue itself remains owned by the GC/mark threads.
 extern _Atomic int bibopGcEpoch;
 extern _Atomic int bibopBypassGeneration[CN1_BIBOP_NUM_CLASSES];
-extern CN1BibopPage* _Atomic bibopFreshPages[2];
 #if defined(CN1_GC_INSTRUMENT) && !defined(CN1_DISABLE_BIBOP)
 // QA-only diagnostics. Production builds contain neither the counters nor
 // their atomic updates.
@@ -1359,7 +1359,6 @@ extern _Atomic long cn1BibopBeltRuns;
 extern _Atomic long cn1BibopAdoptedRescanSkips;
 #endif
 extern int currentGcMarkValue;
-extern void cn1BibopNoteFreshAllocation(CN1BibopPage* page, int epoch);
 #ifndef CN1_BIBOP_NO_FASTSWEEP
 // Called from monitorEnter (any thread) when a monitor (CN1ThreadData) is freshly
 // attached to a heap object. If the object is a BiBOP slot it bumps a global live-monitor
@@ -1471,16 +1470,13 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
 #endif
             __atomic_store_n(&o->__codenameOneGcMark, -1, __ATOMIC_RELEASE);
             atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
-            int __cn1FreshEpoch = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
-            if(__builtin_expect(atomic_load_explicit(&p->gcFreshEpoch[__cn1FreshEpoch & 1], memory_order_relaxed)
-                                != __cn1FreshEpoch, 0)) {
-                cn1BibopNoteFreshAllocation(p, __cn1FreshEpoch);
-            }
 #ifndef CN1_BIBOP_NO_FASTSWEEP
-            // Mark the page dirty so the O(1) sweep never treats a page that still has
-            // fresh mark==-1 (grace-candidate) slots as homogeneous. Single plain store
-            // to the already-hot page header; published to the GC by the eventual
-            // retire release-push.
+            // Mark the page dirty: the O(1) sweep never treats a page that still has
+            // fresh mark==-1 (grace-candidate) slots as homogeneous, and the grace
+            // pass slot-scans exactly the flagged pages ("-1 slot present" implies
+            // "allocated into since last sweep" -- the sweep converts every -1 it
+            // sees). Single plain store to the already-hot page header; pre-mark
+            // stores are published to the GC by the mark-start thread sync.
             p->gcAllocedSinceSweep = JAVA_TRUE;
 #endif
             CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
@@ -1559,11 +1555,6 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
 #endif
             __atomic_store_n(&o->__codenameOneGcMark, -1, __ATOMIC_RELEASE);
             atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
-            int __cn1FreshEpoch = atomic_load_explicit(&bibopGcEpoch, memory_order_relaxed);
-            if(__builtin_expect(atomic_load_explicit(&p->gcFreshEpoch[__cn1FreshEpoch & 1], memory_order_relaxed)
-                                != __cn1FreshEpoch, 0)) {
-                cn1BibopNoteFreshAllocation(p, __cn1FreshEpoch);
-            }
 #ifndef CN1_BIBOP_NO_FASTSWEEP
             p->gcAllocedSinceSweep = JAVA_TRUE;
 #endif
