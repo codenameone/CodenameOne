@@ -971,7 +971,11 @@ def ar_vr_scripts(title: str) -> tuple[dict, dict, list[tuple[int, str]]]:
 
 def ar_story_svgs_v2() -> dict[str, str]:
     """Three-act AR story art, including attributed public evidence cards."""
-    result = ar_diagram_svgs()
+    result = {
+        filename: svg
+        for filename, svg in ar_diagram_svgs().items()
+        if filename.startswith("portable-")
+    }
     result.update({
         "ar-intro-landscape.svg": '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 650">
 <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#50d8ff"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs>
@@ -1437,7 +1441,7 @@ def generate(entry: dict, output_root: Path, ignore_timings: bool = False) -> di
             encoding="utf-8",
         )
         asset_root = ROOT / "docs" / "website" / "static" / "blog" / slug
-        for filename in ("ar-simulator-model.png", "vr-stereo-scene.png", "vr-360-panorama.png"):
+        for filename in ("ar-simulator-model.png", "vr-360-panorama.png"):
             (project / filename).write_bytes((asset_root / filename).read_bytes())
         (project / "codename-one-logo.png").write_bytes(
             (ROOT / "docs" / "website" / "static" / "uploads" / "Codename-One-White-Logo.png").read_bytes()
