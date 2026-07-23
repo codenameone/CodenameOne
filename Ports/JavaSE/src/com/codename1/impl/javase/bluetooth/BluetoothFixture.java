@@ -24,8 +24,7 @@ package com.codename1.impl.javase.bluetooth;
 
 import com.codename1.bluetooth.BluetoothUuid;
 import com.codename1.bluetooth.gatt.GattCharacteristic;
-import com.codename1.impl.bluetooth.NativeBlePeripheral;
-import com.codename1.impl.bluetooth.Json;
+/* fixture JSON codec is JavaSE-side (FixtureJson); core has no public JSON */
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -52,7 +51,7 @@ import java.util.Map;
  * <p>Serialization is plain JSON without external libraries:
  * {@link #toJson()} hand-rolls the writer (indented, deterministic field
  * order) and {@link #fromJson(InputStream)} parses with the core
- * {@code com.codename1.io.JSONParser} through {@link Json}. Format
+ * {@code com.codename1.io.JSONParser} through {@link FixtureJson}. Format
  * (version {@value #FORMAT_VERSION}):</p>
  *
  * <pre>
@@ -283,7 +282,7 @@ public final class BluetoothFixture {
         sb.append("  \"version\": ").append(version);
         if (platform != null) {
             sb.append(",\n  \"platform\": \"")
-                    .append(Json.escape(platform)).append('"');
+                    .append(FixtureJson.escape(platform)).append('"');
         }
         sb.append(",\n  \"devices\": [");
         int size = devices.size();
@@ -299,9 +298,9 @@ public final class BluetoothFixture {
     }
 
     private static void writeDevice(StringBuilder sb, Device d) {
-        sb.append("    {\"id\": \"").append(Json.escape(d.id)).append('"');
+        sb.append("    {\"id\": \"").append(FixtureJson.escape(d.id)).append('"');
         if (d.name != null) {
-            sb.append(",\n     \"name\": \"").append(Json.escape(d.name))
+            sb.append(",\n     \"name\": \"").append(FixtureJson.escape(d.name))
                     .append('"');
         }
         sb.append(",\n     \"connectable\": ").append(d.connectable);
@@ -336,7 +335,7 @@ public final class BluetoothFixture {
             }
             first = false;
             sb.append('"').append(e.getKey()).append("\": \"")
-                    .append(Json.encodeBase64(e.getValue())).append('"');
+                    .append(FixtureJson.encodeBase64(e.getValue())).append('"');
         }
         sb.append('}');
         sb.append(",\n     \"serviceData\": {");
@@ -347,7 +346,7 @@ public final class BluetoothFixture {
             }
             first = false;
             sb.append('"').append(e.getKey()).append("\": \"")
-                    .append(Json.encodeBase64(e.getValue())).append('"');
+                    .append(FixtureJson.encodeBase64(e.getValue())).append('"');
         }
         sb.append('}');
         if (!d.gatt.isEmpty()) {
@@ -393,7 +392,7 @@ public final class BluetoothFixture {
         }
         sb.append(']');
         if (c.value != null) {
-            sb.append(", \"value\": \"").append(Json.encodeBase64(c.value))
+            sb.append(", \"value\": \"").append(FixtureJson.encodeBase64(c.value))
                     .append('"');
         }
         sb.append(", \"descriptors\": [");
@@ -411,7 +410,7 @@ public final class BluetoothFixture {
     /**
      * The wire names (see {@code PROTOCOL.md}) of a
      * {@link GattCharacteristic}{@code .PROPERTY_*} bitmask; the inverse
-     * of {@link NativeBlePeripheral#propertiesMask(List)}.
+     * of {@link FixtureJson#propertiesMask(List)}.
      */
     static String[] propertyNames(int mask) {
         ArrayList<String> out = new ArrayList<String>();
@@ -464,67 +463,67 @@ public final class BluetoothFixture {
 
     /** Parses a fixture from its JSON form. */
     public static BluetoothFixture fromJson(String json) throws IOException {
-        Map<String, Object> root = Json.parse(json);
-        long version = Json.longVal(root, "version", -1);
+        Map<String, Object> root = FixtureJson.parse(json);
+        long version = FixtureJson.longVal(root, "version", -1);
         if (version != FORMAT_VERSION) {
             throw new IOException("Unsupported fixture version " + version
                     + " (this build reads version " + FORMAT_VERSION + ")");
         }
         BluetoothFixture fixture = new BluetoothFixture();
-        fixture.platform = Json.str(root, "platform", null);
-        List<Object> deviceArr = Json.list(root, "devices");
+        fixture.platform = FixtureJson.str(root, "platform", null);
+        List<Object> deviceArr = FixtureJson.list(root, "devices");
         int size = deviceArr.size();
         for (int i = 0; i < size; i++) {
-            fixture.addDevice(parseDevice(Json.map(deviceArr.get(i))));
+            fixture.addDevice(parseDevice(FixtureJson.map(deviceArr.get(i))));
         }
         return fixture;
     }
 
     private static Device parseDevice(Map<String, Object> obj)
             throws IOException {
-        String id = Json.str(obj, "id", "");
+        String id = FixtureJson.str(obj, "id", "");
         if (id.length() == 0) {
             throw new IOException("Fixture device without an id");
         }
         Device d = new Device(id);
-        d.name = Json.str(obj, "name", null);
-        d.connectable = Json.boolVal(obj, "connectable", true);
+        d.name = FixtureJson.str(obj, "name", null);
+        d.connectable = FixtureJson.boolVal(obj, "connectable", true);
         if (obj.containsKey("txPower")) {
-            d.txPower = Integer.valueOf(Json.intVal(obj, "txPower", 0));
+            d.txPower = Integer.valueOf(FixtureJson.intVal(obj, "txPower", 0));
         }
-        List<Object> timeline = Json.list(obj, "rssiTimeline");
+        List<Object> timeline = FixtureJson.list(obj, "rssiTimeline");
         int size = timeline.size();
         for (int i = 0; i < size; i++) {
-            Map<String, Object> s = Json.map(timeline.get(i));
+            Map<String, Object> s = FixtureJson.map(timeline.get(i));
             d.rssiTimeline.add(new RssiSample(
-                    Json.longVal(s, "relTimeMs", 0),
-                    Json.intVal(s, "rssi", -127)));
+                    FixtureJson.longVal(s, "relTimeMs", 0),
+                    FixtureJson.intVal(s, "rssi", -127)));
         }
-        List<Object> uuids = Json.list(obj, "serviceUuids");
+        List<Object> uuids = FixtureJson.list(obj, "serviceUuids");
         size = uuids.size();
         for (int i = 0; i < size; i++) {
             d.serviceUuids.add(parseUuid(String.valueOf(uuids.get(i))));
         }
         Map<String, Object> manufacturer =
-                Json.map(obj.get("manufacturerData"));
+                FixtureJson.map(obj.get("manufacturerData"));
         for (Map.Entry<String, Object> e : manufacturer.entrySet()) {
             try {
                 d.manufacturerData.put(Integer.valueOf(e.getKey()),
-                        Json.decodeBase64(String.valueOf(e.getValue())));
+                        FixtureJson.decodeBase64(String.valueOf(e.getValue())));
             } catch (NumberFormatException ex) {
                 throw new IOException("Bad manufacturer company id: "
                         + e.getKey());
             }
         }
-        Map<String, Object> serviceData = Json.map(obj.get("serviceData"));
+        Map<String, Object> serviceData = FixtureJson.map(obj.get("serviceData"));
         for (Map.Entry<String, Object> e : serviceData.entrySet()) {
             d.serviceData.put(parseUuid(e.getKey()),
-                    Json.decodeBase64(String.valueOf(e.getValue())));
+                    FixtureJson.decodeBase64(String.valueOf(e.getValue())));
         }
-        List<Object> gatt = Json.list(obj, "gatt");
+        List<Object> gatt = FixtureJson.list(obj, "gatt");
         size = gatt.size();
         for (int i = 0; i < size; i++) {
-            d.gatt.add(parseService(Json.map(gatt.get(i))));
+            d.gatt.add(parseService(FixtureJson.map(gatt.get(i))));
         }
         return d;
     }
@@ -532,24 +531,24 @@ public final class BluetoothFixture {
     private static ServiceRecord parseService(Map<String, Object> obj)
             throws IOException {
         ServiceRecord s = new ServiceRecord(
-                parseUuid(Json.str(obj, "uuid", "")));
-        s.primary = Json.boolVal(obj, "primary", true);
-        List<Object> chars = Json.list(obj, "characteristics");
+                parseUuid(FixtureJson.str(obj, "uuid", "")));
+        s.primary = FixtureJson.boolVal(obj, "primary", true);
+        List<Object> chars = FixtureJson.list(obj, "characteristics");
         int size = chars.size();
         for (int i = 0; i < size; i++) {
-            Map<String, Object> ch = Json.map(chars.get(i));
+            Map<String, Object> ch = FixtureJson.map(chars.get(i));
             CharacteristicRecord c = new CharacteristicRecord(
-                    parseUuid(Json.str(ch, "uuid", "")),
-                    NativeBlePeripheral.propertiesMask(
-                            Json.list(ch, "properties")));
+                    parseUuid(FixtureJson.str(ch, "uuid", "")),
+                    FixtureJson.propertiesMask(
+                            FixtureJson.list(ch, "properties")));
             if (ch.containsKey("value")) {
-                c.value = Json.decodeBase64(Json.str(ch, "value", ""));
+                c.value = FixtureJson.decodeBase64(FixtureJson.str(ch, "value", ""));
             }
-            List<Object> descriptors = Json.list(ch, "descriptors");
+            List<Object> descriptors = FixtureJson.list(ch, "descriptors");
             int ds = descriptors.size();
             for (int j = 0; j < ds; j++) {
-                c.descriptors.add(new DescriptorRecord(parseUuid(Json.str(
-                        Json.map(descriptors.get(j)), "uuid", ""))));
+                c.descriptors.add(new DescriptorRecord(parseUuid(FixtureJson.str(
+                        FixtureJson.map(descriptors.get(j)), "uuid", ""))));
             }
             s.characteristics.add(c);
         }

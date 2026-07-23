@@ -58,7 +58,7 @@ import java.util.concurrent.atomic.AtomicReference;
 /// reads answer with the last advertisement sighting.
 ///
 /// Internal to the native-backend implementation -- not a public API.
-public class NativeBlePeripheral extends BlePeripheral {
+class NativeBlePeripheral extends BlePeripheral {
 
     private final NativeBleBackend backend;
     private final String address;
@@ -254,7 +254,7 @@ public class NativeBlePeripheral extends BlePeripheral {
     }
 
     /// Maps the wire property names onto the GattCharacteristic bits.
-    public static int propertiesMask(List<Object> names) {
+    static int propertiesMask(List<Object> names) {
         int mask = 0;
         int size = names.size();
         for (int i = 0; i < size; i++) {

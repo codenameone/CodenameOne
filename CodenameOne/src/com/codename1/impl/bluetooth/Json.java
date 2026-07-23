@@ -31,71 +31,31 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/// Event decoder for the in-process native BLE engine (`libcn1ble`). The
-/// engine's commands are typed native calls, so nothing is serialized on the
-/// way out; only inbound events arrive as one JSON object per
-/// {@link NativeBleBridge#pollEvent}, with Base64-encoded
-/// characteristic/descriptor payloads decoded here.
-///
-/// Public only so the JavaSE simulator's fixture tooling can share the exact
-/// codec; it lives under `com.codename1.impl`, so it is excluded from the
-/// published API reference. Not a public API.
-public final class Json {
+/// Internal event decoder for the in-process native BLE engine
+/// (`libcn1ble`). The engine's commands are typed native calls, so nothing is
+/// serialized on the way out; only inbound events arrive as one JSON object
+/// per {@link NativeBleBridge#pollEvent}, with Base64-encoded
+/// characteristic/descriptor payloads decoded here. Package-private -- it is
+/// not part of any API.
+final class Json {
 
     private Json() {
     }
 
     /// Parses one event object.
-    public static Map<String, Object> parse(String text) throws IOException {
+    static Map<String, Object> parse(String text) throws IOException {
         JSONParser parser = new JSONParser();
         parser.setUseLongsInstance(true);
         parser.setUseBooleanInstance(true);
         return parser.parseJSON(new StringReader(text));
     }
 
-    /// Escapes a string for embedding as a JSON value.
-    public static String escape(String s) {
-        if (s == null) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder(s.length());
-        int len = s.length();
-        for (int i = 0; i < len; i++) {
-            char c = s.charAt(i);
-            switch (c) {
-                case '"':
-                    sb.append("\\\"");
-                    break;
-                case '\\':
-                    sb.append("\\\\");
-                    break;
-                case '\n':
-                    sb.append("\\n");
-                    break;
-                case '\r':
-                    sb.append("\\r");
-                    break;
-                case '\t':
-                    sb.append("\\t");
-                    break;
-                default:
-                    if (c < 0x20) {
-                        String t = "000" + Integer.toHexString(c);
-                        sb.append("\\u").append(t.substring(t.length() - 4));
-                    } else {
-                        sb.append(c);
-                    }
-            }
-        }
-        return sb.toString();
-    }
-
-    public static String str(Map<String, Object> m, String key, String def) {
+    static String str(Map<String, Object> m, String key, String def) {
         Object v = m.get(key);
         return v == null ? def : v.toString();
     }
 
-    public static long longVal(Map<String, Object> m, String key, long def) {
+    static long longVal(Map<String, Object> m, String key, long def) {
         Object v = m.get(key);
         if (v instanceof Number) {
             return ((Number) v).longValue();
@@ -109,11 +69,11 @@ public final class Json {
         return def;
     }
 
-    public static int intVal(Map<String, Object> m, String key, int def) {
+    static int intVal(Map<String, Object> m, String key, int def) {
         return (int) longVal(m, key, def);
     }
 
-    public static boolean boolVal(Map<String, Object> m, String key, boolean def) {
+    static boolean boolVal(Map<String, Object> m, String key, boolean def) {
         Object v = m.get(key);
         if (v instanceof Boolean) {
             return ((Boolean) v).booleanValue();
@@ -125,14 +85,14 @@ public final class Json {
     }
 
     @SuppressWarnings("unchecked")
-    public static List<Object> list(Map<String, Object> m, String key) {
+    static List<Object> list(Map<String, Object> m, String key) {
         Object v = m.get(key);
         return v instanceof List ? (List<Object>) v
                 : new ArrayList<Object>();
     }
 
     @SuppressWarnings("unchecked")
-    public static Map<String, Object> map(Object v) {
+    static Map<String, Object> map(Object v) {
         return v instanceof Map ? (Map<String, Object>) v
                 : new HashMap<String, Object>();
     }
@@ -145,7 +105,7 @@ public final class Json {
             ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
                     .toCharArray();
 
-    public static String encodeBase64(byte[] data) {
+    static String encodeBase64(byte[] data) {
         if (data == null || data.length == 0) {
             return "";
         }
@@ -171,7 +131,7 @@ public final class Json {
         return sb.toString();
     }
 
-    public static byte[] decodeBase64(String s) {
+    static byte[] decodeBase64(String s) {
         if (s == null || s.length() == 0) {
             return new byte[0];
         }
