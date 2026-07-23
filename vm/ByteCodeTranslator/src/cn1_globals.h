@@ -1304,7 +1304,11 @@ typedef struct CN1BibopPage {
     // page in O(1) -- without the per-slot walk -- whenever it can PROVE the page is
     // homogeneous. The fields are always present (so the struct layout is identical in
     // A/B builds); only the writes/reads are gated. See cn1BibopSweep for the proof.
-    JAVA_BOOLEAN gcAllocedSinceSweep;     // any alloc into the page since last sweep/reset
+    JAVA_BOOLEAN gcAllocedSinceSweep;     // any alloc into the page since last sweep/reset.
+                                          //  Alloc paths set it / the grace pass reads it
+                                          //  via relaxed __atomic ops (concurrent pair);
+                                          //  sweep/format access it plain -- they only
+                                          //  touch retired/pooled pages no mutator holds
                                           // (owner-thread single-writer; published to the
                                           //  GC via the sweep-stack release-push)
     JAVA_BOOLEAN gcNeedsReclaim;          // a survivor carries a finalizer or monitor ->
@@ -1475,9 +1479,13 @@ static inline JAVA_OBJECT cn1BibopFastAlloc(CODENAME_ONE_THREAD_STATE, int size,
             // fresh mark==-1 (grace-candidate) slots as homogeneous, and the grace
             // pass slot-scans exactly the flagged pages ("-1 slot present" implies
             // "allocated into since last sweep" -- the sweep converts every -1 it
-            // sees). Single plain store to the already-hot page header; pre-mark
-            // stores are published to the GC by the mark-start thread sync.
-            p->gcAllocedSinceSweep = JAVA_TRUE;
+            // sees). Relaxed atomic (compiles to the same plain store on the hot
+            // path) because the GRACE PASS reads this concurrently: pre-mark stores
+            // are ordered ahead of it by the mark-start thread pause, and a store
+            // it can still miss is by definition a during-mark allocation --
+            // SATB-covered this cycle and rescanned next cycle since only the
+            // sweep (never a concurrent phase) clears the flag.
+            __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
 #endif
             CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
             // allocationsSinceLastGC / totalAllocations (the isHighFrequencyGC heuristic)
@@ -1556,7 +1564,8 @@ static inline JAVA_OBJECT cn1BibopFastAllocNoZero(CODENAME_ONE_THREAD_STATE, int
             __atomic_store_n(&o->__codenameOneGcMark, -1, __ATOMIC_RELEASE);
             atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
 #ifndef CN1_BIBOP_NO_FASTSWEEP
-            p->gcAllocedSinceSweep = JAVA_TRUE;
+            // relaxed: concurrently read by the grace pass (see cn1BibopFastAlloc)
+            __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
 #endif
             CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
             return o;

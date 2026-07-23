@@ -24,11 +24,14 @@
 package com.bench;
 
 /**
- * Repro driver for issue 5425: a bursty small-object size class that goes
- * quiet across GC cycle boundaries. Fresh objects allocated into a page AFTER
- * that page's fresh-stack entry was consumed by the grace pass (same epoch)
- * are never grace-traced if the size class receives no allocation in the next
- * epoch before its grace pass. Run with -DCN1_GRACE_AUDIT to count them.
+ * Grace-completeness gate born from issue 5425: a bursty small-object size
+ * class allocates fresh objects WHILE the concurrent mark runs (System.gc is
+ * asynchronous), each holding the only reference to an older object, then
+ * goes quiet across the next GC cycle. Any grace scheme that tracks "pages
+ * with fresh slots" incrementally must still trace those objects; the
+ * fresh-page-stack scheme this driver was written against dropped them and
+ * the sweep freed their children while still referenced. Run with
+ * -DCN1_GRACE_AUDIT: every reported doomedChildren value must be zero.
  */
 public class GraceAudit {
     static class Node {
@@ -39,19 +42,9 @@ public class GraceAudit {
         long a, b, c, d, e, f, g, h, i2, j, k, l;
     }
 
-    static Object sink;
     static Object[] keep = new Object[256];
     static Object[] tmp = new Object[16];
     static long checksum;
-
-    // deterministic LCG so runs are comparable without java.util.Random
-    static long seed = 42;
-
-    static int next(int bound) {
-        seed = seed * 6364136223846793005L + 1442695040888963407L;
-        int v = (int) (seed >>> 33) % bound;
-        return v < 0 ? v + bound : v;
-    }
 
     public static void main(String[] args) throws Exception {
         for (int round = 0; round < 120; round++) {
@@ -65,8 +58,9 @@ public class GraceAudit {
                 }
             }
             // Kick a concurrent mark, then keep allocating fresh dropped nodes
-            // WHILE it runs: allocations landing after the grace pass consumed
-            // this page's fresh-stack entry stay unqueued for this epoch.
+            // WHILE it runs: some land after the grace pass already visited (or
+            // dismissed) this page, the window where queue/dedup-based grace
+            // schemes lose track of fresh objects.
             System.gc();
             for (int slice = 0; slice < 40; slice++) {
                 for (int i = 0; i < 8; i++) {
@@ -99,6 +93,6 @@ public class GraceAudit {
                 checksum += 3;
             }
         }
-        System.out.println("GRACE_AUDIT_DRIVER_DONE checksum=" + checksum + " sink=" + (sink == null));
+        System.out.println("GRACE_AUDIT_DRIVER_DONE checksum=" + checksum);
     }
 }

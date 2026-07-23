@@ -1293,8 +1293,13 @@ void codenameOneGCMark() {
     // page's last sweep (the sweep converts every -1 it sees to V), and EVERY
     // allocation path sets the flag before the mark-start thread sync publishes it
     // -- so a flag-FALSE page provably holds no fresh slot and is skipped without
-    // touching its slots. Only the sweep clears the flag, and it only processes
-    // retired (owner==0) pages, so no mutator/GC race on the flag exists. This
+    // touching its slots. The flag is read with a relaxed atomic (its writers
+    // mirror this; same machine code as the old plain access): pre-mark stores
+    // are ordered ahead of this pass by the mark-start thread pause, a store
+    // this read can still miss is by definition a during-mark allocation (SATB
+    // covers its links this cycle), and only the sweep -- never a phase running
+    // concurrently with mutators or with this pass -- clears the flag, so a
+    // missed store is re-observed next cycle. This
     // replaced a queue-of-fresh-pages scheme (issue 5425): queue-once-per-epoch
     // dedup left every allocation AFTER the queue was consumed (rest of the mark
     // plus the whole unbarriered inter-cycle window) untraced when the page was
@@ -1304,7 +1309,7 @@ void codenameOneGCMark() {
         CN1BibopPage* gp = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
         while(gp != 0) {
 #ifndef CN1_BIBOP_NO_FASTSWEEP
-            if(gp->gcAllocedSinceSweep == JAVA_FALSE) {
+            if(__atomic_load_n(&gp->gcAllocedSinceSweep, __ATOMIC_RELAXED) == JAVA_FALSE) {
                 gp = atomic_load_explicit(&gp->nextAll, memory_order_acquire);
                 continue;
             }
@@ -2008,6 +2013,15 @@ void cn1BibopBeginGcCycle(void) {
     // QA builds only: snapshot every page's cursor at mark start. Slots below the
     // snapshot existed before the grace pass ran, so a complete grace pass must
     // have traced every one of them that is still fresh at pre-sweep time.
+    // Mutators are still running here, so a snapshot may trail a page's true
+    // cursor by the allocations racing mark start. That is INTENTIONAL
+    // under-approximation: boundary slots are during-mark allocations -- the
+    // class the grace guarantee does not cover this cycle (SATB + the sticky
+    // dirty flag cover them) -- and excluding them keeps the audit free of
+    // false positives. The audited set still spans every clearly-pre-mark slot,
+    // which is exactly the population the issue-5425 bug dropped; snapshotting
+    // later (after the pause) would widen coverage by only those boundary slots
+    // while making benign mid-mark allocations report as misses.
     {
         CN1BibopPage* ap = atomic_load_explicit(&bibopAllPages, memory_order_acquire);
         while(ap != 0) {
@@ -2505,7 +2519,8 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
                 // mark) is fully initialized.
                 atomic_store_explicit(&p->bumpIndex, bi + 1, memory_order_release);
 #ifndef CN1_BIBOP_NO_FASTSWEEP
-                p->gcAllocedSinceSweep = JAVA_TRUE;
+                // relaxed: concurrently read by the grace pass (see cn1BibopFastAlloc)
+                __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
 #endif
                 CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
                 return o;
@@ -2522,7 +2537,8 @@ static JAVA_OBJECT cn1BibopAlloc(CODENAME_ONE_THREAD_STATE, int size, struct cla
     // free-list slot path
     cn1BibopInitSlot(threadStateData, o, size, parent);
 #ifndef CN1_BIBOP_NO_FASTSWEEP
-    p->gcAllocedSinceSweep = JAVA_TRUE;
+    // relaxed: concurrently read by the grace pass (see cn1BibopFastAlloc)
+    __atomic_store_n(&p->gcAllocedSinceSweep, JAVA_TRUE, __ATOMIC_RELAXED);
 #endif
     CN1_BIBOP_ACCOUNT_BYTES(threadStateData, p->slotSize);
     return o;
