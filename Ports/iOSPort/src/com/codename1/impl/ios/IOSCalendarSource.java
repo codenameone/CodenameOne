@@ -79,18 +79,14 @@ final class IOSCalendarSource extends LocalCalendarSource {
     public AsyncResource<Boolean>deleteEvent(String calendarId,String eventId,CalendarMutationScope scope,String version){boolean deleted=nativeInstance.calendarDeleteEvent(eventId,scope==null?0:scope.ordinal());if(deleted)fireChange(new CalendarChange(getId(),calendarId,eventId,CalendarChange.EntityType.EVENT,CalendarChange.ChangeType.DELETED));return value(Boolean.valueOf(deleted));}
     public AsyncResource<List<FreeBusyInterval>>queryFreeBusy(List<String>ids,Instant start,Instant end){
         final AsyncResource<List<FreeBusyInterval>>out=new AsyncResource<List<FreeBusyInterval>>();
-        queryEvents(new CalendarQuery().setStartTime(start).setEndTime(end)).ready(new SuccessCallback<CalendarPage<CalendarEvent>>(){
-            public void onSucess(CalendarPage<CalendarEvent>page){List<FreeBusyInterval>items=new ArrayList<FreeBusyInterval>();for(CalendarEvent event:page.getItems())if(event.getAvailability()!=CalendarEvent.Availability.FREE&&event.getStart()!=null&&event.getEnd()!=null&&!event.getStart().isAllDay())items.add(new FreeBusyInterval(event.getStart().getDateTime().toInstant(),event.getEnd().getDateTime().toInstant(),event.getAvailability()));out.complete(items);}
-        }).except(new SuccessCallback<Throwable>(){public void onSucess(Throwable error){out.error(error);}});
+        queryEvents(new CalendarQuery().setStartTime(start).setEndTime(end)).ready(new FreeBusyReady(out)).except(new ErrorForwarder<List<FreeBusyInterval>>(out));
         return out;
     }
     public AsyncResource<CalendarPage<CalendarTask>>queryTasks(CalendarQuery query){try{List<CalendarTask>out=new ArrayList<CalendarTask>();for(Map<String,Object>m:items(nativeInstance.calendarTasks(query==null?null:query.getCalendarId())))out.add(task(m));return value(new CalendarPage<CalendarTask>(out,null,String.valueOf(System.currentTimeMillis())));}catch(Exception ex){return failure(ex);}}
     public AsyncResource<CalendarTask>getTask(String calendarId,final String id){
         if(id==null)return failed(CalendarError.INVALID_ARGUMENT,"taskId required");
         final AsyncResource<CalendarTask>out=new AsyncResource<CalendarTask>();
-        queryTasks(new CalendarQuery().setCalendarId(calendarId)).ready(new SuccessCallback<CalendarPage<CalendarTask>>(){
-            public void onSucess(CalendarPage<CalendarTask>page){for(CalendarTask task:page.getItems())if(id.equals(task.getId())){out.complete(task);return;}out.error(new CalendarException(CalendarError.NOT_FOUND,"Task not found"));}
-        }).except(new SuccessCallback<Throwable>(){public void onSucess(Throwable error){out.error(error);}});
+        queryTasks(new CalendarQuery().setCalendarId(calendarId)).ready(new TaskReady(id,out)).except(new ErrorForwarder<CalendarTask>(out));
         return out;
     }
     public AsyncResource<CalendarTask>saveTask(CalendarTask task,CalendarMutationScope scope){try{Map<String,Object>m=new HashMap<String,Object>();m.put("id",task.getId());m.put("calendarId",task.getCalendarId());m.put("title",task.getTitle());m.put("notes",task.getDescription());m.put("completed",Boolean.valueOf(task.isCompleted()));putDate(m,"due",task.getDue());boolean create=task.getId()==null;CalendarTask saved=task(parseResult(nativeInstance.calendarSaveTask(JSONParser.toJson(m))));fireChange(new CalendarChange(getId(),saved.getCalendarId(),saved.getId(),CalendarChange.EntityType.TASK,create?CalendarChange.ChangeType.CREATED:CalendarChange.ChangeType.UPDATED));return value(saved);}catch(IOException ex){return failure(ex);}catch(CalendarException ex){return failure(ex);}}
@@ -100,6 +96,21 @@ final class IOSCalendarSource extends LocalCalendarSource {
     private static void putDate(Map<String,Object>m,String key,CalendarDateTime d){if(d==null)return;if(d.isAllDay()){m.put(key+"Date",d.getDate().toString());m.put(key+"AllDay",Boolean.TRUE);}else{m.put(key,Long.valueOf(d.getDateTime().toInstant().toEpochMilli()));m.put(key+"Zone",d.getDateTime().getZone().getId());}}
     private static CalendarDateTime date(Map<String,Object>m,String key,boolean allDay){String value=s(m,key+"Date");if(value!=null)return CalendarDateTime.allDay(LocalDate.parse(value));String zone=s(m,key+"Zone");return m.get(key)==null?null:CalendarDateTime.instant(Instant.ofEpochMilli(l(m,key)),ZoneId.of(zone==null?"UTC":zone));}
     private static CalendarAuthorizationStatus status(int value){return value==3?CalendarAuthorizationStatus.FULL:value==4?CalendarAuthorizationStatus.WRITE_ONLY:value==1?CalendarAuthorizationStatus.RESTRICTED:value==2?CalendarAuthorizationStatus.DENIED:CalendarAuthorizationStatus.NOT_DETERMINED;}
+    private static final class FreeBusyReady implements SuccessCallback<CalendarPage<CalendarEvent>>{
+        private final AsyncResource<List<FreeBusyInterval>>out;
+        FreeBusyReady(AsyncResource<List<FreeBusyInterval>>out){this.out=out;}
+        public void onSucess(CalendarPage<CalendarEvent>page){List<FreeBusyInterval>items=new ArrayList<FreeBusyInterval>();for(CalendarEvent event:page.getItems())if(event.getAvailability()!=CalendarEvent.Availability.FREE&&event.getStart()!=null&&event.getEnd()!=null&&!event.getStart().isAllDay())items.add(new FreeBusyInterval(event.getStart().getDateTime().toInstant(),event.getEnd().getDateTime().toInstant(),event.getAvailability()));out.complete(items);}
+    }
+    private static final class TaskReady implements SuccessCallback<CalendarPage<CalendarTask>>{
+        private final String id;private final AsyncResource<CalendarTask>out;
+        TaskReady(String id,AsyncResource<CalendarTask>out){this.id=id;this.out=out;}
+        public void onSucess(CalendarPage<CalendarTask>page){for(CalendarTask task:page.getItems())if(id.equals(task.getId())){out.complete(task);return;}out.error(new CalendarException(CalendarError.NOT_FOUND,"Task not found"));}
+    }
+    private static final class ErrorForwarder<T>implements SuccessCallback<Throwable>{
+        private final AsyncResource<T>out;
+        ErrorForwarder(AsyncResource<T>out){this.out=out;}
+        public void onSucess(Throwable error){out.error(error);}
+    }
     private static Map<String,Object>parse(String json)throws IOException{return JSONParser.parseJSON(json);}private static Map<String,Object>parseResult(String json)throws IOException,CalendarException{Map<String,Object>out=parse(json);if(out.get("error")!=null)throw new CalendarException(CalendarError.UNKNOWN,String.valueOf(out.get("error")));return out;}@SuppressWarnings("unchecked")private static List<Map<String,Object>>items(String json)throws IOException{return maps(parse(json).get("items"));}@SuppressWarnings("unchecked")private static List<Map<String,Object>>maps(Object v){List<Map<String,Object>>out=new ArrayList<Map<String,Object>>();if(v instanceof List)for(Object x:(List<Object>)v)if(x instanceof Map)out.add((Map<String,Object>)x);return out;}private static String s(Map<String,Object>m,String k){Object v=m.get(k);return v==null?null:String.valueOf(v);}private static long l(Map<String,Object>m,String k){Object v=m.get(k);return v instanceof Number?((Number)v).longValue():Long.parseLong(String.valueOf(v));}private static int i(Map<String,Object>m,String k){Object v=m.get(k);return v instanceof Number?((Number)v).intValue():Integer.parseInt(String.valueOf(v));}private static boolean b(Map<String,Object>m,String k){Object v=m.get(k);return Boolean.TRUE.equals(v)||"true".equals(String.valueOf(v));}
     private static <T>AsyncResource<T>value(T value){AsyncResource<T>out=new AsyncResource<T>();out.complete(value);return out;}private static <T>AsyncResource<T>failed(CalendarError type,String message){AsyncResource<T>out=new AsyncResource<T>();out.error(new CalendarException(type,message));return out;}private static <T>AsyncResource<T>failure(Throwable error){AsyncResource<T>out=new AsyncResource<T>();out.error(error instanceof CalendarException?error:new CalendarException(CalendarError.UNKNOWN,error.getMessage(),error));return out;}
 }
