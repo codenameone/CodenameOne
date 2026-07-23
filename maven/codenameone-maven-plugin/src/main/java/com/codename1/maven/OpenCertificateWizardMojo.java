@@ -1,6 +1,24 @@
 /*
- * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.maven;
 
@@ -193,7 +211,6 @@ public class OpenCertificateWizardMojo extends AbstractCN1Mojo {
         pb.directory(projectDir);
         pb.redirectErrorStream(true);
         pb.redirectOutput(ProcessBuilder.Redirect.appendTo(log));
-        configureLauncherEnvironment(pb);
         try {
             pb.start();
             getLog().info("Certificate Wizard launched in the background. Log: " + log.getAbsolutePath());
@@ -210,14 +227,11 @@ public class OpenCertificateWizardMojo extends AbstractCN1Mojo {
     File namedJavaLauncher(File runtimeDir) {
         File java = new File(javaExecutable());
         if (isWindows()) {
-            File launcher = new File(runtimeDir, "CertificateWizard.exe");
-            try {
-                FileUtils.copyFile(java, launcher);
-                return launcher;
-            } catch (IOException ex) {
-                getLog().debug("Unable to create Certificate Wizard launcher executable: " + ex.getMessage());
-                return java;
-            }
+            // Never copy javaw.exe out of the JDK: a copied launcher loses the JDK's
+            // bin directory as its DLL search anchor, so dependent native libraries
+            // can bind to wrong DLLs from System32/PATH and break rendering
+            // (issue #5443). Launch the real javaw.exe instead.
+            return java;
         }
         File launcher = new File(runtimeDir, "Certificate Wizard");
         try {
@@ -228,16 +242,6 @@ public class OpenCertificateWizardMojo extends AbstractCN1Mojo {
             getLog().debug("Unable to create Certificate Wizard launcher symlink: " + ex.getMessage());
             return java;
         }
-    }
-
-    private void configureLauncherEnvironment(ProcessBuilder pb) {
-        if (!isWindows()) {
-            return;
-        }
-        String javaBin = new File(System.getProperty("java.home"), "bin").getAbsolutePath();
-        String path = pb.environment().get("PATH");
-        pb.environment().put("PATH", path == null || path.length() == 0
-                ? javaBin : javaBin + File.pathSeparator + path);
     }
 
     List<String> desktopIdentityArgs(File jar, File runtimeDir) {

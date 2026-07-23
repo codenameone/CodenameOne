@@ -14663,30 +14663,45 @@ public class JavaSEPort extends CodenameOneImplementation {
             }
         } else {
             if(file.indexOf("%") > 0) {
-                // this is an encoded file URL convert it to a regular file
+                // likely an encoded file URL; decode it when it parses, but fall
+                // back to plain prefix stripping for paths that merely contain a
+                // literal % (or spaces/backslashes that java.net.URI rejects)
+                // instead of throwing and killing the caller
                 try {
-                    File f = new File(new URI(file));
-                    return f.getAbsolutePath();
+                    return new File(new URI(file)).getAbsolutePath();
                 } catch(Exception err) {
-                    Log.e(err);
-                    throw new RuntimeException(err);
+                    // not a parseable encoded URL - treat as a plain path below
                 }
             }
         }
-        
+
         if(file.startsWith("file://home")) {
             return System.getProperty("user.home").replace('\\', '/') + File.separator + appHomeDir + file.substring(11).replace('/', File.separatorChar);
         }
         if (file.startsWith("file:///")) {
-            return file.substring(7);
+            return stripWindowsDriveSlash(file.substring(7));
         }
         if (file.startsWith("file://")) {
-            return file.substring(6);
+            return stripWindowsDriveSlash(file.substring(6));
         }
         if (file.startsWith("file:/")) {
-            return file.substring(5);
+            return stripWindowsDriveSlash(file.substring(5));
         }
         return file;
+    }
+
+    /**
+     * A file URL for a Windows path (file:///C:/Users/...) strips to
+     * /C:/Users/...; java.io.File treats the leading slash as drive-relative,
+     * resolving to C:\C:\Users\... - drop it so drive-letter paths survive the
+     * URL round trip. No-op for Unix paths and everything else.
+     */
+    static String stripWindowsDriveSlash(String path) {
+        if (path.length() > 2 && path.charAt(0) == '/' && path.charAt(2) == ':'
+                && Character.isLetter(path.charAt(1))) {
+            return path.substring(1);
+        }
+        return path;
     }
 
     /**

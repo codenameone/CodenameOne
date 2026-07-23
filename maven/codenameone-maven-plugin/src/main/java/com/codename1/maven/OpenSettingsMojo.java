@@ -1,6 +1,24 @@
 /*
- * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
  */
 package com.codename1.maven;
 
@@ -71,7 +89,29 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
         java.createClasspath().setPath(joinClasspath(toolClasspath.files));
         configureDesktopIdentity(java, toolClasspath.primaryJar, runtimeDir);
         java.createJvmarg().setValue("-Dsettings.input=" + inputFile.getAbsolutePath());
+        for (String arg : forwardedSettingsProperties()) {
+            java.createJvmarg().setValue(arg);
+        }
         java.executeJava();
+    }
+
+    /**
+     * Forwards {@code settings.*} system properties (screenshot capture, forced
+     * section/dark-mode, etc.) from the Maven invocation to the spawned Settings
+     * JVM so {@code mvn cn1:settings -Dsettings.screenshot=out.png} works. The
+     * {@code settings.input} binding and {@code settings.spawn} launch flag are
+     * owned by this mojo and never forwarded.
+     */
+    List<String> forwardedSettingsProperties() {
+        List<String> args = new ArrayList<String>();
+        for (String key : System.getProperties().stringPropertyNames()) {
+            if (key.startsWith("settings.")
+                    && !key.equals("settings.input")
+                    && !key.equals("settings.spawn")) {
+                args.add("-D" + key + "=" + System.getProperty(key));
+            }
+        }
+        return args;
     }
 
     @Override
@@ -109,6 +149,7 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
         command.add(namedJavaLauncher(runtimeDir).getAbsolutePath());
         command.addAll(desktopIdentityArgs(toolClasspath.primaryJar, runtimeDir));
         command.add("-Dsettings.input=" + inputFile.getAbsolutePath());
+        command.addAll(forwardedSettingsProperties());
         command.add("-cp");
         command.add(joinClasspath(toolClasspath.files));
         command.add("com.codename1.settings.CodenameOneSettingsLauncher");
@@ -116,7 +157,6 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
         pb.directory(projectDir);
         pb.redirectErrorStream(true);
         pb.redirectOutput(ProcessBuilder.Redirect.appendTo(log));
-        configureLauncherEnvironment(pb);
         try {
             pb.start();
             getLog().info("Codename One Settings launched in the background. Log: " + log.getAbsolutePath());
@@ -154,14 +194,12 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
     File namedJavaLauncher(File runtimeDir) {
         File java = new File(javaExecutable());
         if (isWindows()) {
-            File launcher = new File(runtimeDir, "CodenameOneSettings.exe");
-            try {
-                FileUtils.copyFile(java, launcher);
-                return launcher;
-            } catch (IOException ex) {
-                getLog().debug("Unable to create Settings launcher executable: " + ex.getMessage());
-                return java;
-            }
+            // Never copy javaw.exe out of the JDK: a copied launcher loses the JDK's
+            // bin directory as its DLL search anchor, so dependent native libraries
+            // (fontmanager/freetype and friends) can bind to wrong DLLs from
+            // System32/PATH and break rendering (issue #5443). The cosmetic Task
+            // Manager name is not worth a broken JVM - launch the real javaw.exe.
+            return java;
         }
         File launcher = new File(runtimeDir, "Codename One Settings");
         try {
@@ -189,16 +227,6 @@ public class OpenSettingsMojo extends AbstractCN1Mojo {
             getLog().debug("Unable to extract Settings dock icon: " + ex.getMessage());
             return null;
         }
-    }
-
-    private void configureLauncherEnvironment(ProcessBuilder pb) {
-        if (!isWindows()) {
-            return;
-        }
-        String javaBin = new File(System.getProperty("java.home"), "bin").getAbsolutePath();
-        String path = pb.environment().get("PATH");
-        pb.environment().put("PATH", path == null || path.length() == 0
-                ? javaBin : javaBin + File.pathSeparator + path);
     }
 
     void writeBinding(File inputFile, File projectDir) throws MojoExecutionException {
