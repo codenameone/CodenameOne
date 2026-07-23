@@ -221,6 +221,7 @@ import java.net.ServerSocket;
 import java.security.MessageDigest;
 import java.text.ParseException;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.net.ssl.HttpsURLConnection;
 import javax.xml.parsers.ParserConfigurationException;
 
@@ -232,6 +233,8 @@ import org.xml.sax.SAXException;
 
 public class AndroidImplementation extends CodenameOneImplementation implements IntentResultListener {
     private AndroidCalendarSource calendarSource;
+    private static final AtomicLong V3_NOTIFICATION_SEQUENCE = new AtomicLong();
+
     public static final Thread.UncaughtExceptionHandler exceptionHandler = new Thread.UncaughtExceptionHandler() {
         @Override
         public void uncaughtException(Thread t, Throwable e) {
@@ -861,7 +864,18 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             NotificationManager manager = (NotificationManager)
                     context.getSystemService(Context.NOTIFICATION_SERVICE);
             setNotificationChannel(manager, builder, context);
-            manager.notify(1, builder.build());
+            String collapseKey = message.optString("collapseKey", null);
+            String messageId = message.optString("id", null);
+            String notificationTag;
+            if (collapseKey != null && collapseKey.length() > 0) {
+                notificationTag = "CN1_PUSH_V3_COLLAPSE:" + collapseKey;
+            } else if (messageId != null && messageId.length() > 0) {
+                notificationTag = "CN1_PUSH_V3_MESSAGE:" + messageId;
+            } else {
+                notificationTag = "CN1_PUSH_V3_EPHEMERAL:" + System.currentTimeMillis()
+                        + ":" + V3_NOTIFICATION_SEQUENCE.incrementAndGet();
+            }
+            manager.notify(notificationTag, 0, builder.build());
         } catch (Exception error) {
             error.printStackTrace();
         }
