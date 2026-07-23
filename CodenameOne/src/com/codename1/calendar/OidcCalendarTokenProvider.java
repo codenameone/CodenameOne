@@ -41,7 +41,7 @@ public final class OidcCalendarTokenProvider implements CalendarTokenProvider {
 
     private OidcTokens tokens;
 
-    private volatile TokenListener listener;
+    private TokenListener listener;
 
     public OidcCalendarTokenProvider(OidcClient client, OidcTokens initialTokens) {
         if (client == null) {
@@ -51,7 +51,7 @@ public final class OidcCalendarTokenProvider implements CalendarTokenProvider {
         this.tokens = initialTokens;
     }
 
-    public OidcCalendarTokenProvider setTokenListener(TokenListener listener) {
+    public synchronized OidcCalendarTokenProvider setTokenListener(TokenListener listener) {
         this.listener = listener;
         return this;
     }
@@ -83,10 +83,11 @@ public final class OidcCalendarTokenProvider implements CalendarTokenProvider {
 
             @Override
             public void onSucess(OidcTokens fresh) {
+                TokenListener currentListener;
                 synchronized (OidcCalendarTokenProvider.this) {
                     tokens = fresh;
+                    currentListener = listener;
                 }
-                TokenListener currentListener = listener;
                 if (currentListener != null) {
                     currentListener.tokensUpdated(fresh);
                 }
