@@ -14,6 +14,7 @@ import os
 import plistlib
 import re
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -53,21 +54,26 @@ CHROME_INFO = Path("/Applications/Google Chrome.app/Contents/Info.plist")
 
 
 def chrome_major() -> int | None:
+    bundle_major = None
     try:
         with CHROME_INFO.open("rb") as stream:
             version = str(plistlib.load(stream)["CFBundleShortVersionString"])
         match = re.match(r"(\d+)\.", version)
         if match:
-            return int(match.group(1))
-    except Exception:
-        pass
+            bundle_major = int(match.group(1))
+    except (OSError, KeyError, TypeError, ValueError, plistlib.InvalidFileException):
+        # Fall back to the executable when the app bundle metadata is absent
+        # or malformed, as it can be in minimal CI and non-macOS environments.
+        bundle_major = None
+    if bundle_major is not None:
+        return bundle_major
     try:
         output = subprocess.check_output(
             [CHROME, "--version"], stderr=subprocess.DEVNULL, timeout=15
         ).decode()
         match = re.search(r"(\d+)\.\d+\.\d+", output)
         return int(match.group(1)) if match else None
-    except Exception:
+    except (OSError, subprocess.SubprocessError, UnicodeDecodeError):
         return None
 
 
@@ -620,10 +626,6 @@ class StudioUploader:
         if len(items) != 2:
             raise RuntimeError("expected one video and one subscribe end-screen element")
         video_item = max(items, key=lambda item: item.rect["width"] / item.rect["height"])
-        subscribe_item = min(
-            items, key=lambda item: abs(item.rect["width"] / item.rect["height"] - 1)
-        )
-
         ActionChains(self.driver).move_to_element(video_item).click().perform()
         already_targeted = any(
             target_title in row.text for row in self.visible("ytve-endscreen-row")
@@ -1465,7 +1467,7 @@ def main() -> int:
                 # title-only wait can therefore capture a visually empty page
                 # and misreport a caption failure even though the authored
                 # track was published. Wait for the table's semantic content.
-                captions_body = wait_until(
+                wait_until(
                     lambda: (
                         body if "English" in body and any(
                             marker in body
@@ -1475,10 +1477,7 @@ def main() -> int:
                     90,
                     f"authored English captions for {video_id}",
                 )
-                captions = True
                 uploader.screenshot("captions-persisted")
-                if not captions:
-                    raise RuntimeError(f"{key} authored English captions were not visible")
                 details[key] = {
                     "videoId": video_id,
                     "privacy": "private",
@@ -1771,7 +1770,9 @@ def main() -> int:
             try:
                 uploader.click_text_button("Show more", 15)
             except TimeoutException:
-                pass
+                # The control is absent when Studio has already expanded the
+                # optional metadata section; the inspection can continue.
+                print("Show more is absent; inspecting expanded details", file=sys.stderr)
             uploader.driver.execute_script(
                 "window.scrollTo(0, document.documentElement.scrollHeight)"
             )
@@ -1948,8 +1949,13 @@ def main() -> int:
             except Exception:
                 try:
                     uploader.screenshot("upload-failed")
-                except WebDriverException:
-                    pass
+                except WebDriverException as screenshot_error:
+                    # Preserve the original upload failure even if the browser
+                    # has already closed and diagnostic capture also fails.
+                    print(
+                        f"warning: could not capture upload failure: {screenshot_error}",
+                        file=sys.stderr,
+                    )
                 raise
     finally:
         uploader.close()
