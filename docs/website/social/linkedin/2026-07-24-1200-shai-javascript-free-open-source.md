@@ -1,13 +1,11 @@
 ---
 title: "The Codename One JavaScript port is now free and open source"
-slug: 2026-07-27-0300-shai-javascript-free-open-source
+slug: 2026-07-24-1200-shai-javascript-free-open-source
 platform: linkedin
 account: shai
 source_slug: javascript-free-open-source
-publish_at: '2026-07-27T03:00:00'
+publish_at: '2026-07-24T12:00:00'
 timezone: Asia/Jerusalem
-review_by: '2026-07-24'
-status: draft
 image: /blog/javascript-free-open-source.jpg
 ---
 

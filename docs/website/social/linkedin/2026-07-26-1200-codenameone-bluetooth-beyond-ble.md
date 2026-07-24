@@ -1,13 +1,11 @@
 ---
 title: "Bluetooth support across every Codename One target"
-slug: 2026-07-28-0300-codenameone-bluetooth-beyond-ble
+slug: 2026-07-26-1200-codenameone-bluetooth-beyond-ble
 platform: linkedin
 account: codenameone
 source_slug: bluetooth-beyond-ble
-publish_at: '2026-07-28T03:00:00'
+publish_at: '2026-07-26T12:00:00'
 timezone: Asia/Jerusalem
-review_by: '2026-07-24'
-status: draft
 image: /blog/bluetooth-beyond-ble.jpg
 ---
 

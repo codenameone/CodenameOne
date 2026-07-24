@@ -68,6 +68,12 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Validate LinkedIn queue inputs
+        if: steps.detect.outputs.has_posts == 'true'
+        run: |
+          python3 scripts/website/test_queue_social_posts.py
+          python3 scripts/website/queue_social_posts.py --validate-only
+
       - name: Install python-markdown
         if: steps.detect.outputs.has_posts == 'true'
         run: pip install --user 'markdown==3.7'

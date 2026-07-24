@@ -6,8 +6,6 @@ account: shai
 source_slug: codename-one-mcp-server
 publish_at: '2026-07-21T12:00:00'
 timezone: Asia/Jerusalem
-review_by: '2026-07-17'
-status: approved
 image: /blog/codename-one-mcp-server.jpg
 ---
 

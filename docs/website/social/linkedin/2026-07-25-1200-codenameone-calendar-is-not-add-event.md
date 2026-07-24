@@ -1,13 +1,11 @@
 ---
 title: "Calendar API with local calendars, cloud sync, and conflict handling"
-slug: 2026-07-27-1200-codenameone-calendar-is-not-add-event
+slug: 2026-07-25-1200-codenameone-calendar-is-not-add-event
 platform: linkedin
 account: codenameone
 source_slug: calendar-is-not-add-event
-publish_at: '2026-07-27T12:00:00'
+publish_at: '2026-07-25T12:00:00'
 timezone: Asia/Jerusalem
-review_by: '2026-07-24'
-status: draft
 image: /blog/calendar-is-not-add-event.jpg
 ---
 

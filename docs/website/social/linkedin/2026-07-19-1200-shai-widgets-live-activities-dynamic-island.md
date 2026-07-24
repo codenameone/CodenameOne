@@ -6,8 +6,6 @@ account: shai
 source_slug: widgets-live-activities-dynamic-island
 publish_at: '2026-07-19T12:00:00'
 timezone: Asia/Jerusalem
-review_by: '2026-07-17'
-status: approved
 image: /blog/widgets-live-activities-dynamic-island.jpg
 ---
 

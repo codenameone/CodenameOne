@@ -6,8 +6,6 @@ account: shai
 source_slug: pixel-perfect-is-a-test
 publish_at: '2026-07-17T18:00:00'
 timezone: Asia/Jerusalem
-review_by: '2026-07-17'
-status: approved
 image: /blog/pixel-perfect-is-a-test.jpg
 ---
 
