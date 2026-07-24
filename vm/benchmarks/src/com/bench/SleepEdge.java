@@ -49,8 +49,17 @@ public class SleepEdge {
         parked.start();
         Thread.sleep(300);
         boolean stillParked = parked.isAlive();
-        System.out.println("small_elapsed=" + elapsed + " parkedAlive=" + stillParked);
-        System.out.println(elapsed >= 50 && elapsed < 2000 && stillParked
+        // Negative millis must throw IllegalArgumentException (JDK contract),
+        // not return immediately or park.
+        boolean negativeThrew = false;
+        try {
+            Thread.sleep(-1);
+        } catch (IllegalArgumentException e) {
+            negativeThrew = true;
+        }
+        System.out.println("small_elapsed=" + elapsed + " parkedAlive=" + stillParked
+                + " negativeThrew=" + negativeThrew);
+        System.out.println(elapsed >= 50 && elapsed < 2000 && stillParked && negativeThrew
                 ? "SLEEP_EDGE_OK" : "SLEEP_EDGE_FAIL");
         System.exit(0);
     }

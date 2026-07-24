@@ -2080,7 +2080,10 @@ static JAVA_LONG cn1SleepNowMicros(void) {
 #endif
 }
 
-JAVA_VOID java_lang_Thread_sleep___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG millis) {
+// Bound to Thread.sleepImpl: the public Thread.sleep(long) is Java code that
+// throws IllegalArgumentException for negative millis (per the JDK contract)
+// before delegating here, so millis is always >= 0 at this point.
+JAVA_VOID java_lang_Thread_sleepImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG millis) {
     // Park per the CN1_YIELD_THREAD contract (cn1_globals.h): capture SP +
     // callee-saved registers FIRST, then publish threadActive=FALSE. Under
     // CN1_CONSERVATIVE_GC_ROOTS this lets the collector scan the sleeper's

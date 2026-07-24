@@ -1821,6 +1821,15 @@ long long cn1_instr_allocCount = 0;
 // long long, NOT long: on the Windows LLP64 target long is 32-bit and this
 // counter accumulates raw allocation bytes between cycle resets.
 static _Atomic long long cn1LegacyBytesSinceGc = 0;
+// One-shot per-cycle latch for the legacy volume trigger. The trigger is
+// LEVEL-triggered on the counter -- so a crossing that lands while the
+// allocating thread is inside a native-allocation bracket (skipped below when
+// conservative roots are off) is simply retried by the next out-of-bracket
+// legacy allocation on ANY thread, instead of being lost until the GC thread's
+// idle wake -- but LATCHED so the async System.gc() (a lock+notify) is
+// scheduled at most once per cycle window, not on every allocation after the
+// crossing. Cleared in cn1BibopBeginGcCycle after the counter reset.
+static _Atomic int cn1LegacyGcScheduled = 0;
 #endif
 
 JAVA_BOOLEAN java_lang_System_isHighFrequencyGC___R_boolean(CODENAME_ONE_THREAD_STATE) {
@@ -2078,6 +2087,10 @@ void cn1BibopBeginGcCycle(void) {
     // lands either before the swap (covered by the cycle that is starting) or
     // after it (charged to the next cycle) -- never dropped.
     (void)atomic_exchange_explicit(&cn1LegacyBytesSinceGc, 0, memory_order_acq_rel);
+    // Latch AFTER the counter: an allocator racing between the two exchanges
+    // still sees the old latch and skips, so the fresh latch can never be
+    // consumed by bytes just charged to the cycle that is starting.
+    (void)atomic_exchange_explicit(&cn1LegacyGcScheduled, 0, memory_order_acq_rel);
 #ifdef CN1_GRACE_AUDIT
     // QA builds only: snapshot every page's cursor at mark start. Slots below the
     // snapshot existed before the grace pass ran, so a complete grace pass must
@@ -3952,20 +3965,21 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     // asynchronous (sets forceGc + notifies the GC thread) exactly as in the
     // BiBOP path. nativeAllocationMode save/restore matches cn1BibopMaybeGc:
     // we may already be inside a caller's native-allocation bracket.
-    // EDGE-triggered on the threshold crossing: level-triggering here would
-    // call System.gc() (a lock+notify) on EVERY legacy allocation between the
-    // crossing and the cycle start that resets the counter -- avoidable
-    // overhead that is itself a mini-storm on large-array churn. At most one
-    // schedule per cycle window; a crossing that lands while a cycle is
-    // already running just sets forceGc for the GC thread's next loop pass
-    // (which is why there is deliberately no !gcCurrentlyRunning suppression:
-    // suppressing would LOSE the edge and delay collection up to the 30s
-    // idle wait).
+    // LEVEL-triggered on volume, LATCHED to one schedule per cycle window
+    // (cn1LegacyGcScheduled, cleared at cycle begin). Level-triggering means a
+    // crossing suppressed by the native-bracket gate below is retried by the
+    // next out-of-bracket legacy allocation on any thread -- a pure edge
+    // trigger would lose that crossing permanently (prev already above the
+    // threshold forever after) and delay collection up to the GC thread's 30s
+    // idle wait. The latch supplies what edge-triggering was buying: no
+    // per-allocation System.gc() (lock+notify) spam after the crossing. A
+    // crossing that lands while a cycle is already running just sets forceGc
+    // for the GC thread's next loop pass (deliberately no !gcCurrentlyRunning
+    // suppression -- the latch makes it redundant anyway).
     long long prevLegacyBytes = atomic_fetch_add_explicit(&cn1LegacyBytesSinceGc,
                                                           (long long)size,
                                                           memory_order_relaxed);
-    if(prevLegacyBytes <= CN1_LEGACY_GC_TRIGGER_BYTES
-       && prevLegacyBytes + (long long)size > CN1_LEGACY_GC_TRIGGER_BYTES
+    if(prevLegacyBytes + (long long)size > CN1_LEGACY_GC_TRIGGER_BYTES
        && constantPoolObjects != 0
 #ifndef CN1_CONSERVATIVE_GC_ROOTS
        // Mirror cn1BibopMaybeGc's gate exactly: without conservative roots a
@@ -3976,11 +3990,16 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
        // natives (the same starvation the BiBOP comment documents).
        && !threadStateData->nativeAllocationMode
 #endif
-       ) {
-        JAVA_BOOLEAN wasNam = threadStateData->nativeAllocationMode;
-        threadStateData->nativeAllocationMode = JAVA_TRUE;
-        java_lang_System_gc__(threadStateData);
-        threadStateData->nativeAllocationMode = wasNam;
+       && atomic_load_explicit(&cn1LegacyGcScheduled, memory_order_relaxed) == 0) {
+        int expectedLatch = 0;
+        if(atomic_compare_exchange_strong_explicit(&cn1LegacyGcScheduled, &expectedLatch, 1,
+                                                   memory_order_acq_rel,
+                                                   memory_order_relaxed)) {
+            JAVA_BOOLEAN wasNam = threadStateData->nativeAllocationMode;
+            threadStateData->nativeAllocationMode = JAVA_TRUE;
+            java_lang_System_gc__(threadStateData);
+            threadStateData->nativeAllocationMode = wasNam;
+        }
     }
 #endif
     return o;
