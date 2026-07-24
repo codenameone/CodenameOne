@@ -263,13 +263,12 @@ int usleep(unsigned int usec) {
 long long cn1_monotonic_micros(void) {
     /* QPC is Win32's monotonic clock. The divide is split so ticks * 1e6
        cannot overflow 64 bits at multi-GHz tick rates over long uptimes.
-       The lazy freq init is benignly racy: every writer stores the same
-       boot-constant value. */
-    static LARGE_INTEGER freq;
+       No cached static for the frequency: QueryPerformanceFrequency is a
+       cheap userspace read of a boot constant, and a lazily-written shared
+       static would be a formal C data race across concurrent sleepers. */
+    LARGE_INTEGER freq;
     LARGE_INTEGER count;
-    if(freq.QuadPart == 0) {
-        QueryPerformanceFrequency(&freq);
-    }
+    QueryPerformanceFrequency(&freq);
     QueryPerformanceCounter(&count);
     return (count.QuadPart / freq.QuadPart) * 1000000LL
          + ((count.QuadPart % freq.QuadPart) * 1000000LL) / freq.QuadPart;
