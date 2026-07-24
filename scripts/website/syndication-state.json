@@ -1146,6 +1146,18 @@
         "source_slug": "tested-port-support",
         "scheduled_at": "2026-07-22T09:00:00+00:00"
       }
+    },
+    "pixel-perfect-is-a-test": {
+      "hashnode": {
+        "url": "https://hashnode.com/edit/cmrz2ih9400000ahx0rcydwno",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6a637dfe3bd75cc42a7ac5d5",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-07-24T15:01:14+00:00"
+      }
     }
   }
 }
