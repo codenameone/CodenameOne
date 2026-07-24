@@ -39,12 +39,14 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 /// Explicit v3 client binding. The application main class does not implement `PushCallback`.
 public final class PushClient {
     private static final int MAX_PENDING_MESSAGES = 100;
     private static final List<String> pendingMessages = new ArrayList<String>();
-    private static volatile PushClient active;
+    private static final AtomicReference<PushClient> active =
+            new AtomicReference<PushClient>();
 
     private final String appId;
     private final PushListener listener;
@@ -74,7 +76,7 @@ public final class PushClient {
             List<String> replay;
             synchronized (pendingMessages) {
                 if (pendingMessages.isEmpty()) {
-                    active = this;
+                    active.set(this);
                     CodenameOneImplementation.setPushCallback(compatibilityCallback);
                     break;
                 }
@@ -111,20 +113,21 @@ public final class PushClient {
 
     /// Used by generated native bootstraps to find the explicit callback binding.
     public static PushCallback getActiveCallback() {
-        return active == null ? null : active.compatibilityCallback;
+        PushClient client = active.get();
+        return client == null ? null : client.compatibilityCallback;
     }
 
     /// Returns true when a v3 binding can receive a native push immediately.
     public static boolean hasActiveClient() {
-        return active != null;
+        return active.get() != null;
     }
 
     /// Native/custom transport entry point for an encoded v3 envelope.
     public static void dispatch(String envelopeJson) {
-        PushClient client = active;
+        PushClient client = active.get();
         if (client == null) {
             synchronized (pendingMessages) {
-                client = active;
+                client = active.get();
                 if (client == null) {
                     if (pendingMessages.size() == MAX_PENDING_MESSAGES) {
                         pendingMessages.remove(0);
@@ -216,8 +219,7 @@ public final class PushClient {
             unregisterManaged();
         }
         subscription = null;
-        if (this.equals(active)) {
-            active = null;
+        if (active.compareAndSet(this, null)) {
             CodenameOneImplementation.setPushCallback(null);
         }
     }
@@ -305,10 +307,7 @@ public final class PushClient {
     }
 
     private static final class ManagedUnregisterRequest extends ConnectionRequest {
-        private final String subscriptionId;
-
         ManagedUnregisterRequest(String appId, String subscriptionId) {
-            this.subscriptionId = subscriptionId;
             setUrl(endpoint("/subscriptions/") + subscriptionId);
             setHttpMethod("DELETE");
             addRequestHeader("X-CN1-Push-App", appId);
@@ -316,7 +315,9 @@ public final class PushClient {
         }
 
         private void removePersistedId() {
-            if (subscriptionId.equals(Preferences.get("push_v3_subscription", null))) {
+            String persistedId = Preferences.get("push_v3_subscription", null);
+            if (persistedId != null
+                    && getUrl().equals(endpoint("/subscriptions/") + persistedId)) {
                 Preferences.delete("push_v3_subscription");
             }
         }
@@ -331,16 +332,6 @@ public final class PushClient {
             if (code == 404) {
                 removePersistedId();
             }
-        }
-
-        @Override
-        public boolean equals(Object value) {
-            return super.equals(value);
-        }
-
-        @Override
-        public int hashCode() {
-            return super.hashCode();
         }
     }
 
