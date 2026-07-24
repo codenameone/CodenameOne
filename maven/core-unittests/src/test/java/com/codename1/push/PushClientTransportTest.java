@@ -110,6 +110,34 @@ class PushClientTransportTest extends UITestBase {
     }
 
     @FormTest
+    void managedRegistrationSinkMirrorsWithoutSuppressingBuildCloud() {
+        RecordingSink sink = new RecordingSink();
+        PushClient client = track(PushClient.builder("managed-app")
+                .listener(new RecordingListener()).registrationSink(sink).build());
+        client.register();
+
+        PushClient.getActiveCallback().registeredForPush("cn1-fcm-managed-token");
+
+        assertNotNull(sink.registered);
+        assertEquals("managed-token", sink.registered.getToken());
+        List<ConnectionRequest> requests = implementation.getQueuedRequests();
+        assertEquals(1, requests.size());
+        assertTrue(requests.get(0).isPost());
+        assertTrue(requests.get(0).getUrl().endsWith("/subscriptions"));
+
+        Preferences.set("push_v3_subscription", "managed-subscription");
+        client.unregister();
+        activeClient = null;
+
+        assertSame(sink.registered, sink.unregistered);
+        requests = implementation.getQueuedRequests();
+        assertEquals(2, requests.size());
+        assertEquals("DELETE", requests.get(1).getHttpMethod());
+        assertTrue(requests.get(1).getUrl().endsWith(
+                "/subscriptions/managed-subscription"));
+    }
+
+    @FormTest
     void coldStartReplayAppliesSurfaceCommandsAtTheNativeSeam() {
         RecordingBridge bridge = new RecordingBridge();
         Surfaces.setBridge(bridge);

@@ -153,7 +153,8 @@ public final class PushClient {
         subscription = value;
         if (registrationSink != null) {
             registrationSink.registered(value);
-        } else if (transport == null) {
+        }
+        if (transport == null) {
             registerManaged(value);
         }
         if (listener != null) {
@@ -215,7 +216,8 @@ public final class PushClient {
         }
         if (subscription != null && registrationSink != null) {
             registrationSink.unregistered(subscription);
-        } else if (transport == null) {
+        }
+        if (transport == null) {
             unregisterManaged();
         }
         subscription = null;

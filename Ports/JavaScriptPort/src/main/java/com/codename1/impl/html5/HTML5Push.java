@@ -156,6 +156,9 @@ public class HTML5Push {
     }
     
     static void registerPush() {
+        final PushCallback typedCallback =
+                com.codename1.push.PushClient.getActiveCallback();
+        final boolean typedEnvelope = typedCallback != null;
         PushRegisterSuccessCallback onSuccess = new PushRegisterSuccessCallback() {
 
             @Override
@@ -163,9 +166,11 @@ public class HTML5Push {
                 final String id = _id.stringValue();
                 HTML5Implementation.callSerially(new Runnable() {
                     public void run() {
-                        PushCallback active = com.codename1.push.PushClient.getActiveCallback();
-                        if (active != null) active.registeredForPush(id);
-                        else HTML5Implementation.getInstance()._registerServerPush(id);
+                        if (typedEnvelope) {
+                            typedCallback.registeredForPush(id);
+                        } else {
+                            HTML5Implementation.getInstance()._registerServerPush(id);
+                        }
                     }
                 });
             }
@@ -175,8 +180,8 @@ public class HTML5Push {
 
             @Override
             public void onPush(final JSObject data) {
-                if (com.codename1.push.PushClient.getActiveCallback() != null) {
-                    com.codename1.push.PushClient.dispatch(stringify(data));
+                if (typedEnvelope) {
+                    typedCallback.push(stringify(data));
                     return;
                 }
                 //System.out.println("In onPush");
@@ -263,7 +268,12 @@ public class HTML5Push {
                 final String message = _message.stringValue();
                 HTML5Implementation.callSerially(new Runnable() {
                     public void run() {
-                        HTML5Implementation.getInstance()._sendPushRegistrationError(message, -1);
+                        if (typedEnvelope) {
+                            typedCallback.pushRegistrationError(message, -1);
+                        } else {
+                            HTML5Implementation.getInstance()
+                                    ._sendPushRegistrationError(message, -1);
+                        }
                     }
                 });
                 
@@ -275,6 +285,6 @@ public class HTML5Push {
             pushActionCategories = convertPushActionCategoriesToJSArray(((PushActionsProvider)pushCallback).getPushActionCategories());
         }
         registerPushNative(onSuccess, onFail, onPush, pushActionCategories,
-                com.codename1.push.PushClient.getActiveCallback() != null);
+                typedEnvelope);
     }
 }
