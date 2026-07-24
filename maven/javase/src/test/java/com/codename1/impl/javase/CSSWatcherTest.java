@@ -105,19 +105,12 @@ class CSSWatcherTest {
 
     @Test
     void staleSimulatorGenerationCannotRegisterDelayedCSSWatcher() {
-        String oldReloadVersion = System.getProperty("reload.simulator.count");
         int simulatorReloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
         TrackingCSSWatcher watcher = new TrackingCSSWatcher();
-        System.setProperty("reload.simulator.count", String.valueOf(simulatorReloadVersion + 1));
         try {
-            assertFalse(Executor.registerCSSWatcher(watcher, simulatorReloadVersion));
+            assertFalse(Executor.registerCSSWatcher(watcher, simulatorReloadVersion + 1));
         } finally {
             watcher.stop();
-            if (oldReloadVersion == null) {
-                System.clearProperty("reload.simulator.count");
-            } else {
-                System.setProperty("reload.simulator.count", oldReloadVersion);
-            }
         }
     }
 }

@@ -50,7 +50,8 @@ import java.util.logging.Logger;
  */
 public class CSSWatcher implements Runnable {
     private int simulatorReloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
-    private Thread watchThread, pulseThread;
+    private volatile Thread watchThread;
+    private Thread pulseThread;
     private ServerSocket pulseSocket;
     private volatile Process childProcess;
     private volatile boolean closing;
