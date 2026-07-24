@@ -6203,10 +6203,17 @@ public class AndroidGradleBuilder extends Executor {
         }
     }
 
+    // Package-private for direct unit testing; this is not part of the builder API.
     static String ensureCompileSdkAtLeastTarget(String compileSdkVersion, String targetSdkVersion) {
         Integer compileSdkInt = parseSdkInt(compileSdkVersion);
         Integer targetSdkInt = parseSdkInt(targetSdkVersion);
-        if (targetSdkInt != null && (compileSdkInt == null || targetSdkInt > compileSdkInt)) {
+        if (targetSdkInt == null) {
+            return compileSdkVersion;
+        }
+        if (compileSdkVersion == null || compileSdkVersion.trim().isEmpty()) {
+            return String.valueOf(targetSdkInt);
+        }
+        if (compileSdkInt != null && targetSdkInt > compileSdkInt) {
             return String.valueOf(targetSdkInt);
         }
         return compileSdkVersion;

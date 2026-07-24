@@ -45,4 +45,16 @@ class AndroidGradleBuilderSdkVersionTest {
         assertEquals("36",
                 AndroidGradleBuilder.ensureCompileSdkAtLeastTarget("'android-21'", "36"));
     }
+
+    @Test
+    void preservesNonNumericCompileSdk() {
+        assertEquals("'android-Baklava'",
+                AndroidGradleBuilder.ensureCompileSdkAtLeastTarget("'android-Baklava'", "36"));
+    }
+
+    @Test
+    void suppliesMissingCompileSdk() {
+        assertEquals("36",
+                AndroidGradleBuilder.ensureCompileSdkAtLeastTarget(null, "36"));
+    }
 }
