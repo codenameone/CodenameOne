@@ -173,28 +173,17 @@ self.addEventListener('message', function(event){
         pushActionCategories = event.data.pushActionCategories;
         return;
     }
-    if (pendingPushes.length > 0) {
-        var tmp = pendingPushes.splice(0, pendingPushes.length);
-        const promiseChain = clients.matchAll({
-            type: 'window',
-            includeUncontrolled: true
-          })
-          .then((windowClients) => {
-            let matchingClient = null;
-        
-            for (let i = 0; i < windowClients.length; i++) {
-              const windowClient = windowClients[i];
-              if (urlToOpen.indexOf(windowClient.url) >= 0) {
-                try {
-                    for (var pushData of tmp) {
-                        windowClient.postMessage(pushData);
-                    }
-                } catch (ex){}
-
-              }
+    var readyClient = event.source;
+    if (pendingPushes.length > 0 && readyClient
+            && typeof readyClient.postMessage === 'function') {
+        while (pendingPushes.length > 0) {
+            try {
+                readyClient.postMessage(pendingPushes[0]);
+                pendingPushes.shift();
+            } catch (ex) {
+                break;
             }
-          });
-        
+        }
     }
 });
 

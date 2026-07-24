@@ -63,6 +63,7 @@ async function pushScenario(envelope, windows) {
     const posted = [];
     const notifications = [];
     const openedUrls = [];
+    const openedClients = [];
     const clients = windows.map(window => ({
         url: window.url ?? 'https://fixture/index.html',
         focused: !!window.focused,
@@ -80,21 +81,32 @@ async function pushScenario(envelope, windows) {
             matchAll: async () => clients,
             openWindow: async url => {
                 openedUrls.push(url);
-                return {url, focused: true, postMessage: value => posted.push(value)};
+                const openedClient = {
+                    url,
+                    focused: true,
+                    postMessage: value => posted.push(value)
+                };
+                openedClients.push(openedClient);
+                return openedClient;
             }
         },
         self: {
             location: {href: 'https://fixture/sw.js'},
             registration: {showNotification: async (title, options) => notifications.push({title, options})},
-            addEventListener: (type, callback) => { handlers[type] = callback; }
+            addEventListener: (type, callback) => {
+                if (!handlers[type]) {
+                    handlers[type] = [];
+                }
+                handlers[type].push(callback);
+            }
         }
     };
     vm.createContext(sandbox);
     vm.runInContext(source, sandbox, {filename: 'sw.js'});
-    assert.equal(typeof handlers.push, 'function',
+    assert.equal(typeof handlers.push?.[0], 'function',
             'service worker must register a push event handler');
     let completion;
-    handlers.push({data: {json: () => envelope}, waitUntil: value => { completion = value; }});
+    handlers.push[0]({data: {json: () => envelope}, waitUntil: value => { completion = value; }});
     assert.equal(typeof completion?.then, 'function',
             'push handler must pass asynchronous work to event.waitUntil()');
     await completion;
@@ -103,9 +115,9 @@ async function pushScenario(envelope, windows) {
         notifications,
         openedUrls,
         async click(notification, action) {
-            assert.equal(typeof handlers.notificationclick, 'function');
+            assert.equal(typeof handlers.notificationclick?.[0], 'function');
             let clickCompletion;
-            handlers.notificationclick({
+            handlers.notificationclick[0]({
                 notification: {
                     data: notification.options.data,
                     close() {}
@@ -115,6 +127,17 @@ async function pushScenario(envelope, windows) {
             });
             assert.equal(typeof clickCompletion?.then, 'function');
             await clickCompletion;
+        },
+        signalReady() {
+            assert.ok(handlers.message?.length > 0);
+            assert.ok(openedClients.length > 0,
+                    'a notification click must open a client before it signals readiness');
+            for (const handler of handlers.message) {
+                handler({
+                    data: 'ready',
+                    source: openedClients[openedClients.length - 1]
+                });
+            }
         }
     };
 }
@@ -141,6 +164,16 @@ result = await pushScenario({...visible, deepLink: 'https://attacker.example/phi
 await result.click(result.notifications[0]);
 assert.deepEqual(result.openedUrls, ['https://fixture/index.html'],
         'notification clicks must not navigate outside the application origin');
+
+result = await pushScenario({...visible, id: 'deep-link', deepLink: '/orders/42'}, []);
+await result.click(result.notifications[0]);
+assert.deepEqual(result.openedUrls, ['https://fixture/orders/42']);
+assert.equal(result.posted.length, 0,
+        'a newly opened deep-link client must receive the push only after it is ready');
+result.signalReady();
+assert.equal(result.posted.length, 1,
+        'pending pushes must be delivered to the deep-link client that signals readiness');
+assert.equal(result.posted[0].data.id, 'deep-link');
 
 result = await registrationScenario({
     endpoint: 'https://push.example/subscription',
