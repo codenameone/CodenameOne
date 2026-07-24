@@ -230,6 +230,9 @@ public class JavaScriptBuilder extends Executor {
 
     private File stageJavaScriptPort(BuildRequest request, File portSources, File stageClasses, File portClasses)
             throws Exception {
+        // Recompute per build: a reused builder instance must not carry a
+        // previous target's webapp path when this one has none.
+        jsPortWebApp = null;
         // Prefer a pre-built JavaScriptPort.jar bundled as a plugin resource.
         InputStream bundled = getResourceAsStream("/JavaScriptPort.jar");
         if (bundled != null) {
@@ -689,9 +692,17 @@ public class JavaScriptBuilder extends Executor {
         // ...) so it bundles port.js -- the worker-side native bindings that make
         // Window.current() etc. resolve. Off-repo builds can't find it via the
         // translator's own source-tree walk, so we pass the copy staged from
-        // JavaScriptPort.jar. An explicit override in CN1_TRANSLATOR_OPTS wins.
-        if (jsPortWebApp != null && jsPortWebApp.isDirectory()
-                && (translatorOpts == null || !translatorOpts.contains("codename1.javascriptport.webapp"))) {
+        // JavaScriptPort.jar. An explicit override in CN1_TRANSLATOR_OPTS wins --
+        // detected by an actual -D token, not a loose substring match.
+        boolean webAppOverridden = false;
+        for (String opt : extraOpts) {
+            if (opt.startsWith("-Dcodename1.javascriptport.webapp=")
+                    || opt.equals("-Dcodename1.javascriptport.webapp")) {
+                webAppOverridden = true;
+                break;
+            }
+        }
+        if (jsPortWebApp != null && jsPortWebApp.isDirectory() && !webAppOverridden) {
             extraOpts.add("-Dcodename1.javascriptport.webapp=" + jsPortWebApp.getAbsolutePath());
         }
         // Default heap; a -Xmx in CN1_TRANSLATOR_OPTS takes precedence (apps

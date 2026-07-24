@@ -211,6 +211,14 @@
                                      nothing off-repo and the app ships without port.js and
                                      fails to boot. index.html is emitted by the translator, so
                                      it (and the servlet-only WEB-INF) are excluded here. -->
+                                <!-- Fail loudly if the webapp (esp. port.js) is absent rather
+                                     than silently shipping a JavaScriptPort.jar without it --
+                                     that missing-port.js jar is exactly the bug this bundling
+                                     prevents. -->
+                                <available file="${codename1.javascriptport.webapp.dir}/port.js"
+                                           property="cn1.jsport.webapp.present"/>
+                                <fail unless="cn1.jsport.webapp.present"
+                                      message="JavaScript-port webapp not found at ${codename1.javascriptport.webapp.dir} (expected port.js). A full Codename One checkout is required to build the JavaScript port bundle."/>
                                 <jar destfile="${project.build.directory}/bundle/JavaScriptPort.jar">
                                     <fileset dir="${project.build.directory}/javascript-port-classes"/>
                                     <zipfileset dir="${codename1.javascriptport.webapp.dir}" prefix="webapp">
