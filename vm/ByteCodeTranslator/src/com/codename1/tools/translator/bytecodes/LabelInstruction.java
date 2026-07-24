@@ -130,7 +130,24 @@ public class LabelInstruction extends Instruction {
             usedLabels.put(l,l);
         }
     }
-        
+
+    /**
+     * True when {@code l} is referenced by a jump, a switch or an exception
+     * handler range -- in other words when it marks a control-flow join.
+     *
+     * Peephole passes that match ADJACENT instruction pairs must not look
+     * through such a label: the instruction after it can also be reached from
+     * a predecessor that never executed the instruction before it, so folding
+     * the pair changes what the other predecessors do. The registration side
+     * of this map is populated while the method is parsed (Jump, CustomJump,
+     * SwitchInstruction and TryCatch all call labelIsUsed in their
+     * constructors), so it is already complete by the time optimize() runs.
+     */
+    public static boolean isJumpTarget(Label l) {
+        return usedLabels.get(l) != null;
+    }
+
+
     @Override
     public void appendInstruction(StringBuilder b) {
         if(usedLabels.get(parent)==null) {
