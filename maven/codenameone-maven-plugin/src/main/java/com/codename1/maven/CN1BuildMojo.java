@@ -536,6 +536,40 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
                 || BUILD_TARGET_WINDOWS_NATIVE_PROJECT.equals(buildTarget));
     }
 
+    /**
+     * Collapses build-type-qualified app-extension keys into the unqualified keys the rest
+     * of the build pipeline understands. Like the app's own signing assets
+     * ({@code codename1.ios.debug.provision} vs {@code codename1.ios.release.provision}),
+     * an extension's provisioning profile differs between development and distribution
+     * builds, so both plain settings ({@code codename1.ios.debug.appext.<Name>.provision})
+     * and build hints ({@code codename1.arg.ios.release.appext.<Name>.provisioningURL})
+     * accept a {@code debug}/{@code release} qualifier after the {@code ios.} segment.
+     * The variant matching the build target overrides the unqualified key; both variants
+     * are removed afterwards so the build server only ever sees the resolved value.
+     */
+    static void resolveAppExtensionBuildTypeQualifiers(Properties props, String buildTarget) {
+        String matching = buildTarget != null && buildTarget.contains("release") ? "release" : "debug";
+        for (String key : new ArrayList<String>(props.stringPropertyNames())) {
+            for (String prefix : new String[] {"codename1.arg.ios.", "codename1.ios."}) {
+                String qualifier;
+                if (key.startsWith(prefix + "debug.appext.")) {
+                    qualifier = "debug";
+                } else if (key.startsWith(prefix + "release.appext.")) {
+                    qualifier = "release";
+                } else {
+                    continue;
+                }
+                String value = props.getProperty(key);
+                props.remove(key);
+                if (qualifier.equals(matching) && value != null && value.trim().length() > 0) {
+                    props.setProperty(prefix + "appext."
+                            + key.substring((prefix + qualifier + ".appext.").length()), value);
+                }
+                break;
+            }
+        }
+    }
+
     private void createAntProject() throws IOException, LibraryPropertiesException, MojoExecutionException, MojoFailureException {
         File cn1dir = new File(project.getBuild().getDirectory() + File.separator + "codenameone");
         File antProject = new File(cn1dir, "antProject");
@@ -782,6 +816,10 @@ public class CN1BuildMojo extends AbstractCN1Mojo {
         // file into, so base64-encode its bytes into the ios.appext.<Name>.provisioningData
         // build arg; the daemon decodes it back to <Name>.mobileprovision before signing.
         // Done generically over <Name>, mirroring the daemon's per-extension plumbing.
+        // Extension profiles differ between build types just like the app's own
+        // (development for device/debug builds, distribution for release), so debug/release
+        // qualified keys are collapsed into the unqualified ones first.
+        resolveAppExtensionBuildTypeQualifiers(cn1SettingsProps, buildTarget);
         String appExtPrefix = "codename1.ios.appext.";
         String appExtSuffix = ".provision";
         for (String settingKey : new ArrayList<String>(cn1SettingsProps.stringPropertyNames())) {

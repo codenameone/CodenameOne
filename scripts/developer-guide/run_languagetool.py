@@ -73,6 +73,12 @@ SKIP_ELEMENT_ATTRS = {
     # Footer / header metadata blocks rarely contain prose worth checking.
     ("div", "id", "footer"),
     ("div", "id", "footer-text"),
+    # The document-header byline: author list plus the revision line built
+    # from the -a revnumber attribute. CI passes the git branch name as the
+    # revision, so any branch whose name isn't a dictionary word (e.g.
+    # "claude/surfaces-feature-issue-zm044b") produced a spurious
+    # MORFOLOGIK_RULE_EN_US match. None of it is prose.
+    ("div", "class", "details"),
 }
 
 

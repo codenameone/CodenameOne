@@ -341,6 +341,7 @@ The Codename One build servers read signing assets from `codenameone_settings.pr
 * `codename1.ios.debug.certificate` / `codename1.ios.debug.certificatePassword` / `codename1.ios.debug.provision`: Development P12 and provisioning profile for device/debug builds.
 * `codename1.ios.release.certificate` / `codename1.ios.release.certificatePassword` / `codename1.ios.release.provision`: Distribution P12 and provisioning profile for App Store/TestFlight builds.
 * `codename1.ios.certificate`, `codename1.ios.certificatePassword`, and `codename1.ios.provision`: Legacy/global defaults. The IDE uses these as fallbacks when the debug/release-specific properties are blank, so keep them aligned with your preferred certificates.
+* `codename1.ios.appext.<Name>.provision`: Provisioning profile for an embedded app extension (for example the generated `CN1Widgets` widget extension), used for both build types. Add `codename1.ios.debug.appext.<Name>.provision` / `codename1.ios.release.appext.<Name>.provision` to use the development profile for device/debug builds and the distribution profile for release builds; the variant matching the build target wins and the unqualified key is the fallback.
 
 Paths may be absolute or relative to the project directory. The passwords must match the values you used when exporting the P12 files from Keychain Access.
 

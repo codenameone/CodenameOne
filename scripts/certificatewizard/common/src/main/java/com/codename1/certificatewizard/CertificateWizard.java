@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.certificatewizard;
 
 import com.codename1.certificatewizard.api.CloudSigningService;
@@ -1367,57 +1389,98 @@ public class CertificateWizard extends Lifecycle {
 
     private void createWidgetExtensionProfile(String appName, ProjectDefaults defaults, String extIdentifier,
             Runnable next) {
-        SigningState.Profile existing = findProfile(extIdentifier, PROFILE_APP_STORE);
+        // The extension needs a distribution profile for release builds and a development
+        // profile for debug device builds, mirroring codename1.ios.release.provision /
+        // codename1.ios.debug.provision on the app itself. The App Store profile is
+        // required; the development profile is skipped gracefully when no development
+        // certificate or registered device is available.
+        ensureWidgetExtensionProfile(appName, extIdentifier, PROFILE_APP_STORE, releasePath ->
+                ensureWidgetExtensionProfile(appName, extIdentifier, PROFILE_DEVELOPMENT, debugPath ->
+                        installWidgetExtensionSigning(defaults, releasePath, debugPath, next)));
+    }
+
+    private void ensureWidgetExtensionProfile(String appName, String extIdentifier, String profileType,
+            com.codename1.util.OnComplete<String> onPath) {
+        SigningState.Profile existing = findProfile(extIdentifier, profileType);
         if (existing != null) {
-            downloadWidgetExtensionProfile(defaults, existing, next);
+            downloadWidgetExtensionProfile(existing, profileType, onPath);
             return;
         }
         SigningState.BundleId ext = findBundleByIdentifier(extIdentifier, "IOS");
-        List<SigningState.Certificate> compatible = WizardDecisions.compatibleCertificates(state, PROFILE_APP_STORE);
+        List<SigningState.Certificate> compatible = WizardDecisions.compatibleCertificates(state, profileType);
+        boolean development = PROFILE_DEVELOPMENT.equals(profileType);
         if (ext == null || compatible.isEmpty()) {
+            if (development) {
+                onPath.completed(null);
+                return;
+            }
             showPageMessage("No distribution certificate was available for the widget extension profile.", true);
             return;
         }
         List<String> certs = new ArrayList<String>();
         certs.add(compatible.get(0).appleCertId());
-        String profileName = appName + " Widgets App Store";
-        showPageMessage("Creating widget extension provisioning profile...", false);
-        service.createProfile(profileName, PROFILE_APP_STORE, ext.id(), certs, new ArrayList<String>(), r -> {
+        List<String> devices = deviceIdsFor(profileType);
+        if (!WizardDecisions.canCreateProfile(profileType, ext.id(), certs, devices, appName)) {
+            showPageMessage("Skipped the widget extension development profile: register a device to create development signing assets.", true);
+            onPath.completed(null);
+            return;
+        }
+        String profileName = appName + " Widgets " + (development ? "Development" : "App Store");
+        showPageMessage("Creating widget extension provisioning profile " + profileName + "...", false);
+        service.createProfile(profileName, profileType, ext.id(), certs, devices, r -> {
             if (!r.ok) {
                 showPageMessage(r.message, true);
+                // A failed development profile shouldn't drop the App Store profile that
+                // was already downloaded -- continue and install what we have.
+                if (development) {
+                    onPath.completed(null);
+                }
                 return;
             }
             refreshForAutoSetup(() -> {
-                SigningState.Profile created = findProfile(extIdentifier, PROFILE_APP_STORE);
+                SigningState.Profile created = findProfile(extIdentifier, profileType);
                 if (created == null) {
                     showPageMessage("Widget extension profile was created but could not be found after refresh.", true);
+                    if (development) {
+                        onPath.completed(null);
+                    }
                     return;
                 }
-                downloadWidgetExtensionProfile(defaults, created, next);
+                downloadWidgetExtensionProfile(created, profileType, onPath);
             });
         });
     }
 
-    private void downloadWidgetExtensionProfile(ProjectDefaults defaults, SigningState.Profile profile,
-            Runnable next) {
-        service.downloadProfile(profile.id(), "CN1Widgets.mobileprovision", r -> {
+    private void downloadWidgetExtensionProfile(SigningState.Profile profile, String profileType,
+            com.codename1.util.OnComplete<String> onPath) {
+        String fileName = PROFILE_DEVELOPMENT.equals(profileType)
+                ? "CN1Widgets_Development.mobileprovision" : "CN1Widgets.mobileprovision";
+        service.downloadProfile(profile.id(), fileName, r -> {
             if (!r.ok) {
                 showPageMessage(r.message, true);
+                if (PROFILE_DEVELOPMENT.equals(profileType)) {
+                    onPath.completed(null);
+                }
                 return;
             }
-            try {
-                String groupId = resolveAppGroupIdentifier(defaults);
-                SigningAssetInstaller.applyWidgetExtensionSigning(binding.settings(), groupId, r.value);
-                clearPageMessage();
-                ToastBar.showMessage("Widget extension signing installed", FontImage.MATERIAL_CHECK);
-                if (next != null) {
-                    next.run();
-                }
-            } catch (Exception ex) {
-                Log.e(ex);
-                showPageMessage("Failed to update widget extension settings: " + friendlyMessage(ex), true);
-            }
+            onPath.completed(r.value);
         });
+    }
+
+    private void installWidgetExtensionSigning(ProjectDefaults defaults, String releasePath, String debugPath,
+            Runnable next) {
+        try {
+            String groupId = resolveAppGroupIdentifier(defaults);
+            SigningAssetInstaller.applyWidgetExtensionSigning(binding.settings(), groupId, releasePath, debugPath);
+            clearPageMessage();
+            ToastBar.showMessage("Widget extension signing installed", FontImage.MATERIAL_CHECK);
+            if (next != null) {
+                next.run();
+            }
+        } catch (Exception ex) {
+            Log.e(ex);
+            showPageMessage("Failed to update widget extension settings: " + friendlyMessage(ex), true);
+        }
     }
 
     private void generateAndroidKeystore(String alias, String password, String dname) {
