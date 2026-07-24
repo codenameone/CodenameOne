@@ -438,8 +438,8 @@ cn1ss_generate_port_status() {
   if [ -n "$binary_size" ]; then
     args+=(--binary-size "$binary_size")
   fi
-  if [ "${CN1SS_FAIL_ON_TEST_FAILURE:-0}" = "1" ]; then
-    args+=(--fail-on-test-failure)
+  if [ "${CN1SS_FAIL_ON_TEST_PROBLEMS:-0}" = "1" ]; then
+    args+=(--fail-on-test-problems)
   fi
   if ! "$python_bin" "${args[@]}"; then
     cn1ss_log "FATAL: Failed to generate normalized port status for $CN1SS_PORT_ID"

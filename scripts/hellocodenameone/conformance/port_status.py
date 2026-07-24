@@ -526,13 +526,15 @@ def strict_report_errors(report: dict) -> list[str]:
     errors: list[str] = []
     if not report.get("suite_finished"):
         errors.append("suite did not emit its completion marker")
-    summary = report.get("summary", {})
+    summary = report.get("summary")
     if not isinstance(summary, dict):
         raise ContractError("Expected report summary to be an object")
 
     counts: dict[str, int] = {}
-    for key in ("fail", "not-run"):
-        value = summary.get(key, 0)
+    for key in ("pass", "fail", "skip", "not-run"):
+        if key not in summary:
+            raise ContractError(f"Report summary is missing required count {key!r}")
+        value = summary[key]
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
             raise ContractError(
                 f"Expected report summary {key!r} to be a non-negative integer"
@@ -569,7 +571,7 @@ def build_parser() -> argparse.ArgumentParser:
     normalize_parser.add_argument("--generated-at", default=utc_now())
     normalize_parser.add_argument("--binary-size", type=int)
     normalize_parser.add_argument(
-        "--fail-on-test-failure",
+        "--fail-on-test-problems",
         action="store_true",
         help="return nonzero after writing the report if tests fail, do not run, or the suite is incomplete",
     )
@@ -603,7 +605,7 @@ def main() -> int:
             f"Wrote {args.output}: "
             + ", ".join(f"{key}={value}" for key, value in report["summary"].items())
         )
-        if args.fail_on_test_failure:
+        if args.fail_on_test_problems:
             strict_errors = strict_report_errors(report)
             if strict_errors:
                 print(

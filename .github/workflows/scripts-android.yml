@@ -120,7 +120,7 @@ jobs:
       # markers, not through the launcher instrumentation test. Make the
       # normalized report authoritative so a red port-status test cannot leave
       # the Android workflow green and then be published from master.
-      CN1SS_FAIL_ON_TEST_FAILURE: '1'
+      CN1SS_FAIL_ON_TEST_PROBLEMS: '1'
     steps:
       - uses: actions/checkout@v6
       - name: Set TMPDIR

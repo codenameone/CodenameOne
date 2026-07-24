@@ -135,11 +135,28 @@ class PortStatusTest(unittest.TestCase):
     def test_strict_report_errors_rejects_malformed_summary_counts(self):
         report = {
             "suite_finished": True,
-            "summary": {"fail": None, "not-run": 0},
+            "summary": {"pass": 0, "fail": None, "skip": 0, "not-run": 0},
         }
         with self.assertRaisesRegex(
             port_status.ContractError,
             "Expected report summary 'fail' to be a non-negative integer",
+        ):
+            port_status.strict_report_errors(report)
+
+    def test_strict_report_errors_requires_complete_summary(self):
+        with self.assertRaisesRegex(
+            port_status.ContractError,
+            "Expected report summary to be an object",
+        ):
+            port_status.strict_report_errors({"suite_finished": True})
+
+        report = {
+            "suite_finished": True,
+            "summary": {"pass": 10, "fail": 0, "not-run": 0},
+        }
+        with self.assertRaisesRegex(
+            port_status.ContractError,
+            "Report summary is missing required count 'skip'",
         ):
             port_status.strict_report_errors(report)
 
@@ -155,7 +172,7 @@ class PortStatusTest(unittest.TestCase):
                 str(output_path),
                 "--generated-at",
                 "2026-07-24T00:00:00Z",
-                "--fail-on-test-failure",
+                "--fail-on-test-problems",
             ]
             with patch.object(port_status.sys, "argv", argv):
                 exit_code = port_status.main()
