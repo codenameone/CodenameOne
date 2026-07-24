@@ -198,15 +198,28 @@ class LargeArrayGcIntegrationTest {
         if (root == null || !Files.exists(root)) {
             return;
         }
+        // Best effort -- a locked file must not fail the test -- but not silent:
+        // the translated build tree is large, so leaked roots on a self-hosted
+        // runner need a breadcrumb for triage. One line per root, first failure.
+        final java.io.IOException[] firstFailure = new java.io.IOException[1];
         try (java.util.stream.Stream<Path> walk = Files.walk(root)) {
             walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
                 try {
                     Files.deleteIfExists(p);
-                } catch (java.io.IOException ignore) {
-                    // best effort -- a locked file must not fail the test
+                } catch (java.io.IOException e) {
+                    if (firstFailure[0] == null) {
+                        firstFailure[0] = e;
+                    }
                 }
             });
-        } catch (java.io.IOException ignore) {
+        } catch (java.io.IOException e) {
+            if (firstFailure[0] == null) {
+                firstFailure[0] = e;
+            }
+        }
+        if (firstFailure[0] != null) {
+            System.err.println("LargeArrayGcIntegrationTest: temp cleanup incomplete under "
+                    + root + " (first failure: " + firstFailure[0] + ")");
         }
     }
 

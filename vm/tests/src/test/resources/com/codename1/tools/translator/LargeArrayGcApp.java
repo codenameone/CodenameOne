@@ -39,6 +39,12 @@ import java.util.Hashtable;
  * demands it. The harness runs this with CN1_GC_LOG_CYCLES=1 and counts
  * [GC-CYCLE] stderr lines -- the load-independent observable (measured:
  * unfixed 15 cycles, fixed 6, stable across runs).
+ *
+ * KEEP IN SYNC with com.bench.LargeArrayLoad (vm/benchmarks): this file is
+ * that workload verbatim, differing only in package/class name and the
+ * LARGE_ARRAY_GC_DONE marker. Edit both together; the shared RESULT= value
+ * (currently 1099) is host-JVM-asserted by LargeArrayGcIntegrationTest, so a
+ * one-sided edit surfaces as a parity break instead of silent drift.
  */
 public class LargeArrayGcApp {
     static Hashtable dict;      // survivor set for the current round

@@ -116,6 +116,11 @@ int pthread_setschedparam(pthread_t thread, int policy, const struct sched_param
 int usleep(unsigned int usec);
 int gettimeofday(struct timeval* tv, void* tz);
 
+/* Monotonic microsecond clock (QueryPerformanceCounter), immune to wall-clock
+   adjustments. Used for Thread.sleep deadline arithmetic, where a stepped
+   system clock must not stretch or cut the remaining sleep. */
+long long cn1_monotonic_micros(void);
+
 /* --- environment / time.h POSIX helpers absent from MSVC ---
    Thin static-inline wrappers over the MSVC equivalents; used by the date /
    timezone runtime in nativeMethods. */

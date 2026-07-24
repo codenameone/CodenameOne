@@ -238,6 +238,21 @@ int usleep(unsigned int usec) {
     return 0;
 }
 
+long long cn1_monotonic_micros(void) {
+    /* QPC is Win32's monotonic clock. The divide is split so ticks * 1e6
+       cannot overflow 64 bits at multi-GHz tick rates over long uptimes.
+       The lazy freq init is benignly racy: every writer stores the same
+       boot-constant value. */
+    static LARGE_INTEGER freq;
+    LARGE_INTEGER count;
+    if(freq.QuadPart == 0) {
+        QueryPerformanceFrequency(&freq);
+    }
+    QueryPerformanceCounter(&count);
+    return (count.QuadPart / freq.QuadPart) * 1000000LL
+         + ((count.QuadPart % freq.QuadPart) * 1000000LL) / freq.QuadPart;
+}
+
 int gettimeofday(struct timeval* tv, void* tz) {
     FILETIME ft;
     ULARGE_INTEGER li;

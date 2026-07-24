@@ -2066,13 +2066,13 @@ JAVA_VOID java_lang_Thread_releaseThreadNativeResources___long(CODENAME_ONE_THRE
     }
 }
 
-// Monotonic microsecond clock for the sleep deadline (wall clock on the MSVC /
-// clang-cl target, which lacks clock_gettime -- same fallback as nanoTime above).
+// Monotonic microsecond clock for the sleep deadline. Monotonic on BOTH
+// targets: the MSVC / clang-cl side goes through the QueryPerformanceCounter
+// shim in cn1_win_compat (gettimeofday here would tie the deadline to the
+// wall clock, so a system time step would stretch or cut a sleep-in-progress).
 static JAVA_LONG cn1SleepNowMicros(void) {
 #ifdef _WIN32
-    struct timeval time;
-    gettimeofday(&time, NULL);
-    return (((JAVA_LONG)time.tv_sec) * 1000000LL) + (JAVA_LONG)time.tv_usec;
+    return (JAVA_LONG)cn1_monotonic_micros();
 #else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);

@@ -43,6 +43,14 @@ import java.util.Hashtable;
  * (measured on this workload: unfixed 15 cycles, fixed 6, stable across
  * runs; wall-clock phase times only inflate when cycles contend with the
  * mutator, which depends on core count and machine load).
+ *
+ * KEEP IN SYNC with the CI twin: vm/tests/src/test/resources/com/codename1/
+ * tools/translator/LargeArrayGcApp.java is this workload verbatim (default
+ * package, plus a completion marker line). Any change to the workload shape
+ * or checksum here must be mirrored there; both must keep printing the same
+ * RESULT= value (currently 1099), which the integration test asserts against
+ * a host JVM run, so a one-sided edit shows up as a parity break rather than
+ * silently weakening the guard.
  */
 public class LargeArrayLoad {
     static Hashtable dict;      // survivor set for the current round
