@@ -40,6 +40,7 @@ jobs:
       - name: Run syndication regression tests
         run: |
           python3 scripts/website/test_syndicate_blog_posts.py
+          python3 scripts/website/test_queue_social_posts.py
           python3 scripts/website/test_syndication_health.py
 
       - name: Run API syndication script
@@ -94,6 +95,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/website/queue_browser_syndication.py
+
+      - name: Queue scheduled LinkedIn posts
+        run: |
+          set -euo pipefail
+          python3 scripts/website/queue_social_posts.py
 
       - name: Upload syndication screenshots on failure
         if: ${{ always() && hashFiles('docs/website/reports/syndication-screenshots/**/*.png') != '' }}

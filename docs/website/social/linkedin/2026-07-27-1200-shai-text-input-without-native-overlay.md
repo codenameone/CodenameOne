@@ -1,13 +1,11 @@
 ---
 title: "Pure Codename One text editing without a native overlay"
-slug: 2026-07-28-1200-shai-text-input-without-native-overlay
+slug: 2026-07-27-1200-shai-text-input-without-native-overlay
 platform: linkedin
 account: shai
 source_slug: text-input-without-native-overlay
-publish_at: '2026-07-28T12:00:00'
+publish_at: '2026-07-27T12:00:00'
 timezone: Asia/Jerusalem
-review_by: '2026-07-24'
-status: draft
 image: /blog/text-input-without-native-overlay.jpg
 ---
 

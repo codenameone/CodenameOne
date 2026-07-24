@@ -6,8 +6,6 @@ account: codenameone
 source_slug: tested-port-support
 publish_at: '2026-07-22T12:00:00'
 timezone: Asia/Jerusalem
-review_by: '2026-07-17'
-status: approved
 image: /blog/tested-port-support.jpg
 ---
 

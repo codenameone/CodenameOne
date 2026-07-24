@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Report syndication work that has not been processed.
 
-The GitHub workflow queues Medium, DZone, and reviewed LinkedIn work, while a
+The GitHub workflow queues Medium, DZone, and scheduled LinkedIn work, while a
 signed-in browser runner on the maintainer's machine drains that queue.  A
 successful local run removes completed entries.  Anything left beyond its
 grace period therefore needs attention.  DEV, Foojay, and Hashnode do not all

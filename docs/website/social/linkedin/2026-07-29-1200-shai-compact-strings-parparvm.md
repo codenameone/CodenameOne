@@ -6,8 +6,6 @@ account: shai
 source_slug: compact-strings-parparvm
 publish_at: '2026-07-29T12:00:00'
 timezone: Asia/Jerusalem
-review_by: '2026-07-24'
-status: draft
 image: /blog/compact-strings-parparvm.jpg
 ---
 
