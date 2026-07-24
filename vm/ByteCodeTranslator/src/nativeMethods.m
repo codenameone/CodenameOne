@@ -2094,9 +2094,12 @@ JAVA_VOID java_lang_Thread_sleep___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG mil
     // (issue-5425 PR, ToastBarTopPosition CI failure). Sleep on a monotonic
     // deadline and resume across early wakeups. Chunked below 1s because POSIX
     // allows usleep() to reject arguments >= 1000000 outright (EINVAL on musl),
-    // which silently turned long sleeps into no-ops on those libcs. Honors the
-    // interrupt flag so interrupt() now actually shortens a sleep instead of
-    // relying on an accidental EINTR.
+    // which silently turned long sleeps into no-ops on those libcs.
+    // INTERRUPT SEMANTICS UNCHANGED: this VM has never delivered
+    // InterruptedException from sleep (interrupt() only sets the flag), so the
+    // resume loop deliberately does NOT exit early on it -- waking without the
+    // exception would be a third behavior, neither historical nor Java's.
+    // Proper interrupt delivery is a separate change.
     // Saturate instead of overflowing: Thread.sleep(Long.MAX_VALUE) is a real
     // "park this thread" idiom, and millis * 1000 would wrap negative and make
     // it return immediately.
@@ -2105,9 +2108,6 @@ JAVA_VOID java_lang_Thread_sleep___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG mil
     JAVA_LONG deltaMicros = (millis > maxMicros / 1000) ? maxMicros : millis * 1000;
     JAVA_LONG deadline = (deltaMicros > maxMicros - now) ? maxMicros : now + deltaMicros;
     for(;;) {
-        if(threadStateData->interrupted) {
-            break;
-        }
         JAVA_LONG remainMicros = deadline - cn1SleepNowMicros();
         if(remainMicros <= 0) {
             break;
