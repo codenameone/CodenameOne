@@ -2109,7 +2109,9 @@ JAVA_VOID java_lang_Thread_sleep___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG mil
         if(remainMicros > 500000) {
             remainMicros = 500000;
         }
-        usleep((useconds_t)remainMicros);
+        // JAVA_INT cast, not useconds_t: the MSVC/clang-cl target's cn1_win_compat
+        // usleep shim has no useconds_t typedef (same reason the old code cast here)
+        usleep((JAVA_INT)remainMicros);
     }
     while(threadStateData->threadBlockedByGC) {
         usleep(1000);
