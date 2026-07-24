@@ -665,6 +665,7 @@ public final class RoundRectBorder extends Border {
             public void paint(Graphics g) {
                 super.paint(g);
                 try {
+                    boolean rtl = c.isRTL();
                     g.translate(getX(), getY());
                     int shapeX = 0;
                     int shapeY = 0;
@@ -686,13 +687,13 @@ public final class RoundRectBorder extends Border {
                         for (int iter = shadowSpreadL - 1; iter >= 0; iter--) {
                             tg.translate(iter, iter);
                             int iterOpacity = Math.max(0, Math.min(255, (int) (shadowOpacity * (shadowSpreadL - iter) / (float) shadowSpreadL)));
-                            drawShape(tg, shadowColor, shadowOpacity - iterOpacity, w - (iter * 2), h - (iter * 2), c.isRTL());
+                            drawShape(tg, shadowColor, shadowOpacity - iterOpacity, w - (iter * 2), h - (iter * 2), rtl);
                             tg.translate(-iter, -iter);
                         }
                     }
                     tg.translate(shapeX, shapeY);
 
-                    GeneralPath gp = createShape(shapeW, shapeH, c.isRTL());
+                    GeneralPath gp = createShape(shapeW, shapeH, rtl);
                     Style s = c.getStyle();
                     if (s.getBgImage() == null) {
                         byte type = s.getBackgroundType();
@@ -735,6 +736,7 @@ public final class RoundRectBorder extends Border {
         if (!useCache) {
             return createTargetComponentImage(c, w, h);
         }
+        boolean rtl = c.isRTL();
         Image target = ImageFactory.createImage(c, w, h, 0);
 
         int shapeX = 0;
@@ -757,7 +759,7 @@ public final class RoundRectBorder extends Border {
             for (int iter = shadowSpreadL - 1; iter >= 0; iter--) {
                 tg.translate(iter, iter);
                 int iterOpacity = Math.max(0, Math.min(255, (int) (shadowOpacity * (shadowSpreadL - iter) / (float) shadowSpreadL)));
-                drawShape(tg, shadowColor, shadowOpacity - iterOpacity, w - (iter * 2), h - (iter * 2), c.isRTL());
+                drawShape(tg, shadowColor, shadowOpacity - iterOpacity, w - (iter * 2), h - (iter * 2), rtl);
                 tg.translate(-iter, -iter);
             }
 
@@ -771,7 +773,7 @@ public final class RoundRectBorder extends Border {
         }
         tg.translate(shapeX, shapeY);
 
-        GeneralPath gp = createShape(shapeW, shapeH, c.isRTL());
+        GeneralPath gp = createShape(shapeW, shapeH, rtl);
         Style s = c.getStyle();
         if (s.getBgImage() == null) {
             byte type = s.getBackgroundType();
@@ -872,6 +874,7 @@ public final class RoundRectBorder extends Border {
 
         final int w = c.getWidth();
         final int h = c.getHeight();
+        boolean rtl = c.isRTL();
         int x = c.getX();
         int y = c.getY();
         boolean antiAliased = g.isAntiAliased();
@@ -882,7 +885,7 @@ public final class RoundRectBorder extends Border {
                 if (s.getBgImage() == null) {
                     byte type = s.getBackgroundType();
                     if (type == Style.BACKGROUND_IMAGE_SCALED || type == Style.BACKGROUND_NONE) {
-                        GeneralPath gp = createShape(w, h, c.isRTL());
+                        GeneralPath gp = createShape(w, h, rtl);
                         byte bgt = c.getStyle().getBgTransparency();
                         if (bgt != 0) {
                             int a = g.getAlpha();
@@ -926,7 +929,7 @@ public final class RoundRectBorder extends Border {
                         int shapeW = w - inset * 2;
                         int shapeH = h - inset * 2;
                         if (shapeW > 0 && shapeH > 0) {
-                            GeneralPath gp = createShape(shapeW, shapeH, c.isRTL());
+                            GeneralPath gp = createShape(shapeW, shapeH, rtl);
                             int dx = Math.round((shadowX - 0.5f) * blurPx);
                             int dy = Math.max(1, Math.round((shadowY * 0.5f + 0.25f) * blurPx));
                             g.translate(x + inset, y + inset);
