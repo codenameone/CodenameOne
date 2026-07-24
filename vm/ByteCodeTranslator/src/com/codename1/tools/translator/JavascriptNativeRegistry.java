@@ -134,6 +134,7 @@ final class JavascriptNativeRegistry {
             "cn1_java_lang_Thread_releaseThreadNativeResources_long",
             "cn1_java_lang_Thread_setPriorityImpl_int",
             "cn1_java_lang_Thread_sleep_long",
+            "cn1_java_lang_Thread_sleepImpl_long",
             "cn1_java_lang_Thread_start",
             "cn1_java_lang_Throwable_fillInStack",
             "cn1_java_lang_Throwable_getStack_R_java_lang_String",

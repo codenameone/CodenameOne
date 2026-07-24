@@ -54,6 +54,8 @@ class JavascriptOpcodeCoverageTest {
                 "Runtime should expose notifyAll() native support");
         assertTrue(runtime.contains("cn1_java_lang_Thread_sleep_long") || runtime.contains("cn1_java_lang_Thread_sleep___long"),
                 "Runtime should expose sleep() native support");
+        assertTrue(runtime.contains("cn1_java_lang_Thread_sleepImpl_long") || runtime.contains("cn1_java_lang_Thread_sleepImpl___long"),
+                "Runtime should expose sleepImpl() native support (Thread.sleep is now a Java wrapper over it)");
     }
 
     @Test

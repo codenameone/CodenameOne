@@ -452,7 +452,7 @@ jobs:
               # they live in the app log, not the job log.
               if [ -f "$raw/app-output.log" ]; then
                 echo "[linux-gtk-$arch] ---- CN1SS diagnostics from app-output.log ----"
-                grep -n "CN1SS:WARN\|CN1SS:ERR\|CN1SS:INFO:test=ToastBar\|timed out\|TIMEOUT\|watchdog" "$raw/app-output.log" | tail -80 || true
+                grep -nE "CN1SS:WARN|CN1SS:ERR|CN1SS:INFO:test=ToastBar|timed out|TIMEOUT|watchdog" "$raw/app-output.log" | tail -80 || true
                 echo "[linux-gtk-$arch] ---- last 40 app log lines ----"
                 tail -40 "$raw/app-output.log" || true
               fi
