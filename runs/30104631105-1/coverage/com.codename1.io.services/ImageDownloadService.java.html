@@ -1,0 +1,1046 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ImageDownloadService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.services</a> &gt; <span class="el_source">ImageDownloadService.java</span></div><h1>ImageDownloadService.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.io.services;
+
+import com.codename1.components.FileEncodedImage;
+import com.codename1.components.FileEncodedImageAsync;
+import com.codename1.components.StorageImage;
+import com.codename1.components.StorageImageAsync;
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.NetworkEvent;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.Storage;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.List;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.list.ContainerList;
+import com.codename1.ui.list.DefaultListModel;
+import com.codename1.ui.list.ListModel;
+import com.codename1.ui.util.EventDispatcher;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Map;
+
+/// Simplifies the process of implementing an image link for labels and lists by
+/// binding a request to a component. On the completion of the request a Codename One
+/// encoded image is created and installs itself into the given component.
+/// For the case of a Label this is seamless, in case of a List renderer the model
+/// or the renderer must register itself as a listener and update the data when
+/// the response arrives.
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// @deprecated this class uses an unconventional storage mechanism and has many issues, we recommend
+/// replacing it with the simpler and more powerful URLImage or Util.dowloadFileTo* calls.
+///
+/// #### See also
+///
+/// - com.codename1.ui.URLImage
+///
+/// - com.codename1.io.Util#downloadUrlToFile(java.lang.String, java.lang.String, boolean)
+///
+/// - com.codename1.io.Util#downloadUrlToStorage(java.lang.String, java.lang.String, boolean)
+public class ImageDownloadService extends ConnectionRequest {
+
+    private static boolean alwaysRevalidate;
+<span class="fc" id="L78">    private static int defaultTimeout = -1;</span>
+<span class="fc" id="L79">    private static boolean fastScale = true;</span>
+    private static boolean defaultMaintainAspectRatio;
+    private static EventDispatcher onErrorListeners;
+    private boolean downloadToStyles;
+    private Label parentLabel;
+    private EncodedImage result;
+    private Component targetList;
+    private int targetOffset;
+    private String targetKey;
+    private boolean cacheImages;
+    private String destinationFile;
+    private Dimension toScale;
+    private String cacheId;
+    private boolean keep;
+    private ListModel targetModel;
+    private Image placeholder;
+<span class="pc" id="L95">    private boolean maintainAspectRatio = defaultMaintainAspectRatio;</span>
+
+    /// Accepts the url to bind to the list renderer, on completion the action listener
+    /// will be invoked with the image so a list can be updated with the data
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `l`: an action listener callback
+<span class="fc" id="L105">    public ImageDownloadService(String url, ActionListener l) {</span>
+<span class="fc" id="L106">        init(url);</span>
+<span class="fc" id="L107">        addResponseListener(l);</span>
+<span class="fc" id="L108">        setDuplicateSupported(true);</span>
+<span class="fc" id="L109">    }</span>
+
+    /// Constructs an image request that will automatically populate the given list
+    /// when the response arrives. This assumes the GenericListCellRenderer style of
+    /// list which relies on a map based model approach.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `targetList`: the list that should be updated when the data arrives
+    ///
+    /// - `targetOffset`: the offset within the list to insert the image
+    ///
+    /// - `targetKey`: the key for the map in the target offset
+<span class="fc" id="L124">    public ImageDownloadService(String url, Component targetList, int targetOffset, String targetKey) {</span>
+<span class="fc" id="L125">        this.targetList = targetList;</span>
+<span class="fc" id="L126">        this.targetKey = targetKey;</span>
+<span class="fc" id="L127">        this.targetOffset = targetOffset;</span>
+<span class="fc" id="L128">        init(url);</span>
+<span class="fc" id="L129">        setDuplicateSupported(true);</span>
+<span class="fc" id="L130">    }</span>
+
+    /// Constructs an image request that will automatically populate the given list
+    /// when the response arrives. This assumes the GenericListCellRenderer style of
+    /// list which relies on a Map based model approach.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `targetList`: the list that should be updated when the data arrives
+    ///
+    /// - `targetOffset`: the offset within the list to insert the image
+    ///
+    /// - `targetKey`: the key for the map in the target offset
+<span class="nc" id="L145">    public ImageDownloadService(String url, List targetList, int targetOffset, String targetKey) {</span>
+<span class="nc" id="L146">        this.targetList = targetList;</span>
+<span class="nc" id="L147">        this.targetKey = targetKey;</span>
+<span class="nc" id="L148">        this.targetOffset = targetOffset;</span>
+<span class="nc" id="L149">        init(url);</span>
+<span class="nc" id="L150">        setDuplicateSupported(true);</span>
+<span class="nc" id="L151">    }</span>
+
+    /// Accepts the url to bind to the label, on completion the label will be updated
+    /// and revalidated with the new image.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `parentLabel`: the label to update
+<span class="fc" id="L161">    public ImageDownloadService(String url, Label parentLabel) {</span>
+<span class="fc" id="L162">        init(url);</span>
+<span class="fc" id="L163">        this.parentLabel = parentLabel;</span>
+<span class="fc" id="L164">        setDuplicateSupported(true);</span>
+<span class="fc" id="L165">    }</span>
+
+    /// Fast scaling uses runtime draw scaling rather than the Image scaled method. This works
+    /// better on smartphones but doesn't work well on feature phones
+    ///
+    /// #### Returns
+    ///
+    /// the fastScale
+    public static boolean isFastScale() {
+<span class="fc" id="L174">        return fastScale;</span>
+    }
+
+    /// Fast scaling uses runtime draw scaling rather than the Image scaled method. This works
+    /// better on smartphones but doesn't work well on feature phones
+    ///
+    /// #### Parameters
+    ///
+    /// - `aFastScale`: the fastScale to set
+    public static void setFastScale(boolean aFastScale) {
+<span class="fc" id="L184">        fastScale = aFastScale;</span>
+<span class="fc" id="L185">    }</span>
+
+    /// By default lists don't revalidate on every change to avoid &quot;jumpiness&quot; when scrolling
+    ///
+    /// #### Returns
+    ///
+    /// the alwaysRevalidate
+    public static boolean isAlwaysRevalidate() {
+<span class="fc" id="L193">        return alwaysRevalidate;</span>
+    }
+
+    /// By default lists don't revalidate on every change to avoid &quot;jumpiness&quot; when scrolling
+    ///
+    /// #### Parameters
+    ///
+    /// - `aAlwaysRevalidate`: the alwaysRevalidate to set
+    public static void setAlwaysRevalidate(boolean aAlwaysRevalidate) {
+<span class="fc" id="L202">        alwaysRevalidate = aAlwaysRevalidate;</span>
+<span class="fc" id="L203">    }</span>
+
+    /// #### Returns
+    ///
+    /// the defaultMaintainAspectRatio
+    public static boolean isDefaultMaintainAspectRatio() {
+<span class="fc" id="L209">        return defaultMaintainAspectRatio;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `aDefaultMaintainAspectRatio`: the defaultMaintainAspectRatio to set
+    public static void setDefaultMaintainAspectRatio(boolean aDefaultMaintainAspectRatio) {
+<span class="fc" id="L216">        defaultMaintainAspectRatio = aDefaultMaintainAspectRatio;</span>
+<span class="fc" id="L217">    }</span>
+
+    /// Indicates the default timeout to use for image download service, -1 indicates no default is set.
+    ///
+    /// #### Returns
+    ///
+    /// the defaultTimeout
+    public static int getDefaultTimeout() {
+<span class="fc" id="L225">        return defaultTimeout;</span>
+    }
+
+    /// Indicates the default timeout to use for image download service, -1 indicates no default is set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultTimeout`: the defaultTimeout to set
+    public static void setDefaultTimeout(int aDefaultTimeout) {
+<span class="fc" id="L234">        defaultTimeout = aDefaultTimeout;</span>
+<span class="fc" id="L235">    }</span>
+
+    private static Image scaleImage(Image img, Dimension toScale, boolean maintainAspectRatio) {
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        if (maintainAspectRatio) {</span>
+<span class="nc" id="L239">            float r2 = Math.min(((float) toScale.getWidth()) / ((float) img.getWidth()), ((float) toScale.getHeight()) / ((float) img.getHeight()));</span>
+<span class="nc" id="L240">            int awidth = (int) (((float) img.getWidth()) * r2);</span>
+<span class="nc" id="L241">            int aheight = (int) (((float) img.getHeight()) * r2);</span>
+<span class="nc" id="L242">            img = img.scaled(awidth, aheight);</span>
+<span class="nc" id="L243">        } else {</span>
+<span class="nc" id="L244">            img = img.scaled(toScale.getWidth(), toScale.getHeight());</span>
+        }
+<span class="nc" id="L246">        return img;</span>
+    }
+
+    /// Constructs an image request that will automatically populate the given list
+    /// when the response arrives, it will cache the file locally as a file
+    /// in the file storage.
+    /// This assumes the GenericListCellRenderer style of
+    /// list which relies on a map based model approach.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `targetList`: the list that should be updated when the data arrives
+    ///
+    /// - `targetOffset`: the offset within the list to insert the image
+    ///
+    /// - `targetKey`: the key for the map in the target offset
+    ///
+    /// - `destFile`: local file to store the data into the given path
+    public static void createImageToFileSystem(String url, List targetList, int targetOffset,
+                                               String targetKey, String destFile, Dimension toScale) {
+<span class="fc" id="L268">        createImageToFileSystem(url, targetList, targetOffset, targetKey, destFile, toScale, PRIORITY_NORMAL);</span>
+<span class="fc" id="L269">    }</span>
+
+    /// Constructs an image request that will automatically populate the given list
+    /// when the response arrives, it will cache the file locally as a file
+    /// in the file storage.
+    /// This assumes the GenericListCellRenderer style of
+    /// list which relies on a map based model approach.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `targetList`: the list that should be updated when the data arrives
+    ///
+    /// - `targetOffset`: the offset within the list to insert the image
+    ///
+    /// - `targetKey`: the key for the map in the target offset
+    ///
+    /// - `destFile`: local file to store the data into the given path
+    public static void createImageToFileSystem(String url, Component targetList, int targetOffset,
+                                               String targetKey, String destFile, Dimension toScale, byte priority) {
+<span class="fc" id="L290">        createImageToFileSystem(url, targetList, null, targetOffset, targetKey, destFile, toScale, priority, null, defaultMaintainAspectRatio);</span>
+<span class="fc" id="L291">    }</span>
+
+    /// Constructs an image request that will automatically populate the given list
+    /// when the response arrives, it will cache the file locally as a file
+    /// in the file storage.
+    /// This assumes the GenericListCellRenderer style of
+    /// list which relies on a map based model approach.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `targetList`: the list that should be updated when the data arrives
+    ///
+    /// - `targetOffset`: the offset within the list to insert the image
+    ///
+    /// - `targetKey`: the key for the map in the target offset
+    ///
+    /// - `destFile`: local file to store the data into the given path
+    public static void createImageToFileSystem(String url, Component targetList, int targetOffset,
+                                               String targetKey, String destFile, Image placeholder, byte priority) {
+<span class="nc" id="L312">        createImageToFileSystem(url, targetList, null, targetOffset, targetKey, destFile, null, priority, placeholder, defaultMaintainAspectRatio);</span>
+<span class="nc" id="L313">    }</span>
+
+    /// Constructs an image request that will automatically populate the given list
+    /// when the response arrives, it will cache the file locally as a file
+    /// in the file storage.
+    /// This assumes the GenericListCellRenderer style of
+    /// list which relies on a map based model approach.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `targetList`: the list that should be updated when the data arrives
+    ///
+    /// - `model`: the list model
+    ///
+    /// - `targetOffset`: the offset within the list to insert the image
+    ///
+    /// - `targetKey`: the key for the map in the target offset
+    ///
+    /// - `destFile`: local file to store the data into the given path
+    public static void createImageToFileSystem(String url, Component targetList, ListModel model, int targetOffset,
+                                               String targetKey, String destFile, Image placeholder, byte priority) {
+<span class="nc" id="L336">        createImageToFileSystem(url, targetList, model, targetOffset, targetKey, destFile, null, priority, placeholder, defaultMaintainAspectRatio);</span>
+<span class="nc" id="L337">    }</span>
+
+    /// Constructs an image request that will automatically populate the given list
+    /// when the response arrives, it will cache the file locally as a file
+    /// in the file storage.
+    /// This assumes the GenericListCellRenderer style of
+    /// list which relies on a map based model approach.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `targetList`: the list that should be updated when the data arrives
+    ///
+    /// - `targetOffset`: the offset within the list to insert the image
+    ///
+    /// - `targetKey`: the key for the map in the target offset
+    ///
+    /// - `destFile`: local file to store the data into the given path
+    private static void createImageToFileSystem(final String url, final Component targetList, final ListModel targetModel, final int targetOffset,
+                                                final String targetKey, final String destFile, final Dimension toScale, final byte priority, final Image placeholderImage,
+                                                final boolean maintainAspectRatio) {
+<span class="fc bfc" id="L359" title="All 2 branches covered.">        if (Display.getInstance().isEdt()) {</span>
+<span class="fc" id="L360">            Display.getInstance().scheduleBackgroundTask(new Runnable() {</span>
+
+                @Override
+                public void run() {
+<span class="fc" id="L364">                    createImageToFileSystem(url, targetList, targetModel, targetOffset,</span>
+                            targetKey, destFile, toScale, priority, placeholderImage, maintainAspectRatio);
+<span class="fc" id="L366">                }</span>
+            });
+<span class="fc" id="L368">            return;</span>
+        }
+
+
+        //image not found on cache go and download from the url
+<span class="fc" id="L373">        ImageDownloadService i = new ImageDownloadService(url, targetList, targetOffset, targetKey);</span>
+<span class="fc" id="L374">        i.targetModel = targetModel;</span>
+<span class="fc" id="L375">        i.maintainAspectRatio = maintainAspectRatio;</span>
+<span class="fc" id="L376">        Image im = cacheImage(null, false, destFile, toScale, placeholderImage, maintainAspectRatio);</span>
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">        if (im != null) {</span>
+<span class="nc" id="L378">            i.setEntryInListModel(targetOffset, im);</span>
+<span class="nc" id="L379">            targetList.repaint();</span>
+
+<span class="nc" id="L381">            return;</span>
+        }
+<span class="fc" id="L383">        i.cacheImages = true;</span>
+<span class="fc" id="L384">        i.destinationFile = destFile;</span>
+<span class="fc" id="L385">        i.toScale = toScale;</span>
+<span class="fc" id="L386">        i.placeholder = placeholderImage;</span>
+<span class="fc" id="L387">        i.setPriority(priority);</span>
+<span class="fc" id="L388">        i.setFailSilently(true);</span>
+<span class="fc" id="L389">        NetworkManager.getInstance().addToQueue(i);</span>
+<span class="fc" id="L390">    }</span>
+
+    /// Binds an error listener that will fire an instance of NetworkEvent with an error
+    /// for a specific fetch operation if applicable
+    ///
+    /// #### Parameters
+    ///
+    /// - `listener`: the listener
+    public static synchronized void addErrorListener(ActionListener listener) {
+<span class="pc bpc" id="L399" title="1 of 2 branches missed.">        if (onErrorListeners == null) {</span>
+<span class="fc" id="L400">            onErrorListeners = new EventDispatcher();</span>
+        }
+<span class="fc" id="L402">        onErrorListeners.addListener(listener);</span>
+<span class="fc" id="L403">    }</span>
+
+    /// Unbinds an error listener that will fire an instance of NetworkEvent with an error
+    /// for a specific fetch operation if applicable
+    ///
+    /// #### Parameters
+    ///
+    /// - `listener`: the listener
+    public static synchronized void removeErrorListener(ActionListener listener) {
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">        if (onErrorListeners == null) {</span>
+<span class="nc" id="L413">            return;</span>
+        }
+<span class="fc" id="L415">        onErrorListeners.removeListener(listener);</span>
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">        if (!onErrorListeners.hasListeners()) {</span>
+<span class="fc" id="L417">            onErrorListeners = null;</span>
+        }
+<span class="fc" id="L419">    }</span>
+
+    /// Constructs an image request that will automatically populate the given list
+    /// when the response arrives, it will cache the file locally as a file
+    /// in the file storage.
+    /// This assumes the GenericListCellRenderer style of
+    /// list which relies on a map based model approach.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `targetList`: the list that should be updated when the data arrives
+    ///
+    /// - `targetOffset`: the offset within the list to insert the image
+    ///
+    /// - `targetKey`: the key for the map in the target offset
+    ///
+    /// - `cacheId`: a unique identifier to be used to store the image into storage
+    ///
+    /// - `scale`: the scale of the image to put in the List or null
+    public static void createImageToStorage(String url, List targetList, int targetOffset,
+                                            String targetKey, String cacheId, Dimension scale) {
+<span class="fc" id="L442">        createImageToStorage(url, targetList, targetOffset, targetKey, cacheId, scale, PRIORITY_NORMAL);</span>
+<span class="fc" id="L443">    }</span>
+
+    /// Constructs an image request that will automatically populate the given list
+    /// when the response arrives, it will cache the file locally as a file
+    /// in the file storage.
+    /// This assumes the GenericListCellRenderer style of
+    /// list which relies on a map based model approach.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `targetList`: the list that should be updated when the data arrives
+    ///
+    /// - `targetOffset`: the offset within the list to insert the image
+    ///
+    /// - `targetKey`: the key for the map in the target offset
+    ///
+    /// - `cacheId`: a unique identifier to be used to store the image into storage
+    ///
+    /// - `scale`: the scale of the image to put in the List or null
+    public static void createImageToStorage(String url, Component targetList, int targetOffset,
+                                            String targetKey, String cacheId, Dimension scale, byte priority) {
+<span class="fc" id="L466">        createImageToStorage(url, targetList, null, targetOffset, targetKey, cacheId, false, scale, priority, null, defaultMaintainAspectRatio);</span>
+<span class="fc" id="L467">    }</span>
+
+    /// Constructs an image request that will automatically populate the given list
+    /// when the response arrives, it will cache the file locally as a file
+    /// in the file storage.
+    /// This assumes the GenericListCellRenderer style of
+    /// list which relies on a map based model approach.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `targetList`: the list that should be updated when the data arrives
+    ///
+    /// - `targetOffset`: the offset within the list to insert the image
+    ///
+    /// - `targetKey`: the key for the map in the target offset
+    ///
+    /// - `cacheId`: a unique identifier to be used to store the image into storage
+    ///
+    /// - `placeholderImage`: the image placeholder
+    public static void createImageToStorage(String url, Component targetList, int targetOffset,
+                                            String targetKey, String cacheId, Image placeholderImage, byte priority) {
+<span class="nc" id="L490">        createImageToStorage(url, targetList, null, targetOffset, targetKey, cacheId, false, null, priority, placeholderImage, defaultMaintainAspectRatio);</span>
+<span class="nc" id="L491">    }</span>
+
+    /// Constructs an image request that will automatically populate the given list
+    /// when the response arrives, it will cache the file locally as a file
+    /// in the file storage.
+    /// This assumes the GenericListCellRenderer style of
+    /// list which relies on a map based model approach.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `targetList`: the list that should be updated when the data arrives
+    ///
+    /// - `model`: the model destination
+    ///
+    /// - `targetOffset`: the offset within the list to insert the image
+    ///
+    /// - `targetKey`: the key for the map in the target offset
+    ///
+    /// - `cacheId`: a unique identifier to be used to store the image into storage
+    ///
+    /// - `placeholderImage`: the image placeholder
+    public static void createImageToStorage(String url, Component targetList, ListModel model, int targetOffset,
+                                            String targetKey, String cacheId, Image placeholderImage, byte priority) {
+<span class="nc" id="L516">        createImageToStorage(url, targetList, model, targetOffset, targetKey, cacheId, false, null, priority, placeholderImage, defaultMaintainAspectRatio);</span>
+<span class="nc" id="L517">    }</span>
+
+    /// Constructs an image request that will automatically populate the given list
+    /// when the response arrives, it will cache the file locally as a file
+    /// in the file storage.
+    /// This assumes the GenericListCellRenderer style of
+    /// list which relies on a map based model approach.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `targetList`: the list that should be updated when the data arrives
+    ///
+    /// - `targetModel`: the model
+    ///
+    /// - `targetOffset`: the offset within the list to insert the image
+    ///
+    /// - `targetKey`: the key for the map in the target offset
+    ///
+    /// - `cacheId`: a unique identifier to be used to store the image into storage
+    ///
+    /// - `keep`: if set to true keeps the file in RAM once loaded
+    ///
+    /// - `scale`: the scale of the image to put in the List or null
+    private static void createImageToStorage(final String url, final Component targetList, final ListModel targetModel, final int targetOffset,
+                                             final String targetKey, final String cacheId, final boolean keep, final Dimension scale, final byte priority, final Image placeholderImage,
+                                             final boolean maintainAspectRatio) {
+<span class="fc bfc" id="L545" title="All 2 branches covered.">        if (Display.getInstance().isEdt()) {</span>
+<span class="fc" id="L546">            Display.getInstance().scheduleBackgroundTask(new Runnable() {</span>
+
+                @Override
+                public void run() {
+<span class="fc" id="L550">                    createImageToStorage(url, targetList, targetModel, targetOffset,</span>
+                            targetKey, cacheId, keep, scale, priority, placeholderImage, maintainAspectRatio);
+<span class="fc" id="L552">                }</span>
+            });
+<span class="fc" id="L554">            return;</span>
+        }
+<span class="fc" id="L556">        Image im = cacheImage(cacheId, keep, null, scale, placeholderImage, maintainAspectRatio);</span>
+<span class="fc" id="L557">        ImageDownloadService i = new ImageDownloadService(url, targetList, targetOffset, targetKey);</span>
+<span class="fc" id="L558">        i.targetModel = targetModel;</span>
+<span class="fc" id="L559">        i.maintainAspectRatio = maintainAspectRatio;</span>
+<span class="pc bpc" id="L560" title="1 of 2 branches missed.">        if (im != null) {</span>
+<span class="nc" id="L561">            i.setEntryInListModel(targetOffset, im);</span>
+<span class="nc" id="L562">            targetList.repaint();</span>
+
+<span class="nc" id="L564">            return;</span>
+        }
+        //image not found on cache go and download from the url
+<span class="fc" id="L567">        i.cacheImages = true;</span>
+<span class="fc" id="L568">        i.cacheId = cacheId;</span>
+<span class="fc" id="L569">        i.keep = keep;</span>
+<span class="fc" id="L570">        i.toScale = scale;</span>
+<span class="fc" id="L571">        i.placeholder = placeholderImage;</span>
+<span class="fc" id="L572">        i.setPriority(priority);</span>
+<span class="fc" id="L573">        i.setFailSilently(true);</span>
+<span class="fc" id="L574">        NetworkManager.getInstance().addToQueue(i);</span>
+<span class="fc" id="L575">    }</span>
+
+    /// Constructs an image request that will automatically populate the given Label
+    /// when the response arrives, it will cache the file locally to the Storage
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `l`: @param l       the Label that should be updated when the data arrives
+    /// to just use storage and the url as the key
+    ///
+    /// - `cacheId`: a unique identifier to be used to store the image into storage
+    ///
+    /// - `toScale`: the scale dimension or null
+    public static void createImageToStorage(String url, Label l, String cacheId, Dimension toScale) {
+<span class="fc" id="L591">        createImageToStorage(url, l, cacheId, toScale, PRIORITY_NORMAL);</span>
+<span class="fc" id="L592">    }</span>
+
+    /// Constructs an image request that will automatically populate the given Label
+    /// when the response arrives, it will cache the file locally to the Storage
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `l`: @param l        the Label that should be updated when the data arrives
+    /// to just use storage and the url as the key
+    ///
+    /// - `cacheId`: a unique identifier to be used to store the image into storage
+    ///
+    /// - `toScale`: the scale dimension or null
+    ///
+    /// - `priority`: the priority for the task
+    public static void createImageToStorage(String url, Label l, String cacheId, Dimension toScale,
+                                            byte priority) {
+<span class="fc" id="L611">        createImageToStorage(url, l, cacheId, false, toScale, priority, null, defaultMaintainAspectRatio);</span>
+<span class="fc" id="L612">    }</span>
+
+    /// Constructs an image request that will automatically populate the given Label
+    /// when the response arrives, it will cache the file locally to the Storage
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `l`: @param l           the Label that should be updated when the data arrives
+    /// to just use storage and the url as the key
+    ///
+    /// - `cacheId`: a unique identifier to be used to store the image into storage
+    ///
+    /// - `placeholder`: the image that will appear as a placeholder
+    ///
+    /// - `priority`: the priority for the task
+    public static void createImageToStorage(String url, Label l, String cacheId, Image placeholder,
+                                            byte priority) {
+<span class="nc" id="L631">        createImageToStorage(url, l, cacheId, false, null, priority, placeholder, defaultMaintainAspectRatio);</span>
+<span class="nc" id="L632">    }</span>
+
+    /// Constructs an image request that will automatically populate the given Label
+    /// when the response arrives, it will cache the file locally to the Storage
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `l`: @param l        the Label that should be updated when the data arrives
+    /// to just use storage and the url as the key
+    ///
+    /// - `cacheId`: a unique identifier to be used to store the image into storage
+    ///
+    /// - `toScale`: the scale dimension or null
+    ///
+    /// - `priority`: the priority for the task
+    private static void createImageToStorage(final String url, final Label l, final String cacheId, final boolean keep, final Dimension toScale,
+                                             final byte priority, final Image placeholder, final boolean maintainAspectRatio) {
+<span class="fc bfc" id="L651" title="All 2 branches covered.">        if (Display.getInstance().isEdt()) {</span>
+<span class="fc" id="L652">            Display.getInstance().scheduleBackgroundTask(new Runnable() {</span>
+
+                @Override
+                public void run() {
+<span class="fc" id="L656">                    createImageToStorage(url, l, cacheId, keep, toScale,</span>
+                            priority, placeholder, maintainAspectRatio);
+<span class="fc" id="L658">                }</span>
+            });
+<span class="fc" id="L660">            return;</span>
+        }
+
+<span class="fc" id="L663">        Image im = cacheImage(cacheId, keep, null, toScale, placeholder, maintainAspectRatio);</span>
+<span class="fc bfc" id="L664" title="All 2 branches covered.">        if (im != null) {</span>
+<span class="pc bpc" id="L665" title="3 of 4 branches missed.">            if (!fastScale &amp;&amp; toScale != null) {</span>
+<span class="nc" id="L666">                im = scaleImage(im, toScale, defaultMaintainAspectRatio);</span>
+            }
+<span class="fc" id="L668">            final Image i = im;</span>
+<span class="fc" id="L669">            Display.getInstance().callSerially(new Runnable() {</span>
+
+                @Override
+                public void run() {
+<span class="fc" id="L673">                    l.setIcon(i);</span>
+<span class="fc" id="L674">                    Form f = l.getComponentForm();</span>
+<span class="pc bpc" id="L675" title="1 of 2 branches missed.">                    if (f != null) {</span>
+<span class="fc" id="L676">                        f.revalidate();</span>
+                    }
+<span class="fc" id="L678">                }</span>
+            });
+<span class="fc" id="L680">            return;</span>
+        }
+        //image not found on cache go and download from the url
+<span class="fc" id="L683">        ImageDownloadService i = new ImageDownloadService(url, l);</span>
+<span class="fc" id="L684">        i.maintainAspectRatio = maintainAspectRatio;</span>
+<span class="fc" id="L685">        i.setDuplicateSupported(true);</span>
+<span class="fc" id="L686">        i.cacheImages = true;</span>
+<span class="fc" id="L687">        i.toScale = toScale;</span>
+<span class="fc" id="L688">        i.cacheId = cacheId;</span>
+<span class="fc" id="L689">        i.placeholder = placeholder;</span>
+<span class="fc" id="L690">        i.setPriority(priority);</span>
+<span class="fc" id="L691">        i.setFailSilently(true);</span>
+<span class="fc" id="L692">        NetworkManager.getInstance().addToQueue(i);</span>
+<span class="fc" id="L693">    }</span>
+
+    /// Constructs an image request that will automatically populate the given Label
+    /// when the response arrives, it will cache the file locally.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `callback`: the callback that should be updated when the data arrives
+    ///
+    /// - `destFile`: local file to store the data into the given path
+    public static void createImageToFileSystem(String url, ActionListener callback, String destFile) {
+
+<span class="nc" id="L707">        Image im = cacheImage(null, false, destFile, null, null, defaultMaintainAspectRatio);</span>
+<span class="nc bnc" id="L708" title="All 2 branches missed.">        if (im != null) {</span>
+<span class="nc" id="L709">            callback.actionPerformed(new NetworkEvent(null, im));</span>
+<span class="nc" id="L710">            return;</span>
+        }
+        //image not found on cache go and download from the url
+<span class="nc" id="L713">        ImageDownloadService i = new ImageDownloadService(url, callback);</span>
+<span class="nc" id="L714">        i.cacheImages = true;</span>
+<span class="nc" id="L715">        i.destinationFile = destFile;</span>
+<span class="nc" id="L716">        i.setFailSilently(true);</span>
+<span class="nc" id="L717">        NetworkManager.getInstance().addToQueue(i);</span>
+<span class="nc" id="L718">    }</span>
+
+    public static void createImageToStorage(String url, ActionListener callback, String cacheId) {
+<span class="fc" id="L721">        createImageToStorage(url, callback, cacheId, false);</span>
+<span class="fc" id="L722">    }</span>
+
+    /// Constructs an image request that will automatically populate the given Label
+    /// when the response arrives, it will cache the file locally.
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the image URL
+    ///
+    /// - `callback`: the callback that should be updated when the data arrives
+    ///
+    /// - `cacheId`: a unique identifier to be used to store the image into storage
+    ///
+    /// - `keep`: if set to true keeps the file in RAM once loaded
+    public static void createImageToStorage(String url, ActionListener callback, String cacheId, boolean keep) {
+
+<span class="fc" id="L738">        Image im = cacheImage(cacheId, keep, null, null, null, defaultMaintainAspectRatio);</span>
+<span class="pc bpc" id="L739" title="1 of 2 branches missed.">        if (im != null) {</span>
+<span class="nc" id="L740">            callback.actionPerformed(new NetworkEvent(null, im));</span>
+<span class="nc" id="L741">            return;</span>
+        }
+        //image not found on cache go and download from the url
+<span class="fc" id="L744">        ImageDownloadService i = new ImageDownloadService(url, callback);</span>
+<span class="fc" id="L745">        i.cacheImages = true;</span>
+<span class="fc" id="L746">        i.cacheId = cacheId;</span>
+<span class="fc" id="L747">        i.setFailSilently(true);</span>
+<span class="fc" id="L748">        NetworkManager.getInstance().addToQueue(i);</span>
+<span class="fc" id="L749">    }</span>
+
+    private static Image cacheImage(String cacheKey, boolean keep, String destFile, Dimension scale, Image placeholderImage, boolean maintainAspectRatio) {
+<span class="fc bfc" id="L752" title="All 2 branches covered.">        if (destFile != null) {</span>
+<span class="pc bpc" id="L753" title="1 of 2 branches missed.">            if (FileSystemStorage.getInstance().exists(destFile)) {</span>
+                Image f;
+<span class="nc bnc" id="L755" title="All 2 branches missed.">                if (placeholderImage != null) {</span>
+<span class="nc" id="L756">                    f = FileEncodedImageAsync.create(destFile, placeholderImage);</span>
+                } else {
+<span class="nc bnc" id="L758" title="All 4 branches missed.">                    if (fastScale &amp;&amp; scale != null) {</span>
+<span class="nc" id="L759">                        int w = scale.getWidth();</span>
+<span class="nc" id="L760">                        int h = scale.getHeight();</span>
+<span class="nc bnc" id="L761" title="All 2 branches missed.">                        if (maintainAspectRatio) {</span>
+<span class="nc" id="L762">                            f = FileEncodedImage.create(destFile, -1, -1);</span>
+<span class="nc" id="L763">                            float actualW = f.getWidth();</span>
+<span class="nc" id="L764">                            float actualH = f.getHeight();</span>
+<span class="nc" id="L765">                            float r2 = Math.min(((float) w) / actualW, ((float) h) / actualH);</span>
+<span class="nc" id="L766">                            w = (int) (actualW * r2);</span>
+<span class="nc" id="L767">                            h = (int) (actualH * r2);</span>
+                        }
+<span class="nc" id="L769">                        f = FileEncodedImage.create(destFile, w, h);</span>
+<span class="nc" id="L770">                    } else {</span>
+<span class="nc" id="L771">                        f = FileEncodedImage.create(destFile, -1, -1);</span>
+                    }
+                }
+<span class="nc" id="L774">                return f;</span>
+            }
+<span class="pc bpc" id="L776" title="1 of 2 branches missed.">        } else if (cacheKey != null) {</span>
+<span class="fc bfc" id="L777" title="All 2 branches covered.">            if (Storage.getInstance().exists(cacheKey)) {</span>
+                Image s;
+<span class="pc bpc" id="L779" title="1 of 2 branches missed.">                if (placeholderImage != null) {</span>
+<span class="nc" id="L780">                    s = StorageImageAsync.create(cacheKey, placeholderImage);</span>
+                } else {
+<span class="pc bpc" id="L782" title="2 of 4 branches missed.">                    if (fastScale &amp;&amp; scale != null) {</span>
+<span class="nc" id="L783">                        int w = scale.getWidth();</span>
+<span class="nc" id="L784">                        int h = scale.getHeight();</span>
+<span class="nc bnc" id="L785" title="All 2 branches missed.">                        if (maintainAspectRatio) {</span>
+<span class="nc" id="L786">                            s = StorageImage.create(cacheKey, -1, -1);</span>
+<span class="nc" id="L787">                            float actualW = s.getWidth();</span>
+<span class="nc" id="L788">                            float actualH = s.getHeight();</span>
+<span class="nc" id="L789">                            float r2 = Math.min(((float) w) / actualW, ((float) h) / actualH);</span>
+<span class="nc" id="L790">                            w = (int) (actualW * r2);</span>
+<span class="nc" id="L791">                            h = (int) (actualH * r2);</span>
+                        }
+<span class="nc" id="L793">                        s = StorageImage.create(cacheKey, w, h, keep);</span>
+<span class="nc" id="L794">                    } else {</span>
+<span class="fc" id="L795">                        s = StorageImage.create(cacheKey, -1, -1, keep);</span>
+                    }
+
+                    // due to the way the storage image works the data might be corrupted!
+<span class="pc bpc" id="L799" title="1 of 2 branches missed.">                    if (((StorageImage) s).getImageData() == null) {</span>
+<span class="nc" id="L800">                        return null;</span>
+                    }
+                }
+<span class="fc" id="L803">                return s;</span>
+            }
+        }
+<span class="fc" id="L806">        return null;</span>
+    }
+
+    /// This method is invoked when an image finished downloading and should be set to an offset in the list
+    /// model. This is useful for special cases with complex list model hierarchies or proxies.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the offset in the list given when creating the service
+    ///
+    /// - `img`: the image
+    protected void setEntryInListModel(int offset, Image img) {
+        Map h;
+        ListModel model;
+<span class="pc bpc" id="L820" title="1 of 2 branches missed.">        if (targetModel != null) {</span>
+<span class="nc" id="L821">            model = targetModel;</span>
+        } else {
+<span class="pc bpc" id="L823" title="1 of 2 branches missed.">            if (targetList instanceof List) {</span>
+<span class="fc" id="L824">                model = ((List) targetList).getModel();</span>
+            } else {
+<span class="nc" id="L826">                model = ((ContainerList) targetList).getModel();</span>
+            }
+        }
+<span class="fc" id="L829">        h = (Map) model.getItemAt(targetOffset);</span>
+<span class="pc bpc" id="L830" title="3 of 4 branches missed.">        if (!fastScale &amp;&amp; toScale != null) {</span>
+<span class="nc" id="L831">            img = scaleImage(img, toScale, maintainAspectRatio);</span>
+        }
+<span class="fc" id="L833">        h.put(targetKey, img);</span>
+<span class="pc bpc" id="L834" title="1 of 2 branches missed.">        if (model instanceof DefaultListModel) {</span>
+<span class="fc" id="L835">            ((DefaultListModel) model).setItem(targetOffset, h);</span>
+        }
+<span class="fc" id="L837">    }</span>
+
+    private void init(String url) {
+<span class="fc" id="L840">        setUrl(url);</span>
+<span class="fc" id="L841">        setPost(false);</span>
+<span class="pc bpc" id="L842" title="1 of 2 branches missed.">        if (defaultTimeout &gt; -1) {</span>
+<span class="nc" id="L843">            setTimeout(defaultTimeout);</span>
+        }
+<span class="fc" id="L845">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void handleException(Exception err) {
+<span class="nc bnc" id="L850" title="All 2 branches missed.">        if (onErrorListeners != null) {</span>
+<span class="nc" id="L851">            NetworkEvent ne = new NetworkEvent(this, err);</span>
+<span class="nc" id="L852">            onErrorListeners.fireActionEvent(ne);</span>
+        }
+<span class="nc" id="L854">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void handleErrorResponseCode(int code, String message) {
+<span class="nc bnc" id="L859" title="All 2 branches missed.">        if (onErrorListeners != null) {</span>
+<span class="nc" id="L860">            NetworkEvent ne = new NetworkEvent(this, code, message);</span>
+<span class="nc" id="L861">            onErrorListeners.fireActionEvent(ne);</span>
+        }
+<span class="nc" id="L863">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void postResponse() {
+        // trigger an exception in case of an invalid image
+<span class="fc" id="L869">        result.getWidth();</span>
+<span class="fc" id="L870">        Image image = result;</span>
+
+<span class="pc bpc" id="L872" title="5 of 6 branches missed.">        if (toScale != null &amp;&amp; toScale.getWidth() != image.getWidth() &amp;&amp; toScale.getHeight() != image.getHeight()) {</span>
+<span class="nc" id="L873">            image = scaleImage(image, toScale, maintainAspectRatio);</span>
+        }
+
+<span class="fc" id="L876">        final Image i = image;</span>
+<span class="fc bfc" id="L877" title="All 2 branches covered.">        if (parentLabel != null) {</span>
+<span class="fc" id="L878">            final Dimension pref = parentLabel.getPreferredSize();</span>
+<span class="fc bfc" id="L879" title="All 2 branches covered.">            if (parentLabel.getComponentForm() != null) {</span>
+<span class="fc" id="L880">                Display.getInstance().callSerially(new Runnable() {</span>
+
+                    @Override
+                    public void run() {
+<span class="pc bpc" id="L884" title="1 of 2 branches missed.">                        if (isDownloadToStyles()) {</span>
+<span class="nc" id="L885">                            parentLabel.getUnselectedStyle().setBgImage(i);</span>
+<span class="nc" id="L886">                            parentLabel.getSelectedStyle().setBgImage(i);</span>
+<span class="nc" id="L887">                            parentLabel.getPressedStyle().setBgImage(i);</span>
+                        } else {
+<span class="fc" id="L889">                            parentLabel.setIcon(i);</span>
+                        }
+<span class="fc" id="L891">                        Dimension newPref = parentLabel.getPreferredSize();</span>
+                        // if the preferred size changed we need to reflow the UI
+                        // this might not be necessary if the label already had an identically
+                        // sized image in place or has a hardcoded preferred size.
+<span class="pc bpc" id="L895" title="2 of 4 branches missed.">                        if (pref.getWidth() != newPref.getWidth() || pref.getHeight() != newPref.getHeight()) {</span>
+<span class="nc" id="L896">                            parentLabel.getComponentForm().revalidate();</span>
+                        }
+<span class="fc" id="L898">                    }</span>
+                });
+
+            } else {
+<span class="fc" id="L902">                Display.getInstance().callSerially(new Runnable() {</span>
+
+                    @Override
+                    public void run() {
+<span class="pc bpc" id="L906" title="1 of 2 branches missed.">                        if (isDownloadToStyles()) {</span>
+<span class="nc" id="L907">                            parentLabel.getUnselectedStyle().setBgImage(i);</span>
+<span class="nc" id="L908">                            parentLabel.getSelectedStyle().setBgImage(i);</span>
+<span class="nc" id="L909">                            parentLabel.getPressedStyle().setBgImage(i);</span>
+                        } else {
+<span class="fc" id="L911">                            parentLabel.setIcon(i);</span>
+                        }
+
+<span class="fc" id="L914">                    }</span>
+                });
+            }
+<span class="fc" id="L917">            parentLabel.repaint();</span>
+<span class="fc" id="L918">            return;</span>
+        } else {
+<span class="fc bfc" id="L920" title="All 2 branches covered.">            if (targetList != null) {</span>
+<span class="fc" id="L921">                setEntryInListModel(targetOffset, image);</span>
+
+                // revalidate only once to avoid multiple revalidate refreshes during scroll
+<span class="pc bpc" id="L924" title="1 of 2 branches missed.">                if (targetList.getParent() != null) {</span>
+<span class="nc bnc" id="L925" title="All 2 branches missed.">                    if (alwaysRevalidate) {</span>
+<span class="nc" id="L926">                        targetList.getParent().revalidate();</span>
+                    } else {
+<span class="nc bnc" id="L928" title="All 2 branches missed.">                        if (targetList.getClientProperty(&quot;$imgDSReval&quot;) == null) {</span>
+<span class="nc" id="L929">                            targetList.putClientProperty(&quot;$imgDSReval&quot;, Boolean.TRUE);</span>
+<span class="nc" id="L930">                            targetList.getParent().revalidate();</span>
+                        } else {
+<span class="nc" id="L932">                            targetList.repaint();</span>
+                        }
+                    }
+                }
+            }
+        }
+
+        // if this is a list cell renderer component
+<span class="fc" id="L940">        fireResponseListener(new NetworkEvent(this, result));</span>
+<span class="fc" id="L941">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void readResponse(InputStream input) throws IOException {
+<span class="fc" id="L946">        int imageScaleWidth = -1;</span>
+<span class="fc" id="L947">        int imageScaleHeight = -1;</span>
+<span class="pc bpc" id="L948" title="1 of 2 branches missed.">        if (fastScale) {</span>
+<span class="pc bpc" id="L949" title="1 of 2 branches missed.">            if (toScale != null) {</span>
+<span class="nc" id="L950">                imageScaleWidth = toScale.getWidth();</span>
+<span class="nc" id="L951">                imageScaleHeight = toScale.getHeight();</span>
+            } else {
+<span class="pc bpc" id="L953" title="1 of 2 branches missed.">                if (placeholder != null) {</span>
+<span class="nc" id="L954">                    imageScaleWidth = placeholder.getWidth();</span>
+<span class="nc" id="L955">                    imageScaleHeight = placeholder.getHeight();</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L959" title="All 2 branches covered.">        if (cacheImages) {</span>
+<span class="fc bfc" id="L960" title="All 2 branches covered.">            if (destinationFile != null) {</span>
+<span class="fc" id="L961">                result = FileEncodedImage.create(destinationFile, input, imageScaleWidth, imageScaleHeight);</span>
+            } else {
+<span class="fc" id="L963">                EncodedImage e = EncodedImage.create(input);</span>
+<span class="pc bpc" id="L964" title="1 of 2 branches missed.">                if (maintainAspectRatio) {</span>
+<span class="nc" id="L965">                    float actualW = e.getWidth();</span>
+<span class="nc" id="L966">                    float actualH = e.getHeight();</span>
+<span class="nc" id="L967">                    float r2 = Math.min(((float) imageScaleWidth) / actualW, ((float) imageScaleHeight) / actualH);</span>
+<span class="nc" id="L968">                    imageScaleWidth = (int) (actualW * r2);</span>
+<span class="nc" id="L969">                    imageScaleHeight = (int) (actualH * r2);</span>
+                }
+
+                // workaround for http://stackoverflow.com/questions/35347353/label-image-scale-issue-in-codename-one-library-3-3/35354605
+<span class="pc bpc" id="L973" title="2 of 4 branches missed.">                if (imageScaleWidth &gt; -1 || imageScaleHeight &gt; -1) {</span>
+<span class="nc" id="L974">                    e = e.scaledEncoded(imageScaleWidth, imageScaleHeight);</span>
+                }
+
+<span class="fc" id="L977">                result = StorageImage.create(cacheId, e.getImageData(), imageScaleWidth, imageScaleHeight, keep);</span>
+                //if the storage has failed create the image from the stream
+<span class="pc bpc" id="L979" title="1 of 2 branches missed.">                if (result == null) {</span>
+<span class="nc" id="L980">                    result = e;</span>
+                }
+<span class="fc" id="L982">            }</span>
+        } else {
+<span class="fc" id="L984">            result = EncodedImage.create(input);</span>
+        }
+
+
+<span class="fc" id="L988">    }</span>
+
+    /// Returns the image returned from the server, this method is useful for renderers
+    ///
+    /// #### Returns
+    ///
+    /// the result
+    public EncodedImage getResult() {
+<span class="nc" id="L996">        return result;</span>
+    }
+
+    /// Downloads the image to the style objects associated with this component, effectively
+    /// sets the bgImage property on all the styles for the component instead of invoking setIcon
+    ///
+    /// #### Returns
+    ///
+    /// the downloadToStyles
+    public boolean isDownloadToStyles() {
+<span class="fc" id="L1006">        return downloadToStyles;</span>
+    }
+
+    /// Downloads the image to the style objects associated with this component, effectively
+    /// sets the bgImage property on all the styles for the component instead of invoking setIcon
+    ///
+    /// #### Parameters
+    ///
+    /// - `downloadToStyles`: the downloadToStyles to set
+    public void setDownloadToStyles(boolean downloadToStyles) {
+<span class="nc" id="L1016">        this.downloadToStyles = downloadToStyles;</span>
+<span class="nc" id="L1017">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L1022" title="All 4 branches missed.">        return (o instanceof ImageDownloadService) &amp;&amp; ((ImageDownloadService) o).cacheId != null &amp;&amp;</span>
+<span class="nc bnc" id="L1023" title="All 2 branches missed.">                ((ImageDownloadService) o).cacheId.equals(cacheId);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public int hashCode() {
+<span class="nc bnc" id="L1029" title="All 2 branches missed.">        return cacheId != null ? cacheId.hashCode() : 0;</span>
+    }
+
+    /// #### Returns
+    ///
+    /// the maintainAspectRatio
+    public boolean isMaintainAspectRatio() {
+<span class="nc" id="L1036">        return maintainAspectRatio;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `maintainAspectRatio`: the maintainAspectRatio to set
+    public void setMaintainAspectRatio(boolean maintainAspectRatio) {
+<span class="nc" id="L1043">        this.maintainAspectRatio = maintainAspectRatio;</span>
+<span class="nc" id="L1044">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

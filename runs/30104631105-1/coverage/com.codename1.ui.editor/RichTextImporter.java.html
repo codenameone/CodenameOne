@@ -1,0 +1,1014 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RichTextImporter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.editor</a> &gt; <span class="el_source">RichTextImporter.java</span></div><h1>RichTextImporter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.editor;
+
+import com.codename1.ui.RichTextFormat;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// Parses supported rich-text interchange formats into the shared editor model. HTML delegates to the
+/// framework HTML/XML parser; Markdown and AsciiDoc are parsed directly so neither format is rewritten
+/// through HTML on input or output.
+public final class RichTextImporter {
+    private RichTextImporter() {
+    }
+
+    /// Parses rich text directly into the editor model. Markdown and AsciiDoc use native model
+    /// builders so their structure does not make an intermediate trip through HTML.
+    public static HtmlImporter.Result parse(String content, RichTextFormat format) {
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        String value = content == null ? &quot;&quot; : content;</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (format == RichTextFormat.HTML) {</span>
+<span class="fc" id="L43">            return HtmlImporter.parse(value);</span>
+        }
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (format == RichTextFormat.MARKDOWN) {</span>
+<span class="fc" id="L46">            return parseLightweightMarkup(value, false);</span>
+        }
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (format == RichTextFormat.ASCIIDOC) {</span>
+<span class="fc" id="L49">            return parseLightweightMarkup(value, true);</span>
+        }
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (format == RichTextFormat.RTF) {</span>
+<span class="fc" id="L52">            return parseRtf(value);</span>
+        }
+<span class="fc" id="L54">        ModelBuilder builder = new ModelBuilder();</span>
+<span class="fc" id="L55">        List&lt;String&gt; plainLines = lines(value);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        for (String plainLine : plainLines) {</span>
+<span class="fc" id="L57">            builder.startBlock(RichBlocks.PARAGRAPH, RichBlocks.LIST_NONE);</span>
+<span class="fc" id="L58">            builder.append(plainLine, TextStyle.DEFAULT, null);</span>
+<span class="fc" id="L59">        }</span>
+<span class="fc" id="L60">        return builder.result(false);</span>
+    }
+
+    /// Converts HTML produced by a browser fallback into another rich-text format through the shared
+    /// document model. Pure editors do not use this path for Markdown or AsciiDoc input.
+    public static String fromHtml(String html, RichTextFormat format) {
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        HtmlImporter.Result result = HtmlImporter.parse(html == null ? &quot;&quot; : html);</span>
+<span class="nc" id="L67">        EditorDocument doc = new EditorDocument(result.getText());</span>
+<span class="nc" id="L68">        InlineStyles inline = new InlineStyles(doc.length());</span>
+<span class="nc bnc" id="L69" title="All 4 branches missed.">        for (int i = 0; i &lt; doc.length() &amp;&amp; i &lt; result.getStyles().size(); i++) {</span>
+<span class="nc" id="L70">            inline.setAt(i, result.getStyles().get(i));</span>
+        }
+<span class="nc" id="L72">        RichBlocks blocks = new RichBlocks(doc.getLineCount());</span>
+<span class="nc bnc" id="L73" title="All 4 branches missed.">        for (int i = 0; i &lt; blocks.count() &amp;&amp; i &lt; result.getBlocks().size(); i++) {</span>
+<span class="nc" id="L74">            RichBlocks.BlockAttr source = result.getBlocks().get(i);</span>
+<span class="nc" id="L75">            RichBlocks.BlockAttr target = blocks.get(i);</span>
+<span class="nc" id="L76">            target.type = source.type;</span>
+<span class="nc" id="L77">            target.align = source.align;</span>
+<span class="nc" id="L78">            target.listType = source.listType;</span>
+<span class="nc" id="L79">            target.indent = source.indent;</span>
+        }
+<span class="nc" id="L81">        return RichTextSerializer.serialize(doc, inline, blocks, result.getLinks(),</span>
+<span class="nc" id="L82">                result.getImageSources(), format);</span>
+    }
+
+    /// Converts between non-HTML formats through the native rich-text model. This preserves source
+    /// mode in browser fallbacks without using HTML as an intermediate representation.
+    public static String convert(String content, RichTextFormat sourceFormat, RichTextFormat targetFormat) {
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        RichTextFormat source = sourceFormat == null ? RichTextFormat.PLAIN_TEXT : sourceFormat;</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        RichTextFormat target = targetFormat == null ? RichTextFormat.PLAIN_TEXT : targetFormat;</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        if (source == target) {</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">            return content == null ? &quot;&quot; : content;</span>
+        }
+<span class="nc" id="L93">        HtmlImporter.Result result = parse(content, source);</span>
+<span class="nc" id="L94">        EditorDocument doc = new EditorDocument(result.getText());</span>
+<span class="nc" id="L95">        InlineStyles inline = new InlineStyles(doc.length());</span>
+<span class="nc bnc" id="L96" title="All 4 branches missed.">        for (int i = 0; i &lt; doc.length() &amp;&amp; i &lt; result.getStyles().size(); i++) {</span>
+<span class="nc" id="L97">            inline.setAt(i, result.getStyles().get(i));</span>
+        }
+<span class="nc" id="L99">        RichBlocks blocks = new RichBlocks(doc.getLineCount());</span>
+<span class="nc bnc" id="L100" title="All 4 branches missed.">        for (int i = 0; i &lt; blocks.count() &amp;&amp; i &lt; result.getBlocks().size(); i++) {</span>
+<span class="nc" id="L101">            RichBlocks.BlockAttr sourceBlock = result.getBlocks().get(i);</span>
+<span class="nc" id="L102">            RichBlocks.BlockAttr targetBlock = blocks.get(i);</span>
+<span class="nc" id="L103">            targetBlock.type = sourceBlock.type;</span>
+<span class="nc" id="L104">            targetBlock.align = sourceBlock.align;</span>
+<span class="nc" id="L105">            targetBlock.listType = sourceBlock.listType;</span>
+<span class="nc" id="L106">            targetBlock.indent = sourceBlock.indent;</span>
+        }
+<span class="nc" id="L108">        return RichTextSerializer.serialize(doc, inline, blocks, result.getLinks(),</span>
+<span class="nc" id="L109">                result.getImageSources(), target);</span>
+    }
+
+    /// Converts content to an HTML fragment. HTML input is returned unchanged and plain text is escaped.
+    public static String toHtml(String content, RichTextFormat format) {
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        String value = content == null ? &quot;&quot; : content;</span>
+<span class="nc bnc" id="L115" title="All 4 branches missed.">        if (format == null || format == RichTextFormat.PLAIN_TEXT) {</span>
+<span class="nc" id="L116">            return &quot;&lt;p&gt;&quot; + escape(value).replace(&quot;\n&quot;, &quot;&lt;br&gt;&quot;) + &quot;&lt;/p&gt;&quot;;</span>
+        }
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (format == RichTextFormat.HTML) {</span>
+<span class="nc" id="L119">            return value;</span>
+        }
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (format == RichTextFormat.RTF) {</span>
+<span class="nc" id="L122">            return rtfToHtml(value);</span>
+        }
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (format == RichTextFormat.ASCIIDOC) {</span>
+<span class="nc" id="L125">            return asciiDocToHtml(value);</span>
+        }
+<span class="nc" id="L127">        return markdownToHtml(value);</span>
+    }
+
+    private static String markdownToHtml(String source) {
+<span class="nc" id="L131">        List&lt;String&gt; lines = lines(source);</span>
+<span class="nc" id="L132">        StringBuilder out = new StringBuilder();</span>
+<span class="nc" id="L133">        String list = null;</span>
+<span class="nc" id="L134">        boolean fenced = false;</span>
+<span class="nc" id="L135">        StringBuilder code = new StringBuilder();</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        for (String line : lines) {</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">            if (line.startsWith(&quot;```&quot;)) {</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">                if (fenced) {</span>
+<span class="nc" id="L139">                    out.append(&quot;&lt;pre&gt;&quot;).append(escape(code.toString())).append(&quot;&lt;/pre&gt;&quot;);</span>
+<span class="nc" id="L140">                    code.setLength(0);</span>
+                }
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                fenced = !fenced;</span>
+<span class="nc" id="L143">                continue;</span>
+            }
+<span class="nc bnc" id="L145" title="All 2 branches missed.">            if (fenced) {</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">                if (code.length() &gt; 0) {</span>
+<span class="nc" id="L147">                    code.append('\n');</span>
+                }
+<span class="nc" id="L149">                code.append(line);</span>
+<span class="nc" id="L150">                continue;</span>
+            }
+<span class="nc" id="L152">            String nextList = markdownList(line);</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">            if (!equals(list, nextList)) {</span>
+<span class="nc" id="L154">                closeList(out, list);</span>
+<span class="nc" id="L155">                list = nextList;</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                if (list != null) {</span>
+<span class="nc" id="L157">                    out.append('&lt;').append(list).append('&gt;');</span>
+                }
+            }
+<span class="nc bnc" id="L160" title="All 2 branches missed.">            if (list != null) {</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">                int offset = &quot;ol&quot;.equals(list) ? orderedListOffset(line) : 2;</span>
+<span class="nc" id="L162">                out.append(&quot;&lt;li&gt;&quot;).append(markdownInline(line.substring(offset).trim())).append(&quot;&lt;/li&gt;&quot;);</span>
+<span class="nc" id="L163">                continue;</span>
+            }
+<span class="nc bnc" id="L165" title="All 2 branches missed.">            if (line.trim().length() == 0) {</span>
+<span class="nc" id="L166">                continue;</span>
+            }
+<span class="nc" id="L168">            int heading = headingLevel(line, '#');</span>
+<span class="nc bnc" id="L169" title="All 8 branches missed.">            if (heading &gt; 0 &amp;&amp; heading &lt;= 6 &amp;&amp; line.length() &gt; heading &amp;&amp; line.charAt(heading) == ' ') {</span>
+<span class="nc" id="L170">                out.append(&quot;&lt;h&quot;).append(heading).append('&gt;')</span>
+<span class="nc" id="L171">                        .append(markdownInline(line.substring(heading + 1))).append(&quot;&lt;/h&quot;).append(heading).append('&gt;');</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">            } else if (line.startsWith(&quot;&gt; &quot;)) {</span>
+<span class="nc" id="L173">                out.append(&quot;&lt;blockquote&gt;&quot;).append(markdownInline(line.substring(2))).append(&quot;&lt;/blockquote&gt;&quot;);</span>
+            } else {
+<span class="nc" id="L175">                out.append(&quot;&lt;p&gt;&quot;).append(markdownInline(line)).append(&quot;&lt;/p&gt;&quot;);</span>
+            }
+<span class="nc" id="L177">        }</span>
+<span class="nc" id="L178">        closeList(out, list);</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        if (fenced) {</span>
+<span class="nc" id="L180">            out.append(&quot;&lt;pre&gt;&quot;).append(escape(code.toString())).append(&quot;&lt;/pre&gt;&quot;);</span>
+        }
+<span class="nc" id="L182">        return out.toString();</span>
+    }
+
+    private static HtmlImporter.Result parseLightweightMarkup(String source, boolean asciidoc) {
+<span class="fc" id="L186">        ModelBuilder out = new ModelBuilder();</span>
+<span class="fc" id="L187">        List&lt;String&gt; sourceLines = lines(source);</span>
+<span class="fc" id="L188">        boolean literal = false;</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        for (String line : sourceLines) {</span>
+<span class="fc" id="L190">            String trimmed = line.trim();</span>
+<span class="pc bpc" id="L191" title="2 of 6 branches missed.">            boolean fence = asciidoc ? &quot;----&quot;.equals(trimmed) || &quot;....&quot;.equals(trimmed)</span>
+<span class="fc" id="L192">                    : line.startsWith(&quot;```&quot;);</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">            if (fence) {</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">                literal = !literal;</span>
+<span class="nc" id="L195">                continue;</span>
+            }
+<span class="pc bpc" id="L197" title="1 of 4 branches missed.">            if (asciidoc &amp;&amp; line.startsWith(&quot;[source&quot;)) {</span>
+<span class="nc" id="L198">                continue;</span>
+            }
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">            if (literal) {</span>
+<span class="nc" id="L201">                out.startBlock(RichBlocks.PRE, RichBlocks.LIST_NONE);</span>
+<span class="nc" id="L202">                out.append(line, TextStyle.DEFAULT, null);</span>
+<span class="nc" id="L203">                continue;</span>
+            }
+
+<span class="fc" id="L206">            int type = RichBlocks.PARAGRAPH;</span>
+<span class="fc" id="L207">            int listType = RichBlocks.LIST_NONE;</span>
+<span class="fc" id="L208">            String inline = line;</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            int heading = headingLevel(line, asciidoc ? '=' : '#');</span>
+<span class="pc bpc" id="L210" title="3 of 8 branches missed.">            if (heading &gt; 0 &amp;&amp; heading &lt;= 6 &amp;&amp; line.length() &gt; heading &amp;&amp; line.charAt(heading) == ' ') {</span>
+<span class="fc" id="L211">                type = RichBlocks.H1 + heading - 1;</span>
+<span class="fc" id="L212">                inline = line.substring(heading + 1);</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">            } else if (line.startsWith(&quot;&gt; &quot;)) {</span>
+<span class="nc" id="L214">                type = RichBlocks.BLOCKQUOTE;</span>
+<span class="nc" id="L215">                inline = line.substring(2);</span>
+            } else {
+<span class="fc bfc" id="L217" title="All 2 branches covered.">                String list = asciidoc ? asciiDocList(line) : markdownList(line);</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">                if (list != null) {</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">                    listType = &quot;ol&quot;.equals(list) ? RichBlocks.LIST_ORDERED : RichBlocks.LIST_UNORDERED;</span>
+<span class="fc bfc" id="L220" title="All 4 branches covered.">                    int offset = asciidoc ? 2 : (listType == RichBlocks.LIST_ORDERED</span>
+<span class="fc" id="L221">                            ? orderedListOffset(line) : 2);</span>
+<span class="fc" id="L222">                    inline = line.substring(Math.min(offset, line.length())).trim();</span>
+                }
+            }
+<span class="fc" id="L225">            out.startBlock(type, listType);</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">            if (asciidoc) {</span>
+<span class="fc" id="L227">                appendAsciiDocInline(out, inline, TextStyle.DEFAULT, null);</span>
+            } else {
+<span class="fc" id="L229">                appendMarkdownInline(out, inline, TextStyle.DEFAULT, null);</span>
+            }
+<span class="fc" id="L231">        }</span>
+<span class="fc" id="L232">        return out.result(true);</span>
+    }
+
+    private static void appendMarkdownInline(ModelBuilder out, String value, TextStyle style, String href) {
+<span class="fc" id="L236">        int i = 0;</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        while (i &lt; value.length()) {</span>
+<span class="pc bpc" id="L238" title="1 of 4 branches missed.">            if (value.charAt(i) == '\\' &amp;&amp; i + 1 &lt; value.length()) {</span>
+<span class="fc" id="L239">                out.append(String.valueOf(value.charAt(i + 1)), style, href);</span>
+<span class="fc" id="L240">                i += 2;</span>
+<span class="fc" id="L241">                continue;</span>
+            }
+<span class="fc bfc" id="L243" title="All 2 branches covered.">            if (value.startsWith(&quot;[![&quot;, i)) {</span>
+<span class="fc" id="L244">                int labelEnd = value.indexOf(']', i + 3);</span>
+<span class="pc bpc" id="L245" title="2 of 4 branches missed.">                int imageEnd = labelEnd &gt;= 0 &amp;&amp; labelEnd + 1 &lt; value.length()</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">                        &amp;&amp; value.charAt(labelEnd + 1) == '(' ? value.indexOf(')', labelEnd + 2) : -1;</span>
+<span class="pc bpc" id="L247" title="2 of 4 branches missed.">                int outerEnd = imageEnd &gt;= 0 &amp;&amp; imageEnd + 1 &lt; value.length()</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">                        &amp;&amp; value.charAt(imageEnd + 1) == ']' ? imageEnd + 1 : -1;</span>
+<span class="pc bpc" id="L249" title="2 of 4 branches missed.">                int linkEnd = outerEnd &gt;= 0 &amp;&amp; outerEnd + 1 &lt; value.length()</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">                        &amp;&amp; value.charAt(outerEnd + 1) == '(' ? value.indexOf(')', outerEnd + 2) : -1;</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">                if (linkEnd &gt; 0) {</span>
+<span class="fc" id="L252">                    out.appendImage(value.substring(labelEnd + 2, imageEnd),</span>
+<span class="fc" id="L253">                            value.substring(outerEnd + 2, linkEnd));</span>
+<span class="fc" id="L254">                    i = linkEnd + 1;</span>
+<span class="fc" id="L255">                    continue;</span>
+                }
+            }
+<span class="fc bfc" id="L258" title="All 2 branches covered.">            if (value.startsWith(&quot;![&quot;, i)) {</span>
+<span class="fc" id="L259">                int labelEnd = value.indexOf(']', i + 2);</span>
+<span class="pc bpc" id="L260" title="2 of 4 branches missed.">                int urlEnd = labelEnd &gt;= 0 &amp;&amp; labelEnd + 1 &lt; value.length()</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">                        &amp;&amp; value.charAt(labelEnd + 1) == '(' ? value.indexOf(')', labelEnd + 2) : -1;</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">                if (urlEnd &gt; 0) {</span>
+<span class="fc" id="L263">                    out.appendImage(value.substring(labelEnd + 2, urlEnd), href);</span>
+<span class="fc" id="L264">                    i = urlEnd + 1;</span>
+<span class="fc" id="L265">                    continue;</span>
+                }
+            }
+<span class="fc bfc" id="L268" title="All 2 branches covered.">            if (value.charAt(i) == '[') {</span>
+<span class="fc" id="L269">                int labelEnd = value.indexOf(']', i + 1);</span>
+<span class="pc bpc" id="L270" title="2 of 4 branches missed.">                int urlEnd = labelEnd &gt;= 0 &amp;&amp; labelEnd + 1 &lt; value.length()</span>
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">                        &amp;&amp; value.charAt(labelEnd + 1) == '(' ? value.indexOf(')', labelEnd + 2) : -1;</span>
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">                if (urlEnd &gt; 0) {</span>
+<span class="fc" id="L273">                    appendMarkdownInline(out, value.substring(i + 1, labelEnd), style,</span>
+<span class="fc" id="L274">                            value.substring(labelEnd + 2, urlEnd));</span>
+<span class="fc" id="L275">                    i = urlEnd + 1;</span>
+<span class="fc" id="L276">                    continue;</span>
+                }
+            }
+<span class="fc bfc" id="L279" title="All 2 branches covered.">            if (value.charAt(i) == '`') {</span>
+<span class="fc" id="L280">                int end = value.indexOf('`', i + 1);</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">                if (end &gt; i + 1) {</span>
+<span class="fc" id="L282">                    out.append(value.substring(i + 1, end), style.withMonospace(true), href);</span>
+<span class="fc" id="L283">                    i = end + 1;</span>
+<span class="fc" id="L284">                    continue;</span>
+                }
+            }
+<span class="fc" id="L287">            String marker = markerAt(value, i);</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">            if (marker != null) {</span>
+<span class="fc" id="L289">                int end = value.indexOf(marker, i + marker.length());</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">                if (end &gt; i + marker.length()) {</span>
+<span class="fc" id="L291">                    TextStyle nested = style;</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">                    if (&quot;~~&quot;.equals(marker)) {</span>
+<span class="nc" id="L293">                        nested = nested.withStrike(true);</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">                    } else if (marker.length() == 2) {</span>
+<span class="fc" id="L295">                        nested = nested.withBold(true);</span>
+                    } else {
+<span class="fc" id="L297">                        nested = nested.withItalic(true);</span>
+                    }
+<span class="fc" id="L299">                    appendMarkdownInline(out, value.substring(i + marker.length(), end), nested, href);</span>
+<span class="fc" id="L300">                    i = end + marker.length();</span>
+<span class="fc" id="L301">                    continue;</span>
+                }
+            }
+<span class="fc" id="L304">            int next = nextMarkdownSpecial(value, i + 1);</span>
+<span class="fc" id="L305">            out.append(value.substring(i, next), style, href);</span>
+<span class="fc" id="L306">            i = next;</span>
+<span class="fc" id="L307">        }</span>
+<span class="fc" id="L308">    }</span>
+
+    private static int nextMarkdownSpecial(String value, int from) {
+<span class="fc" id="L311">        int i = from;</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">        while (i &lt; value.length()) {</span>
+<span class="fc" id="L313">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L314" title="3 of 14 branches missed.">            if (c == '\\' || c == '[' || c == '!' || c == '*' || c == '_' || c == '~' || c == '`') {</span>
+<span class="fc" id="L315">                break;</span>
+            }
+<span class="fc" id="L317">            i++;</span>
+<span class="fc" id="L318">        }</span>
+<span class="fc" id="L319">        return i;</span>
+    }
+
+    private static void appendAsciiDocInline(ModelBuilder out, String value, TextStyle style, String href) {
+<span class="fc" id="L323">        int i = 0;</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">        while (i &lt; value.length()) {</span>
+<span class="pc bpc" id="L325" title="1 of 4 branches missed.">            if (value.charAt(i) == '\\' &amp;&amp; i + 1 &lt; value.length()) {</span>
+<span class="fc" id="L326">                out.append(String.valueOf(value.charAt(i + 1)), style, href);</span>
+<span class="fc" id="L327">                i += 2;</span>
+<span class="fc" id="L328">                continue;</span>
+            }
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">            if (value.startsWith(&quot;image:&quot;, i)) {</span>
+<span class="nc" id="L331">                int open = value.indexOf('[', i + 6);</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">                int close = open &lt; 0 ? -1 : value.indexOf(']', open + 1);</span>
+<span class="nc bnc" id="L333" title="All 4 branches missed.">                if (open &gt; i + 6 &amp;&amp; close &gt;= 0) {</span>
+<span class="nc" id="L334">                    out.appendImage(value.substring(i + 6, open), href);</span>
+<span class="nc" id="L335">                    i = close + 1;</span>
+<span class="nc" id="L336">                    continue;</span>
+                }
+            }
+<span class="pc bpc" id="L339" title="1 of 4 branches missed.">            if (value.startsWith(&quot;http://&quot;, i) || value.startsWith(&quot;https://&quot;, i)) {</span>
+<span class="fc" id="L340">                int open = value.indexOf('[', i);</span>
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">                int close = open &lt; 0 ? -1 : findMatchingBracket(value, open);</span>
+<span class="pc bpc" id="L342" title="2 of 4 branches missed.">                if (open &gt; i &amp;&amp; close &gt; open) {</span>
+<span class="fc" id="L343">                    String target = value.substring(i, open);</span>
+<span class="fc" id="L344">                    String label = value.substring(open + 1, close);</span>
+<span class="pc bpc" id="L345" title="1 of 4 branches missed.">                    if (label.startsWith(&quot;image:&quot;) &amp;&amp; label.endsWith(&quot;[]&quot;)) {</span>
+<span class="fc" id="L346">                        out.appendImage(label.substring(6, label.length() - 2), target);</span>
+<span class="fc" id="L347">                        i = close + 1;</span>
+<span class="fc" id="L348">                        continue;</span>
+                    }
+<span class="fc" id="L350">                    appendAsciiDocInline(out, label, style, target);</span>
+<span class="fc" id="L351">                    i = close + 1;</span>
+<span class="fc" id="L352">                    continue;</span>
+                }
+            }
+<span class="fc bfc" id="L355" title="All 4 branches covered.">            if (value.startsWith(&quot;[line-through]#&quot;, i) || value.startsWith(&quot;[underline]#&quot;, i)) {</span>
+<span class="fc" id="L356">                boolean strike = value.startsWith(&quot;[line-through]#&quot;, i);</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">                int prefix = strike ? 15 : 12;</span>
+<span class="fc" id="L358">                int end = value.indexOf('#', i + prefix);</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">                if (end &gt; i + prefix) {</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">                    TextStyle nested = strike ? style.withStrike(true) : style.withUnderline(true);</span>
+<span class="fc" id="L361">                    appendAsciiDocInline(out, value.substring(i + prefix, end), nested, href);</span>
+<span class="fc" id="L362">                    i = end + 1;</span>
+<span class="fc" id="L363">                    continue;</span>
+                }
+            }
+<span class="fc" id="L366">            char marker = value.charAt(i);</span>
+<span class="pc bpc" id="L367" title="1 of 6 branches missed.">            if (marker == '*' || marker == '_' || marker == '+') {</span>
+<span class="fc" id="L368">                int end = value.indexOf(marker, i + 1);</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">                if (end &gt; i + 1) {</span>
+<span class="pc bpc" id="L370" title="1 of 4 branches missed.">                    TextStyle nested = marker == '*' ? style.withBold(true)</span>
+<span class="pc" id="L371">                            : (marker == '_' ? style.withItalic(true) : style.withMonospace(true));</span>
+<span class="fc" id="L372">                    appendAsciiDocInline(out, value.substring(i + 1, end), nested, href);</span>
+<span class="fc" id="L373">                    i = end + 1;</span>
+<span class="fc" id="L374">                    continue;</span>
+                }
+            }
+<span class="fc" id="L377">            int next = i + 1;</span>
+<span class="fc bfc" id="L378" title="All 2 branches covered.">            while (next &lt; value.length()) {</span>
+<span class="fc" id="L379">                char c = value.charAt(next);</span>
+<span class="pc bpc" id="L380" title="1 of 8 branches missed.">                if (c == '\\' || c == '*' || c == '_' || c == '+'</span>
+<span class="fc bfc" id="L381" title="All 2 branches covered.">                        || value.startsWith(&quot;[line-through]#&quot;, next)</span>
+<span class="pc bpc" id="L382" title="1 of 4 branches missed.">                        || value.startsWith(&quot;[underline]#&quot;, next) || value.startsWith(&quot;http://&quot;, next)</span>
+<span class="pc bpc" id="L383" title="1 of 4 branches missed.">                        || value.startsWith(&quot;https://&quot;, next) || value.startsWith(&quot;image:&quot;, next)) {</span>
+<span class="nc" id="L384">                    break;</span>
+                }
+<span class="fc" id="L386">                next++;</span>
+<span class="fc" id="L387">            }</span>
+<span class="fc" id="L388">            out.append(value.substring(i, next), style, href);</span>
+<span class="fc" id="L389">            i = next;</span>
+<span class="fc" id="L390">        }</span>
+<span class="fc" id="L391">    }</span>
+
+    private static int findMatchingBracket(String value, int open) {
+<span class="fc" id="L394">        int depth = 0;</span>
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">        for (int i = open; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L396">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">            if (c == '\\') {</span>
+<span class="nc" id="L398">                i++;</span>
+<span class="fc bfc" id="L399" title="All 2 branches covered.">            } else if (c == '[') {</span>
+<span class="fc" id="L400">                depth++;</span>
+<span class="fc bfc" id="L401" title="All 2 branches covered.">            } else if (c == ']') {</span>
+<span class="fc" id="L402">                depth--;</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">                if (depth == 0) {</span>
+<span class="fc" id="L404">                    return i;</span>
+                }
+            }
+        }
+<span class="nc" id="L408">        return -1;</span>
+    }
+
+<span class="fc" id="L411">    private static final class ModelBuilder {</span>
+<span class="fc" id="L412">        @SuppressWarnings(&quot;PMD.AvoidStringBufferField&quot;)</span>
+        private final StringBuilder text = new StringBuilder();
+<span class="fc" id="L414">        private final List&lt;TextStyle&gt; styles = new ArrayList&lt;TextStyle&gt;();</span>
+<span class="fc" id="L415">        private final List&lt;RichBlocks.BlockAttr&gt; blocks = new ArrayList&lt;RichBlocks.BlockAttr&gt;();</span>
+<span class="fc" id="L416">        private final List&lt;String&gt; links = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L417">        private final List&lt;String&gt; imageSources = new ArrayList&lt;String&gt;();</span>
+
+        void startBlock(int type, int listType) {
+<span class="fc bfc" id="L420" title="All 2 branches covered.">            if (!blocks.isEmpty()) {</span>
+<span class="fc" id="L421">                append(&quot;\n&quot;, TextStyle.DEFAULT, null);</span>
+            }
+<span class="fc" id="L423">            RichBlocks.BlockAttr block = new RichBlocks.BlockAttr();</span>
+<span class="fc" id="L424">            block.type = type;</span>
+<span class="fc" id="L425">            block.listType = listType;</span>
+<span class="fc" id="L426">            blocks.add(block);</span>
+<span class="fc" id="L427">        }</span>
+
+        void append(String value, TextStyle style, String href) {
+<span class="fc bfc" id="L430" title="All 2 branches covered.">            for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L431">                text.append(value.charAt(i));</span>
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">                styles.add(style == null ? TextStyle.DEFAULT : style);</span>
+<span class="fc" id="L433">                links.add(href);</span>
+<span class="fc" id="L434">                imageSources.add(null);</span>
+            }
+<span class="fc" id="L436">        }</span>
+
+        void appendImage(String source, String href) {
+<span class="fc" id="L439">            text.append('\uFFFC');</span>
+<span class="fc" id="L440">            styles.add(TextStyle.DEFAULT);</span>
+<span class="fc" id="L441">            links.add(href);</span>
+<span class="fc" id="L442">            imageSources.add(source);</span>
+<span class="fc" id="L443">        }</span>
+
+        HtmlImporter.Result result(boolean blockContent) {
+<span class="pc bpc" id="L446" title="1 of 2 branches missed.">            if (blocks.isEmpty()) {</span>
+<span class="nc" id="L447">                blocks.add(new RichBlocks.BlockAttr());</span>
+            }
+<span class="fc" id="L449">            return new HtmlImporter.Result(text.toString(), styles, blocks, links, imageSources,</span>
+                    blockContent);
+        }
+    }
+
+    private static String asciiDocToHtml(String source) {
+<span class="nc" id="L455">        List&lt;String&gt; lines = lines(source);</span>
+<span class="nc" id="L456">        StringBuilder out = new StringBuilder();</span>
+<span class="nc" id="L457">        String list = null;</span>
+<span class="nc" id="L458">        boolean literal = false;</span>
+<span class="nc" id="L459">        StringBuilder code = new StringBuilder();</span>
+<span class="nc bnc" id="L460" title="All 2 branches missed.">        for (String line : lines) {</span>
+<span class="nc bnc" id="L461" title="All 4 branches missed.">            if (&quot;----&quot;.equals(line.trim()) || &quot;....&quot;.equals(line.trim())) {</span>
+<span class="nc bnc" id="L462" title="All 2 branches missed.">                if (literal) {</span>
+<span class="nc" id="L463">                    out.append(&quot;&lt;pre&gt;&quot;).append(escape(code.toString())).append(&quot;&lt;/pre&gt;&quot;);</span>
+<span class="nc" id="L464">                    code.setLength(0);</span>
+                }
+<span class="nc bnc" id="L466" title="All 2 branches missed.">                literal = !literal;</span>
+<span class="nc" id="L467">                continue;</span>
+            }
+<span class="nc bnc" id="L469" title="All 2 branches missed.">            if (literal) {</span>
+<span class="nc bnc" id="L470" title="All 2 branches missed.">                if (code.length() &gt; 0) {</span>
+<span class="nc" id="L471">                    code.append('\n');</span>
+                }
+<span class="nc" id="L473">                code.append(line);</span>
+<span class="nc" id="L474">                continue;</span>
+            }
+<span class="nc" id="L476">            String nextList = asciiDocList(line);</span>
+<span class="nc bnc" id="L477" title="All 2 branches missed.">            if (!equals(list, nextList)) {</span>
+<span class="nc" id="L478">                closeList(out, list);</span>
+<span class="nc" id="L479">                list = nextList;</span>
+<span class="nc bnc" id="L480" title="All 2 branches missed.">                if (list != null) {</span>
+<span class="nc" id="L481">                    out.append('&lt;').append(list).append('&gt;');</span>
+                }
+            }
+<span class="nc bnc" id="L484" title="All 2 branches missed.">            if (list != null) {</span>
+<span class="nc" id="L485">                out.append(&quot;&lt;li&gt;&quot;).append(asciiDocInline(line.substring(2).trim())).append(&quot;&lt;/li&gt;&quot;);</span>
+<span class="nc" id="L486">                continue;</span>
+            }
+<span class="nc bnc" id="L488" title="All 4 branches missed.">            if (line.trim().length() == 0 || line.startsWith(&quot;[source&quot;)) {</span>
+<span class="nc" id="L489">                continue;</span>
+            }
+<span class="nc" id="L491">            int heading = headingLevel(line, '=');</span>
+<span class="nc bnc" id="L492" title="All 8 branches missed.">            if (heading &gt; 0 &amp;&amp; heading &lt;= 6 &amp;&amp; line.length() &gt; heading &amp;&amp; line.charAt(heading) == ' ') {</span>
+<span class="nc" id="L493">                out.append(&quot;&lt;h&quot;).append(heading).append('&gt;')</span>
+<span class="nc" id="L494">                        .append(asciiDocInline(line.substring(heading + 1))).append(&quot;&lt;/h&quot;).append(heading).append('&gt;');</span>
+<span class="nc bnc" id="L495" title="All 2 branches missed.">            } else if (line.startsWith(&quot;&gt; &quot;)) {</span>
+<span class="nc" id="L496">                out.append(&quot;&lt;blockquote&gt;&quot;).append(asciiDocInline(line.substring(2))).append(&quot;&lt;/blockquote&gt;&quot;);</span>
+            } else {
+<span class="nc" id="L498">                out.append(&quot;&lt;p&gt;&quot;).append(asciiDocInline(line)).append(&quot;&lt;/p&gt;&quot;);</span>
+            }
+<span class="nc" id="L500">        }</span>
+<span class="nc" id="L501">        closeList(out, list);</span>
+<span class="nc bnc" id="L502" title="All 2 branches missed.">        if (literal) {</span>
+<span class="nc" id="L503">            out.append(&quot;&lt;pre&gt;&quot;).append(escape(code.toString())).append(&quot;&lt;/pre&gt;&quot;);</span>
+        }
+<span class="nc" id="L505">        return out.toString();</span>
+    }
+
+    private static String markdownInline(String value) {
+<span class="nc" id="L509">        StringBuilder out = new StringBuilder();</span>
+<span class="nc" id="L510">        int i = 0;</span>
+<span class="nc bnc" id="L511" title="All 2 branches missed.">        while (i &lt; value.length()) {</span>
+<span class="nc bnc" id="L512" title="All 4 branches missed.">            if (value.charAt(i) == '\\' &amp;&amp; i + 1 &lt; value.length()) {</span>
+<span class="nc" id="L513">                appendEscaped(out, value.charAt(i + 1));</span>
+<span class="nc" id="L514">                i += 2;</span>
+<span class="nc" id="L515">                continue;</span>
+            }
+<span class="nc bnc" id="L517" title="All 2 branches missed.">            if (value.startsWith(&quot;![&quot;, i)) {</span>
+<span class="nc" id="L518">                int labelEnd = value.indexOf(']', i + 2);</span>
+<span class="nc bnc" id="L519" title="All 6 branches missed.">                int urlEnd = labelEnd &gt;= 0 &amp;&amp; labelEnd + 1 &lt; value.length() &amp;&amp; value.charAt(labelEnd + 1) == '('</span>
+<span class="nc" id="L520">                        ? value.indexOf(')', labelEnd + 2) : -1;</span>
+<span class="nc bnc" id="L521" title="All 2 branches missed.">                if (urlEnd &gt; 0) {</span>
+<span class="nc" id="L522">                    out.append(&quot;&lt;img src=\&quot;&quot;).append(escapeAttribute(value.substring(labelEnd + 2, urlEnd))).append(&quot;\&quot;&gt;&quot;);</span>
+<span class="nc" id="L523">                    i = urlEnd + 1;</span>
+<span class="nc" id="L524">                    continue;</span>
+                }
+            }
+<span class="nc bnc" id="L527" title="All 2 branches missed.">            if (value.charAt(i) == '[') {</span>
+<span class="nc" id="L528">                int labelEnd = value.indexOf(']', i + 1);</span>
+<span class="nc bnc" id="L529" title="All 6 branches missed.">                int urlEnd = labelEnd &gt;= 0 &amp;&amp; labelEnd + 1 &lt; value.length() &amp;&amp; value.charAt(labelEnd + 1) == '('</span>
+<span class="nc" id="L530">                        ? value.indexOf(')', labelEnd + 2) : -1;</span>
+<span class="nc bnc" id="L531" title="All 2 branches missed.">                if (urlEnd &gt; 0) {</span>
+<span class="nc" id="L532">                    out.append(&quot;&lt;a href=\&quot;&quot;).append(escapeAttribute(value.substring(labelEnd + 2, urlEnd))).append(&quot;\&quot;&gt;&quot;)</span>
+<span class="nc" id="L533">                            .append(markdownInline(value.substring(i + 1, labelEnd))).append(&quot;&lt;/a&gt;&quot;);</span>
+<span class="nc" id="L534">                    i = urlEnd + 1;</span>
+<span class="nc" id="L535">                    continue;</span>
+                }
+            }
+<span class="nc" id="L538">            String marker = markerAt(value, i);</span>
+<span class="nc bnc" id="L539" title="All 2 branches missed.">            if (marker != null) {</span>
+<span class="nc" id="L540">                int end = value.indexOf(marker, i + marker.length());</span>
+<span class="nc bnc" id="L541" title="All 2 branches missed.">                if (end &gt; i + marker.length()) {</span>
+<span class="nc bnc" id="L542" title="All 4 branches missed.">                    String tag = &quot;~~&quot;.equals(marker) ? &quot;s&quot; : (marker.length() == 2 ? &quot;strong&quot; : &quot;em&quot;);</span>
+<span class="nc" id="L543">                    out.append('&lt;').append(tag).append('&gt;')</span>
+<span class="nc" id="L544">                            .append(markdownInline(value.substring(i + marker.length(), end)))</span>
+<span class="nc" id="L545">                            .append(&quot;&lt;/&quot;).append(tag).append('&gt;');</span>
+<span class="nc" id="L546">                    i = end + marker.length();</span>
+<span class="nc" id="L547">                    continue;</span>
+                }
+            }
+<span class="nc bnc" id="L550" title="All 2 branches missed.">            if (value.charAt(i) == '`') {</span>
+<span class="nc" id="L551">                int end = value.indexOf('`', i + 1);</span>
+<span class="nc bnc" id="L552" title="All 2 branches missed.">                if (end &gt; i) {</span>
+<span class="nc" id="L553">                    out.append(&quot;&lt;span&gt;&quot;).append(escape(value.substring(i + 1, end))).append(&quot;&lt;/span&gt;&quot;);</span>
+<span class="nc" id="L554">                    i = end + 1;</span>
+<span class="nc" id="L555">                    continue;</span>
+                }
+            }
+<span class="nc" id="L558">            appendEscaped(out, value.charAt(i++));</span>
+<span class="nc" id="L559">        }</span>
+<span class="nc" id="L560">        return out.toString();</span>
+    }
+
+    private static String asciiDocInline(String value) {
+<span class="nc" id="L564">        StringBuilder out = new StringBuilder();</span>
+<span class="nc" id="L565">        int i = 0;</span>
+<span class="nc bnc" id="L566" title="All 2 branches missed.">        while (i &lt; value.length()) {</span>
+<span class="nc bnc" id="L567" title="All 4 branches missed.">            if (value.startsWith(&quot;http://&quot;, i) || value.startsWith(&quot;https://&quot;, i)) {</span>
+<span class="nc" id="L568">                int bracket = value.indexOf('[', i);</span>
+<span class="nc bnc" id="L569" title="All 2 branches missed.">                int end = bracket &lt; 0 ? -1 : value.indexOf(']', bracket + 1);</span>
+<span class="nc bnc" id="L570" title="All 2 branches missed.">                if (end &gt; bracket) {</span>
+<span class="nc" id="L571">                    out.append(&quot;&lt;a href=\&quot;&quot;).append(escapeAttribute(value.substring(i, bracket))).append(&quot;\&quot;&gt;&quot;)</span>
+<span class="nc" id="L572">                            .append(escape(value.substring(bracket + 1, end))).append(&quot;&lt;/a&gt;&quot;);</span>
+<span class="nc" id="L573">                    i = end + 1;</span>
+<span class="nc" id="L574">                    continue;</span>
+                }
+            }
+<span class="nc" id="L577">            char marker = value.charAt(i);</span>
+<span class="nc bnc" id="L578" title="All 6 branches missed.">            if (marker == '*' || marker == '_' || marker == '`') {</span>
+<span class="nc" id="L579">                int end = value.indexOf(marker, i + 1);</span>
+<span class="nc bnc" id="L580" title="All 2 branches missed.">                if (end &gt; i + 1) {</span>
+<span class="nc bnc" id="L581" title="All 4 branches missed.">                    String tag = marker == '*' ? &quot;strong&quot; : (marker == '_' ? &quot;em&quot; : &quot;span&quot;);</span>
+<span class="nc" id="L582">                    out.append('&lt;').append(tag).append('&gt;').append(escape(value.substring(i + 1, end)))</span>
+<span class="nc" id="L583">                            .append(&quot;&lt;/&quot;).append(tag).append('&gt;');</span>
+<span class="nc" id="L584">                    i = end + 1;</span>
+<span class="nc" id="L585">                    continue;</span>
+                }
+            }
+<span class="nc" id="L588">            appendEscaped(out, value.charAt(i++));</span>
+<span class="nc" id="L589">        }</span>
+<span class="nc" id="L590">        return out.toString();</span>
+    }
+
+    private static String rtfToHtml(String source) {
+<span class="nc" id="L594">        RtfState state = new RtfState();</span>
+<span class="nc" id="L595">        List&lt;RtfState&gt; stack = new ArrayList&lt;RtfState&gt;();</span>
+<span class="nc" id="L596">        RtfState rendered = new RtfState();</span>
+<span class="nc" id="L597">        StringBuilder out = new StringBuilder(&quot;&lt;p&gt;&quot;);</span>
+<span class="nc" id="L598">        int skipFallback = 0;</span>
+<span class="nc bnc" id="L599" title="All 2 branches missed.">        for (int i = 0; i &lt; source.length();) {</span>
+<span class="nc" id="L600">            char c = source.charAt(i++);</span>
+<span class="nc bnc" id="L601" title="All 2 branches missed.">            if (c == '{') {</span>
+<span class="nc" id="L602">                stack.add(state.copy());</span>
+<span class="nc" id="L603">                continue;</span>
+            }
+<span class="nc bnc" id="L605" title="All 2 branches missed.">            if (c == '}') {</span>
+<span class="nc bnc" id="L606" title="All 2 branches missed.">                if (!stack.isEmpty()) {</span>
+<span class="nc" id="L607">                    state = stack.remove(stack.size() - 1);</span>
+                }
+                continue;
+            }
+<span class="nc bnc" id="L611" title="All 2 branches missed.">            if (c == '\\') {</span>
+<span class="nc bnc" id="L612" title="All 2 branches missed.">                if (i &gt;= source.length()) {</span>
+<span class="nc" id="L613">                    break;</span>
+                }
+<span class="nc" id="L615">                char next = source.charAt(i);</span>
+<span class="nc bnc" id="L616" title="All 6 branches missed.">                if (next == '\\' || next == '{' || next == '}') {</span>
+<span class="nc" id="L617">                    i++;</span>
+<span class="nc bnc" id="L618" title="All 2 branches missed.">                    if (!state.skip) {</span>
+<span class="nc bnc" id="L619" title="All 2 branches missed.">                        if (skipFallback &lt;= 0) {</span>
+<span class="nc" id="L620">                            syncRtfStyle(out, rendered, state);</span>
+<span class="nc" id="L621">                            appendEscaped(out, next);</span>
+                        }
+<span class="nc" id="L623">                        skipFallback--;</span>
+                    }
+                    continue;
+                }
+<span class="nc bnc" id="L627" title="All 2 branches missed.">                if (next == '\'') {</span>
+<span class="nc" id="L628">                    i++;</span>
+<span class="nc bnc" id="L629" title="All 2 branches missed.">                    if (i + 1 &lt; source.length()) {</span>
+<span class="nc" id="L630">                        int value = hex(source.charAt(i), source.charAt(i + 1));</span>
+<span class="nc" id="L631">                        i += 2;</span>
+<span class="nc bnc" id="L632" title="All 4 branches missed.">                        if (!state.skip &amp;&amp; value &gt;= 0) {</span>
+<span class="nc bnc" id="L633" title="All 2 branches missed.">                            if (skipFallback &lt;= 0) {</span>
+<span class="nc" id="L634">                                syncRtfStyle(out, rendered, state);</span>
+<span class="nc" id="L635">                                appendEscaped(out, (char) value);</span>
+                            }
+<span class="nc" id="L637">                            skipFallback--;</span>
+                        }
+<span class="nc" id="L639">                    }</span>
+                    continue;
+                }
+<span class="nc bnc" id="L642" title="All 2 branches missed.">                if (!isAsciiLetter(next)) {</span>
+<span class="nc" id="L643">                    i++;</span>
+<span class="nc bnc" id="L644" title="All 2 branches missed.">                    if (next == '*') {</span>
+<span class="nc" id="L645">                        state.skip = true;</span>
+<span class="nc bnc" id="L646" title="All 8 branches missed.">                    } else if (!state.skip &amp;&amp; (next == '~' || next == '_' || next == '-')) {</span>
+<span class="nc" id="L647">                        syncRtfStyle(out, rendered, state);</span>
+<span class="nc bnc" id="L648" title="All 2 branches missed.">                        appendEscaped(out, next == '~' ? ' ' : '-');</span>
+                    }
+                    continue;
+                }
+<span class="nc" id="L652">                int wordStart = i;</span>
+<span class="nc bnc" id="L653" title="All 4 branches missed.">                while (i &lt; source.length() &amp;&amp; isAsciiLetter(source.charAt(i))) {</span>
+<span class="nc" id="L654">                    i++;</span>
+                }
+<span class="nc" id="L656">                String word = source.substring(wordStart, i);</span>
+<span class="nc" id="L657">                int sign = 1;</span>
+<span class="nc bnc" id="L658" title="All 4 branches missed.">                if (i &lt; source.length() &amp;&amp; source.charAt(i) == '-') {</span>
+<span class="nc" id="L659">                    sign = -1;</span>
+<span class="nc" id="L660">                    i++;</span>
+                }
+<span class="nc" id="L662">                int numberStart = i;</span>
+<span class="nc bnc" id="L663" title="All 4 branches missed.">                while (i &lt; source.length() &amp;&amp; Character.isDigit(source.charAt(i))) {</span>
+<span class="nc" id="L664">                    i++;</span>
+                }
+<span class="nc bnc" id="L666" title="All 2 branches missed.">                boolean hasNumber = i &gt; numberStart;</span>
+<span class="nc bnc" id="L667" title="All 2 branches missed.">                int number = hasNumber ? sign * Integer.parseInt(source.substring(numberStart, i)) : 1;</span>
+<span class="nc bnc" id="L668" title="All 4 branches missed.">                if (i &lt; source.length() &amp;&amp; source.charAt(i) == ' ') {</span>
+<span class="nc" id="L669">                    i++;</span>
+                }
+<span class="nc bnc" id="L671" title="All 2 branches missed.">                if (isRtfDestination(word)) {</span>
+<span class="nc" id="L672">                    state.skip = true;</span>
+<span class="nc bnc" id="L673" title="All 2 branches missed.">                } else if (&quot;b&quot;.equals(word)) {</span>
+<span class="nc bnc" id="L674" title="All 2 branches missed.">                    state.bold = number != 0;</span>
+<span class="nc bnc" id="L675" title="All 2 branches missed.">                } else if (&quot;i&quot;.equals(word)) {</span>
+<span class="nc bnc" id="L676" title="All 2 branches missed.">                    state.italic = number != 0;</span>
+<span class="nc bnc" id="L677" title="All 2 branches missed.">                } else if (&quot;ul&quot;.equals(word)) {</span>
+<span class="nc bnc" id="L678" title="All 2 branches missed.">                    state.underline = number != 0;</span>
+<span class="nc bnc" id="L679" title="All 2 branches missed.">                } else if (&quot;ulnone&quot;.equals(word)) {</span>
+<span class="nc" id="L680">                    state.underline = false;</span>
+<span class="nc bnc" id="L681" title="All 2 branches missed.">                } else if (&quot;strike&quot;.equals(word)) {</span>
+<span class="nc bnc" id="L682" title="All 2 branches missed.">                    state.strike = number != 0;</span>
+<span class="nc bnc" id="L683" title="All 2 branches missed.">                } else if (&quot;plain&quot;.equals(word)) {</span>
+<span class="nc" id="L684">                    state.bold = state.italic = state.underline = state.strike = false;</span>
+<span class="nc bnc" id="L685" title="All 4 branches missed.">                } else if (&quot;par&quot;.equals(word) || &quot;line&quot;.equals(word)) {</span>
+<span class="nc bnc" id="L686" title="All 2 branches missed.">                    if (!state.skip) {</span>
+<span class="nc" id="L687">                        closeRtfStyle(out, rendered);</span>
+<span class="nc" id="L688">                        out.append(&quot;&lt;/p&gt;&lt;p&gt;&quot;);</span>
+                    }
+<span class="nc bnc" id="L690" title="All 4 branches missed.">                } else if (&quot;tab&quot;.equals(word) &amp;&amp; !state.skip) {</span>
+<span class="nc" id="L691">                    syncRtfStyle(out, rendered, state);</span>
+<span class="nc" id="L692">                    out.append(&quot;&amp;#9;&quot;);</span>
+<span class="nc bnc" id="L693" title="All 4 branches missed.">                } else if (&quot;uc&quot;.equals(word) &amp;&amp; hasNumber) {</span>
+<span class="nc" id="L694">                    state.unicodeFallback = Math.max(0, number);</span>
+<span class="nc bnc" id="L695" title="All 6 branches missed.">                } else if (&quot;u&quot;.equals(word) &amp;&amp; hasNumber &amp;&amp; !state.skip) {</span>
+<span class="nc" id="L696">                    syncRtfStyle(out, rendered, state);</span>
+<span class="nc bnc" id="L697" title="All 2 branches missed.">                    int unicode = number &lt; 0 ? number + 65536 : number;</span>
+<span class="nc" id="L698">                    appendEscaped(out, (char) unicode);</span>
+<span class="nc" id="L699">                    skipFallback = state.unicodeFallback;</span>
+<span class="nc" id="L700">                }</span>
+                continue;
+            }
+<span class="nc bnc" id="L703" title="All 6 branches missed.">            if (c == '\r' || c == '\n' || state.skip) {</span>
+<span class="nc" id="L704">                continue;</span>
+            }
+<span class="nc bnc" id="L706" title="All 2 branches missed.">            if (skipFallback &gt; 0) {</span>
+<span class="nc" id="L707">                skipFallback--;</span>
+<span class="nc" id="L708">                continue;</span>
+            }
+<span class="nc" id="L710">            syncRtfStyle(out, rendered, state);</span>
+<span class="nc" id="L711">            appendEscaped(out, c);</span>
+<span class="nc" id="L712">        }</span>
+<span class="nc" id="L713">        closeRtfStyle(out, rendered);</span>
+<span class="nc" id="L714">        return out.append(&quot;&lt;/p&gt;&quot;).toString();</span>
+    }
+
+    private static HtmlImporter.Result parseRtf(String source) {
+<span class="fc" id="L718">        ModelBuilder out = new ModelBuilder();</span>
+<span class="fc" id="L719">        out.startBlock(RichBlocks.PARAGRAPH, RichBlocks.LIST_NONE);</span>
+<span class="fc" id="L720">        RtfState state = new RtfState();</span>
+<span class="fc" id="L721">        List&lt;RtfState&gt; stack = new ArrayList&lt;RtfState&gt;();</span>
+<span class="fc" id="L722">        int skipFallback = 0;</span>
+<span class="fc bfc" id="L723" title="All 2 branches covered.">        for (int i = 0; i &lt; source.length();) {</span>
+<span class="fc" id="L724">            char c = source.charAt(i++);</span>
+<span class="fc bfc" id="L725" title="All 2 branches covered.">            if (c == '{') {</span>
+<span class="fc" id="L726">                stack.add(state.copy());</span>
+<span class="fc" id="L727">                continue;</span>
+            }
+<span class="fc bfc" id="L729" title="All 2 branches covered.">            if (c == '}') {</span>
+<span class="pc bpc" id="L730" title="1 of 2 branches missed.">                if (!stack.isEmpty()) {</span>
+<span class="fc" id="L731">                    state = stack.remove(stack.size() - 1);</span>
+                }
+                continue;
+            }
+<span class="fc bfc" id="L735" title="All 2 branches covered.">            if (c == '\\') {</span>
+<span class="pc bpc" id="L736" title="1 of 2 branches missed.">                if (i &gt;= source.length()) {</span>
+<span class="nc" id="L737">                    break;</span>
+                }
+<span class="fc" id="L739">                char next = source.charAt(i);</span>
+<span class="pc bpc" id="L740" title="3 of 6 branches missed.">                if (next == '\\' || next == '{' || next == '}') {</span>
+<span class="nc" id="L741">                    i++;</span>
+<span class="nc bnc" id="L742" title="All 2 branches missed.">                    if (!state.skip) {</span>
+<span class="nc bnc" id="L743" title="All 2 branches missed.">                        boolean appendCharacter = skipFallback &lt;= 0;</span>
+<span class="nc" id="L744">                        skipFallback--;</span>
+<span class="nc bnc" id="L745" title="All 2 branches missed.">                        if (appendCharacter) {</span>
+<span class="nc" id="L746">                            out.append(String.valueOf(next), rtfStyle(state), null);</span>
+                        }
+<span class="nc" id="L748">                    }</span>
+                    continue;
+                }
+<span class="pc bpc" id="L751" title="1 of 2 branches missed.">                if (next == '\'') {</span>
+<span class="nc" id="L752">                    i++;</span>
+<span class="nc bnc" id="L753" title="All 2 branches missed.">                    if (i + 1 &lt; source.length()) {</span>
+<span class="nc" id="L754">                        int value = hex(source.charAt(i), source.charAt(i + 1));</span>
+<span class="nc" id="L755">                        i += 2;</span>
+<span class="nc bnc" id="L756" title="All 4 branches missed.">                        if (!state.skip &amp;&amp; value &gt;= 0) {</span>
+<span class="nc bnc" id="L757" title="All 2 branches missed.">                            boolean appendCharacter = skipFallback &lt;= 0;</span>
+<span class="nc" id="L758">                            skipFallback--;</span>
+<span class="nc bnc" id="L759" title="All 2 branches missed.">                            if (appendCharacter) {</span>
+<span class="nc" id="L760">                                out.append(String.valueOf((char) value), rtfStyle(state), null);</span>
+                            }
+                        }
+<span class="nc" id="L763">                    }</span>
+                    continue;
+                }
+<span class="pc bpc" id="L766" title="1 of 2 branches missed.">                if (!isAsciiLetter(next)) {</span>
+<span class="nc" id="L767">                    i++;</span>
+<span class="nc bnc" id="L768" title="All 2 branches missed.">                    if (next == '*') {</span>
+<span class="nc" id="L769">                        state.skip = true;</span>
+<span class="nc bnc" id="L770" title="All 8 branches missed.">                    } else if (!state.skip &amp;&amp; (next == '~' || next == '_' || next == '-')) {</span>
+<span class="nc bnc" id="L771" title="All 2 branches missed.">                        out.append(next == '~' ? &quot; &quot; : &quot;-&quot;, rtfStyle(state), null);</span>
+                    }
+                    continue;
+                }
+<span class="fc" id="L775">                int wordStart = i;</span>
+<span class="pc bpc" id="L776" title="1 of 4 branches missed.">                while (i &lt; source.length() &amp;&amp; isAsciiLetter(source.charAt(i))) {</span>
+<span class="fc" id="L777">                    i++;</span>
+                }
+<span class="fc" id="L779">                String word = source.substring(wordStart, i);</span>
+<span class="fc" id="L780">                int sign = 1;</span>
+<span class="pc bpc" id="L781" title="2 of 4 branches missed.">                if (i &lt; source.length() &amp;&amp; source.charAt(i) == '-') {</span>
+<span class="nc" id="L782">                    sign = -1;</span>
+<span class="nc" id="L783">                    i++;</span>
+                }
+<span class="fc" id="L785">                int numberStart = i;</span>
+<span class="pc bpc" id="L786" title="1 of 4 branches missed.">                while (i &lt; source.length() &amp;&amp; Character.isDigit(source.charAt(i))) {</span>
+<span class="fc" id="L787">                    i++;</span>
+                }
+<span class="fc bfc" id="L789" title="All 2 branches covered.">                boolean hasNumber = i &gt; numberStart;</span>
+<span class="fc bfc" id="L790" title="All 2 branches covered.">                int number = hasNumber ? sign * Integer.parseInt(source.substring(numberStart, i)) : 1;</span>
+<span class="pc bpc" id="L791" title="1 of 4 branches missed.">                if (i &lt; source.length() &amp;&amp; source.charAt(i) == ' ') {</span>
+<span class="fc" id="L792">                    i++;</span>
+                }
+<span class="fc bfc" id="L794" title="All 2 branches covered.">                if (isRtfDestination(word)) {</span>
+<span class="fc" id="L795">                    state.skip = true;</span>
+<span class="fc bfc" id="L796" title="All 2 branches covered.">                } else if (&quot;b&quot;.equals(word)) {</span>
+<span class="pc bpc" id="L797" title="1 of 2 branches missed.">                    state.bold = number != 0;</span>
+<span class="fc bfc" id="L798" title="All 2 branches covered.">                } else if (&quot;i&quot;.equals(word)) {</span>
+<span class="pc bpc" id="L799" title="1 of 2 branches missed.">                    state.italic = number != 0;</span>
+<span class="fc bfc" id="L800" title="All 2 branches covered.">                } else if (&quot;ul&quot;.equals(word)) {</span>
+<span class="pc bpc" id="L801" title="1 of 2 branches missed.">                    state.underline = number != 0;</span>
+<span class="pc bpc" id="L802" title="1 of 2 branches missed.">                } else if (&quot;ulnone&quot;.equals(word)) {</span>
+<span class="nc" id="L803">                    state.underline = false;</span>
+<span class="fc bfc" id="L804" title="All 2 branches covered.">                } else if (&quot;strike&quot;.equals(word)) {</span>
+<span class="pc bpc" id="L805" title="1 of 2 branches missed.">                    state.strike = number != 0;</span>
+<span class="pc bpc" id="L806" title="1 of 2 branches missed.">                } else if (&quot;plain&quot;.equals(word)) {</span>
+<span class="nc" id="L807">                    state.bold = state.italic = state.underline = state.strike = false;</span>
+<span class="pc bpc" id="L808" title="2 of 6 branches missed.">                } else if ((&quot;par&quot;.equals(word) || &quot;line&quot;.equals(word)) &amp;&amp; !state.skip) {</span>
+<span class="fc" id="L809">                    out.startBlock(RichBlocks.PARAGRAPH, RichBlocks.LIST_NONE);</span>
+<span class="pc bpc" id="L810" title="3 of 4 branches missed.">                } else if (&quot;tab&quot;.equals(word) &amp;&amp; !state.skip) {</span>
+<span class="nc" id="L811">                    out.append(&quot;\t&quot;, rtfStyle(state), null);</span>
+<span class="pc bpc" id="L812" title="3 of 4 branches missed.">                } else if (&quot;uc&quot;.equals(word) &amp;&amp; hasNumber) {</span>
+<span class="nc" id="L813">                    state.unicodeFallback = Math.max(0, number);</span>
+<span class="pc bpc" id="L814" title="2 of 6 branches missed.">                } else if (&quot;u&quot;.equals(word) &amp;&amp; hasNumber &amp;&amp; !state.skip) {</span>
+<span class="pc bpc" id="L815" title="1 of 2 branches missed.">                    int unicode = number &lt; 0 ? number + 65536 : number;</span>
+<span class="fc" id="L816">                    out.append(String.valueOf((char) unicode), rtfStyle(state), null);</span>
+<span class="fc" id="L817">                    skipFallback = state.unicodeFallback;</span>
+<span class="fc" id="L818">                }</span>
+                continue;
+            }
+<span class="pc bpc" id="L821" title="2 of 6 branches missed.">            if (c == '\r' || c == '\n' || state.skip) {</span>
+<span class="fc" id="L822">                continue;</span>
+            }
+<span class="fc bfc" id="L824" title="All 2 branches covered.">            if (skipFallback &gt; 0) {</span>
+<span class="fc" id="L825">                skipFallback--;</span>
+<span class="fc" id="L826">                continue;</span>
+            }
+<span class="fc" id="L828">            out.append(String.valueOf(c), rtfStyle(state), null);</span>
+<span class="fc" id="L829">        }</span>
+<span class="fc" id="L830">        return out.result(true);</span>
+    }
+
+    private static TextStyle rtfStyle(RtfState state) {
+<span class="fc" id="L834">        return TextStyle.DEFAULT.withBold(state.bold).withItalic(state.italic)</span>
+<span class="fc" id="L835">                .withUnderline(state.underline).withStrike(state.strike);</span>
+    }
+
+    private static boolean isRtfDestination(String word) {
+<span class="pc bpc" id="L839" title="2 of 6 branches missed.">        return &quot;fonttbl&quot;.equals(word) || &quot;colortbl&quot;.equals(word) || &quot;stylesheet&quot;.equals(word)</span>
+<span class="pc bpc" id="L840" title="3 of 6 branches missed.">                || &quot;info&quot;.equals(word) || &quot;pict&quot;.equals(word) || &quot;object&quot;.equals(word)</span>
+<span class="pc bpc" id="L841" title="3 of 6 branches missed.">                || &quot;header&quot;.equals(word) || &quot;footer&quot;.equals(word) || &quot;fldinst&quot;.equals(word);</span>
+    }
+
+    private static void syncRtfStyle(StringBuilder out, RtfState rendered, RtfState desired) {
+<span class="nc bnc" id="L845" title="All 2 branches missed.">        if (rendered.sameStyle(desired)) {</span>
+<span class="nc" id="L846">            return;</span>
+        }
+<span class="nc" id="L848">        closeRtfStyle(out, rendered);</span>
+<span class="nc bnc" id="L849" title="All 2 branches missed.">        if (desired.bold) {</span>
+<span class="nc" id="L850">            out.append(&quot;&lt;strong&gt;&quot;);</span>
+        }
+<span class="nc bnc" id="L852" title="All 2 branches missed.">        if (desired.italic) {</span>
+<span class="nc" id="L853">            out.append(&quot;&lt;em&gt;&quot;);</span>
+        }
+<span class="nc bnc" id="L855" title="All 2 branches missed.">        if (desired.underline) {</span>
+<span class="nc" id="L856">            out.append(&quot;&lt;u&gt;&quot;);</span>
+        }
+<span class="nc bnc" id="L858" title="All 2 branches missed.">        if (desired.strike) {</span>
+<span class="nc" id="L859">            out.append(&quot;&lt;s&gt;&quot;);</span>
+        }
+<span class="nc" id="L861">        rendered.setStyle(desired);</span>
+<span class="nc" id="L862">    }</span>
+
+    private static void closeRtfStyle(StringBuilder out, RtfState rendered) {
+<span class="nc bnc" id="L865" title="All 2 branches missed.">        if (rendered.strike) {</span>
+<span class="nc" id="L866">            out.append(&quot;&lt;/s&gt;&quot;);</span>
+        }
+<span class="nc bnc" id="L868" title="All 2 branches missed.">        if (rendered.underline) {</span>
+<span class="nc" id="L869">            out.append(&quot;&lt;/u&gt;&quot;);</span>
+        }
+<span class="nc bnc" id="L871" title="All 2 branches missed.">        if (rendered.italic) {</span>
+<span class="nc" id="L872">            out.append(&quot;&lt;/em&gt;&quot;);</span>
+        }
+<span class="nc bnc" id="L874" title="All 2 branches missed.">        if (rendered.bold) {</span>
+<span class="nc" id="L875">            out.append(&quot;&lt;/strong&gt;&quot;);</span>
+        }
+<span class="nc" id="L877">        rendered.bold = rendered.italic = rendered.underline = rendered.strike = false;</span>
+<span class="nc" id="L878">    }</span>
+
+<span class="fc" id="L880">    private static final class RtfState {</span>
+        boolean bold;
+        boolean italic;
+        boolean underline;
+        boolean strike;
+        boolean skip;
+<span class="fc" id="L886">        int unicodeFallback = 1;</span>
+
+        RtfState copy() {
+<span class="fc" id="L889">            RtfState result = new RtfState();</span>
+<span class="fc" id="L890">            result.bold = bold;</span>
+<span class="fc" id="L891">            result.italic = italic;</span>
+<span class="fc" id="L892">            result.underline = underline;</span>
+<span class="fc" id="L893">            result.strike = strike;</span>
+<span class="fc" id="L894">            result.skip = skip;</span>
+<span class="fc" id="L895">            result.unicodeFallback = unicodeFallback;</span>
+<span class="fc" id="L896">            return result;</span>
+        }
+
+        boolean sameStyle(RtfState other) {
+<span class="nc bnc" id="L900" title="All 8 branches missed.">            return bold == other.bold &amp;&amp; italic == other.italic &amp;&amp; underline == other.underline</span>
+                    &amp;&amp; strike == other.strike;
+        }
+
+        void setStyle(RtfState other) {
+<span class="nc" id="L905">            bold = other.bold;</span>
+<span class="nc" id="L906">            italic = other.italic;</span>
+<span class="nc" id="L907">            underline = other.underline;</span>
+<span class="nc" id="L908">            strike = other.strike;</span>
+<span class="nc" id="L909">        }</span>
+    }
+
+    private static String markerAt(String value, int offset) {
+<span class="pc bpc" id="L913" title="1 of 4 branches missed.">        if (value.startsWith(&quot;**&quot;, offset) || value.startsWith(&quot;__&quot;, offset)) {</span>
+<span class="fc" id="L914">            return value.substring(offset, offset + 2);</span>
+        }
+<span class="pc bpc" id="L916" title="1 of 2 branches missed.">        if (value.startsWith(&quot;~~&quot;, offset)) {</span>
+<span class="nc" id="L917">            return &quot;~~&quot;;</span>
+        }
+<span class="fc" id="L919">        char c = value.charAt(offset);</span>
+<span class="pc bpc" id="L920" title="1 of 4 branches missed.">        return c == '*' || c == '_' ? String.valueOf(c) : null;</span>
+    }
+
+    private static String markdownList(String line) {
+<span class="pc bpc" id="L924" title="2 of 6 branches missed.">        if (line.startsWith(&quot;- &quot;) || line.startsWith(&quot;* &quot;) || line.startsWith(&quot;+ &quot;)) {</span>
+<span class="fc" id="L925">            return &quot;ul&quot;;</span>
+        }
+<span class="fc bfc" id="L927" title="All 2 branches covered.">        return orderedListOffset(line) &gt; 0 ? &quot;ol&quot; : null;</span>
+    }
+
+    private static int orderedListOffset(String line) {
+<span class="fc" id="L931">        int i = 0;</span>
+<span class="fc bfc" id="L932" title="All 4 branches covered.">        while (i &lt; line.length() &amp;&amp; Character.isDigit(line.charAt(i))) {</span>
+<span class="fc" id="L933">            i++;</span>
+        }
+<span class="pc bpc" id="L935" title="3 of 8 branches missed.">        return i &gt; 0 &amp;&amp; i + 1 &lt; line.length() &amp;&amp; line.charAt(i) == '.' &amp;&amp; line.charAt(i + 1) == ' '</span>
+                ? i + 2 : 0;
+    }
+
+    private static String asciiDocList(String line) {
+<span class="pc bpc" id="L940" title="1 of 2 branches missed.">        if (line.startsWith(&quot;* &quot;)) {</span>
+<span class="nc" id="L941">            return &quot;ul&quot;;</span>
+        }
+<span class="fc bfc" id="L943" title="All 2 branches covered.">        return line.startsWith(&quot;. &quot;) ? &quot;ol&quot; : null;</span>
+    }
+
+    private static int headingLevel(String line, char marker) {
+<span class="fc" id="L947">        int i = 0;</span>
+<span class="fc bfc" id="L948" title="All 4 branches covered.">        while (i &lt; line.length() &amp;&amp; line.charAt(i) == marker) {</span>
+<span class="fc" id="L949">            i++;</span>
+        }
+<span class="fc" id="L951">        return i;</span>
+    }
+
+    private static void closeList(StringBuilder out, String list) {
+<span class="nc bnc" id="L955" title="All 2 branches missed.">        if (list != null) {</span>
+<span class="nc" id="L956">            out.append(&quot;&lt;/&quot;).append(list).append('&gt;');</span>
+        }
+<span class="nc" id="L958">    }</span>
+
+    private static boolean equals(String a, String b) {
+<span class="nc bnc" id="L961" title="All 4 branches missed.">        return a == null ? b == null : a.equals(b);</span>
+    }
+
+    private static List&lt;String&gt; lines(String source) {
+<span class="fc" id="L965">        List&lt;String&gt; result = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L966">        int start = 0;</span>
+<span class="fc bfc" id="L967" title="All 2 branches covered.">        for (int i = 0; i &lt; source.length(); i++) {</span>
+<span class="fc bfc" id="L968" title="All 2 branches covered.">            if (source.charAt(i) == '\n') {</span>
+<span class="pc bpc" id="L969" title="1 of 4 branches missed.">                int end = i &gt; start &amp;&amp; source.charAt(i - 1) == '\r' ? i - 1 : i;</span>
+<span class="fc" id="L970">                result.add(source.substring(start, end));</span>
+<span class="fc" id="L971">                start = i + 1;</span>
+            }
+        }
+<span class="fc" id="L974">        result.add(source.substring(start));</span>
+<span class="fc" id="L975">        return result;</span>
+    }
+
+    private static int hex(char high, char low) {
+<span class="nc" id="L979">        int h = Character.digit(high, 16);</span>
+<span class="nc" id="L980">        int l = Character.digit(low, 16);</span>
+<span class="nc bnc" id="L981" title="All 4 branches missed.">        return h &lt; 0 || l &lt; 0 ? -1 : (h &lt;&lt; 4) | l;</span>
+    }
+
+    private static boolean isAsciiLetter(char value) {
+<span class="pc bpc" id="L985" title="1 of 8 branches missed.">        return value &gt;= 'A' &amp;&amp; value &lt;= 'Z' || value &gt;= 'a' &amp;&amp; value &lt;= 'z';</span>
+    }
+
+    private static String escape(String value) {
+<span class="nc" id="L989">        StringBuilder out = new StringBuilder(value.length());</span>
+<span class="nc bnc" id="L990" title="All 2 branches missed.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="nc" id="L991">            appendEscaped(out, value.charAt(i));</span>
+        }
+<span class="nc" id="L993">        return out.toString();</span>
+    }
+
+    private static String escapeAttribute(String value) {
+<span class="nc" id="L997">        return escape(value).replace(&quot;\&quot;&quot;, &quot;&amp;quot;&quot;);</span>
+    }
+
+    private static void appendEscaped(StringBuilder out, char c) {
+<span class="nc bnc" id="L1001" title="All 2 branches missed.">        if (c == '&amp;') {</span>
+<span class="nc" id="L1002">            out.append(&quot;&amp;amp;&quot;);</span>
+<span class="nc bnc" id="L1003" title="All 2 branches missed.">        } else if (c == '&lt;') {</span>
+<span class="nc" id="L1004">            out.append(&quot;&amp;lt;&quot;);</span>
+<span class="nc bnc" id="L1005" title="All 2 branches missed.">        } else if (c == '&gt;') {</span>
+<span class="nc" id="L1006">            out.append(&quot;&amp;gt;&quot;);</span>
+<span class="nc bnc" id="L1007" title="All 2 branches missed.">        } else if (c == '&quot;') {</span>
+<span class="nc" id="L1008">            out.append(&quot;&amp;quot;&quot;);</span>
+        } else {
+<span class="nc" id="L1010">            out.append(c);</span>
+        }
+<span class="nc" id="L1012">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

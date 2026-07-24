@@ -1,0 +1,519 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Login.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.social</a> &gt; <span class="el_source">Login.java</span></div><h1>Login.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.social;
+
+import com.codename1.compat.java.util.Objects;
+import com.codename1.io.AccessToken;
+import com.codename1.io.Log;
+import com.codename1.io.Oauth2;
+import com.codename1.io.Oauth2.RefreshTokenRequest;
+import com.codename1.io.Preferences;
+import com.codename1.io.Storage;
+import com.codename1.io.Util;
+import com.codename1.ui.CN;
+import com.codename1.ui.Display;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.util.AsyncResource;
+
+import java.io.IOException;
+import java.util.ArrayList;
+
+/// The Login abstract base class is used to simplify Oauth2 authentications
+/// services.
+/// Services can override the default Oauth2 web login and offers the native login
+/// experience.
+///
+/// @author Chen
+<span class="fc" id="L48">public abstract class Login {</span>
+
+
+<span class="fc" id="L51">    private final ArrayList&lt;LoginCallback&gt; loginCallbacksSingleUse = new ArrayList&lt;LoginCallback&gt;();</span>
+<span class="fc" id="L52">    LoginCallback callback = new LoginCallBackProxy();</span>
+    String oauth2URL;
+    String clientId;
+    String redirectURI;
+    String clientSecret;
+    String scope;
+    private LoginCallback loginCallback;
+<span class="fc" id="L59">    private boolean callbackEnabled = true;</span>
+<span class="fc" id="L60">    private String validateErr = null;</span>
+    private AccessToken token;
+    // A flag that is used in the javascript port to optionally use a redirect instead of
+    // a popup for the signin prompt.  Redirect is better for UX, but it also means that
+    // you leave the app and restart it after login, which may be a non-starter.
+    // So this needs to be explicitly enabled by the app.
+<span class="fc" id="L66">    private boolean preferRedirectPrompt = false;</span>
+
+    /// Adds the given scopes to the OAuth2 login request.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scopes`: Scopes to add.
+    ///
+    /// #### Returns
+    ///
+    /// Self for chaining.
+    ///
+    /// #### See also
+    ///
+    /// - #setScope(java.lang.String)
+    public Login addScopes(String... scopes) {
+<span class="nc" id="L82">        ArrayList&lt;String&gt; existing = new ArrayList&lt;String&gt;();</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (scope != null) {</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">            for (String str : Util.split(scope, &quot; &quot;)) {</span>
+<span class="nc" id="L85">                str = str.trim();</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">                if (str.length() == 0) {</span>
+<span class="nc" id="L87">                    continue;</span>
+                }
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                if (!existing.contains(str)) {</span>
+<span class="nc" id="L90">                    existing.add(str);</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        for (String scope : scopes) {</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            if (scope.trim().length() == 0) {</span>
+<span class="nc" id="L96">                continue;</span>
+            }
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            if (!existing.contains(scope)) {</span>
+<span class="nc" id="L99">                existing.add(scope);</span>
+            }
+        }
+<span class="nc" id="L102">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L103">        boolean first = true;</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        for (String scope : existing) {</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">            if (first) {</span>
+<span class="nc" id="L106">                first = false;</span>
+            } else {
+<span class="nc" id="L108">                sb.append(&quot; &quot;);</span>
+            }
+<span class="nc" id="L110">            sb.append(scope);</span>
+<span class="nc" id="L111">        }</span>
+<span class="nc" id="L112">        scope = sb.toString();</span>
+<span class="nc" id="L113">        return this;</span>
+    }
+
+    /// Connects to the login service asynchronously, automatically logging in
+    /// if not yet logged in.
+    ///
+    /// #### Returns
+    ///
+    /// AsyncResource that can be monitored for completion.
+    ///
+    public AsyncResource&lt;Login&gt; connect() {
+<span class="fc" id="L124">        final AsyncResource&lt;Login&gt; out = new AsyncResource&lt;Login&gt;();</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (isUserLoggedIn()) {</span>
+<span class="fc" id="L126">            out.complete(this);</span>
+        } else {
+<span class="nc" id="L128">            doLogin(new LoginCallback() {</span>
+                @Override
+                public void loginSuccessful() {
+<span class="nc" id="L131">                    out.complete(Login.this);</span>
+<span class="nc" id="L132">                }</span>
+
+                @Override
+                public void loginFailed(String errorMessage) {
+<span class="nc" id="L136">                    out.error(new RuntimeException(errorMessage));</span>
+<span class="nc" id="L137">                }</span>
+            });
+        }
+<span class="fc" id="L140">        return out;</span>
+    }
+
+    /// Initiates login using the given single-use callback.
+    ///
+    /// #### Parameters
+    ///
+    /// - `callback`: Callback to be called if login succeeds or fails.
+    ///
+    public void doLogin(LoginCallback callback) {
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (callback != null) {</span>
+<span class="fc" id="L151">            loginCallbacksSingleUse.add(callback);</span>
+        }
+<span class="fc" id="L153">        doLogin();</span>
+<span class="fc" id="L154">    }</span>
+
+    /// Logs in the user.
+    /// If the service has a native login it will try to use that, otherwise an
+    /// Oauth2 web login will be used.
+    public void doLogin() {
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        if (isNativeLoginSupported()) {</span>
+<span class="nc" id="L161">            nativelogin();</span>
+        } else {
+
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">            if (oauth2URL == null) {</span>
+<span class="nc" id="L165">                System.out.println(&quot;No oauth2URL found Use setOauth2URL&quot;);</span>
+<span class="nc" id="L166">                return;</span>
+            }
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">            if (clientId == null) {</span>
+<span class="nc" id="L169">                System.out.println(&quot;No ClientId found Use setClientId&quot;);</span>
+<span class="nc" id="L170">                return;</span>
+            }
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            if (redirectURI == null) {</span>
+<span class="nc" id="L173">                System.out.println(&quot;No redirectURI found Use setRedirectURI&quot;);</span>
+<span class="nc" id="L174">                return;</span>
+            }
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">            if (clientSecret == null) {</span>
+<span class="nc" id="L177">                System.out.println(&quot;No clientSecret found Use setClientSecret&quot;);</span>
+<span class="nc" id="L178">                return;</span>
+            }
+
+<span class="fc" id="L181">            Oauth2 auth = createOauth2();</span>
+<span class="fc" id="L182">            auth.showAuthentication(new ActionListener() {</span>
+
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    //success
+<span class="fc bfc" id="L187" title="All 2 branches covered.">                    if (evt.getSource() instanceof AccessToken) {</span>
+<span class="fc" id="L188">                        AccessToken t = (AccessToken) evt.getSource();</span>
+<span class="fc" id="L189">                        setAccessToken(t);</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">                        if (callback != null) {</span>
+<span class="fc" id="L191">                            callback.loginSuccessful();</span>
+                        }
+<span class="fc" id="L193">                        return;</span>
+                    }
+<span class="fc bfc" id="L195" title="All 2 branches covered.">                    if (evt.getSource() instanceof String) {</span>
+<span class="fc" id="L196">                        String t = (String) evt.getSource();</span>
+<span class="fc" id="L197">                        setAccessToken(new AccessToken(t, null));</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">                        if (callback != null) {</span>
+<span class="fc" id="L199">                            callback.loginSuccessful();</span>
+                        }
+<span class="fc" id="L201">                        return;</span>
+                    }
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">                    if (evt.getSource() instanceof Exception) {</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">                        if (callback != null) {</span>
+<span class="fc" id="L205">                            Exception e = (Exception) evt.getSource();</span>
+<span class="fc" id="L206">                            Log.e(e);</span>
+<span class="fc" id="L207">                            System.out.println(&quot;Calling loginFailed of callback &quot; + callback);</span>
+<span class="fc" id="L208">                            String msg = e.getMessage();</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">                            if (msg == null) {</span>
+<span class="nc" id="L210">                                msg = &quot;Unknown error&quot;;</span>
+                            }
+<span class="fc" id="L212">                            callback.loginFailed(msg);</span>
+                        }
+
+                    }
+
+<span class="fc" id="L217">                }</span>
+
+            });
+
+        }
+
+<span class="fc" id="L223">    }</span>
+
+    /// Logs out the current user
+    public void doLogout() {
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (isNativeLoginSupported()) {</span>
+<span class="fc" id="L228">            nativeLogout();</span>
+        } else {
+<span class="fc" id="L230">            setAccessToken(null);</span>
+        }
+<span class="fc" id="L232">        Preferences.delete(getClass().getName() + &quot;Token&quot;);</span>
+<span class="fc" id="L233">    }</span>
+
+    /// Indicates if the user is currently logged in
+    ///
+    /// #### Returns
+    ///
+    /// true if logged in
+    public boolean isUserLoggedIn() {
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        if (isNativeLoginSupported()) {</span>
+<span class="nc" id="L242">            return nativeIsLoggedIn();</span>
+        } else {
+<span class="fc" id="L244">            AccessToken accessTok = getAccessToken();</span>
+<span class="pc bpc" id="L245" title="3 of 6 branches missed.">            if (accessTok != null &amp;&amp; accessTok.getExpiryDate() != null &amp;&amp; accessTok.isExpired()) {</span>
+<span class="nc" id="L246">                return false;</span>
+            }
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            return token != null;</span>
+        }
+    }
+
+    /// Indicates if the user is currently logged in.
+    /// Subclasses that uses a native sdk to login/logout should override this
+    /// method.
+    ///
+    /// #### Returns
+    ///
+    /// true if logged in
+    public boolean nativeIsLoggedIn() {
+<span class="nc" id="L260">        throw new RuntimeException(&quot;Native isLoggedIn not implemented&quot;);</span>
+    }
+
+    /// Logs in the current user natively.
+    /// Subclasses that uses a native sdk to login/logout should override this
+    /// method.
+    public void nativelogin() {
+<span class="nc" id="L267">        throw new RuntimeException(&quot;Native login not implemented&quot;);</span>
+    }
+
+    /// Logs out the current user natively.
+    /// Subclasses that uses a native sdk to login/logout should override this
+    /// method.
+    public void nativeLogout() {
+<span class="nc" id="L274">        throw new RuntimeException(&quot;Native logout not implemented&quot;);</span>
+    }
+
+
+    /// Returns true if this service supports native login.
+    /// If implementation returns true here, the nativelogin, nativelogout,
+    /// nativeIsLoggedIn should be implemented
+    ///
+    /// #### Returns
+    ///
+    /// true if the service supports native login
+    public abstract boolean isNativeLoginSupported();
+
+    /// The AccessToken of this service
+    ///
+    /// #### Returns
+    ///
+    /// the token
+    public AccessToken getAccessToken() {
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        if (token == null) {</span>
+<span class="fc" id="L294">            Util.register(new AccessToken());</span>
+<span class="fc" id="L295">            token = (AccessToken) Storage.getInstance().readObject(getClass().getName() + &quot;AccessToken&quot;);</span>
+        }
+<span class="fc" id="L297">        return token;</span>
+    }
+
+    /// Sets the Login access token
+    public void setAccessToken(AccessToken token) {
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">        if (!Objects.equals(token, this.token)) {</span>
+<span class="fc" id="L303">            this.token = token;</span>
+<span class="fc" id="L304">            Storage.getInstance().writeObject(getClass().getName() + &quot;AccessToken&quot;, token);</span>
+        }
+<span class="fc" id="L306">    }</span>
+
+    /// This method tries to validate the last access token if exists, if the
+    /// last token is not valid anymore it will try to login the user in order to
+    /// get a fresh token
+    /// The method blocks until a valid token has been granted
+    public void validateToken() throws IOException {
+
+<span class="fc" id="L314">        String token = Preferences.get(getClass().getName() + &quot;Token&quot;, null);</span>
+<span class="pc bpc" id="L315" title="3 of 4 branches missed.">        if (token == null || !validateToken(token)) {</span>
+<span class="fc" id="L316">            AccessToken accessTok = getAccessToken();</span>
+<span class="pc bpc" id="L317" title="2 of 4 branches missed.">            if (accessTok != null &amp;&amp; accessTok.getRefreshToken() != null) {</span>
+<span class="nc" id="L318">                String refreshTok = accessTok.getRefreshToken();</span>
+<span class="nc" id="L319">                RefreshTokenRequest refreshReq = createOauth2().refreshToken(refreshTok);</span>
+                try {
+<span class="nc" id="L321">                    System.out.println(&quot;Attempting to refresh the access token&quot;);</span>
+<span class="nc" id="L322">                    AccessToken newTok = refreshReq.get(5000);</span>
+<span class="nc" id="L323">                    setAccessToken(newTok);</span>
+<span class="nc" id="L324">                    Preferences.set(getClass().getName() + &quot;Token&quot;, getAccessToken().getToken());</span>
+<span class="nc" id="L325">                    return;</span>
+<span class="nc" id="L326">                } catch (Throwable t) {</span>
+<span class="nc" id="L327">                    Log.e(t);</span>
+                }
+            }
+
+            // At this point We'll need to attempt to login again.
+<span class="fc" id="L332">            callbackEnabled = false;</span>
+<span class="fc" id="L333">            doLogin();</span>
+<span class="fc" id="L334">            Display.getInstance().invokeAndBlock(new Runnable() {</span>
+
+                @Override
+                public void run() {
+<span class="fc bfc" id="L338" title="All 2 branches covered.">                    while (!callbackEnabled) {</span>
+<span class="fc" id="L339">                        Util.sleep(100);</span>
+                    }
+<span class="fc" id="L341">                }</span>
+            });
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">            if (validateErr != null) {</span>
+<span class="nc" id="L344">                throw new IOException(validateErr);</span>
+            }
+        }
+<span class="fc" id="L347">    }</span>
+
+    /// Returns true if the previous granted access token is still valid otherwise
+    /// false.
+    ///
+    /// #### Parameters
+    ///
+    /// - `token`: the access token to check
+    ///
+    /// #### Returns
+    ///
+    /// true of the token is valid
+    protected abstract boolean validateToken(String token);
+
+    /// Sets the login callback that will receive event callback notification
+    /// from the API
+    ///
+    /// #### Parameters
+    ///
+    /// - `lc`: @param lc the login callback or null to remove the existing login
+    /// callback
+    public void setCallback(LoginCallback lc) {
+<span class="fc" id="L369">        loginCallback = lc;</span>
+<span class="fc" id="L370">    }</span>
+
+
+    /// The client id (appid) which asks to connect
+    ///
+    /// #### Parameters
+    ///
+    /// - `clientId`
+    public void setClientId(String id) {
+<span class="fc" id="L379">        clientId = id;</span>
+<span class="fc" id="L380">    }</span>
+
+    /// The client secret
+    ///
+    /// #### Parameters
+    ///
+    /// - `clientSecret`
+    public void setClientSecret(String secret) {
+<span class="fc" id="L388">        clientSecret = secret;</span>
+<span class="fc" id="L389">    }</span>
+
+    /// The redirect URI
+    ///
+    /// #### Parameters
+    ///
+    /// - `redirectURI`
+    public void setRedirectURI(String redirectURI) {
+<span class="fc" id="L397">        this.redirectURI = redirectURI;</span>
+<span class="fc" id="L398">    }</span>
+
+    /// The authentication scope
+    public void setScope(String scope) {
+<span class="fc" id="L402">        this.scope = scope;</span>
+<span class="fc" id="L403">    }</span>
+
+    /// The oauth2 URL
+    public void setOauth2URL(String oauth2URL) {
+<span class="fc" id="L407">        this.oauth2URL = oauth2URL;</span>
+<span class="fc" id="L408">    }</span>
+
+    /// Creates the oauth2 to be used to login in case no native login is available
+    /// for this service.
+    ///
+    /// #### Returns
+    ///
+    /// @return the Oauth2 to be used to login if no native login available and
+    /// on the simulator
+    protected Oauth2 createOauth2() {
+<span class="fc" id="L418">        return new Oauth2(oauth2URL, clientId, redirectURI, scope);</span>
+    }
+
+    /// A flag used by the javascript port to indicate that the login will use a redirect
+    /// for the prompt instead of a popup.   On the web, a redirect is usually better UX
+    /// but it can be problematic since it involves leaving the app, and reloading it
+    /// after the login.
+    ///
+    /// #### Returns
+    ///
+    /// the preferRedirectPrompt
+    ///
+    public boolean isPreferRedirectPrompt() {
+<span class="nc" id="L431">        return preferRedirectPrompt;</span>
+    }
+
+    /// A flag used by the javascript port to indicate that the login will use a redirect
+    /// for the prompt instead of a popup.   On the web, a redirect is usually better UX
+    /// but it can be problematic since it involves leaving the app, and reloading it
+    /// after the login.
+    ///
+    /// #### Parameters
+    ///
+    /// - `preferRedirectPrompt`: the preferRedirectPrompt to set
+    ///
+    public void setPreferRedirectPrompt(boolean preferRedirectPrompt) {
+<span class="nc" id="L444">        this.preferRedirectPrompt = preferRedirectPrompt;</span>
+<span class="nc" id="L445">    }</span>
+
+<span class="fc" id="L447">    class LoginCallBackProxy extends LoginCallback {</span>
+
+        @Override
+        public void loginSuccessful() {
+            // Analytics auto-instrumentation: emit a &quot;login&quot; event tagged with
+            // the provider. Consent-gated and a no-op when no provider is
+            // registered; never throws into the login flow.
+<span class="fc" id="L454">            java.util.HashMap&lt;String, Object&gt; loginEvt = new java.util.HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L455">            loginEvt.put(&quot;service&quot;, Login.this.getClass().getSimpleName());</span>
+<span class="fc" id="L456">            com.codename1.analytics.Analytics.autoEvent(&quot;login&quot;, &quot;auth&quot;, loginEvt);</span>
+
+            //store the access token upon login success for future use
+<span class="fc" id="L459">            Preferences.set(Login.this.getClass().getName() + &quot;Token&quot;, getAccessToken().getToken());</span>
+
+<span class="fc bfc" id="L461" title="All 2 branches covered.">            if (callbackEnabled) {</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">                if (loginCallback != null) {</span>
+<span class="fc" id="L463">                    loginCallback.loginSuccessful();</span>
+                }
+<span class="fc bfc" id="L465" title="All 2 branches covered.">                while (!loginCallbacksSingleUse.isEmpty()) {</span>
+<span class="fc" id="L466">                    final LoginCallback cb = loginCallbacksSingleUse.remove(0);</span>
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">                    if (!CN.isEdt()) {</span>
+<span class="fc" id="L468">                        CN.callSerially(new Runnable() {</span>
+                            @Override
+                            public void run() {
+<span class="fc" id="L471">                                cb.loginSuccessful();</span>
+<span class="fc" id="L472">                            }</span>
+                        });
+                    } else {
+<span class="nc" id="L475">                        cb.loginSuccessful();</span>
+                    }
+<span class="fc" id="L477">                }</span>
+<span class="fc" id="L478">                return;</span>
+            }
+<span class="fc" id="L480">            callbackEnabled = true;</span>
+<span class="fc" id="L481">            validateErr = null;</span>
+<span class="fc" id="L482">        }</span>
+
+        @Override
+        public void loginFailed(final String errorMessage) {
+            // Analytics auto-instrumentation: the failure half of the auth
+            // funnel. Consent-gated, no-op without a provider, never throws.
+<span class="fc" id="L488">            java.util.HashMap&lt;String, Object&gt; failEvt = new java.util.HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L489">            failEvt.put(&quot;service&quot;, Login.this.getClass().getSimpleName());</span>
+<span class="pc bpc" id="L490" title="1 of 2 branches missed.">            if (errorMessage != null) {</span>
+<span class="fc" id="L491">                failEvt.put(&quot;error&quot;, errorMessage);</span>
+            }
+<span class="fc" id="L493">            com.codename1.analytics.Analytics.autoEvent(&quot;login_failed&quot;, &quot;auth&quot;, failEvt);</span>
+
+<span class="pc bpc" id="L495" title="1 of 2 branches missed.">            if (callbackEnabled) {</span>
+<span class="pc bpc" id="L496" title="1 of 2 branches missed.">                if (loginCallback != null) {</span>
+<span class="nc" id="L497">                    loginCallback.loginFailed(errorMessage);</span>
+                }
+<span class="fc bfc" id="L499" title="All 2 branches covered.">                while (!loginCallbacksSingleUse.isEmpty()) {</span>
+<span class="fc" id="L500">                    final LoginCallback cb = loginCallbacksSingleUse.remove(0);</span>
+<span class="pc bpc" id="L501" title="1 of 2 branches missed.">                    if (!CN.isEdt()) {</span>
+<span class="fc" id="L502">                        CN.callSerially(new Runnable() {</span>
+                            @Override
+                            public void run() {
+<span class="fc" id="L505">                                cb.loginFailed(errorMessage);</span>
+<span class="fc" id="L506">                            }</span>
+                        });
+                    } else {
+<span class="nc" id="L509">                        cb.loginFailed(errorMessage);</span>
+                    }
+<span class="fc" id="L511">                }</span>
+<span class="fc" id="L512">                return;</span>
+            }
+<span class="nc" id="L514">            callbackEnabled = true;</span>
+<span class="nc" id="L515">            validateErr = errorMessage;</span>
+<span class="nc" id="L516">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AccessibilityAssertions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.accessibility</a> &gt; <span class="el_source">AccessibilityAssertions.java</span></div><h1>AccessibilityAssertions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.accessibility;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+/// Automated semantic-tree assertions suitable for unit tests and CI.
+public final class AccessibilityAssertions {
+    private AccessibilityAssertions() {
+    }
+
+    public static List&lt;AccessibilityIssue&gt; audit(AccessibilityTreeSnapshot tree) {
+<span class="fc" id="L36">        List&lt;AccessibilityIssue&gt; issues = new ArrayList&lt;AccessibilityIssue&gt;();</span>
+<span class="fc" id="L37">        Set&lt;String&gt; identifiers = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (AccessibilityNodeSnapshot node : tree.getNodes().values()) {</span>
+<span class="fc" id="L39">            auditNode(tree, node, identifiers, issues);</span>
+<span class="fc" id="L40">        }</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (Long root : tree.getRootIds()) {</span>
+<span class="fc" id="L42">            detectCycle(tree, root.longValue(), new HashSet&lt;Long&gt;(), new HashSet&lt;Long&gt;(), issues);</span>
+<span class="fc" id="L43">        }</span>
+<span class="fc" id="L44">        return issues;</span>
+    }
+
+    public static void assertNoErrors(AccessibilityTreeSnapshot tree) {
+<span class="fc" id="L48">        List&lt;AccessibilityIssue&gt; issues = audit(tree);</span>
+<span class="fc" id="L49">        StringBuilder errors = new StringBuilder();</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        for (AccessibilityIssue issue : issues) {</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            if (issue.getSeverity() == AccessibilityIssue.Severity.ERROR) {</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">                if (errors.length() &gt; 0) {</span>
+<span class="fc" id="L53">                    errors.append('\n');</span>
+                }
+<span class="fc" id="L55">                errors.append(issue.toString());</span>
+            }
+<span class="fc" id="L57">        }</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (errors.length() &gt; 0) {</span>
+<span class="fc" id="L59">            throw new AssertionError(errors.toString());</span>
+        }
+<span class="fc" id="L61">    }</span>
+
+    public static void assertNoUnlabeledInteractiveNodes(AccessibilityTreeSnapshot tree) {
+<span class="nc" id="L64">        StringBuilder errors = new StringBuilder();</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        for (AccessibilityNodeSnapshot node : tree.getNodes().values()) {</span>
+<span class="nc bnc" id="L66" title="All 6 branches missed.">            if (node.isFocusable() &amp;&amp; empty(node.getLabel()) &amp;&amp; empty(node.getValue())) {</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">                if (errors.length() &gt; 0) {</span>
+<span class="nc" id="L68">                    errors.append('\n');</span>
+                }
+<span class="nc" id="L70">                errors.append(&quot;Interactive node &quot;).append(node.getId()).append(&quot; (&quot;)</span>
+<span class="nc" id="L71">                        .append(node.getRole()).append(&quot;) has no accessible name&quot;);</span>
+            }
+<span class="nc" id="L73">        }</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        if (errors.length() &gt; 0) {</span>
+<span class="nc" id="L75">            throw new AssertionError(errors.toString());</span>
+        }
+<span class="nc" id="L77">    }</span>
+
+    private static void auditNode(AccessibilityTreeSnapshot tree, AccessibilityNodeSnapshot node,
+            Set&lt;String&gt; identifiers, List&lt;AccessibilityIssue&gt; issues) {
+<span class="pc bpc" id="L81" title="1 of 6 branches missed.">        if (node.isFocusable() &amp;&amp; empty(node.getLabel()) &amp;&amp; empty(node.getValue())) {</span>
+<span class="fc" id="L82">            error(issues, &quot;unlabeled-interactive&quot;, &quot;Interactive nodes require a label or value&quot;, node);</span>
+        }
+<span class="pc bpc" id="L84" title="1 of 4 branches missed.">        if (node.getRange() != null &amp;&amp; !node.getRange().isValid()) {</span>
+<span class="fc" id="L85">            error(issues, &quot;invalid-range&quot;, &quot;Range must satisfy min &lt;= current &lt;= max and step &gt;= 0&quot;, node);</span>
+        }
+<span class="pc bpc" id="L87" title="3 of 4 branches missed.">        if (node.getRole() == AccessibilityRole.HEADING &amp;&amp; node.getHeadingLevel() == 0) {</span>
+<span class="nc" id="L88">            error(issues, &quot;invalid-heading-level&quot;, &quot;Heading levels are 1-based&quot;, node);</span>
+        }
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (node.getChecked() != AccessibilityCheckedState.UNSPECIFIED</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">                &amp;&amp; node.getRole() != AccessibilityRole.CHECKBOX</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                &amp;&amp; node.getRole() != AccessibilityRole.RADIO_BUTTON</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">                &amp;&amp; node.getRole() != AccessibilityRole.SWITCH</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">                &amp;&amp; node.getRole() != AccessibilityRole.TREE_ITEM</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">                &amp;&amp; node.getRole() != AccessibilityRole.MENU_ITEM) {</span>
+<span class="nc" id="L96">            warning(issues, &quot;checked-role&quot;, &quot;Checked state is unusual for this role&quot;, node);</span>
+        }
+<span class="pc bpc" id="L98" title="3 of 4 branches missed.">        if (node.getExpanded() != null &amp;&amp; node.getRole() != AccessibilityRole.TREE_ITEM</span>
+<span class="nc bnc" id="L99" title="All 4 branches missed.">                &amp;&amp; node.getRole() != AccessibilityRole.BUTTON &amp;&amp; node.getRole() != AccessibilityRole.MENU_ITEM</span>
+<span class="nc bnc" id="L100" title="All 4 branches missed.">                &amp;&amp; node.getRole() != AccessibilityRole.COMBO_BOX &amp;&amp; node.getRole() != AccessibilityRole.GENERIC) {</span>
+<span class="nc" id="L101">            warning(issues, &quot;expanded-role&quot;, &quot;Expanded state is unusual for this role&quot;, node);</span>
+        }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (node.getCollectionItemInfo() != null) {</span>
+<span class="fc" id="L104">            AccessibilityCollectionItemInfo item = node.getCollectionItemInfo();</span>
+<span class="pc bpc" id="L105" title="2 of 4 branches missed.">            if (item.getPositionInSet() == 0 || item.getSetSize() == 0</span>
+<span class="pc bpc" id="L106" title="2 of 4 branches missed.">                    || item.getPositionInSet() &gt; 0 &amp;&amp; item.getSetSize() &gt; 0</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                    &amp;&amp; item.getPositionInSet() &gt; item.getSetSize()) {</span>
+<span class="nc" id="L108">                error(issues, &quot;invalid-collection-position&quot;, &quot;Collection position and size must be 1-based and consistent&quot;, node);</span>
+            }
+        }
+<span class="pc bpc" id="L111" title="1 of 4 branches missed.">        if (node.getParentId() &gt;= 0 &amp;&amp; tree.getNode(node.getParentId()) == null) {</span>
+<span class="nc" id="L112">            error(issues, &quot;missing-parent&quot;, &quot;Semantic parent does not exist&quot;, node);</span>
+        }
+<span class="pc bpc" id="L114" title="3 of 4 branches missed.">        if (node.getIdentifier() != null &amp;&amp; !identifiers.add(node.getIdentifier())) {</span>
+<span class="nc" id="L115">            error(issues, &quot;duplicate-identifier&quot;, &quot;Accessibility identifiers must be unique&quot;, node);</span>
+        }
+<span class="fc bfc" id="L117" title="All 4 branches covered.">        if (node.getBounds().getWidth() &lt;= 0 || node.getBounds().getHeight() &lt;= 0) {</span>
+<span class="fc" id="L118">            warning(issues, &quot;empty-bounds&quot;, &quot;Node is fully clipped or has empty bounds&quot;, node);</span>
+        }
+<span class="fc" id="L120">        Set&lt;String&gt; actions = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (AccessibilityAction action : node.getActions()) {</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">            if (!actions.add(action.getId())) {</span>
+<span class="nc" id="L123">                error(issues, &quot;duplicate-action&quot;, &quot;Action ids must be unique per node&quot;, node);</span>
+            }
+<span class="pc bpc" id="L125" title="1 of 4 branches missed.">            if (!isStandardAction(action.getId()) &amp;&amp; empty(action.getLabel())) {</span>
+<span class="fc" id="L126">                error(issues, &quot;unlabeled-custom-action&quot;, &quot;Custom accessibility actions require localized labels&quot;, node);</span>
+            }
+<span class="fc" id="L128">        }</span>
+<span class="pc bpc" id="L129" title="2 of 4 branches missed.">        if ((node.getRole() == AccessibilityRole.DIALOG || node.getRole() == AccessibilityRole.ALERT)</span>
+<span class="nc bnc" id="L130" title="All 4 branches missed.">                &amp;&amp; empty(node.getLabel()) &amp;&amp; empty(node.getPaneTitle())) {</span>
+<span class="nc" id="L131">            error(issues, &quot;unnamed-dialog&quot;, &quot;Dialogs require a label or pane title&quot;, node);</span>
+        }
+<span class="fc" id="L133">    }</span>
+
+    private static void detectCycle(AccessibilityTreeSnapshot tree, long id, Set&lt;Long&gt; visiting,
+            Set&lt;Long&gt; visited, List&lt;AccessibilityIssue&gt; issues) {
+<span class="fc" id="L137">        Long boxed = Long.valueOf(id);</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (visited.contains(boxed)) {</span>
+<span class="nc" id="L139">            return;</span>
+        }
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (!visiting.add(boxed)) {</span>
+<span class="nc" id="L142">            AccessibilityNodeSnapshot node = tree.getNode(id);</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">            if (node != null) {</span>
+<span class="nc" id="L144">                error(issues, &quot;tree-cycle&quot;, &quot;Semantic tree contains a cycle&quot;, node);</span>
+            }
+<span class="nc" id="L146">            return;</span>
+        }
+<span class="fc" id="L148">        AccessibilityNodeSnapshot node = tree.getNode(id);</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (node != null) {</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            for (Long child : node.getChildIds()) {</span>
+<span class="fc" id="L151">                detectCycle(tree, child.longValue(), visiting, visited, issues);</span>
+<span class="fc" id="L152">            }</span>
+        }
+<span class="fc" id="L154">        visiting.remove(boxed);</span>
+<span class="fc" id="L155">        visited.add(boxed);</span>
+<span class="fc" id="L156">    }</span>
+
+    private static boolean isStandardAction(String id) {
+<span class="pc bpc" id="L159" title="1 of 4 branches missed.">        return AccessibilityAction.ACTIVATE.equals(id) || AccessibilityAction.LONG_PRESS.equals(id)</span>
+<span class="pc bpc" id="L160" title="2 of 4 branches missed.">                || AccessibilityAction.INCREMENT.equals(id) || AccessibilityAction.DECREMENT.equals(id)</span>
+<span class="pc bpc" id="L161" title="2 of 4 branches missed.">                || AccessibilityAction.SET_VALUE.equals(id) || AccessibilityAction.SET_TEXT.equals(id)</span>
+<span class="pc bpc" id="L162" title="1 of 4 branches missed.">                || AccessibilityAction.FOCUS.equals(id) || AccessibilityAction.DISMISS.equals(id)</span>
+<span class="pc bpc" id="L163" title="2 of 4 branches missed.">                || AccessibilityAction.EXPAND.equals(id) || AccessibilityAction.COLLAPSE.equals(id)</span>
+<span class="fc bfc" id="L164" title="All 4 branches covered.">                || AccessibilityAction.SCROLL_FORWARD.equals(id) || AccessibilityAction.SCROLL_BACKWARD.equals(id)</span>
+<span class="pc bpc" id="L165" title="2 of 4 branches missed.">                || AccessibilityAction.COPY.equals(id) || AccessibilityAction.CUT.equals(id)</span>
+<span class="pc bpc" id="L166" title="2 of 4 branches missed.">                || AccessibilityAction.PASTE.equals(id) || AccessibilityAction.SHOW_ON_SCREEN.equals(id)</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                || AccessibilityAction.SET_SELECTION.equals(id)</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">                || AccessibilityAction.MOVE_CURSOR_FORWARD_BY_CHARACTER.equals(id)</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">                || AccessibilityAction.MOVE_CURSOR_BACKWARD_BY_CHARACTER.equals(id)</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">                || AccessibilityAction.MOVE_CURSOR_FORWARD_BY_WORD.equals(id)</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">                || AccessibilityAction.MOVE_CURSOR_BACKWARD_BY_WORD.equals(id);</span>
+    }
+
+    private static void error(List&lt;AccessibilityIssue&gt; issues, String code, String message,
+            AccessibilityNodeSnapshot node) {
+<span class="fc" id="L176">        issues.add(new AccessibilityIssue(AccessibilityIssue.Severity.ERROR, code, message, node.getId()));</span>
+<span class="fc" id="L177">    }</span>
+
+    private static void warning(List&lt;AccessibilityIssue&gt; issues, String code, String message,
+            AccessibilityNodeSnapshot node) {
+<span class="fc" id="L181">        issues.add(new AccessibilityIssue(AccessibilityIssue.Severity.WARNING, code, message, node.getId()));</span>
+<span class="fc" id="L182">    }</span>
+
+    private static boolean empty(String value) {
+<span class="pc bpc" id="L185" title="1 of 4 branches missed.">        return value == null || value.length() == 0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

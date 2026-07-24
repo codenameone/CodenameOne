@@ -1,0 +1,882 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AccessibilityManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.accessibility</a> &gt; <span class="el_source">AccessibilityManager.java</span></div><h1>AccessibilityManager.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.accessibility;
+
+import com.codename1.ui.Button;
+import com.codename1.ui.CheckBox;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Label;
+import com.codename1.ui.RadioButton;
+import com.codename1.ui.Slider;
+import com.codename1.ui.Tabs;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextField;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.table.Table;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+
+/// Builds, caches, diffs, and dispatches actions for the portable semantic tree.
+///
+/// The tree is always constructed on the Codename One EDT. Native ports read the
+/// last immutable snapshot and post actions through {@link #performAction(long, String, Object)},
+/// so native accessibility threads never synchronously enter application code.
+public final class AccessibilityManager {
+    public static final int CHANGE_STRUCTURE = 1;
+    public static final int CHANGE_CONTENT = 2;
+    public static final int CHANGE_STATE = 4;
+    public static final int CHANGE_VALUE = 8;
+    public static final int CHANGE_BOUNDS = 16;
+    public static final int CHANGE_FOCUS = 32;
+    public static final int CHANGE_ACTIONS = 64;
+    public static final int CHANGE_LIVE_REGION = 128;
+    public static final int CHANGE_PANE = 256;
+    public static final int CHANGE_ALL = 0x7fffffff;
+
+<span class="fc" id="L63">    private static final AccessibilityManager INSTANCE = new AccessibilityManager();</span>
+<span class="fc" id="L64">    private long nextId = 1;</span>
+    private long generation;
+<span class="fc" id="L66">    private boolean dirty = true;</span>
+    private boolean refreshScheduled;
+<span class="fc" id="L68">    private int pendingChanges = CHANGE_ALL;</span>
+    private Form snapshotForm;
+<span class="fc" id="L70">    private AccessibilityTreeSnapshot snapshot = new AccessibilityTreeSnapshot(</span>
+<span class="fc" id="L71">            0, Collections.&lt;Long&gt;emptyList(), Collections.&lt;Long, AccessibilityNodeSnapshot&gt;emptyMap());</span>
+
+<span class="fc" id="L73">    private AccessibilityManager() {</span>
+<span class="fc" id="L74">    }</span>
+
+    public static AccessibilityManager getInstance() {
+<span class="fc" id="L77">        return INSTANCE;</span>
+    }
+
+    public synchronized void invalidate(Component component, int changeType) {
+<span class="fc" id="L81">        dirty = true;</span>
+<span class="fc" id="L82">        pendingChanges |= changeType;</span>
+        try {
+            // Most mutations only need to make the cached snapshot stale. Ports
+            // that can pull the tree do so on demand, and ports such as Android
+            // opt into eager projection only while assistive technology is active.
+            // This keeps layout, scrolling, and text setters at O(1) when nobody
+            // is consuming the semantic tree.
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">            if (!Display.getInstance().isAccessibilityTreeUpdateRequired()) {</span>
+<span class="fc" id="L90">                return;</span>
+            }
+<span class="nc bnc" id="L92" title="All 2 branches missed.">            if (!refreshScheduled) {</span>
+<span class="nc" id="L93">                refreshScheduled = true;</span>
+<span class="nc" id="L94">                Display.getInstance().callSerially(new Runnable() {</span>
+                    @Override
+                    public void run() {
+                        int changes;
+<span class="nc" id="L98">                        synchronized (AccessibilityManager.this) {</span>
+<span class="nc" id="L99">                            changes = pendingChanges;</span>
+<span class="nc" id="L100">                        }</span>
+<span class="nc" id="L101">                        getSnapshot(Display.getInstance().getCurrent());</span>
+<span class="nc" id="L102">                        synchronized (AccessibilityManager.this) {</span>
+<span class="nc" id="L103">                            refreshScheduled = false;</span>
+<span class="nc" id="L104">                        }</span>
+<span class="nc" id="L105">                        Display.getInstance().accessibilityTreeChanged(changes);</span>
+<span class="nc" id="L106">                    }</span>
+                });
+            }
+<span class="nc" id="L109">        } catch (Throwable ignored) {</span>
+            // Display may not be initialized yet while an application constructs its first form.
+<span class="nc" id="L111">            refreshScheduled = false;</span>
+<span class="nc" id="L112">        }</span>
+<span class="nc" id="L113">    }</span>
+
+    public void invalidateAll() {
+<span class="nc" id="L116">        invalidate(null, CHANGE_ALL);</span>
+<span class="nc" id="L117">    }</span>
+
+    public AccessibilityTreeSnapshot getCurrentSnapshot() {
+<span class="nc" id="L120">        synchronized (this) {</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">            if (!Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L122">                return snapshot;</span>
+            }
+<span class="nc" id="L124">        }</span>
+<span class="nc" id="L125">        return getSnapshot(Display.getInstance().getCurrent());</span>
+    }
+
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    public synchronized AccessibilityTreeSnapshot getSnapshot(Form form) {
+        // Walking a live lightweight component hierarchy off the Codename One
+        // EDT is unsafe. Native bridges on other threads receive the last
+        // immutable snapshot; active bridges arrange eager refreshes on the EDT.
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (!Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L134">            return snapshot;</span>
+        }
+<span class="pc bpc" id="L136" title="1 of 4 branches missed.">        if (!dirty &amp;&amp; form == snapshotForm) {</span>
+<span class="fc" id="L137">            return snapshot;</span>
+        }
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (form == null) {</span>
+<span class="nc" id="L140">            generation++;</span>
+<span class="nc" id="L141">            AccessibilityTreeSnapshot emptySnapshot = new AccessibilityTreeSnapshot(</span>
+<span class="nc" id="L142">                    generation, Collections.&lt;Long&gt;emptyList(),</span>
+<span class="nc" id="L143">                    Collections.&lt;Long, AccessibilityNodeSnapshot&gt;emptyMap());</span>
+<span class="nc" id="L144">            snapshot = emptySnapshot;</span>
+<span class="nc" id="L145">            snapshotForm = null;</span>
+<span class="nc" id="L146">            dirty = false;</span>
+<span class="nc" id="L147">            pendingChanges = 0;</span>
+<span class="nc" id="L148">            return snapshot;</span>
+        }
+
+<span class="fc" id="L151">        List&lt;BuildNode&gt; roots = new ArrayList&lt;BuildNode&gt;();</span>
+<span class="fc" id="L152">        resolveComponent(form, roots);</span>
+<span class="fc" id="L153">        sortTree(roots);</span>
+<span class="fc" id="L154">        List&lt;Long&gt; rootIds = new ArrayList&lt;Long&gt;();</span>
+<span class="fc" id="L155">        LinkedHashMap&lt;Long, AccessibilityNodeSnapshot&gt; nodes = new LinkedHashMap&lt;Long, AccessibilityNodeSnapshot&gt;();</span>
+<span class="fc" id="L156">        freeze(roots, -1, rootIds, nodes);</span>
+<span class="fc" id="L157">        generation++;</span>
+<span class="fc" id="L158">        AccessibilityTreeSnapshot updatedSnapshot = new AccessibilityTreeSnapshot(generation, rootIds, nodes);</span>
+<span class="fc" id="L159">        snapshot = updatedSnapshot;</span>
+<span class="fc" id="L160">        snapshotForm = form;</span>
+<span class="fc" id="L161">        dirty = false;</span>
+<span class="fc" id="L162">        pendingChanges = 0;</span>
+<span class="fc" id="L163">        return snapshot;</span>
+    }
+
+    public synchronized int getPendingChanges() {
+<span class="nc" id="L167">        return pendingChanges;</span>
+    }
+
+    public boolean performAction(long nodeId, String actionId, final Object argument) {
+        final AccessibilityNodeSnapshot node;
+        final AccessibilityAction action;
+<span class="nc" id="L173">        synchronized (this) {</span>
+<span class="nc" id="L174">            node = snapshot.getNode(nodeId);</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            action = node == null ? null : node.getAction(actionId);</span>
+<span class="nc" id="L176">        }</span>
+<span class="nc bnc" id="L177" title="All 6 branches missed.">        if (node == null || action == null || !action.isEnabled()) {</span>
+<span class="nc" id="L178">            return false;</span>
+        }
+<span class="nc" id="L180">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L183">                action.perform(node.getComponent(), argument);</span>
+<span class="nc" id="L184">                invalidate(node.getComponent(), CHANGE_STATE | CHANGE_VALUE | CHANGE_CONTENT);</span>
+<span class="nc" id="L185">            }</span>
+        });
+<span class="nc" id="L187">        return true;</span>
+    }
+
+    private long idFor(Component component) {
+<span class="fc" id="L191">        AccessibilityNode semantics = component.getSemantics();</span>
+<span class="fc" id="L192">        long id = semantics.getInternalId();</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (id == 0) {</span>
+<span class="fc" id="L194">            id = nextId++;</span>
+<span class="fc" id="L195">            semantics.setInternalId(id);</span>
+        }
+<span class="fc" id="L197">        return id;</span>
+    }
+
+    private long idForVirtual(Component host, String path) {
+<span class="fc" id="L201">        AccessibilityNode semantics = host.getSemantics();</span>
+<span class="fc" id="L202">        Long id = semantics.getInternalVirtualId(path);</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (id == null) {</span>
+<span class="fc" id="L204">            id = Long.valueOf(nextId++);</span>
+<span class="fc" id="L205">            semantics.putInternalVirtualId(path, id.longValue());</span>
+        }
+<span class="fc" id="L207">        return id.longValue();</span>
+    }
+
+    private void resolveComponent(Component component, List&lt;BuildNode&gt; destination) {
+<span class="pc bpc" id="L211" title="3 of 8 branches missed.">        if (component == null || (!(component instanceof Form) &amp;&amp; !component.isVisible()) || component.isHidden(true)) {</span>
+<span class="nc" id="L212">            return;</span>
+        }
+<span class="fc" id="L214">        AccessibilityNode config = component.getSemantics();</span>
+<span class="fc" id="L215">        AccessibilityGrouping grouping = config.getGrouping();</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (grouping == AccessibilityGrouping.EXCLUDE_SUBTREE) {</span>
+<span class="nc" id="L217">            return;</span>
+        }
+
+<span class="fc" id="L220">        BuildNode node = buildComponentNode(component, config);</span>
+<span class="fc" id="L221">        List&lt;BuildNode&gt; children = new ArrayList&lt;BuildNode&gt;();</span>
+<span class="pc bpc" id="L222" title="1 of 4 branches missed.">        if (grouping != AccessibilityGrouping.LEAF &amp;&amp; component instanceof Container) {</span>
+<span class="fc" id="L223">            Container container = (Container) component;</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">            for (int i = 0; i &lt; container.getComponentCount(); i++) {</span>
+<span class="fc" id="L225">                resolveComponent(container.getComponentAt(i), children);</span>
+            }
+        }
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        if (grouping != AccessibilityGrouping.LEAF) {</span>
+<span class="fc" id="L229">            addVirtualChildren(component, config, &quot;custom&quot;, children);</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">            if (component instanceof com.codename1.ui.List) {</span>
+<span class="fc" id="L231">                addListChildren((com.codename1.ui.List) component, children);</span>
+            }
+        }
+
+<span class="fc" id="L235">        boolean expose = shouldExpose(component, config, node);</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        if (grouping == AccessibilityGrouping.EXCLUDE) {</span>
+<span class="fc" id="L237">            expose = false;</span>
+        }
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        if (grouping == AccessibilityGrouping.MERGE_DESCENDANTS) {</span>
+<span class="fc" id="L240">            String merged = collectLabels(children);</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">            if (isEmpty(node.builder.label)) {</span>
+<span class="fc" id="L242">                node.builder.label = merged;</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">            } else if (!isEmpty(merged)) {</span>
+<span class="nc" id="L244">                node.builder.description = join(node.builder.description, merged);</span>
+            }
+<span class="fc" id="L246">            children.clear();</span>
+<span class="fc" id="L247">            expose = true;</span>
+        }
+<span class="pc bpc" id="L249" title="2 of 4 branches missed.">        if (grouping == AccessibilityGrouping.LEAF || grouping == AccessibilityGrouping.GROUP) {</span>
+<span class="nc" id="L250">            expose = true;</span>
+        }
+
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        if (expose) {</span>
+<span class="fc" id="L254">            node.children.addAll(children);</span>
+<span class="fc" id="L255">            destination.add(node);</span>
+        } else {
+<span class="fc" id="L257">            destination.addAll(children);</span>
+        }
+<span class="fc" id="L259">    }</span>
+
+    private BuildNode buildComponentNode(final Component component, AccessibilityNode config) {
+<span class="fc" id="L262">        BuildNode out = new BuildNode();</span>
+<span class="fc" id="L263">        out.id = idFor(component);</span>
+<span class="fc" id="L264">        out.builder.id = out.id;</span>
+<span class="fc" id="L265">        out.builder.component = component;</span>
+<span class="fc" id="L266">        out.builder.identifier = config.getIdentifier();</span>
+<span class="fc" id="L267">        out.builder.label = firstNonEmpty(config.getLabel(), component.getAccessibilityText());</span>
+<span class="fc" id="L268">        out.builder.hint = config.getHint();</span>
+<span class="fc" id="L269">        out.builder.description = config.getDescription();</span>
+<span class="fc" id="L270">        out.builder.value = config.getValue();</span>
+<span class="fc" id="L271">        out.builder.validationError = config.getValidationError();</span>
+<span class="fc" id="L272">        out.builder.paneTitle = config.getPaneTitle();</span>
+<span class="fc" id="L273">        out.builder.roleDescription = config.getRoleDescription();</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        out.builder.role = config.getRole() == AccessibilityRole.NONE ? inferRole(component) : config.getRole();</span>
+<span class="fc" id="L275">        out.builder.checked = inferChecked(component, config);</span>
+<span class="fc" id="L276">        out.builder.liveRegion = config.getLiveRegion();</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        out.builder.range = config.getRange() == null ? inferRange(component) : config.getRange();</span>
+<span class="fc" id="L278">        out.builder.collectionInfo =</span>
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">                config.getCollectionInfo() == null ? inferCollection(component) : config.getCollectionInfo();</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        out.builder.collectionItemInfo = config.getCollectionItemInfo() == null ? inferCollectionItem(component)</span>
+<span class="pc" id="L281">                                                                                : config.getCollectionItemInfo();</span>
+<span class="fc" id="L282">        out.builder.bounds = componentBounds(component);</span>
+<span class="fc" id="L283">        out.builder.selected = config.getSelected();</span>
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">        if (out.builder.selected == null) {</span>
+<span class="fc" id="L285">            applyInferredSelected(component, out.builder);</span>
+        }
+<span class="fc" id="L287">        out.builder.expanded = config.getExpanded();</span>
+<span class="fc" id="L288">        out.builder.enabled =</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">                config.getEnabled() == null ? Boolean.valueOf(component.isEnabled()) : config.getEnabled();</span>
+<span class="fc" id="L290">        out.builder.invalid = config.getInvalid();</span>
+<span class="fc" id="L291">        out.builder.busy = config.getBusy();</span>
+<span class="fc" id="L292">        out.builder.readOnly = config.getReadOnly();</span>
+<span class="fc" id="L293">        out.builder.required = config.getRequired();</span>
+<span class="fc" id="L294">        out.builder.multiline = config.getMultiline();</span>
+<span class="fc" id="L295">        out.builder.obscured = config.getObscured();</span>
+<span class="fc" id="L296">        applyInferredTextStates(component, out.builder);</span>
+<span class="fc" id="L297">        out.builder.pressed = config.getPressed();</span>
+<span class="fc" id="L298">        out.builder.current = config.getCurrent();</span>
+<span class="pc bpc" id="L299" title="2 of 4 branches missed.">        out.builder.modal = config.isModal() || component instanceof Dialog;</span>
+<span class="fc bfc" id="L300" title="All 4 branches covered.">        out.builder.focusable = component.isFocusable() || isInteractiveRole(out.builder.role);</span>
+<span class="fc" id="L301">        out.builder.focused = component.hasFocus();</span>
+<span class="fc" id="L302">        out.builder.headingLevel = config.getHeadingLevel();</span>
+<span class="fc" id="L303">        out.builder.sortKey = config.getSortKey();</span>
+<span class="fc" id="L304">        out.builder.traversalBefore = config.getTraversalBefore();</span>
+<span class="fc" id="L305">        out.builder.traversalAfter = config.getTraversalAfter();</span>
+<span class="fc" id="L306">        out.builder.actions.addAll(config.getActions());</span>
+<span class="fc" id="L307">        addDefaultActions(component, out.builder);</span>
+<span class="pc bpc" id="L308" title="1 of 4 branches missed.">        if (component instanceof Form &amp;&amp; isEmpty(out.builder.paneTitle)) {</span>
+<span class="fc" id="L309">            out.builder.paneTitle = ((Form) component).getTitle();</span>
+        }
+<span class="fc" id="L311">        out.component = component;</span>
+<span class="fc" id="L312">        return out;</span>
+    }
+
+    private void addVirtualChildren(Component host, AccessibilityNode config, String path,
+                                    List&lt;BuildNode&gt; destination) {
+<span class="fc" id="L317">        List&lt;AccessibilityNode&gt; virtual = new ArrayList&lt;AccessibilityNode&gt;();</span>
+<span class="fc" id="L318">        virtual.addAll(config.getChildren());</span>
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">        if (config.getChildProvider() != null) {</span>
+<span class="nc" id="L320">            List&lt;AccessibilityNode&gt; provided = config.getChildProvider().getAccessibilityChildren(host);</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">            if (provided != null) {</span>
+<span class="nc" id="L322">                virtual.addAll(provided);</span>
+            }
+        }
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">        for (int i = 0; i &lt; virtual.size(); i++) {</span>
+<span class="nc" id="L326">            AccessibilityNode child = virtual.get(i);</span>
+<span class="nc" id="L327">            String key = child.getVirtualKey();</span>
+<span class="nc bnc" id="L328" title="All 2 branches missed.">            if (isEmpty(key)) {</span>
+<span class="nc" id="L329">                key = &quot;index-&quot; + i;</span>
+            }
+<span class="nc" id="L331">            BuildNode resolved = buildVirtualNode(host, child, path + &quot;/&quot; + key);</span>
+<span class="nc" id="L332">            addVirtualChildren(host, child, path + &quot;/&quot; + key, resolved.children);</span>
+<span class="nc" id="L333">            destination.add(resolved);</span>
+        }
+<span class="fc" id="L335">    }</span>
+
+    private BuildNode buildVirtualNode(Component host, AccessibilityNode config, String path) {
+<span class="fc" id="L338">        BuildNode out = new BuildNode();</span>
+<span class="fc" id="L339">        out.id = idForVirtual(host, path);</span>
+<span class="fc" id="L340">        out.builder.id = out.id;</span>
+<span class="fc" id="L341">        out.builder.component = host;</span>
+<span class="fc" id="L342">        out.builder.virtualKey = config.getVirtualKey();</span>
+<span class="fc" id="L343">        out.builder.identifier = config.getIdentifier();</span>
+<span class="fc" id="L344">        out.builder.label = config.getLabel();</span>
+<span class="fc" id="L345">        out.builder.hint = config.getHint();</span>
+<span class="fc" id="L346">        out.builder.description = config.getDescription();</span>
+<span class="fc" id="L347">        out.builder.value = config.getValue();</span>
+<span class="fc" id="L348">        out.builder.validationError = config.getValidationError();</span>
+<span class="fc" id="L349">        out.builder.paneTitle = config.getPaneTitle();</span>
+<span class="fc" id="L350">        out.builder.roleDescription = config.getRoleDescription();</span>
+<span class="pc bpc" id="L351" title="1 of 2 branches missed.">        out.builder.role = config.getRole() == AccessibilityRole.NONE ? AccessibilityRole.GENERIC : config.getRole();</span>
+<span class="fc" id="L352">        out.builder.checked = config.getChecked();</span>
+<span class="fc" id="L353">        out.builder.liveRegion = config.getLiveRegion();</span>
+<span class="fc" id="L354">        out.builder.range = config.getRange();</span>
+<span class="fc" id="L355">        out.builder.collectionInfo = config.getCollectionInfo();</span>
+<span class="fc" id="L356">        out.builder.collectionItemInfo = config.getCollectionItemInfo();</span>
+<span class="fc" id="L357">        out.builder.bounds = virtualBounds(host, config.getBounds());</span>
+<span class="fc" id="L358">        out.builder.selected = config.getSelected();</span>
+<span class="fc" id="L359">        out.builder.expanded = config.getExpanded();</span>
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">        out.builder.enabled = config.getEnabled() == null ? Boolean.valueOf(host.isEnabled()) : config.getEnabled();</span>
+<span class="fc" id="L361">        out.builder.invalid = config.getInvalid();</span>
+<span class="fc" id="L362">        out.builder.busy = config.getBusy();</span>
+<span class="fc" id="L363">        out.builder.readOnly = config.getReadOnly();</span>
+<span class="fc" id="L364">        out.builder.required = config.getRequired();</span>
+<span class="fc" id="L365">        out.builder.multiline = config.getMultiline();</span>
+<span class="fc" id="L366">        out.builder.obscured = config.getObscured();</span>
+<span class="fc" id="L367">        out.builder.pressed = config.getPressed();</span>
+<span class="fc" id="L368">        out.builder.current = config.getCurrent();</span>
+<span class="fc" id="L369">        out.builder.modal = config.isModal();</span>
+<span class="pc bpc" id="L370" title="3 of 4 branches missed.">        out.builder.focusable = !config.getActions().isEmpty() || isInteractiveRole(out.builder.role);</span>
+<span class="fc" id="L371">        out.builder.headingLevel = config.getHeadingLevel();</span>
+<span class="fc" id="L372">        out.builder.sortKey = config.getSortKey();</span>
+<span class="fc" id="L373">        out.builder.actions.addAll(config.getActions());</span>
+<span class="fc" id="L374">        out.component = host;</span>
+<span class="fc" id="L375">        return out;</span>
+    }
+
+    private void addListChildren(final com.codename1.ui.List list, List&lt;BuildNode&gt; destination) {
+<span class="fc" id="L379">        int size = list.size();</span>
+<span class="fc" id="L380">        int[] visibleItems = list.getAccessibilityVisibleItemIndices();</span>
+<span class="fc bfc" id="L381" title="All 2 branches covered.">        for (int i : visibleItems) {</span>
+<span class="fc" id="L382">            final int index = i;</span>
+<span class="fc" id="L383">            AccessibilityNode item = new AccessibilityNode(&quot;item-&quot; + i)</span>
+<span class="fc" id="L384">                                             .setRole(AccessibilityRole.LIST_ITEM)</span>
+<span class="fc" id="L385">                                             .setLabel(list.getAccessibilityItemText(i))</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">                                             .setSelected(Boolean.valueOf(i == list.getSelectedIndex()))</span>
+<span class="fc" id="L387">                                             .setCollectionItemInfo(new AccessibilityCollectionItemInfo(</span>
+                                                     i, 1, 0, 1, i + 1, size, 1, false))
+<span class="fc" id="L389">                                             .setBounds(list.getAccessibilityItemBounds(i, new Rectangle()))</span>
+<span class="fc" id="L390">                                             .addAction(new AccessibilityAction(AccessibilityAction.ACTIVATE, null,</span>
+                                                                                new ListActivateHandler(list, index)));
+<span class="fc" id="L392">            destination.add(buildVirtualNode(list, item, &quot;list/item-&quot; + i));</span>
+        }
+<span class="fc" id="L394">    }</span>
+
+    private void addDefaultActions(final Component component, AccessibilityNodeSnapshot.Builder builder) {
+<span class="pc bpc" id="L397" title="1 of 4 branches missed.">        if (component.isFocusable() &amp;&amp; !hasAction(builder.actions, AccessibilityAction.FOCUS)) {</span>
+<span class="fc" id="L398">            builder.actions.add(new AccessibilityAction(AccessibilityAction.FOCUS, null, FocusHandler.INSTANCE));</span>
+        }
+<span class="pc bpc" id="L400" title="1 of 4 branches missed.">        if (component instanceof Button &amp;&amp; !hasAction(builder.actions, AccessibilityAction.ACTIVATE)) {</span>
+<span class="fc" id="L401">            builder.actions.add(new AccessibilityAction(AccessibilityAction.ACTIVATE, null, ActivateHandler.INSTANCE));</span>
+        }
+<span class="fc bfc" id="L403" title="All 2 branches covered.">        if (component instanceof Slider) {</span>
+<span class="fc" id="L404">            final Slider slider = (Slider) component;</span>
+<span class="pc bpc" id="L405" title="2 of 4 branches missed.">            if (slider.isEditable() &amp;&amp; !hasAction(builder.actions, AccessibilityAction.INCREMENT)) {</span>
+<span class="fc" id="L406">                builder.actions.add(new AccessibilityAction(AccessibilityAction.INCREMENT, null,</span>
+                                                            new SliderAdjustmentHandler(slider, 1)));
+            }
+<span class="pc bpc" id="L409" title="2 of 4 branches missed.">            if (slider.isEditable() &amp;&amp; !hasAction(builder.actions, AccessibilityAction.DECREMENT)) {</span>
+<span class="fc" id="L410">                builder.actions.add(new AccessibilityAction(AccessibilityAction.DECREMENT, null,</span>
+                                                            new SliderAdjustmentHandler(slider, -1)));
+            }
+        }
+<span class="fc bfc" id="L414" title="All 2 branches covered.">        if (component instanceof com.codename1.ui.List) {</span>
+<span class="fc" id="L415">            final com.codename1.ui.List list = (com.codename1.ui.List) component;</span>
+<span class="pc bpc" id="L416" title="2 of 4 branches missed.">            if (list.size() &gt; 0 &amp;&amp; !hasAction(builder.actions, AccessibilityAction.SCROLL_FORWARD)) {</span>
+<span class="fc" id="L417">                builder.actions.add(new AccessibilityAction(AccessibilityAction.SCROLL_FORWARD, null,</span>
+                                                            new ListScrollHandler(list, 1)));
+            }
+<span class="pc bpc" id="L420" title="2 of 4 branches missed.">            if (list.size() &gt; 0 &amp;&amp; !hasAction(builder.actions, AccessibilityAction.SCROLL_BACKWARD)) {</span>
+<span class="fc" id="L421">                builder.actions.add(new AccessibilityAction(AccessibilityAction.SCROLL_BACKWARD, null,</span>
+                                                            new ListScrollHandler(list, -1)));
+            }
+        }
+<span class="fc bfc" id="L425" title="All 2 branches covered.">        if (component instanceof TextArea) {</span>
+<span class="fc" id="L426">            final TextArea text = (TextArea) component;</span>
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">            if (!hasAction(builder.actions, AccessibilityAction.FOCUS)) {</span>
+<span class="nc" id="L428">                builder.actions.add(new AccessibilityAction(AccessibilityAction.FOCUS, null, FocusHandler.INSTANCE));</span>
+            }
+<span class="pc bpc" id="L430" title="2 of 4 branches missed.">            if (text.isEditable() &amp;&amp; !hasAction(builder.actions, AccessibilityAction.SET_TEXT)) {</span>
+<span class="fc" id="L431">                builder.actions.add(</span>
+                        new AccessibilityAction(AccessibilityAction.SET_TEXT, null, new SetTextHandler(text)));
+            }
+        }
+<span class="fc" id="L435">    }</span>
+
+    private AccessibilityRole inferRole(Component component) {
+<span class="pc bpc" id="L438" title="1 of 2 branches missed.">        if (component.getParent() instanceof Table) {</span>
+<span class="nc bnc" id="L439" title="All 2 branches missed.">            return ((Table) component.getParent()).getCellRow(component) &lt; 0 ? AccessibilityRole.COLUMN_HEADER</span>
+                                                                             : AccessibilityRole.CELL;
+        }
+<span class="fc" id="L442">        Tabs tabOwner = tabPanelOwner(component);</span>
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">        if (tabOwner != null) {</span>
+<span class="nc" id="L444">            return AccessibilityRole.TAB_PANEL;</span>
+        }
+<span class="pc bpc" id="L446" title="1 of 2 branches missed.">        if (component instanceof Dialog) {</span>
+<span class="nc" id="L447">            return AccessibilityRole.DIALOG;</span>
+        }
+<span class="pc bpc" id="L449" title="1 of 2 branches missed.">        if (component instanceof RadioButton) {</span>
+<span class="nc" id="L450">            return AccessibilityRole.RADIO_BUTTON;</span>
+        }
+<span class="fc bfc" id="L452" title="All 2 branches covered.">        if (component instanceof CheckBox) {</span>
+<span class="fc" id="L453">            return AccessibilityRole.CHECKBOX;</span>
+        }
+<span class="fc bfc" id="L455" title="All 2 branches covered.">        if (component instanceof Button) {</span>
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">            if (isTabButton((Button) component)) {</span>
+<span class="nc" id="L457">                return AccessibilityRole.TAB;</span>
+            }
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">            return ((Button) component).isToggle() ? AccessibilityRole.TOGGLE_BUTTON : AccessibilityRole.BUTTON;</span>
+        }
+<span class="fc bfc" id="L461" title="All 2 branches covered.">        if (component instanceof Slider) {</span>
+<span class="pc bpc" id="L462" title="1 of 2 branches missed.">            return ((Slider) component).isEditable() ? AccessibilityRole.SLIDER : AccessibilityRole.PROGRESS_BAR;</span>
+        }
+<span class="fc bfc" id="L464" title="All 2 branches covered.">        if (component instanceof TextField) {</span>
+<span class="fc" id="L465">            return AccessibilityRole.TEXT_FIELD;</span>
+        }
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">        if (component instanceof TextArea) {</span>
+<span class="nc" id="L468">            return AccessibilityRole.TEXT_FIELD;</span>
+        }
+<span class="fc bfc" id="L470" title="All 2 branches covered.">        if (component instanceof com.codename1.ui.List) {</span>
+<span class="fc" id="L471">            return AccessibilityRole.LIST;</span>
+        }
+<span class="pc bpc" id="L473" title="1 of 2 branches missed.">        if (component instanceof Table) {</span>
+<span class="nc" id="L474">            return AccessibilityRole.GRID;</span>
+        }
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">        if (component instanceof Tabs) {</span>
+<span class="nc" id="L477">            return AccessibilityRole.TAB_LIST;</span>
+        }
+<span class="fc bfc" id="L479" title="All 2 branches covered.">        if (component instanceof Form) {</span>
+<span class="fc" id="L480">            return AccessibilityRole.GENERIC;</span>
+        }
+<span class="fc bfc" id="L482" title="All 2 branches covered.">        if (component instanceof Label) {</span>
+<span class="fc" id="L483">            return AccessibilityRole.STATIC_TEXT;</span>
+        }
+<span class="fc" id="L485">        return AccessibilityRole.NONE;</span>
+    }
+
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    private boolean isTabButton(Button button) {
+<span class="fc" id="L490">        Container parent = button.getParent();</span>
+<span class="fc bfc" id="L491" title="All 2 branches covered.">        while (parent != null) {</span>
+<span class="fc" id="L492">            Container owner = parent.getParent();</span>
+<span class="pc bpc" id="L493" title="3 of 4 branches missed.">            if (owner instanceof Tabs &amp;&amp; ((Tabs) owner).getTabsContainer() == parent) {</span>
+<span class="nc" id="L494">                return true;</span>
+            }
+<span class="fc" id="L496">            parent = parent.getParent();</span>
+<span class="fc" id="L497">        }</span>
+<span class="fc" id="L498">        return false;</span>
+    }
+
+    private AccessibilityCheckedState inferChecked(Component component, AccessibilityNode config) {
+<span class="fc bfc" id="L502" title="All 2 branches covered.">        if (config.getChecked() != AccessibilityCheckedState.UNSPECIFIED) {</span>
+<span class="fc" id="L503">            return config.getChecked();</span>
+        }
+<span class="pc bpc" id="L505" title="1 of 4 branches missed.">        if (component instanceof CheckBox || component instanceof RadioButton) {</span>
+<span class="pc bpc" id="L506" title="1 of 2 branches missed.">            return ((Button) component).isSelected() ? AccessibilityCheckedState.CHECKED</span>
+                                                     : AccessibilityCheckedState.UNCHECKED;
+        }
+<span class="fc" id="L509">        return AccessibilityCheckedState.UNSPECIFIED;</span>
+    }
+
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    private void applyInferredSelected(Component component, AccessibilityNodeSnapshot.Builder builder) {
+<span class="pc bpc" id="L514" title="2 of 6 branches missed.">        if (component instanceof Button &amp;&amp; (((Button) component).isToggle() || isTabButton((Button) component))) {</span>
+<span class="nc" id="L515">            builder.selected = Boolean.valueOf(((Button) component).isSelected());</span>
+<span class="nc" id="L516">            return;</span>
+        }
+<span class="fc" id="L518">        Tabs tabOwner = tabPanelOwner(component);</span>
+<span class="pc bpc" id="L519" title="1 of 2 branches missed.">        if (tabOwner != null) {</span>
+<span class="nc bnc" id="L520" title="All 2 branches missed.">            builder.selected = Boolean.valueOf(tabOwner.getSelectedComponent() == component);</span>
+        }
+<span class="fc" id="L522">    }</span>
+
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    private Tabs tabPanelOwner(Component component) {
+<span class="fc" id="L526">        Container parent = component.getParent();</span>
+<span class="pc bpc" id="L527" title="1 of 4 branches missed.">        if (parent != null &amp;&amp; parent.getParent() instanceof Tabs) {</span>
+<span class="nc" id="L528">            Tabs tabs = (Tabs) parent.getParent();</span>
+<span class="nc bnc" id="L529" title="All 2 branches missed.">            if (tabs.getContentPane() == parent) {</span>
+<span class="nc" id="L530">                return tabs;</span>
+            }
+        }
+<span class="fc" id="L533">        return null;</span>
+    }
+
+    private AccessibilityRange inferRange(Component component) {
+<span class="fc bfc" id="L537" title="All 2 branches covered.">        if (component instanceof Slider) {</span>
+<span class="fc" id="L538">            Slider slider = (Slider) component;</span>
+<span class="fc" id="L539">            return new AccessibilityRange(slider.getMinValue(), slider.getMaxValue(), slider.getProgress(),</span>
+<span class="fc" id="L540">                                          slider.getIncrements(), null);</span>
+        }
+<span class="fc" id="L542">        return null;</span>
+    }
+
+    private AccessibilityCollectionInfo inferCollection(Component component) {
+<span class="fc bfc" id="L546" title="All 2 branches covered.">        if (component instanceof com.codename1.ui.List) {</span>
+<span class="fc" id="L547">            return new AccessibilityCollectionInfo(((com.codename1.ui.List) component).size(), 1, false,</span>
+                                                   AccessibilityCollectionInfo.SELECTION_SINGLE);
+        }
+<span class="pc bpc" id="L550" title="1 of 2 branches missed.">        if (component instanceof Table) {</span>
+<span class="nc" id="L551">            Table table = (Table) component;</span>
+<span class="nc" id="L552">            return new AccessibilityCollectionInfo(table.getModel().getRowCount(), table.getModel().getColumnCount(),</span>
+                                                   false, AccessibilityCollectionInfo.SELECTION_SINGLE);
+        }
+<span class="pc bpc" id="L555" title="1 of 2 branches missed.">        if (component instanceof Tabs) {</span>
+<span class="nc" id="L556">            return new AccessibilityCollectionInfo(1, ((Tabs) component).getTabCount(), false,</span>
+                                                   AccessibilityCollectionInfo.SELECTION_SINGLE);
+        }
+<span class="fc" id="L559">        return null;</span>
+    }
+
+    private AccessibilityCollectionItemInfo inferCollectionItem(Component component) {
+<span class="pc bpc" id="L563" title="1 of 2 branches missed.">        if (component.getParent() instanceof Table) {</span>
+<span class="nc" id="L564">            Table table = (Table) component.getParent();</span>
+<span class="nc" id="L565">            int sourceRow = table.getCellRow(component);</span>
+<span class="nc bnc" id="L566" title="All 4 branches missed.">            int row = sourceRow &lt; 0 ? 0 : sourceRow + (table.isIncludeHeader() ? 1 : 0);</span>
+<span class="nc" id="L567">            int column = table.getCellColumn(component);</span>
+<span class="nc bnc" id="L568" title="All 2 branches missed.">            return new AccessibilityCollectionItemInfo(row, 1, column, 1, column + 1, table.getModel().getColumnCount(),</span>
+                                                       1, sourceRow &lt; 0);
+        }
+<span class="fc" id="L571">        return null;</span>
+    }
+
+    private void applyInferredTextStates(Component component, AccessibilityNodeSnapshot.Builder builder) {
+<span class="fc bfc" id="L575" title="All 2 branches covered.">        if (!(component instanceof TextArea)) {</span>
+<span class="fc" id="L576">            return;</span>
+        }
+<span class="fc" id="L578">        TextArea text = (TextArea) component;</span>
+<span class="pc bpc" id="L579" title="1 of 2 branches missed.">        if (builder.readOnly == null) {</span>
+<span class="pc bpc" id="L580" title="1 of 2 branches missed.">            builder.readOnly = Boolean.valueOf(!text.isEditable());</span>
+        }
+<span class="pc bpc" id="L582" title="1 of 2 branches missed.">        if (builder.multiline == null) {</span>
+<span class="pc bpc" id="L583" title="2 of 4 branches missed.">            builder.multiline = Boolean.valueOf(!(component instanceof TextField) || text.getRows() &gt; 1);</span>
+        }
+<span class="pc bpc" id="L585" title="1 of 2 branches missed.">        if (builder.obscured == null) {</span>
+<span class="pc bpc" id="L586" title="1 of 2 branches missed.">            builder.obscured = Boolean.valueOf((text.getConstraint() &amp; TextArea.PASSWORD) != 0);</span>
+        }
+<span class="fc" id="L588">    }</span>
+
+    private boolean shouldExpose(Component component, AccessibilityNode config, BuildNode node) {
+<span class="fc bfc" id="L591" title="All 2 branches covered.">        if (component instanceof Form) {</span>
+<span class="fc" id="L592">            return true;</span>
+        }
+<span class="fc bfc" id="L594" title="All 2 branches covered.">        if (config.hasExplicitConfiguration()) {</span>
+<span class="fc" id="L595">            return true;</span>
+        }
+<span class="fc bfc" id="L597" title="All 2 branches covered.">        return node.builder.role != AccessibilityRole.NONE &amp;&amp;</span>
+<span class="pc bpc" id="L598" title="2 of 6 branches missed.">                (!isEmpty(node.builder.label) || !isEmpty(node.builder.value) || node.builder.focusable ||</span>
+<span class="pc bnc" id="L599" title="All 6 branches missed.">                 !node.builder.actions.isEmpty() || node.builder.collectionInfo != null || node.builder.range != null);</span>
+    }
+
+    private Rectangle componentBounds(Component component) {
+<span class="fc" id="L603">        Rectangle bounds = new Rectangle(component.getAbsoluteX() + component.getScrollX(),</span>
+<span class="fc" id="L604">                                         component.getAbsoluteY() + component.getScrollY(), component.getWidth(),</span>
+<span class="fc" id="L605">                                         component.getHeight());</span>
+<span class="fc" id="L606">        Container parent = component.getParent();</span>
+<span class="pc bpc" id="L607" title="1 of 6 branches missed.">        while (parent != null &amp;&amp; bounds.getWidth() &gt; 0 &amp;&amp; bounds.getHeight() &gt; 0) {</span>
+<span class="fc" id="L608">            Rectangle clip =</span>
+<span class="fc" id="L609">                    new Rectangle(parent.getAbsoluteX() + parent.getScrollX(),</span>
+<span class="fc" id="L610">                                  parent.getAbsoluteY() + parent.getScrollY(), parent.getWidth(), parent.getHeight());</span>
+<span class="fc" id="L611">            intersect(bounds, clip);</span>
+<span class="fc" id="L612">            parent = parent.getParent();</span>
+<span class="fc" id="L613">        }</span>
+<span class="fc" id="L614">        return bounds;</span>
+    }
+
+    private Rectangle virtualBounds(Component host, Rectangle relative) {
+<span class="pc bpc" id="L618" title="1 of 2 branches missed.">        if (relative == null) {</span>
+<span class="nc" id="L619">            return componentBounds(host);</span>
+        }
+<span class="fc" id="L621">        Rectangle bounds = new Rectangle(host.getAbsoluteX() + host.getScrollX() + relative.getX(),</span>
+<span class="fc" id="L622">                                         host.getAbsoluteY() + host.getScrollY() + relative.getY(), relative.getWidth(),</span>
+<span class="fc" id="L623">                                         relative.getHeight());</span>
+<span class="fc" id="L624">        intersect(bounds, componentBounds(host));</span>
+<span class="fc" id="L625">        return bounds;</span>
+    }
+
+    private void intersect(Rectangle target, Rectangle clip) {
+<span class="fc" id="L629">        int x1 = Math.max(target.getX(), clip.getX());</span>
+<span class="fc" id="L630">        int y1 = Math.max(target.getY(), clip.getY());</span>
+<span class="fc" id="L631">        int x2 = Math.min(target.getX() + target.getWidth(), clip.getX() + clip.getWidth());</span>
+<span class="fc" id="L632">        int y2 = Math.min(target.getY() + target.getHeight(), clip.getY() + clip.getHeight());</span>
+<span class="fc" id="L633">        target.setBounds(x1, y1, Math.max(0, x2 - x1), Math.max(0, y2 - y1));</span>
+<span class="fc" id="L634">    }</span>
+
+    private void sortTree(List&lt;BuildNode&gt; nodes) {
+<span class="fc" id="L637">        Collections.sort(nodes, SortKeyComparator.INSTANCE);</span>
+<span class="fc" id="L638">        applyRelativeOrder(nodes);</span>
+<span class="fc bfc" id="L639" title="All 2 branches covered.">        for (BuildNode node : nodes) {</span>
+<span class="fc" id="L640">            sortTree(node.children);</span>
+<span class="fc" id="L641">        }</span>
+<span class="fc" id="L642">    }</span>
+
+    private void applyRelativeOrder(List&lt;BuildNode&gt; nodes) {
+<span class="fc" id="L645">        int remainingPasses = nodes.size();</span>
+<span class="fc bfc" id="L646" title="All 2 branches covered.">        while (remainingPasses &gt; 0) {</span>
+<span class="fc" id="L647">            boolean changed = false;</span>
+<span class="fc bfc" id="L648" title="All 2 branches covered.">            for (int i = 0; i &lt; nodes.size(); i++) {</span>
+<span class="fc" id="L649">                BuildNode node = nodes.get(i);</span>
+<span class="fc" id="L650">                int target = indexOf(nodes, node.builder.traversalBefore);</span>
+<span class="pc bpc" id="L651" title="3 of 4 branches missed.">                if (target &gt;= 0 &amp;&amp; i &gt; target) {</span>
+<span class="nc" id="L652">                    nodes.remove(i);</span>
+<span class="nc" id="L653">                    nodes.add(target, node);</span>
+<span class="nc" id="L654">                    changed = true;</span>
+<span class="nc" id="L655">                    break;</span>
+                }
+<span class="fc" id="L657">                target = indexOf(nodes, node.builder.traversalAfter);</span>
+<span class="pc bpc" id="L658" title="3 of 4 branches missed.">                if (target &gt;= 0 &amp;&amp; i &lt; target) {</span>
+<span class="nc" id="L659">                    nodes.remove(i);</span>
+<span class="nc" id="L660">                    nodes.add(Math.min(target, nodes.size()), node);</span>
+<span class="nc" id="L661">                    changed = true;</span>
+<span class="nc" id="L662">                    break;</span>
+                }
+            }
+<span class="pc bpc" id="L665" title="1 of 2 branches missed.">            if (!changed) {</span>
+<span class="fc" id="L666">                return;</span>
+            }
+<span class="nc" id="L668">            remainingPasses--;</span>
+<span class="nc" id="L669">        }</span>
+<span class="fc" id="L670">    }</span>
+
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    private int indexOf(List&lt;BuildNode&gt; nodes, Component component) {
+<span class="pc bpc" id="L674" title="1 of 2 branches missed.">        if (component == null) {</span>
+<span class="fc" id="L675">            return -1;</span>
+        }
+<span class="nc bnc" id="L677" title="All 2 branches missed.">        for (int i = 0; i &lt; nodes.size(); i++) {</span>
+<span class="nc bnc" id="L678" title="All 2 branches missed.">            if (nodes.get(i).component == component) {</span>
+<span class="nc" id="L679">                return i;</span>
+            }
+        }
+<span class="nc" id="L682">        return -1;</span>
+    }
+
+    private void freeze(List&lt;BuildNode&gt; source, long parentId, List&lt;Long&gt; childIds,
+                        LinkedHashMap&lt;Long, AccessibilityNodeSnapshot&gt; nodes) {
+<span class="fc bfc" id="L687" title="All 2 branches covered.">        for (BuildNode node : source) {</span>
+<span class="fc" id="L688">            node.builder.parentId = parentId;</span>
+<span class="fc bfc" id="L689" title="All 2 branches covered.">            for (BuildNode child : node.children) {</span>
+<span class="fc" id="L690">                node.builder.childIds.add(Long.valueOf(child.id));</span>
+<span class="fc" id="L691">            }</span>
+<span class="fc" id="L692">            AccessibilityNodeSnapshot frozen = new AccessibilityNodeSnapshot(node.builder);</span>
+<span class="fc" id="L693">            nodes.put(Long.valueOf(node.id), frozen);</span>
+<span class="fc" id="L694">            childIds.add(Long.valueOf(node.id));</span>
+<span class="fc" id="L695">            List&lt;Long&gt; ignored = new ArrayList&lt;Long&gt;();</span>
+<span class="fc" id="L696">            freeze(node.children, node.id, ignored, nodes);</span>
+<span class="fc" id="L697">        }</span>
+<span class="fc" id="L698">    }</span>
+
+    private String collectLabels(List&lt;BuildNode&gt; nodes) {
+<span class="fc" id="L701">        String value = null;</span>
+<span class="fc bfc" id="L702" title="All 2 branches covered.">        for (BuildNode node : nodes) {</span>
+<span class="fc" id="L703">            value = join(value, node.builder.label);</span>
+<span class="fc" id="L704">            value = join(value, collectLabels(node.children));</span>
+<span class="fc" id="L705">        }</span>
+<span class="fc" id="L706">        return value;</span>
+    }
+
+    private static boolean hasAction(List&lt;AccessibilityAction&gt; actions, String id) {
+<span class="fc bfc" id="L710" title="All 2 branches covered.">        for (AccessibilityAction action : actions) {</span>
+<span class="fc bfc" id="L711" title="All 2 branches covered.">            if (id.equals(action.getId())) {</span>
+<span class="fc" id="L712">                return true;</span>
+            }
+<span class="fc" id="L714">        }</span>
+<span class="fc" id="L715">        return false;</span>
+    }
+
+    private static boolean isInteractiveRole(AccessibilityRole role) {
+<span class="pc bpc" id="L719" title="13 of 28 branches missed.">        return role == AccessibilityRole.BUTTON || role == AccessibilityRole.TOGGLE_BUTTON ||</span>
+                role == AccessibilityRole.CHECKBOX || role == AccessibilityRole.RADIO_BUTTON ||
+                role == AccessibilityRole.SWITCH || role == AccessibilityRole.LINK ||
+                role == AccessibilityRole.TEXT_FIELD || role == AccessibilityRole.SEARCH_FIELD ||
+                role == AccessibilityRole.SLIDER || role == AccessibilityRole.TAB ||
+                role == AccessibilityRole.MENU_ITEM || role == AccessibilityRole.SPIN_BUTTON ||
+                role == AccessibilityRole.COMBO_BOX || role == AccessibilityRole.TREE_ITEM;
+    }
+
+    private static String firstNonEmpty(String first, String second) {
+<span class="fc bfc" id="L729" title="All 2 branches covered.">        return !isEmpty(first) ? first : second;</span>
+    }
+
+    private static String join(String first, String second) {
+<span class="fc bfc" id="L733" title="All 2 branches covered.">        if (isEmpty(first)) {</span>
+<span class="fc" id="L734">            return second;</span>
+        }
+<span class="fc bfc" id="L736" title="All 2 branches covered.">        if (isEmpty(second)) {</span>
+<span class="fc" id="L737">            return first;</span>
+        }
+<span class="fc" id="L739">        return first + &quot;, &quot; + second;</span>
+    }
+
+    private static boolean isEmpty(String value) {
+<span class="pc bpc" id="L743" title="1 of 4 branches missed.">        return value == null || value.length() == 0;</span>
+    }
+
+<span class="fc" id="L746">    private static final class BuildNode {</span>
+        long id;
+        Component component;
+<span class="fc" id="L749">        AccessibilityNodeSnapshot.Builder builder = new AccessibilityNodeSnapshot.Builder();</span>
+<span class="fc" id="L750">        List&lt;BuildNode&gt; children = new ArrayList&lt;BuildNode&gt;();</span>
+    }
+
+    private static final class SortKeyComparator implements Comparator&lt;BuildNode&gt; {
+<span class="fc" id="L754">        private static final SortKeyComparator INSTANCE = new SortKeyComparator();</span>
+
+        @Override
+        public int compare(BuildNode a, BuildNode b) {
+<span class="fc" id="L758">            boolean an = Double.isNaN(a.builder.sortKey);</span>
+<span class="fc" id="L759">            boolean bn = Double.isNaN(b.builder.sortKey);</span>
+<span class="pc bpc" id="L760" title="1 of 4 branches missed.">            if (an &amp;&amp; bn) {</span>
+<span class="fc" id="L761">                return 0;</span>
+            }
+<span class="pc bpc" id="L763" title="1 of 2 branches missed.">            if (an) {</span>
+<span class="nc" id="L764">                return 1;</span>
+            }
+<span class="fc bfc" id="L766" title="All 2 branches covered.">            if (bn) {</span>
+<span class="fc" id="L767">                return -1;</span>
+            }
+<span class="fc" id="L769">            return Double.compare(a.builder.sortKey, b.builder.sortKey);</span>
+        }
+    }
+
+    private static final class FocusHandler implements AccessibilityAction.Handler {
+<span class="fc" id="L774">        private static final FocusHandler INSTANCE = new FocusHandler();</span>
+
+        @Override
+        public boolean perform(Component source, Object argument) {
+<span class="nc bnc" id="L778" title="All 2 branches missed.">            if (!source.isEnabled()) {</span>
+<span class="nc" id="L779">                return false;</span>
+            }
+<span class="nc" id="L781">            source.requestFocus();</span>
+<span class="nc" id="L782">            return true;</span>
+        }
+    }
+
+    private static final class ActivateHandler implements AccessibilityAction.Handler {
+<span class="fc" id="L787">        private static final ActivateHandler INSTANCE = new ActivateHandler();</span>
+
+        @Override
+        public boolean perform(Component source, Object argument) {
+<span class="pc bpc" id="L791" title="1 of 2 branches missed.">            if (!source.isEnabled()) {</span>
+<span class="nc" id="L792">                return false;</span>
+            }
+<span class="fc" id="L794">            source.keyReleased(Display.getInstance().getKeyCode(Display.GAME_FIRE));</span>
+<span class="fc" id="L795">            return true;</span>
+        }
+    }
+
+    private static final class ListActivateHandler implements AccessibilityAction.Handler {
+        private final com.codename1.ui.List list;
+        private final int index;
+
+<span class="fc" id="L803">        private ListActivateHandler(com.codename1.ui.List list, int index) {</span>
+<span class="fc" id="L804">            this.list = list;</span>
+<span class="fc" id="L805">            this.index = index;</span>
+<span class="fc" id="L806">        }</span>
+
+        @Override
+        public boolean perform(Component source, Object argument) {
+<span class="nc bnc" id="L810" title="All 2 branches missed.">            if (!list.isEnabled()) {</span>
+<span class="nc" id="L811">                return false;</span>
+            }
+<span class="nc" id="L813">            list.setSelectedIndex(index);</span>
+<span class="nc" id="L814">            list.keyReleased(Display.getInstance().getKeyCode(Display.GAME_FIRE));</span>
+<span class="nc" id="L815">            return true;</span>
+        }
+    }
+
+    private static final class ListScrollHandler implements AccessibilityAction.Handler {
+        private final com.codename1.ui.List list;
+        private final int direction;
+
+<span class="fc" id="L823">        private ListScrollHandler(com.codename1.ui.List list, int direction) {</span>
+<span class="fc" id="L824">            this.list = list;</span>
+<span class="fc" id="L825">            this.direction = direction;</span>
+<span class="fc" id="L826">        }</span>
+
+        @Override
+        public boolean perform(Component source, Object argument) {
+<span class="nc bnc" id="L830" title="All 4 branches missed.">            if (!list.isEnabled() || list.size() == 0) {</span>
+<span class="nc" id="L831">                return false;</span>
+            }
+<span class="nc" id="L833">            int selected = list.getSelectedIndex();</span>
+<span class="nc bnc" id="L834" title="All 2 branches missed.">            if (selected &lt; 0) {</span>
+<span class="nc bnc" id="L835" title="All 2 branches missed.">                selected = direction &gt; 0 ? 0 : list.size() - 1;</span>
+            } else {
+<span class="nc" id="L837">                selected = Math.max(0, Math.min(list.size() - 1, selected + direction));</span>
+            }
+<span class="nc bnc" id="L839" title="All 2 branches missed.">            if (selected == list.getSelectedIndex()) {</span>
+<span class="nc" id="L840">                return false;</span>
+            }
+<span class="nc" id="L842">            list.setSelectedIndex(selected);</span>
+<span class="nc" id="L843">            return true;</span>
+        }
+    }
+
+    private static final class SliderAdjustmentHandler implements AccessibilityAction.Handler {
+        private final Slider slider;
+        private final int direction;
+
+<span class="fc" id="L851">        private SliderAdjustmentHandler(Slider slider, int direction) {</span>
+<span class="fc" id="L852">            this.slider = slider;</span>
+<span class="fc" id="L853">            this.direction = direction;</span>
+<span class="fc" id="L854">        }</span>
+
+        @Override
+        public boolean perform(Component source, Object argument) {
+<span class="nc" id="L858">            int increment = Math.max(1, slider.getIncrements());</span>
+<span class="nc" id="L859">            int value = slider.getProgress() + direction * increment;</span>
+<span class="nc" id="L860">            slider.setProgress(Math.max(slider.getMinValue(), Math.min(slider.getMaxValue(), value)));</span>
+<span class="nc" id="L861">            return true;</span>
+        }
+    }
+
+    private static final class SetTextHandler implements AccessibilityAction.Handler {
+        private final TextArea text;
+
+<span class="fc" id="L868">        private SetTextHandler(TextArea text) {</span>
+<span class="fc" id="L869">            this.text = text;</span>
+<span class="fc" id="L870">        }</span>
+
+        @Override
+        public boolean perform(Component source, Object argument) {
+<span class="pc bpc" id="L874" title="1 of 2 branches missed.">            if (!(argument instanceof String)) {</span>
+<span class="nc" id="L875">                return false;</span>
+            }
+<span class="fc" id="L877">            text.setText((String) argument);</span>
+<span class="fc" id="L878">            return true;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

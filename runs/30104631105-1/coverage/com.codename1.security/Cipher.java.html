@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Cipher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">Cipher.java</span></div><h1>Cipher.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+import com.codename1.io.Util;
+
+/// Convenience entry points for symmetric (AES) and asymmetric (RSA)
+/// encryption. The actual algorithms run on the platform's native crypto
+/// provider -- this class is just a thin, friendly facade over the
+/// [com.codename1.impl.CodenameOneImplementation] crypto bridge.
+///
+/// #### Recommended transformations
+///
+/// - **AES**: `AES/GCM/NoPadding` for authenticated encryption (uses a 12-byte
+///   nonce and produces ciphertext with a 16-byte tag appended). Falls back
+///   to `AES/CBC/PKCS5Padding` if GCM is unavailable on a target platform.
+/// - **RSA**: `RSA/ECB/OAEPWithSHA-256AndMGF1Padding` for new code,
+///   `RSA/ECB/PKCS1Padding` only for interop with old systems.
+///
+/// #### Example: AES-GCM round-trip
+///
+/// ```java
+/// SecretKey key = KeyGenerator.aes(256);
+/// byte[] nonce  = SecureRandom.bytes(12);
+/// byte[] cipher = Cipher.aesEncrypt(Cipher.AES_GCM, key, nonce, null, &quot;secret&quot;.getBytes(&quot;UTF-8&quot;));
+/// byte[] plain  = Cipher.aesDecrypt(Cipher.AES_GCM, key, nonce, null, cipher);
+/// ```
+///
+/// #### Example: RSA-OAEP round-trip
+///
+/// ```java
+/// KeyPair kp = KeyGenerator.rsa(2048);
+/// byte[] cipher = Cipher.rsaEncrypt(Cipher.RSA_OAEP_SHA256, kp.getPublicKey(), data);
+/// byte[] plain  = Cipher.rsaDecrypt(Cipher.RSA_OAEP_SHA256, kp.getPrivateKey(), cipher);
+/// ```
+public final class Cipher {
+
+    /// `AES/GCM/NoPadding` -- recommended authenticated mode for AES.
+    public static final String AES_GCM = &quot;AES/GCM/NoPadding&quot;;
+
+    /// `AES/CBC/PKCS5Padding` -- block-chained AES with PKCS#5 padding.
+    public static final String AES_CBC_PKCS5 = &quot;AES/CBC/PKCS5Padding&quot;;
+
+    /// `AES/CBC/NoPadding` -- raw CBC, caller must pre-pad to a 16-byte
+    /// boundary.
+    public static final String AES_CBC = &quot;AES/CBC/NoPadding&quot;;
+
+    /// `AES/ECB/PKCS5Padding` -- legacy interop only. ECB leaks structure;
+    /// avoid for new designs.
+    public static final String AES_ECB_PKCS5 = &quot;AES/ECB/PKCS5Padding&quot;;
+
+    /// `RSA/ECB/OAEPWithSHA-256AndMGF1Padding` -- recommended RSA encryption
+    /// transformation.
+    public static final String RSA_OAEP_SHA256 = &quot;RSA/ECB/OAEPWithSHA-256AndMGF1Padding&quot;;
+
+    /// `RSA/ECB/PKCS1Padding` -- legacy RSA padding, kept for interop.
+    public static final String RSA_PKCS1 = &quot;RSA/ECB/PKCS1Padding&quot;;
+
+    private Cipher() {}
+
+    /// Encrypts with AES.
+    ///
+    /// #### Parameters
+    ///
+    /// - `transformation`: one of [#AES_GCM], [#AES_CBC_PKCS5], [#AES_CBC],
+    ///   [#AES_ECB_PKCS5]
+    ///
+    /// - `key`: AES key (16, 24 or 32 bytes for AES-128/192/256)
+    ///
+    /// - `iv`: initialisation vector for CBC (16 bytes) / nonce for GCM
+    ///   (12 bytes recommended). Pass null for ECB.
+    ///
+    /// - `aad`: associated authenticated data -- GCM only, may be null
+    ///
+    /// - `plaintext`: data to encrypt
+    public static byte[] aesEncrypt(String transformation, SecretKey key,
+                                    byte[] iv, byte[] aad, byte[] plaintext) {
+        try {
+<span class="fc" id="L99">            return Util.aesEncrypt(transformation, key.getEncoded(), iv, aad, plaintext);</span>
+<span class="nc" id="L100">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L101">            throw new CryptoException(re.getMessage(), re);</span>
+        }
+    }
+
+    /// Decrypts AES ciphertext produced by [#aesEncrypt]. For GCM mode, the
+    /// auth tag is part of the ciphertext (last 16 bytes) -- a tag mismatch
+    /// raises [CryptoException].
+    public static byte[] aesDecrypt(String transformation, SecretKey key,
+                                    byte[] iv, byte[] aad, byte[] ciphertext) {
+        try {
+<span class="fc" id="L111">            return Util.aesDecrypt(transformation, key.getEncoded(), iv, aad, ciphertext);</span>
+<span class="fc" id="L112">        } catch (RuntimeException re) {</span>
+<span class="fc" id="L113">            throw new CryptoException(re.getMessage(), re);</span>
+        }
+    }
+
+    /// Encrypts a small amount of data with RSA. The plaintext size is bounded
+    /// by the modulus minus padding overhead (e.g. ~190 bytes max for
+    /// RSA-2048 + OAEP-SHA-256); use AES with an RSA-wrapped AES key for
+    /// larger payloads.
+    public static byte[] rsaEncrypt(String transformation, PublicKey key, byte[] plaintext) {
+        try {
+<span class="fc" id="L123">            return Util.rsaEncrypt(transformation, key.getEncoded(), plaintext);</span>
+<span class="nc" id="L124">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L125">            throw new CryptoException(re.getMessage(), re);</span>
+        }
+    }
+
+    /// Decrypts an RSA ciphertext.
+    public static byte[] rsaDecrypt(String transformation, PrivateKey key, byte[] ciphertext) {
+        try {
+<span class="fc" id="L132">            return Util.rsaDecrypt(transformation, key.getEncoded(), ciphertext);</span>
+<span class="nc" id="L133">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L134">            throw new CryptoException(re.getMessage(), re);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

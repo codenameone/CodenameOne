@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TileLayer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.level</a> &gt; <span class="el_source">TileLayer.java</span></div><h1>TileLayer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming.level;
+
+import com.codename1.gaming.Scene;
+import com.codename1.gaming.Sprite;
+import com.codename1.gaming.SpriteSheet;
+
+/// An efficient, single-tileset tile grid: a `#getCols()` x `#getRows()` array of frame
+/// indices into one `SpriteSheet` (-1 means &quot;empty cell&quot;).
+///
+/// This is the fast representation a game uses when every tile comes from the same
+/// atlas -- contrast with a `Layer` of `Layer.Kind#TILE`, which stores an
+/// `assetId`-per-cell map and can mix assets from different packs. `#toScene(Scene,
+/// int)` materializes the non-empty cells as `Sprite`s anchored at their top-left at
+/// `tileSize` spacing.
+public class TileLayer {
+    private final SpriteSheet sheet;
+    private final int cols;
+    private final int rows;
+    private final int tileSize;
+    private final int[] cells;
+
+<span class="nc" id="L44">    public TileLayer(SpriteSheet sheet, int cols, int rows, int tileSize) {</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (sheet == null) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(&quot;sheet is null&quot;);</span>
+        }
+<span class="nc bnc" id="L48" title="All 4 branches missed.">        if (cols &lt;= 0 || rows &lt;= 0) {</span>
+<span class="nc" id="L49">            throw new IllegalArgumentException(&quot;grid must be positive&quot;);</span>
+        }
+<span class="nc" id="L51">        this.sheet = sheet;</span>
+<span class="nc" id="L52">        this.cols = cols;</span>
+<span class="nc" id="L53">        this.rows = rows;</span>
+<span class="nc" id="L54">        this.tileSize = tileSize;</span>
+<span class="nc" id="L55">        this.cells = new int[cols * rows];</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        for (int i = 0; i &lt; cells.length; i++) {</span>
+<span class="nc" id="L57">            cells[i] = -1;</span>
+        }
+<span class="nc" id="L59">    }</span>
+
+    public int getCols() {
+<span class="nc" id="L62">        return cols;</span>
+    }
+
+    public int getRows() {
+<span class="nc" id="L66">        return rows;</span>
+    }
+
+    public int getTileSize() {
+<span class="nc" id="L70">        return tileSize;</span>
+    }
+
+    public SpriteSheet getSheet() {
+<span class="nc" id="L74">        return sheet;</span>
+    }
+
+    /// The frame index painted at a cell, or -1 if empty.
+    public int getTile(int col, int row) {
+<span class="nc bnc" id="L79" title="All 8 branches missed.">        if (col &lt; 0 || row &lt; 0 || col &gt;= cols || row &gt;= rows) {</span>
+<span class="nc" id="L80">            return -1;</span>
+        }
+<span class="nc" id="L82">        return cells[row * cols + col];</span>
+    }
+
+    /// Paints a frame index into a cell (-1 clears it).
+    public TileLayer setTile(int col, int row, int frame) {
+<span class="nc bnc" id="L87" title="All 8 branches missed.">        if (col &gt;= 0 &amp;&amp; row &gt;= 0 &amp;&amp; col &lt; cols &amp;&amp; row &lt; rows) {</span>
+<span class="nc" id="L88">            cells[row * cols + col] = frame;</span>
+        }
+<span class="nc" id="L90">        return this;</span>
+    }
+
+    /// Adds a `Sprite` for every non-empty cell to the scene, anchored at the cell's
+    /// top-left corner and z-ordered at `zOrder`.
+    public void toScene(Scene scene, int zOrder) {
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        for (int row = 0; row &lt; rows; row++) {</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">            for (int col = 0; col &lt; cols; col++) {</span>
+<span class="nc" id="L98">                int frame = cells[row * cols + col];</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">                if (frame &lt; 0) {</span>
+<span class="nc" id="L100">                    continue;</span>
+                }
+<span class="nc" id="L102">                Sprite s = new Sprite(sheet.getFrame(frame));</span>
+<span class="nc" id="L103">                s.setAnchor(0, 0);</span>
+<span class="nc" id="L104">                s.setPosition(col * tileSize, row * tileSize);</span>
+<span class="nc" id="L105">                s.setZOrder(zOrder);</span>
+<span class="nc" id="L106">                scene.add(s);</span>
+            }
+        }
+<span class="nc" id="L109">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

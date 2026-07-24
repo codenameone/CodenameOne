@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ChatMessage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai</a> &gt; <span class="el_source">ChatMessage.java</span></div><h1>ChatMessage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+/// A single turn in a chat conversation. Holds a [Role], one or more
+/// [MessagePart]s, and (for assistant turns) any [ToolCall]s the model
+/// produced. Construct via the static helpers ([#user(String)],
+/// [#system(String)], etc.) for the common case, or pass parts
+/// directly for multi-modal messages.
+public final class ChatMessage {
+    private final Role role;
+    private final List&lt;MessagePart&gt; parts;
+    private final List&lt;ToolCall&gt; toolCalls;
+    private final String name;
+    private final String toolCallId;
+
+    public ChatMessage(Role role, List&lt;MessagePart&gt; parts) {
+<span class="fc" id="L43">        this(role, parts, null, null, null);</span>
+<span class="fc" id="L44">    }</span>
+
+    public ChatMessage(Role role, List&lt;MessagePart&gt; parts, List&lt;ToolCall&gt; toolCalls,
+<span class="fc" id="L47">                       String name, String toolCallId) {</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (role == null) {</span>
+<span class="nc" id="L49">            throw new IllegalArgumentException(&quot;role is required&quot;);</span>
+        }
+<span class="fc" id="L51">        this.role = role;</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        this.parts = parts == null ? Collections.&lt;MessagePart&gt;emptyList()</span>
+<span class="fc" id="L53">                : Collections.unmodifiableList(new ArrayList&lt;MessagePart&gt;(parts));</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        this.toolCalls = toolCalls == null ? Collections.&lt;ToolCall&gt;emptyList()</span>
+<span class="fc" id="L55">                : Collections.unmodifiableList(new ArrayList&lt;ToolCall&gt;(toolCalls));</span>
+<span class="fc" id="L56">        this.name = name;</span>
+<span class="fc" id="L57">        this.toolCallId = toolCallId;</span>
+<span class="fc" id="L58">    }</span>
+
+    public static ChatMessage system(String text) {
+<span class="fc" id="L61">        return single(Role.SYSTEM, new TextPart(text));</span>
+    }
+
+    public static ChatMessage user(String text) {
+<span class="fc" id="L65">        return single(Role.USER, new TextPart(text));</span>
+    }
+
+    public static ChatMessage assistant(String text) {
+<span class="fc" id="L69">        return single(Role.ASSISTANT, new TextPart(text));</span>
+    }
+
+    /// Builds a USER message containing both a text and image part --
+    /// the common multi-modal pattern.
+    public static ChatMessage userWithImage(String text, ImagePart image) {
+<span class="fc" id="L75">        List&lt;MessagePart&gt; parts = new ArrayList&lt;MessagePart&gt;(2);</span>
+<span class="pc bpc" id="L76" title="2 of 4 branches missed.">        if (text != null &amp;&amp; text.length() &gt; 0) {</span>
+<span class="fc" id="L77">            parts.add(new TextPart(text));</span>
+        }
+<span class="fc" id="L79">        parts.add(image);</span>
+<span class="fc" id="L80">        return new ChatMessage(Role.USER, parts);</span>
+    }
+
+    /// Builds a TOOL message wrapping the result of a previous tool call.
+    public static ChatMessage toolResult(String toolCallId, String resultJson) {
+<span class="fc" id="L85">        return new ChatMessage(Role.TOOL,</span>
+<span class="fc" id="L86">                Arrays.&lt;MessagePart&gt;asList(new ToolResultPart(toolCallId, resultJson)),</span>
+                null, null, toolCallId);
+    }
+
+    private static ChatMessage single(Role r, MessagePart p) {
+<span class="fc" id="L91">        List&lt;MessagePart&gt; parts = new ArrayList&lt;MessagePart&gt;(1);</span>
+<span class="fc" id="L92">        parts.add(p);</span>
+<span class="fc" id="L93">        return new ChatMessage(r, parts);</span>
+    }
+
+    public Role getRole() {
+<span class="fc" id="L97">        return role;</span>
+    }
+
+    public List&lt;MessagePart&gt; getParts() {
+<span class="fc" id="L101">        return parts;</span>
+    }
+
+    public List&lt;ToolCall&gt; getToolCalls() {
+<span class="fc" id="L105">        return toolCalls;</span>
+    }
+
+    public String getName() {
+<span class="fc" id="L109">        return name;</span>
+    }
+
+    public String getToolCallId() {
+<span class="fc" id="L113">        return toolCallId;</span>
+    }
+
+    /// Convenience: concatenates the text of every [TextPart]. Image
+    /// and tool-result parts are skipped. Useful for `ChatView`
+    /// rendering when you don't care about multi-modal content.
+    public String getText() {
+<span class="fc" id="L120">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (MessagePart p : parts) {</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            if (p instanceof TextPart) {</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">                if (sb.length() &gt; 0) {</span>
+<span class="fc" id="L124">                    sb.append('\n');</span>
+                }
+<span class="fc" id="L126">                sb.append(((TextPart) p).getText());</span>
+            }
+<span class="fc" id="L128">        }</span>
+<span class="fc" id="L129">        return sb.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GattOperationQueue.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.bluetooth.le</a> &gt; <span class="el_source">GattOperationQueue.java</span></div><h1>GattOperationQueue.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.bluetooth.le;
+
+import com.codename1.bluetooth.BluetoothError;
+import com.codename1.bluetooth.BluetoothException;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.AsyncResult;
+
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.Timer;
+import java.util.TimerTask;
+
+/// Serializes GATT operations against one peripheral: platform stacks
+/// (Android in particular) silently drop a second in-flight GATT request,
+/// so every operation is started only after the previous one completed,
+/// failed, or hit the safety timeout. Each operation owns an independent
+/// `AsyncResource`, so callers may issue any number of concurrent requests
+/// and correlate results per call.
+<span class="fc" id="L41">final class GattOperationQueue {</span>
+
+    /// One queued operation: `start()` invokes the port SPI which must
+    /// eventually complete or fail [#result].
+    abstract static class Op {
+        final AsyncResource&lt;?&gt; result;
+        TimerTask timeoutTask;
+        Timer timeoutTimer;
+
+<span class="fc" id="L50">        Op(AsyncResource&lt;?&gt; result) {</span>
+<span class="fc" id="L51">            this.result = result;</span>
+<span class="fc" id="L52">        }</span>
+
+        abstract void start();
+    }
+
+<span class="fc" id="L57">    private final Object lock = new Object();</span>
+<span class="fc" id="L58">    private final LinkedList&lt;Op&gt; pending = new LinkedList&lt;Op&gt;();</span>
+    private Op current;
+<span class="fc" id="L60">    private int timeoutMillis = 30000;</span>
+
+    /// Sets the per-operation safety timeout; `0` or negative disables it.
+    void setTimeoutMillis(int millis) {
+<span class="fc" id="L64">        timeoutMillis = millis;</span>
+<span class="fc" id="L65">    }</span>
+
+    int getTimeoutMillis() {
+<span class="nc" id="L68">        return timeoutMillis;</span>
+    }
+
+    /// Enqueues the operation; it starts immediately when the queue is
+    /// idle. Safe to call from any thread.
+    void enqueue(final Op op) {
+<span class="fc" id="L74">        op.result.onResult(new AsyncResult() {</span>
+            @Override
+            public void onReady(Object value, Throwable err) {
+<span class="fc" id="L77">                advance(op);</span>
+<span class="fc" id="L78">            }</span>
+        });
+        boolean startNow;
+<span class="fc" id="L81">        synchronized (lock) {</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            if (current == null) {</span>
+<span class="fc" id="L83">                current = op;</span>
+<span class="fc" id="L84">                startNow = true;</span>
+            } else {
+<span class="fc" id="L86">                pending.add(op);</span>
+<span class="fc" id="L87">                startNow = false;</span>
+            }
+<span class="fc" id="L89">        }</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (startNow) {</span>
+<span class="fc" id="L91">            startOp(op);</span>
+        }
+<span class="fc" id="L93">    }</span>
+
+    /// Fails the in-flight and all queued operations -- called when the
+    /// connection drops.
+    void failAll(BluetoothException reason) {
+<span class="fc" id="L98">        ArrayList&lt;Op&gt; toFail = new ArrayList&lt;Op&gt;();</span>
+<span class="fc" id="L99">        synchronized (lock) {</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            if (current != null) {</span>
+<span class="fc" id="L101">                toFail.add(current);</span>
+<span class="fc" id="L102">                current = null;</span>
+            }
+<span class="fc" id="L104">            toFail.addAll(pending);</span>
+<span class="fc" id="L105">            pending.clear();</span>
+<span class="fc" id="L106">        }</span>
+<span class="fc" id="L107">        int size = toFail.size();</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (int i = 0; i &lt; size; i++) {</span>
+<span class="fc" id="L109">            Op op = toFail.get(i);</span>
+<span class="fc" id="L110">            cancelTimeout(op);</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">            if (!op.result.isDone()) {</span>
+<span class="fc" id="L112">                op.result.error(reason);</span>
+            }
+        }
+<span class="fc" id="L115">    }</span>
+
+    private void startOp(final Op op) {
+        // an operation cancelled while it waited in the queue never fires
+        // its callbacks, so it must be skipped explicitly
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (op.result.isDone()) {</span>
+<span class="fc" id="L121">            advance(op);</span>
+<span class="fc" id="L122">            return;</span>
+        }
+<span class="fc" id="L124">        armTimeout(op);</span>
+        try {
+<span class="fc" id="L126">            op.start();</span>
+<span class="fc" id="L127">        } catch (RuntimeException ex) {</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            if (!op.result.isDone()) {</span>
+<span class="fc" id="L129">                op.result.error(new BluetoothException(BluetoothError.UNKNOWN,</span>
+                        &quot;GATT operation failed to start: &quot; + ex, ex));
+            }
+<span class="fc" id="L132">        }</span>
+<span class="fc" id="L133">    }</span>
+
+    private void advance(Op op) {
+        Op next;
+<span class="fc" id="L137">        synchronized (lock) {</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            if (current != op) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L139">                return;</span>
+            }
+<span class="fc" id="L141">            cancelTimeout(op);</span>
+<span class="fc" id="L142">            current = pending.poll();</span>
+<span class="fc" id="L143">            next = current;</span>
+<span class="fc" id="L144">        }</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (next != null) {</span>
+<span class="fc" id="L146">            startOp(next);</span>
+        }
+<span class="fc" id="L148">    }</span>
+
+    private void armTimeout(final Op op) {
+<span class="fc" id="L151">        final int t = timeoutMillis;</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (t &lt;= 0) {</span>
+<span class="fc" id="L153">            return;</span>
+        }
+<span class="fc" id="L155">        TimerTask task = new TimerTask() {</span>
+            @Override
+            public void run() {
+                boolean isCurrent;
+<span class="fc" id="L159">                synchronized (lock) {</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">                    isCurrent = current == op; //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L161">                }</span>
+<span class="pc bpc" id="L162" title="2 of 4 branches missed.">                if (isCurrent &amp;&amp; !op.result.isDone()) {</span>
+<span class="fc" id="L163">                    op.result.error(new BluetoothException(</span>
+                            BluetoothError.TIMEOUT,
+                            &quot;GATT operation timed out after &quot; + t + &quot;ms&quot;));
+                }
+<span class="fc" id="L167">            }</span>
+        };
+<span class="fc" id="L169">        op.timeoutTask = task;</span>
+<span class="fc" id="L170">        op.timeoutTimer = schedule(task, t);</span>
+<span class="fc" id="L171">    }</span>
+
+    private void cancelTimeout(Op op) {
+<span class="fc" id="L174">        TimerTask task = op.timeoutTask;</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (task != null) {</span>
+<span class="fc" id="L176">            op.timeoutTask = null;</span>
+<span class="fc" id="L177">            task.cancel();</span>
+        }
+<span class="fc" id="L179">        Timer timer = op.timeoutTimer;</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (timer != null) {</span>
+<span class="fc" id="L181">            op.timeoutTimer = null;</span>
+            // ends the timer thread rather than leaving it parked for the
+            // life of the process
+<span class="fc" id="L184">            timer.cancel();</span>
+        }
+<span class="fc" id="L186">    }</span>
+
+    /// Schedules a one-shot task on its own timer and returns it so the
+    /// caller can cancel both task and timer. A timer per pending timeout
+    /// mirrors `Display.setTimeout` and keeps the device API surface
+    /// (CLDC11) satisfied -- it declares no daemon-thread constructor, and
+    /// a shared non-daemon timer would keep a desktop JVM alive after the
+    /// app closes. Also used by [BlePeripheral] for connect timeouts.
+    static Timer schedule(TimerTask task, int delayMillis) {
+<span class="fc" id="L195">        Timer timer = new Timer();</span>
+<span class="fc" id="L196">        timer.schedule(task, delayMillis);</span>
+<span class="fc" id="L197">        return timer;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,422 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Media360View.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.vr</a> &gt; <span class="el_source">Media360View.java</span></div><h1>Media360View.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.vr;
+
+import com.codename1.gpu.Camera;
+import com.codename1.gpu.GraphicsDevice;
+import com.codename1.gpu.Material;
+import com.codename1.gpu.Mesh;
+import com.codename1.gpu.Primitives;
+import com.codename1.gpu.Quaternion;
+import com.codename1.gpu.RenderView;
+import com.codename1.gpu.Renderer;
+import com.codename1.gpu.Texture;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Image;
+import com.codename1.ui.layouts.BorderLayout;
+
+/// A 360 degree panorama viewer: renders an equirectangular image onto the
+/// inside of a sphere with drag-to-look navigation and optional gyroscope
+/// look. Works everywhere `Display#isGpuSupported()` is true; on platforms
+/// without a GPU backend it degrades to the standard &quot;3D not supported&quot;
+/// placeholder without crashing.
+///
+/// Mono mode fills the component; `#setStereo(boolean)` renders the same
+/// viewpoint side by side for cardboard-style viewers. Photo spheres are
+/// captured from a single point, so stereo intentionally uses a zero eye
+/// separation - there is no parallax information in the image to reproduce.
+///
+/// 360 video is not supported directly because the platform has no path from
+/// media frames to GPU textures yet; `#setTextureSource(TextureSource)` is
+/// the extension point for dynamic content.
+///
+/// ```java
+/// Media360View pano = new Media360View();
+/// pano.setImage(EncodedImage.create(&quot;/panorama.jpg&quot;));
+/// form.add(BorderLayout.CENTER, pano);
+/// ```
+public class Media360View extends Container {
+    private static final float MAX_PITCH_DEGREES = 89f;
+
+    private final RenderView renderView;
+    // Guards the state the EDT writes and the render thread reads each frame
+    // (the codebase convention is locking over volatile fields).
+<span class="fc" id="L65">    private final Object stateLock = new Object();</span>
+    private Image pendingImage;
+    private boolean imageDirty;
+    private TextureSource textureSource;
+    private boolean sourceDirty;
+    private float yaw;
+    private float pitch;
+    private boolean stereo;
+    private boolean headTrackingEnabled;
+    private HeadTracker tracker;
+
+<span class="fc" id="L76">    private int lastDragX = -1;</span>
+<span class="fc" id="L77">    private int lastDragY = -1;</span>
+
+    /// Creates an empty viewer; supply content with `#setImage(Image)` or
+    /// `#setTextureSource(TextureSource)`.
+    public Media360View() {
+<span class="fc" id="L82">        super(new BorderLayout());</span>
+<span class="fc" id="L83">        renderView = new RenderView(new SphereLoop());</span>
+<span class="fc" id="L84">        add(BorderLayout.CENTER, renderView);</span>
+<span class="fc" id="L85">        setFocusable(true);</span>
+<span class="fc" id="L86">    }</span>
+
+    /// True when the current platform provides a 3D backend.
+    public boolean isSupported() {
+<span class="fc" id="L90">        return Display.getInstance().isGpuSupported();</span>
+    }
+
+    /// Shows an equirectangular panorama image (the format produced by 360
+    /// cameras and phone panorama modes: longitude maps to X, latitude to Y).
+    /// Replaces any previous image or texture source.
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: the panorama to display
+    public void setImage(Image image) {
+<span class="fc" id="L101">        synchronized (stateLock) {</span>
+<span class="fc" id="L102">            pendingImage = image;</span>
+<span class="fc" id="L103">            imageDirty = true;</span>
+<span class="fc" id="L104">        }</span>
+<span class="fc" id="L105">        renderView.requestRender();</span>
+<span class="fc" id="L106">    }</span>
+
+    /// Installs a dynamic texture source, replacing any static image. The
+    /// extension point for procedural or (future) video content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the source, or null to remove it
+    public void setTextureSource(TextureSource source) {
+<span class="nc" id="L115">        synchronized (stateLock) {</span>
+<span class="nc" id="L116">            textureSource = source;</span>
+<span class="nc" id="L117">            sourceDirty = true;</span>
+<span class="nc" id="L118">        }</span>
+<span class="nc" id="L119">        renderView.requestRender();</span>
+<span class="nc" id="L120">    }</span>
+
+    /// Switches between a full-viewport mono view (the default) and
+    /// side-by-side stereo for cardboard-style viewers.
+    public void setStereo(boolean stereo) {
+<span class="fc" id="L125">        synchronized (stateLock) {</span>
+<span class="fc" id="L126">            this.stereo = stereo;</span>
+<span class="fc" id="L127">        }</span>
+<span class="fc" id="L128">        renderView.requestRender();</span>
+<span class="fc" id="L129">    }</span>
+
+    /// True when rendering side-by-side stereo.
+    public boolean isStereo() {
+<span class="fc" id="L133">        synchronized (stateLock) {</span>
+<span class="fc" id="L134">            return stereo;</span>
+        }
+    }
+
+    /// Enables gyroscope look-around, composed with drag navigation. When the
+    /// device has no motion sensors this quietly stays drag-only.
+    public void setHeadTrackingEnabled(boolean enabled) {
+<span class="fc" id="L141">        synchronized (stateLock) {</span>
+<span class="fc" id="L142">            headTrackingEnabled = enabled;</span>
+<span class="fc" id="L143">        }</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (enabled) {</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">            if (tracker == null) {</span>
+<span class="fc" id="L146">                tracker = new HeadTracker();</span>
+            }
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            if (isInitialized()) {</span>
+<span class="nc" id="L149">                tracker.start();</span>
+            }
+<span class="fc" id="L151">            renderView.setContinuous(true);</span>
+        } else {
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            if (tracker != null) {</span>
+<span class="fc" id="L154">                tracker.stop();</span>
+            }
+<span class="fc" id="L156">            renderView.setContinuous(false);</span>
+        }
+<span class="fc" id="L158">        renderView.requestRender();</span>
+<span class="fc" id="L159">    }</span>
+
+    /// True when gyroscope look-around is enabled.
+    public boolean isHeadTrackingEnabled() {
+<span class="fc" id="L163">        synchronized (stateLock) {</span>
+<span class="fc" id="L164">            return headTrackingEnabled;</span>
+        }
+    }
+
+    /// The horizontal look angle in degrees; positive turns right.
+    public float getYaw() {
+<span class="fc" id="L170">        synchronized (stateLock) {</span>
+<span class="fc" id="L171">            return yaw;</span>
+        }
+    }
+
+    /// Sets the horizontal look angle in degrees.
+    public void setYaw(float yawDegrees) {
+<span class="fc" id="L177">        synchronized (stateLock) {</span>
+<span class="fc" id="L178">            this.yaw = yawDegrees;</span>
+<span class="fc" id="L179">        }</span>
+<span class="fc" id="L180">        renderView.requestRender();</span>
+<span class="fc" id="L181">    }</span>
+
+    /// The vertical look angle in degrees, clamped so the view cannot flip
+    /// over the poles; positive looks up.
+    public float getPitch() {
+<span class="fc" id="L186">        synchronized (stateLock) {</span>
+<span class="fc" id="L187">            return pitch;</span>
+        }
+    }
+
+    /// Sets the vertical look angle in degrees. Clamped to stay off the
+    /// poles.
+    public void setPitch(float pitchDegrees) {
+<span class="fc" id="L194">        synchronized (stateLock) {</span>
+<span class="fc" id="L195">            this.pitch = clampPitch(pitchDegrees);</span>
+<span class="fc" id="L196">        }</span>
+<span class="fc" id="L197">        renderView.requestRender();</span>
+<span class="fc" id="L198">    }</span>
+
+    /// Resets the view to look straight ahead and recenters the gyroscope.
+    public void reset() {
+<span class="fc" id="L202">        synchronized (stateLock) {</span>
+<span class="fc" id="L203">            yaw = 0f;</span>
+<span class="fc" id="L204">            pitch = 0f;</span>
+<span class="fc" id="L205">        }</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if (tracker != null) {</span>
+<span class="nc" id="L207">            tracker.recenter();</span>
+        }
+<span class="fc" id="L209">        renderView.requestRender();</span>
+<span class="fc" id="L210">    }</span>
+
+    /// The underlying render view, exposed for advanced integration.
+    public RenderView getRenderView() {
+<span class="fc" id="L214">        return renderView;</span>
+    }
+
+    private static float clampPitch(float p) {
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        if (p &gt; MAX_PITCH_DEGREES) {</span>
+<span class="fc" id="L219">            return MAX_PITCH_DEGREES;</span>
+        }
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (p &lt; -MAX_PITCH_DEGREES) {</span>
+<span class="fc" id="L222">            return -MAX_PITCH_DEGREES;</span>
+        }
+<span class="fc" id="L224">        return p;</span>
+    }
+
+    @Override
+    protected void initComponent() {
+<span class="nc" id="L229">        super.initComponent();</span>
+<span class="nc bnc" id="L230" title="All 4 branches missed.">        if (isHeadTrackingEnabled() &amp;&amp; tracker != null) {</span>
+<span class="nc" id="L231">            tracker.start();</span>
+        }
+<span class="nc" id="L233">    }</span>
+
+    @Override
+    protected void deinitialize() {
+<span class="nc bnc" id="L237" title="All 2 branches missed.">        if (tracker != null) {</span>
+<span class="nc" id="L238">            tracker.stop();</span>
+        }
+<span class="nc" id="L240">        super.deinitialize();</span>
+<span class="nc" id="L241">    }</span>
+
+    @Override
+    public void pointerPressed(int x, int y) {
+<span class="fc" id="L245">        super.pointerPressed(x, y);</span>
+<span class="fc" id="L246">        lastDragX = x;</span>
+<span class="fc" id="L247">        lastDragY = y;</span>
+<span class="fc" id="L248">    }</span>
+
+    @Override
+    public void pointerDragged(int x, int y) {
+<span class="fc" id="L252">        super.pointerDragged(x, y);</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">        if (lastDragX &gt;= 0) {</span>
+<span class="fc" id="L254">            int w = Math.max(1, getWidth());</span>
+<span class="fc" id="L255">            int h = Math.max(1, getHeight());</span>
+            // Dragging the image right turns the view left, matching the
+            // grab-the-world gesture users expect from panorama viewers.
+<span class="fc" id="L258">            synchronized (stateLock) {</span>
+<span class="fc" id="L259">                yaw -= (x - lastDragX) * 180f / w;</span>
+<span class="fc" id="L260">                pitch = clampPitch(pitch + (y - lastDragY) * 180f / h);</span>
+<span class="fc" id="L261">            }</span>
+        }
+<span class="fc" id="L263">        lastDragX = x;</span>
+<span class="fc" id="L264">        lastDragY = y;</span>
+<span class="fc" id="L265">        renderView.requestRender();</span>
+<span class="fc" id="L266">    }</span>
+
+    @Override
+    public void pointerReleased(int x, int y) {
+<span class="fc" id="L270">        super.pointerReleased(x, y);</span>
+<span class="fc" id="L271">        lastDragX = -1;</span>
+<span class="fc" id="L272">        lastDragY = -1;</span>
+<span class="fc" id="L273">    }</span>
+
+    /// The internal renderer: an inside-out UV sphere carrying the panorama
+    /// texture, looked at from the origin.
+<span class="fc" id="L277">    private final class SphereLoop implements Renderer {</span>
+        private Mesh sphere;
+        private Material material;
+        private Texture texture;
+<span class="fc" id="L281">        private final Camera camera = new Camera();</span>
+<span class="fc" id="L282">        private final float[] quat = Quaternion.identity();</span>
+<span class="fc" id="L283">        private final float[] dir = new float[3];</span>
+<span class="fc" id="L284">        private final float[] up = new float[3];</span>
+<span class="fc" id="L285">        private int surfaceWidth = 1;</span>
+<span class="fc" id="L286">        private int surfaceHeight = 1;</span>
+
+        @Override
+        public void onInit(GraphicsDevice device) {
+<span class="nc" id="L290">            sphere = Primitives.sphere(device, 50f, 48, 96, true);</span>
+<span class="nc" id="L291">            material = new Material(Material.Type.UNLIT).setColor(0xffffffff);</span>
+<span class="nc" id="L292">        }</span>
+
+        @Override
+        public void onResize(GraphicsDevice device, int width, int height) {
+<span class="nc" id="L296">            surfaceWidth = Math.max(1, width);</span>
+<span class="nc" id="L297">            surfaceHeight = Math.max(1, height);</span>
+<span class="nc" id="L298">        }</span>
+
+        @Override
+        public void onFrame(GraphicsDevice device) {
+            // Snapshot the EDT-owned state once per frame.
+            TextureSource sourceNow;
+            boolean sourceDirtyNow;
+            Image imageNow;
+            boolean imageDirtyNow;
+            float yawNow;
+            float pitchNow;
+            boolean stereoNow;
+            boolean trackingNow;
+<span class="nc" id="L311">            synchronized (stateLock) {</span>
+<span class="nc" id="L312">                sourceNow = textureSource;</span>
+<span class="nc" id="L313">                sourceDirtyNow = sourceDirty;</span>
+<span class="nc" id="L314">                sourceDirty = false;</span>
+<span class="nc" id="L315">                imageNow = pendingImage;</span>
+<span class="nc" id="L316">                imageDirtyNow = imageDirty;</span>
+<span class="nc" id="L317">                imageDirty = false;</span>
+<span class="nc" id="L318">                yawNow = yaw;</span>
+<span class="nc" id="L319">                pitchNow = pitch;</span>
+<span class="nc" id="L320">                stereoNow = stereo;</span>
+<span class="nc" id="L321">                trackingNow = headTrackingEnabled;</span>
+<span class="nc" id="L322">            }</span>
+<span class="nc" id="L323">            refreshTexture(device, sourceNow, sourceDirtyNow, imageNow, imageDirtyNow);</span>
+<span class="nc" id="L324">            computeLook(yawNow, pitchNow, trackingNow);</span>
+<span class="nc" id="L325">            int w = surfaceWidth;</span>
+<span class="nc" id="L326">            int h = surfaceHeight;</span>
+<span class="nc" id="L327">            device.clear(0xff000000, true, true);</span>
+<span class="nc bnc" id="L328" title="All 2 branches missed.">            if (stereoNow) {</span>
+<span class="nc" id="L329">                int half = w / 2;</span>
+<span class="nc" id="L330">                drawSphere(device, 0, 0, half, h);</span>
+<span class="nc" id="L331">                drawSphere(device, half, 0, w - half, h);</span>
+<span class="nc" id="L332">                device.setViewport(0, 0, w, h);</span>
+<span class="nc" id="L333">            } else {</span>
+<span class="nc" id="L334">                drawSphere(device, 0, 0, w, h);</span>
+            }
+<span class="nc" id="L336">        }</span>
+
+        private void refreshTexture(GraphicsDevice device, TextureSource source,
+                                    boolean sourceChanged, Image img, boolean imageChanged) {
+<span class="nc bnc" id="L340" title="All 2 branches missed.">            if (sourceChanged) {</span>
+<span class="nc bnc" id="L341" title="All 2 branches missed.">                if (texture != null) {</span>
+<span class="nc" id="L342">                    device.dispose(texture);</span>
+<span class="nc" id="L343">                    texture = null;</span>
+                }
+            }
+<span class="nc bnc" id="L346" title="All 2 branches missed.">            if (source != null) {</span>
+<span class="nc bnc" id="L347" title="All 2 branches missed.">                if (texture == null) {</span>
+<span class="nc" id="L348">                    texture = source.createTexture(device);</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">                    if (texture != null) {</span>
+<span class="nc" id="L350">                        texture.setFilter(Texture.Filter.LINEAR);</span>
+                    }
+                }
+<span class="nc bnc" id="L353" title="All 2 branches missed.">                if (texture != null) {</span>
+<span class="nc" id="L354">                    source.updateTexture(device, texture);</span>
+                }
+<span class="nc bnc" id="L356" title="All 2 branches missed.">            } else if (imageChanged) {</span>
+<span class="nc bnc" id="L357" title="All 2 branches missed.">                if (texture != null) {</span>
+<span class="nc" id="L358">                    device.dispose(texture);</span>
+<span class="nc" id="L359">                    texture = null;</span>
+                }
+<span class="nc bnc" id="L361" title="All 2 branches missed.">                if (img != null) {</span>
+<span class="nc" id="L362">                    texture = device.createTexture(img);</span>
+<span class="nc" id="L363">                    texture.setFilter(Texture.Filter.LINEAR);</span>
+                }
+            }
+<span class="nc" id="L366">            material.setTexture(texture);</span>
+<span class="nc" id="L367">        }</span>
+
+        private void computeLook(float yawDegrees, float pitchDegrees, boolean tracking) {
+<span class="nc" id="L370">            float yawRad = (float) Math.toRadians(yawDegrees);</span>
+<span class="nc" id="L371">            float pitchRad = (float) Math.toRadians(pitchDegrees);</span>
+<span class="nc bnc" id="L372" title="All 4 branches missed.">            if (tracking &amp;&amp; tracker != null) {</span>
+                // The drag yaw acts as a manual offset on top of the gyro
+                // orientation; drag pitch is ignored while the gyro owns it.
+<span class="nc" id="L375">                tracker.getOrientation(quat);</span>
+<span class="nc" id="L376">                float[] yawQ = Quaternion.fromAxisAngle(-yawRad, 0f, 1f, 0f);</span>
+<span class="nc" id="L377">                Quaternion.multiply(yawQ, quat, quat);</span>
+<span class="nc" id="L378">                dir[0] = 0f;</span>
+<span class="nc" id="L379">                dir[1] = 0f;</span>
+<span class="nc" id="L380">                dir[2] = -1f;</span>
+<span class="nc" id="L381">                Quaternion.rotateVector(quat, dir);</span>
+<span class="nc" id="L382">                up[0] = 0f;</span>
+<span class="nc" id="L383">                up[1] = 1f;</span>
+<span class="nc" id="L384">                up[2] = 0f;</span>
+<span class="nc" id="L385">                Quaternion.rotateVector(quat, up);</span>
+<span class="nc" id="L386">            } else {</span>
+<span class="nc" id="L387">                float cp = (float) Math.cos(pitchRad);</span>
+<span class="nc" id="L388">                dir[0] = cp * (float) Math.sin(yawRad);</span>
+<span class="nc" id="L389">                dir[1] = (float) Math.sin(pitchRad);</span>
+<span class="nc" id="L390">                dir[2] = -cp * (float) Math.cos(yawRad);</span>
+<span class="nc" id="L391">                up[0] = 0f;</span>
+<span class="nc" id="L392">                up[1] = 1f;</span>
+<span class="nc" id="L393">                up[2] = 0f;</span>
+            }
+<span class="nc" id="L395">            camera.setPosition(0f, 0f, 0f);</span>
+<span class="nc" id="L396">            camera.setTarget(dir[0], dir[1], dir[2]);</span>
+<span class="nc" id="L397">            camera.setUp(up[0], up[1], up[2]);</span>
+<span class="nc" id="L398">            camera.setPerspective(75f, 0.1f, 100f);</span>
+<span class="nc" id="L399">        }</span>
+
+        private void drawSphere(GraphicsDevice device, int x, int y, int w, int h) {
+<span class="nc" id="L402">            device.setViewport(x, y, w, h);</span>
+<span class="nc" id="L403">            camera.setAspect((float) w / (float) Math.max(1, h));</span>
+<span class="nc" id="L404">            device.setCamera(camera);</span>
+<span class="nc" id="L405">            device.draw(sphere, material, null);</span>
+<span class="nc" id="L406">        }</span>
+
+        @Override
+        public void onDispose(GraphicsDevice device) {
+<span class="nc" id="L410">            TextureSource source = textureSource;</span>
+<span class="nc bnc" id="L411" title="All 4 branches missed.">            if (source != null &amp;&amp; device != null) {</span>
+<span class="nc" id="L412">                source.dispose(device);</span>
+            }
+<span class="nc bnc" id="L414" title="All 4 branches missed.">            if (texture != null &amp;&amp; device != null) {</span>
+<span class="nc" id="L415">                device.dispose(texture);</span>
+            }
+<span class="nc" id="L417">            texture = null;</span>
+<span class="nc" id="L418">            sphere = null;</span>
+<span class="nc" id="L419">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

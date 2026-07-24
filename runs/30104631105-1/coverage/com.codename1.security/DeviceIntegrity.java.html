@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DeviceIntegrity.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">DeviceIntegrity.java</span></div><h1>DeviceIntegrity.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+
+/// Device-integrity and runtime self-protection (RASP) entry point. Groups three families of
+/// security primitives that an app -- a banking app in particular -- can use to react to a hostile
+/// runtime environment:
+///
+/// 1. **Platform attestation** -- [#requestIntegrityToken(String)] returns a signed Google Play
+///    Integrity token (Android) or Apple App Attest assertion (iOS). The token is opaque and must be
+///    sent to and **verified by your backend**; it is the only trustworthy way to gate a high value
+///    action (such as a transfer to a newly added beneficiary) on device/app integrity, because a
+///    decision made on a compromised device can itself be tampered with.
+/// 2. **RASP reporting** -- [#isDeviceCompromised()] / [#getCompromiseReasons()] expose a non-exiting
+///    aggregate of the root/jailbreak/instrumentation checks so the app can degrade gracefully
+///    (warn, disable a feature, require step-up auth) instead of being hard-killed at launch.
+/// 3. **Accessibility-abuse defense** -- [#getEnabledAccessibilityServices()] /
+///    [#hasUntrustedAccessibilityService(String...)] detect malware that abuses Android accessibility
+///    services for overlays, remote control and on-screen text extraction, and [#setSecureScreen(boolean)]
+///    blocks screenshots, screen recording and accessibility screen scraping on sensitive screens.
+///
+/// #### Zero-code build hints
+///
+/// Each capability also has a build hint that wires an automatic launch-time guard, so a project can
+/// adopt it without writing code:
+///
+/// - `android.playIntegrity=true` (optionally `android.playIntegrity.verifyUrl=&lt;backend&gt;`) -- bundles
+///   the Play Integrity SDK, enables [#requestIntegrityToken(String)], and -- when a verify URL is set
+///   -- attests at launch and exits if the backend rejects the token.
+/// - `ios.appAttest=true` -- enables App Attest and [#requestIntegrityToken(String)] on iOS.
+/// - `android.rootCheck` / `android.fridaDetection` / `ios.detectJailbreak` -- existing hard launch
+///   gates that exit on a compromised device. [#isDeviceCompromised()] reports the same signals
+///   without exiting.
+/// - `android.accessibilityGuard=true` (optionally `android.accessibilityGuard.allow=&lt;csv packages&gt;`
+///   and `android.accessibilityGuard.mode=exit|warn`) -- checks the enabled accessibility services at
+///   launch and exits (or logs) when an untrusted one is active.
+///
+/// #### Platform support
+///
+/// - **Android** -- full support. Attestation via Play Integrity (requires the `android.playIntegrity`
+///   build hint to bundle the SDK), RASP via the root/Frida/emulator checks, accessibility enumeration
+///   via the system settings, and secure screens via `FLAG_SECURE`.
+/// - **iOS** -- attestation via App Attest (requires the `ios.appAttest` build hint), RASP via the
+///   jailbreak detector. Accessibility-service enumeration and [#setSecureScreen(boolean)] are
+///   Android-only concepts and are no-ops on iOS.
+/// - **JavaSE simulator / other ports** -- behave as a clean, unsupported device: attestation
+///   completes with an error, [#isDeviceCompromised()] returns false and the accessibility list is
+///   empty. Application code never needs platform `if` statements.
+public final class DeviceIntegrity {
+
+    private DeviceIntegrity() {
+    }
+
+    /// Requests a signed platform-attestation token bound to the supplied server nonce.
+    ///
+    /// On Android this drives the Google Play Integrity API (bundle it with the `android.playIntegrity`
+    /// build hint); on iOS it drives Apple App Attest (enable it with the `ios.appAttest` build hint).
+    /// The resulting token is opaque and **must be verified server-side** -- POST it to your backend,
+    /// which decrypts/validates the verdict with Google/Apple and decides whether to permit the action.
+    ///
+    /// ```java
+    /// DeviceIntegrity.requestIntegrityToken(serverNonce).onResult((token, err) -&gt; {
+    ///     if (err != null) {
+    ///         // attestation unavailable -- treat as untrusted / require step-up
+    ///         return;
+    ///     }
+    ///     // POST token to the bank backend; the backend allows or blocks the transfer
+    /// });
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `serverNonce`: a fresh, server-generated nonce/challenge to bind into the attestation, used by
+    ///   the backend to prevent replay
+    ///
+    /// #### Returns
+    ///
+    /// an `AsyncResource` that completes with the opaque attestation token, or completes with an error
+    /// when attestation is unsupported or the platform request fails
+    public static AsyncResource&lt;String&gt; requestIntegrityToken(String serverNonce) {
+<span class="nc" id="L104">        return Display.getInstance().requestIntegrityToken(serverNonce);</span>
+    }
+
+    /// Returns true when platform attestation (Play Integrity / App Attest) is available on this device
+    /// and was bundled into the build via the relevant build hint.
+    public static boolean isAttestationSupported() {
+<span class="nc" id="L110">        return Display.getInstance().isAttestationSupported();</span>
+    }
+
+    /// Non-exiting RASP check. Returns true when the device shows signs of being rooted, jailbroken,
+    /// running under dynamic instrumentation (e.g. Frida) or otherwise tampered. Unlike the
+    /// `android.rootCheck` / `ios.detectJailbreak` launch gates this never terminates the app, so it is
+    /// safe to call from runtime logic (for example before authorizing a transfer).
+    public static boolean isDeviceCompromised() {
+<span class="nc" id="L118">        return Display.getInstance().isDeviceCompromised();</span>
+    }
+
+    /// Returns the reason codes behind [#isDeviceCompromised()], e.g. `&quot;root&quot;`, `&quot;frida&quot;`, `&quot;emulator&quot;`,
+    /// `&quot;jailbreak&quot;`. Empty when the device appears clean.
+    public static String[] getCompromiseReasons() {
+<span class="nc" id="L124">        return Display.getInstance().getCompromiseReasons();</span>
+    }
+
+    /// Returns the component identifiers (`package/.ServiceClass`) of the accessibility services
+    /// currently enabled on the device. Android only; returns an empty array on iOS and other ports.
+    public static String[] getEnabledAccessibilityServices() {
+<span class="nc" id="L130">        return Display.getInstance().getEnabledAccessibilityServices();</span>
+    }
+
+    /// Returns true when an accessibility service that is **not** in the supplied allow-list is
+    /// currently enabled -- a strong indicator of accessibility-abusing malware on Android. Pass the
+    /// package names your app explicitly trusts (for example a known screen reader the user relies on);
+    /// any enabled service whose package is not listed makes this return true. With no arguments, this
+    /// returns true whenever any accessibility service is enabled.
+    ///
+    /// #### Parameters
+    ///
+    /// - `allowedPackages`: package names of accessibility services considered safe
+    ///
+    /// #### Returns
+    ///
+    /// true if at least one enabled accessibility service is not in `allowedPackages`
+    public static boolean hasUntrustedAccessibilityService(String... allowedPackages) {
+<span class="nc" id="L147">        return containsUntrustedService(getEnabledAccessibilityServices(), allowedPackages);</span>
+    }
+
+    /// Pure allow-list evaluation, separated from the platform lookup so it can be unit tested.
+    /// Returns true if any entry in `enabledServices` (a `package/.ServiceClass` component id) has a
+    /// package that is not present in `allowedPackages`.
+    static boolean containsUntrustedService(String[] enabledServices, String[] allowedPackages) {
+<span class="fc bfc" id="L154" title="All 4 branches covered.">        if (enabledServices == null || enabledServices.length == 0) {</span>
+<span class="fc" id="L155">            return false;</span>
+        }
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        for (String service : enabledServices) {</span>
+<span class="fc bfc" id="L158" title="All 4 branches covered.">            if (service == null || service.length() == 0) {</span>
+<span class="fc" id="L159">                continue;</span>
+            }
+<span class="fc" id="L161">            String pkg = service;</span>
+<span class="fc" id="L162">            int slash = pkg.indexOf('/');</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            if (slash &gt;= 0) {</span>
+<span class="fc" id="L164">                pkg = pkg.substring(0, slash);</span>
+            }
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            if (!isAllowed(pkg, allowedPackages)) {</span>
+<span class="fc" id="L167">                return true;</span>
+            }
+        }
+<span class="fc" id="L170">        return false;</span>
+    }
+
+    private static boolean isAllowed(String pkg, String[] allowedPackages) {
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (allowedPackages == null) {</span>
+<span class="fc" id="L175">            return false;</span>
+        }
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        for (String allowed : allowedPackages) {</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            if (pkg.equals(allowed)) {</span>
+<span class="fc" id="L179">                return true;</span>
+            }
+        }
+<span class="fc" id="L182">        return false;</span>
+    }
+
+    /// Marks the currently displayed screen as secure, blocking OS screenshots, screen recording and
+    /// accessibility screen scraping while it is showing (Android `FLAG_SECURE`). Call with `true`
+    /// when entering a sensitive screen (PIN entry, transfer confirmation) and `false` when leaving it.
+    /// No-op on iOS and other ports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `secure`: true to protect the screen, false to clear the protection
+    public static void setSecureScreen(boolean secure) {
+<span class="nc" id="L194">        Display.getInstance().setSecureScreen(secure);</span>
+<span class="nc" id="L195">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

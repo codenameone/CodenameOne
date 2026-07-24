@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CarNavigationTemplate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.car</a> &gt; <span class="el_source">CarNavigationTemplate.java</span></div><h1>CarNavigationTemplate.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.car;
+
+/// A turn-by-turn navigation surface: a drawable map (via a `CarSurfaceCallback`), an optional
+/// next-manoeuvre / arrival info strip, and map-control action strips. Maps to
+/// `androidx.car.app.navigation.model.NavigationTemplate` and `CPMapTemplate`.
+///
+/// Navigation is the only category with a pixel surface and it is the most tightly gated: the app
+/// must declare the navigation category and hold the platform navigation entitlement
+/// (`ios.carplay.navigation` build hint on iOS; the builder injects the
+/// `androidx.car.app.category.NAVIGATION` filter and `androidx.car.app.MAP_TEMPLATES` permission on
+/// Android).
+<span class="nc" id="L34">public class CarNavigationTemplate extends CarTemplate {</span>
+    private CarSurfaceCallback surfaceCallback;
+    private String nextManeuver;
+    private String distanceRemaining;
+    private String timeRemaining;
+    private CarActionStrip mapActions;
+    private CarActionStrip headerActions;
+    private boolean navigating;
+
+    /// Returns the map drawing callback, or null.
+    public CarSurfaceCallback getSurfaceCallback() {
+<span class="nc" id="L45">        return surfaceCallback;</span>
+    }
+
+    /// Sets the callback that draws the moving map onto the head-unit surface.
+    ///
+    /// #### Parameters
+    ///
+    /// - `surfaceCallback`: the drawing callback
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarNavigationTemplate setSurfaceCallback(CarSurfaceCallback surfaceCallback) {
+<span class="nc" id="L58">        this.surfaceCallback = surfaceCallback;</span>
+<span class="nc" id="L59">        return this;</span>
+    }
+
+    /// Returns the next-manoeuvre instruction text, or null.
+    public String getNextManeuver() {
+<span class="nc" id="L64">        return nextManeuver;</span>
+    }
+
+    /// Sets the next-manoeuvre instruction (e.g. &quot;Turn right onto Main St&quot;).
+    ///
+    /// #### Parameters
+    ///
+    /// - `nextManeuver`: the instruction text
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarNavigationTemplate setNextManeuver(String nextManeuver) {
+<span class="nc" id="L77">        this.nextManeuver = nextManeuver;</span>
+<span class="nc" id="L78">        return this;</span>
+    }
+
+    /// Returns the remaining-distance string, or null.
+    public String getDistanceRemaining() {
+<span class="nc" id="L83">        return distanceRemaining;</span>
+    }
+
+    /// Sets the remaining-distance string (e.g. &quot;300 m&quot;).
+    ///
+    /// #### Parameters
+    ///
+    /// - `distanceRemaining`: the distance text
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarNavigationTemplate setDistanceRemaining(String distanceRemaining) {
+<span class="nc" id="L96">        this.distanceRemaining = distanceRemaining;</span>
+<span class="nc" id="L97">        return this;</span>
+    }
+
+    /// Returns the remaining-time / ETA string, or null.
+    public String getTimeRemaining() {
+<span class="nc" id="L102">        return timeRemaining;</span>
+    }
+
+    /// Sets the remaining-time / ETA string (e.g. &quot;12 min&quot;).
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeRemaining`: the time text
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarNavigationTemplate setTimeRemaining(String timeRemaining) {
+<span class="nc" id="L115">        this.timeRemaining = timeRemaining;</span>
+<span class="nc" id="L116">        return this;</span>
+    }
+
+    /// Returns the map-control action strip (zoom, recenter), or null.
+    public CarActionStrip getMapActions() {
+<span class="nc" id="L121">        return mapActions;</span>
+    }
+
+    /// Sets the map-control action strip (zoom in/out, recenter).
+    ///
+    /// #### Parameters
+    ///
+    /// - `mapActions`: the action strip
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarNavigationTemplate setMapActions(CarActionStrip mapActions) {
+<span class="nc" id="L134">        this.mapActions = mapActions;</span>
+<span class="nc" id="L135">        return this;</span>
+    }
+
+    /// Returns the header action strip, or null.
+    public CarActionStrip getHeaderActions() {
+<span class="nc" id="L140">        return headerActions;</span>
+    }
+
+    /// Sets the header action strip.
+    ///
+    /// #### Parameters
+    ///
+    /// - `headerActions`: the action strip
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarNavigationTemplate setHeaderActions(CarActionStrip headerActions) {
+<span class="nc" id="L153">        this.headerActions = headerActions;</span>
+<span class="nc" id="L154">        return this;</span>
+    }
+
+    /// Returns true when turn-by-turn guidance is active (the info strip is shown).
+    public boolean isNavigating() {
+<span class="nc" id="L159">        return navigating;</span>
+    }
+
+    /// Marks whether guidance is active; when true the head unit shows the manoeuvre/ETA strip.
+    ///
+    /// #### Parameters
+    ///
+    /// - `navigating`: true while guiding
+    ///
+    /// #### Returns
+    ///
+    /// this template, for chaining
+    public CarNavigationTemplate setNavigating(boolean navigating) {
+<span class="nc" id="L172">        this.navigating = navigating;</span>
+<span class="nc" id="L173">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

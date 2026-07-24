@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ImageGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai</a> &gt; <span class="el_source">ImageGenerator.java</span></div><h1>ImageGenerator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.JSONParser;
+import com.codename1.io.NetworkManager;
+import com.codename1.ui.Display;
+import com.codename1.ui.Image;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.Base64;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Cloud-first image generation. The `openai` and `replicate` factory
+/// methods cover the two dominant managed endpoints. On-device
+/// generation via Core ML / ONNX Stable Diffusion is provided
+/// separately by the optional `cn1-ai-stablediffusion` cn1lib; see
+/// [#onDevice()].
+///
+/// ```
+/// ImageGenerator.openai(KeyStore.get(&quot;openai_key&quot;))
+///     .generate(new GenerateImageRequest(&quot;A cat in a sombrero&quot;).setSize(&quot;1024x1024&quot;))
+///     .ready(img -&gt; imageComponent.setIcon(img));
+/// ```
+<span class="fc" id="L51">public abstract class ImageGenerator {</span>
+
+    public static ImageGenerator openai(String apiKey) {
+<span class="fc" id="L54">        return new OpenAiImageGenerator(apiKey);</span>
+    }
+
+    /// Replicate runs a wide catalog of third-party image models
+    /// (SDXL, Flux, etc.) behind a uniform REST API. Pass the API
+    /// token from `https://replicate.com/account`.
+    public static ImageGenerator replicate(String apiKey) {
+<span class="fc" id="L61">        return new ReplicateImageGenerator(apiKey);</span>
+    }
+
+    /// On-device generator. Requires the optional cn1lib
+    /// `cn1-ai-stablediffusion`; without it this returns an
+    /// `AsyncResource` that completes with
+    /// `UnsupportedOperationException`.
+    public static ImageGenerator onDevice() {
+        // Lazy lookup so app code can compile even without the
+        // cn1lib. The cn1lib registers an implementation via
+        // `NativeLookup.register(...)` when it ships, but for the
+        // base framework we just return a no-op stub.
+<span class="fc" id="L73">        return new ImageGenerator() {</span>
+            @Override
+            public AsyncResource&lt;Image&gt; generate(GenerateImageRequest req) {
+<span class="fc" id="L76">                AsyncResource&lt;Image&gt; out = new AsyncResource&lt;Image&gt;();</span>
+<span class="fc" id="L77">                out.error(new UnsupportedOperationException(</span>
+                        &quot;On-device image generation requires the cn1-ai-stablediffusion cn1lib. &quot;
+                        + &quot;Add it to your dependencies or use ImageGenerator.openai(...) instead.&quot;));
+<span class="fc" id="L80">                return out;</span>
+            }
+        };
+    }
+
+    public abstract AsyncResource&lt;Image&gt; generate(GenerateImageRequest req);
+
+    // --------------------- OpenAI ---------------------
+
+    private static final class OpenAiImageGenerator extends ImageGenerator {
+        private final String apiKey;
+
+<span class="fc" id="L92">        OpenAiImageGenerator(String apiKey) {</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">            this.apiKey = apiKey == null ? &quot;&quot; : apiKey;</span>
+<span class="fc" id="L94">        }</span>
+
+        @Override
+        public AsyncResource&lt;Image&gt; generate(GenerateImageRequest req) {
+<span class="fc" id="L98">            final AsyncResource&lt;Image&gt; result = new AsyncResource&lt;Image&gt;();</span>
+            final byte[] body;
+            try {
+<span class="fc" id="L101">                Map&lt;String, Object&gt; root = new HashMap&lt;String, Object&gt;();</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">                root.put(&quot;model&quot;, req.getModel() != null ? req.getModel() : &quot;dall-e-3&quot;);</span>
+<span class="fc" id="L103">                root.put(&quot;prompt&quot;, req.getPrompt());</span>
+<span class="fc" id="L104">                root.put(&quot;n&quot;, Integer.valueOf(req.getCount()));</span>
+<span class="fc" id="L105">                root.put(&quot;size&quot;, req.getSize());</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">                if (req.getStyle() != null) {</span>
+<span class="fc" id="L107">                    root.put(&quot;style&quot;, req.getStyle());</span>
+                }
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                if (req.getQuality() != null) {</span>
+<span class="fc" id="L110">                    root.put(&quot;quality&quot;, req.getQuality());</span>
+                }
+                // b64_json keeps the request self-contained; the
+                // alternative `url` requires a second fetch and
+                // expires after an hour, which is hostile to caching.
+<span class="fc" id="L115">                root.put(&quot;response_format&quot;, &quot;b64_json&quot;);</span>
+<span class="fc" id="L116">                body = JSONParser.toJson(root).getBytes(&quot;UTF-8&quot;);</span>
+<span class="nc" id="L117">            } catch (IOException ioe) {</span>
+<span class="nc" id="L118">                result.error(ioe);</span>
+<span class="nc" id="L119">                return result;</span>
+<span class="fc" id="L120">            }</span>
+<span class="fc" id="L121">            ConnectionRequest cr = new ConnectionRequest() {</span>
+                @Override
+                protected void buildRequestBody(OutputStream os) throws IOException {
+<span class="fc" id="L124">                    os.write(body);</span>
+<span class="fc" id="L125">                }</span>
+
+                @Override
+                protected void handleErrorResponseCode(int code, String message) {
+<span class="nc" id="L129">                }</span>
+
+                @Override
+                protected void postResponse() {
+                    try {
+<span class="fc" id="L134">                        Map root = JSONParser.parseJSON(getResponseData());</span>
+<span class="fc" id="L135">                        List&lt;Object&gt; data = JSONParser.asList(root.get(&quot;data&quot;));</span>
+<span class="pc bpc" id="L136" title="1 of 4 branches missed.">                        if (data == null || data.isEmpty()) {</span>
+<span class="fc" id="L137">                            failOnEdt(result, new LlmException(</span>
+                                    &quot;Empty data[] in image generation response&quot;, 200, null, null, null, LlmException.ErrorType.INVALID_REQUEST));
+<span class="fc" id="L139">                            return;</span>
+                        }
+<span class="fc" id="L141">                        Map first = JSONParser.asMap(data.get(0));</span>
+<span class="fc" id="L142">                        String b64 = JSONParser.getString(first, &quot;b64_json&quot;);</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                        if (b64 == null) {</span>
+<span class="fc" id="L144">                            failOnEdt(result, new LlmException(</span>
+                                    &quot;Missing b64_json in image generation response&quot;, 200, null, null, null, LlmException.ErrorType.INVALID_REQUEST));
+<span class="fc" id="L146">                            return;</span>
+                        }
+<span class="nc" id="L148">                        byte[] bytes = Base64.decode(b64.getBytes(&quot;UTF-8&quot;));</span>
+<span class="nc" id="L149">                        final Image img = Image.createImage(bytes, 0, bytes.length);</span>
+<span class="nc" id="L150">                        Display.getInstance().callSerially(new Runnable() {</span>
+                            @Override
+                            public void run() {
+<span class="nc" id="L153">                                result.complete(img);</span>
+<span class="nc" id="L154">                            }</span>
+                        });
+<span class="nc" id="L156">                    } catch (IOException ex) {</span>
+<span class="nc" id="L157">                        failOnEdt(result, new LlmException(&quot;Failed to decode image&quot;, ex));</span>
+<span class="nc" id="L158">                    } catch (RuntimeException ex) {</span>
+<span class="nc" id="L159">                        failOnEdt(result, new LlmException(&quot;Failed to decode image&quot;, ex));</span>
+<span class="nc" id="L160">                    }</span>
+<span class="nc" id="L161">                }</span>
+
+                @Override
+                protected void handleException(Exception err) {
+                    int sc;
+                    try {
+<span class="nc" id="L167">                        sc = getResponseCode();</span>
+<span class="nc" id="L168">                    } catch (Throwable ignore) {</span>
+<span class="nc" id="L169">                        sc = -1;</span>
+<span class="nc" id="L170">                    }</span>
+<span class="nc" id="L171">                    String bodyText = &quot;&quot;;</span>
+                    try {
+<span class="nc" id="L173">                        byte[] d = getResponseData();</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">                        bodyText = d == null ? &quot;&quot; : new String(d, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L175">                    } catch (UnsupportedEncodingException ignored) {</span>
+                        // UTF-8 is universally available; defensive only.
+<span class="nc" id="L177">                    }</span>
+<span class="nc" id="L178">                    failOnEdt(result, OpenAiSseDecoder.mapErrorStatic(sc, bodyText));</span>
+<span class="nc" id="L179">                }</span>
+            };
+<span class="fc" id="L181">            cr.setUrl(&quot;https://api.openai.com/v1/images/generations&quot;);</span>
+<span class="fc" id="L182">            cr.setPost(true);</span>
+<span class="fc" id="L183">            cr.setReadResponseForErrors(true);</span>
+<span class="fc" id="L184">            cr.setDuplicateSupported(true);</span>
+<span class="fc" id="L185">            cr.setContentType(&quot;application/json&quot;);</span>
+<span class="fc" id="L186">            cr.setTimeout(120000);</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            if (apiKey.length() &gt; 0) {</span>
+<span class="fc" id="L188">                cr.addRequestHeader(&quot;Authorization&quot;, &quot;Bearer &quot; + apiKey);</span>
+            }
+<span class="fc" id="L190">            NetworkManager.getInstance().addToQueue(cr);</span>
+<span class="fc" id="L191">            return result;</span>
+        }
+    }
+
+    // --------------------- Replicate ---------------------
+
+    private static final class ReplicateImageGenerator extends ImageGenerator {
+        @SuppressWarnings(&quot;PMD.UnusedFormalParameter&quot;)
+<span class="fc" id="L199">        ReplicateImageGenerator(String apiKey) {</span>
+            // apiKey is currently unused -- this generator is a
+            // scaffold pending long-poll support. The parameter is
+            // accepted so the factory signature stays stable when
+            // the real implementation lands.
+<span class="fc" id="L204">        }</span>
+
+        @Override
+        public AsyncResource&lt;Image&gt; generate(GenerateImageRequest req) {
+<span class="fc" id="L208">            AsyncResource&lt;Image&gt; result = new AsyncResource&lt;Image&gt;();</span>
+            // Replicate's &quot;predictions&quot; API is async/polled; full
+            // long-poll support is a follow-up. For now we surface a
+            // clear error so callers know to use a self-hosted
+            // Replicate-compatible endpoint or the OpenAI path.
+<span class="fc" id="L213">            result.error(new UnsupportedOperationException(</span>
+                    &quot;Replicate's prediction API requires long-polling that is not implemented yet. &quot;
+                    + &quot;Use ImageGenerator.openai(...) or run a Replicate-compatible server behind LlmClient.localOpenAiCompatible(...).&quot;));
+<span class="fc" id="L216">            return result;</span>
+        }
+    }
+
+    private static void failOnEdt(final AsyncResource&lt;Image&gt; result, final Throwable t) {
+<span class="fc" id="L221">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L224">                result.error(t);</span>
+<span class="fc" id="L225">            }</span>
+        });
+<span class="fc" id="L227">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

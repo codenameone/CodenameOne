@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GraphQLSubscription.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.graphql</a> &gt; <span class="el_source">GraphQLSubscription.java</span></div><h1>GraphQLSubscription.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.graphql;
+
+import com.codename1.io.JSONParser;
+import com.codename1.io.Log;
+import com.codename1.io.WebSocket;
+import com.codename1.ui.CN;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Handle for a live GraphQL subscription. Implements the
+/// `graphql-transport-ws` message protocol over
+/// [com.codename1.io.WebSocket] (introduced in core alongside this
+/// package): `connection_init` -&gt; `connection_ack` -&gt; `subscribe`,
+/// then a stream of `next` payloads terminated by `complete` or
+/// `error`.
+///
+/// Each `next` payload's `data` object is mapped to `T` and delivered
+/// to [Handler#onNext(Object)]. All handler callbacks are dispatched on
+/// the Codename One EDT (matching the `OnComplete` semantics the query
+/// and mutation paths use), even though the underlying WebSocket fires
+/// on a background thread.
+///
+/// The connection offers the `graphql-transport-ws` subprotocol during
+/// the WebSocket handshake (RFC 6455 `Sec-WebSocket-Protocol`), as the
+/// graphql-ws specification requires.
+public final class GraphQLSubscription {
+
+    /// The graphql-ws (graphql-transport-ws) WebSocket subprotocol name.
+    static final String SUBPROTOCOL = &quot;graphql-transport-ws&quot;;
+
+    /// Receives the events of one subscription. All methods run on the
+    /// Codename One EDT.
+    public interface Handler&lt;T&gt; {
+        /// A `next` payload arrived and its `data` mapped to `T`. When
+        /// the payload also carried `errors`, `response.hasErrors()` is
+        /// true and `response.getData()` may still be non-null.
+        void onNext(GraphQLResponse&lt;T&gt; response);
+
+        /// The subscription failed (an `error` message, a transport
+        /// error, or a non-clean close). No further events follow.
+        void onError(GraphQLResponse&lt;T&gt; response);
+
+        /// The subscription ended cleanly (server `complete`, or a
+        /// caller [#cancel()]). No further events follow.
+        void onComplete();
+    }
+
+    private static final String OPERATION_ID = &quot;1&quot;;
+
+    private final Class&lt;?&gt; dataType;
+    private final String operationName;
+    private final String document;
+    private final Map&lt;String, Object&gt; variables;
+    private final String bearerToken;
+    private final Handler&lt;?&gt; handler;
+
+    private WebSocket socket;
+    private boolean terminated;
+
+    private GraphQLSubscription(Class&lt;?&gt; dataType, String operationName, String document,
+                                Map&lt;String, Object&gt; variables, String bearerToken,
+<span class="fc" id="L88">                                Handler&lt;?&gt; handler) {</span>
+<span class="fc" id="L89">        this.dataType = dataType;</span>
+<span class="fc" id="L90">        this.operationName = operationName;</span>
+<span class="fc" id="L91">        this.document = document;</span>
+<span class="fc" id="L92">        this.variables = variables;</span>
+<span class="fc" id="L93">        this.bearerToken = bearerToken;</span>
+<span class="fc" id="L94">        this.handler = handler;</span>
+<span class="fc" id="L95">    }</span>
+
+    static &lt;T&gt; GraphQLSubscription start(String wsUrl, String bearerToken, String operationName,
+                                         String document, Map&lt;String, Object&gt; variables,
+                                         Class&lt;T&gt; dataType, Handler&lt;T&gt; handler) {
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (handler == null) {</span>
+<span class="fc" id="L101">            throw new IllegalArgumentException(&quot;handler must not be null&quot;);</span>
+        }
+<span class="fc" id="L103">        final GraphQLSubscription sub = new GraphQLSubscription(</span>
+                dataType, operationName, document, variables, bearerToken, handler);
+<span class="nc" id="L105">        WebSocket ws = WebSocket.build(wsUrl)</span>
+<span class="nc" id="L106">                .subprotocols(SUBPROTOCOL)</span>
+<span class="nc" id="L107">                .onConnect(new WebSocket.ConnectHandler() {</span>
+                    @Override
+                    public void onConnect(WebSocket w) {
+<span class="nc" id="L110">                        sub.sendConnectionInit(w);</span>
+<span class="nc" id="L111">                    }</span>
+                })
+<span class="nc" id="L113">                .onTextMessage(new WebSocket.TextHandler() {</span>
+                    @Override
+                    public void onText(WebSocket w, String message) {
+<span class="nc" id="L116">                        sub.onMessage(w, message);</span>
+<span class="nc" id="L117">                    }</span>
+                })
+<span class="nc" id="L119">                .onClose(new WebSocket.CloseHandler() {</span>
+                    @Override
+                    public void onClose(WebSocket w, int statusCode, String reason) {
+                        // 1000 (normal) and 1005 (no status) are clean.
+<span class="nc bnc" id="L123" title="All 4 branches missed.">                        if (statusCode == 1000 || statusCode == 1005) {</span>
+<span class="nc" id="L124">                            sub.finishComplete();</span>
+                        } else {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">                            sub.finishError(transportError(</span>
+                                    &quot;WebSocket closed: &quot; + statusCode
+<span class="nc bnc" id="L128" title="All 2 branches missed.">                                            + (reason == null || reason.length() == 0 ? &quot;&quot; : &quot; &quot; + reason)));</span>
+                        }
+<span class="nc" id="L130">                    }</span>
+                })
+<span class="nc" id="L132">                .onError(new WebSocket.ErrorHandler() {</span>
+                    @Override
+                    public void onError(WebSocket w, Exception ex) {
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                        sub.finishError(transportError(</span>
+<span class="nc" id="L136">                                ex == null ? &quot;WebSocket error&quot; : ex.getMessage()));</span>
+<span class="nc" id="L137">                    }</span>
+                });
+<span class="nc" id="L139">        sub.socket = ws;</span>
+<span class="nc" id="L140">        ws.connect();</span>
+<span class="nc" id="L141">        return sub;</span>
+    }
+
+    /// Cancels the subscription: sends a `complete` to the server and
+    /// closes the socket. Idempotent; safe to call from any thread.
+    public void cancel() {
+        WebSocket w;
+<span class="nc" id="L148">        synchronized (this) {</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">            if (terminated) {</span>
+<span class="nc" id="L150">                return;</span>
+            }
+<span class="nc" id="L152">            terminated = true;</span>
+<span class="nc" id="L153">            w = socket;</span>
+<span class="nc" id="L154">        }</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        if (w != null) {</span>
+            try {
+<span class="nc" id="L157">                w.send(message(&quot;complete&quot;, OPERATION_ID, null));</span>
+<span class="nc" id="L158">            } catch (Throwable ignored) {</span>
+                // Socket may already be closing; closing below covers it.
+<span class="nc" id="L160">            }</span>
+            try {
+<span class="nc" id="L162">                w.close();</span>
+<span class="nc" id="L163">            } catch (Throwable ignored) {</span>
+<span class="nc" id="L164">                Log.e(ignored);</span>
+<span class="nc" id="L165">            }</span>
+        }
+<span class="nc" id="L167">    }</span>
+
+    // ----------------------------------------------------------------
+    // Protocol handling (runs on the WebSocket background thread)
+    // ----------------------------------------------------------------
+
+    private void sendConnectionInit(WebSocket w) {
+<span class="nc" id="L174">        Map&lt;String, Object&gt; init = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L175">        init.put(&quot;type&quot;, &quot;connection_init&quot;);</span>
+<span class="nc bnc" id="L176" title="All 4 branches missed.">        if (bearerToken != null &amp;&amp; bearerToken.length() &gt; 0) {</span>
+<span class="nc" id="L177">            Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L178">            payload.put(&quot;Authorization&quot;, bearerToken);</span>
+<span class="nc" id="L179">            init.put(&quot;payload&quot;, JSONParser.rawJson(JSONParser.toJson(payload)));</span>
+        }
+<span class="nc" id="L181">        safeSend(w, JSONParser.toJson(init));</span>
+<span class="nc" id="L182">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private void onMessage(WebSocket w, String text) {
+        Map&lt;String, Object&gt; msg;
+        try {
+<span class="nc" id="L188">            msg = JSONParser.parseJSON(text);</span>
+<span class="nc" id="L189">        } catch (Exception e) {</span>
+            // Malformed frame -- log and drop it rather than tear the
+            // subscription down over one bad message.
+<span class="nc" id="L192">            Log.e(e);</span>
+<span class="nc" id="L193">            return;</span>
+<span class="nc" id="L194">        }</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">        if (msg == null) {</span>
+<span class="nc" id="L196">            return;</span>
+        }
+<span class="nc" id="L198">        String type = str(msg.get(&quot;type&quot;));</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        if (&quot;connection_ack&quot;.equals(type)) {</span>
+<span class="nc" id="L200">            safeSend(w, subscribeMessage());</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        } else if (&quot;next&quot;.equals(type)) {</span>
+<span class="nc" id="L202">            deliverNext(msg.get(&quot;payload&quot;));</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        } else if (&quot;error&quot;.equals(type)) {</span>
+<span class="nc" id="L204">            List&lt;GraphQLError&gt; errors = GraphQL.parseErrors(asErrorsArray(msg.get(&quot;payload&quot;)));</span>
+<span class="nc" id="L205">            finishError(new GraphQLResponse&lt;Object&gt;(0, null, errors,</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">                    errors.isEmpty() ? &quot;Subscription error&quot; : errors.get(0).getMessage()));</span>
+<span class="nc bnc" id="L207" title="All 2 branches missed.">        } else if (&quot;complete&quot;.equals(type)) {</span>
+<span class="nc" id="L208">            finishComplete();</span>
+<span class="nc" id="L209">            WebSocket s = socket;</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">            if (s != null) {</span>
+                try {
+<span class="nc" id="L212">                    s.close();</span>
+<span class="nc" id="L213">                } catch (Throwable ignored) {</span>
+<span class="nc" id="L214">                    Log.e(ignored);</span>
+<span class="nc" id="L215">                }</span>
+            }
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        } else if (&quot;ping&quot;.equals(type)) {</span>
+<span class="nc" id="L218">            safeSend(w, &quot;{\&quot;type\&quot;:\&quot;pong\&quot;}&quot;);</span>
+        }
+        // connection_error / unknown types are ignored.
+<span class="nc" id="L221">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private void deliverNext(Object payload) {
+<span class="nc" id="L225">        synchronized (this) {</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">            if (terminated) {</span>
+<span class="nc" id="L227">                return;</span>
+            }
+<span class="nc" id="L229">        }</span>
+<span class="nc" id="L230">        Object dataObj = null;</span>
+<span class="nc" id="L231">        Object errorsObj = null;</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">        if (payload instanceof Map) {</span>
+<span class="nc" id="L233">            Map&lt;String, Object&gt; p = (Map&lt;String, Object&gt;) payload;</span>
+<span class="nc" id="L234">            dataObj = p.get(&quot;data&quot;);</span>
+<span class="nc" id="L235">            errorsObj = p.get(&quot;errors&quot;);</span>
+        }
+<span class="nc" id="L237">        Object data = GraphQL.mapData(dataObj, dataType);</span>
+<span class="nc" id="L238">        List&lt;GraphQLError&gt; errors = GraphQL.parseErrors(errorsObj);</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">        String message = errors.isEmpty() ? null : errors.get(0).getMessage();</span>
+<span class="nc" id="L240">        final GraphQLResponse&lt;Object&gt; response =</span>
+                new GraphQLResponse&lt;Object&gt;(200, data, errors, message);
+<span class="nc" id="L242">        dispatch(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L245">                ((Handler&lt;Object&gt;) handler).onNext(response);</span>
+<span class="nc" id="L246">            }</span>
+        });
+<span class="nc" id="L248">    }</span>
+
+    private void finishComplete() {
+<span class="nc" id="L251">        synchronized (this) {</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">            if (terminated) {</span>
+<span class="nc" id="L253">                return;</span>
+            }
+<span class="nc" id="L255">            terminated = true;</span>
+<span class="nc" id="L256">        }</span>
+<span class="nc" id="L257">        dispatch(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L260">                handler.onComplete();</span>
+<span class="nc" id="L261">            }</span>
+        });
+<span class="nc" id="L263">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private void finishError(final GraphQLResponse&lt;Object&gt; response) {
+<span class="nc" id="L267">        synchronized (this) {</span>
+<span class="nc bnc" id="L268" title="All 2 branches missed.">            if (terminated) {</span>
+<span class="nc" id="L269">                return;</span>
+            }
+<span class="nc" id="L271">            terminated = true;</span>
+<span class="nc" id="L272">        }</span>
+<span class="nc" id="L273">        dispatch(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L276">                ((Handler&lt;Object&gt;) handler).onError(response);</span>
+<span class="nc" id="L277">            }</span>
+        });
+<span class="nc" id="L279">    }</span>
+
+    // ----------------------------------------------------------------
+    // Helpers
+    // ----------------------------------------------------------------
+
+    private String subscribeMessage() {
+<span class="nc" id="L286">        return message(&quot;subscribe&quot;, OPERATION_ID,</span>
+<span class="nc" id="L287">                GraphQL.buildRequestBody(operationName, document, variables));</span>
+    }
+
+    /// Builds a `graphql-transport-ws` envelope. When `payloadJson` is
+    /// non-null it is spliced in as the raw `payload` object.
+    private static String message(String type, String id, String payloadJson) {
+<span class="nc" id="L293">        Map&lt;String, Object&gt; m = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L294">        m.put(&quot;id&quot;, id);</span>
+<span class="nc" id="L295">        m.put(&quot;type&quot;, type);</span>
+<span class="nc bnc" id="L296" title="All 2 branches missed.">        if (payloadJson != null) {</span>
+<span class="nc" id="L297">            m.put(&quot;payload&quot;, JSONParser.rawJson(payloadJson));</span>
+        }
+<span class="nc" id="L299">        return JSONParser.toJson(m);</span>
+    }
+
+    private static void safeSend(WebSocket w, String text) {
+        try {
+<span class="nc" id="L304">            w.send(text);</span>
+<span class="nc" id="L305">        } catch (Throwable t) {</span>
+<span class="nc" id="L306">            Log.e(t);</span>
+<span class="nc" id="L307">        }</span>
+<span class="nc" id="L308">    }</span>
+
+    private static void dispatch(Runnable r) {
+<span class="nc" id="L311">        CN.callSerially(r);</span>
+<span class="nc" id="L312">    }</span>
+
+    private static GraphQLResponse&lt;Object&gt; transportError(String message) {
+<span class="nc" id="L315">        return new GraphQLResponse&lt;Object&gt;(0, null,</span>
+<span class="nc" id="L316">                Collections.&lt;GraphQLError&gt;emptyList(), message);</span>
+    }
+
+    private static String str(Object o) {
+<span class="nc bnc" id="L320" title="All 2 branches missed.">        return o == null ? null : String.valueOf(o);</span>
+    }
+
+    /// The `error` message `payload` is an array of error objects;
+    /// wrap it so [GraphQL#parseErrors(Object)] (which expects the
+    /// value of an `errors` key) can consume it.
+    private static Object asErrorsArray(Object payload) {
+<span class="nc bnc" id="L327" title="All 2 branches missed.">        if (payload instanceof List) {</span>
+<span class="nc" id="L328">            return payload;</span>
+        }
+<span class="nc bnc" id="L330" title="All 2 branches missed.">        if (payload instanceof Map) {</span>
+<span class="nc" id="L331">            List&lt;Object&gt; one = new ArrayList&lt;Object&gt;(1);</span>
+<span class="nc" id="L332">            one.add(payload);</span>
+<span class="nc" id="L333">            return one;</span>
+        }
+<span class="nc" id="L335">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

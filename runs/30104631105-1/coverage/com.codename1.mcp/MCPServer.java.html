@@ -1,0 +1,431 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MCPServer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.mcp</a> &gt; <span class="el_source">MCPServer.java</span></div><h1>MCPServer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.mcp;
+
+import com.codename1.ai.Tool;
+import com.codename1.io.JSONParser;
+import com.codename1.io.Log;
+import com.codename1.util.Base64;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A Model Context Protocol server. Speaks JSON-RPC 2.0 over a pluggable
+/// {@link MCPTransport}, dispatching the MCP methods `initialize`, `tools/list`,
+/// `tools/call`, `resources/list`, `resources/read`, `ping` and the
+/// `notifications/*` family.
+///
+/// Tools are {@link com.codename1.ai.Tool} instances. The built in tools from
+/// {@link McpUiTools} expose the accessibility semantics tree so any application is
+/// drivable without code; applications add domain tools with {@link #addTool(Tool)}.
+///
+/// The message dispatch is thread free and reentrant: {@link #handleMessage(String)}
+/// takes one request line and returns one response line (or null for a notification),
+/// which makes it directly unit testable. {@link #start(MCPTransport)} wraps that in a
+/// reader thread over the transport.
+public class MCPServer {
+    /// Standard JSON-RPC and MCP error codes.
+    public static final int PARSE_ERROR = -32700;
+    public static final int INVALID_REQUEST = -32600;
+    public static final int METHOD_NOT_FOUND = -32601;
+    public static final int INVALID_PARAMS = -32602;
+    public static final int INTERNAL_ERROR = -32603;
+    public static final int RESOURCE_NOT_FOUND = -32002;
+
+    /// MCP protocol revision advertised when the client does not request one, or requests
+    /// one this server does not implement.
+    public static final String DEFAULT_PROTOCOL_VERSION = &quot;2024-11-05&quot;;
+
+    /// The MCP protocol revisions this server actually implements.
+<span class="fc" id="L62">    private static final String[] SUPPORTED_PROTOCOL_VERSIONS = {&quot;2024-11-05&quot;};</span>
+
+    private static boolean isSupportedProtocol(String version) {
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (version == null) {</span>
+<span class="fc" id="L66">            return false;</span>
+        }
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (String v : SUPPORTED_PROTOCOL_VERSIONS) {</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (v.equals(version)) {</span>
+<span class="fc" id="L70">                return true;</span>
+            }
+        }
+<span class="fc" id="L73">        return false;</span>
+    }
+
+    private static final String SCREEN_RESOURCE_URI = &quot;cn1://screen.png&quot;;
+
+<span class="fc" id="L78">    private final Map&lt;String, Tool&gt; tools = new LinkedHashMap&lt;String, Tool&gt;();</span>
+<span class="fc" id="L79">    private String serverName = &quot;Codename One MCP&quot;;</span>
+<span class="fc" id="L80">    private String serverVersion = &quot;1.0&quot;;</span>
+<span class="fc" id="L81">    private boolean screenshotEnabled = true;</span>
+    private boolean running;
+    private MCPTransport transport;
+<span class="fc" id="L84">    private MCPVerbosity verbosity = MCPVerbosity.OFF;</span>
+
+    /// Sets how much of the MCP conversation is echoed to the Codename One log for
+    /// debugging. Defaults to {@link MCPVerbosity#OFF}.
+    public void setVerbosity(MCPVerbosity verbosity) {
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        this.verbosity = verbosity == null ? MCPVerbosity.OFF : verbosity;</span>
+<span class="nc" id="L90">    }</span>
+
+    public MCPVerbosity getVerbosity() {
+<span class="nc" id="L93">        return verbosity;</span>
+    }
+
+<span class="fc" id="L96">    public MCPServer() {</span>
+<span class="fc" id="L97">        List&lt;Tool&gt; builtIn = McpUiTools.builtInTools();</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        for (Tool t : builtIn) {</span>
+<span class="fc" id="L99">            tools.put(t.getName(), t);</span>
+<span class="fc" id="L100">        }</span>
+<span class="fc" id="L101">    }</span>
+
+    /// Registers a developer defined tool, replacing any existing tool with the same
+    /// name. This is how an application publishes domain specific data and actions.
+    public synchronized void addTool(Tool tool) {
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (tool != null) {</span>
+<span class="fc" id="L107">            tools.put(tool.getName(), tool);</span>
+        }
+<span class="fc" id="L109">    }</span>
+
+    /// Removes a previously registered tool by name.
+    public synchronized void removeTool(String name) {
+<span class="nc" id="L113">        tools.remove(name);</span>
+<span class="nc" id="L114">    }</span>
+
+    /// Sets the server identity reported to the host during `initialize`.
+    public void setServerInfo(String name, String version) {
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (name != null) {</span>
+<span class="nc" id="L119">            this.serverName = name;</span>
+        }
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (version != null) {</span>
+<span class="nc" id="L122">            this.serverVersion = version;</span>
+        }
+<span class="nc" id="L124">    }</span>
+
+    /// Enables or disables the built in screenshot resource. Enabled by default.
+    public void setScreenshotEnabled(boolean screenshotEnabled) {
+<span class="nc" id="L128">        this.screenshotEnabled = screenshotEnabled;</span>
+<span class="nc" id="L129">    }</span>
+
+    public boolean isRunning() {
+<span class="nc" id="L132">        return running;</span>
+    }
+
+    /// Starts serving over the given transport on a dedicated reader thread.
+    public synchronized void start(MCPTransport transport) {
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if (running) {</span>
+<span class="nc" id="L138">            return;</span>
+        }
+<span class="nc" id="L140">        this.transport = transport;</span>
+<span class="nc" id="L141">        running = true;</span>
+<span class="nc" id="L142">        Thread readerThread = new Thread(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L145">                runLoop();</span>
+<span class="nc" id="L146">            }</span>
+        }, &quot;cn1-mcp-server&quot;);
+<span class="nc" id="L148">        readerThread.start();</span>
+<span class="nc" id="L149">    }</span>
+
+    /// Stops serving and closes the transport.
+    public synchronized void stop() {
+<span class="nc" id="L153">        running = false;</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        if (transport != null) {</span>
+<span class="nc" id="L155">            transport.close();</span>
+        }
+<span class="nc" id="L157">    }</span>
+
+    private void runLoop() {
+        try {
+<span class="nc" id="L161">            transport.open();</span>
+<span class="nc" id="L162">        } catch (IOException ex) {</span>
+            // The transport failed to start listening. Log defensively: the CN1 Log
+            // routes through the platform implementation, which may not be registered
+            // yet when the server is auto-started early in Display.init(), and a raw
+            // NullPointerException here would silently kill the reader thread.
+            try {
+<span class="nc" id="L168">                Log.e(ex);</span>
+<span class="nc" id="L169">            } catch (Throwable logErr) {</span>
+<span class="nc" id="L170">                System.err.println(&quot;[cn1.mcp] transport open failed: &quot; + ex);</span>
+<span class="nc" id="L171">            }</span>
+<span class="nc" id="L172">            running = false;</span>
+<span class="nc" id="L173">            return;</span>
+<span class="nc" id="L174">        }</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">        while (running) {</span>
+            String line;
+            try {
+<span class="nc" id="L178">                line = transport.readMessage();</span>
+<span class="nc" id="L179">            } catch (IOException ex) {</span>
+<span class="nc" id="L180">                break;</span>
+<span class="nc" id="L181">            }</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">            if (line == null) {</span>
+<span class="nc" id="L183">                break;</span>
+            }
+<span class="nc bnc" id="L185" title="All 2 branches missed.">            if (line.trim().length() == 0) {</span>
+<span class="nc" id="L186">                continue;</span>
+            }
+<span class="nc" id="L188">            String response = handleMessage(line);</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            if (response != null) {</span>
+                try {
+<span class="nc" id="L191">                    transport.writeMessage(response);</span>
+<span class="nc" id="L192">                } catch (IOException ex) {</span>
+<span class="nc" id="L193">                    break;</span>
+<span class="nc" id="L194">                }</span>
+            }
+<span class="nc" id="L196">        }</span>
+<span class="nc" id="L197">        running = false;</span>
+<span class="nc" id="L198">        transport.close();</span>
+<span class="nc" id="L199">    }</span>
+
+    /// Handles one inbound JSON-RPC message and returns the response line, or null
+    /// when the message is a notification that warrants no reply. Never throws; every
+    /// failure is turned into a JSON-RPC error response.
+    public String handleMessage(String line) {
+<span class="fc" id="L205">        String response = handleMessageInternal(line);</span>
+<span class="fc" id="L206">        logConversation(line, response);</span>
+<span class="fc" id="L207">        return response;</span>
+    }
+
+    private String handleMessageInternal(String line) {
+        Map&lt;String, Object&gt; request;
+        try {
+<span class="fc" id="L213">            request = MCPJson.parse(line);</span>
+<span class="nc" id="L214">        } catch (Exception ex) {</span>
+<span class="nc" id="L215">            return errorEnvelope(null, PARSE_ERROR, &quot;Parse error&quot;);</span>
+<span class="fc" id="L216">        }</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (request == null) {</span>
+<span class="nc" id="L218">            return errorEnvelope(null, PARSE_ERROR, &quot;Parse error&quot;);</span>
+        }
+<span class="fc" id="L220">        boolean hasId = request.containsKey(&quot;id&quot;);</span>
+<span class="fc" id="L221">        Object id = request.get(&quot;id&quot;);</span>
+        try {
+<span class="fc" id="L223">            String method = JSONParser.getString(request, &quot;method&quot;);</span>
+<span class="fc" id="L224">            Map&lt;String, Object&gt; params = JSONParser.asMap(request.get(&quot;params&quot;));</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">            if (method == null) {</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">                return hasId ? errorEnvelope(id, INVALID_REQUEST, &quot;Invalid Request&quot;) : null;</span>
+            }
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            if (!hasId) {</span>
+                // A notification (no id) such as notifications/initialized needs no reply.
+<span class="fc" id="L230">                return null;</span>
+            }
+<span class="fc" id="L232">            return dispatch(id, method, params);</span>
+<span class="nc" id="L233">        } catch (Exception ex) {</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">            return errorEnvelope(hasId ? id : null, INTERNAL_ERROR,</span>
+<span class="nc" id="L235">                    &quot;Internal error: &quot; + messageOf(ex));</span>
+        }
+    }
+
+    /// Echoes the exchange to the log according to the configured verbosity. Never throws.
+    private void logConversation(String request, String response) {
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        if (verbosity == MCPVerbosity.OFF) {</span>
+<span class="fc" id="L242">            return;</span>
+        }
+        try {
+<span class="nc bnc" id="L245" title="All 4 branches missed.">            boolean isError = response != null &amp;&amp; (response.indexOf(&quot;\&quot;error\&quot;&quot;) &gt;= 0</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">                    || response.indexOf(&quot;\&quot;isError\&quot;:true&quot;) &gt;= 0);</span>
+<span class="nc bnc" id="L247" title="All 4 branches missed.">            if (verbosity == MCPVerbosity.ERRORS &amp;&amp; !isError) {</span>
+<span class="nc" id="L248">                return;</span>
+            }
+<span class="nc bnc" id="L250" title="All 2 branches missed.">            if (verbosity.includes(MCPVerbosity.FULL)) {</span>
+<span class="nc" id="L251">                Log.p(&quot;MCP &gt;&gt; &quot; + request);</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">                if (response != null) {</span>
+<span class="nc" id="L253">                    Log.p(&quot;MCP &lt;&lt; &quot; + response);</span>
+                }
+<span class="nc" id="L255">                return;</span>
+            }
+            // SUMMARY / ERRORS: one concise line
+<span class="nc" id="L258">            Map&lt;String, Object&gt; req = MCPJson.parse(request);</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">            String method = req == null ? &quot;?&quot; : JSONParser.getString(req, &quot;method&quot;);</span>
+<span class="nc" id="L260">            String detail = &quot;&quot;;</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">            Map&lt;String, Object&gt; params = req == null ? null : JSONParser.asMap(req.get(&quot;params&quot;));</span>
+<span class="nc bnc" id="L262" title="All 4 branches missed.">            if (params != null &amp;&amp; &quot;tools/call&quot;.equals(method)) {</span>
+<span class="nc" id="L263">                detail = &quot; &quot; + JSONParser.getString(params, &quot;name&quot;);</span>
+            }
+<span class="nc bnc" id="L265" title="All 2 branches missed.">            Log.p(&quot;MCP &quot; + method + detail + (isError ? &quot; -&gt; error&quot; : &quot; -&gt; ok&quot;));</span>
+<span class="nc" id="L266">        } catch (Throwable ignored) {</span>
+            // logging must never disrupt the protocol
+<span class="nc" id="L268">        }</span>
+<span class="nc" id="L269">    }</span>
+
+    private String dispatch(Object id, String method, Map&lt;String, Object&gt; params) throws Exception {
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (&quot;initialize&quot;.equals(method)) {</span>
+<span class="fc" id="L273">            return resultEnvelope(id, initializeResult(params));</span>
+        }
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">        if (&quot;ping&quot;.equals(method)) {</span>
+<span class="nc" id="L276">            return resultEnvelope(id, new LinkedHashMap&lt;String, Object&gt;());</span>
+        }
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        if (&quot;tools/list&quot;.equals(method)) {</span>
+<span class="fc" id="L279">            return resultEnvelope(id, toolsList());</span>
+        }
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        if (&quot;tools/call&quot;.equals(method)) {</span>
+<span class="fc" id="L282">            return toolsCall(id, params);</span>
+        }
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">        if (&quot;resources/list&quot;.equals(method)) {</span>
+<span class="nc" id="L285">            return resultEnvelope(id, resourcesList());</span>
+        }
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">        if (&quot;resources/read&quot;.equals(method)) {</span>
+<span class="nc" id="L288">            return resourcesRead(id, params);</span>
+        }
+<span class="fc" id="L290">        return errorEnvelope(id, METHOD_NOT_FOUND, &quot;Method not found: &quot; + method);</span>
+    }
+
+    private Map&lt;String, Object&gt; initializeResult(Map&lt;String, Object&gt; params) {
+        // Only echo a protocol version we actually implement. MCP requires an unsupported
+        // request to be answered with a version the server supports, not the client's.
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">        String requested = params == null ? null : JSONParser.getString(params, &quot;protocolVersion&quot;);</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        String protocol = isSupportedProtocol(requested) ? requested : DEFAULT_PROTOCOL_VERSION;</span>
+<span class="fc" id="L298">        Map&lt;String, Object&gt; capabilities = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L299">        capabilities.put(&quot;tools&quot;, new LinkedHashMap&lt;String, Object&gt;());</span>
+<span class="fc" id="L300">        capabilities.put(&quot;resources&quot;, new LinkedHashMap&lt;String, Object&gt;());</span>
+<span class="fc" id="L301">        Map&lt;String, Object&gt; serverInfo = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L302">        serverInfo.put(&quot;name&quot;, serverName);</span>
+<span class="fc" id="L303">        serverInfo.put(&quot;version&quot;, serverVersion);</span>
+<span class="fc" id="L304">        Map&lt;String, Object&gt; result = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L305">        result.put(&quot;protocolVersion&quot;, protocol);</span>
+<span class="fc" id="L306">        result.put(&quot;capabilities&quot;, capabilities);</span>
+<span class="fc" id="L307">        result.put(&quot;serverInfo&quot;, serverInfo);</span>
+<span class="fc" id="L308">        return result;</span>
+    }
+
+    private synchronized Map&lt;String, Object&gt; toolsList() {
+<span class="fc" id="L312">        List&lt;Object&gt; list = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">        for (Tool tool : tools.values()) {</span>
+<span class="fc" id="L314">            Map&lt;String, Object&gt; entry = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L315">            entry.put(&quot;name&quot;, tool.getName());</span>
+<span class="fc" id="L316">            entry.put(&quot;description&quot;, tool.getDescription());</span>
+<span class="fc" id="L317">            entry.put(&quot;inputSchema&quot;, JSONParser.rawJson(tool.getParametersJsonSchema()));</span>
+<span class="fc" id="L318">            list.add(entry);</span>
+<span class="fc" id="L319">        }</span>
+<span class="fc" id="L320">        Map&lt;String, Object&gt; result = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L321">        result.put(&quot;tools&quot;, list);</span>
+<span class="fc" id="L322">        return result;</span>
+    }
+
+    private String toolsCall(Object id, Map&lt;String, Object&gt; params) {
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">        String name = params == null ? null : JSONParser.getString(params, &quot;name&quot;);</span>
+<span class="pc bpc" id="L327" title="2 of 4 branches missed.">        if (name == null || name.length() == 0) {</span>
+<span class="nc" id="L328">            return errorEnvelope(id, INVALID_PARAMS, &quot;Missing tool name&quot;);</span>
+        }
+        Tool tool;
+<span class="fc" id="L331">        synchronized (this) {</span>
+<span class="fc" id="L332">            tool = tools.get(name);</span>
+<span class="fc" id="L333">        }</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">        if (tool == null) {</span>
+<span class="fc" id="L335">            return errorEnvelope(id, METHOD_NOT_FOUND, &quot;Unknown tool: &quot; + name);</span>
+        }
+<span class="fc" id="L337">        Object argObj = params.get(&quot;arguments&quot;);</span>
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">        String argumentsJson = argObj == null ? &quot;{}&quot; : MCPJson.toJson(argObj);</span>
+        String text;
+        boolean isError;
+        try {
+<span class="fc" id="L342">            text = tool.invoke(argumentsJson);</span>
+<span class="fc" id="L343">            isError = false;</span>
+<span class="fc" id="L344">        } catch (Exception ex) {</span>
+<span class="fc" id="L345">            text = messageOf(ex);</span>
+<span class="fc" id="L346">            isError = true;</span>
+<span class="fc" id="L347">        }</span>
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">        if (text == null) {</span>
+<span class="nc" id="L349">            text = &quot;&quot;;</span>
+        }
+<span class="fc" id="L351">        Map&lt;String, Object&gt; content = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L352">        content.put(&quot;type&quot;, &quot;text&quot;);</span>
+<span class="fc" id="L353">        content.put(&quot;text&quot;, text);</span>
+<span class="fc" id="L354">        List&lt;Object&gt; contentList = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L355">        contentList.add(content);</span>
+<span class="fc" id="L356">        Map&lt;String, Object&gt; result = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L357">        result.put(&quot;content&quot;, contentList);</span>
+<span class="fc" id="L358">        result.put(&quot;isError&quot;, Boolean.valueOf(isError));</span>
+<span class="fc" id="L359">        return resultEnvelope(id, result);</span>
+    }
+
+    private Map&lt;String, Object&gt; resourcesList() {
+<span class="nc" id="L363">        List&lt;Object&gt; list = new ArrayList&lt;Object&gt;();</span>
+<span class="nc bnc" id="L364" title="All 2 branches missed.">        if (screenshotEnabled) {</span>
+<span class="nc" id="L365">            Map&lt;String, Object&gt; screen = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L366">            screen.put(&quot;uri&quot;, SCREEN_RESOURCE_URI);</span>
+<span class="nc" id="L367">            screen.put(&quot;name&quot;, &quot;Current screen&quot;);</span>
+<span class="nc" id="L368">            screen.put(&quot;description&quot;, &quot;A PNG screenshot of the current Codename One form.&quot;);</span>
+<span class="nc" id="L369">            screen.put(&quot;mimeType&quot;, &quot;image/png&quot;);</span>
+<span class="nc" id="L370">            list.add(screen);</span>
+        }
+<span class="nc" id="L372">        Map&lt;String, Object&gt; result = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L373">        result.put(&quot;resources&quot;, list);</span>
+<span class="nc" id="L374">        return result;</span>
+    }
+
+    private String resourcesRead(Object id, Map&lt;String, Object&gt; params) {
+<span class="nc bnc" id="L378" title="All 2 branches missed.">        String uri = params == null ? null : JSONParser.getString(params, &quot;uri&quot;);</span>
+<span class="nc bnc" id="L379" title="All 4 branches missed.">        if (uri == null || uri.length() == 0) {</span>
+<span class="nc" id="L380">            return errorEnvelope(id, INVALID_PARAMS, &quot;Missing resource uri&quot;);</span>
+        }
+<span class="nc bnc" id="L382" title="All 4 branches missed.">        if (screenshotEnabled &amp;&amp; SCREEN_RESOURCE_URI.equals(uri)) {</span>
+<span class="nc" id="L383">            byte[] png = McpUiTools.screenshotPng();</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">            if (png == null) {</span>
+<span class="nc" id="L385">                return errorEnvelope(id, INTERNAL_ERROR, &quot;No screen available to capture&quot;);</span>
+            }
+<span class="nc" id="L387">            Map&lt;String, Object&gt; content = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L388">            content.put(&quot;uri&quot;, uri);</span>
+<span class="nc" id="L389">            content.put(&quot;mimeType&quot;, &quot;image/png&quot;);</span>
+<span class="nc" id="L390">            content.put(&quot;blob&quot;, Base64.encodeNoNewline(png));</span>
+<span class="nc" id="L391">            List&lt;Object&gt; contents = new ArrayList&lt;Object&gt;();</span>
+<span class="nc" id="L392">            contents.add(content);</span>
+<span class="nc" id="L393">            Map&lt;String, Object&gt; result = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L394">            result.put(&quot;contents&quot;, contents);</span>
+<span class="nc" id="L395">            return resultEnvelope(id, result);</span>
+        }
+<span class="nc" id="L397">        return errorEnvelope(id, RESOURCE_NOT_FOUND, &quot;Unknown resource: &quot; + uri);</span>
+    }
+
+    private String resultEnvelope(Object id, Map&lt;String, Object&gt; result) {
+<span class="fc" id="L401">        return &quot;{\&quot;jsonrpc\&quot;:\&quot;2.0\&quot;,\&quot;id\&quot;:&quot; + idJson(id)</span>
+<span class="fc" id="L402">                + &quot;,\&quot;result\&quot;:&quot; + JSONParser.toJson(result) + &quot;}&quot;;</span>
+    }
+
+    private String errorEnvelope(Object id, int code, String message) {
+<span class="fc" id="L406">        Map&lt;String, Object&gt; error = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L407">        error.put(&quot;code&quot;, Integer.valueOf(code));</span>
+<span class="fc" id="L408">        error.put(&quot;message&quot;, message);</span>
+<span class="fc" id="L409">        return &quot;{\&quot;jsonrpc\&quot;:\&quot;2.0\&quot;,\&quot;id\&quot;:&quot; + idJson(id)</span>
+<span class="fc" id="L410">                + &quot;,\&quot;error\&quot;:&quot; + JSONParser.toJson(error) + &quot;}&quot;;</span>
+    }
+
+    /// Serializes the JSON-RPC id, preserving integer form. The lenient CN1 parser reads
+    /// `1` as a double, but the id must be echoed exactly so strict hosts can correlate
+    /// the response, so an integral double is emitted without a fractional part.
+    private static String idJson(Object id) {
+<span class="pc bpc" id="L417" title="2 of 4 branches missed.">        if (id instanceof Double || id instanceof Float) {</span>
+<span class="nc" id="L418">            double d = ((Number) id).doubleValue();</span>
+<span class="nc bnc" id="L419" title="All 6 branches missed.">            if (!Double.isInfinite(d) &amp;&amp; !Double.isNaN(d) &amp;&amp; d == Math.floor(d)) {</span>
+<span class="nc" id="L420">                return Long.toString((long) d);</span>
+            }
+        }
+<span class="fc" id="L423">        return JSONParser.toJson(id);</span>
+    }
+
+    private static String messageOf(Throwable ex) {
+<span class="fc" id="L427">        String m = ex.getMessage();</span>
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">        return m == null ? ex.getClass().getName() : m;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

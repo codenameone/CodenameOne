@@ -1,0 +1,429 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ThreadSafeDatabase.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.db</a> &gt; <span class="el_source">ThreadSafeDatabase.java</span></div><h1>ThreadSafeDatabase.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.db;
+
+import com.codename1.io.Log;
+import com.codename1.util.EasyThread;
+import com.codename1.util.RunnableWithResultSync;
+
+import java.io.IOException;
+
+/// Wraps all database calls in a single thread so they are all proxied thru that thread
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// platform specific nuances prevented this approach from working out, we improved the native iOS support for thread safety instead
+public class ThreadSafeDatabase extends Database {
+    private final Database underlying;
+    private final EasyThread et;
+
+    /// Wraps the given database with a threadsafe version
+    ///
+    /// #### Parameters
+    ///
+    /// - `db`: the database
+<span class="fc" id="L48">    public ThreadSafeDatabase(Database db) {</span>
+<span class="fc" id="L49">        underlying = db;</span>
+<span class="fc" id="L50">        et = EasyThread.start(&quot;Database&quot;);</span>
+<span class="fc" id="L51">    }</span>
+
+    /// Returns the underlying easy thread we can use to pipe tasks to the db thread
+    ///
+    /// #### Returns
+    ///
+    /// the easy thread object
+    public EasyThread getThread() {
+<span class="nc" id="L59">        return et;</span>
+    }
+
+
+    @Override
+    public void beginTransaction() throws IOException {
+<span class="fc" id="L65">        invokeWithException(new RunnableWithIOException() {</span>
+            @Override
+            public void run() throws IOException {
+<span class="fc" id="L68">                underlying.beginTransaction();</span>
+<span class="fc" id="L69">            }</span>
+        });
+<span class="fc" id="L71">    }</span>
+
+    private void invokeWithException(final RunnableWithIOException r) throws IOException {
+<span class="fc" id="L74">        IOException err = et.run(new RunnableWithResultSync&lt;IOException&gt;() {</span>
+            @Override
+            @SuppressWarnings(&quot;PMD.UnnecessaryLocalBeforeReturn&quot;)
+            public IOException run() {
+                try {
+<span class="fc" id="L79">                    r.run();</span>
+<span class="fc" id="L80">                    return null;</span>
+<span class="nc" id="L81">                } catch (IOException err) {</span>
+<span class="nc" id="L82">                    return err;</span>
+                }
+            }
+        });
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (err != null) {</span>
+<span class="nc" id="L87">            throw err;</span>
+        }
+<span class="fc" id="L89">    }</span>
+
+    private Object invokeWithException(final RunnableWithResponseOrIOException r) throws IOException {
+<span class="fc" id="L92">        Object ret = et.run(new RunnableWithResultSync&lt;Object&gt;() {</span>
+            @Override
+            @SuppressWarnings(&quot;PMD.UnnecessaryLocalBeforeReturn&quot;)
+            public Object run() {
+                try {
+<span class="fc" id="L97">                    return r.run();</span>
+<span class="nc" id="L98">                } catch (IOException err) {</span>
+<span class="nc" id="L99">                    return err;</span>
+                }
+            }
+        });
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (ret instanceof IOException) {</span>
+<span class="nc" id="L104">            throw (IOException) ret;</span>
+        }
+<span class="fc" id="L106">        return ret;</span>
+    }
+
+    @Override
+    public void commitTransaction() throws IOException {
+<span class="fc" id="L111">        invokeWithException(new RunnableWithIOException() {</span>
+            @Override
+            public void run() throws IOException {
+<span class="fc" id="L114">                underlying.commitTransaction();</span>
+<span class="fc" id="L115">            }</span>
+        });
+<span class="fc" id="L117">    }</span>
+
+    @Override
+    public void rollbackTransaction() throws IOException {
+<span class="nc" id="L121">        invokeWithException(new RunnableWithIOException() {</span>
+            @Override
+            public void run() throws IOException {
+<span class="nc" id="L124">                underlying.rollbackTransaction();</span>
+<span class="nc" id="L125">            }</span>
+        });
+<span class="nc" id="L127">    }</span>
+
+    @Override
+    public void close() {
+        // close should NEVER throw an exception...
+<span class="fc" id="L132">        et.run(new Runnable() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="fc" id="L136">                    underlying.close();</span>
+<span class="nc" id="L137">                } catch (IOException err) {</span>
+<span class="nc" id="L138">                    Log.e(err);</span>
+<span class="fc" id="L139">                }</span>
+<span class="fc" id="L140">                et.kill();</span>
+<span class="fc" id="L141">            }</span>
+        });
+<span class="fc" id="L143">    }</span>
+
+    @Override
+    public void execute(final String sql) throws IOException {
+<span class="fc" id="L147">        invokeWithException(new RunnableWithIOException() {</span>
+            @Override
+            public void run() throws IOException {
+<span class="fc" id="L150">                underlying.execute(sql);</span>
+<span class="fc" id="L151">            }</span>
+        });
+<span class="fc" id="L153">    }</span>
+
+    @Override
+    public void execute(final String sql, final String[] params) throws IOException {
+<span class="nc" id="L157">        invokeWithException(new RunnableWithIOException() {</span>
+            @Override
+            public void run() throws IOException {
+<span class="nc" id="L160">                underlying.execute(sql, params);</span>
+<span class="nc" id="L161">            }</span>
+        });
+<span class="nc" id="L163">    }</span>
+
+    @Override
+    public Cursor executeQuery(final String sql, final String[] params) throws IOException {
+<span class="nc" id="L167">        final Cursor[] curs = new Cursor[1];</span>
+<span class="nc" id="L168">        invokeWithException(new RunnableWithIOException() {</span>
+            @Override
+            public void run() throws IOException {
+<span class="nc" id="L171">                curs[0] = underlying.executeQuery(sql, params);</span>
+<span class="nc" id="L172">            }</span>
+        });
+<span class="nc" id="L174">        return new CursorWrapper(curs[0]);</span>
+    }
+
+    @Override
+    public Cursor executeQuery(final String sql) throws IOException {
+<span class="fc" id="L179">        final Cursor[] curs = new Cursor[1];</span>
+<span class="fc" id="L180">        invokeWithException(new RunnableWithIOException() {</span>
+            @Override
+            public void run() throws IOException {
+<span class="fc" id="L183">                curs[0] = underlying.executeQuery(sql);</span>
+<span class="fc" id="L184">            }</span>
+        });
+<span class="fc" id="L186">        return new CursorWrapper(curs[0]);</span>
+    }
+
+    @Override
+    public Cursor executeQuery(final String sql, final Object... params) throws IOException {
+<span class="fc" id="L191">        final Cursor[] curs = new Cursor[1];</span>
+<span class="fc" id="L192">        invokeWithException(new RunnableWithIOException() {</span>
+            @Override
+            public void run() throws IOException {
+<span class="fc" id="L195">                curs[0] = underlying.executeQuery(sql, params);</span>
+<span class="fc" id="L196">            }</span>
+        });
+<span class="fc" id="L198">        return new CursorWrapper(curs[0]);</span>
+    }
+
+    @Override
+    public void execute(final String sql, final Object... params) throws IOException {
+<span class="fc" id="L203">        invokeWithException(new RunnableWithIOException() {</span>
+            @Override
+            public void run() throws IOException {
+<span class="fc" id="L206">                underlying.execute(sql, params);</span>
+<span class="fc" id="L207">            }</span>
+        });
+<span class="fc" id="L209">    }</span>
+
+    interface RunnableWithIOException {
+        // PMD Fix (UnnecessaryModifier): Interface methods are implicitly public.
+        void run() throws IOException;
+    }
+
+    interface RunnableWithResponseOrIOException {
+        // PMD Fix (UnnecessaryModifier): Interface methods are implicitly public.
+        Object run() throws IOException;
+    }
+
+    private class RowWrapper implements RowExt {
+        private final Row underlyingRow;
+
+<span class="fc" id="L224">        public RowWrapper(Row underlyingRow) {</span>
+<span class="fc" id="L225">            this.underlyingRow = underlyingRow;</span>
+<span class="fc" id="L226">        }</span>
+
+        @Override
+        public byte[] getBlob(final int index) throws IOException {
+<span class="nc" id="L230">            return (byte[]) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L233">                    return underlyingRow.getBlob(index);</span>
+                }
+            });
+        }
+
+        @Override
+        public double getDouble(final int index) throws IOException {
+<span class="nc" id="L240">            return (Double) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L243">                    return underlyingRow.getDouble(index);</span>
+                }
+            });
+        }
+
+        @Override
+        public float getFloat(final int index) throws IOException {
+<span class="nc" id="L250">            return (Float) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L253">                    return underlyingRow.getFloat(index);</span>
+                }
+            });
+        }
+
+        @Override
+        public int getInteger(final int index) throws IOException {
+<span class="fc" id="L260">            return (Integer) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="fc" id="L263">                    return underlyingRow.getInteger(index);</span>
+                }
+            });
+        }
+
+        @Override
+        public long getLong(final int index) throws IOException {
+<span class="nc" id="L270">            return (Long) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L273">                    return underlyingRow.getLong(index);</span>
+                }
+            });
+        }
+
+        @Override
+        public short getShort(final int index) throws IOException {
+<span class="nc" id="L280">            return (Short) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L283">                    return underlyingRow.getShort(index);</span>
+                }
+            });
+        }
+
+        @Override
+        public String getString(final int index) throws IOException {
+<span class="nc" id="L290">            return (String) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L293">                    return underlyingRow.getString(index);</span>
+                }
+            });
+        }
+
+
+        @Override
+        public boolean wasNull() throws IOException {
+<span class="nc" id="L301">            return (Boolean) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L304">                    return Database.wasNull(underlyingRow);</span>
+                }
+            });
+        }
+    }
+
+    private class CursorWrapper implements Cursor {
+        private final Cursor underlyingCursor;
+
+<span class="fc" id="L313">        public CursorWrapper(Cursor underlyingCursor) {</span>
+<span class="fc" id="L314">            this.underlyingCursor = underlyingCursor;</span>
+<span class="fc" id="L315">        }</span>
+
+        @Override
+        public boolean first() throws IOException {
+<span class="nc" id="L319">            return (Boolean) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L322">                    return underlyingCursor.first();</span>
+                }
+            });
+        }
+
+        @Override
+        public boolean last() throws IOException {
+<span class="nc" id="L329">            return (Boolean) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L332">                    return underlyingCursor.last();</span>
+                }
+            });
+        }
+
+        @Override
+        public boolean next() throws IOException {
+<span class="fc" id="L339">            return (Boolean) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="fc" id="L342">                    return underlyingCursor.next();</span>
+                }
+            });
+        }
+
+        @Override
+        public boolean prev() throws IOException {
+<span class="nc" id="L349">            return (Boolean) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L352">                    return underlyingCursor.prev();</span>
+                }
+            });
+        }
+
+        @Override
+        public int getColumnIndex(final String columnName) throws IOException {
+<span class="nc" id="L359">            return (Integer) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L362">                    return underlyingCursor.getColumnIndex(columnName);</span>
+                }
+            });
+        }
+
+        @Override
+        public String getColumnName(final int columnIndex) throws IOException {
+<span class="nc" id="L369">            return (String) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L372">                    return underlyingCursor.getColumnName(columnIndex);</span>
+                }
+            });
+        }
+
+        @Override
+        public int getColumnCount() throws IOException {
+<span class="nc" id="L379">            return (Integer) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L382">                    return underlyingCursor.getColumnCount();</span>
+                }
+            });
+        }
+
+        @Override
+        public int getPosition() throws IOException {
+<span class="nc" id="L389">            return (Integer) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L392">                    return underlyingCursor.getPosition();</span>
+                }
+            });
+        }
+
+        @Override
+        public boolean position(final int row) throws IOException {
+<span class="nc" id="L399">            return (Boolean) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="nc" id="L402">                    return underlyingCursor.position(row);</span>
+                }
+            });
+        }
+
+        @Override
+        public void close() throws IOException {
+<span class="fc" id="L409">            invokeWithException(new RunnableWithIOException() {</span>
+                @Override
+                public void run() throws IOException {
+<span class="fc" id="L412">                    underlyingCursor.close();</span>
+<span class="fc" id="L413">                }</span>
+            });
+<span class="fc" id="L415">        }</span>
+
+        @Override
+        public Row getRow() throws IOException {
+<span class="fc" id="L419">            return new RowWrapper((Row) invokeWithException(new RunnableWithResponseOrIOException() {</span>
+                @Override
+                public Object run() throws IOException {
+<span class="fc" id="L422">                    return underlyingCursor.getRow();</span>
+                }
+            }));
+        }
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

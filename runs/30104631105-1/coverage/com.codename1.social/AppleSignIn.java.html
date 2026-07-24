@@ -1,0 +1,436 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AppleSignIn.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.social</a> &gt; <span class="el_source">AppleSignIn.java</span></div><h1>AppleSignIn.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.social;
+
+import com.codename1.io.AccessToken;
+import com.codename1.io.Preferences;
+import com.codename1.io.oidc.OidcClient;
+import com.codename1.io.oidc.OidcException;
+import com.codename1.io.oidc.OidcTokens;
+import com.codename1.security.Hash;
+import com.codename1.security.SecureRandom;
+import com.codename1.util.Base64;
+import com.codename1.util.SuccessCallback;
+
+import java.util.Map;
+
+/// `Sign in with Apple` for Codename One. Replaces the external
+/// `cn1-applesignin` library for new code; the cn1lib continues to work
+/// on its own (this class doesn't depend on it and doesn't forward to it
+/// -- they're independent implementations).
+///
+/// Behavior by platform:
+///
+/// - **iOS 13+** -- native `ASAuthorizationAppleIDProvider` flow via
+///   [AppleSignInNative]. Returns the identity token plus the user's name
+///   and email on the first authorization (Apple does not echo them on
+///   subsequent ones; this class persists them in [Preferences]).
+/// - **Android / JavaSE / Web** -- web fallback via
+///   [com.codename1.io.oidc.OidcClient] against the public Apple OIDC issuer
+///   (`https://appleid.apple.com`). Requires a *Services ID* (web client
+///   ID), a redirect URI registered with Apple, and a `client_secret` JWT
+///   generated server-side (use [#setClientSecret(String)]).
+///
+/// #### Quick example
+///
+/// ```java
+/// AppleSignIn apple = AppleSignIn.getInstance()
+///     .withServiceId(&quot;com.example.appleweb&quot;)     // web only
+///     .withRedirectUri(&quot;https://example.com/cb&quot;); // web only
+///
+/// apple.signIn(&quot;name email&quot;, new AppleSignInCallback() {
+///     public void onSuccess(AppleSignInResult result) {
+///         String id    = result.getUserId();
+///         String email = result.getEmail();
+///         String idTok = result.getIdentityToken();
+///         // send idTok to your backend for verification
+///     }
+///     public void onError(String error) { ... }
+///     public void onCancel() { ... }
+/// });
+/// ```
+///
+public final class AppleSignIn extends Login {
+
+    /// Apple's public OIDC issuer.
+    public static final String APPLE_ISSUER = &quot;https://appleid.apple.com&quot;;
+
+    private static final String PREF_NAME = &quot;cn1.applesignin.name&quot;;
+    private static final String PREF_EMAIL = &quot;cn1.applesignin.email&quot;;
+    private static final String PREF_USER = &quot;cn1.applesignin.userid&quot;;
+    private static final String PREF_LOGGED_IN = &quot;cn1.applesignin.loggedIn&quot;;
+
+    private static AppleSignIn INSTANCE;
+
+    private String serviceId;          // web Services ID
+    private String webRedirectUri;     // for web fallback only
+    private String webClientSecret;    // JWT generated by your backend
+<span class="fc" id="L89">    private String defaultScopes = &quot;name email&quot;;</span>
+
+<span class="fc" id="L91">    private AppleSignIn() {}</span>
+
+    public static synchronized AppleSignIn getInstance() {
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (INSTANCE == null) {</span>
+<span class="fc" id="L95">            INSTANCE = new AppleSignIn();</span>
+        }
+<span class="fc" id="L97">        return INSTANCE;</span>
+    }
+
+    /// Apple *Services ID* used for the web fallback. Required only when
+    /// running on platforms without the native sheet (Android, JavaSE, Web).
+    public AppleSignIn withServiceId(String serviceId) {
+<span class="fc" id="L103">        this.serviceId = serviceId;</span>
+<span class="fc" id="L104">        super.setClientId(serviceId);</span>
+<span class="fc" id="L105">        return this;</span>
+    }
+
+    /// Redirect URI registered with Apple for the Services ID. Used by the
+    /// web fallback.
+    public AppleSignIn withRedirectUri(String redirectUri) {
+<span class="fc" id="L111">        this.webRedirectUri = redirectUri;</span>
+<span class="fc" id="L112">        super.setRedirectURI(redirectUri);</span>
+<span class="fc" id="L113">        return this;</span>
+    }
+
+    /// Client-secret JWT generated by your backend (Apple does not let mobile
+    /// apps mint this themselves -- see the developer guide for the recipe).
+    public AppleSignIn withClientSecret(String secret) {
+<span class="fc" id="L119">        this.webClientSecret = secret;</span>
+<span class="fc" id="L120">        super.setClientSecret(secret);</span>
+<span class="fc" id="L121">        return this;</span>
+    }
+
+    public AppleSignIn withDefaultScopes(String scopes) {
+<span class="fc" id="L125">        this.defaultScopes = scopes;</span>
+<span class="fc" id="L126">        return this;</span>
+    }
+
+    @Override
+    public boolean isNativeLoginSupported() {
+<span class="fc" id="L131">        AppleSignInNative n = lookupNative();</span>
+<span class="fc bfc" id="L132" title="All 4 branches covered.">        return n != null &amp;&amp; n.isSupported();</span>
+    }
+
+    @Override
+    public boolean nativeIsLoggedIn() {
+<span class="fc" id="L137">        AppleSignInNative n = lookupNative();</span>
+<span class="pc bpc" id="L138" title="1 of 4 branches missed.">        if (n != null &amp;&amp; n.isSupported()) {</span>
+<span class="fc" id="L139">            return n.isLoggedIn();</span>
+        }
+<span class="fc" id="L141">        return Preferences.get(PREF_LOGGED_IN, false);</span>
+    }
+
+    @Override
+    public void nativeLogout() {
+<span class="fc" id="L146">        AppleSignInNative n = lookupNative();</span>
+<span class="pc bpc" id="L147" title="2 of 4 branches missed.">        if (n != null &amp;&amp; n.isSupported()) {</span>
+<span class="fc" id="L148">            n.signOut();</span>
+        }
+<span class="fc" id="L150">        Preferences.delete(PREF_LOGGED_IN);</span>
+<span class="fc" id="L151">        Preferences.delete(PREF_NAME);</span>
+<span class="fc" id="L152">        Preferences.delete(PREF_EMAIL);</span>
+<span class="fc" id="L153">        Preferences.delete(PREF_USER);</span>
+<span class="fc" id="L154">    }</span>
+
+    @Override
+    public void nativelogin() {
+<span class="nc" id="L158">        signIn(defaultScopes, new LoginCallbackAdapter());</span>
+<span class="nc" id="L159">    }</span>
+
+    @Override
+    protected boolean validateToken(String token) {
+        // Apple identity tokens carry an `exp` claim; we trust it.
+<span class="fc" id="L164">        return true;</span>
+    }
+
+    /// Primary entry point. Triggers either the native sheet (iOS) or the
+    /// web OIDC fallback (everything else) and delivers the result to
+    /// `callback`.
+    public void signIn(String scopes, final AppleSignInCallback callback) {
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (callback == null) {</span>
+<span class="fc" id="L172">            throw new IllegalArgumentException(&quot;callback must not be null&quot;);</span>
+        }
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        final String resolvedScopes = scopes != null ? scopes : defaultScopes;</span>
+<span class="fc" id="L175">        AppleSignInNative n = lookupNative();</span>
+<span class="pc bpc" id="L176" title="1 of 4 branches missed.">        if (n != null &amp;&amp; n.isSupported()) {</span>
+<span class="fc" id="L177">            signInNative(n, resolvedScopes, callback);</span>
+        } else {
+<span class="fc" id="L179">            signInWeb(resolvedScopes, callback);</span>
+        }
+<span class="fc" id="L181">    }</span>
+
+    private void signInNative(final AppleSignInNative n,
+                              final String scopes,
+                              final AppleSignInCallback callback) {
+<span class="fc" id="L186">        final byte[] rawNonce = SecureRandom.bytes(32);</span>
+<span class="fc" id="L187">        final String plainNonce = strip(Base64.encodeUrlSafe(rawNonce));</span>
+        // Apple expects the SHA-256 hash of the nonce as the `nonce` value
+        // sent on the request; the returned ID token then carries the *hashed*
+        // value in its `nonce` claim. We hash it here.
+        byte[] hashed;
+        try {
+<span class="fc" id="L193">            hashed = Hash.sha256(plainNonce.getBytes(&quot;UTF-8&quot;));</span>
+<span class="nc" id="L194">        } catch (java.io.UnsupportedEncodingException e) {</span>
+            // UTF-8 is guaranteed by the Java spec on every JVM; reach this
+            // branch only on a malformed runtime. Rethrow rather than fall
+            // back to the platform default encoding (SpotBugs DM_DEFAULT_ENCODING).
+<span class="nc" id="L198">            throw new IllegalStateException(&quot;UTF-8 is not available on this JVM&quot;, e);</span>
+<span class="fc" id="L199">        }</span>
+<span class="fc" id="L200">        final String hashedNonce = strip(Base64.encodeUrlSafe(hashed));</span>
+<span class="fc" id="L201">        new Thread(new Runnable() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="fc" id="L205">                    String packed = n.signIn(scopes, hashedNonce);</span>
+<span class="fc bfc" id="L206" title="All 4 branches covered.">                    if (packed == null || packed.length() == 0) {</span>
+<span class="fc" id="L207">                        callback.onCancel();</span>
+<span class="fc" id="L208">                        return;</span>
+                    }
+<span class="fc" id="L210">                    AppleSignInResult result = parsePackedResult(packed);</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">                    if (result.getIdentityToken() == null) {</span>
+<span class="fc" id="L212">                        callback.onError(&quot;Apple Sign-In returned no identity token&quot;);</span>
+<span class="fc" id="L213">                        return;</span>
+                    }
+<span class="fc" id="L215">                    persistProfile(result);</span>
+<span class="fc" id="L216">                    setAccessToken(buildAccessToken(result));</span>
+<span class="fc" id="L217">                    callback.onSuccess(result);</span>
+<span class="fc" id="L218">                } catch (Throwable t) {</span>
+<span class="fc" id="L219">                    callback.onError(t.getMessage());</span>
+<span class="fc" id="L220">                }</span>
+<span class="fc" id="L221">            }</span>
+<span class="fc" id="L222">        }, &quot;AppleSignIn-native&quot;).start();</span>
+<span class="fc" id="L223">    }</span>
+
+    private void signInWeb(final String scopes, final AppleSignInCallback callback) {
+<span class="pc bpc" id="L226" title="1 of 4 branches missed.">        if (serviceId == null || webRedirectUri == null) {</span>
+<span class="fc" id="L227">            callback.onError(&quot;AppleSignIn web fallback requires setServiceId() and setRedirectUri()&quot;);</span>
+<span class="fc" id="L228">            return;</span>
+        }
+        // Apple advertises `.well-known/openid-configuration` -- discover then auth.
+<span class="fc" id="L231">        OidcClient.discover(APPLE_ISSUER)</span>
+<span class="fc" id="L232">                .ready(new SuccessCallback&lt;OidcClient&gt;() {</span>
+                    @Override
+                    public void onSucess(OidcClient client) {
+                        // Apple does NOT issue refresh tokens to public clients; require
+                        // form_post + `response_mode` for compatibility.
+<span class="nc" id="L237">                        client.setClientId(serviceId)</span>
+<span class="nc" id="L238">                                .setRedirectUri(webRedirectUri)</span>
+<span class="nc" id="L239">                                .setScopes(splitScopes(scopes))</span>
+<span class="nc" id="L240">                                .setResponseMode(&quot;form_post&quot;);</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">                        if (webClientSecret != null) {</span>
+<span class="nc" id="L242">                            client.setClientSecret(webClientSecret);</span>
+                        }
+<span class="nc" id="L244">                        client.authorize()</span>
+<span class="nc" id="L245">                                .ready(new SuccessCallback&lt;OidcTokens&gt;() {</span>
+                                    @Override
+                                    public void onSucess(OidcTokens t) {
+<span class="nc" id="L248">                                        AppleSignInResult r = fromOidcTokens(t);</span>
+<span class="nc" id="L249">                                        persistProfile(r);</span>
+<span class="nc" id="L250">                                        setAccessToken(t.toAccessToken());</span>
+<span class="nc" id="L251">                                        callback.onSuccess(r);</span>
+<span class="nc" id="L252">                                    }</span>
+                                })
+<span class="nc" id="L254">                                .except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                                    @Override
+                                    public void onSucess(Throwable err) {
+<span class="nc bnc" id="L257" title="All 2 branches missed.">                                        if (err instanceof OidcException &amp;&amp;</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">                                                OidcException.USER_CANCELLED.equals(</span>
+<span class="nc" id="L259">                                                        ((OidcException) err).getError())) {</span>
+<span class="nc" id="L260">                                            callback.onCancel();</span>
+                                        } else {
+<span class="nc" id="L262">                                            callback.onError(err.getMessage());</span>
+                                        }
+<span class="nc" id="L264">                                    }</span>
+                                });
+<span class="nc" id="L266">                    }</span>
+                })
+<span class="fc" id="L268">                .except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                    @Override
+                    public void onSucess(Throwable err) {
+<span class="fc" id="L271">                        callback.onError(&quot;Apple OIDC discovery failed: &quot; + err.getMessage());</span>
+<span class="fc" id="L272">                    }</span>
+                });
+<span class="fc" id="L274">    }</span>
+
+    private void persistProfile(AppleSignInResult result) {
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (result.getUserId() != null) {</span>
+<span class="fc" id="L278">            Preferences.set(PREF_USER, result.getUserId());</span>
+        }
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        if (result.getEmail() != null) {</span>
+<span class="fc" id="L281">            Preferences.set(PREF_EMAIL, result.getEmail());</span>
+        }
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        if (result.getFullName() != null) {</span>
+<span class="fc" id="L284">            Preferences.set(PREF_NAME, result.getFullName());</span>
+        }
+<span class="fc" id="L286">        Preferences.set(PREF_LOGGED_IN, true);</span>
+<span class="fc" id="L287">    }</span>
+
+    private AccessToken buildAccessToken(AppleSignInResult result) {
+<span class="fc" id="L290">        return new AccessToken(</span>
+<span class="fc" id="L291">                result.getAuthorizationCode(),</span>
+                null,
+                null,
+<span class="fc" id="L294">                result.getIdentityToken());</span>
+    }
+
+    private static String[] splitScopes(String scopes) {
+<span class="nc bnc" id="L298" title="All 2 branches missed.">        if (scopes == null) {</span>
+<span class="nc" id="L299">            return new String[0];</span>
+        }
+<span class="nc" id="L301">        String trimmed = scopes.trim();</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">        if (trimmed.length() == 0) {</span>
+<span class="nc" id="L303">            return new String[0];</span>
+        }
+<span class="nc" id="L305">        return com.codename1.util.StringUtil.tokenize(trimmed, ' ').toArray(new String[0]);</span>
+    }
+
+    private static AppleSignInResult parsePackedResult(String packed) {
+<span class="fc" id="L309">        String[] parts = explode(packed, '|', 6);</span>
+<span class="fc" id="L310">        AppleSignInResult r = new AppleSignInResult();</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        r.identityToken = empty(parts[0]) ? null : parts[0];</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">        r.authorizationCode = empty(parts[1]) ? null : parts[1];</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">        r.userId = empty(parts[2]) ? null : parts[2];</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        String given = empty(parts[3]) ? null : parts[3];</span>
+<span class="fc bfc" id="L315" title="All 2 branches covered.">        String family = empty(parts[4]) ? null : parts[4];</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        r.email = empty(parts[5]) ? null : parts[5];</span>
+<span class="pc bpc" id="L317" title="1 of 4 branches missed.">        if (given != null || family != null) {</span>
+<span class="pc bpc" id="L318" title="2 of 8 branches missed.">            r.fullName = (given == null ? &quot;&quot; : given) +</span>
+                    (given != null &amp;&amp; family != null ? &quot; &quot; : &quot;&quot;) +
+                    (family == null ? &quot;&quot; : family);
+        }
+        // Backfill from preferences when Apple omits the profile on
+        // subsequent logins.
+<span class="fc bfc" id="L324" title="All 2 branches covered.">        if (r.email == null) {</span>
+<span class="fc" id="L325">            r.email = Preferences.get(PREF_EMAIL, (String) null);</span>
+        }
+<span class="fc bfc" id="L327" title="All 2 branches covered.">        if (r.fullName == null) {</span>
+<span class="fc" id="L328">            r.fullName = Preferences.get(PREF_NAME, (String) null);</span>
+        }
+<span class="fc" id="L330">        return r;</span>
+    }
+
+    private static AppleSignInResult fromOidcTokens(OidcTokens t) {
+<span class="nc" id="L334">        AppleSignInResult r = new AppleSignInResult();</span>
+<span class="nc" id="L335">        r.identityToken = t.getIdToken();</span>
+<span class="nc" id="L336">        r.authorizationCode = (String) t.getRawResponse().get(&quot;code&quot;);</span>
+<span class="nc" id="L337">        r.userId = t.getSubject();</span>
+<span class="nc" id="L338">        r.email = t.getEmail();</span>
+<span class="nc" id="L339">        Map&lt;String, Object&gt; claims = t.getIdTokenClaims();</span>
+<span class="nc bnc" id="L340" title="All 2 branches missed.">        Object name = claims != null ? claims.get(&quot;name&quot;) : null;</span>
+<span class="nc bnc" id="L341" title="All 2 branches missed.">        if (name != null) {</span>
+<span class="nc" id="L342">            r.fullName = name.toString();</span>
+        }
+<span class="nc" id="L344">        return r;</span>
+    }
+
+    private static String[] explode(String s, char sep, int expected) {
+<span class="fc" id="L348">        String[] out = new String[expected];</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        for (int i = 0; i &lt; expected; i++) {</span>
+<span class="fc" id="L350">            out[i] = &quot;&quot;;</span>
+        }
+<span class="fc" id="L352">        int idx = 0;</span>
+<span class="fc" id="L353">        int start = 0;</span>
+<span class="fc" id="L354">        int len = s.length();</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">            if (s.charAt(i) == sep) {</span>
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">                if (idx &lt; expected) {</span>
+<span class="fc" id="L358">                    out[idx++] = s.substring(start, i);</span>
+                }
+<span class="fc" id="L360">                start = i + 1;</span>
+            }
+        }
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">        if (idx &lt; expected) {</span>
+<span class="fc" id="L364">            out[idx] = s.substring(start);</span>
+        }
+<span class="fc" id="L366">        return out;</span>
+    }
+
+    private static boolean empty(String s) {
+<span class="pc bpc" id="L370" title="1 of 4 branches missed.">        return s == null || s.length() == 0;</span>
+    }
+
+    private static String strip(String s) {
+<span class="fc" id="L374">        StringBuilder b = new StringBuilder(s.length());</span>
+<span class="fc" id="L375">        int len = s.length();</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L377">            char c = s.charAt(i);</span>
+<span class="pc bpc" id="L378" title="3 of 6 branches missed.">            if (c == '=' || c == '\n' || c == '\r') {</span>
+<span class="nc" id="L379">                continue;</span>
+            }
+<span class="fc" id="L381">            b.append(c);</span>
+        }
+<span class="fc" id="L383">        return b.toString();</span>
+    }
+
+    private static AppleSignInNative provider;
+
+    /// Registers the native [AppleSignInNative] implementation. Called at
+    /// app startup by the port (`AppleSignInNativeImpl.init()`); cn1lib
+    /// authors can also call this to plug in their own implementation, e.g.
+    /// wrapping the `AuthenticationServices` framework differently. Pass
+    /// `null` to fall back to the [com.codename1.io.oidc.OidcClient] web
+    /// flow.
+    ///
+    /// We use an explicit setter rather than `Class.forName` because
+    /// Codename One obfuscates class names; the port instantiates the impl
+    /// itself and passes the instance here.
+    public static void setProvider(AppleSignInNative p) {
+<span class="fc" id="L399">        synchronized (AppleSignIn.class) {</span>
+<span class="fc" id="L400">            provider = p;</span>
+<span class="fc" id="L401">        }</span>
+<span class="fc" id="L402">    }</span>
+
+    private static AppleSignInNative lookupNative() {
+<span class="fc" id="L405">        synchronized (AppleSignIn.class) {</span>
+<span class="fc" id="L406">            return provider;</span>
+        }
+    }
+
+    /// Bridges [AppleSignInCallback] into the legacy [LoginCallback] used by
+    /// [Login#doLogin()].
+<span class="nc" id="L412">    private final class LoginCallbackAdapter implements AppleSignInCallback {</span>
+        @Override
+        public void onSuccess(AppleSignInResult result) {
+            // `callback` from Login is package-private; trigger success via setAccessToken side-effect.
+<span class="nc bnc" id="L416" title="All 2 branches missed.">            if (callback != null) {</span>
+<span class="nc" id="L417">                callback.loginSuccessful();</span>
+            }
+<span class="nc" id="L419">        }</span>
+
+        @Override
+        public void onError(String error) {
+<span class="nc bnc" id="L423" title="All 2 branches missed.">            if (callback != null) {</span>
+<span class="nc" id="L424">                callback.loginFailed(error);</span>
+            }
+<span class="nc" id="L426">        }</span>
+
+        @Override
+        public void onCancel() {
+<span class="nc bnc" id="L430" title="All 2 branches missed.">            if (callback != null) {</span>
+<span class="nc" id="L431">                callback.loginFailed(&quot;cancelled&quot;);</span>
+            }
+<span class="nc" id="L433">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

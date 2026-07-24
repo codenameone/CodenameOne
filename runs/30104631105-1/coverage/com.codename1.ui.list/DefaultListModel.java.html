@@ -1,0 +1,419 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultListModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.list</a> &gt; <span class="el_source">DefaultListModel.java</span></div><h1>DefaultListModel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.list;
+
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.events.SelectionListener;
+import com.codename1.ui.util.EventDispatcher;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.Vector;
+
+/// Default implementation of the list model based on a `List` of elements.
+/// The list model is an observable set of objects that `com.codename1.ui.List` uses to pull
+/// the data to display.
+///
+/// ```java
+/// public void showForm() {
+///   Form hi = new Form(&quot;MultiList&quot;, new BorderLayout());
+///
+///   int mm = Display.getInstance().convertToPixels(3);
+///   EncodedImage placeholder = EncodedImage.createFromImage(Image.createImage(mm * 3, mm * 4, 0), false);
+///   Image icon1 = URLImage.createToStorage(placeholder, &quot;icon1&quot;, &quot;http://www.georgerrmartin.com/wp-content/uploads/2013/03/GOTMTI2.jpg&quot;);
+///   Image icon2 = URLImage.createToStorage(placeholder, &quot;icon2&quot;, &quot;http://www.georgerrmartin.com/wp-content/uploads/2012/08/clashofkings.jpg&quot;);
+///   Image icon3 = URLImage.createToStorage(placeholder, &quot;icon3&quot;, &quot;http://www.georgerrmartin.com/wp-content/uploads/2013/03/stormswordsMTI.jpg&quot;);
+///   Image icon4 = URLImage.createToStorage(placeholder, &quot;icon4&quot;, &quot;http://www.georgerrmartin.com/wp-content/uploads/2012/08/feastforcrows.jpg&quot;);
+///   Image icon5 = URLImage.createToStorage(placeholder, &quot;icon5&quot;, &quot;http://georgerrmartin.com/gallery/art/dragons05.jpg&quot;);
+///
+///   ArrayList&gt; data = new ArrayList&lt;&gt;();
+///   data.add(createListEntry(&quot;A Game of Thrones&quot;, &quot;1996&quot;, icon1));
+///   data.add(createListEntry(&quot;A Clash Of Kings&quot;, &quot;1998&quot;, icon2));
+///   data.add(createListEntry(&quot;A Storm Of Swords&quot;, &quot;2000&quot;, icon3));
+///   data.add(createListEntry(&quot;A Feast For Crows&quot;, &quot;2005&quot;, icon4));
+///   data.add(createListEntry(&quot;A Dance With Dragons&quot;, &quot;2011&quot;, icon5));
+///   data.add(createListEntry(&quot;The Winds of Winter&quot;, &quot;2016 (please, please, please)&quot;, placeholder));
+///   data.add(createListEntry(&quot;A Dream of Spring&quot;, &quot;Ugh&quot;, placeholder));
+///
+///   DefaultListModel&gt; model = new DefaultListModel&lt;&gt;(data);
+///   MultiList ml = new MultiList(model);
+///   hi.add(BorderLayout.CENTER, ml);
+///   hi.show();
+/// }
+///
+/// private Map createListEntry(String name, String date, Image icon) {
+///   Map entry = new HashMap&lt;&gt;();
+///   entry.put(&quot;Line1&quot;, name);
+///   entry.put(&quot;Line2&quot;, date);
+///   entry.put(&quot;icon&quot;, icon);
+///   return entry;
+/// }
+/// ```
+///
+/// @author Chen Fishbein
+public class DefaultListModel&lt;T&gt; implements MultipleSelectionListModel&lt;T&gt; {
+
+
+    private final java.util.List items;
+<span class="fc" id="L82">    private final EventDispatcher dataListener = new EventDispatcher();</span>
+<span class="fc" id="L83">    private final EventDispatcher selectionListener = new EventDispatcher();</span>
+    private boolean multiSelectionMode;
+<span class="fc" id="L85">    private int selectedIndex = 0;</span>
+    private Set&lt;Integer&gt; selectedIndices;
+<span class="fc" id="L87">    private boolean firstSetSelectedIndex = true;</span>
+
+    /// Creates a new instance of DefaultListModel
+<span class="fc" id="L90">    public DefaultListModel() {</span>
+<span class="fc" id="L91">        this.items = new ArrayList();</span>
+<span class="fc" id="L92">    }</span>
+
+    /// Creates a new instance of DefaultListModel
+    ///
+    /// #### Parameters
+    ///
+    /// - `items`: the items in the model
+<span class="fc" id="L99">    public DefaultListModel(Vector&lt;T&gt; items) {</span>
+<span class="fc" id="L100">        this.items = new ArrayList(items);</span>
+<span class="fc" id="L101">    }</span>
+
+    /// Creates a new instance of DefaultListModel
+    ///
+    /// #### Parameters
+    ///
+    /// - `items`: the items in the model
+<span class="fc" id="L108">    public DefaultListModel(Collection&lt;T&gt; items) {</span>
+<span class="fc" id="L109">        this.items = new ArrayList(items);</span>
+<span class="fc" id="L110">    }</span>
+
+    /// Creates a new instance of DefaultListModel
+    ///
+    /// #### Parameters
+    ///
+    /// - `items`: the items in the model
+<span class="fc" id="L117">    public DefaultListModel(T... items) {</span>
+<span class="fc" id="L118">        this.items = createList(items);</span>
+<span class="fc" id="L119">    }</span>
+
+    private static java.util.List createList(Object[] items) {
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (items == null) {</span>
+<span class="nc" id="L123">            items = new Object[]{};</span>
+        }
+<span class="fc" id="L125">        java.util.List vec = new ArrayList(items.length);</span>
+<span class="fc" id="L126">        int ilen = items.length;</span>
+<span class="fc" id="L127">        vec.addAll(Arrays.asList(items).subList(0, ilen));</span>
+<span class="fc" id="L128">        return vec;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public T getItemAt(int index) {
+<span class="pc bpc" id="L134" title="1 of 4 branches missed.">        if (index &lt; getSize() &amp;&amp; index &gt;= 0) {</span>
+<span class="fc" id="L135">            return (T) items.get(index);</span>
+        }
+<span class="fc" id="L137">        return null;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public int getSize() {
+<span class="fc" id="L143">        return items.size();</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public int getSelectedIndex() {
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (isMultiSelectionMode()) {</span>
+<span class="fc" id="L150">            int[] selected = getSelectedIndices();</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            if (selected.length == 0) {</span>
+<span class="fc" id="L152">                return -1;</span>
+            } else {
+<span class="nc" id="L154">                return selected[0];</span>
+            }
+        }
+<span class="fc" id="L157">        return selectedIndex;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void setSelectedIndex(int index) {
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (isMultiSelectionMode()) {</span>
+<span class="fc" id="L164">            setSelectedIndices(index);</span>
+        } else {
+<span class="fc bfc" id="L166" title="All 4 branches covered.">            if (index != selectedIndex || firstSetSelectedIndex) {</span>
+<span class="fc" id="L167">                firstSetSelectedIndex = false;</span>
+<span class="fc" id="L168">                int oldIndex = selectedIndex;</span>
+<span class="fc" id="L169">                this.selectedIndex = index;</span>
+<span class="fc" id="L170">                selectionListener.fireSelectionEvent(oldIndex, selectedIndex);</span>
+            }
+        }
+<span class="fc" id="L173">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void addItem(T item) {
+<span class="fc" id="L178">        items.add(item);</span>
+<span class="fc" id="L179">        fireDataChangedEvent(DataChangedListener.ADDED, items.size() - 1);</span>
+<span class="fc" id="L180">    }</span>
+
+    /// Change the item at the given index
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the offset for the item
+    ///
+    /// - `item`: the value to set
+    public void setItem(int index, T item) {
+<span class="fc" id="L190">        items.set(index, item);</span>
+<span class="fc" id="L191">        fireDataChangedEvent(DataChangedListener.CHANGED, index);</span>
+<span class="fc" id="L192">    }</span>
+
+    /// Adding an item to list at given index
+    ///
+    /// #### Parameters
+    ///
+    /// - `item`: - the item to add
+    ///
+    /// - `index`: - the index position in the list
+    public void addItemAtIndex(T item, int index) {
+<span class="nc bnc" id="L202" title="All 2 branches missed.">        if (index &lt;= items.size()) {</span>
+<span class="nc" id="L203">            items.add(index, item);</span>
+<span class="nc" id="L204">            fireDataChangedEvent(DataChangedListener.ADDED, index);</span>
+        }
+<span class="nc" id="L206">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void removeItem(int index) {
+<span class="pc bpc" id="L211" title="2 of 4 branches missed.">        if (index &lt; getSize() &amp;&amp; index &gt;= 0) {</span>
+<span class="fc" id="L212">            items.remove(index);</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">            if (index != 0) {</span>
+<span class="fc" id="L214">                setSelectedIndex(index - 1);</span>
+            }
+<span class="fc" id="L216">            fireDataChangedEvent(DataChangedListener.REMOVED, index);</span>
+        }
+<span class="fc" id="L218">    }</span>
+
+    /// Removes all elements from the model
+    public void removeAll() {
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        while (getSize() &gt; 0) {</span>
+<span class="fc" id="L223">            removeItem(0);</span>
+        }
+<span class="fc" id="L225">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void addDataChangedListener(DataChangedListener l) {
+<span class="fc" id="L230">        dataListener.addListener(l);</span>
+<span class="fc" id="L231">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void removeDataChangedListener(DataChangedListener l) {
+<span class="fc" id="L236">        dataListener.removeListener(l);</span>
+<span class="fc" id="L237">    }</span>
+
+    /// Broadcast a change event to all listeners
+    ///
+    /// #### Parameters
+    ///
+    /// - `status`: the status of the event
+    ///
+    /// - `index`: the index changed
+    protected void fireDataChangedEvent(final int status, final int index) {
+<span class="fc" id="L247">        dataListener.fireDataChangeEvent(index, status);</span>
+<span class="fc" id="L248">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void addSelectionListener(SelectionListener l) {
+<span class="fc" id="L253">        selectionListener.addListener(l);</span>
+<span class="fc" id="L254">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void removeSelectionListener(SelectionListener l) {
+<span class="fc" id="L259">        selectionListener.removeListener(l);</span>
+<span class="fc" id="L260">    }</span>
+
+    /// Returns the internal list of items which makes traversal using iterators easier.
+    ///
+    /// #### Returns
+    ///
+    /// the list, notice that you shouldn't modify it
+    public java.util.List&lt;T&gt; getList() {
+<span class="nc" id="L268">        return items;</span>
+    }
+
+    // Multi-selection Mode methods.
+
+    private java.util.List&lt;Integer&gt; toList(int[] ints) {
+<span class="fc" id="L274">        int len = ints.length;</span>
+<span class="fc" id="L275">        ArrayList&lt;Integer&gt; out = new ArrayList&lt;Integer&gt;(len);</span>
+
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L278">            out.add(ints[i]);</span>
+        }
+<span class="fc" id="L280">        return out;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void addSelectedIndices(int... indices) {
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">        if (isMultiSelectionMode()) {</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">            if (selectedIndices == null) {</span>
+<span class="fc" id="L288">                selectedIndices = new HashSet&lt;Integer&gt;();</span>
+            }
+<span class="fc bfc" id="L290" title="All 2 branches covered.">            for (int index : indices) {</span>
+<span class="fc bfc" id="L291" title="All 2 branches covered.">                if (!selectedIndices.contains(index)) {</span>
+<span class="fc" id="L292">                    selectedIndices.add(index);</span>
+<span class="fc" id="L293">                    selectionListener.fireSelectionEvent(-1, index);</span>
+                }
+            }
+        } else {
+<span class="nc" id="L297">            throw new IllegalArgumentException(&quot;addSelectedIndices only supported if isMultiSelectionMode() is on&quot;);</span>
+        }
+<span class="fc" id="L299">    }</span>
+
+    /// {@inheritDoc}
+    ///
+    @Override
+    public void removeSelectedIndices(int... indices) {
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">        if (isMultiSelectionMode()) {</span>
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">            if (selectedIndices == null) {</span>
+<span class="nc" id="L307">                return;</span>
+            }
+<span class="fc bfc" id="L309" title="All 2 branches covered.">            for (int index : indices) {</span>
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">                if (selectedIndices.contains(index)) {</span>
+<span class="fc" id="L311">                    selectedIndices.remove(index);</span>
+<span class="fc" id="L312">                    selectionListener.fireSelectionEvent(index, -1);</span>
+                }
+            }
+        } else {
+<span class="nc" id="L316">            throw new IllegalArgumentException(&quot;removeSelectedIndices only supported if isMultiSelectionMode() is on&quot;);</span>
+        }
+<span class="fc" id="L318">    }</span>
+
+    /// {@inheritDoc}
+    ///
+    @Override
+    public int[] getSelectedIndices() {
+
+<span class="fc bfc" id="L325" title="All 2 branches covered.">        if (isMultiSelectionMode()) {</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">            if (selectedIndices == null) {</span>
+<span class="fc" id="L327">                return new int[0];</span>
+            }
+<span class="fc" id="L329">            int[] out = new int[selectedIndices.size()];</span>
+<span class="fc" id="L330">            int index = 0;</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">            for (Integer i : selectedIndices) {</span>
+<span class="fc" id="L332">                out[index++] = i;</span>
+<span class="fc" id="L333">            }</span>
+<span class="fc" id="L334">            Arrays.sort(out);</span>
+<span class="fc" id="L335">            return out;</span>
+        } else {
+<span class="fc" id="L337">            int selectedIndex = getSelectedIndex();</span>
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">            if (selectedIndex &gt;= 0) {</span>
+<span class="fc" id="L339">                return new int[]{selectedIndex};</span>
+            } else {
+<span class="nc" id="L341">                return new int[0];</span>
+            }
+        }
+    }
+
+    /// For use with multi-selection mode.  Sets the selected indices in this model.
+    ///
+    /// Note:  This may fire multiple selectionChange events.  For each &quot;deselected&quot; index,
+    /// it will fire an event with the (oldIndex, newIndex) being (index, -1) (i.e. selected index
+    /// changes from the index to -1.  And for each newly selected index, it will fire
+    /// the event with (oldIndex, newIndex) being (-1, index).
+    ///
+    /// #### Parameters
+    ///
+    /// - `indices`: The indices to select.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: If `#isMultiSelectionMode()` is false, and indices length is greater than 1.
+    ///
+    /// #### See also
+    ///
+    /// - #setMultiSelectionMode(boolean)
+    ///
+    /// - #isMultiSelectionMode()
+    @Override
+    public void setSelectedIndices(int... indices) {
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">        if (isMultiSelectionMode()) {</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">            if (selectedIndices == null) {</span>
+<span class="fc" id="L370">                selectedIndices = new HashSet&lt;Integer&gt;();</span>
+            }
+<span class="fc" id="L372">            Set newSelections = new HashSet(toList(indices));</span>
+<span class="pc bpc" id="L373" title="3 of 4 branches missed.">            if (selectedIndices.size() != indices.length || !selectedIndices.containsAll(newSelections)) {</span>
+<span class="fc" id="L374">                HashSet toRemove = new HashSet(selectedIndices);</span>
+<span class="fc" id="L375">                toRemove.removeAll(newSelections);</span>
+<span class="fc" id="L376">                HashSet toAdd = new HashSet(newSelections);</span>
+<span class="fc" id="L377">                toAdd.removeAll(selectedIndices);</span>
+<span class="fc" id="L378">                selectedIndices.clear();</span>
+<span class="fc" id="L379">                selectedIndices.addAll(newSelections);</span>
+
+<span class="pc bpc" id="L381" title="1 of 2 branches missed.">                for (Integer i : (Set&lt;Integer&gt;) toRemove) {</span>
+<span class="nc" id="L382">                    selectionListener.fireSelectionEvent(i, -1);</span>
+<span class="nc" id="L383">                }</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">                for (Integer i : (Set&lt;Integer&gt;) toAdd) {</span>
+<span class="fc" id="L385">                    selectionListener.fireSelectionEvent(-1, i);</span>
+<span class="fc" id="L386">                }</span>
+            }
+<span class="fc" id="L388">        } else {</span>
+<span class="nc bnc" id="L389" title="All 2 branches missed.">            if (indices.length == 1) {</span>
+<span class="nc" id="L390">                setSelectedIndex(indices[0]);</span>
+<span class="nc bnc" id="L391" title="All 2 branches missed.">            } else if (indices.length == 0) {</span>
+<span class="nc" id="L392">                setSelectedIndex(-1);</span>
+            } else {
+<span class="nc" id="L394">                throw new IllegalArgumentException(&quot;setSelectedIndices can only include 0 or 1 index in multiselection mode, but received &quot; + indices.length);</span>
+            }
+        }
+<span class="fc" id="L397">    }</span>
+
+    /// Checks to see if this list model is in multi-selection mode.
+    ///
+    /// #### Returns
+    ///
+    /// the multiSelectionMode
+    ///
+    public boolean isMultiSelectionMode() {
+<span class="fc" id="L406">        return multiSelectionMode;</span>
+    }
+
+    /// Enables or disables multi-selection mode.
+    ///
+    /// #### Parameters
+    ///
+    /// - `multiSelectionMode`: the multiSelectionMode to set
+    ///
+    public void setMultiSelectionMode(boolean multiSelectionMode) {
+<span class="fc" id="L416">        this.multiSelectionMode = multiSelectionMode;</span>
+<span class="fc" id="L417">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

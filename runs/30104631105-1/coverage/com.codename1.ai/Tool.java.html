@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Tool.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai</a> &gt; <span class="el_source">Tool.java</span></div><h1>Tool.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai;
+
+/// A function the model can call. `parametersJsonSchema` is a raw
+/// JSON-Schema string; each provider wraps it differently on the wire
+/// (OpenAI `{type:&quot;function&quot;,function:{...}}`, Anthropic
+/// `{name,description,input_schema}`, Gemini `functionDeclarations`),
+/// but the inner schema shape is the same across all of them, so we
+/// hand it through as a string and let the provider client wrap.
+///
+/// #### Linking a tool to its executor
+///
+/// Pass an optional [ToolHandler] at construction time and the
+/// matching [ToolCall] can dispatch through it without the caller
+/// having to match names by hand:
+///
+/// ```
+/// Tool weather = new Tool(
+///     &quot;get_weather&quot;,
+///     &quot;Returns the current weather for a location&quot;,
+///     &quot;{\&quot;type\&quot;:\&quot;object\&quot;,\&quot;properties\&quot;:{&quot; +
+///        &quot;\&quot;location\&quot;:{\&quot;type\&quot;:\&quot;string\&quot;}},&quot; +
+///        &quot;\&quot;required\&quot;:[\&quot;location\&quot;]}&quot;,
+///     argumentsJson -&gt; {
+///         Map args = JSONParser.parseJSON(argumentsJson);
+///         return &quot;{\&quot;temp\&quot;:21,\&quot;city\&quot;:\&quot;&quot;
+///                 + JSONParser.getString(args, &quot;location&quot;) + &quot;\&quot;}&quot;;
+///     });
+///
+/// // Later, when the model returns a ToolCall:
+/// for (ToolCall call : response.getToolCalls()) {
+///     String resultJson = call.execute(Arrays.asList(weather));
+///     conversation.add(ChatMessage.toolResult(call.getId(), resultJson));
+/// }
+/// ```
+///
+/// The handler is optional -- a `Tool` constructed without one is a
+/// pure description for the model, and the caller can dispatch
+/// however they like via the raw [ToolCall#getName] /
+/// [ToolCall#getArgumentsJson] accessors.
+public final class Tool {
+    private final String name;
+    private final String description;
+    private final String parametersJsonSchema;
+    private final ToolHandler handler;
+
+    public Tool(String name, String description, String parametersJsonSchema) {
+<span class="fc" id="L69">        this(name, description, parametersJsonSchema, null);</span>
+<span class="fc" id="L70">    }</span>
+
+    public Tool(String name, String description, String parametersJsonSchema,
+<span class="fc" id="L73">                ToolHandler handler) {</span>
+<span class="fc bfc" id="L74" title="All 4 branches covered.">        if (name == null || name.length() == 0) {</span>
+<span class="fc" id="L75">            throw new IllegalArgumentException(&quot;name is required&quot;);</span>
+        }
+<span class="fc" id="L77">        this.name = name;</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        this.description = description == null ? &quot;&quot; : description;</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        this.parametersJsonSchema = parametersJsonSchema == null</span>
+                ? &quot;{\&quot;type\&quot;:\&quot;object\&quot;,\&quot;properties\&quot;:{}}&quot;
+                : parametersJsonSchema;
+<span class="fc" id="L82">        this.handler = handler;</span>
+<span class="fc" id="L83">    }</span>
+
+    public String getName() {
+<span class="fc" id="L86">        return name;</span>
+    }
+
+    public String getDescription() {
+<span class="fc" id="L90">        return description;</span>
+    }
+
+    public String getParametersJsonSchema() {
+<span class="fc" id="L94">        return parametersJsonSchema;</span>
+    }
+
+    /// The optional executor wired up by the constructor. Returns
+    /// `null` for description-only tools.
+    public ToolHandler getHandler() {
+<span class="fc" id="L100">        return handler;</span>
+    }
+
+    /// Invokes the handler with the given arguments JSON. Throws
+    /// `IllegalStateException` when no handler was registered.
+    public String invoke(String argumentsJson) throws Exception {
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (handler == null) {</span>
+<span class="fc" id="L107">            throw new IllegalStateException(</span>
+                    &quot;No handler registered for tool '&quot; + name + &quot;'. &quot;
+                  + &quot;Either register a ToolHandler when constructing the Tool, &quot;
+                  + &quot;or call ToolCall.getArgumentsJson() and dispatch by hand.&quot;);
+        }
+<span class="fc" id="L112">        return handler.invoke(argumentsJson);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

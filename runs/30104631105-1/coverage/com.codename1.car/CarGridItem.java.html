@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CarGridItem.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.car</a> &gt; <span class="el_source">CarGridItem.java</span></div><h1>CarGridItem.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.car;
+
+import com.codename1.ui.Image;
+
+/// A single cell in a `CarGridTemplate`: a large image with a short title and optional secondary
+/// text. Maps to `androidx.car.app.model.GridItem` and to a `CPGridButton` on CarPlay. Grid items
+/// are image-forward (browse categories, presets, playlists) -- always supply an image.
+public class CarGridItem {
+    private String title;
+    private String text;
+    private Image image;
+    private CarActionListener listener;
+
+    /// Creates an empty grid item.
+<span class="nc" id="L37">    public CarGridItem() {</span>
+<span class="nc" id="L38">    }</span>
+
+    /// Creates a grid item with a title and image.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the item label
+    ///
+    /// - `image`: the item image
+<span class="nc" id="L47">    public CarGridItem(String title, Image image) {</span>
+<span class="nc" id="L48">        this.title = title;</span>
+<span class="nc" id="L49">        this.image = image;</span>
+<span class="nc" id="L50">    }</span>
+
+    /// Returns the item title.
+    public String getTitle() {
+<span class="nc" id="L54">        return title;</span>
+    }
+
+    /// Sets the item title.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the label
+    ///
+    /// #### Returns
+    ///
+    /// this item, for chaining
+    public CarGridItem setTitle(String title) {
+<span class="nc" id="L67">        this.title = title;</span>
+<span class="nc" id="L68">        return this;</span>
+    }
+
+    /// Returns the secondary text line, or null.
+    public String getText() {
+<span class="nc" id="L73">        return text;</span>
+    }
+
+    /// Sets the secondary text line.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the secondary line
+    ///
+    /// #### Returns
+    ///
+    /// this item, for chaining
+    public CarGridItem setText(String text) {
+<span class="nc" id="L86">        this.text = text;</span>
+<span class="nc" id="L87">        return this;</span>
+    }
+
+    /// Returns the item image, or null.
+    public Image getImage() {
+<span class="nc" id="L92">        return image;</span>
+    }
+
+    /// Sets the item image.
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: the image
+    ///
+    /// #### Returns
+    ///
+    /// this item, for chaining
+    public CarGridItem setImage(Image image) {
+<span class="nc" id="L105">        this.image = image;</span>
+<span class="nc" id="L106">        return this;</span>
+    }
+
+    /// Returns the activation listener, or null.
+    public CarActionListener getOnAction() {
+<span class="nc" id="L111">        return listener;</span>
+    }
+
+    /// Sets the listener invoked (on the EDT) when the item is selected.
+    ///
+    /// #### Parameters
+    ///
+    /// - `listener`: the activation callback
+    ///
+    /// #### Returns
+    ///
+    /// this item, for chaining
+    public CarGridItem setOnAction(CarActionListener listener) {
+<span class="nc" id="L124">        this.listener = listener;</span>
+<span class="nc" id="L125">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,449 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GridLayout.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts</a> &gt; <span class="el_source">GridLayout.java</span></div><h1>GridLayout.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.layouts;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.Style;
+
+/// The components are arranged in a grid based on available space, all cells in the grid are given exactly
+/// the same size which matches the largest preferred size or available space. The main use case for this layout
+/// is a grid of icons e.g. like one would see in the iPhone home screen.
+///
+/// If the number of rows * columns is smaller than the number of components added a new row is implicitly added to the grid.
+/// However, if the number of components is smaller than available cells (won't fill the last row) blank spaces will
+/// be left in place.
+///
+/// In this example we can see that a 2x2 grid is used to add 5 elements, this results in an additional row that's implicitly
+/// added turning the grid to a 3x2 grid implicitly and leaving one blank cell.
+///
+/// ```java
+/// Form hi = new Form(&quot;Grid Layout 2x2&quot;, new GridLayout(2, 2));
+/// hi.add(new Label(&quot;First&quot;)).
+///     add(new Label(&quot;Second&quot;)).
+///     add(new Label(&quot;Third&quot;)).
+///     add(new Label(&quot;Fourth&quot;)).
+///     add(new Label(&quot;Fifth&quot;));
+/// ```
+///
+/// When we use a 2x4 size ratio we would see elements getting cropped as we do here. The grid layout uses the grid
+/// size first and doesn't pay too much attention to the preferred size of the components it holds.
+///
+/// Grid also has an autoFit attribute that can be used to automatically calculate the column count based on
+/// available space and preferred width. This is really useful for working with UI's where the device orientation
+/// might change.
+///
+/// There is also a terse syntax for working with a grid that has two versions, one that uses the &quot;auto fit&quot; option and
+/// another that accepts the column names. Heres a sample of the terse syntax coupled with the auto fit screenshots
+/// of the same code in two orientations:
+///
+/// ```java
+/// GridLayout.encloseIn(new Label(&quot;First&quot;),
+///     new Label(&quot;Second&quot;),
+///     new Label(&quot;Third&quot;),
+///     new Label(&quot;Fourth&quot;),
+///     new Label(&quot;Fifth&quot;));
+/// ```
+///
+/// @author Chen Fishbein
+public class GridLayout extends Layout {
+    private boolean fillLastRow;
+    private int portraitRows;
+    private int portraitColumns;
+
+<span class="fc" id="L77">    private int landscapeRows = -1;</span>
+<span class="fc" id="L78">    private int landscapeColumns = -1;</span>
+
+    /// When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This
+    /// makes animating a grid layout component MUCH easier.
+    private boolean hideZeroSized;
+
+    /// Auto fits columns/rows to available screen space
+    private boolean autoFit;
+
+    /// Creates a new instance of GridLayout with the given rows and columns
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: - number of rows.
+    ///
+    /// - `columns`: - number of columns.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if rows &lt; 1 or columns &lt; 1
+<span class="fc" id="L98">    public GridLayout(int rows, int columns) {</span>
+<span class="fc" id="L99">        this.portraitRows = rows;</span>
+<span class="fc" id="L100">        this.portraitColumns = columns;</span>
+<span class="fc bfc" id="L101" title="All 4 branches covered.">        if (rows &lt; 1 || columns &lt; 1) {</span>
+<span class="fc" id="L102">            throw new IllegalArgumentException(&quot;Rows and columns must be greater than zero&quot;);</span>
+        }
+<span class="fc" id="L104">    }</span>
+
+    /// Creates a new instance of GridLayout with the given rows and columns
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: - number of rows.
+    ///
+    /// - `columns`: - number of columns.
+    ///
+    /// - `landscapeRows`: - number of rows when in landscape mode
+    ///
+    /// - `landscapeColumns`: - number of columns when in landscape mode
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if rows &lt; 1 or columns &lt; 1
+<span class="fc" id="L121">    public GridLayout(int rows, int columns, int landscapeRows, int landscapeColumns) {</span>
+<span class="fc" id="L122">        this.portraitRows = rows;</span>
+<span class="fc" id="L123">        this.portraitColumns = columns;</span>
+<span class="fc" id="L124">        this.landscapeRows = landscapeRows;</span>
+<span class="fc" id="L125">        this.landscapeColumns = landscapeColumns;</span>
+<span class="pc bpc" id="L126" title="2 of 4 branches missed.">        if (rows &lt; 1 || columns &lt; 1) {</span>
+<span class="nc" id="L127">            throw new IllegalArgumentException(&quot;Rows and columns must be greater than zero&quot;);</span>
+        }
+<span class="fc" id="L129">    }</span>
+
+    /// Creates a new instance of GridLayout with the given columns, rows is set to 1 but will implicitly grow
+    /// if more components are added
+    ///
+    /// #### Parameters
+    ///
+    /// - `columns`: - number of columns.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if rows &lt; 1 or columns &lt; 1
+    public GridLayout(int columns) {
+<span class="fc" id="L142">        this(1, columns);</span>
+<span class="fc" id="L143">    }</span>
+
+    /// Returns a grid layout that implicitly auto-fits to width in term of number of columns
+    ///
+    /// #### Returns
+    ///
+    /// a grid layout that automatically adapts its size
+    public static GridLayout autoFit() {
+<span class="fc" id="L151">        GridLayout g = new GridLayout(1);</span>
+<span class="fc" id="L152">        g.setAutoFit(true);</span>
+<span class="fc" id="L153">        return g;</span>
+    }
+
+    /// Creates a new container with an auto fit grid layout and the components added to it
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the components
+    ///
+    /// #### Returns
+    ///
+    /// a new container
+    public static Container encloseIn(Component... cmp) {
+<span class="fc" id="L166">        return Container.encloseIn(autoFit(), cmp);</span>
+    }
+
+    /// Creates a new container with the grid layout and the components added to it
+    ///
+    /// #### Parameters
+    ///
+    /// - `columns`: the number of columns for the grid
+    ///
+    /// - `cmp`: the components
+    ///
+    /// #### Returns
+    ///
+    /// a new container
+    public static Container encloseIn(int columns, Component... cmp) {
+<span class="fc" id="L181">        return Container.encloseIn(new GridLayout(columns), cmp);</span>
+    }
+
+    private boolean isLandscapeMode() {
+<span class="pc bpc" id="L185" title="3 of 4 branches missed.">        return landscapeRows &gt; -1 &amp;&amp; (!Display.getInstance().isPortrait());</span>
+    }
+
+    private int autoSizeCols(Container parent, int width, boolean landscapeMode) {
+<span class="fc" id="L189">        int numOfcomponents = parent.getComponentCount();</span>
+<span class="fc" id="L190">        int totalComponentCount = numOfcomponents;</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (isAutoFit()) {</span>
+<span class="fc" id="L192">            int maxWidth = 0;</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">            for (int iter = 0; iter &lt; numOfcomponents; iter++) {</span>
+<span class="fc" id="L194">                Component cmp = parent.getComponentAt(iter);</span>
+<span class="pc bpc" id="L195" title="3 of 4 branches missed.">                if (hideZeroSized &amp;&amp; cmp.isHidden()) {</span>
+<span class="nc" id="L196">                    totalComponentCount--;</span>
+                } else {
+<span class="fc" id="L198">                    Style s = cmp.getStyle();</span>
+<span class="fc" id="L199">                    maxWidth = Math.max(cmp.getPreferredW() + s.getHorizontalMargins(), maxWidth);</span>
+                }
+            }
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">            if (width &lt; maxWidth) {</span>
+<span class="nc" id="L203">                width = Display.getInstance().getDisplayWidth();</span>
+            }
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">            if (landscapeMode) {</span>
+                // prevent arithmetic exception
+<span class="nc bnc" id="L207" title="All 2 branches missed.">                if (maxWidth &lt;= 0) {</span>
+<span class="nc" id="L208">                    landscapeColumns = 1;</span>
+                } else {
+<span class="nc" id="L210">                    landscapeColumns = Math.max(width / maxWidth, 1);</span>
+                }
+<span class="nc" id="L212">                landscapeRows = Math.max(1, totalComponentCount / landscapeColumns);</span>
+<span class="nc bnc" id="L213" title="All 4 branches missed.">                if (totalComponentCount % landscapeColumns &gt; 0 &amp;&amp; totalComponentCount &gt; landscapeColumns) {</span>
+<span class="nc" id="L214">                    landscapeRows++;</span>
+                }
+            } else {
+                // prevent arithmentic exception
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">                if (maxWidth &lt;= 0) {</span>
+<span class="nc" id="L219">                    portraitColumns = 1;</span>
+                } else {
+<span class="fc" id="L221">                    portraitColumns = Math.max(width / maxWidth, 1);</span>
+                }
+<span class="fc" id="L223">                portraitRows = Math.max(1, totalComponentCount / portraitColumns);</span>
+<span class="pc bpc" id="L224" title="2 of 4 branches missed.">                if (totalComponentCount % portraitColumns &gt; 0 &amp;&amp; totalComponentCount &gt; portraitColumns) {</span>
+<span class="nc" id="L225">                    portraitRows++;</span>
+                }
+            }
+        }
+<span class="fc" id="L229">        return totalComponentCount;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void layoutContainer(Container parent) {
+<span class="fc" id="L235">        Style s = parent.getStyle();</span>
+<span class="fc" id="L236">        int width = parent.getLayoutWidth() - parent.getSideGap() - s.getHorizontalPadding();</span>
+<span class="fc" id="L237">        int height = parent.getLayoutHeight() - parent.getBottomGap() - s.getVerticalPadding();</span>
+<span class="fc" id="L238">        int numOfcomponents = parent.getComponentCount();</span>
+
+<span class="fc" id="L240">        boolean landscapeMode = isLandscapeMode();</span>
+<span class="fc" id="L241">        autoSizeCols(parent, width, landscapeMode);</span>
+
+        int rows;
+        int columns;
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        if (landscapeMode) {</span>
+<span class="nc" id="L246">            rows = landscapeRows;</span>
+<span class="nc" id="L247">            columns = landscapeColumns;</span>
+        } else {
+<span class="fc" id="L249">            rows = portraitRows;</span>
+<span class="fc" id="L250">            columns = portraitColumns;</span>
+        }
+
+<span class="fc" id="L253">        int x = s.getPaddingLeft(parent.isRTL());</span>
+<span class="fc" id="L254">        int y = s.getPaddingTop();</span>
+
+<span class="fc" id="L256">        boolean rtl = parent.isRTL();</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">        if (rtl) {</span>
+<span class="nc" id="L258">            x += parent.getSideGap();</span>
+        }
+<span class="fc" id="L260">        int localColumns = columns;</span>
+<span class="fc" id="L261">        int cmpWidth = width / columns;</span>
+        int cmpHeight;
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        if (numOfcomponents &gt; rows * columns) {</span>
+            // actual rows number
+<span class="fc bfc" id="L265" title="All 2 branches covered.">            cmpHeight = height / (numOfcomponents / columns + (numOfcomponents % columns == 0 ? 0 : 1));</span>
+        } else {
+<span class="fc" id="L267">            cmpHeight = height / rows;</span>
+        }
+<span class="fc" id="L269">        int row = 0;</span>
+
+<span class="fc" id="L271">        int offset = 0;</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        for (int iter = 0; iter &lt; numOfcomponents; iter++) {</span>
+<span class="fc" id="L273">            Component cmp = parent.getComponentAt(iter);</span>
+<span class="fc" id="L274">            Style cmpStyle = cmp.getStyle();</span>
+<span class="fc" id="L275">            int marginLeft = cmpStyle.getMarginLeft(parent.isRTL());</span>
+<span class="fc" id="L276">            int marginTop = cmpStyle.getMarginTop();</span>
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">            if (hideZeroSized) {</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">                if (cmp.isHidden()) {</span>
+<span class="nc" id="L279">                    continue;</span>
+                }
+            }
+<span class="fc" id="L282">            cmp.setWidth(cmpWidth - marginLeft - cmpStyle.getMarginRight(parent.isRTL()));</span>
+<span class="fc" id="L283">            cmp.setHeight(cmpHeight - marginTop - cmpStyle.getMarginBottom());</span>
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">            if (rtl) {</span>
+<span class="nc" id="L285">                cmp.setX(x + (localColumns - 1 - (offset % localColumns)) * cmpWidth + marginLeft);</span>
+            } else {
+<span class="fc" id="L287">                cmp.setX(x + (offset % localColumns) * cmpWidth + marginLeft);</span>
+            }
+<span class="fc" id="L289">            cmp.setY(y + row * cmpHeight + marginTop);</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">            if ((offset + 1) % columns == 0) {</span>
+<span class="fc" id="L291">                row++;</span>
+
+                // check if we need to recalculate component widths
+<span class="pc bpc" id="L294" title="1 of 4 branches missed.">                if (fillLastRow &amp;&amp; row == rows - 1) {</span>
+<span class="fc" id="L295">                    localColumns = numOfcomponents % columns;</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">                    if (localColumns == 0) {</span>
+<span class="nc" id="L297">                        localColumns = columns;</span>
+                    }
+<span class="fc" id="L299">                    cmpWidth = width / localColumns;</span>
+                }
+            }
+<span class="fc" id="L302">            offset++;</span>
+        }
+<span class="fc" id="L304">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public Dimension getPreferredSize(Container parent) {
+<span class="fc" id="L309">        int width = 0;</span>
+<span class="fc" id="L310">        int height = 0;</span>
+
+<span class="fc" id="L312">        int numOfcomponents = parent.getComponentCount();</span>
+<span class="fc" id="L313">        int totalComponentCount = numOfcomponents;</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        for (int i = 0; i &lt; numOfcomponents; i++) {</span>
+<span class="fc" id="L315">            Component cmp = parent.getComponentAt(i);</span>
+<span class="fc bfc" id="L316" title="All 4 branches covered.">            if (hideZeroSized &amp;&amp; cmp.isHidden()) {</span>
+<span class="fc" id="L317">                totalComponentCount--;</span>
+            } else {
+<span class="fc" id="L319">                width = Math.max(width, cmp.getPreferredW() + cmp.getStyle().getMarginLeftNoRTL() + cmp.getStyle().getMarginRightNoRTL());</span>
+<span class="fc" id="L320">                height = Math.max(height, cmp.getPreferredH() + cmp.getStyle().getMarginTop() + cmp.getStyle().getMarginBottom());</span>
+            }
+        }
+
+<span class="fc" id="L324">        boolean landscapeMode = isLandscapeMode();</span>
+<span class="fc" id="L325">        autoSizeCols(parent, parent.getWidth(), landscapeMode);</span>
+        int rows;
+        int columns;
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">        if (landscapeMode) {</span>
+<span class="nc" id="L329">            rows = landscapeRows;</span>
+<span class="nc" id="L330">            columns = landscapeColumns;</span>
+        } else {
+<span class="fc" id="L332">            rows = portraitRows;</span>
+<span class="fc" id="L333">            columns = portraitColumns;</span>
+        }
+
+<span class="fc bfc" id="L336" title="All 2 branches covered.">        if (columns &gt; 1) {</span>
+<span class="fc" id="L337">            width = width * columns;</span>
+        }
+
+<span class="fc bfc" id="L340" title="All 2 branches covered.">        if (rows &gt; 1) {</span>
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">            if (totalComponentCount &gt; rows * columns) { //if there are more components than planned</span>
+<span class="nc bnc" id="L342" title="All 2 branches missed.">                height = height * (totalComponentCount / columns + (totalComponentCount % columns == 0 ? 0 : 1));</span>
+            } else {
+<span class="fc" id="L344">                height = height * rows;</span>
+            }
+        }
+
+<span class="fc" id="L348">        Style s = parent.getStyle();</span>
+<span class="fc" id="L349">        return new Dimension(width + s.getHorizontalPadding(),</span>
+<span class="fc" id="L350">                height + s.getVerticalPadding());</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String toString() {
+<span class="fc" id="L356">        return &quot;GridLayout&quot;;</span>
+    }
+
+    /// #### Returns
+    ///
+    /// the rows
+    public int getRows() {
+<span class="fc" id="L363">        return portraitRows;</span>
+    }
+
+    /// #### Returns
+    ///
+    /// the columns
+    public int getColumns() {
+<span class="fc" id="L370">        return portraitColumns;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L376" title="1 of 4 branches missed.">        return super.equals(o) &amp;&amp; ((GridLayout) o).getRows() == getRows() &amp;&amp;</span>
+<span class="pc bpc" id="L377" title="1 of 4 branches missed.">                ((GridLayout) o).getColumns() == getColumns() &amp;&amp; ((GridLayout) o).autoFit == autoFit;</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc bnc" id="L382" title="All 2 branches missed.">        return super.hashCode() ^ getRows() ^ getColumns() ^ (autoFit ? 1231 : 1237);</span>
+    }
+
+    /// When set to true makes the grid layout fill the last row of the layout
+    /// entirely if the number of elements in that row is bigger.
+    ///
+    /// #### Returns
+    ///
+    /// the fillLastRow
+    public boolean isFillLastRow() {
+<span class="fc" id="L392">        return fillLastRow;</span>
+    }
+
+    /// When set to true makes the grid layout fill the last row of the layout
+    /// entirely if the number of elements in that row is bigger.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fillLastRow`: the fillLastRow to set
+    public void setFillLastRow(boolean fillLastRow) {
+<span class="fc" id="L402">        this.fillLastRow = fillLastRow;</span>
+<span class="fc" id="L403">    }</span>
+
+    /// Auto fits columns/rows to available screen space
+    ///
+    /// #### Returns
+    ///
+    /// the autoFit
+    public boolean isAutoFit() {
+<span class="fc" id="L411">        return autoFit;</span>
+    }
+
+    /// Auto fits columns/rows to available screen space
+    ///
+    /// #### Parameters
+    ///
+    /// - `autoFit`: the autoFit to set
+    public void setAutoFit(boolean autoFit) {
+<span class="fc" id="L420">        this.autoFit = autoFit;</span>
+<span class="fc" id="L421">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public boolean obscuresPotential(Container parent) {
+<span class="pc bpc" id="L426" title="1 of 4 branches missed.">        return parent.getComponentCount() == portraitRows * portraitColumns || autoFit;</span>
+    }
+
+    /// When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This
+    /// makes animating a grid layout component MUCH easier.
+    ///
+    /// #### Returns
+    ///
+    /// the hideZeroSized
+    public boolean isHideZeroSized() {
+<span class="fc" id="L436">        return hideZeroSized;</span>
+    }
+
+    /// When set to true components that have 0 size will be hidden and won't occupy a cell within the grid. This
+    /// makes animating a grid layout component MUCH easier.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hideZeroSized`: the hideZeroSized to set
+    public void setHideZeroSized(boolean hideZeroSized) {
+<span class="fc" id="L446">        this.hideZeroSized = hideZeroSized;</span>
+<span class="fc" id="L447">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

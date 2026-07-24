@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BluetoothLE.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.bluetooth.le</a> &gt; <span class="el_source">BluetoothLE.java</span></div><h1>BluetoothLE.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.bluetooth.le;
+
+import com.codename1.bluetooth.BluetoothError;
+import com.codename1.bluetooth.BluetoothException;
+import com.codename1.bluetooth.BluetoothUuid;
+import com.codename1.bluetooth.le.server.AdvertiseData;
+import com.codename1.bluetooth.le.server.AdvertiseSettings;
+import com.codename1.bluetooth.le.server.BleAdvertisement;
+import com.codename1.bluetooth.le.server.GattServer;
+import com.codename1.bluetooth.le.server.GattServerListener;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+
+/// The BLE central role: scanning for peripherals and re-obtaining known
+/// ones. Obtain via `Bluetooth.getInstance().getLE()`; the instance is
+/// owned by the active port and never `null` -- on ports without BLE it
+/// reports every operation as unsupported.
+///
+/// Any number of scans may run concurrently. This base class multiplexes
+/// them over a single platform scan: each [BleScan] handle only receives
+/// advertisements matching its own [ScanSettings] filters, and the
+/// platform scan stops when the last handle stops.
+public class BluetoothLE {
+
+<span class="fc" id="L51">    private final Object scanLock = new Object();</span>
+<span class="fc" id="L52">    private final ArrayList&lt;ScanRegistration&gt; activeScans =</span>
+            new ArrayList&lt;ScanRegistration&gt;();
+
+    private static final class ScanRegistration {
+        BleScan handle;
+        ScanSettings settings;
+        ScanListener listener;
+        HashSet&lt;String&gt; seen;
+    }
+
+    /// Ports construct subclasses. Application code obtains the active
+    /// instance via `Bluetooth.getInstance().getLE()`.
+<span class="fc" id="L64">    protected BluetoothLE() {</span>
+<span class="fc" id="L65">    }</span>
+
+    /// Starts scanning; the listener fires on the EDT for every
+    /// advertisement passing the settings' filters. Returns a live
+    /// [BleScan] handle -- keep a reference and call [BleScan#stop()]
+    /// when done. On ports without BLE the returned handle is already
+    /// failed with [BluetoothError#NOT_SUPPORTED].
+    public final BleScan startScan(ScanSettings settings, ScanListener listener) {
+<span class="fc" id="L73">        final ScanRegistration reg = new ScanRegistration();</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        reg.settings = settings == null ? new ScanSettings() : settings;</span>
+<span class="fc" id="L75">        reg.listener = listener;</span>
+<span class="fc" id="L76">        reg.handle = new BleScan() {</span>
+            @Override
+            protected void onStop() {
+<span class="fc" id="L79">                unregisterScan(reg);</span>
+<span class="fc" id="L80">            }</span>
+        };
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (listener == null) {</span>
+<span class="nc" id="L83">            reg.handle.error(new BluetoothException(BluetoothError.UNKNOWN,</span>
+                    &quot;startScan requires a listener&quot;));
+<span class="nc" id="L85">            return reg.handle;</span>
+        }
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (!isScanSupported()) {</span>
+<span class="fc" id="L88">            reg.handle.error(new BluetoothException(</span>
+                    BluetoothError.NOT_SUPPORTED,
+                    &quot;BLE scanning is not supported on this platform&quot;));
+<span class="fc" id="L91">            return reg.handle;</span>
+        }
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (!reg.settings.isAllowDuplicates()) {</span>
+<span class="fc" id="L94">            reg.seen = new HashSet&lt;String&gt;();</span>
+        }
+        boolean first;
+<span class="fc" id="L97">        synchronized (scanLock) {</span>
+<span class="fc" id="L98">            activeScans.add(reg);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            first = activeScans.size() == 1;</span>
+<span class="fc" id="L100">        }</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (first) {</span>
+            try {
+<span class="fc" id="L103">                startPlatformScan();</span>
+<span class="fc" id="L104">            } catch (RuntimeException ex) {</span>
+<span class="fc" id="L105">                unregisterScan(reg);</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">                if (!reg.handle.isDone()) {</span>
+<span class="fc" id="L107">                    reg.handle.error(new BluetoothException(</span>
+                            BluetoothError.SCAN_FAILED,
+                            &quot;Failed to start scan: &quot; + ex, ex));
+                }
+<span class="fc" id="L111">                return reg.handle;</span>
+<span class="fc" id="L112">            }</span>
+        }
+<span class="fc" id="L114">        onScanRegistrationsChanged();</span>
+<span class="fc" id="L115">        return reg.handle;</span>
+    }
+
+    private void unregisterScan(ScanRegistration reg) {
+        boolean last;
+<span class="fc" id="L120">        synchronized (scanLock) {</span>
+<span class="fc" id="L121">            boolean removed = activeScans.remove(reg);</span>
+<span class="pc bpc" id="L122" title="1 of 4 branches missed.">            last = removed &amp;&amp; activeScans.isEmpty();</span>
+<span class="fc" id="L123">        }</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (last) {</span>
+            try {
+<span class="fc" id="L126">                stopPlatformScan();</span>
+<span class="nc" id="L127">            } catch (RuntimeException ignored) {</span>
+<span class="fc" id="L128">            }</span>
+        }
+<span class="fc" id="L130">        onScanRegistrationsChanged();</span>
+<span class="fc" id="L131">    }</span>
+
+    /// Re-obtains a peripheral from an address persisted earlier (see
+    /// [com.codename1.bluetooth.BluetoothDevice#getAddress()] for the
+    /// address semantics) without scanning. Returns `null` when the
+    /// platform cannot resolve the address.
+    public BlePeripheral getPeripheral(String address) {
+<span class="fc" id="L138">        return null;</span>
+    }
+
+    /// The peripherals the *system* currently holds connected (e.g.
+    /// paired wearables), optionally filtered to those offering the given
+    /// service. Empty on ports without BLE.
+    ///
+    /// iOS filters exactly (CoreBluetooth resolves services); Android can
+    /// only consult its cached SDP/GATT UUIDs, so the filter is
+    /// best-effort there and devices with an empty cache are retained.
+    public List&lt;BlePeripheral&gt; getConnectedPeripherals(
+            BluetoothUuid serviceFilter) {
+<span class="fc" id="L150">        return new ArrayList&lt;BlePeripheral&gt;();</span>
+    }
+
+    /// The LE peripherals bonded with this device. Empty on ports without
+    /// BLE or without a bonded-device registry (iOS).
+    public List&lt;BlePeripheral&gt; getBondedPeripherals() {
+<span class="fc" id="L156">        return new ArrayList&lt;BlePeripheral&gt;();</span>
+    }
+
+    // ------------------------------------------------------------------
+    // peripheral role
+    // ------------------------------------------------------------------
+
+    /// Opens the local GATT server for the peripheral role; the
+    /// listener's methods fire on the EDT. Fails with
+    /// [BluetoothError#NOT_SUPPORTED] on ports without peripheral mode --
+    /// branch via `Bluetooth.getInstance().isPeripheralModeSupported()`.
+    public AsyncResource&lt;GattServer&gt; openGattServer(
+            GattServerListener listener) {
+<span class="fc" id="L169">        AsyncResource&lt;GattServer&gt; r = new AsyncResource&lt;GattServer&gt;();</span>
+<span class="fc" id="L170">        r.error(peripheralNotSupported());</span>
+<span class="fc" id="L171">        return r;</span>
+    }
+
+    /// Starts advertising. Resolves with a live [BleAdvertisement] handle
+    /// once the platform actually started broadcasting, or fails with
+    /// [BluetoothError#ADVERTISE_FAILED] /
+    /// [BluetoothError#NOT_SUPPORTED]. `scanResponse` may be `null`.
+    public AsyncResource&lt;BleAdvertisement&gt; startAdvertising(
+            AdvertiseSettings settings, AdvertiseData data,
+            AdvertiseData scanResponse) {
+<span class="fc" id="L181">        AsyncResource&lt;BleAdvertisement&gt; r =</span>
+                new AsyncResource&lt;BleAdvertisement&gt;();
+<span class="fc" id="L183">        r.error(peripheralNotSupported());</span>
+<span class="fc" id="L184">        return r;</span>
+    }
+
+    /// Opens a listening L2CAP endpoint for the peripheral role; publish
+    /// [L2capServer#getPsm()] to centrals (typically via a GATT
+    /// characteristic). Fails with [BluetoothError#NOT_SUPPORTED] where
+    /// L2CAP or peripheral mode is unavailable.
+    public AsyncResource&lt;L2capServer&gt; openL2capServer(boolean secure) {
+<span class="fc" id="L192">        AsyncResource&lt;L2capServer&gt; r = new AsyncResource&lt;L2capServer&gt;();</span>
+<span class="fc" id="L193">        r.error(peripheralNotSupported());</span>
+<span class="fc" id="L194">        return r;</span>
+    }
+
+    private static BluetoothException peripheralNotSupported() {
+<span class="fc" id="L198">        return new BluetoothException(BluetoothError.NOT_SUPPORTED,</span>
+                &quot;BLE peripheral mode is not supported on this platform&quot;);
+    }
+
+    // ------------------------------------------------------------------
+    // port SPI
+    // ------------------------------------------------------------------
+
+    /// `true` when this port can scan; the base class returns `false`,
+    /// making [#startScan(ScanSettings, ScanListener)] fail fast.
+    protected boolean isScanSupported() {
+<span class="fc" id="L209">        return false;</span>
+    }
+
+    /// Starts the single underlying platform scan; called when the first
+    /// [BleScan] handle registers. Sightings are reported via
+    /// [#fireScanResult(ScanResult)]. May throw a `RuntimeException` to
+    /// fail the initiating handle.
+    protected void startPlatformScan() {
+<span class="nc" id="L217">    }</span>
+
+    /// Stops the underlying platform scan; called when the last handle
+    /// stops.
+    protected void stopPlatformScan() {
+<span class="nc" id="L222">    }</span>
+
+    /// Called after every scan registration change. Ports may retune the
+    /// platform scan (e.g. push down filters or raise the scan mode) based
+    /// on [#getActiveScanSettings()]. Default does nothing.
+    protected void onScanRegistrationsChanged() {
+<span class="fc" id="L228">    }</span>
+
+    /// The settings of all currently active scan handles -- for ports
+    /// that optimize the platform scan.
+    protected final List&lt;ScanSettings&gt; getActiveScanSettings() {
+<span class="nc" id="L233">        ArrayList&lt;ScanSettings&gt; out = new ArrayList&lt;ScanSettings&gt;();</span>
+<span class="nc" id="L234">        synchronized (scanLock) {</span>
+<span class="nc" id="L235">            int size = activeScans.size();</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">            for (int i = 0; i &lt; size; i++) {</span>
+<span class="nc" id="L237">                out.add(activeScans.get(i).settings);</span>
+            }
+<span class="nc" id="L239">        }</span>
+<span class="nc" id="L240">        return out;</span>
+    }
+
+    /// The most aggressive [ScanMode] among the active handles --
+    /// convenience for ports mapping the merged scan onto a platform scan
+    /// mode.
+    protected final ScanMode getAggregateScanMode() {
+<span class="nc" id="L247">        ScanMode mode = ScanMode.OPPORTUNISTIC;</span>
+<span class="nc" id="L248">        synchronized (scanLock) {</span>
+<span class="nc" id="L249">            int size = activeScans.size();</span>
+<span class="nc bnc" id="L250" title="All 2 branches missed.">            for (int i = 0; i &lt; size; i++) {</span>
+<span class="nc" id="L251">                ScanMode m = activeScans.get(i).settings.getScanMode();</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">                if (m.ordinal() &gt; mode.ordinal()) {</span>
+<span class="nc" id="L253">                    mode = m;</span>
+                }
+            }
+<span class="nc" id="L256">        }</span>
+<span class="nc" id="L257">        return mode;</span>
+    }
+
+    /// Reports one advertisement sighting from the platform scan; safe to
+    /// call from any thread. The base class demultiplexes it to every
+    /// active handle whose filters match, applying per-handle duplicate
+    /// suppression, and dispatches the listeners on the EDT.
+    protected final void fireScanResult(final ScanResult result) {
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">        if (result == null) {</span>
+<span class="nc" id="L266">            return;</span>
+        }
+<span class="fc" id="L268">        final ArrayList&lt;ScanListener&gt; targets = new ArrayList&lt;ScanListener&gt;();</span>
+<span class="fc" id="L269">        synchronized (scanLock) {</span>
+<span class="fc" id="L270">            int size = activeScans.size();</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">            for (int i = 0; i &lt; size; i++) {</span>
+<span class="fc" id="L272">                ScanRegistration reg = activeScans.get(i);</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">                if (!reg.settings.matches(result)) {</span>
+<span class="fc" id="L274">                    continue;</span>
+                }
+<span class="fc bfc" id="L276" title="All 4 branches covered.">                if (reg.seen != null &amp;&amp; !reg.seen.add(</span>
+<span class="fc" id="L277">                        result.getPeripheral().getAddress())) {</span>
+<span class="fc" id="L278">                    continue;</span>
+                }
+<span class="fc" id="L280">                targets.add(reg.listener);</span>
+            }
+<span class="fc" id="L282">        }</span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        if (targets.isEmpty()) {</span>
+<span class="nc" id="L284">            return;</span>
+        }
+<span class="fc" id="L286">        dispatchScanResult(targets, result);</span>
+<span class="fc" id="L287">    }</span>
+
+    // Static so the Runnable doesn't carry a synthetic outer-BluetoothLE
+    // reference (SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static void dispatchScanResult(
+            final ArrayList&lt;ScanListener&gt; targets, final ScanResult result) {
+<span class="fc" id="L293">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L296">                int size = targets.size();</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">                for (int i = 0; i &lt; size; i++) {</span>
+<span class="fc" id="L298">                    targets.get(i).peripheralDiscovered(result);</span>
+                }
+<span class="fc" id="L300">            }</span>
+        });
+<span class="fc" id="L302">    }</span>
+
+    /// Reports that the OS aborted the platform scan; every active handle
+    /// fails with the given reason and the registry is cleared. The base
+    /// class does NOT call [#stopPlatformScan()] on this path -- the
+    /// platform scan is presumed dead, so ports must clean up their own
+    /// scanner state before (or when) calling this.
+    protected final void fireScanFailed(BluetoothException reason) {
+        final ArrayList&lt;ScanRegistration&gt; failed;
+<span class="fc" id="L311">        synchronized (scanLock) {</span>
+<span class="fc" id="L312">            failed = new ArrayList&lt;ScanRegistration&gt;(activeScans);</span>
+<span class="fc" id="L313">            activeScans.clear();</span>
+<span class="fc" id="L314">        }</span>
+<span class="fc bfc" id="L315" title="All 2 branches covered.">        BluetoothException r = reason != null ? reason</span>
+                : new BluetoothException(BluetoothError.SCAN_FAILED,
+                        &quot;Scan aborted by the OS&quot;);
+<span class="fc" id="L318">        int size = failed.size();</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">        for (int i = 0; i &lt; size; i++) {</span>
+<span class="fc" id="L320">            BleScan handle = failed.get(i).handle;</span>
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">            if (!handle.isDone()) {</span>
+<span class="fc" id="L322">                handle.error(r);</span>
+            }
+        }
+<span class="fc" id="L325">        onScanRegistrationsChanged();</span>
+<span class="fc" id="L326">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

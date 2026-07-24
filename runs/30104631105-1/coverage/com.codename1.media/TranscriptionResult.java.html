@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TranscriptionResult.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media</a> &gt; <span class="el_source">TranscriptionResult.java</span></div><h1>TranscriptionResult.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// A complete transcription: plain text plus the timed segments needed
+/// for captions.
+public final class TranscriptionResult {
+    private final List&lt;TranscriptionSegment&gt; segments;
+    private final String text;
+
+    /// Creates a transcription result from timed segments.
+    ///
+    /// The supplied list is copied, validated, and exposed through [#getSegments()]
+    /// as an immutable list. The plain text returned by [#getText()] is the
+    /// concatenation of each segment's text in order.
+    ///
+    /// @param segments ordered transcript segments
+    /// @throws IllegalArgumentException if `segments` is `null` or contains `null`
+<span class="fc" id="L43">    public TranscriptionResult(List&lt;TranscriptionSegment&gt; segments) {</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (segments == null) {</span>
+<span class="nc" id="L45">            throw new IllegalArgumentException(&quot;segments is required&quot;);</span>
+        }
+<span class="fc" id="L47">        ArrayList&lt;TranscriptionSegment&gt; copy = new ArrayList&lt;TranscriptionSegment&gt;(segments.size());</span>
+<span class="fc" id="L48">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        for (TranscriptionSegment s : segments) {</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            if (s == null) {</span>
+<span class="nc" id="L51">                throw new IllegalArgumentException(&quot;segments must not contain null&quot;);</span>
+            }
+<span class="fc" id="L53">            copy.add(s);</span>
+<span class="fc" id="L54">            sb.append(s.getText());</span>
+<span class="fc" id="L55">        }</span>
+<span class="fc" id="L56">        this.segments = Collections.unmodifiableList(copy);</span>
+<span class="fc" id="L57">        this.text = sb.toString();</span>
+<span class="fc" id="L58">    }</span>
+
+    /// Creates a text-only result for providers that do not expose segment timing.
+    ///
+    /// The returned result contains one segment from `0` to `0` milliseconds.
+    ///
+    /// @param text recognized text
+    /// @return a transcription result containing one untimed segment
+    public static TranscriptionResult textOnly(String text) {
+<span class="fc" id="L67">        ArrayList&lt;TranscriptionSegment&gt; segments = new ArrayList&lt;TranscriptionSegment&gt;(1);</span>
+<span class="fc" id="L68">        segments.add(new TranscriptionSegment(0, 0, text));</span>
+<span class="fc" id="L69">        return new TranscriptionResult(segments);</span>
+    }
+
+    /// Gets the ordered timed transcript segments.
+    ///
+    /// @return immutable segment list
+    public List&lt;TranscriptionSegment&gt; getSegments() {
+<span class="fc" id="L76">        return segments;</span>
+    }
+
+    /// Gets the plain transcript text.
+    ///
+    /// @return transcript text, never `null`
+    public String getText() {
+<span class="fc" id="L83">        return text;</span>
+    }
+
+    /// Formats this transcription as SubRip captions.
+    ///
+    /// @return SRT text using millisecond timestamps
+    public String toSrt() {
+<span class="fc" id="L90">        StringBuilder out = new StringBuilder();</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (int i = 0; i &lt; segments.size(); i++) {</span>
+<span class="fc" id="L92">            TranscriptionSegment s = segments.get(i);</span>
+<span class="fc" id="L93">            out.append(i + 1).append('\n');</span>
+<span class="fc" id="L94">            out.append(formatTime(s.getStartTimeMs(), ',')).append(&quot; --&gt; &quot;)</span>
+<span class="fc" id="L95">                    .append(formatTime(s.getEndTimeMs(), ',')).append('\n');</span>
+<span class="fc" id="L96">            out.append(normalizeCaptionText(s.getText())).append(&quot;\n\n&quot;);</span>
+        }
+<span class="fc" id="L98">        return out.toString();</span>
+    }
+
+    /// Formats this transcription as WebVTT captions.
+    ///
+    /// @return WebVTT text using millisecond timestamps
+    public String toVtt() {
+<span class="fc" id="L105">        StringBuilder out = new StringBuilder(&quot;WEBVTT\n\n&quot;);</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        for (TranscriptionSegment s : segments) {</span>
+<span class="fc" id="L107">            out.append(formatTime(s.getStartTimeMs(), '.')).append(&quot; --&gt; &quot;)</span>
+<span class="fc" id="L108">                    .append(formatTime(s.getEndTimeMs(), '.')).append('\n');</span>
+<span class="fc" id="L109">            out.append(normalizeCaptionText(s.getText()).replace(&quot;--&gt;&quot;, &quot;-- &gt;&quot;)).append(&quot;\n\n&quot;);</span>
+<span class="fc" id="L110">        }</span>
+<span class="fc" id="L111">        return out.toString();</span>
+    }
+
+    private static String normalizeCaptionText(String value) {
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L116">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L118">        return value.replace('\r', '\n').trim();</span>
+    }
+
+    private static String formatTime(long millis, char decimalSeparator) {
+<span class="fc" id="L122">        long hours = millis / 3600000L;</span>
+<span class="fc" id="L123">        millis %= 3600000L;</span>
+<span class="fc" id="L124">        long minutes = millis / 60000L;</span>
+<span class="fc" id="L125">        millis %= 60000L;</span>
+<span class="fc" id="L126">        long seconds = millis / 1000L;</span>
+<span class="fc" id="L127">        long ms = millis % 1000L;</span>
+<span class="fc" id="L128">        return two(hours) + &quot;:&quot; + two(minutes) + &quot;:&quot; + two(seconds)</span>
+<span class="fc" id="L129">                + decimalSeparator + three(ms);</span>
+    }
+
+    private static String two(long value) {
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        return value &lt; 10 ? &quot;0&quot; + value : String.valueOf(value);</span>
+    }
+
+    private static String three(long value) {
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (value &lt; 10) {</span>
+<span class="fc" id="L138">            return &quot;00&quot; + value;</span>
+        }
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (value &lt; 100) {</span>
+<span class="nc" id="L141">            return &quot;0&quot; + value;</span>
+        }
+<span class="fc" id="L143">        return String.valueOf(value);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

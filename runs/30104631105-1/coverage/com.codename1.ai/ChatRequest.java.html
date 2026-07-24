@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ChatRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai</a> &gt; <span class="el_source">ChatRequest.java</span></div><h1>ChatRequest.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// The full request to [LlmClient#chat(ChatRequest)] /
+/// [LlmClient#chatStream(ChatRequest, StreamingListener)]. Built via
+/// [#builder()]; immutable once constructed so the same request can be
+/// re-used across retries.
+///
+/// Numeric tuning fields are boxed so a `null` means &quot;don't send&quot; --
+/// the provider's own default is used instead of one we picked.
+public final class ChatRequest {
+    private final String model;
+    private final List&lt;ChatMessage&gt; messages;
+    private final Float temperature;
+    private final Integer maxTokens;
+    private final Float topP;
+    private final List&lt;String&gt; stopSequences;
+    private final Long seed;
+    private final ResponseFormat responseFormat;
+    private final List&lt;Tool&gt; tools;
+    private final ToolChoice toolChoice;
+    private final Map&lt;String, String&gt; metadata;
+    private final SafetyFilter safetyFilter;
+
+<span class="fc" id="L52">    private ChatRequest(Builder b) {</span>
+<span class="fc" id="L53">        this.model = b.model;</span>
+<span class="fc" id="L54">        this.messages = Collections.unmodifiableList(new ArrayList&lt;ChatMessage&gt;(b.messages));</span>
+<span class="fc" id="L55">        this.temperature = b.temperature;</span>
+<span class="fc" id="L56">        this.maxTokens = b.maxTokens;</span>
+<span class="fc" id="L57">        this.topP = b.topP;</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        this.stopSequences = b.stopSequences == null ? Collections.&lt;String&gt;emptyList()</span>
+<span class="fc" id="L59">                : Collections.unmodifiableList(new ArrayList&lt;String&gt;(b.stopSequences));</span>
+<span class="fc" id="L60">        this.seed = b.seed;</span>
+<span class="fc" id="L61">        this.responseFormat = b.responseFormat;</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        this.tools = b.tools == null ? Collections.&lt;Tool&gt;emptyList()</span>
+<span class="fc" id="L63">                : Collections.unmodifiableList(new ArrayList&lt;Tool&gt;(b.tools));</span>
+<span class="fc" id="L64">        this.toolChoice = b.toolChoice;</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        this.metadata = b.metadata == null ? Collections.&lt;String, String&gt;emptyMap()</span>
+<span class="fc" id="L66">                : Collections.unmodifiableMap(new HashMap&lt;String, String&gt;(b.metadata));</span>
+<span class="fc" id="L67">        this.safetyFilter = b.safetyFilter;</span>
+<span class="fc" id="L68">    }</span>
+
+    public static Builder builder() {
+<span class="fc" id="L71">        return new Builder();</span>
+    }
+
+    public String getModel() {
+<span class="fc" id="L75">        return model;</span>
+    }
+
+    public List&lt;ChatMessage&gt; getMessages() {
+<span class="fc" id="L79">        return messages;</span>
+    }
+
+    public Float getTemperature() {
+<span class="fc" id="L83">        return temperature;</span>
+    }
+
+    public Integer getMaxTokens() {
+<span class="fc" id="L87">        return maxTokens;</span>
+    }
+
+    public Float getTopP() {
+<span class="fc" id="L91">        return topP;</span>
+    }
+
+    public List&lt;String&gt; getStopSequences() {
+<span class="fc" id="L95">        return stopSequences;</span>
+    }
+
+    public Long getSeed() {
+<span class="fc" id="L99">        return seed;</span>
+    }
+
+    public ResponseFormat getResponseFormat() {
+<span class="fc" id="L103">        return responseFormat;</span>
+    }
+
+    public List&lt;Tool&gt; getTools() {
+<span class="fc" id="L107">        return tools;</span>
+    }
+
+    public ToolChoice getToolChoice() {
+<span class="nc" id="L111">        return toolChoice;</span>
+    }
+
+    public Map&lt;String, String&gt; getMetadata() {
+<span class="fc" id="L115">        return metadata;</span>
+    }
+
+    public SafetyFilter getSafetyFilter() {
+<span class="fc" id="L119">        return safetyFilter;</span>
+    }
+
+    /// Returns a builder pre-populated with the values of this request.
+    /// Useful for replaying a request with one field changed.
+    public Builder toBuilder() {
+<span class="fc" id="L125">        Builder b = new Builder();</span>
+<span class="fc" id="L126">        b.model = model;</span>
+<span class="fc" id="L127">        b.messages = new ArrayList&lt;ChatMessage&gt;(messages);</span>
+<span class="fc" id="L128">        b.temperature = temperature;</span>
+<span class="fc" id="L129">        b.maxTokens = maxTokens;</span>
+<span class="fc" id="L130">        b.topP = topP;</span>
+<span class="fc" id="L131">        b.stopSequences = new ArrayList&lt;String&gt;(stopSequences);</span>
+<span class="fc" id="L132">        b.seed = seed;</span>
+<span class="fc" id="L133">        b.responseFormat = responseFormat;</span>
+<span class="fc" id="L134">        b.tools = new ArrayList&lt;Tool&gt;(tools);</span>
+<span class="fc" id="L135">        b.toolChoice = toolChoice;</span>
+<span class="fc" id="L136">        b.metadata = new HashMap&lt;String, String&gt;(metadata);</span>
+<span class="fc" id="L137">        b.safetyFilter = safetyFilter;</span>
+<span class="fc" id="L138">        return b;</span>
+    }
+
+    public static final class Builder {
+        private String model;
+<span class="fc" id="L143">        private List&lt;ChatMessage&gt; messages = new ArrayList&lt;ChatMessage&gt;();</span>
+        private Float temperature;
+        private Integer maxTokens;
+        private Float topP;
+        private List&lt;String&gt; stopSequences;
+        private Long seed;
+        private ResponseFormat responseFormat;
+        private List&lt;Tool&gt; tools;
+        private ToolChoice toolChoice;
+        private Map&lt;String, String&gt; metadata;
+        private SafetyFilter safetyFilter;
+
+<span class="fc" id="L155">        Builder() {</span>
+<span class="fc" id="L156">        }</span>
+
+        public Builder model(String model) {
+<span class="fc" id="L159">            this.model = model;</span>
+<span class="fc" id="L160">            return this;</span>
+        }
+
+        public Builder messages(List&lt;ChatMessage&gt; messages) {
+<span class="nc bnc" id="L164" title="All 2 branches missed.">            this.messages = messages == null ? new ArrayList&lt;ChatMessage&gt;()</span>
+                    : new ArrayList&lt;ChatMessage&gt;(messages);
+<span class="nc" id="L166">            return this;</span>
+        }
+
+        public Builder addMessage(ChatMessage m) {
+<span class="fc" id="L170">            this.messages.add(m);</span>
+<span class="fc" id="L171">            return this;</span>
+        }
+
+        public Builder temperature(Float t) {
+<span class="fc" id="L175">            this.temperature = t;</span>
+<span class="fc" id="L176">            return this;</span>
+        }
+
+        public Builder maxTokens(Integer n) {
+<span class="fc" id="L180">            this.maxTokens = n;</span>
+<span class="fc" id="L181">            return this;</span>
+        }
+
+        public Builder topP(Float p) {
+<span class="fc" id="L185">            this.topP = p;</span>
+<span class="fc" id="L186">            return this;</span>
+        }
+
+        public Builder stopSequences(List&lt;String&gt; stops) {
+<span class="fc" id="L190">            this.stopSequences = stops;</span>
+<span class="fc" id="L191">            return this;</span>
+        }
+
+        public Builder seed(Long seed) {
+<span class="fc" id="L195">            this.seed = seed;</span>
+<span class="fc" id="L196">            return this;</span>
+        }
+
+        public Builder responseFormat(ResponseFormat f) {
+<span class="fc" id="L200">            this.responseFormat = f;</span>
+<span class="fc" id="L201">            return this;</span>
+        }
+
+        public Builder tools(List&lt;Tool&gt; tools) {
+<span class="nc" id="L205">            this.tools = tools;</span>
+<span class="nc" id="L206">            return this;</span>
+        }
+
+        public Builder toolChoice(ToolChoice choice) {
+<span class="nc" id="L210">            this.toolChoice = choice;</span>
+<span class="nc" id="L211">            return this;</span>
+        }
+
+        public Builder metadata(Map&lt;String, String&gt; meta) {
+<span class="nc" id="L215">            this.metadata = meta;</span>
+<span class="nc" id="L216">            return this;</span>
+        }
+
+        public Builder safetyFilter(SafetyFilter f) {
+<span class="fc" id="L220">            this.safetyFilter = f;</span>
+<span class="fc" id="L221">            return this;</span>
+        }
+
+        public ChatRequest build() {
+<span class="fc bfc" id="L225" title="All 2 branches covered.">            if (messages.isEmpty()) {</span>
+<span class="fc" id="L226">                throw new IllegalStateException(&quot;at least one message is required&quot;);</span>
+            }
+<span class="fc" id="L228">            return new ChatRequest(this);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

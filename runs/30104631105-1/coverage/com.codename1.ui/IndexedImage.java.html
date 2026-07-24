@@ -1,0 +1,485 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IndexedImage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">IndexedImage.java</span></div><h1>IndexedImage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.io.Log;
+import com.codename1.ui.geom.Dimension;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+
+/// An indexed image is an image &quot;compressed&quot; in memory to occupy as little memory
+/// as possible in this sense it is slower to draw and only a single indexed image
+/// can be drawn at any given time. However, this allows images with low color counts
+/// to use as little as one byte per pixel which can save up to 4 times of the memory
+/// overhead.
+///
+/// @author Shai Almog
+///
+/// #### Deprecated
+///
+/// This class should no longer be referenced directly. Use Image.createIndexed instead
+class IndexedImage extends Image {
+<span class="fc" id="L47">    private static final Object LINE_CACHE_LOCK = new Object();</span>
+    static int[] lineCache;
+    // package protected for access by the resource editor
+    byte[] imageDataByte;
+    int[] palette;
+    private int width;
+    private int height;
+
+    /// Creates an indexed image with byte data
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: image width
+    ///
+    /// - `height`: image height
+    ///
+    /// - `palette`: the color palette to use with the byte data
+    ///
+    /// - `data`: byte data containing palette offsets to map to ARGB colors
+    ///
+    /// #### Deprecated
+    ///
+    /// use Image.createIndexed instead
+    public IndexedImage(int width, int height, int[] palette, byte[] data) {
+<span class="fc" id="L71">        super(null);</span>
+<span class="fc" id="L72">        this.width = width;</span>
+<span class="fc" id="L73">        this.height = height;</span>
+<span class="fc" id="L74">        this.palette = palette;</span>
+<span class="fc" id="L75">        this.imageDataByte = data;</span>
+<span class="fc" id="L76">        initOpaque();</span>
+<span class="fc" id="L77">    }</span>
+
+    /// Converts an image to a package image after which the original image can be GC'd
+    private IndexedImage(int width, int height, int[] palette, int[] rgb) {
+<span class="fc" id="L81">        super(null);</span>
+
+<span class="fc" id="L83">        this.width = width;</span>
+<span class="fc" id="L84">        this.height = height;</span>
+<span class="fc" id="L85">        this.palette = palette;</span>
+
+        // byte based package image
+<span class="fc" id="L88">        imageDataByte = new byte[width * height];</span>
+<span class="fc" id="L89">        int ilen = imageDataByte.length;</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for (int iter = 0; iter &lt; ilen; iter++) {</span>
+<span class="fc" id="L91">            imageDataByte[iter] = (byte) paletteOffset(rgb[iter]);</span>
+        }
+<span class="fc" id="L93">        initOpaque();</span>
+<span class="fc" id="L94">    }</span>
+
+    /// Packs the image loaded by MIDP
+    ///
+    /// #### Parameters
+    ///
+    /// - `imageName`: a name to load using Image.createImage()
+    ///
+    /// #### Returns
+    ///
+    /// a packed image
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when create fails
+    public static Image pack(String imageName) throws IOException {
+<span class="nc" id="L110">        return pack(Image.createImage(imageName));</span>
+    }
+
+    /// Packs the source rgba image and returns null if it fails
+    ///
+    /// #### Parameters
+    ///
+    /// - `rgb`: array containing ARGB data
+    ///
+    /// - `width`: width of the image in the rgb array
+    ///
+    /// - `height`: height of the image
+    ///
+    /// #### Returns
+    ///
+    /// a packed image or null
+    public static IndexedImage pack(int[] rgb, int width, int height) {
+<span class="fc" id="L127">        int arrayLength = width * height;</span>
+
+        // using a Vector is slower for a small scale device and this is mission critical code
+<span class="fc" id="L130">        int[] tempPalette = new int[256];</span>
+<span class="fc" id="L131">        int paletteLocation = 0;</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (int iter = 0; iter &lt; arrayLength; iter++) {</span>
+<span class="fc" id="L133">            int current = rgb[iter];</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            if (!contains(tempPalette, paletteLocation, current)) {</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">                if (paletteLocation &gt; 255) {</span>
+<span class="fc" id="L136">                    return null;</span>
+                }
+<span class="fc" id="L138">                tempPalette[paletteLocation] = current;</span>
+<span class="fc" id="L139">                paletteLocation++;</span>
+            }
+        }
+
+        // we need to &quot;shrink&quot; the palette array
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (paletteLocation != tempPalette.length) {</span>
+<span class="fc" id="L145">            int[] newArray = new int[paletteLocation];</span>
+<span class="fc" id="L146">            System.arraycopy(tempPalette, 0, newArray, 0, paletteLocation);</span>
+<span class="fc" id="L147">            tempPalette = newArray;</span>
+        }
+
+
+<span class="fc" id="L151">        return new IndexedImage(width, height, tempPalette, rgb);</span>
+    }
+
+    /// Tries to pack the given image and would return the packed image or source
+    /// image if packing failed
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceImage`: the image which would be converted to a packed image if possible
+    ///
+    /// #### Returns
+    ///
+    /// the source image if packing failed or a newly packed image if it succeeded
+    public static Image pack(final Image sourceImage) {
+<span class="fc" id="L165">        int width = sourceImage.getWidth();</span>
+<span class="fc" id="L166">        int height = sourceImage.getHeight();</span>
+<span class="fc" id="L167">        int[] rgb = sourceImage.getRGBCached();</span>
+
+<span class="fc" id="L169">        Image i = pack(rgb, width, height);</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (i == null) {</span>
+<span class="fc" id="L171">            return sourceImage;</span>
+        }
+<span class="fc" id="L173">        return i;</span>
+    }
+
+    /// Searches the array up to &quot;length&quot; and returns true if value is within the
+    /// array up to that point.
+    private static boolean contains(int[] array, int length, int value) {
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        for (int iter = 0; iter &lt; length; iter++) {</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">            if (array[iter] == value) {</span>
+<span class="fc" id="L181">                return true;</span>
+            }
+        }
+<span class="fc" id="L184">        return false;</span>
+    }
+
+    /// Loads a packaged image that was stored in a stream using the toByteArray method
+    ///
+    /// #### Parameters
+    ///
+    /// - `data`: previously stored image data
+    ///
+    /// #### Returns
+    ///
+    /// newly created packed image
+    public static IndexedImage load(byte[] data) {
+        try {
+<span class="fc" id="L198">            DataInputStream input = new DataInputStream(new ByteArrayInputStream(data));</span>
+<span class="fc" id="L199">            int width = input.readShort();</span>
+<span class="fc" id="L200">            int height = input.readShort();</span>
+<span class="fc" id="L201">            int[] palette = new int[input.readByte() &amp; 0xff];</span>
+<span class="fc" id="L202">            int plen = palette.length;</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">            for (int iter = 0; iter &lt; plen; iter++) {</span>
+<span class="fc" id="L204">                palette[iter] = input.readInt();</span>
+            }
+<span class="fc" id="L206">            byte[] arr = new byte[width * height];</span>
+<span class="fc" id="L207">            input.readFully(arr);</span>
+<span class="fc" id="L208">            return new IndexedImage(width, height, palette, arr);</span>
+<span class="nc" id="L209">        } catch (IOException ex) {</span>
+<span class="nc" id="L210">            Log.e(ex);</span>
+<span class="nc" id="L211">            return null;</span>
+        }
+    }
+
+    private void initOpaque() {
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        if (palette != null) {</span>
+<span class="fc" id="L217">            int plen = palette.length;</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            for (int iter = 0; iter &lt; plen; iter++) {</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">                if ((palette[iter] &amp; 0xff000000) != 0xff000000) {</span>
+<span class="fc" id="L220">                    setOpaque(false);</span>
+<span class="fc" id="L221">                    return;</span>
+                }
+            }
+<span class="fc" id="L224">            setOpaque(true);</span>
+<span class="fc" id="L225">        } else {</span>
+<span class="fc" id="L226">            setOpaque(false);</span>
+        }
+<span class="fc" id="L228">    }</span>
+
+    /// Finds the offset within the palette of the given rgb value
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: ARGB value from the image
+    ///
+    /// #### Returns
+    ///
+    /// offset within the palette array
+    private int paletteOffset(int rgb) {
+<span class="fc" id="L240">        int plen = palette.length;</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        for (int iter = 0; iter &lt; plen; iter++) {</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">            if (rgb == palette[iter]) {</span>
+<span class="fc" id="L243">                return iter;</span>
+            }
+        }
+<span class="nc" id="L246">        throw new IllegalStateException(&quot;Invalid palette request in paletteOffset&quot;);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Image subImage(int x, int y, int width, int height, boolean processAlpha) {
+<span class="fc" id="L252">        byte[] arr = new byte[width * height];</span>
+<span class="fc" id="L253">        int alen = arr.length;</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="fc" id="L255">            int destY = iter / width;</span>
+<span class="fc" id="L256">            int destX = iter % width;</span>
+<span class="fc" id="L257">            int offset = x + destX + ((y + destY) * this.width);</span>
+<span class="fc" id="L258">            arr[iter] = imageDataByte[offset];</span>
+        }
+
+<span class="fc" id="L261">        return new IndexedImage(width, height, palette, arr);</span>
+    }
+
+    /// Unsupported in the current version, this method will be implemented in a future release
+    @Override
+    public Image rotate(int degrees) {
+<span class="fc" id="L267">        throw new RuntimeException(&quot;The rotate method is not supported by indexed images at the moment&quot;);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Image modifyAlpha(byte alpha) {
+<span class="fc" id="L273">        int[] newPalette = new int[palette.length];</span>
+<span class="fc" id="L274">        System.arraycopy(palette, 0, newPalette, 0, palette.length);</span>
+<span class="fc" id="L275">        int alphaInt = (((int) alpha) &lt;&lt; 24) &amp; 0xff000000;</span>
+<span class="fc" id="L276">        int plen = palette.length;</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        for (int iter = 0; iter &lt; plen; iter++) {</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">            if ((palette[iter] &amp; 0xff000000) != 0) {</span>
+<span class="fc" id="L279">                newPalette[iter] = (palette[iter] &amp; 0xffffff) | alphaInt;</span>
+            }
+        }
+<span class="fc" id="L282">        return new IndexedImage(width, height, newPalette, imageDataByte);</span>
+    }
+
+    /// This method is unsupported in this image type
+    @Override
+    public Graphics getGraphics() {
+<span class="fc" id="L288">        throw new RuntimeException(&quot;Indexed image objects are immutable&quot;);</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    void getRGB(int[] rgbData,
+                int offset,
+                int x,
+                int y,
+                int width,
+                int height) {
+        // need to support scanlength???
+<span class="nc" id="L300">        int startPoint = y * this.width + x;</span>
+<span class="nc bnc" id="L301" title="All 2 branches missed.">        for (int rows = 0; rows &lt; height; rows++) {</span>
+<span class="nc" id="L302">            int currentRow = rows * width;</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">            for (int columns = 0; columns &lt; width; columns++) {</span>
+<span class="nc" id="L304">                int i = imageDataByte[startPoint + columns] &amp; 0xff;</span>
+<span class="nc" id="L305">                rgbData[offset + currentRow + columns] = palette[i];</span>
+            }
+<span class="nc" id="L307">            startPoint += this.width;</span>
+        }
+<span class="nc" id="L309">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
+<span class="nc" id="L314">        synchronized (LINE_CACHE_LOCK) {</span>
+<span class="nc bnc" id="L315" title="All 4 branches missed.">            if (lineCache == null || lineCache.length &lt; width * 3) {</span>
+<span class="nc" id="L316">                lineCache = new int[width * 3];</span>
+            }
+
+            // for performance we can calculate the visible drawing area so we don't have to
+            // calculate the whole array
+<span class="nc" id="L321">            int clipY = g.getClipY();</span>
+<span class="nc" id="L322">            int clipBottomY = g.getClipHeight() + clipY;</span>
+<span class="nc" id="L323">            int firstLine = 0;</span>
+<span class="nc" id="L324">            int lastLine = height;</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">            if (clipY &gt; y) {</span>
+<span class="nc" id="L326">                firstLine = clipY - y;</span>
+            }
+<span class="nc bnc" id="L328" title="All 2 branches missed.">            if (clipBottomY &lt; y + height) {</span>
+<span class="nc" id="L329">                lastLine = clipBottomY - y;</span>
+            }
+
+
+<span class="nc bnc" id="L333" title="All 2 branches missed.">            for (int line = firstLine; line &lt; lastLine; line += 3) {</span>
+<span class="nc" id="L334">                int currentPos = line * width;</span>
+<span class="nc" id="L335">                int rowsToDraw = Math.min(3, height - line);</span>
+<span class="nc" id="L336">                int amount = width * rowsToDraw;</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">                for (int position = 0; position &lt; amount; position++) {</span>
+<span class="nc" id="L338">                    int i = imageDataByte[position + currentPos] &amp; 0xff;</span>
+<span class="nc" id="L339">                    lineCache[position] = palette[i];</span>
+                }
+<span class="nc" id="L341">                g.drawRGB(lineCache, 0, x, y + line, width, rowsToDraw, true);</span>
+            }
+<span class="nc" id="L343">        }</span>
+<span class="nc" id="L344">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public int getWidth() {
+<span class="fc" id="L349">        return width;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public int getHeight() {
+<span class="fc" id="L355">        return height;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void scale(int width, int height) {
+<span class="fc" id="L361">        IndexedImage p = (IndexedImage) scaled(width, height);</span>
+<span class="fc" id="L362">        this.imageDataByte = p.imageDataByte;</span>
+<span class="fc" id="L363">        this.width = width;</span>
+<span class="fc" id="L364">        this.height = height;</span>
+<span class="fc" id="L365">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public Image scaled(int width, int height) {
+<span class="fc" id="L370">        int srcWidth = getWidth();</span>
+<span class="fc" id="L371">        int srcHeight = getHeight();</span>
+
+        // no need to scale
+<span class="pc bpc" id="L374" title="1 of 4 branches missed.">        if (srcWidth == width &amp;&amp; srcHeight == height) {</span>
+<span class="fc" id="L375">            return this;</span>
+        }
+<span class="fc" id="L377">        Dimension d = new Dimension(width, height);</span>
+<span class="fc" id="L378">        Image i = getCachedImage(d);</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        if (i != null) {</span>
+<span class="nc" id="L380">            return i;</span>
+        }
+        // currently we only support byte data...
+<span class="fc" id="L383">        i = new IndexedImage(width, height, palette, scaleArray(imageDataByte, width, height));</span>
+<span class="fc" id="L384">        cacheImage(d, i);</span>
+<span class="fc" id="L385">        return i;</span>
+    }
+
+    byte[] scaleArray(byte[] sourceArray, int width, int height) {
+<span class="fc" id="L389">        int srcWidth = getWidth();</span>
+<span class="fc" id="L390">        int srcHeight = getHeight();</span>
+
+        // no need to scale
+<span class="pc bpc" id="L393" title="3 of 4 branches missed.">        if (srcWidth == width &amp;&amp; srcHeight == height) {</span>
+<span class="nc" id="L394">            return sourceArray;</span>
+        }
+<span class="fc" id="L396">        byte[] destinationArray = new byte[width * height];</span>
+
+        //Horizontal Resize
+<span class="fc" id="L399">        int yRatio = (srcHeight &lt;&lt; 16) / height;</span>
+<span class="fc" id="L400">        int xRatio = (srcWidth &lt;&lt; 16) / width;</span>
+<span class="fc" id="L401">        int xPos = xRatio / 2;</span>
+<span class="fc" id="L402">        int yPos = yRatio / 2;</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">        for (int x = 0; x &lt; width; x++) {</span>
+<span class="fc" id="L404">            int srcX = xPos &gt;&gt; 16;</span>
+<span class="fc bfc" id="L405" title="All 2 branches covered.">            for (int y = 0; y &lt; height; y++) {</span>
+<span class="fc" id="L406">                int srcY = yPos &gt;&gt; 16;</span>
+<span class="fc" id="L407">                int destPixel = x + y * width;</span>
+<span class="fc" id="L408">                int srcPixel = srcX + srcY * srcWidth;</span>
+<span class="pc bpc" id="L409" title="4 of 8 branches missed.">                if ((destPixel &gt;= 0 &amp;&amp; destPixel &lt; destinationArray.length) &amp;&amp;</span>
+                        (srcPixel &gt;= 0 &amp;&amp; srcPixel &lt; sourceArray.length)) {
+<span class="fc" id="L411">                    destinationArray[destPixel] = sourceArray[srcPixel];</span>
+                }
+<span class="fc" id="L413">                yPos += yRatio;</span>
+            }
+<span class="fc" id="L415">            yPos = yRatio / 2;</span>
+<span class="fc" id="L416">            xPos += xRatio;</span>
+        }
+<span class="fc" id="L418">        return destinationArray;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    int[] getRGBImpl() {
+<span class="fc" id="L424">        int rlen = width * height;</span>
+<span class="fc" id="L425">        int[] rgb = Image.allocateRgbArray(rlen);</span>
+
+<span class="fc bfc" id="L427" title="All 2 branches covered.">        for (int iter = 0; iter &lt; rlen; iter++) {</span>
+<span class="fc" id="L428">            int i = imageDataByte[iter] &amp; 0xff;</span>
+<span class="fc" id="L429">            rgb[iter] = palette[i];</span>
+        }
+<span class="fc" id="L431">        return rgb;</span>
+    }
+
+    /// Retrieves the palette for the indexed image drawing
+    ///
+    /// #### Returns
+    ///
+    /// the palette data
+    public final int[] getPalette() {
+<span class="fc" id="L440">        return palette;</span>
+    }
+
+    /// Retrieves the image data as offsets into the palette array
+    ///
+    /// #### Returns
+    ///
+    /// the image data
+    public final byte[] getImageDataByte() {
+<span class="fc" id="L449">        return imageDataByte;</span>
+    }
+
+    /// This method allows us to store a package image into a persistent stream easily
+    /// thus allowing us to store the image in RMS.
+    ///
+    /// #### Returns
+    ///
+    /// a byte array that can be loaded using the load method
+    public byte[] toByteArray() {
+        try {
+<span class="fc" id="L460">            ByteArrayOutputStream array = new ByteArrayOutputStream();</span>
+<span class="fc" id="L461">            DataOutputStream out = new DataOutputStream(array);</span>
+<span class="fc" id="L462">            out.writeShort(width);</span>
+<span class="fc" id="L463">            out.writeShort(height);</span>
+<span class="fc" id="L464">            out.writeByte(palette.length);</span>
+<span class="fc" id="L465">            int plen = palette.length;</span>
+<span class="fc bfc" id="L466" title="All 2 branches covered.">            for (int iter = 0; iter &lt; plen; iter++) {</span>
+<span class="fc" id="L467">                out.writeInt(palette[iter]);</span>
+            }
+<span class="fc" id="L469">            out.write(imageDataByte);</span>
+<span class="fc" id="L470">            out.close();</span>
+<span class="fc" id="L471">            return array.toByteArray();</span>
+<span class="nc" id="L472">        } catch (IOException ex) {</span>
+            // will never happen since IO is purely in memory
+<span class="nc" id="L474">            ex.printStackTrace();</span>
+<span class="nc" id="L475">            return null;</span>
+        }
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public boolean requiresDrawImage() {
+<span class="fc" id="L482">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

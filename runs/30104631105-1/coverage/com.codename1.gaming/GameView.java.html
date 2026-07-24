@@ -1,0 +1,414 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GameView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming</a> &gt; <span class="el_source">GameView.java</span></div><h1>GameView.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming;
+
+import com.codename1.gpu.GraphicsDevice;
+import com.codename1.gpu.Light;
+import com.codename1.gpu.RenderView;
+import com.codename1.ui.Form;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Rectangle;
+
+/// A GPU accelerated game surface: a `com.codename1.gpu.RenderView` that hosts a
+/// `SpriteRenderer` over a `Scene` and calls your `#update(double)` once per frame.
+///
+/// Subclass it, build your world by adding `Sprite`s to `#getScene()`, advance the
+/// game in `#update(double)`, add the view to a `com.codename1.ui.Form` and call
+/// `#start()`:
+///
+/// ```java
+/// class MyGame extends GameView {
+///     final Sprite player = new Sprite(playerImage);
+///     MyGame() { getScene().add(player); player.setPosition(160, 240); }
+///
+///     protected void update(double dt) {
+///         if (getInput().isGameKeyDown(Display.GAME_RIGHT)) {
+///             player.setX(player.getX() + 200 * dt);   // 200 px/second
+///         }
+///     }
+/// }
+///
+/// Form f = new Form(&quot;Game&quot;, new BorderLayout());
+/// MyGame game = new MyGame();
+/// f.add(BorderLayout.CENTER, game);
+/// f.show();
+/// game.start();
+/// ```
+///
+/// Rendering is GPU driven: the underlying `RenderView` runs the frame loop (a
+/// display link on device, the software rasterizer in the simulator), so there is
+/// no EDT busy loop. Drawing is handled for you by the `SpriteRenderer` -- you only
+/// position sprites. The `deltaSeconds` passed to `#update(double)` is the wall
+/// clock time since the previous frame; multiply movement by it to stay framerate
+/// independent. With `#setFixedTimestep(double)` the update is stepped at a fixed
+/// interval for deterministic physics, and `#getInterpolationAlpha()` gives a 0..1
+/// blend factor.
+///
+/// `#update(double)` runs on the render thread together with drawing. Keep it non
+/// blocking -- offload asset loading to a background thread and hand the result
+/// back with `com.codename1.ui.CN#callSerially(java.lang.Runnable)`.
+public abstract class GameView extends RenderView implements SpriteRenderer.Updatable {
+    private final Scene scene;
+    private boolean running;
+    private boolean paused;
+    private double fixedTimestep;
+    private double accumulator;
+<span class="fc" id="L77">    private double interpolationAlpha = 1;</span>
+    private static final int MAX_FIXED_STEPS = 8;
+<span class="fc" id="L79">    private final GameInput input = new GameInput();</span>
+    private final TouchControls controls;
+    private ActionListener pressListener;
+    private ActionListener dragListener;
+    private ActionListener releaseListener;
+    private boolean formListenersAdded;
+
+    public GameView() {
+<span class="fc" id="L87">        super(new SpriteRenderer());</span>
+<span class="fc" id="L88">        SpriteRenderer r = (SpriteRenderer) getRenderer();</span>
+<span class="fc" id="L89">        r.setUpdatable(this);</span>
+<span class="fc" id="L90">        this.scene = r.getScene();</span>
+<span class="fc" id="L91">        this.controls = new TouchControls(input);</span>
+<span class="fc" id="L92">        r.setControls(controls);</span>
+<span class="fc" id="L93">        setFocusable(true);</span>
+<span class="fc" id="L94">    }</span>
+
+    /// Advance the game by the given amount of time. Called once per frame (or
+    /// repeatedly at a fixed interval when `#setFixedTimestep(double)` is used).
+    protected abstract void update(double deltaSeconds);
+
+    /// The scene drawn by this view; add and remove `Sprite`s here.
+    public Scene getScene() {
+<span class="fc" id="L102">        return scene;</span>
+    }
+
+    /// The pollable input state for this view.
+    public GameInput getInput() {
+<span class="fc" id="L107">        return input;</span>
+    }
+
+    /// The on-screen touch controls for this view (a virtual joystick and buttons).
+    /// Add controls to it to make the game playable on touch devices; whatever you
+    /// add feeds the same `GameInput` your keyboard handling already reads.
+    public TouchControls getControls() {
+<span class="fc" id="L114">        return controls;</span>
+    }
+
+    /// The camera this view renders through. It starts in 2D mode; call
+    /// `GameCamera#setPerspective(float, float, float)` on it to switch the view into
+    /// a 3D perspective with billboarded sprites.
+    public GameCamera getCamera() {
+<span class="fc" id="L121">        return ((SpriteRenderer) getRenderer()).getCamera();</span>
+    }
+
+    /// The directional light shading lit 3D `Model`s in perspective mode.
+    public Light getLight() {
+<span class="fc" id="L126">        return ((SpriteRenderer) getRenderer()).getLight();</span>
+    }
+
+    /// Adds a 3D `Model` to be drawn in the perspective camera alongside the sprites.
+    /// Build models from `#onSetup(com.codename1.gpu.GraphicsDevice)`, where the GPU
+    /// device is available.
+    public void addModel(Model model) {
+<span class="nc" id="L133">        ((SpriteRenderer) getRenderer()).addModel(model);</span>
+<span class="nc" id="L134">    }</span>
+
+    /// Removes a previously added 3D `Model`.
+    public void removeModel(Model model) {
+<span class="nc" id="L138">        ((SpriteRenderer) getRenderer()).removeModel(model);</span>
+<span class="nc" id="L139">    }</span>
+
+    /// Override to allocate GPU resources (meshes, textures, `Model`s) once the GPU
+    /// device is ready. Invoked once on the render thread before the first frame --
+    /// the only place you can call `com.codename1.gpu.Primitives` /
+    /// `com.codename1.gpu.GltfLoader`, which need the device. The default does
+    /// nothing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `device`: the GPU device for creating meshes, textures and buffers
+    protected void onSetup(GraphicsDevice device) {
+<span class="nc" id="L151">    }</span>
+
+    /// {@inheritDoc} Forwards GPU setup to `#onSetup(com.codename1.gpu.GraphicsDevice)`.
+    @Override
+    public void setup(GraphicsDevice device) {
+<span class="nc" id="L156">        onSetup(device);</span>
+<span class="nc" id="L157">    }</span>
+
+    /// Sets the ARGB color the view is cleared to each frame.
+    public void setClearColor(int argb) {
+<span class="nc" id="L161">        ((SpriteRenderer) getRenderer()).setClearColor(argb);</span>
+<span class="nc" id="L162">    }</span>
+
+    /// Starts the game loop (continuous rendering). Safe to call before or after the
+    /// view is shown.
+    public void start() {
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (running) {</span>
+<span class="fc" id="L168">            return;</span>
+        }
+<span class="fc" id="L170">        running = true;</span>
+<span class="fc" id="L171">        paused = false;</span>
+<span class="fc" id="L172">        accumulator = 0;</span>
+<span class="fc" id="L173">        setContinuous(true);</span>
+<span class="fc" id="L174">        requestFocus();</span>
+<span class="fc" id="L175">        requestRender();</span>
+<span class="fc" id="L176">    }</span>
+
+    /// Stops the game loop (no further frames until `#start()`).
+    public void stop() {
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (!running) {</span>
+<span class="fc" id="L181">            return;</span>
+        }
+<span class="fc" id="L183">        running = false;</span>
+<span class="fc" id="L184">        setContinuous(false);</span>
+<span class="fc" id="L185">    }</span>
+
+    /// Pauses updates; frames still render but `#update(double)` is not called.
+    public void pause() {
+<span class="fc" id="L189">        paused = true;</span>
+<span class="fc" id="L190">    }</span>
+
+    /// Resumes after `#pause()`.
+    public void resume() {
+<span class="fc" id="L194">        paused = false;</span>
+<span class="fc" id="L195">    }</span>
+
+    public boolean isRunning() {
+<span class="fc" id="L198">        return running;</span>
+    }
+
+    public boolean isPaused() {
+<span class="fc" id="L202">        return paused;</span>
+    }
+
+    /// Sets a fixed update interval in seconds (0 disables, the default). With a
+    /// fixed timestep `#update(double)` may be called several times per frame to
+    /// catch up, and `#getInterpolationAlpha()` returns the leftover fraction.
+    public void setFixedTimestep(double seconds) {
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        fixedTimestep = seconds &lt; 0 ? 0 : seconds;</span>
+<span class="fc" id="L210">    }</span>
+
+    public double getFixedTimestep() {
+<span class="fc" id="L213">        return fixedTimestep;</span>
+    }
+
+    /// The 0..1 fraction of a fixed step left after the last update, for
+    /// interpolating rendered positions. Always 1 with a variable timestep.
+    public double getInterpolationAlpha() {
+<span class="fc" id="L219">        return interpolationAlpha;</span>
+    }
+
+    /// {@inheritDoc} Re-applies the running state once the GPU peer exists and starts
+    /// listening for pointer events at the form level.
+    @Override
+    protected void initComponent() {
+<span class="nc" id="L226">        super.initComponent();</span>
+<span class="nc" id="L227">        addFormPointerListeners();</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">        if (running) {</span>
+<span class="nc" id="L229">            setContinuous(true);</span>
+<span class="nc" id="L230">            requestFocus();</span>
+        }
+<span class="nc" id="L232">    }</span>
+
+    /// {@inheritDoc} Stops listening for pointer events when detached.
+    @Override
+    protected void deinitialize() {
+<span class="nc" id="L237">        removeFormPointerListeners();</span>
+<span class="nc" id="L238">        super.deinitialize();</span>
+<span class="nc" id="L239">    }</span>
+
+    /// The GPU surface is hosted in a native peer that swallows the platform's
+    /// pointer events before they reach this component, so the usual
+    /// `#pointerPressed(int[], int[])` callbacks never fire over the surface. Instead
+    /// we listen at the form level (those listeners fire for every pointer event,
+    /// regardless of which component is hit) and route the touches to the on-screen
+    /// controls ourselves.
+    private void addFormPointerListeners() {
+<span class="nc bnc" id="L248" title="All 2 branches missed.">        if (formListenersAdded) {</span>
+<span class="nc" id="L249">            return;</span>
+        }
+<span class="nc" id="L251">        Form f = getComponentForm();</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">        if (f == null) {</span>
+<span class="nc" id="L253">            return;</span>
+        }
+<span class="nc bnc" id="L255" title="All 2 branches missed.">        if (pressListener == null) {</span>
+<span class="nc" id="L256">            pressListener = new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent e) {
+<span class="nc" id="L259">                    routeFormTouch(e.getX(), e.getY(), true, true, false);</span>
+<span class="nc" id="L260">                }</span>
+            };
+<span class="nc" id="L262">            dragListener = new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent e) {
+<span class="nc" id="L265">                    routeFormTouch(e.getX(), e.getY(), true, false, false);</span>
+<span class="nc" id="L266">                }</span>
+            };
+<span class="nc" id="L268">            releaseListener = new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent e) {
+<span class="nc" id="L271">                    routeFormTouch(e.getX(), e.getY(), false, false, true);</span>
+<span class="nc" id="L272">                }</span>
+            };
+        }
+<span class="nc" id="L275">        f.addPointerPressedListener(pressListener);</span>
+<span class="nc" id="L276">        f.addPointerDraggedListener(dragListener);</span>
+<span class="nc" id="L277">        f.addPointerReleasedListener(releaseListener);</span>
+<span class="nc" id="L278">        formListenersAdded = true;</span>
+<span class="nc" id="L279">    }</span>
+
+    private void removeFormPointerListeners() {
+<span class="nc bnc" id="L282" title="All 2 branches missed.">        if (!formListenersAdded) {</span>
+<span class="nc" id="L283">            return;</span>
+        }
+<span class="nc" id="L285">        Form f = getComponentForm();</span>
+<span class="nc bnc" id="L286" title="All 4 branches missed.">        if (f != null &amp;&amp; pressListener != null) {</span>
+<span class="nc" id="L287">            f.removePointerPressedListener(pressListener);</span>
+<span class="nc" id="L288">            f.removePointerDraggedListener(dragListener);</span>
+<span class="nc" id="L289">            f.removePointerReleasedListener(releaseListener);</span>
+        }
+<span class="nc" id="L291">        formListenersAdded = false;</span>
+<span class="nc" id="L292">    }</span>
+
+    /// Routes a single form-level pointer event (in absolute coordinates) to the
+    /// on-screen controls and the raw pointer state, in view-local pixels.
+    private void routeFormTouch(int x, int y, boolean down, boolean pressed, boolean released) {
+<span class="nc" id="L297">        int lx = x - getAbsoluteX();</span>
+<span class="nc" id="L298">        int ly = y - getAbsoluteY();</span>
+<span class="nc" id="L299">        controls.onTouches(new int[]{lx}, new int[]{ly}, down);</span>
+<span class="nc" id="L300">        input.pointer(lx, ly, down, pressed, released);</span>
+<span class="nc" id="L301">    }</span>
+
+    /// {@inheritDoc} Drives game logic each frame -- invoked by the `SpriteRenderer`
+    /// before the scene is drawn.
+    @Override
+    public void frame(double deltaSeconds) {
+        // Keep the renderer's coordinate space in sync with this component's logical
+        // size so sprites, the joystick and touch (all in component pixels) line up
+        // with what is drawn, regardless of the GPU framebuffer's device-pixel size.
+<span class="fc" id="L310">        ((SpriteRenderer) getRenderer()).setLogicalSize(getWidth(), getHeight());</span>
+<span class="pc bpc" id="L311" title="1 of 4 branches missed.">        if (running &amp;&amp; !paused) {</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">            if (fixedTimestep &lt;= 0) {</span>
+<span class="fc" id="L313">                update(deltaSeconds);</span>
+<span class="fc" id="L314">                interpolationAlpha = 1;</span>
+            } else {
+<span class="fc" id="L316">                accumulator += deltaSeconds;</span>
+<span class="fc" id="L317">                int steps = 0;</span>
+<span class="pc bpc" id="L318" title="1 of 4 branches missed.">                while (accumulator &gt;= fixedTimestep &amp;&amp; steps &lt; MAX_FIXED_STEPS) {</span>
+<span class="fc" id="L319">                    update(fixedTimestep);</span>
+<span class="fc" id="L320">                    accumulator -= fixedTimestep;</span>
+<span class="fc" id="L321">                    steps++;</span>
+                }
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">                if (accumulator &gt; fixedTimestep) {</span>
+<span class="nc" id="L324">                    accumulator = fixedTimestep;</span>
+                }
+<span class="fc" id="L326">                interpolationAlpha = accumulator / fixedTimestep;</span>
+            }
+        }
+<span class="fc" id="L329">        relayoutControls();</span>
+<span class="fc" id="L330">        input.clearFrameEdges();</span>
+<span class="fc" id="L331">    }</span>
+
+    /// Repositions any anchored on-screen controls inside the current safe area, so a
+    /// joystick or button pinned to a corner clears notches/home indicators and tracks
+    /// rotation without the game recomputing coordinates.
+    private void relayoutControls() {
+<span class="fc" id="L337">        int sx = 0;</span>
+<span class="fc" id="L338">        int sy = 0;</span>
+<span class="fc" id="L339">        int sw = getWidth();</span>
+<span class="fc" id="L340">        int sh = getHeight();</span>
+<span class="fc" id="L341">        Form f = getComponentForm();</span>
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="nc" id="L343">            Rectangle safe = f.getSafeArea();</span>
+<span class="nc bnc" id="L344" title="All 6 branches missed.">            if (safe != null &amp;&amp; safe.getWidth() &gt; 0 &amp;&amp; safe.getHeight() &gt; 0) {</span>
+<span class="nc" id="L345">                int ax = getAbsoluteX();</span>
+<span class="nc" id="L346">                int ay = getAbsoluteY();</span>
+<span class="nc" id="L347">                int left = Math.max(0, safe.getX() - ax);</span>
+<span class="nc" id="L348">                int top = Math.max(0, safe.getY() - ay);</span>
+<span class="nc" id="L349">                int right = Math.min(getWidth(), safe.getX() + safe.getWidth() - ax);</span>
+<span class="nc" id="L350">                int bottom = Math.min(getHeight(), safe.getY() + safe.getHeight() - ay);</span>
+<span class="nc bnc" id="L351" title="All 4 branches missed.">                if (right &gt; left &amp;&amp; bottom &gt; top) {</span>
+<span class="nc" id="L352">                    sx = left;</span>
+<span class="nc" id="L353">                    sy = top;</span>
+<span class="nc" id="L354">                    sw = right - left;</span>
+<span class="nc" id="L355">                    sh = bottom - top;</span>
+                }
+            }
+        }
+<span class="fc" id="L359">        controls.relayout(sx, sy, sw, sh);</span>
+<span class="fc" id="L360">    }</span>
+
+    // ---- input capture ---------------------------------------------------
+
+    /// While running the view consumes all key events (including the directional
+    /// pad and fire button) so they are not stolen for focus traversal.
+    @Override
+    public boolean handlesInput() {
+<span class="nc bnc" id="L368" title="All 4 branches missed.">        return running &amp;&amp; !paused;</span>
+    }
+
+    @Override
+    public void keyPressed(int keyCode) {
+<span class="nc" id="L373">        input.keyDown(keyCode);</span>
+<span class="nc" id="L374">    }</span>
+
+    @Override
+    public void keyReleased(int keyCode) {
+<span class="nc" id="L378">        input.keyUp(keyCode);</span>
+<span class="nc" id="L379">    }</span>
+
+    @Override
+    public void pointerPressed(int[] x, int[] y) {
+<span class="nc" id="L383">        routeTouches(x, y, true, true, false);</span>
+<span class="nc" id="L384">    }</span>
+
+    @Override
+    public void pointerDragged(int[] x, int[] y) {
+<span class="nc" id="L388">        routeTouches(x, y, true, false, false);</span>
+<span class="nc" id="L389">    }</span>
+
+    @Override
+    public void pointerReleased(int[] x, int[] y) {
+<span class="nc" id="L393">        routeTouches(x, y, false, false, true);</span>
+<span class="nc" id="L394">    }</span>
+
+    /// Converts the absolute multi-touch points to view-local pixels, feeds them to
+    /// the on-screen `TouchControls` and updates the raw pointer state from the first
+    /// touch.
+    private void routeTouches(int[] x, int[] y, boolean down, boolean pressed, boolean released) {
+<span class="nc" id="L400">        int ox = getAbsoluteX();</span>
+<span class="nc" id="L401">        int oy = getAbsoluteY();</span>
+<span class="nc" id="L402">        int[] lx = new int[x.length];</span>
+<span class="nc" id="L403">        int[] ly = new int[y.length];</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">        for (int i = 0; i &lt; x.length; i++) {</span>
+<span class="nc" id="L405">            lx[i] = x[i] - ox;</span>
+<span class="nc" id="L406">            ly[i] = y[i] - oy;</span>
+        }
+<span class="nc" id="L408">        controls.onTouches(lx, ly, down);</span>
+<span class="nc bnc" id="L409" title="All 2 branches missed.">        if (x.length &gt; 0) {</span>
+<span class="nc" id="L410">            input.pointer(lx[0], ly[0], down, pressed, released);</span>
+        }
+<span class="nc" id="L412">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

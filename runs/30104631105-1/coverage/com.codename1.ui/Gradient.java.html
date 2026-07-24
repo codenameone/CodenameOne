@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Gradient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">Gradient.java</span></div><h1>Gradient.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.geom.Rectangle2D;
+
+/// Abstract description of a CSS-style gradient that can be used as a
+/// background or painted directly via `Graphics#fillGradient`. Three
+/// concrete subclasses mirror the corresponding CSS functions:
+///
+/// - `LinearGradient` for `linear-gradient(&lt;angle&gt;, &lt;stops&gt;)`
+/// - `RadialGradient` for `radial-gradient([shape] [extent] [at pos], &lt;stops&gt;)`
+/// - `ConicGradient` for `conic-gradient([from &lt;angle&gt;] [at pos], &lt;stops&gt;)`
+///
+/// A Gradient is a [Paint], so it can also be assigned via `Graphics#setColor(Paint)`
+/// and consumed by `fillRect` / `fillShape`. The dedicated
+/// `Graphics#fillGradient(Gradient, int, int, int, int)` entry point gives
+/// the platform port the rectangle bounds up front so it can pick the
+/// fastest native shader path (Java2D `LinearGradientPaint` /
+/// `RadialGradientPaint`, Android `LinearGradient` / `RadialGradient` /
+/// `SweepGradient`, Core Graphics `CGGradient`).
+///
+/// Subclass instances are intended to be immutable after construction;
+/// modify via builder-style setters before handing the gradient off to
+/// `Graphics` or `Style`. `copy()` produces a defensive deep clone for
+/// places that must outlive caller mutation (e.g. async paint queues).
+public abstract class Gradient implements Paint {
+    /// Sentinel returned by `getKind()` for `LinearGradient` instances.
+    public static final byte KIND_LINEAR = 0;
+    /// Sentinel returned by `getKind()` for `RadialGradient` instances.
+    public static final byte KIND_RADIAL = 1;
+    /// Sentinel returned by `getKind()` for `ConicGradient` instances.
+    public static final byte KIND_CONIC = 2;
+
+    /// Cycle modes mirroring `MultipleGradientPaint.CycleMethod`. Repeated as
+    /// byte constants here so that this class (and the .res serializer) does
+    /// not pull the enum across the resource format boundary.
+    public static final byte CYCLE_NONE = 0;
+    public static final byte CYCLE_REPEAT = 1;
+    public static final byte CYCLE_REFLECT = 2;
+
+    private int[] colors;
+    private float[] positions;
+<span class="fc" id="L64">    private byte cycleMethod = CYCLE_NONE;</span>
+
+    // Weak-ref token (Display.createSoftWeakRef) holding a previously rasterized
+    // ARGB image for fillGradient's default software path. Sized to the last
+    // rectangle the gradient was drawn into; if a different size comes in we
+    // re-rasterize. The cache is intentionally weak so it does not pin large
+    // bitmaps in memory when the gradient is not actively painting.
+    private Object cachedRasterRef;
+    private int cachedRasterWidth;
+    private int cachedRasterHeight;
+
+<span class="fc" id="L75">    Gradient(int[] colors, float[] positions) {</span>
+<span class="pc bpc" id="L76" title="4 of 8 branches missed.">        if (colors == null || positions == null || colors.length != positions.length || colors.length &lt; 2) {</span>
+<span class="nc" id="L77">            throw new IllegalArgumentException(&quot;colors and positions must be same length, at least 2&quot;);</span>
+        }
+<span class="fc" id="L79">        this.colors = colors;</span>
+<span class="fc" id="L80">        this.positions = positions;</span>
+<span class="fc" id="L81">    }</span>
+
+    /// Parses a CSS gradient function string and returns the corresponding
+    /// `Gradient` subclass. Supports `linear-gradient`, `radial-gradient`,
+    /// `conic-gradient`, and the `repeating-*` variants. Mirrors the syntax
+    /// accepted by the build-time CSS compiler so a string copied verbatim
+    /// from a `.css` file produces the same gradient at runtime.
+    ///
+    /// Returns null if `css` is null/empty or does not look like a gradient
+    /// function call. Throws `IllegalArgumentException` on hard parse errors
+    /// (unknown direction, missing stops, malformed colors).
+    public static Gradient parseCss(String css) {
+<span class="fc" id="L93">        return CSSGradientParser.parse(css);</span>
+    }
+
+    /// Returns one of `KIND_LINEAR`, `KIND_RADIAL`, `KIND_CONIC`.
+    public abstract byte getKind();
+
+    /// ARGB stop colors (length &gt;= 2).
+    public final int[] getColors() {
+<span class="fc" id="L101">        return colors;</span>
+    }
+
+    /// Stop positions in [0,1] aligned with `getColors()`.
+    public final float[] getPositions() {
+<span class="fc" id="L106">        return positions;</span>
+    }
+
+    /// One of `CYCLE_NONE` / `CYCLE_REPEAT` / `CYCLE_REFLECT`. Defaults to NONE.
+    public final byte getCycleMethod() {
+<span class="fc" id="L111">        return cycleMethod;</span>
+    }
+
+    /// Sets the cycle method. Returns `this` for chaining.
+    public final Gradient setCycleMethod(byte cycleMethod) {
+<span class="fc" id="L116">        this.cycleMethod = cycleMethod;</span>
+<span class="fc" id="L117">        invalidateRasterCache();</span>
+<span class="fc" id="L118">        return this;</span>
+    }
+
+    /// Returns a software-rasterized image of this gradient at the requested
+    /// rectangle size, reusing a weakly-cached bitmap when possible. Ports
+    /// without a hardware shader path can call this from their `fillGradient`
+    /// override to avoid re-rasterizing on every frame; the cache is a
+    /// `Display.createSoftWeakRef` so the bitmap is reclaimable when idle.
+    public final Image getCachedRaster(int width, int height) {
+<span class="pc bpc" id="L127" title="2 of 4 branches missed.">        if (width &lt;= 0 || height &lt;= 0) {</span>
+<span class="nc" id="L128">            return null;</span>
+        }
+<span class="pc bpc" id="L130" title="5 of 6 branches missed.">        if (cachedRasterRef != null &amp;&amp; width == cachedRasterWidth &amp;&amp; height == cachedRasterHeight) {</span>
+<span class="nc" id="L131">            Object cached = Display.getInstance().extractHardRef(cachedRasterRef);</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">            if (cached instanceof Image) {</span>
+<span class="nc" id="L133">                return (Image) cached;</span>
+            }
+        }
+<span class="fc" id="L136">        int[] rgb = new int[width * height];</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        for (int py = 0; py &lt; height; py++) {</span>
+<span class="fc" id="L138">            int row = py * width;</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            for (int px = 0; px &lt; width; px++) {</span>
+<span class="fc" id="L140">                rgb[row + px] = sampleArgb(px, py, width, height);</span>
+            }
+        }
+<span class="fc" id="L143">        Image img = Image.createImage(rgb, width, height);</span>
+<span class="fc" id="L144">        cachedRasterRef = Display.getInstance().createSoftWeakRef(img);</span>
+<span class="fc" id="L145">        cachedRasterWidth = width;</span>
+<span class="fc" id="L146">        cachedRasterHeight = height;</span>
+<span class="fc" id="L147">        return img;</span>
+    }
+
+    /// Drops the weak cached raster - call after any mutation that changes the
+    /// painted pixels (cycle method change, subclass parameter change). Public
+    /// so subclass setters can keep the cache coherent.
+    protected final void invalidateRasterCache() {
+<span class="fc" id="L154">        cachedRasterRef = null;</span>
+<span class="fc" id="L155">        cachedRasterWidth = 0;</span>
+<span class="fc" id="L156">        cachedRasterHeight = 0;</span>
+<span class="fc" id="L157">    }</span>
+
+    /// Returns a defensive deep copy. Implemented by each concrete subclass
+    /// so async-paint queues can capture an immutable snapshot.
+    public abstract Gradient copy();
+
+    @Override
+    public final void paint(Graphics g, Rectangle2D bounds) {
+<span class="nc" id="L165">        paint(g, bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());</span>
+<span class="nc" id="L166">    }</span>
+
+    @Override
+    public final void paint(Graphics g, double x, double y, double w, double h) {
+<span class="nc" id="L170">        g.fillGradient(this, (int) x, (int) y, (int) w, (int) h);</span>
+<span class="nc" id="L171">    }</span>
+
+    /// Software-rasterizer hook used by the default port implementation when
+    /// no native gradient shader is available. Samples an ARGB color for the
+    /// pixel at (px, py) within a rectangle of the given width / height.
+    /// Ports overriding `fillGradient` directly do not call this.
+    public abstract int sampleArgb(int px, int py, int width, int height);
+
+    /// Samples one of the stops at fractional position t. Honors the
+    /// configured cycle method. Shared by the three subclasses' sampling
+    /// implementations.
+    ///
+    /// CSS `repeating-*-gradient` stops define one period from
+    /// `positions[0]` to `positions[last]`, not `[0, 1]`. For
+    /// `white 0%, red 16%` the period is 0.16 of the gradient extent and
+    /// the pattern must wrap on that range; collapsing to `t - floor(t)`
+    /// would leak the final color across the rest of the rect.
+    protected final int sampleStops(float t) {
+<span class="fc" id="L189">        float p0 = positions[0];</span>
+<span class="fc" id="L190">        float pN = positions[positions.length - 1];</span>
+<span class="fc" id="L191">        float period = pN - p0;</span>
+<span class="pc bpc" id="L192" title="2 of 3 branches missed.">        switch (cycleMethod) {</span>
+            case CYCLE_REPEAT:
+<span class="nc bnc" id="L194" title="All 2 branches missed.">                if (period &gt; 0) {</span>
+<span class="nc" id="L195">                    float rel = (t - p0) / period;</span>
+<span class="nc" id="L196">                    rel = rel - (float) Math.floor(rel);</span>
+<span class="nc" id="L197">                    t = p0 + rel * period;</span>
+<span class="nc" id="L198">                }</span>
+                break;
+            case CYCLE_REFLECT:
+<span class="nc bnc" id="L201" title="All 2 branches missed.">                if (period &gt; 0) {</span>
+<span class="nc" id="L202">                    float rel = Math.abs((t - p0) / period);</span>
+<span class="nc" id="L203">                    float intp = (float) Math.floor(rel);</span>
+<span class="nc" id="L204">                    float frac = rel - intp;</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">                    if ((((int) intp) &amp; 1) != 0) {</span>
+<span class="nc" id="L206">                        frac = 1f - frac;</span>
+                    }
+<span class="nc" id="L208">                    t = p0 + frac * period;</span>
+<span class="nc" id="L209">                }</span>
+                break;
+            default:
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                if (t &lt;= p0) {</span>
+<span class="nc" id="L213">                    return colors[0];</span>
+                }
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">                if (t &gt;= pN) {</span>
+<span class="nc" id="L216">                    return colors[colors.length - 1];</span>
+                }
+                break;
+        }
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        for (int i = 1; i &lt; positions.length; i++) {</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">            if (t &lt;= positions[i]) {</span>
+<span class="fc" id="L222">                float span = positions[i] - positions[i - 1];</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">                float local = span &lt;= 0 ? 0 : (t - positions[i - 1]) / span;</span>
+<span class="fc" id="L224">                return blendArgb(colors[i - 1], colors[i], local);</span>
+            }
+        }
+<span class="nc" id="L227">        return colors[colors.length - 1];</span>
+    }
+
+    static int blendArgb(int c0, int c1, float t) {
+<span class="fc" id="L231">        int a0 = (c0 &gt;&gt; 24) &amp; 0xff;</span>
+<span class="fc" id="L232">        int r0 = (c0 &gt;&gt; 16) &amp; 0xff;</span>
+<span class="fc" id="L233">        int g0 = (c0 &gt;&gt; 8) &amp; 0xff;</span>
+<span class="fc" id="L234">        int b0 = c0 &amp; 0xff;</span>
+<span class="fc" id="L235">        int a1 = (c1 &gt;&gt; 24) &amp; 0xff;</span>
+<span class="fc" id="L236">        int r1 = (c1 &gt;&gt; 16) &amp; 0xff;</span>
+<span class="fc" id="L237">        int g1 = (c1 &gt;&gt; 8) &amp; 0xff;</span>
+<span class="fc" id="L238">        int b1 = c1 &amp; 0xff;</span>
+<span class="fc" id="L239">        int a = (int) (a0 + (a1 - a0) * t + 0.5f);</span>
+<span class="fc" id="L240">        int r = (int) (r0 + (r1 - r0) * t + 0.5f);</span>
+<span class="fc" id="L241">        int g = (int) (g0 + (g1 - g0) * t + 0.5f);</span>
+<span class="fc" id="L242">        int b = (int) (b0 + (b1 - b0) * t + 0.5f);</span>
+<span class="fc" id="L243">        return (a &lt;&lt; 24) | (r &lt;&lt; 16) | (g &lt;&lt; 8) | b;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

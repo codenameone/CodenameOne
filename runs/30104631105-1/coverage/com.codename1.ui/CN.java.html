@@ -1,0 +1,2382 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CN.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">CN.java</span></div><h1>CN.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
+import com.codename1.io.NetworkEvent;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.Storage;
+import com.codename1.messaging.Message;
+import com.codename1.plugin.PluginSupport;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.MessageEvent;
+import com.codename1.ui.events.WindowEvent;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.util.Simd;
+import com.codename1.util.RunnableWithResultSync;
+import com.codename1.util.SuccessCallback;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.Hashtable;
+import java.util.Timer;
+
+/// This is a global context static class designed for static import, this class allows us to write more
+/// terse code. However, its chief purpose is simplification by hiding some of the more esoteric methods of
+/// these underlying classes and bringing to the front the commonly used important methods.
+/// This class includes code from Display, NetworkManager, Log and other important classes
+///
+/// @author Shai Almog
+public class CN extends CN1Constants {
+    /// Constant for the name of the main thin native font.
+    public static final String NATIVE_MAIN_THIN = &quot;native:MainThin&quot;;
+
+    /// Constant for the main light native font.
+    public static final String NATIVE_MAIN_LIGHT = &quot;native:MainLight&quot;;
+
+    /// Constant for the main regular native font.
+    public static final String NATIVE_MAIN_REGULAR = &quot;native:MainRegular&quot;;
+
+    /// Constant for the main bold native font.
+    public static final String NATIVE_MAIN_BOLD = &quot;native:MainBold&quot;;
+
+    /// Constant for the main black native font.
+    public static final String NATIVE_MAIN_BLACK = &quot;native:MainBlack&quot;;
+
+    /// Constant for the italic thin native font.
+    public static final String NATIVE_ITALIC_THIN = &quot;native:ItalicThin&quot;;
+
+    /// Constant for the italic light native font.
+    public static final String NATIVE_ITALIC_LIGHT = &quot;native:ItalicLight&quot;;
+
+    /// Constant for the italic regular native font.
+    public static final String NATIVE_ITALIC_REGULAR = &quot;native:ItalicRegular&quot;;
+
+    /// Constant for the italic bold native font.
+    public static final String NATIVE_ITALIC_BOLD = &quot;native:ItalicBold&quot;;
+
+    /// Constant for the italic black native font.
+    public static final String NATIVE_ITALIC_BLACK = &quot;native:ItalicBlack&quot;;
+
+    /// Constant allowing us to author portable system fonts
+    public static final int FACE_MONOSPACE = 32;
+
+    /// Constant allowing us to author portable system fonts
+    public static final int FACE_PROPORTIONAL = 64;
+
+    /// Constant allowing us to author portable system fonts
+    public static final int FACE_SYSTEM = 0;
+
+    /// Constant allowing us to author portable system fonts
+    public static final int SIZE_LARGE = 16;
+
+    /// Constant allowing us to author portable system fonts
+    public static final int SIZE_MEDIUM = 0;
+
+    /// Constant allowing us to author portable system fonts
+    public static final int SIZE_SMALL = 8;
+
+    /// Constant allowing us to author portable system fonts
+    public static final int STYLE_BOLD = 1;
+
+    /// Constant allowing us to author portable system fonts
+    public static final int STYLE_ITALIC = 2;
+
+    /// Constant allowing us to author portable system fonts
+    public static final int STYLE_UNDERLINED = 4;
+
+    /// Constant allowing us to author portable system fonts
+    public static final int STYLE_PLAIN = 0;
+
+    /// The north layout constraint (top of container).
+    public static final String NORTH = &quot;North&quot;;
+    /// The south layout constraint (bottom of container).
+    public static final String SOUTH = &quot;South&quot;;
+
+    /// The west layout constraint (left of container).
+    public static final String WEST = &quot;West&quot;;
+    /// The east layout constraint (right of container).
+    public static final String EAST = &quot;East&quot;;
+
+    /// Indicates a Component center alignment
+    public static final int CENTER = 4;
+    /// Box-orientation constant used to specify the top of a box.
+    public static final int TOP = 0;
+    /// Box-orientation constant used to specify the left side of a box.
+    public static final int LEFT = 1;
+    /// Box-orientation constant used to specify the bottom of a box.
+    public static final int BOTTOM = 2;
+    /// Box-orientation constant used to specify the right side of a box.
+    public static final int RIGHT = 3;
+
+    /// Alignment to the baseline constraint
+    public static final int BASELINE = 5;
+
+    /// Defines the behavior of the component placed in the center position of the layout, by default it is scaled to the available space
+    public static final int CENTER_BEHAVIOR_SCALE = 0;
+
+    /// Defines the behavior of the component placed in the center position of the layout, places the component in the center of
+    /// the space available to the center component.
+    public static final int CENTER_BEHAVIOR_CENTER = 1;
+
+
+    /// Defines the behavior of the component placed in the center position of the layout, places the component in the center of
+    /// the surrounding container
+    public static final int CENTER_BEHAVIOR_CENTER_ABSOLUTE = 2;
+
+    /// The center component takes up the entire screens and the sides are automatically placed on top of it thus creating
+    /// a layered effect
+    public static final int CENTER_BEHAVIOR_TOTAL_BELOW = 3;
+
+<span class="fc" id="L156">    CN() {</span>
+<span class="fc" id="L157">    }</span>
+
+    /// Sets a bookmark that can restore the app to a particular state.  This takes a
+    /// `Runnable` that will be run when `#restoreToBookmark()` () } is called.
+    ///
+    /// The primary purpose of this feature is live code refresh.
+    ///
+    /// #### Parameters
+    ///
+    /// - `bookmark`: A `Runnable` that can be run to restore the app to a particular point.
+    ///
+    public static void setBookmark(Runnable bookmark) {
+<span class="fc" id="L169">        Display.getInstance().setBookmark(bookmark);</span>
+<span class="fc" id="L170">    }</span>
+
+    /// Runs the last bookmark that was set using `#setBookmark(java.lang.Runnable)`
+    ///
+    public static void restoreToBookmark() {
+<span class="fc" id="L175">        Display.getInstance().restoreToBookmark();</span>
+<span class="fc" id="L176">    }</span>
+
+    /// This method allows us to manipulate the drag started detection logic.
+    /// If the pointer was dragged for more than this percentage of the display size it
+    /// is safe to assume that a drag is in progress.
+    ///
+    /// #### Returns
+    ///
+    /// motion percentage
+    public static int getDragStartPercentage() {
+<span class="nc" id="L186">        return Display.impl.getDragStartPercentage();</span>
+    }
+
+    /// This method allows us to manipulate the drag started detection logic.
+    /// If the pointer was dragged for more than this percentage of the display size it
+    /// is safe to assume that a drag is in progress.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dragStartPercentage`: percentage of the screen required to initiate drag
+    public static void setDragStartPercentage(int dragStartPercentage) {
+<span class="nc" id="L197">        Display.impl.setDragStartPercentage(dragStartPercentage);</span>
+<span class="nc" id="L198">    }</span>
+
+    /// Creates a soft/weak reference to an object that allows it to be collected
+    /// yet caches it. This method is in the porting layer since CLDC only includes
+    /// weak references while some platforms include nothing at all and some include
+    /// the superior soft references.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: object to cache
+    ///
+    /// #### Returns
+    ///
+    /// a caching object or null  if caching isn't supported
+    public static Object createSoftWeakRef(Object o) {
+<span class="nc" id="L213">        return Display.impl.createSoftWeakRef(o);</span>
+    }
+
+    /// Extracts the hard reference from the soft/weak reference given
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the reference returned by createSoftWeakRef
+    ///
+    /// #### Returns
+    ///
+    /// the original object submitted or null
+    public static Object extractHardRef(Object o) {
+<span class="nc" id="L226">        return Display.impl.extractHardRef(o);</span>
+    }
+
+    /// Checks if async stack traces are enabled.  If enabled, the stack trace
+    /// at the point of `#callSerially(java.lang.Runnable)` calls will
+    /// be recorded, and logged in the case that there is an uncaught exception.
+    ///
+    /// Currently this is only supported in the JavaSE/Simulator port.
+    ///
+    /// #### Returns
+    ///
+    /// Whether async stack traces are enabled.
+    ///
+    /// #### See also
+    ///
+    /// - #setEnableAsyncStackTraces(boolean)
+    public static boolean isEnableAsyncStackTraces() {
+<span class="nc" id="L243">        return Display.getInstance().isEnableAsyncStackTraces();</span>
+    }
+
+    /// Enables or disables async stack traces.  If enabled, the stack trace
+    /// at the point of `#callSerially(java.lang.Runnable)` calls will
+    /// be recorded, and logged in the case that there is an uncaught exception.
+    ///
+    /// Currently this is only supported in the JavaSE/Simulator port.
+    ///
+    /// #### Parameters
+    ///
+    /// - `enable`: True to enable async stack traces.
+    ///
+    /// #### See also
+    ///
+    /// - #isEnableAsyncStackTraces()
+    public static void setEnableAsyncStackTraces(boolean enable) {
+<span class="nc" id="L260">        Display.getInstance().setEnableAsyncStackTraces(enable);</span>
+<span class="nc" id="L261">    }</span>
+
+    /// Vibrates the device for the given length of time, notice that this might ignore the time value completely
+    /// on some OS's where this level of control isn't supported e.g. iOS see: https://github.com/codenameone/CodenameOne/issues/1904
+    ///
+    /// #### Parameters
+    ///
+    /// - `duration`: length of time to vibrate (might be ignored)
+    public static void vibrate(int duration) {
+<span class="nc" id="L270">        Display.impl.vibrate(duration);</span>
+<span class="nc" id="L271">    }</span>
+
+    /// Manually announces text to native accessibility services, optionally associating the
+    /// announcement with a specific component. Normally, components are announced automatically
+    /// when they receive focus; this method is for cases where an announcement is needed outside
+    /// the normal focus lifecycle.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmp`: the component related to this announcement or `null` for the root view
+    ///
+    /// - `text`: the message to announce
+    public static void announceForAccessibility(Component cmp, String text) {
+<span class="nc" id="L284">        Display.impl.announceForAccessibility(cmp, text);</span>
+<span class="nc" id="L285">    }</span>
+
+    /// Convenience overload to announce text without specifying a component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the message to announce
+    public static void announceForAccessibility(String text) {
+<span class="nc" id="L293">        Display.impl.announceForAccessibility(null, text);</span>
+<span class="nc" id="L294">    }</span>
+
+    /// Returns true if we are currently in the event dispatch thread.
+    /// This is useful for generic code that can be used both with the
+    /// EDT and outside of it.
+    ///
+    /// #### Returns
+    ///
+    /// @return true if we are currently in the event dispatch thread;
+    /// otherwise false
+    public static boolean isEdt() {
+<span class="fc" id="L305">        return Display.INSTANCE.isEdt();</span>
+    }
+
+
+    /// Causes the runnable to be invoked on the event dispatch thread. This method
+    /// returns immediately and will not wait for the serial call to occur
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
+    /// the paint and key handling events
+    public static void callSerially(Runnable r) {
+<span class="fc" id="L317">        Display.INSTANCE.callSerially(r);</span>
+<span class="fc" id="L318">    }</span>
+
+    /// Causes the runnable to be invoked on the event dispatch thread when the event
+    /// dispatch thread is idle. This method returns immediately and will not wait for the serial call
+    /// to occur. Notice this method is identical to call serially but will perform the runnable only when
+    /// the EDT is idle
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
+    /// the paint and key handling events
+    public static void callSeriallyOnIdle(Runnable r) {
+<span class="nc" id="L330">        Display.INSTANCE.callSeriallyOnIdle(r);</span>
+<span class="nc" id="L331">    }</span>
+
+    /// Allows executing a background task in a separate low priority thread. Tasks are serialized
+    /// so they don't overload the CPU.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the task to perform in the background
+    public static void scheduleBackgroundTask(Runnable r) {
+<span class="fc" id="L340">        Display.INSTANCE.scheduleBackgroundTask(r);</span>
+<span class="fc" id="L341">    }</span>
+
+
+    /// Identical to callSerially with the added benefit of waiting for the Runnable method to complete.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: @param r runnable (NOT A THREAD!) that will be invoked on the EDT serial to
+    /// the paint and key handling events
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: @throws IllegalStateException if this method is invoked on the event dispatch thread (e.g. during
+    /// paint or event handling).
+    public static void callSeriallyAndWait(Runnable r) {
+<span class="fc" id="L356">        Display.INSTANCE.callSeriallyAndWait(r);</span>
+<span class="fc" id="L357">    }</span>
+
+    /// Identical to callSerially with the added benefit of waiting for the Runnable method to complete.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: @param r       runnable (NOT A THREAD!) that will be invoked on the EDT serial to
+    /// the paint and key handling events
+    ///
+    /// - `timeout`: timeout duration, on timeout the method just returns
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: @throws IllegalStateException if this method is invoked on the event dispatch thread (e.g. during
+    /// paint or event handling).
+    public static void callSeriallyAndWait(Runnable r, int timeout) {
+<span class="nc" id="L373">        Display.INSTANCE.callSeriallyAndWait(r, timeout);</span>
+<span class="nc" id="L374">    }</span>
+
+    /// Invokes runnable and blocks the current thread, if the current thread is the
+    /// EDT it will still be blocked in a way that doesn't break event dispatch .
+    /// **Important:** calling this method spawns a new thread that shouldn't access the UI!
+    ///
+    /// See [this section](https://www.codenameone.com/manual/edt.html#_invoke_and_block) in the developer guide for further information.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: runnable (NOT A THREAD!) that will be invoked synchroniously by this method
+    public static void invokeAndBlock(Runnable r) {
+<span class="fc" id="L386">        Display.INSTANCE.invokeAndBlock(r);</span>
+<span class="fc" id="L387">    }</span>
+
+    /// Invokes a Runnable with blocking disabled.  If any attempt is made to block
+    /// (i.e. call `#invokeAndBlock(java.lang.Runnable)` from inside this Runnable,
+    /// it will result in a `BlockingDisallowedException` being thrown.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: Runnable to be run immediately.
+    ///
+    /// #### Throws
+    ///
+    /// - `BlockingDisallowedException`: @throws BlockingDisallowedException If `#invokeAndBlock(java.lang.Runnable)` is attempted
+    /// anywhere in the Runnable.
+    ///
+    public static void invokeWithoutBlocking(Runnable r) {
+<span class="nc" id="L403">        Display.INSTANCE.invokeWithoutBlocking(r);</span>
+<span class="nc" id="L404">    }</span>
+
+    /// Invokes a RunnableWithResultSync with blocking disabled.  If any attempt is made to block
+    /// (i.e. call `#invokeAndBlock(java.lang.Runnable)` from inside this Runnable,
+    /// it will result in a `BlockingDisallowedException` being thrown.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: Runnable to be run immediately.
+    ///
+    /// #### Throws
+    ///
+    /// - `BlockingDisallowedException`: @throws BlockingDisallowedException If `#invokeAndBlock(java.lang.Runnable)` is attempted
+    /// anywhere in the Runnable.
+    ///
+    public static &lt;T&gt; T invokeWithoutBlockingWithResultSync(RunnableWithResultSync&lt;T&gt; r) {
+<span class="fc" id="L420">        return Display.INSTANCE.invokeWithoutBlockingWithResultSync(r);</span>
+    }
+
+    /// Minimizes the current application if minimization is supported by the platform (may fail).
+    /// Returns false if minimization failed.
+    ///
+    /// #### Returns
+    ///
+    /// false if minimization failed true if it succeeded or seems to be successful
+    public static boolean minimizeApplication() {
+<span class="nc" id="L430">        return Display.impl.minimizeApplication();</span>
+    }
+
+    /// Indicates whether an application is minimized
+    ///
+    /// #### Returns
+    ///
+    /// true if the application is minimized
+    public static boolean isMinimized() {
+<span class="nc" id="L439">        return Display.impl.isMinimized();</span>
+    }
+
+    /// Restore the minimized application if minimization is supported by the platform
+    public static void restoreMinimizedApplication() {
+<span class="nc" id="L444">        Display.impl.restoreMinimizedApplication();</span>
+<span class="nc" id="L445">    }</span>
+
+    /// Return the form currently displayed on the screen or null if no form is
+    /// currently displayed.
+    ///
+    /// #### Returns
+    ///
+    /// @return the form currently displayed on the screen or null if no form is
+    /// currently displayed
+    public static Form getCurrentForm() {
+<span class="fc" id="L455">        return Display.INSTANCE.getCurrent();</span>
+    }
+
+    /// Return the width of the display
+    ///
+    /// #### Returns
+    ///
+    /// the width of the display
+    public static int getDisplayWidth() {
+<span class="fc" id="L464">        return Display.impl.getDisplayWidth();</span>
+    }
+
+    /// Return the height of the display
+    ///
+    /// #### Returns
+    ///
+    /// the height of the display
+    public static int getDisplayHeight() {
+<span class="fc" id="L473">        return Display.impl.getDisplayHeight();</span>
+    }
+
+
+    /// Converts the dips count to pixels, dips are roughly 1mm in length. This is a very rough estimate and not
+    /// to be relied upon
+    ///
+    /// #### Parameters
+    ///
+    /// - `dipCount`: the dips that we will convert to pixels
+    ///
+    /// - `horizontal`: indicates pixels in the horizontal plane
+    ///
+    /// #### Returns
+    ///
+    /// value in pixels
+    public static int convertToPixels(int dipCount, boolean horizontal) {
+<span class="fc" id="L490">        return Display.impl.convertToPixels(dipCount, horizontal);</span>
+    }
+
+    /// Converts from specified unit to pixels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: The value to convert, expressed in unitType.
+    ///
+    /// - `unitType`: @param unitType   The unit type.  One of `Style#UNIT_TYPE_DIPS`, `Style#UNIT_TYPE_PIXELS`,
+    /// `Style#UNIT_TYPE_REM`, `Style#UNIT_TYPE_SCREEN_PERCENTAGE`, `Style#UNIT_TYPE_VH`,
+    /// `Style#UNIT_TYPE_VW`, `Style#UNIT_TYPE_VMIN`, `Style#UNIT_TYPE_VMAX`
+    ///
+    /// - `horizontal`: Whether screen percentage units should be based on horitonzal or vertical percentage.
+    ///
+    /// #### Returns
+    ///
+    /// The value converted to pixels.
+    ///
+    public static int convertToPixels(float value, byte unitType, boolean horizontal) {
+<span class="fc" id="L510">        return Display.INSTANCE.convertToPixels(value, unitType, horizontal);</span>
+    }
+
+    /// Converts from specified unit to pixels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: The value to convert, expressed in unitType.
+    ///
+    /// - `unitType`: @param unitType The unit type.  One of `Style#UNIT_TYPE_DIPS`, `Style#UNIT_TYPE_PIXELS`,
+    /// `Style#UNIT_TYPE_REM`, `Style#UNIT_TYPE_SCREEN_PERCENTAGE`, `Style#UNIT_TYPE_VH`,
+    /// `Style#UNIT_TYPE_VW`, `Style#UNIT_TYPE_VMIN`, `Style#UNIT_TYPE_VMAX`
+    ///
+    /// #### Returns
+    ///
+    /// The value converted to pixels.
+    ///
+    public static int convertToPixels(float value, byte unitType) {
+<span class="nc" id="L528">        return Display.INSTANCE.convertToPixels(value, unitType);</span>
+    }
+
+
+    /// Converts the dips count to pixels, dips are roughly 1mm in length. This is a very rough estimate and not
+    /// to be relied upon. This version of the method assumes square pixels which is pretty much the norm.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dipCount`: the dips that we will convert to pixels
+    ///
+    /// #### Returns
+    ///
+    /// value in pixels
+    public static int convertToPixels(float dipCount) {
+<span class="fc" id="L543">        return Math.round(Display.impl.convertToPixels((int) (dipCount * 1000), true) / 1000.0f);</span>
+    }
+
+    /// This method is essentially equivalent to cls.getResourceAsStream(String)
+    /// however some platforms might define unique ways in which to load resources
+    /// within the implementation.
+    ///
+    /// #### Parameters
+    ///
+    /// - `resource`: relative/absolute URL based on the Java convention
+    ///
+    /// #### Returns
+    ///
+    /// input stream for the resource or null if not found
+    public static InputStream getResourceAsStream(String resource) {
+<span class="nc" id="L558">        return Display.impl.getResourceAsStream(CN.class, resource);</span>
+    }
+
+
+    /// An error handler will receive an action event with the source exception from the EDT
+    /// once an error handler is installed the default Codename One error dialog will no longer appear
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: listener receiving the errors
+    public static void addEdtErrorHandler(ActionListener e) {
+<span class="nc" id="L569">        Display.INSTANCE.addEdtErrorHandler(e);</span>
+<span class="nc" id="L570">    }</span>
+
+    /// An error handler will receive an action event with the source exception from the EDT
+    /// once an error handler is installed the default Codename One error dialog will no longer appear
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: listener receiving the errors
+    public static void removeEdtErrorHandler(ActionListener e) {
+<span class="nc" id="L579">        Display.INSTANCE.removeEdtErrorHandler(e);</span>
+<span class="nc" id="L580">    }</span>
+
+    /// Exits the application...
+    public static void exitApplication() {
+<span class="nc" id="L584">        Display.INSTANCE.exitApplication();</span>
+<span class="nc" id="L585">    }</span>
+
+    /// Returns the property from the underlying platform deployment or the default
+    /// value if no deployment values are supported. This is equivalent to the
+    /// getAppProperty from the jad file.
+    ///
+    /// The implementation should be responsible for the following keys to return
+    /// reasonable valid values for the application:
+    ///
+    /// - AppName
+    ///
+    /// - User-Agent
+    ///
+    /// - AppVersion
+    ///
+    /// - Platform - Similar to microedition.platform
+    ///
+    /// - OS - returns what is the underlying platform e.g. - iOS, Android, RIM, SE...
+    ///
+    /// - OSVer - OS version when available as a user readable string (not necessarily a number e.g: 3.2.1).
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the property
+    ///
+    /// - `defaultValue`: a default return value
+    ///
+    /// #### Returns
+    ///
+    /// the value of the property
+    public static String getProperty(String key, String defaultValue) {
+<span class="fc" id="L616">        return Display.INSTANCE.getProperty(key, defaultValue);</span>
+    }
+
+    /// Sets a local property to the application, this method has no effect on the
+    /// implementation code and only allows the user to override the logic of getProperty
+    /// for internal application purposes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: key the key of the property
+    ///
+    /// - `value`: the value of the property
+    public static void setProperty(String key, String value) {
+<span class="fc" id="L629">        Display.INSTANCE.setProperty(key, value);</span>
+<span class="fc" id="L630">    }</span>
+
+    /// Returns true if executing this URL should work, returns false if it will not
+    /// and null if this is unknown.
+    ///
+    /// ```java
+    /// Boolean can = Display.getInstance().canExecute(&quot;imdb:///find?q=godfather&quot;);
+    /// if(can != null &amp;&amp; can) {
+    ///   Display.getInstance().execute(&quot;imdb:///find?q=godfather&quot;);
+    /// } else {
+    ///   Display.getInstance().execute(&quot;http://www.imdb.com&quot;);
+    /// }
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the url that would be executed
+    ///
+    /// #### Returns
+    ///
+    /// @return true if executing this URL should work, returns false if it will not
+    /// and null if this is unknown
+    public static Boolean canExecute(String url) {
+<span class="nc" id="L653">        return Display.impl.canExecute(url);</span>
+    }
+
+    /// Executes the given URL on the native platform
+    ///
+    /// ```java
+    /// Boolean can = Display.getInstance().canExecute(&quot;imdb:///find?q=godfather&quot;);
+    /// if(can != null &amp;&amp; can) {
+    ///   Display.getInstance().execute(&quot;imdb:///find?q=godfather&quot;);
+    /// } else {
+    ///   Display.getInstance().execute(&quot;http://www.imdb.com&quot;);
+    /// }
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `url`: the url to execute
+    public static void execute(String url) {
+<span class="nc" id="L671">        Display.impl.execute(url);</span>
+<span class="nc" id="L672">    }</span>
+
+    /// Offers the given in-memory bytes to the user as a downloadable file,
+    /// bypassing local storage. This exists for platforms (currently the
+    /// JavaScript port) where the storage-backed {@link #execute(String)}
+    /// download path is unavailable. Returns {@code true} if the platform
+    /// handled the download, {@code false} if unsupported (callers should then
+    /// fall back to writing the file and calling {@link #execute(String)}).
+    ///
+    /// #### Parameters
+    ///
+    /// - `fileName`: the suggested file name for the download
+    ///
+    /// - `bytes`: the file contents
+    public static boolean downloadBytesAsFile(String fileName, byte[] bytes) {
+<span class="nc" id="L687">        return Display.impl.downloadBytesAsFile(fileName, bytes);</span>
+    }
+
+
+    /// Returns one of the density variables appropriate for this device, notice that
+    /// density doesn't always correspond to resolution and an implementation might
+    /// decide to change the density based on DPI constraints.
+    ///
+    /// #### Returns
+    ///
+    /// one of the DENSITY constants of Display
+    public static int getDeviceDensity() {
+<span class="fc" id="L699">        return Display.impl.getDeviceDensity();</span>
+    }
+
+    /// Returns true if the device is currently in portrait mode
+    ///
+    /// #### Returns
+    ///
+    /// true if the device is in portrait mode
+    public static boolean isPortrait() {
+<span class="fc" id="L708">        return Display.impl.isPortrait();</span>
+    }
+
+    /// Try to enter full-screen mode if the platform supports it.
+    ///
+    /// Currently only desktop and Javascript builds support full-screen mode; And Javascript
+    /// only supports this on certain browsers.  See the [MDN Fullscreen API docs](https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API)
+    /// for a list of browsers that support full-screen.
+    ///
+    /// When running in the simulator, full-screen is only supported for the desktop skin.
+    ///
+    /// #### Returns
+    ///
+    /// @return true on success.  This will also return true if the app is already running in full-screen mode.  It will return false
+    /// if the app fails to enter full-screen mode.
+    ///
+    /// #### See also
+    ///
+    /// - #exitFullScreen()
+    ///
+    /// - #isInFullScreenMode()
+    ///
+    /// - #isFullScreenSupported()
+    public static boolean requestFullScreen() {
+<span class="nc" id="L732">        return Display.impl.requestFullScreen();</span>
+    }
+
+    /// Try to exit full-screen mode if the platform supports it.
+    ///
+    /// Currently only desktop and Javascript builds support full-screen mode; And Javascript
+    /// only supports this on certain browsers.  See the [MDN Fullscreen API docs](https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API)
+    /// for a list of browsers that support full-screen.
+    ///
+    /// When running in the simulator, full-screen is only supported for the desktop skin.
+    ///
+    /// #### Returns
+    ///
+    /// @return true on success.  This will also return true if the app is already NOT in full-screen mode.  It will return false
+    /// if the app fails to exit full-screen mode.
+    ///
+    /// #### See also
+    ///
+    /// - #requestFullScreen()
+    ///
+    /// - #isInFullScreenMode()
+    ///
+    /// - #isFullScreenSupported()
+    public static boolean exitFullScreen() {
+<span class="nc" id="L756">        return Display.impl.exitFullScreen();</span>
+    }
+
+    /// Checks if the app is currently running in full-screen mode.
+    ///
+    /// #### Returns
+    ///
+    /// true if the app is currently in full-screen mode.
+    ///
+    /// #### See also
+    ///
+    /// - #requestFullScreen()
+    ///
+    /// - #exitFullScreen()
+    ///
+    /// - #isFullScreenSupported()
+    public static boolean isInFullScreenMode() {
+<span class="nc" id="L773">        return Display.impl.isInFullScreenMode();</span>
+    }
+
+    /// Checks if this platform supports full-screen mode.  If full-screen mode is supported, you can use
+    /// the `#requestFullScreen()`, `#exitFullScreen()`, and `#isInFullScreenMode()` methods
+    /// to enter and exit full-screen - and query the current state.
+    ///
+    /// Currently only desktop and Javascript builds support full-screen mode; And Javascript
+    /// only supports this on certain browsers.  See the [MDN Fullscreen API docs](https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API)
+    /// for a list of browsers that support full-screen.
+    ///
+    /// When running in the simulator, full-screen is only supported for the desktop skin.
+    ///
+    /// #### Returns
+    ///
+    /// true if Full-screen mode is supported on this platform.
+    ///
+    /// #### See also
+    ///
+    /// - #requestFullScreen()
+    ///
+    /// - #exitFullScreen()
+    ///
+    /// - #isInFullScreenMode()
+    public static boolean isFullScreenSupported() {
+<span class="nc" id="L798">        return Display.impl.isFullScreenSupported();</span>
+    }
+
+    /// Returns true if the device allows forcing the orientation via code, feature phones do not allow this
+    /// although some include a jad property allowing for this feature
+    ///
+    /// #### Returns
+    ///
+    /// true if lockOrientation  would work
+    public static boolean canForceOrientation() {
+<span class="nc" id="L808">        return Display.impl.canForceOrientation();</span>
+    }
+
+    /// On devices that return true for canForceOrientation() this method can lock the device orientation
+    /// either to portrait or landscape mode
+    ///
+    /// #### Parameters
+    ///
+    /// - `portrait`: true to lock to portrait mode, false to lock to landscape mode
+    public static void lockOrientation(boolean portrait) {
+<span class="nc" id="L818">        Display.impl.lockOrientation(portrait);</span>
+<span class="nc" id="L819">    }</span>
+
+    /// Returns true if orientation was locked using #lockOrientation(boolean) and not yet unlocked via #unlockOrientation().
+    ///
+    /// #### Returns
+    ///
+    /// true if orientation is currently marked as locked
+    public static boolean isLockOrientation() {
+<span class="nc" id="L827">        return Display.getInstance().isLockOrientation();</span>
+    }
+
+    /// This is the reverse method for lock orientation allowing orientation lock to be disabled
+    public static void unlockOrientation() {
+<span class="nc" id="L832">        Display.impl.unlockOrientation();</span>
+<span class="nc" id="L833">    }</span>
+
+    /// Indicates whether the device is a tablet, notice that this is often a guess
+    ///
+    /// #### Returns
+    ///
+    /// true if the device is assumed to be a tablet
+    public static boolean isTablet() {
+<span class="fc" id="L841">        return Display.impl.isTablet();</span>
+    }
+
+    /// Returns true if this is a desktop application
+    ///
+    /// #### Returns
+    ///
+    /// true if this is a desktop application
+    public static boolean isDesktop() {
+<span class="fc" id="L850">        return Display.impl.isDesktop();</span>
+    }
+
+    /// Indicates whether the application is running on a smartwatch form factor
+    /// (Apple Watch / Wear OS). Notice that this is often a guess derived from
+    /// the device metadata.
+    ///
+    /// #### Returns
+    ///
+    /// true if the device is assumed to be a smartwatch
+    public static boolean isWatch() {
+<span class="fc" id="L861">        return Display.impl.isWatch();</span>
+    }
+
+    /// Indicates whether the application is running on a television form factor
+    /// (Apple TV / Android TV / Google TV). Notice that this is often a guess
+    /// derived from the device metadata.
+    ///
+    /// #### Returns
+    ///
+    /// true if the device is assumed to be a TV
+    public static boolean isTV() {
+<span class="nc" id="L872">        return Display.impl.isTV();</span>
+    }
+
+    /// Indicates whether a head unit (Apple CarPlay / Google Android Auto) is currently connected and
+    /// projecting the `com.codename1.car` experience.
+    ///
+    /// #### Returns
+    ///
+    /// true if a car is connected
+    public static boolean isCarConnected() {
+<span class="nc" id="L882">        return Display.impl.isCarConnected();</span>
+    }
+
+    /// Returns a snapshot of the rich detail for the pointer event currently being dispatched such
+    /// as the mouse button, pointer type (finger/mouse/stylus), pressure and stylus tilt.
+    ///
+    /// #### Returns
+    ///
+    /// the current `com.codename1.ui.events.PointerEvent`, never null
+    public static com.codename1.ui.events.PointerEvent getCurrentPointerEvent() {
+<span class="nc" id="L892">        return Display.getInstance().getCurrentPointerEvent();</span>
+    }
+
+    /// The mouse button associated with the current pointer event, one of the
+    /// `com.codename1.ui.events.PointerEvent` `BUTTON_*` constants.
+    public static int getPointerButton() {
+<span class="nc" id="L898">        return Display.impl.getPointerButton();</span>
+    }
+
+    /// A bitmask of the mouse buttons currently held down, built from the
+    /// `com.codename1.ui.events.PointerEvent` `MASK_*` constants.
+    public static int getPressedButtonMask() {
+<span class="nc" id="L904">        return Display.impl.getPointerButtonMask();</span>
+    }
+
+    /// The current pointing device type, one of the `com.codename1.ui.events.PointerEvent` `TYPE_*`
+    /// constants (finger, mouse, stylus or eraser).
+    public static int getPointerType() {
+<span class="nc" id="L910">        return Display.impl.getPointerType();</span>
+    }
+
+    /// The normalized pressure of the current pointer event between `0.0` and `1.0`. Devices and
+    /// ports that do not report pressure return `1.0`.
+    public static float getPointerPressure() {
+<span class="nc" id="L916">        return Display.impl.getPointerPressure();</span>
+    }
+
+    /// The stylus tilt across the x axis of the current pointer event in degrees, or `0` when not reported.
+    public static float getPointerTiltX() {
+<span class="nc" id="L921">        return Display.impl.getPointerTiltX();</span>
+    }
+
+    /// The stylus tilt across the y axis of the current pointer event in degrees, or `0` when not reported.
+    public static float getPointerTiltY() {
+<span class="nc" id="L926">        return Display.impl.getPointerTiltY();</span>
+    }
+
+    /// The normalized contact size of the current pointer event between `0.0` and `1.0`, or `0` when not reported.
+    public static float getPointerContactSize() {
+<span class="nc" id="L931">        return Display.impl.getPointerContactSize();</span>
+    }
+
+    /// True if the current pointer is a stylus or pen (Apple Pencil, S-Pen and similar).
+    public static boolean isStylusPointer() {
+<span class="nc" id="L936">        return Display.getInstance().isStylusPointer();</span>
+    }
+
+    /// True if the device is a foldable or dual screen device.
+    public static boolean isFoldable() {
+<span class="nc" id="L941">        return Display.impl.isFoldable();</span>
+    }
+
+    /// Returns the live device fold posture. See `com.codename1.ui.DevicePosture`.
+    public static DevicePosture getDevicePosture() {
+<span class="nc" id="L946">        return DevicePosture.getInstance();</span>
+    }
+
+    /// Adds a listener that is notified when the device is folded, unfolded or changes posture.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to add
+    public static void addPostureListener(ActionListener l) {
+<span class="nc" id="L955">        Display.getInstance().addPostureListener(l);</span>
+<span class="nc" id="L956">    }</span>
+
+    /// Removes a posture listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to remove
+    public static void removePostureListener(ActionListener l) {
+<span class="nc" id="L964">        Display.getInstance().removePostureListener(l);</span>
+<span class="nc" id="L965">    }</span>
+
+    /// True if the application is currently running in a desktop windowing mode such as Samsung DeX,
+    /// Android desktop windowing or iPad Stage Manager.
+    public static boolean isDesktopMode() {
+<span class="nc" id="L970">        return Display.impl.isDesktopMode();</span>
+    }
+
+    /// Returns the number of displays (monitors or external screens) currently attached.
+    public static int getDisplayCount() {
+<span class="nc" id="L975">        return Display.impl.getDisplayCount();</span>
+    }
+
+    /// True if an external or secondary display is currently attached.
+    public static boolean isExternalDisplayConnected() {
+<span class="nc" id="L980">        return Display.impl.isExternalDisplayConnected();</span>
+    }
+
+    /// Returns the size of the desktop hosting the application window when running on a desktop platform.
+    ///
+    /// #### Returns
+    ///
+    /// the desktop size
+    public static Dimension getDesktopSize() {
+<span class="nc" id="L989">        return Display.getInstance().getDesktopSize();</span>
+    }
+
+    /// Returns the number of monitors attached to the desktop environment when available.
+    ///
+    /// #### Returns
+    ///
+    /// the number of monitors
+    /// Returns the current bounds of the application window when supported by the platform.
+    ///
+    /// #### Returns
+    ///
+    /// the window bounds
+    public static Rectangle getWindowBounds() {
+<span class="nc" id="L1003">        return Display.getInstance().getWindowBounds();</span>
+    }
+
+    /// Requests a resize of the application window when supported by the platform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: the desired window width
+    ///
+    /// - `height`: the desired window height
+    public static void setWindowSize(int width, int height) {
+<span class="nc" id="L1014">        Display.getInstance().setWindowSize(width, height);</span>
+<span class="nc" id="L1015">    }</span>
+
+    /// Returns the initial desktop window size hint provided by the first shown form, when available.
+    ///
+    /// #### Returns
+    ///
+    /// the stored hint or `null`
+    public static Dimension getInitialWindowSizeHintPercent() {
+<span class="fc" id="L1023">        return Display.getInstance().getInitialWindowSizeHintPercent();</span>
+    }
+
+    /// Sets the initial desktop window size hint (percent of the desktop) that should be used when the
+    /// first form is shown. This is primarily useful for desktop environments where the Codename One
+    /// application is hosted in a window rather than full-screen.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hint`: @param hint a `Dimension` whose width/height represent percentages of the desktop to use for
+    /// the initial window size, or `null` to clear a previously stored hint
+    public static void setInitialWindowSizeHintPercent(Dimension hint) {
+<span class="nc" id="L1035">        Display.getInstance().setInitialWindowSizeHintPercent(hint);</span>
+<span class="nc" id="L1036">    }</span>
+
+    /// Adds a listener for window events such as resize or move.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to add
+    public static void addWindowListener(ActionListener&lt;WindowEvent&gt; l) {
+<span class="nc" id="L1044">        Display.getInstance().addWindowListener(l);</span>
+<span class="nc" id="L1045">    }</span>
+
+    /// Removes a previously registered window listener.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: the listener to remove
+    public static void removeWindowListener(ActionListener&lt;WindowEvent&gt; l) {
+<span class="nc" id="L1053">        Display.getInstance().removeWindowListener(l);</span>
+<span class="nc" id="L1054">    }</span>
+
+    /// Returns true if the device has dialing capabilities
+    ///
+    /// #### Returns
+    ///
+    /// false if it cannot dial
+    public static boolean canDial() {
+<span class="nc" id="L1062">        return Display.impl.canDial();</span>
+    }
+
+    /// Returns true if the platform is in dark mode, null is returned for
+    /// unknown status
+    ///
+    /// #### Returns
+    ///
+    /// true in case of dark mode
+    public static Boolean isDarkMode() {
+<span class="fc" id="L1072">        return Display.INSTANCE.isDarkMode();</span>
+    }
+
+    /// Returns true when the user requests stronger foreground/background contrast.
+    public static boolean isHighContrastEnabled() {
+<span class="nc" id="L1077">        return Display.INSTANCE.isHighContrastEnabled();</span>
+    }
+
+    /// Returns true when the user requests that information isn't conveyed by color alone.
+    public static boolean isDifferentiateWithoutColorEnabled() {
+<span class="nc" id="L1082">        return Display.INSTANCE.isDifferentiateWithoutColorEnabled();</span>
+    }
+
+    /// Returns the selected color-vision correction mode.
+    public static AccessibilityColorVisionDeficiency getColorVisionDeficiency() {
+<span class="nc" id="L1087">        return Display.INSTANCE.getColorVisionDeficiency();</span>
+    }
+
+    /// Returns true when the user requests reduced or disabled nonessential motion.
+    public static boolean isReduceMotionEnabled() {
+<span class="nc" id="L1092">        return Display.INSTANCE.isReduceMotionEnabled();</span>
+    }
+
+    /// Returns true when the user requests reduced transparency and blur effects.
+    public static boolean isReduceTransparencyEnabled() {
+<span class="nc" id="L1097">        return Display.INSTANCE.isReduceTransparencyEnabled();</span>
+    }
+
+    /// Returns true when the user requests heavier text weight.
+    public static boolean isBoldTextEnabled() {
+<span class="nc" id="L1102">        return Display.INSTANCE.isBoldTextEnabled();</span>
+    }
+
+    /// Returns true when the operating system is inverting displayed colors.
+    public static boolean isInvertColorsEnabled() {
+<span class="nc" id="L1107">        return Display.INSTANCE.isInvertColorsEnabled();</span>
+    }
+
+    /// Returns true when the operating system requests a grayscale presentation.
+    public static boolean isGrayscaleEnabled() {
+<span class="nc" id="L1112">        return Display.INSTANCE.isGrayscaleEnabled();</span>
+    }
+
+    /// Returns true when switches should include visible on/off labels.
+    public static boolean isOnOffSwitchLabelsEnabled() {
+<span class="nc" id="L1117">        return Display.INSTANCE.isOnOffSwitchLabelsEnabled();</span>
+    }
+
+    /// Returns true when a screen reader or touch-exploration service is active.
+    public static boolean isScreenReaderEnabled() {
+<span class="nc" id="L1122">        return Display.INSTANCE.isScreenReaderEnabled();</span>
+    }
+
+    /// Override the default dark mode setting
+    ///
+    /// #### Parameters
+    ///
+    /// - `darkMode`: can be set to null to reset to platform default
+    public static void setDarkMode(Boolean darkMode) {
+<span class="nc" id="L1131">        Display.INSTANCE.setDarkMode(darkMode);</span>
+<span class="nc" id="L1132">    }</span>
+
+    /// Opens the device gallery to pick an image or a video.
+    ///
+    /// The method returns immediately and the response is sent asynchronously
+    /// to the given ActionListener Object as the source value of the event (as a String)
+    ///
+    /// E.g. within the callback action performed call you can use this code: `String path = (String) evt.getSource();`.
+    ///
+    /// A more detailed sample of picking a video file can be seen here:
+    ///
+    /// ```java
+    /// final Form hi = new Form(&quot;MediaPlayer&quot;, new BorderLayout());
+    /// hi.setToolbar(new Toolbar());
+    /// Style s = UIManager.getInstance().getComponentStyle(&quot;Title&quot;);
+    /// FontImage icon = FontImage.createMaterial(FontImage.MATERIAL_VIDEO_LIBRARY, s);
+    /// hi.getToolbar().addCommandToRightBar(new Command(&quot;&quot;, icon) {
+    /// @Override
+    ///     public void actionPerformed(ActionEvent evt) {
+    ///         Display.getInstance().openGallery((e) -&gt; {
+    ///             if(e != null &amp;&amp; e.getSource() != null) {
+    ///                 String file = (String)e.getSource();
+    ///                 try {
+    ///                     Media video = MediaManager.createMedia(file, true);
+    ///                     hi.removeAll();
+    ///                     hi.add(BorderLayout.CENTER, new MediaPlayer(video));
+    ///                     hi.revalidate();
+    ///                 } catch(IOException err) {
+    ///                     Log.e(err);
+    ///                 }
+    ///             }
+    ///         }, Display.GALLERY_VIDEO);
+    ///     }
+    /// });
+    /// hi.show();
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `response`: a callback Object to retrieve the file path
+    ///
+    /// - `type`: one of the following `#GALLERY_IMAGE`, `#GALLERY_VIDEO`, `#GALLERY_ALL`
+    ///
+    /// #### Throws
+    ///
+    /// - `RuntimeException`: if this feature failed or unsupported on the platform
+    public static void openGallery(ActionListener response, int type) {
+<span class="nc" id="L1179">        Display.impl.openGallery(response, type);</span>
+<span class="nc" id="L1180">    }</span>
+
+    /// Opens a file chooser for arbitrary user-selected files.
+    ///
+    /// The callback source is a `String` path readable by
+    /// `FileSystemStorage.openInputStream()`, or `null` if cancelled. `accept`
+    /// is a comma-separated list of extensions or MIME types.
+    ///
+    /// #### Parameters
+    ///
+    /// - `response`: callback receiving the selected file path
+    /// - `accept`: comma-separated extensions or MIME types, or `null` for all files
+    public static void openFileChooser(ActionListener response, String accept) {
+<span class="nc" id="L1193">        Display.impl.openFileChooser(response, accept);</span>
+<span class="nc" id="L1194">    }</span>
+
+    /// Returns a 2-3 letter code representing the platform name for the platform override
+    ///
+    /// #### Returns
+    ///
+    /// the name of the platform e.g. ios, rim, win, and, me, HTML5
+    public static String getPlatformName() {
+<span class="fc" id="L1202">        return Display.impl.getPlatformName();</span>
+    }
+
+    /// Returns the SIMD API for the current platform.
+    public static Simd getSimd() {
+<span class="fc" id="L1207">        return Display.getInstance().getSimd();</span>
+    }
+
+    /// Returns true if the current platform provides a hardware accelerated 3D
+    /// GPU backend for `com.codename1.gpu.RenderView`.
+    public static boolean isGpuSupported() {
+<span class="nc" id="L1213">        return Display.getInstance().isGpuSupported();</span>
+    }
+
+
+    /// Opens the device Dialer application with the given phone number
+    ///
+    /// #### Parameters
+    ///
+    /// - `phoneNumber`
+    public static void dial(String phoneNumber) {
+<span class="nc" id="L1223">        Display.impl.dial(phoneNumber);</span>
+<span class="nc" id="L1224">    }</span>
+
+    /// Indicates the level of SMS support in the platform as one of:
+    /// `#SMS_NOT_SUPPORTED` (for desktop, tablet etc.),
+    /// `#SMS_SEAMLESS` (no UI interaction), `#SMS_INTERACTIVE` (with compose UI),
+    /// `#SMS_BOTH`.
+    ///
+    /// The sample below demonstrates the use case for this property:
+    ///
+    /// ```java
+    /// void sendMessage(String phone, String data) {
+    ///     switch(Display.getInstance().getSMSSupport()) {
+    ///         case Display.SMS_NOT_SUPPORTED:
+    ///             return;
+    ///         case Display.SMS_SEAMLESS:
+    ///             showUIDialogToEditMessageData();
+    ///             Display.getInstance().sendSMS(phone, data);
+    ///             return;
+    ///         default:
+    ///             Display.getInstance().sendSMS(phone, data);
+    ///             return;
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// #### Returns
+    ///
+    /// one of the SMS_* values
+    public static int getSMSSupport() {
+<span class="nc" id="L1253">        return Display.impl.getSMSSupport();</span>
+    }
+
+
+    /// Sends a SMS message to the given phone number
+    ///
+    /// #### Parameters
+    ///
+    /// - `phoneNumber`: to send the sms
+    ///
+    /// - `message`: the content of the sms
+    public static void sendSMS(String phoneNumber, String message) throws IOException {
+<span class="nc" id="L1265">        Display.impl.sendSMS(phoneNumber, message, false);</span>
+<span class="nc" id="L1266">    }</span>
+
+    /// Sends a SMS message to the given phone number, the code below demonstrates the logic
+    /// of detecting platform behavior for sending SMS.
+    ///
+    /// ```java
+    /// void sendMessage(String phone, String data) {
+    ///     switch(Display.getInstance().getSMSSupport()) {
+    ///         case Display.SMS_NOT_SUPPORTED:
+    ///             return;
+    ///         case Display.SMS_SEAMLESS:
+    ///             showUIDialogToEditMessageData();
+    ///             Display.getInstance().sendSMS(phone, data);
+    ///             return;
+    ///         default:
+    ///             Display.getInstance().sendSMS(phone, data);
+    ///             return;
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `phoneNumber`: to send the sms
+    ///
+    /// - `message`: the content of the sms
+    ///
+    /// - `interactive`: indicates the SMS should show a UI or should not show a UI if applicable see getSMSSupport
+    ///
+    /// #### See also
+    ///
+    /// - #getSMSSupport()
+    public static void sendSMS(String phoneNumber, String message, boolean interactive) throws IOException {
+<span class="nc" id="L1299">        Display.impl.sendSMS(phoneNumber, message, interactive);</span>
+<span class="nc" id="L1300">    }</span>
+
+
+    /// Share the required information using the platform sharing services.
+    /// a Sharing service can be: mail, sms, facebook, twitter,...
+    /// This method is implemented if isNativeShareSupported() returned true for
+    /// a specific platform.
+    ///
+    /// Since 6.0, there is native sharing support in the Javascript port using the [navigator.share](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share)
+    /// API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: String to share.
+    ///
+    /// - `image`: file path to the image or null
+    ///
+    /// - `mimeType`: type of the image or null if no image to share
+    public static void share(String text, String image, String mimeType) {
+<span class="nc" id="L1319">        Display.INSTANCE.share(text, image, mimeType);</span>
+<span class="nc" id="L1320">    }</span>
+
+    /// Indicates if the underlying platform supports sharing capabilities
+    ///
+    /// Since 6.0, there is native sharing support in the Javascript port using the [navigator.share](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share)
+    /// API.  Currently (2019) this is only supported on Chrome for Android, and will only work if the app is accessed over https:.
+    ///
+    /// #### Returns
+    ///
+    /// true if the underlying platform handles share.
+    public static boolean isNativeShareSupported() {
+<span class="nc" id="L1331">        return Display.impl.isNativeShareSupported();</span>
+    }
+
+    /// Indicates whether the platform exposes a native in-app review/rating
+    /// prompt (the OS-sanctioned &quot;rate this app&quot; sheet). When false the
+    /// [com.codename1.appreview.AppReview] API falls back to a Codename One
+    /// drawn rating widget.
+    ///
+    /// #### Returns
+    ///
+    /// true if the platform can present a native review prompt.
+    public static boolean isNativeInAppReviewSupported() {
+<span class="nc" id="L1343">        return Display.impl.isNativeInAppReviewSupported();</span>
+    }
+
+    /// Requests the native in-app review prompt. Should only be invoked when
+    /// [#isNativeInAppReviewSupported] returns true. The platforms hide whether
+    /// the user actually rated and may throttle the prompt; `done` reports
+    /// whether the request reached the native review controller.
+    ///
+    /// #### Parameters
+    ///
+    /// - `done`: invoked with `true` once the native prompt was requested or
+    ///   `false` when the platform did not handle it. May be null.
+    public static void requestNativeInAppReview(SuccessCallback&lt;Boolean&gt; done) {
+<span class="nc" id="L1356">        Display.impl.requestNativeInAppReview(done);</span>
+<span class="nc" id="L1357">    }</span>
+
+    /// Share the required information using the platform sharing services.
+    /// a Sharing service can be: mail, sms, facebook, twitter,...
+    /// This method is implemented if isNativeShareSupported() returned true for
+    /// a specific platform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: String to share.
+    ///
+    /// - `image`: file path to the image or null
+    ///
+    /// - `mimeType`: type of the image or null if no image to share
+    ///
+    /// - `sourceRect`: @param sourceRect The source rectangle of the button that originated the share request.  This is used on
+    /// some platforms to provide a hint as to where the share dialog overlay should pop up.  Particularly,
+    /// on the iPad with iOS 8 and higher.
+    public static void share(String text, String image, String mimeType, Rectangle sourceRect) {
+<span class="nc" id="L1376">        Display.INSTANCE.share(text, image, mimeType, sourceRect);</span>
+<span class="nc" id="L1377">    }</span>
+
+    /// Register to receive push notification, invoke this method once (ever) to receive push
+    /// notifications.
+    public static void registerPush() {
+<span class="nc" id="L1382">        Display.impl.registerPush(new Hashtable(), false);</span>
+<span class="nc" id="L1383">    }</span>
+
+    /// Stop receiving push notifications to this client application
+    public static void deregisterPush() {
+<span class="nc" id="L1387">        Display.impl.deregisterPush();</span>
+<span class="nc" id="L1388">    }</span>
+
+    /// Start a Codename One thread that supports crash protection and similar Codename One features.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: runnable to run, **NOTICE** the thread MUST be explicitly started!
+    ///
+    /// - `name`: the name for the thread
+    ///
+    /// #### Returns
+    ///
+    /// a thread instance which must be explicitly started!
+    public static Thread createThread(Runnable r, String name) {
+<span class="nc" id="L1402">        return Display.INSTANCE.createThread(r, name);</span>
+    }
+
+
+    /// Start a Codename One thread that supports crash protection and similar Codename One features.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: runnable to run, **NOTICE** the thread MUST be explicitly started!
+    ///
+    /// - `name`: the name for the thread
+    ///
+    /// #### Returns
+    ///
+    /// a thread instance which must be explicitly started!
+    ///
+    /// #### Deprecated
+    ///
+    /// confusing name, use `java.lang.String)` instead
+    public static Thread startThread(Runnable r, String name) {
+<span class="nc" id="L1422">        return Display.INSTANCE.startThread(r, name);</span>
+    }
+
+
+    /// Checks if the device supports disabling the screen display from dimming, allowing
+    /// the developer to keep the screen display on.
+    public static boolean isScreenSaverDisableSupported() {
+<span class="nc" id="L1429">        return Display.impl.isScreenLockSupported();</span>
+    }
+
+    /// If isScreenSaverDisableSupported() returns true calling this method will
+    /// lock the screen display on
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: @param e when set to true the screen saver will work as usual and when set to false the screen
+    /// will not turn off automatically
+    public static void setScreenSaverEnabled(boolean e) {
+<span class="nc" id="L1440">        Display.INSTANCE.setScreenSaverEnabled(e);</span>
+<span class="nc" id="L1441">    }</span>
+
+    /// Returns true if the device has camera false otherwise.
+    public static boolean hasCamera() {
+<span class="nc" id="L1445">        return Display.impl.hasCamera();</span>
+    }
+
+    /// Indicates whether the native picker dialog is supported for the given type
+    /// which can include one of PICKER_TYPE_DATE_AND_TIME, PICKER_TYPE_TIME, PICKER_TYPE_DATE
+    ///
+    /// #### Parameters
+    ///
+    /// - `pickerType`: the picker type constant
+    ///
+    /// #### Returns
+    ///
+    /// true if the native platform supports this picker type
+    public static boolean isNativePickerTypeSupported(int pickerType) {
+<span class="nc" id="L1459">        return Display.impl.isNativePickerTypeSupported(pickerType);</span>
+    }
+
+    /// Shows a native modal dialog allowing us to perform the picking for the given type
+    /// which can include one of PICKER_TYPE_DATE_AND_TIME, PICKER_TYPE_TIME, PICKER_TYPE_DATE
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the picker type constant
+    ///
+    /// - `source`: @param source       the source component (optional) the native dialog will be placed in relation to this
+    /// component if applicable
+    ///
+    /// - `currentValue`: the currently selected value
+    ///
+    /// - `data`: additional meta data specific to the picker type when applicable
+    ///
+    /// #### Returns
+    ///
+    /// the value from the picker or null if the operation was canceled.
+    public static Object showNativePicker(int type, Component source, Object currentValue, Object data) {
+<span class="nc" id="L1480">        return Display.impl.showNativePicker(type, source, currentValue, data);</span>
+    }
+
+    /// Prints to the log
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: the string
+    public static void log(String s) {
+<span class="nc" id="L1489">        Log.p(s);</span>
+<span class="nc" id="L1490">    }</span>
+
+
+    /// Prints to the log
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: the exception
+    public static void log(Throwable s) {
+<span class="nc" id="L1499">        Log.e(s);</span>
+<span class="nc" id="L1500">    }</span>
+
+    /// Sends the log to your email account
+    public static void sendLog() {
+<span class="nc" id="L1504">        Log.sendLog();</span>
+<span class="nc" id="L1505">    }</span>
+
+    /// Send an email using the platform mail client.
+    ///
+    /// The code below demonstrates sending a simple message with attachments using the devices
+    /// native email client:
+    ///
+    /// ```java
+    /// Message m = new Message(&quot;Body of message&quot;);
+    /// m.getAttachments().put(textAttachmentUri, &quot;text/plain&quot;);
+    /// m.getAttachments().put(imageAttachmentUri, &quot;image/png&quot;);
+    /// Display.getInstance().sendMessage(new String[] {&quot;someone@gmail.com&quot;}, &quot;Subject of message&quot;, m);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `subject`: e-mail subject
+    ///
+    /// - `msg`: the Message to send
+    ///
+    /// - `recipients`: array of e-mail addresses
+    public static void sendMessage(String subject, Message msg, String... recipients) {
+<span class="nc" id="L1527">        Display.impl.sendMessage(recipients, subject, msg);</span>
+<span class="nc" id="L1528">    }</span>
+
+    /// Allows detecting development mode so debugging code and special cases can be used to simplify flow
+    ///
+    /// #### Returns
+    ///
+    /// true if we are running in the simulator, false otherwise
+    public static boolean isSimulator() {
+<span class="fc" id="L1536">        return Display.impl.isSimulator();</span>
+    }
+
+    /// Adds a header to the global default headers, this header will be implicitly added
+    /// to all requests going out from this point onwards. The main use case for this is
+    /// for authentication information communication via the header.
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: the key of the header
+    ///
+    /// - `value`: the value of the header
+    public static void addDefaultHeader(String key, String value) {
+<span class="nc" id="L1549">        NetworkManager.getInstance().addDefaultHeader(key, value);</span>
+<span class="nc" id="L1550">    }</span>
+
+    /// Identical to add to queue but waits until the request is processed in the queue,
+    /// this is useful for completely synchronous operations.
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: the request object to add
+    public static void addToQueueAndWait(final ConnectionRequest request) {
+<span class="fc" id="L1559">        NetworkManager.getInstance().addToQueueAndWait(request);</span>
+<span class="fc" id="L1560">    }</span>
+
+    /// Adds the given network connection to the queue of execution
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`: network request for execution
+    public static void addToQueue(ConnectionRequest request) {
+<span class="fc" id="L1568">        NetworkManager.getInstance().addToQueue(request);</span>
+<span class="fc" id="L1569">    }</span>
+
+    /// Kills the given request and waits until the request is killed if it is
+    /// being processed by one of the threads. This method must not be invoked from
+    /// a network thread!
+    ///
+    /// #### Parameters
+    ///
+    /// - `request`
+    public static void killAndWait(final ConnectionRequest request) {
+<span class="nc" id="L1579">        NetworkManager.getInstance().killAndWait(request);</span>
+<span class="nc" id="L1580">    }</span>
+
+    /// Adds a generic listener to a network error that is invoked before the exception is propagated.
+    /// Note that this handles also server error codes by default! You can change this default behavior setting to false
+    /// ConnectionRequest.setHandleErrorCodesInGlobalErrorHandler(boolean).
+    /// Consume the event in order to prevent it from propagating further.
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: callback will be invoked with the Exception as the source object
+    public static void addNetworkErrorListener(ActionListener&lt;NetworkEvent&gt; e) {
+<span class="fc" id="L1591">        NetworkManager.getInstance().addErrorListener(e);</span>
+<span class="fc" id="L1592">    }</span>
+
+    /// Removes the given error listener
+    ///
+    /// #### Parameters
+    ///
+    /// - `e`: callback to remove
+    public static void removeNetworkErrorListener(ActionListener&lt;NetworkEvent&gt; e) {
+<span class="nc" id="L1600">        NetworkManager.getInstance().removeErrorListener(e);</span>
+<span class="nc" id="L1601">    }</span>
+
+    /// Adds a listener to be notified when progress updates
+    ///
+    /// #### Parameters
+    ///
+    /// - `al`: action listener
+    public static void addNetworkProgressListener(ActionListener&lt;NetworkEvent&gt; al) {
+<span class="nc" id="L1609">        NetworkManager.getInstance().addProgressListener(al);</span>
+<span class="nc" id="L1610">    }</span>
+
+    /// Adds a listener to be notified when progress updates
+    ///
+    /// #### Parameters
+    ///
+    /// - `al`: action listener
+    public static void removeNetworkProgressListener(ActionListener&lt;NetworkEvent&gt; al) {
+<span class="nc" id="L1618">        NetworkManager.getInstance().removeProgressListener(al);</span>
+<span class="nc" id="L1619">    }</span>
+
+    /// Sets the number of network threads and restarts the network threads
+    ///
+    /// #### Parameters
+    ///
+    /// - `threadCount`: the new number of threads
+    public static void updateNetworkThreadCount(int threadCount) {
+<span class="fc" id="L1627">        NetworkManager.getInstance().updateThreadCount(threadCount);</span>
+<span class="fc" id="L1628">    }</span>
+
+    /// Storage is cached for faster access, however this might cause a problem with refreshing
+    /// objects since they are not cloned. Clearing the cache allows to actually reload from the
+    /// storage file.
+    public static void clearStorageCache() {
+<span class="nc" id="L1634">        Storage.getInstance().clearCache();</span>
+<span class="nc" id="L1635">    }</span>
+
+    /// Flush the storage cache allowing implementations that cache storage objects
+    /// to store
+    public static void flushStorageCache() {
+<span class="nc" id="L1640">        Storage.getInstance().flushStorageCache();</span>
+<span class="nc" id="L1641">    }</span>
+
+    /// Deletes the given file name from the storage
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the storage file
+    public static void deleteStorageFile(String name) {
+<span class="nc" id="L1649">        Storage.getInstance().deleteStorageFile(name);</span>
+<span class="nc" id="L1650">    }</span>
+
+    /// Deletes all the files in the application storage
+    public static void clearStorage() {
+<span class="nc" id="L1654">        Storage.getInstance().clearStorage();</span>
+<span class="nc" id="L1655">    }</span>
+
+    /// Creates an output stream to the storage with the given name
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the storage file name
+    ///
+    /// #### Returns
+    ///
+    /// an output stream of limited capacity
+    public static OutputStream createStorageOutputStream(String name) throws IOException {
+<span class="nc" id="L1667">        return Storage.getInstance().createOutputStream(name);</span>
+    }
+
+    /// Creates an input stream to the given storage source file
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the source file
+    ///
+    /// #### Returns
+    ///
+    /// the input stream
+    public static InputStream createStorageInputStream(String name) throws IOException {
+<span class="nc" id="L1680">        return Storage.getInstance().createInputStream(name);</span>
+    }
+
+    /// Returns true if the given storage file exists
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the storage file name
+    ///
+    /// #### Returns
+    ///
+    /// true if it exists
+    public static boolean existsInStorage(String name) {
+<span class="nc" id="L1693">        return Storage.getInstance().exists(name);</span>
+    }
+
+    /// Lists the names of the storage files
+    ///
+    /// #### Returns
+    ///
+    /// the names of all the storage files
+    public static String[] listStorageEntries() {
+<span class="nc" id="L1702">        return Storage.getInstance().listEntries();</span>
+    }
+
+    /// Returns the size in bytes of the given entry
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the entry
+    ///
+    /// #### Returns
+    ///
+    /// the size in bytes
+    public static int storageEntrySize(String name) {
+<span class="nc" id="L1715">        return Storage.getInstance().entrySize(name);</span>
+    }
+
+    /// Writes the given object to storage assuming it is an externalizable type
+    /// or one of the supported types.
+    ///
+    /// The sample below demonstrates the usage and registration of the `com.codename1.io.Externalizable` interface:
+    ///
+    /// ```java
+    /// // File: Main.java
+    /// public class Main {
+    ///   public void init(Object o) {
+    ///     theme = UIManager.initFirstTheme(&quot;/theme&quot;);
+    ///
+    ///     // IMPORTANT: Notice we don't use MyClass.class.getName()! This won't work due to obfuscation!
+    ///     Util.register(&quot;MyClass&quot;, MyClass.class);
+    ///   }
+    ///
+    ///   public void start() {
+    ///     //...
+    ///   }
+    ///
+    ///   public void stop() {
+    ///     //...
+    ///   }
+    ///
+    ///   public void destroy() {
+    ///     //...
+    ///   }
+    /// }
+    /// ```
+    ///
+    /// ```java
+    /// // File: MyClass.java
+    /// public class MyClass implements Externalizable {
+    ///   // allows us to manipulate the version, in this case we are demonstrating a data change between the initial release
+    ///   // and the current state of object data
+    ///   private static final int VERSION = 2;
+    ///
+    ///   private String name;
+    ///   private Map data;
+    ///
+    ///   // this field was added after version 1
+    ///   private Date startedAt;
+    ///
+    ///   public int getVersion() {
+    ///     return VERSION;
+    ///   }
+    ///
+    ///   public void externalize(DataOutputStream out) throws IOException {
+    ///     Util.writeUTF(name, out);
+    ///     Util.writeObject(data, out);
+    ///     if(startedAt != null) {
+    ///         out.writeBoolean(true);
+    ///         out.writeLong(startedAt.getTime());
+    ///     } else {
+    ///         out.writeBoolean(false);
+    ///     }
+    ///   }
+    ///   public void internalize(int version, DataInputStream in) throws IOException {
+    ///     name = Util.readUTF(in);
+    ///     data = (Map)Util.readObject(in);
+    ///     if(version &gt; 1) {
+    ///         boolean hasDate = in.readBoolean();
+    ///         if(hasDate) {
+    ///             startedAt = new Date(in.readLong());
+    ///         }
+    ///     }
+    ///   }
+    ///   public String getObjectId() {
+    ///     // IMPORTANT: Notice we don't use getClass().getName()! This won't work due to obfuscation!
+    ///     return &quot;MyClass&quot;;
+    ///   }
+    /// }
+    /// ```
+    ///
+    /// ```java
+    /// // File: ReadAndWrite.java
+    /// // will read the file or return null if failed
+    /// MyClass object = (MyClass)Storage.getInstance().readObject(&quot;NameOfFile&quot;);
+    ///
+    /// // write the object back to storage
+    /// Storage.getInstance().writeObject(&quot;NameOfFile&quot;, object);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: store name
+    ///
+    /// - `o`: object to store
+    ///
+    /// #### Returns
+    ///
+    /// true for success, false for failure
+    public static boolean writeObjectToStorage(String name, Object o) {
+<span class="nc" id="L1810">        return Storage.getInstance().writeObject(name, o);</span>
+    }
+
+    /// Reads the object from the storage, returns null if the object isn't there
+    ///
+    /// The sample below demonstrates the usage and registration of the `com.codename1.io.Externalizable` interface:
+    ///
+    /// ```java
+    /// // File: Main.java
+    /// public class Main {
+    ///   public void init(Object o) {
+    ///     theme = UIManager.initFirstTheme(&quot;/theme&quot;);
+    ///
+    ///     // IMPORTANT: Notice we don't use MyClass.class.getName()! This won't work due to obfuscation!
+    ///     Util.register(&quot;MyClass&quot;, MyClass.class);
+    ///   }
+    ///
+    ///   public void start() {
+    ///     //...
+    ///   }
+    ///
+    ///   public void stop() {
+    ///     //...
+    ///   }
+    ///
+    ///   public void destroy() {
+    ///     //...
+    ///   }
+    /// }
+    /// ```
+    ///
+    /// ```java
+    /// // File: MyClass.java
+    /// public class MyClass implements Externalizable {
+    ///   // allows us to manipulate the version, in this case we are demonstrating a data change between the initial release
+    ///   // and the current state of object data
+    ///   private static final int VERSION = 2;
+    ///
+    ///   private String name;
+    ///   private Map data;
+    ///
+    ///   // this field was added after version 1
+    ///   private Date startedAt;
+    ///
+    ///   public int getVersion() {
+    ///     return VERSION;
+    ///   }
+    ///
+    ///   public void externalize(DataOutputStream out) throws IOException {
+    ///     Util.writeUTF(name, out);
+    ///     Util.writeObject(data, out);
+    ///     if(startedAt != null) {
+    ///         out.writeBoolean(true);
+    ///         out.writeLong(startedAt.getTime());
+    ///     } else {
+    ///         out.writeBoolean(false);
+    ///     }
+    ///   }
+    ///   public void internalize(int version, DataInputStream in) throws IOException {
+    ///     name = Util.readUTF(in);
+    ///     data = (Map)Util.readObject(in);
+    ///     if(version &gt; 1) {
+    ///         boolean hasDate = in.readBoolean();
+    ///         if(hasDate) {
+    ///             startedAt = new Date(in.readLong());
+    ///         }
+    ///     }
+    ///   }
+    ///   public String getObjectId() {
+    ///     // IMPORTANT: Notice we don't use getClass().getName()! This won't work due to obfuscation!
+    ///     return &quot;MyClass&quot;;
+    ///   }
+    /// }
+    /// ```
+    ///
+    /// ```java
+    /// // File: ReadAndWrite.java
+    /// // will read the file or return null if failed
+    /// MyClass object = (MyClass)Storage.getInstance().readObject(&quot;NameOfFile&quot;);
+    ///
+    /// // write the object back to storage
+    /// Storage.getInstance().writeObject(&quot;NameOfFile&quot;, object);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: name of the store
+    ///
+    /// #### Returns
+    ///
+    /// object stored under that name
+    public static Object readObjectFromStorage(String name) {
+<span class="nc" id="L1902">        return Storage.getInstance().readObject(name);</span>
+    }
+
+
+    /// Returns the filesystem roots from which the structure of the file system
+    /// can be traversed
+    ///
+    /// #### Returns
+    ///
+    /// the roots of the filesystem
+    public static String[] getFileSystemRoots() {
+<span class="nc" id="L1913">        return FileSystemStorage.getInstance().getRoots();</span>
+    }
+
+    /// Returns the type of the root often by guessing
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root whose type we are checking
+    ///
+    /// #### Returns
+    ///
+    /// one of the type constants above
+    public static int getFileSystemRootType(String root) {
+<span class="nc" id="L1926">        return FileSystemStorage.getInstance().getRootType(root);</span>
+    }
+
+
+    /// Lists the files within the given directory, returns relative file names and not
+    /// full file names.
+    ///
+    /// #### Parameters
+    ///
+    /// - `directory`: the directory in which files should be listed
+    ///
+    /// #### Returns
+    ///
+    /// array of file names
+    public static String[] listFiles(String directory) throws IOException {
+<span class="nc" id="L1941">        return FileSystemStorage.getInstance().listFiles(directory);</span>
+    }
+
+    /// Returns the size of the given root directory
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root directory in the filesystem
+    ///
+    /// #### Returns
+    ///
+    /// the byte size of the directory
+    public static long getFileSystemRootSizeBytes(String root) {
+<span class="nc" id="L1954">        return FileSystemStorage.getInstance().getRootSizeBytes(root);</span>
+    }
+
+    /// Returns the available space in the given root directory
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root directory in the filesystem
+    ///
+    /// #### Returns
+    ///
+    /// the bytes available in the directory
+    public static long getFileSystemRootAvailableSpace(String root) {
+<span class="nc" id="L1967">        return FileSystemStorage.getInstance().getRootAvailableSpace(root);</span>
+    }
+
+    /// Creates the given directory
+    ///
+    /// #### Parameters
+    ///
+    /// - `directory`: the directory name to create
+    public static void mkdir(String directory) {
+<span class="nc" id="L1976">        FileSystemStorage.getInstance().mkdir(directory);</span>
+<span class="nc" id="L1977">    }</span>
+
+
+    /// Deletes the specific file or empty directory.
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: file or empty directory to delete
+    public static void delete(String file) {
+<span class="nc" id="L1986">        FileSystemStorage.getInstance().delete(file);</span>
+<span class="nc" id="L1987">    }</span>
+
+
+    /// Indicates whether a file exists
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: the file to check
+    ///
+    /// #### Returns
+    ///
+    /// true if the file exists and false otherwise
+    public static boolean existsInFileSystem(String file) {
+<span class="nc" id="L2000">        return FileSystemStorage.getInstance().exists(file);</span>
+    }
+
+    /// Indicates the hidden state of the file
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: file
+    ///
+    /// #### Returns
+    ///
+    /// true for a hidden file
+    public static boolean isHiddenFile(String file) {
+<span class="nc" id="L2013">        return FileSystemStorage.getInstance().isHidden(file);</span>
+    }
+
+    /// Toggles the hidden state of the file
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: file
+    ///
+    /// - `h`: hidden state
+    public static void setHiddenFile(String file, boolean h) {
+<span class="nc" id="L2024">        FileSystemStorage.getInstance().setHidden(file, h);</span>
+<span class="nc" id="L2025">    }</span>
+
+    /// Renames a file to the given name, expects the new name to be relative to the
+    /// current directory
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: absolute file name
+    ///
+    /// - `newName`: relative new name
+    public static void renameFile(String file, String newName) {
+<span class="nc" id="L2036">        FileSystemStorage.getInstance().rename(file, newName);</span>
+<span class="nc" id="L2037">    }</span>
+
+    /// Returns the length of the file
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: file
+    ///
+    /// #### Returns
+    ///
+    /// length of said file
+    public static long getFileLength(String file) {
+<span class="nc" id="L2049">        return FileSystemStorage.getInstance().getLength(file);</span>
+    }
+
+    /// Returns the time that the file denoted by this abstract pathname was
+    /// last modified.
+    ///
+    /// #### Returns
+    ///
+    /// @return A long value representing the time the file was last modified,
+    /// measured in milliseconds
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated this API requires additional privacy permissions on iOS
+    /// and might cause problems with iOS submissions
+    public static long getFileLastModifiedFile(String file) {
+<span class="nc" id="L2065">        return FileSystemStorage.getInstance().getLastModified(file);</span>
+    }
+
+    /// Indicates whether the given file is a directory
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: file
+    ///
+    /// #### Returns
+    ///
+    /// true if its a directory
+    public static boolean isDirectory(String file) {
+<span class="nc" id="L2078">        return FileSystemStorage.getInstance().isDirectory(file);</span>
+    }
+
+    /// Opens an output stream to the given file
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: the file
+    ///
+    /// #### Returns
+    ///
+    /// the output stream
+    public static OutputStream openFileOutputStream(String file) throws IOException {
+<span class="nc" id="L2091">        return FileSystemStorage.getInstance().openOutputStream(file);</span>
+    }
+
+    /// Opens an input stream to the given file
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: the file
+    ///
+    /// #### Returns
+    ///
+    /// the input stream
+    public static InputStream openFileInputStream(String file) throws IOException {
+<span class="nc" id="L2104">        return FileSystemStorage.getInstance().openInputStream(file);</span>
+    }
+
+    /// Opens an output stream to the given file
+    ///
+    /// #### Parameters
+    ///
+    /// - `file`: the file
+    ///
+    /// - `offset`: position in the file
+    ///
+    /// #### Returns
+    ///
+    /// the output stream
+    public static OutputStream openFileOutputStream(String file, int offset) throws IOException {
+<span class="nc" id="L2119">        return FileSystemStorage.getInstance().openOutputStream(file, offset);</span>
+    }
+
+    /// The application home directory is a &quot;safe place&quot; to store files for this application in a portable way.
+    /// On some platforms such as Android  &amp; iOS this path may be visible only to the
+    /// application itself, other apps won't have permission to access this path.
+    ///
+    /// The sample below uses the app home directory to save a file so we can share it using the `com.codename1.components.ShareButton`:
+    ///
+    /// ```java
+    /// Form hi = new Form(&quot;ShareButton&quot;);
+    /// ShareButton sb = new ShareButton();
+    /// sb.setText(&quot;Share Screenshot&quot;);
+    /// hi.add(sb);
+    ///
+    /// Image screenshot = Image.createImage(hi.getWidth(), hi.getHeight());
+    /// hi.revalidate();
+    /// hi.setVisible(true);
+    /// hi.paintComponent(screenshot.getGraphics(), true);
+    ///
+    /// String imageFile = FileSystemStorage.getInstance().getAppHomePath() + &quot;screenshot.png&quot;;
+    /// try(OutputStream os = FileSystemStorage.getInstance().openOutputStream(imageFile)) {
+    ///     ImageIO.getImageIO().save(screenshot, os, ImageIO.FORMAT_PNG, 1);
+    /// } catch(IOException err) {
+    ///     Log.e(err);
+    /// }
+    /// sb.setImageToShare(imageFile, &quot;image/png&quot;);
+    /// ```
+    ///
+    /// #### Returns
+    ///
+    /// a writable directory that represent the application home directory
+    public static String getAppHomePath() {
+<span class="nc" id="L2152">        return FileSystemStorage.getInstance().getAppHomePath();</span>
+    }
+
+    /// Returns true if the device has a directory dedicated for &quot;cache&quot; files
+    ///
+    /// #### Returns
+    ///
+    /// true if a caches style directory exists in this device type
+    public static boolean hasCachesDir() {
+<span class="nc" id="L2161">        return FileSystemStorage.getInstance().hasCachesDir();</span>
+    }
+
+    /// Returns a device specific directory designed for cache style files, or null if `#hasCachesDir()`
+    /// is false
+    ///
+    /// #### Returns
+    ///
+    /// file URL or null
+    public static String getCachesDir() {
+<span class="nc" id="L2171">        return FileSystemStorage.getInstance().getCachesDir();</span>
+    }
+
+    /// Checks to see if you can prompt the user to install the app on their homescreen.
+    /// This is only relevant for the Javascript port with PWAs.  This is not a &quot;static&quot; property, as it
+    /// only returns true if the app is in a state that allows you to prompt the user.  E.g. if you have
+    /// previously prompted the user and they have declined, then this will return false.
+    ///
+    /// Best practice is to use `#onCanInstallOnHomescreen(java.lang.Runnable)` to be notified
+    /// when you are allowed to prompt the user for installation.  Then call `#promptInstallOnHomescreen()`
+    /// inside that method - or sometime after.
+    ///
+    /// Example
+    ///
+    /// ```java
+    /// `onCanInstallOnHomescreen(()-&gt;{
+    ///      if (canInstallOnHomescreen()) {
+    ///           if (promptInstallOnHomescreen()) {
+    ///               // User accepted installation` else {
+    ///               // user rejected installation
+    ///           }
+    ///      }
+    /// });
+    /// }
+    /// ```
+    ///
+    /// https://developers.google.com/web/fundamentals/app-install-banners/
+    ///
+    /// #### Returns
+    ///
+    /// True if you are able to prompt the user to install the app on their homescreen.
+    ///
+    /// #### See also
+    ///
+    /// - #promptInstallOnHomescreen()
+    ///
+    /// - #onCanInstallOnHomescreen(java.lang.Runnable)
+    public static boolean canInstallOnHomescreen() {
+<span class="nc" id="L2209">        return Display.impl.canInstallOnHomescreen();</span>
+    }
+
+    /// Prompts the user to install this app on their homescreen.  This is only relevant in the
+    /// javascript port.
+    ///
+    /// #### Returns
+    ///
+    /// @return The result of the user prompt.  true if the user accepts the installation,
+    /// false if they reject it.
+    ///
+    /// #### See also
+    ///
+    /// - #canInstallOnHomescreen()
+    ///
+    /// - #onCanInstallOnHomescreen(java.lang.Runnable)
+    public static boolean promptInstallOnHomescreen() {
+<span class="nc" id="L2226">        return Display.impl.promptInstallOnHomescreen();</span>
+    }
+
+    /// A callback fired when you are allowed to prompt the user to install the app on their homescreen.
+    /// Only relevant in the javascript port.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: @param r Runnable that will be run when/if you are permitted to prompt the user to install
+    /// the app on their homescreen.
+    ///
+    public static void onCanInstallOnHomescreen(Runnable r) {
+<span class="nc" id="L2238">        Display.impl.onCanInstallOnHomescreen(r);</span>
+<span class="nc" id="L2239">    }</span>
+
+    /// Captures a screenshot of the screen.
+    ///
+    /// #### Returns
+    ///
+    /// An image of the screen, or null if it fails.
+    ///
+    public static Image captureScreen() {
+<span class="nc" id="L2248">        return Display.impl.captureScreen();</span>
+    }
+
+    /// Adds a listener to receive messages from the native platform.  This is a mechanism to communicate
+    /// between the app and the native platform.  Currently the Javascript port is the only port to use
+    /// this mechanism.
+    ///
+    /// In the Javascript port, javascript can send messages to the CN1 app by calling
+    ///
+    /// `window.dispatchEvent(new CustomEvent('cn1inbox', {detail:'The message', code: SOMEINTEGER`));
+    /// }
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: The listener.
+    ///
+    public static void addMessageListener(ActionListener&lt;MessageEvent&gt; l) {
+<span class="fc" id="L2265">        Display.INSTANCE.addMessageListener(l);</span>
+<span class="fc" id="L2266">    }</span>
+
+    /// Removes a listener from receiving messages from the native platform.  This is a mechanism to communicate
+    /// between the app and the native platform.  Currently the Javascript port is the only port to use
+    /// this mechanism.
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: The listener.
+    ///
+    public static void removeMessageListener(ActionListener&lt;MessageEvent&gt; l) {
+<span class="fc" id="L2277">        Display.INSTANCE.removeMessageListener(l);</span>
+<span class="fc" id="L2278">    }</span>
+
+    /// Posts a message to the native platform.  This is a mechanism to communicate
+    /// between the app and the native platform.  Currently the Javascript port is the only port to use
+    /// this mechanism.
+    ///
+    /// In the Javascript port these messages can be received in Javascript by adding an event listener
+    /// for 'cn1outbox' events to the 'window' object.  The message is contained in the event data &quot;detail&quot; key. And the
+    /// code in the 'code' key.
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`: The message to send to the native platform.
+    ///
+    public static void postMessage(MessageEvent message) {
+<span class="nc" id="L2293">        Display.INSTANCE.postMessage(message);</span>
+<span class="nc" id="L2294">    }</span>
+
+    /// Convenience method to schedule a task to run on the EDT after timeoutms.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeout`: The timeout in milliseconds.
+    ///
+    /// - `r`: The task to run.
+    ///
+    /// #### Returns
+    ///
+    /// The Timer object that can be used to cancel the task.
+    ///
+    /// #### See also
+    ///
+    /// - #setInterval(int, java.lang.Runnable)
+    public static Timer setTimeout(int timeout, Runnable r) {
+<span class="fc" id="L2312">        return Display.INSTANCE.setTimeout(timeout, r);</span>
+    }
+
+    /// Convenience method to schedule a task to run on the EDT after periodms
+    /// repeating every periodms.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeout`: The delay and repeat in milliseconds.
+    ///
+    /// - `r`: The runnable to run on the EDT.
+    ///
+    /// #### Returns
+    ///
+    /// The timer object which can be used to cancel the task.
+    ///
+    /// #### See also
+    ///
+    /// - #setTimeout(int, java.lang.Runnable)
+    public static Timer setInterval(int timeout, Runnable r) {
+<span class="nc" id="L2332">        return Display.INSTANCE.setInterval(timeout, r);</span>
+    }
+
+    /// Gets a reference to an application-wide shared Javascript context that can be used for running
+    /// Javascript commands.  When running in the Javascript port, this Javascript context will be the
+    /// same context in which the application itself is running, so it gives you the ability to interact
+    /// with the browser and DOM directly using the familiar `BrowserComponent` API.
+    ///
+    /// When running on other platforms, this shared context will be an off-screen browser component.
+    ///
+    /// Sample code allowing user to execute arbitrary Javascript code inside the shared context:
+    ///
+    /// ```java
+    /// Form hi = new Form(&quot;Hi World&quot;, new BorderLayout());
+    /// TextArea input = new TextArea();
+    /// TextArea output = new TextArea();
+    /// output.setEditable(false);
+    ///
+    /// Button execute = new Button(&quot;Run&quot;);
+    /// execute.addActionListener(evt-&gt;{
+    ///     BrowserComponent bc = CN.getSharedJavascriptContext().ready().get();
+    ///     bc.execute(&quot;callback.onSuccess(window.eval(${0}))&quot;, new Object[]{input.getText()}, res-&gt;{
+    ///         output.setText(res.toString());
+    ///     });
+    /// });
+    /// SplitPane split = new SplitPane(SplitPane.VERTICAL_SPLIT, input, output, &quot;0&quot;, &quot;50%&quot;, &quot;99%&quot;);
+    /// hi.add(CENTER, split);
+    /// hi.add(NORTH, execute);
+    ///
+    /// hi.show();
+    /// ```
+    ///
+    /// #### Returns
+    ///
+    /// A shared BrowserComponent
+    ///
+    public static BrowserComponent getSharedJavascriptContext() {
+<span class="nc" id="L2369">        return Display.impl.getSharedJavscriptContext();</span>
+    }
+
+    /// Returns the plugin support object for the current platform.  Use this object for registering plugins.
+    ///
+    /// #### Returns
+    ///
+    /// The plugin support object.
+    ///
+    public static PluginSupport getPluginSupport() {
+<span class="nc" id="L2379">        return Display.INSTANCE.getPluginSupport();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

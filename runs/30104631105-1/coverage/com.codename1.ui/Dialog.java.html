@@ -1,0 +1,2401 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Dialog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">Dialog.java</span></div><h1>Dialog.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.components.InteractionDialog;
+import com.codename1.io.Log;
+import com.codename1.ui.animations.Transition;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+import java.util.Map;
+
+/// A dialog is a form that occupies a part of the screen and appears as a modal
+/// entity to the developer. Dialogs allow us to prompt users for information and
+/// rely on the information being available on the next line after the show method.
+///
+/// Modality indicates that a dialog will block the calling thread even if the
+/// calling thread is the EDT. Notice that a dialog will not release the block
+/// until dispose is called even if show() from another form is called! Events are still performed thanks
+/// to the `com.codename1.ui.Display#invokeAndBlock(java.lang.Runnable)` capability of the
+/// `Display` class.
+///
+/// To determine the size of the dialog use the show method that accepts 4 integer
+/// values, notice that these values accept margin from the four sides rather than x, y, width
+/// and height values!
+///
+/// It's important to style a `Dialog` using `Dialog#getDialogStyle()` or
+/// `Dialog#setDialogUIID(java.lang.String)` methods rather than styling the dialog object directly.
+///
+/// The `Dialog` class also includes support for popup dialog which is a dialog type that is positioned
+/// next to a component or screen area and points an arrow at that location.
+///
+/// Static `Dialog.show(...)` APIs can optionally use `InteractionDialog` under the hood by setting
+/// `Dialog#setDefaultInteractionDialogMode(boolean)` or the theme constant `defaultInteractionDialogModeBool`.
+///
+/// Typical dialog usage looks like this:
+///
+/// ```java
+/// final Button show = new Button(&quot;Show Dialog&quot;);
+/// final Button showPopup = new Button(&quot;Show Popup&quot;);
+/// cnt.add(show).add(showPopup);
+/// show.addActionListener(new ActionListener() {
+///     public void actionPerformed(ActionEvent evt) {
+///         Dialog.show(&quot;Dialog Title&quot;, &quot;This is the dialog body, it can contain anything...&quot;, &quot;OK&quot;, &quot;Cancel&quot;);
+///     }
+/// });
+/// showPopup.addActionListener(new ActionListener() {
+///     public void actionPerformed(ActionEvent evt) {
+///         Dialog d = new Dialog(&quot;Popup Title&quot;);
+///         TextArea popupBody = new TextArea(&quot;This is the body of the popup&quot;, 3, 10);
+///         popupBody.setUIID(&quot;PopupBody&quot;);
+///         popupBody.setEditable(false);
+///         d.setLayout(new BorderLayout());
+///         d.add(BorderLayout.CENTER, popupBody);
+///         d.showPopupDialog(showPopup);
+///     }
+/// });
+/// ```
+///
+/// See this sample for showing a dialog at the bottom of the screen:
+///
+/// ```java
+/// Dialog dlg = new Dialog(&quot;At Bottom&quot;);
+/// dlg.setLayout(new BorderLayout());
+/// // span label accepts the text and the UIID for the dialog body
+/// dlg.add(new SpanLabel(&quot;Dialog Body text&quot;, &quot;DialogBody&quot;));
+/// int h = Display.getInstance().getDisplayHeight();
+/// dlg.setDisposeWhenPointerOutOfBounds(true);
+/// dlg.show(h /8 * 7, 0, 0, 0);
+/// ```
+///
+/// @author Shai Almog
+///
+/// #### See also
+///
+/// - Display#invokeAndBlock(java.lang.Runnable)
+public class Dialog extends Form implements AbstractDialog {
+
+    /// Constant indicating the type of alert to indicate the sound to play or
+    /// icon if none are explicitly set
+    public static final int TYPE_NONE = 0;
+    /// Constant indicating the type of alert to indicate the sound to play or
+    /// icon if none are explicitly set
+    public static final int TYPE_ALARM = 1;
+    /// Constant indicating the type of alert to indicate the sound to play or
+    /// icon if none are explicitly set
+    public static final int TYPE_CONFIRMATION = 2;
+    /// Constant indicating the type of alert to indicate the sound to play or
+    /// icon if none are explicitly set
+    public static final int TYPE_ERROR = 3;
+    /// Constant indicating the type of alert to indicate the sound to play or
+    /// icon if none are explicitly set
+    public static final int TYPE_INFO = 4;
+    /// Constant indicating the type of alert to indicate the sound to play or
+    /// icon if none are explicitly set
+    public static final int TYPE_WARNING = 5;
+    /// Indicates whether Codename One should try to automatically adjust a showing dialog size
+    /// when a screen size change event occurs
+<span class="fc" id="L128">    private static boolean autoAdjustDialogSize = true;</span>
+    /// Default screen orientation position for the upcoming dialog. By default
+    /// the dialog will be shown at hardcoded coordinates, this method allows us
+    /// to pack the dialog appropriately in one of the border layout based locations
+    /// see BorderLayout for futher details.
+    private static String defaultDialogPosition;
+    /// Allows a developer to indicate his interest that the dialog should no longer
+    /// scroll on its own but rather rely on the scrolling properties of internal
+    /// scrollable containers. This flag only affects the static show methods within
+    /// this class.
+    private static boolean disableStaticDialogScrolling;
+    /// The default type for dialogs
+<span class="fc" id="L140">    private static int defaultDialogType = TYPE_INFO;</span>
+    /// Places commands as buttons at the bottom of the standard static dialogs rather than
+    /// as softbuttons. This is especially appropriate for devices such as touch devices and
+    /// devices without the common softbuttons (e.g. blackberries).
+    /// The default value is false
+<span class="fc" id="L145">    private static boolean commandsAsButtons = true;</span>
+    /// The default pointer out of bounds dispose behavior, notice that
+    /// this only applies to dialogs and not popup dialogs where this is
+    /// always true by default
+<span class="fc" id="L149">    private static boolean defaultDisposeWhenPointerOutOfBounds = false;</span>
+    /// Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
+    /// blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+    /// only should be used
+<span class="fc" id="L153">    private static float defaultBlurBackgroundRadius = -1;</span>
+    private static boolean defaultInteractionDialogMode;
+    private static boolean defaultInteractionDialogModeInitialized;
+    private static boolean defaultTitleCentered;
+    /// Indicates whether the dialog has been disposed
+    private boolean disposed;
+    /// Indicates the time in which the alert should be disposed
+    private long time;
+    /// Indicates the last command selected by the user in this form
+    private Command lastCommandPressed;
+    /// Indicates that this is a menu preventing getCurrent() from ever returning this class
+    private boolean menu;
+    private int dialogType;
+<span class="fc" id="L166">    private int top = -1;</span>
+    private int bottom;
+    private int left;
+    private int right;
+    private boolean includeTitle;
+    private String position;
+    /// Default screen orientation position for the upcoming dialog. By default
+    /// the dialog will be shown at hardcoded coordinates, this method allows us
+    /// to pack the dialog appropriately in one of the border layout based locations
+    /// see BorderLayout for futher details.
+<span class="fc" id="L176">    private String dialogPosition = defaultDialogPosition;</span>
+    /// Determines whether the execution of a command on this dialog implicitly
+    /// disposes the dialog. This defaults to true which is a sensible default for
+    /// simple dialogs.
+<span class="fc" id="L180">    private boolean autoDispose = true;</span>
+<span class="fc" id="L181">    private boolean modal = true;</span>
+    private Command[] buttonCommands;
+    private boolean disposeOnRotation;
+<span class="fc" id="L184">    private boolean disposeWhenPointerOutOfBounds = defaultDisposeWhenPointerOutOfBounds;</span>
+    private boolean pressedOutOfBounds;
+    /// Returns true if the dialog was disposed automatically due to device rotation
+    private boolean disposedDueToRotation;
+    private Label dialogTitle;
+    private Container dialogContentPane;
+    private Container centeredTitleBody;
+    private Container centeredTitleArea;
+    /// Indicates if we want to enforce directional bias for the popup dialog. If null this field is ignored but if
+    /// its set to a value it biases the system towards a fixed direction for the popup dialog.
+    private Boolean popupDirectionBiasPortrait;
+    /// Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
+    /// blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+    /// only should be used
+<span class="fc" id="L198">    private float blurBackgroundRadius = defaultBlurBackgroundRadius;</span>
+    private boolean isUIIDByPopupPosition;
+<span class="fc" id="L200">    private boolean interactionDialogMode = defaultInteractionDialogMode;</span>
+<span class="fc" id="L201">    private boolean titleCentered = defaultTitleCentered;</span>
+
+    /// Constructs a Dialog with a title
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the title of the dialog
+    public Dialog(String title) {
+<span class="fc" id="L209">        this();</span>
+<span class="fc" id="L210">        setTitle(title);</span>
+<span class="fc" id="L211">    }</span>
+
+    /// Constructs a Dialog with a title
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the title of the dialog
+    ///
+    /// - `lm`: the layout for the dialog
+    public Dialog(String title, Layout lm) {
+<span class="fc" id="L221">        this(lm);</span>
+<span class="fc" id="L222">        setTitle(title);</span>
+<span class="fc" id="L223">    }</span>
+
+    /// Constructs a Dialog
+    public Dialog() {
+<span class="fc" id="L227">        this(&quot;Dialog&quot;, &quot;DialogTitle&quot;);</span>
+<span class="fc" id="L228">    }</span>
+
+    /// Constructs a Dialog with a layout
+    ///
+    /// #### Parameters
+    ///
+    /// - `lm`: the layout manager
+    public Dialog(Layout lm) {
+<span class="fc" id="L236">        this(&quot;Dialog&quot;, &quot;DialogTitle&quot;, lm);</span>
+<span class="fc" id="L237">    }</span>
+
+
+    Dialog(String dialogUIID, String dialogTitleUIID) {
+<span class="fc" id="L241">        super();</span>
+<span class="fc" id="L242">        initImpl(dialogUIID, dialogTitleUIID, null);</span>
+<span class="fc" id="L243">    }</span>
+
+    Dialog(String dialogUIID, String dialogTitleUIID, Layout lm) {
+<span class="fc" id="L246">        super();</span>
+<span class="fc" id="L247">        initImpl(dialogUIID, dialogTitleUIID, lm);</span>
+<span class="fc" id="L248">    }</span>
+
+    /// The default pointer out of bounds dispose behavior, notice that
+    /// this only applies to dialogs and not popup dialogs where this is
+    /// always true by default
+    ///
+    /// #### Returns
+    ///
+    /// the defaultDisposeWhenPointerOutOfBounds
+    public static boolean isDefaultDisposeWhenPointerOutOfBounds() {
+<span class="fc" id="L258">        return defaultDisposeWhenPointerOutOfBounds;</span>
+    }
+
+    /// The default pointer out of bounds dispose behavior, notice that
+    /// this only applies to dialogs and not popup dialogs where this is
+    /// always true by default
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultDisposeWhenPointerOutOfBounds`: the defaultDisposeWhenPointerOutOfBounds to set
+    public static void setDefaultDisposeWhenPointerOutOfBounds(
+            boolean aDefaultDisposeWhenPointerOutOfBounds) {
+<span class="fc" id="L270">        defaultDisposeWhenPointerOutOfBounds =</span>
+                aDefaultDisposeWhenPointerOutOfBounds;
+<span class="fc" id="L272">    }</span>
+
+    /// Shows a modal prompt dialog with the given title and text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: The title for the dialog optionally null;
+    ///
+    /// - `text`: the text displayed in the dialog
+    ///
+    /// - `type`: @param type       the type of the alert one of TYPE_WARNING, TYPE_INFO,
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    ///
+    /// - `icon`: the icon for the dialog, can be null
+    ///
+    /// - `okText`: the text to appear in the command dismissing the dialog
+    ///
+    /// - `cancelText`: @param cancelText optionally null for a text to appear in the cancel command
+    /// for canceling the dialog
+    ///
+    /// #### Returns
+    ///
+    /// true if the ok command was pressed or if cancelText is null. False otherwise.
+    public static boolean show(String title, String text, int type, Image icon, String okText, String cancelText) {
+<span class="fc" id="L296">        return show(title, text, type, icon, okText, cancelText, 0);</span>
+    }
+
+    /// Shows a modal prompt dialog with the given title and text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: The title for the dialog optionally null;
+    ///
+    /// - `text`: the text displayed in the dialog
+    ///
+    /// - `type`: @param type       the type of the alert one of TYPE_WARNING, TYPE_INFO,
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    ///
+    /// - `icon`: the icon for the dialog, can be null
+    ///
+    /// - `okText`: the text to appear in the command dismissing the dialog
+    ///
+    /// - `cancelText`: @param cancelText optionally null for a text to appear in the cancel command
+    /// for canceling the dialog
+    ///
+    /// - `timeout`: a timeout after which null would be returned if timeout is 0 inifinite time is used
+    ///
+    /// #### Returns
+    ///
+    /// true if the ok command was pressed or if cancelText is null. False otherwise.
+    public static boolean show(String title, String text, int type, Image icon, String okText, String cancelText, long timeout) {
+        Command[] cmds;
+<span class="fc" id="L324">        Command okCommand = new Command(okText);</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">        if (cancelText != null) {</span>
+<span class="fc" id="L326">            cmds = new Command[]{new Command(cancelText), okCommand};</span>
+        } else {
+<span class="nc" id="L328">            cmds = new Command[]{okCommand};</span>
+        }
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">        return show(title, text, okCommand, cmds, type, icon, timeout) == okCommand; //NOPMD CompareObjectsWithEquals</span>
+    }
+
+    /// Shows a modal prompt dialog with the given title and text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: The title for the dialog optionally null;
+    ///
+    /// - `text`: the text displayed in the dialog
+    ///
+    /// - `cmds`: @param cmds    commands that are added to the form any click on any command
+    /// will dispose the form
+    ///
+    /// - `type`: @param type    the type of the alert one of TYPE_WARNING, TYPE_INFO,
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    ///
+    /// - `icon`: the icon for the dialog, can be null
+    ///
+    /// - `timeout`: a timeout after which null would be returned if timeout is 0 inifinite time is used
+    ///
+    /// #### Returns
+    ///
+    /// the command pressed by the user
+    public static Command show(String title, String text, Command[] cmds, int type, Image icon, long timeout) {
+<span class="fc" id="L355">        return show(title, text, null, cmds, type, icon, timeout);</span>
+    }
+
+    /// Shows a modal prompt dialog with the given title and text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: The title for the dialog optionally null;
+    ///
+    /// - `text`: the text displayed in the dialog
+    ///
+    /// - `defaultCommand`: command to be assigned as the default command or null
+    ///
+    /// - `cmds`: @param cmds           commands that are added to the form any click on any command
+    /// will dispose the form
+    ///
+    /// - `type`: @param type           the type of the alert one of TYPE_WARNING, TYPE_INFO,
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    ///
+    /// - `icon`: the icon for the dialog, can be null
+    ///
+    /// - `timeout`: a timeout after which null would be returned if timeout is 0 inifinite time is used
+    ///
+    /// #### Returns
+    ///
+    /// the command pressed by the user
+    public static Command show(String title, String text, Command defaultCommand, Command[] cmds, int type, Image icon, long timeout) {
+<span class="fc" id="L382">        return show(title, text, defaultCommand, cmds, type, icon, timeout, null);</span>
+    }
+
+    /// Shows a modal prompt dialog with the given title and text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: The title for the dialog optionally null;
+    ///
+    /// - `text`: the text displayed in the dialog
+    ///
+    /// - `cmds`: @param cmds       commands that are added to the form any click on any command
+    /// will dispose the form
+    ///
+    /// - `type`: @param type       the type of the alert one of TYPE_WARNING, TYPE_INFO,
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    ///
+    /// - `icon`: the icon for the dialog, can be null
+    ///
+    /// - `timeout`: a timeout after which null would be returned if timeout is 0 inifinite time is used
+    ///
+    /// - `transition`: the transition installed when the dialog enters/leaves
+    ///
+    /// #### Returns
+    ///
+    /// the command pressed by the user
+    public static Command show(String title, String text, Command[] cmds, int type, Image icon, long timeout, Transition transition) {
+<span class="nc" id="L409">        return show(title, text, null, cmds, type, icon, timeout, transition);</span>
+    }
+
+    /// Shows a modal prompt dialog with the given title and text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: The title for the dialog optionally null;
+    ///
+    /// - `text`: the text displayed in the dialog
+    ///
+    /// - `defaultCommand`: command to be assigned as the default command or null
+    ///
+    /// - `cmds`: @param cmds           commands that are added to the form any click on any command
+    /// will dispose the form
+    ///
+    /// - `type`: @param type           the type of the alert one of TYPE_WARNING, TYPE_INFO,
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    ///
+    /// - `icon`: the icon for the dialog, can be null
+    ///
+    /// - `timeout`: a timeout after which null would be returned if timeout is 0 inifinite time is used
+    ///
+    /// - `transition`: the transition installed when the dialog enters/leaves
+    ///
+    /// #### Returns
+    ///
+    /// the command pressed by the user
+    public static Command show(String title, String text, Command defaultCommand, Command[] cmds, int type, Image icon, long timeout, Transition transition) {
+<span class="fc" id="L438">        Map&lt;String, String&gt; h = UIManager.getInstance().getBundle();</span>
+<span class="pc bpc" id="L439" title="3 of 4 branches missed.">        if (h != null &amp;&amp; text != null) {</span>
+<span class="nc" id="L440">            Object o = h.get(text);</span>
+<span class="nc bnc" id="L441" title="All 2 branches missed.">            if (o != null) {</span>
+<span class="nc" id="L442">                text = (String) o;</span>
+            }
+        }
+<span class="fc" id="L445">        TextArea t = new TextArea(text, 3, 30);</span>
+<span class="fc" id="L446">        t.setUIID(&quot;DialogBody&quot;);</span>
+<span class="fc" id="L447">        t.setEditable(false);</span>
+<span class="fc" id="L448">        return show(title, t, defaultCommand, cmds, type, icon, timeout, transition);</span>
+    }
+
+    /// Shows a modal prompt dialog with the given title and text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: The title for the dialog optionally null;
+    ///
+    /// - `text`: the text displayed in the dialog
+    ///
+    /// - `okText`: the text to appear in the command dismissing the dialog
+    ///
+    /// - `cancelText`: @param cancelText optionally null for a text to appear in the cancel command
+    /// for canceling the dialog
+    ///
+    /// #### Returns
+    ///
+    /// true if the ok command was pressed or if cancelText is null. False otherwise.
+    public static boolean show(String title, String text, String okText, String cancelText) {
+<span class="fc" id="L468">        return show(title, text, defaultDialogType, null, okText, cancelText);</span>
+    }
+
+    /// Shows a modal dialog with the given component as its &quot;body&quot; placed in the
+    /// center.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: title for the dialog
+    ///
+    /// - `body`: component placed in the center of the dialog
+    ///
+    /// - `cmds`: @param cmds  commands that are added to the form any click on any command
+    /// will dispose the form
+    ///
+    /// #### Returns
+    ///
+    /// the command pressed by the user
+    public static Command show(String title, Component body, Command... cmds) {
+<span class="nc" id="L487">        return show(title, body, cmds, defaultDialogType, null);</span>
+    }
+
+    /// Shows a modal dialog with the given component as its &quot;body&quot; placed in the
+    /// center.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: title for the dialog
+    ///
+    /// - `body`: text placed in the center of the dialog
+    ///
+    /// - `cmds`: @param cmds  commands that are added to the form any click on any command
+    /// will dispose the form
+    ///
+    /// #### Returns
+    ///
+    /// the command pressed by the user
+    public static Command show(String title, String body, Command... cmds) {
+<span class="nc" id="L506">        TextArea t = new TextArea(body, 3, 30);</span>
+<span class="nc" id="L507">        t.setUIID(&quot;DialogBody&quot;);</span>
+<span class="nc" id="L508">        t.setEditable(false);</span>
+<span class="nc" id="L509">        return show(title, t, cmds);</span>
+    }
+
+    /// Shows a modal dialog with the given component as its &quot;body&quot; placed in the
+    /// center.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: title for the dialog
+    ///
+    /// - `body`: component placed in the center of the dialog
+    ///
+    /// - `cmds`: @param cmds  commands that are added to the form any click on any command
+    /// will dispose the form
+    ///
+    /// - `type`: @param type  the type of the alert one of TYPE_WARNING, TYPE_INFO,
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    ///
+    /// - `icon`: the icon for the dialog, can be null
+    ///
+    /// #### Returns
+    ///
+    /// the command pressed by the user
+    public static Command show(String title, Component body, Command[] cmds, int type, Image icon) {
+<span class="nc" id="L533">        return show(title, body, cmds, type, icon, 0);</span>
+    }
+
+    /// Shows a modal dialog with the given component as its &quot;body&quot; placed in the
+    /// center.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: title for the dialog
+    ///
+    /// - `body`: component placed in the center of the dialog
+    ///
+    /// - `cmds`: @param cmds    commands that are added to the form any click on any command
+    /// will dispose the form
+    ///
+    /// - `type`: @param type    the type of the alert one of TYPE_WARNING, TYPE_INFO,
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    ///
+    /// - `icon`: the icon for the dialog, can be null
+    ///
+    /// - `timeout`: a timeout after which null would be returned if timeout is 0 inifinite time is used
+    ///
+    /// #### Returns
+    ///
+    /// the command pressed by the user
+    public static Command show(String title, Component body, Command[] cmds, final int type, Image icon, long timeout) {
+<span class="nc" id="L559">        return show(title, body, cmds, type, icon, timeout, null);</span>
+    }
+
+    /// Shows a modal dialog with the given component as its &quot;body&quot; placed in the
+    /// center.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: title for the dialog
+    ///
+    /// - `body`: component placed in the center of the dialog
+    ///
+    /// - `cmds`: @param cmds       commands that are added to the form any click on any command
+    /// will dispose the form
+    ///
+    /// - `type`: @param type       the type of the alert one of TYPE_WARNING, TYPE_INFO,
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    ///
+    /// - `icon`: the icon for the dialog, can be null
+    ///
+    /// - `timeout`: a timeout after which null would be returned if timeout is 0 infinite time is used
+    ///
+    /// - `transition`: the transition installed when the dialog enters/leaves
+    ///
+    /// #### Returns
+    ///
+    /// the command pressed by the user
+    public static Command show(String title, Component body, Command[] cmds, int type, Image icon, long timeout, Transition transition) {
+<span class="nc" id="L587">        return show(title, body, null, cmds, type, icon, timeout, transition);</span>
+    }
+
+    /// Shows a modal dialog with the given component as its &quot;body&quot; placed in the
+    /// center.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: title for the dialog
+    ///
+    /// - `body`: component placed in the center of the dialog
+    ///
+    /// - `defaultCommand`: command to be assigned as the default command or null
+    ///
+    /// - `cmds`: @param cmds           commands that are added to the form any click on any command
+    /// will dispose the form
+    ///
+    /// - `type`: @param type           the type of the alert one of TYPE_WARNING, TYPE_INFO,
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    ///
+    /// - `icon`: the icon for the dialog, can be null
+    ///
+    /// - `timeout`: a timeout after which null would be returned if timeout is 0 inifinite time is used
+    ///
+    /// - `transition`: the transition installed when the dialog enters/leaves
+    ///
+    /// #### Returns
+    ///
+    /// the command pressed by the user
+    public static Command show(String title, Component body, Command defaultCommand, Command[] cmds, int type, Image icon, long timeout, Transition transition) {
+<span class="fc bfc" id="L617" title="All 2 branches covered.">        if (!isDefaultInteractionDialogMode()) {</span>
+<span class="fc" id="L618">            Dialog dialog = new Dialog(title);</span>
+<span class="fc" id="L619">            dialog.dialogType = type;</span>
+<span class="fc" id="L620">            dialog.setTransitionInAnimator(transition);</span>
+<span class="fc" id="L621">            dialog.setTransitionOutAnimator(transition);</span>
+<span class="fc" id="L622">            dialog.lastCommandPressed = null;</span>
+<span class="fc" id="L623">            dialog.setLayout(new BorderLayout());</span>
+<span class="pc bpc" id="L624" title="1 of 2 branches missed.">            if (cmds != null) {</span>
+<span class="pc bpc" id="L625" title="1 of 2 branches missed.">                if (commandsAsButtons) {</span>
+<span class="fc" id="L626">                    dialog.placeButtonCommands(cmds);</span>
+                } else {
+<span class="nc bnc" id="L628" title="All 2 branches missed.">                    for (Command cmd : cmds) {</span>
+<span class="nc" id="L629">                        dialog.addCommand(cmd);</span>
+                    }
+                }
+
+                // maps the first command to back
+<span class="pc bpc" id="L634" title="1 of 4 branches missed.">                if (cmds.length == 1 || cmds.length == 2) {</span>
+<span class="fc" id="L635">                    dialog.setBackCommand(cmds[0]);</span>
+                }
+            }
+<span class="fc bfc" id="L638" title="All 2 branches covered.">            if (defaultCommand != null) {</span>
+<span class="fc" id="L639">                dialog.setDefaultCommand(defaultCommand);</span>
+            }
+<span class="fc" id="L641">            dialog.addComponent(BorderLayout.CENTER, body);</span>
+<span class="pc bpc" id="L642" title="1 of 2 branches missed.">            if (icon != null) {</span>
+<span class="nc" id="L643">                dialog.addComponent(BorderLayout.EAST, new Label(icon));</span>
+            }
+<span class="fc bfc" id="L645" title="All 2 branches covered.">            if (timeout != 0) {</span>
+<span class="fc" id="L646">                dialog.setTimeout(timeout);</span>
+            }
+<span class="pc bpc" id="L648" title="3 of 4 branches missed.">            if (body.isScrollable() || disableStaticDialogScrolling) {</span>
+<span class="fc" id="L649">                dialog.setScrollable(false);</span>
+            }
+<span class="fc" id="L651">            dialog.show();</span>
+<span class="fc" id="L652">            return dialog.lastCommandPressed;</span>
+        }
+
+<span class="fc" id="L655">        AbstractDialog dialog = new InteractionDialog(title, new BorderLayout());</span>
+<span class="fc" id="L656">        dialog.setDialogType(type);</span>
+<span class="fc" id="L657">        dialog.setTransitions(transition);</span>
+<span class="fc" id="L658">        dialog.configureCommands(cmds, commandsAsButtons);</span>
+<span class="fc" id="L659">        dialog.setDefaultCommand(defaultCommand);</span>
+<span class="fc" id="L660">        dialog.addComponent(BorderLayout.CENTER, body);</span>
+<span class="pc bpc" id="L661" title="1 of 2 branches missed.">        if (icon != null) {</span>
+<span class="nc" id="L662">            dialog.addComponent(BorderLayout.EAST, new Label(icon));</span>
+        }
+<span class="pc bpc" id="L664" title="1 of 2 branches missed.">        if (timeout != 0) {</span>
+<span class="fc" id="L665">            dialog.setTimeout(timeout);</span>
+        }
+<span class="pc bpc" id="L667" title="3 of 4 branches missed.">        if (body.isScrollable() || disableStaticDialogScrolling) {</span>
+<span class="fc" id="L668">            dialog.setScrollable(false);</span>
+        }
+<span class="fc" id="L670">        return dialog.showDialog();</span>
+    }
+
+    /// Default screen orientation position for the upcoming dialog. By default
+    /// the dialog will be shown at hardcoded coordinates, this method allows us
+    /// to pack the dialog appropriately in one of the border layout based locations
+    /// see BorderLayout for futher details.
+    ///
+    /// #### Returns
+    ///
+    /// position for dialogs on the sceen using BorderLayout orientation tags
+    public static String getDefaultDialogPosition() {
+<span class="fc" id="L682">        return defaultDialogPosition;</span>
+    }
+
+    /// Default screen orientation position for the upcoming dialog. By default
+    /// the dialog will be shown at hardcoded coordinates, this method allows us
+    /// to pack the dialog appropriately in one of the border layout based locations
+    /// see BorderLayout for futher details.
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: for dialogs on the sceen using BorderLayout orientation tags
+    public static void setDefaultDialogPosition(String p) {
+<span class="fc" id="L694">        defaultDialogPosition = p;</span>
+<span class="fc" id="L695">    }</span>
+
+    /// The default type for dialogs
+    ///
+    /// #### Returns
+    ///
+    /// the default type for the dialog
+    public static int getDefaultDialogType() {
+<span class="nc" id="L703">        return defaultDialogType;</span>
+    }
+
+    /// The default type for dialogs
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the default type for the dialog
+    public static void setDefaultDialogType(int d) {
+<span class="nc" id="L712">        defaultDialogType = d;</span>
+<span class="nc" id="L713">    }</span>
+
+    /// Indicates whether Codename One should try to automatically adjust a showing dialog size
+    /// when a screen size change event occurs
+    ///
+    /// #### Returns
+    ///
+    /// true to indicate that Codename One should make a &quot;best effort&quot; to resize the dialog
+    public static boolean isAutoAdjustDialogSize() {
+<span class="fc" id="L722">        return autoAdjustDialogSize;</span>
+    }
+
+    /// Indicates whether Codename One should try to automatically adjust a showing dialog size
+    /// when a screen size change event occurs
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: true to indicate that Codename One should make a &quot;best effort&quot; to resize the dialog
+    public static void setAutoAdjustDialogSize(boolean a) {
+<span class="fc" id="L732">        autoAdjustDialogSize = a;</span>
+<span class="fc" id="L733">    }</span>
+
+    /// Allows a developer to indicate his interest that the dialog should no longer
+    /// scroll on its own but rather rely on the scrolling properties of internal
+    /// scrollable containers. This flag only affects the static show methods within
+    /// this class.
+    ///
+    /// #### Returns
+    ///
+    /// true if scrolling should be activated, false otherwise
+    public static boolean isDisableStaticDialogScrolling() {
+<span class="fc" id="L744">        return disableStaticDialogScrolling;</span>
+    }
+
+    /// Allows a developer to indicate his interest that the dialog should no longer
+    /// scroll on its own but rather rely on the scrolling properties of internal
+    /// scrollable containers. This flag only affects the static show methods within
+    /// this class.
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: indicates whether scrolling should be active or not
+    public static void setDisableStaticDialogScrolling(boolean d) {
+<span class="fc" id="L756">        disableStaticDialogScrolling = d;</span>
+<span class="fc" id="L757">    }</span>
+
+    /// Places commands as buttons at the bottom of the standard static dialogs rather than
+    /// as softbuttons. This is especially appropriate for devices such as touch devices and
+    /// devices without the common softbuttons (e.g. blackberries).
+    /// The default value is false
+    ///
+    /// #### Returns
+    ///
+    /// true if commands are placed as buttons and not as softbutton keys
+    public static boolean isCommandsAsButtons() {
+<span class="fc" id="L768">        return commandsAsButtons;</span>
+    }
+
+    /// Places commands as buttons at the bottom of the standard static dialogs rather than
+    /// as softbuttons. This is especially appropriate for devices such as touch devices and
+    /// devices without the common softbuttons (e.g. blackberries).
+    /// The default value is false
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: true to place commands as buttons and not as softbutton keys
+    public static void setCommandsAsButtons(boolean c) {
+<span class="fc" id="L780">        commandsAsButtons = c;</span>
+<span class="fc" id="L781">    }</span>
+
+    /// Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
+    /// blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+    /// only should be used
+    ///
+    /// #### Returns
+    ///
+    /// the defaultBlurBackgroundRadius
+    public static float getDefaultBlurBackgroundRadius() {
+<span class="fc" id="L791">        return defaultBlurBackgroundRadius;</span>
+    }
+
+    /// Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
+    /// blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+    /// only should be used. Notice that this value can be set using the theme constant: `dialogBlurRadiusInt`
+    ///
+    /// #### Parameters
+    ///
+    /// - `aDefaultBlurBackgroundRadius`: the defaultBlurBackgroundRadius to set
+    public static void setDefaultBlurBackgroundRadius(float aDefaultBlurBackgroundRadius) {
+<span class="fc" id="L802">        defaultBlurBackgroundRadius = aDefaultBlurBackgroundRadius;</span>
+<span class="fc" id="L803">    }</span>
+
+    /// Indicates whether newly-created dialogs place their title in the absolute
+    /// center, with the body below it. This default can be configured with the
+    /// `dialogTitleCenterBool` theme constant.
+    ///
+    /// #### Returns
+    ///
+    /// true when newly-created dialogs use the centered title layout
+    public static boolean isDefaultTitleCentered() {
+<span class="fc" id="L813">        return defaultTitleCentered;</span>
+    }
+
+    /// Sets whether newly-created `Dialog` and `InteractionDialog` instances place
+    /// their title in the absolute center, with the body below it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `defaultTitleCentered`: true to use the centered title layout by default
+    public static void setDefaultTitleCentered(boolean defaultTitleCentered) {
+<span class="fc" id="L823">        Dialog.defaultTitleCentered = defaultTitleCentered;</span>
+<span class="fc" id="L824">    }</span>
+
+    private static void initDefaultInteractionDialogMode() {
+<span class="fc bfc" id="L827" title="All 2 branches covered.">        if (!defaultInteractionDialogModeInitialized) {</span>
+<span class="fc" id="L828">            defaultInteractionDialogModeInitialized = true;</span>
+<span class="fc" id="L829">            defaultInteractionDialogMode = UIManager.getInstance().isThemeConstant(&quot;defaultInteractionDialogModeBool&quot;, defaultInteractionDialogMode);</span>
+        }
+<span class="fc" id="L831">    }</span>
+
+    /// Indicates whether newly-created dialogs should use `InteractionDialog` under the hood.
+    ///
+    /// This default can be configured globally using the theme constant
+    /// `defaultInteractionDialogModeBool`.
+    public static boolean isDefaultInteractionDialogMode() {
+<span class="fc" id="L838">        initDefaultInteractionDialogMode();</span>
+<span class="fc" id="L839">        return defaultInteractionDialogMode;</span>
+    }
+
+    /// Indicates whether newly-created dialogs should use `InteractionDialog` under the hood.
+    ///
+    /// This value overrides the theme constant `defaultInteractionDialogModeBool`
+    /// for the remainder of the app lifecycle.
+    public static void setDefaultInteractionDialogMode(boolean defaultInteractionDialogMode) {
+<span class="fc" id="L847">        defaultInteractionDialogModeInitialized = true;</span>
+<span class="fc" id="L848">        Dialog.defaultInteractionDialogMode = defaultInteractionDialogMode;</span>
+<span class="fc" id="L849">    }</span>
+
+    /// Indicates whether this dialog should use `InteractionDialog` under the hood.
+    public boolean isInteractionDialogMode() {
+<span class="nc" id="L853">        return interactionDialogMode;</span>
+    }
+
+    /// Indicates whether this dialog should use `InteractionDialog` under the hood.
+    public void setInteractionDialogMode(boolean interactionDialogMode) {
+<span class="nc" id="L858">        this.interactionDialogMode = interactionDialogMode;</span>
+<span class="nc" id="L859">    }</span>
+
+    /// Disabling ad padding for dialogs
+    @Override
+    void initAdPadding(Display d) {
+<span class="fc" id="L864">    }</span>
+
+    private void initImpl(String dialogUIID, String dialogTitleUIID, Layout lm) {
+<span class="fc" id="L867">        super.getContentPane().setUIID(dialogUIID);</span>
+<span class="fc" id="L868">        super.getTitleComponent().setText(&quot;&quot;);</span>
+<span class="fc" id="L869">        super.getTitleComponent().setVisible(false);</span>
+<span class="fc" id="L870">        super.getTitleArea().setVisible(false);</span>
+<span class="fc" id="L871">        super.getTitleArea().setUIID(&quot;Container&quot;);</span>
+<span class="fc" id="L872">        lockStyleImages(getUnselectedStyle());</span>
+<span class="fc" id="L873">        titleArea.setVisible(false);</span>
+
+<span class="fc bfc" id="L875" title="All 2 branches covered.">        if (lm != null) {</span>
+<span class="fc" id="L876">            dialogContentPane = new Container(lm);</span>
+        } else {
+<span class="fc" id="L878">            dialogContentPane = new Container();</span>
+        }
+<span class="fc" id="L880">        dialogContentPane.setUIID(&quot;DialogContentPane&quot;);</span>
+<span class="fc" id="L881">        dialogTitle = new Label(&quot;&quot;, dialogTitleUIID);</span>
+<span class="fc" id="L882">        super.getContentPane().setLayout(new BorderLayout());</span>
+<span class="fc" id="L883">        updateTitleLayout();</span>
+<span class="fc" id="L884">        super.getContentPane().setScrollable(false);</span>
+<span class="fc" id="L885">        super.getContentPane().setAlwaysTensile(false);</span>
+
+<span class="fc" id="L887">        super.getStyle().setBgTransparency(0);</span>
+<span class="fc" id="L888">        super.getStyle().setBgImage(null);</span>
+<span class="fc" id="L889">        super.getStyle().setBorder(null);</span>
+<span class="fc" id="L890">        setSmoothScrolling(false);</span>
+<span class="fc" id="L891">        deregisterAnimated(this);</span>
+<span class="fc" id="L892">    }</span>
+
+    /// When the dialog is disposed this form will show. Notice that this can only be set after show was invoked!
+    ///
+    /// #### Parameters
+    ///
+    /// - `previousForm`: the previous form
+    @Override
+    public void setPreviousForm(Form previousForm) {
+<span class="nc" id="L901">        super.setPreviousForm(previousForm);</span>
+<span class="nc" id="L902">    }</span>
+
+    /// Overriden to disable the toolbar in dialogs
+    ///
+    /// {@inheritDoc}
+    @Override
+    protected final void initGlobalToolbar() {
+<span class="fc" id="L909">    }</span>
+
+    @Override
+    public Container getContentPane() {
+<span class="fc" id="L913">        return dialogContentPane;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Layout getLayout() {
+<span class="nc" id="L919">        return dialogContentPane.getLayout();</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public final void setLayout(Layout layout) {
+<span class="fc" id="L925">        dialogContentPane.setLayout(layout);</span>
+<span class="fc" id="L926">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public String getTitle() {
+<span class="fc" id="L931">        return dialogTitle.getText();</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public final void setTitle(String title) {
+<span class="fc" id="L937">        dialogTitle.setText(title);</span>
+<span class="fc" id="L938">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public final void addComponent(Component cmp) {
+<span class="fc" id="L943">        dialogContentPane.addComponent(cmp);</span>
+<span class="fc" id="L944">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void addComponent(Object constraints, Component cmp) {
+<span class="fc" id="L949">        dialogContentPane.addComponent(constraints, cmp);</span>
+<span class="fc" id="L950">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void addComponent(int index, Object constraints, Component cmp) {
+<span class="nc" id="L955">        dialogContentPane.addComponent(index, constraints, cmp);</span>
+<span class="nc" id="L956">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void addComponent(int index, Component cmp) {
+<span class="nc" id="L961">        dialogContentPane.addComponent(index, cmp);</span>
+<span class="nc" id="L962">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void removeAll() {
+<span class="nc" id="L967">        dialogContentPane.removeAll();</span>
+<span class="nc" id="L968">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void removeComponent(Component cmp) {
+<span class="nc" id="L973">        dialogContentPane.removeComponent(cmp);</span>
+<span class="nc" id="L974">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public Label getTitleComponent() {
+<span class="fc" id="L979">        return dialogTitle;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void setTitleComponent(Label title) {
+<span class="fc" id="L985">        Container parent = dialogTitle.getParent();</span>
+<span class="pc bpc" id="L986" title="1 of 2 branches missed.">        if (parent != null) {</span>
+<span class="fc" id="L987">            parent.removeComponent(dialogTitle);</span>
+        }
+<span class="fc" id="L989">        dialogTitle = title;</span>
+<span class="fc" id="L990">        updateTitleLayout();</span>
+<span class="fc" id="L991">    }</span>
+
+    /// Returns whether this dialog places its title in the absolute center with
+    /// the body below it.
+    ///
+    /// #### Returns
+    ///
+    /// true when the centered title layout is active
+    public boolean isTitleCentered() {
+<span class="fc" id="L1000">        return titleCentered;</span>
+    }
+
+    /// Places the title in the absolute center with the body below it. Passing
+    /// false restores the traditional title-at-top layout.
+    ///
+    /// #### Parameters
+    ///
+    /// - `titleCentered`: true to use the centered title layout
+    public void setTitleCentered(boolean titleCentered) {
+<span class="pc bpc" id="L1010" title="1 of 2 branches missed.">        if (this.titleCentered == titleCentered) {</span>
+<span class="nc" id="L1011">            return;</span>
+        }
+<span class="fc" id="L1013">        this.titleCentered = titleCentered;</span>
+<span class="fc" id="L1014">        updateTitleLayout();</span>
+<span class="fc" id="L1015">        revalidate();</span>
+<span class="fc" id="L1016">    }</span>
+
+    private void updateTitleLayout() {
+<span class="fc" id="L1019">        Container root = super.getContentPane();</span>
+<span class="fc bfc" id="L1020" title="All 2 branches covered.">        if (dialogTitle.getParent() != null) {</span>
+<span class="fc" id="L1021">            dialogTitle.remove();</span>
+        }
+<span class="fc bfc" id="L1023" title="All 2 branches covered.">        if (dialogContentPane.getParent() != null) {</span>
+<span class="fc" id="L1024">            dialogContentPane.remove();</span>
+        }
+<span class="pc bpc" id="L1026" title="1 of 4 branches missed.">        if (centeredTitleBody != null &amp;&amp; centeredTitleBody.getParent() != null) {</span>
+<span class="fc" id="L1027">            centeredTitleBody.remove();</span>
+        }
+<span class="fc bfc" id="L1029" title="All 2 branches covered.">        if (titleCentered) {</span>
+<span class="fc bfc" id="L1030" title="All 2 branches covered.">            if (centeredTitleBody == null) {</span>
+<span class="fc" id="L1031">                centeredTitleBody = new Container(new BorderLayout());</span>
+<span class="fc" id="L1032">                centeredTitleBody.setUIID(&quot;Container&quot;);</span>
+<span class="fc" id="L1033">                centeredTitleArea = new Container(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE));</span>
+            }
+<span class="fc" id="L1035">            centeredTitleArea.setUIID(getUIManager().getThemeConstant(</span>
+                    &quot;dlgCenteredTitleUIID&quot;, &quot;Container&quot;));
+<span class="fc" id="L1037">            centeredTitleArea.removeAll();</span>
+<span class="fc" id="L1038">            centeredTitleBody.removeAll();</span>
+<span class="fc" id="L1039">            centeredTitleArea.addComponent(BorderLayout.CENTER, dialogTitle);</span>
+<span class="fc" id="L1040">            centeredTitleBody.addComponent(BorderLayout.CENTER, centeredTitleArea);</span>
+<span class="fc" id="L1041">            centeredTitleBody.addComponent(BorderLayout.SOUTH, dialogContentPane);</span>
+<span class="fc" id="L1042">            root.addComponent(BorderLayout.CENTER, centeredTitleBody);</span>
+        } else {
+<span class="fc" id="L1044">            root.addComponent(BorderLayout.NORTH, dialogTitle);</span>
+<span class="fc" id="L1045">            root.addComponent(BorderLayout.CENTER, dialogContentPane);</span>
+        }
+<span class="fc" id="L1047">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public Style getTitleStyle() {
+<span class="nc" id="L1052">        return dialogTitle.getStyle();</span>
+    }
+
+    @Override
+    void updateIcsIconCommandBehavior() {
+        // don't set the app icon to the dialog title
+<span class="nc" id="L1058">    }</span>
+
+    /// Returns the container that actually implements the dialog positioning.
+    /// This container is normally not accessible via the Codename One API.
+    ///
+    /// #### Returns
+    ///
+    /// internal dialog container useful for various calculations.
+    public Container getDialogComponent() {
+<span class="fc" id="L1067">        return super.getContentPane();</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public void setTitleComponent(Label title, Transition t) {
+<span class="nc" id="L1073">        Container parent = dialogTitle.getParent();</span>
+<span class="nc bnc" id="L1074" title="All 2 branches missed.">        if (parent != null) {</span>
+<span class="nc" id="L1075">            parent.replace(dialogTitle, title, t);</span>
+        }
+<span class="nc" id="L1077">        dialogTitle = title;</span>
+<span class="nc" id="L1078">    }</span>
+
+    /// Returns the uiid of the dialog
+    ///
+    /// #### Returns
+    ///
+    /// the uiid of the dialog
+    public String getDialogUIID() {
+<span class="fc" id="L1086">        return super.getContentPane().getUIID();</span>
+    }
+
+    /// Simple setter to set the Dialog uiid
+    ///
+    /// #### Parameters
+    ///
+    /// - `uiid`: the id for the dialog
+    public void setDialogUIID(String uiid) {
+<span class="fc" id="L1095">        super.getContentPane().setUIID(uiid);</span>
+<span class="fc" id="L1096">    }</span>
+
+    /// Simple getter to get the Dialog Style
+    ///
+    /// #### Returns
+    ///
+    /// the style of the dialog
+    public Style getDialogStyle() {
+<span class="fc" id="L1104">        return super.getContentPane().getUnselectedStyle();</span>
+    }
+
+    /// Simple setter to set the Dialog Style
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`
+    public void setDialogStyle(Style style) {
+<span class="nc" id="L1113">        super.getContentPane().setUnselectedStyle(style);</span>
+<span class="nc" id="L1114">    }</span>
+
+    /// Initialize the default transition for the dialogs overriding the forms
+    /// transition
+    ///
+    /// #### Parameters
+    ///
+    /// - `uim`: the UIManager instance
+    @Override
+    protected void initLaf(UIManager uim) {
+<span class="fc" id="L1124">        super.initLaf(uim);</span>
+<span class="fc" id="L1125">        setTransitionOutAnimator(uim.getLookAndFeel().getDefaultDialogTransitionOut());</span>
+<span class="fc" id="L1126">        setTransitionInAnimator(uim.getLookAndFeel().getDefaultDialogTransitionIn());</span>
+<span class="fc" id="L1127">    }</span>
+
+    /// This method shows the form as a modal alert allowing us to produce a behavior
+    /// of an alert/dialog box. This method will block the calling thread even if the
+    /// calling thread is the EDT. Notice that this method will not release the block
+    /// until dispose is called even if show() from another form is called!
+    ///
+    /// Modal dialogs Allow the forms &quot;content&quot; to &quot;hang in mid air&quot; this is especially useful for
+    /// dialogs where you would want the underlying form to &quot;peek&quot; from behind the
+    /// form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: space in pixels between the top of the screen and the form
+    ///
+    /// - `bottom`: space in pixels between the bottom of the screen and the form
+    ///
+    /// - `left`: space in pixels between the left of the screen and the form
+    ///
+    /// - `right`: space in pixels between the right of the screen and the form
+    ///
+    /// - `includeTitle`: @param includeTitle whether the title should hang in the top of the screen or
+    /// be glued onto the content pane
+    ///
+    /// #### Returns
+    ///
+    /// the last command pressed by the user if such a command exists
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated use the version that doesn't accept the include title, the includeTitle
+    /// feature is no longer supported
+    public Command show(int top, int bottom, int left, int right, boolean includeTitle) {
+<span class="nc" id="L1160">        return show(top, bottom, left, right, includeTitle, true);</span>
+    }
+
+    /// This method shows the form as a modal alert allowing us to produce a behavior
+    /// of an alert/dialog box. This method will block the calling thread even if the
+    /// calling thread is the EDT. Notice that this method will not release the block
+    /// until dispose is called even if show() from another form is called!
+    ///
+    /// Modal dialogs Allow the forms &quot;content&quot; to &quot;hang in mid air&quot; this is especially useful for
+    /// dialogs where you would want the underlying form to &quot;peek&quot; from behind the
+    /// form.
+    ///
+    /// See this sample for showing a dialog at the bottom of the screen:
+    /// ```java
+    /// Dialog dlg = new Dialog(&quot;At Bottom&quot;);
+    /// dlg.setLayout(new BorderLayout());
+    /// // span label accepts the text and the UIID for the dialog body
+    /// dlg.add(new SpanLabel(&quot;Dialog Body text&quot;, &quot;DialogBody&quot;));
+    /// int h = Display.getInstance().getDisplayHeight();
+    /// dlg.setDisposeWhenPointerOutOfBounds(true);
+    /// dlg.show(h /8 * 7, 0, 0, 0);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: space in pixels between the top of the screen and the form
+    ///
+    /// - `bottom`: space in pixels between the bottom of the screen and the form
+    ///
+    /// - `left`: space in pixels between the left of the screen and the form
+    ///
+    /// - `right`: space in pixels between the right of the screen and the form
+    ///
+    /// #### Returns
+    ///
+    /// the last command pressed by the user if such a command exists
+    public Command show(int top, int bottom, int left, int right) {
+<span class="fc" id="L1197">        return show(top, bottom, left, right, false, true);</span>
+    }
+
+    /// This method shows the form as a modal alert allowing us to produce a behavior
+    /// of an alert/dialog box. This method will block the calling thread even if the
+    /// calling thread is the EDT. Notice that this method will not release the block
+    /// until dispose is called even if show() from another form is called!
+    ///
+    /// Modal dialogs Allow the forms &quot;content&quot; to &quot;hang in mid air&quot; this is especially useful for
+    /// dialogs where you would want the underlying form to &quot;peek&quot; from behind the
+    /// form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: space in pixels between the top of the screen and the form
+    ///
+    /// - `bottom`: space in pixels between the bottom of the screen and the form
+    ///
+    /// - `left`: space in pixels between the left of the screen and the form
+    ///
+    /// - `right`: space in pixels between the right of the screen and the form
+    ///
+    /// - `includeTitle`: @param includeTitle whether the title should hang in the top of the screen or
+    /// be glued onto the content pane
+    ///
+    /// - `modal`: @param modal        indicates the dialog should be modal set to false for modeless dialog
+    /// which is useful for some use cases
+    ///
+    /// #### Returns
+    ///
+    /// the last command pressed by the user if such a command exists
+    ///
+    /// #### Deprecated
+    ///
+    /// use showAtPosition, the includeTitle flag is no longer supported
+    public Command show(int top, int bottom, int left, int right, boolean includeTitle, boolean modal) {
+<span class="fc" id="L1233">        this.top = top;</span>
+<span class="fc" id="L1234">        this.bottom = bottom;</span>
+<span class="pc bpc" id="L1235" title="1 of 2 branches missed.">        if (isRTL()) {</span>
+<span class="nc" id="L1236">            this.left = right;</span>
+<span class="nc" id="L1237">            this.right = left;</span>
+        } else {
+<span class="fc" id="L1239">            this.left = left;</span>
+<span class="fc" id="L1240">            this.right = right;</span>
+        }
+        //this.includeTitle = includeTitle;
+<span class="fc" id="L1243">        setDisposed(false);</span>
+<span class="fc" id="L1244">        this.modal = modal;</span>
+<span class="fc" id="L1245">        lastCommandPressed = null;</span>
+<span class="fc" id="L1246">        showModal(this.top, this.bottom, this.left, this.right, includeTitle, modal, false);</span>
+<span class="fc" id="L1247">        return lastCommandPressed;</span>
+    }
+
+    /// This method shows the form as a modal alert allowing us to produce a behavior
+    /// of an alert/dialog box. This method will block the calling thread even if the
+    /// calling thread is the EDT. Notice that this method will not release the block
+    /// until dispose is called even if show() from another form is called!
+    ///
+    /// Modal dialogs Allow the forms &quot;content&quot; to &quot;hang in mid air&quot; this is especially useful for
+    /// dialogs where you would want the underlying form to &quot;peek&quot; from behind the
+    /// form.
+    ///
+    /// #### Parameters
+    ///
+    /// - `top`: space in pixels between the top of the screen and the form
+    ///
+    /// - `bottom`: space in pixels between the bottom of the screen and the form
+    ///
+    /// - `left`: space in pixels between the left of the screen and the form
+    ///
+    /// - `right`: space in pixels between the right of the screen and the form
+    ///
+    /// - `modal`: @param modal  indicates the dialog should be modal set to false for modeless dialog
+    /// which is useful for some use cases
+    ///
+    /// #### Returns
+    ///
+    /// the last command pressed by the user if such a command exists
+    public Command showAtPosition(int top, int bottom, int left, int right, boolean modal) {
+<span class="nc" id="L1276">        this.top = top;</span>
+<span class="nc" id="L1277">        this.bottom = bottom;</span>
+<span class="nc bnc" id="L1278" title="All 2 branches missed.">        if (isRTL()) {</span>
+<span class="nc" id="L1279">            this.left = right;</span>
+<span class="nc" id="L1280">            this.right = left;</span>
+        } else {
+<span class="nc" id="L1282">            this.left = left;</span>
+<span class="nc" id="L1283">            this.right = right;</span>
+        }
+        //this.includeTitle = includeTitle;
+<span class="nc" id="L1286">        setDisposed(false);</span>
+<span class="nc" id="L1287">        this.modal = modal;</span>
+<span class="nc" id="L1288">        lastCommandPressed = null;</span>
+<span class="nc" id="L1289">        showModal(this.top, this.bottom, this.left, this.right, false, modal, false);</span>
+<span class="nc" id="L1290">        return lastCommandPressed;</span>
+    }
+
+    /// Disable title bar status for iOS 7 which breaks dialogs
+    @Override
+    void initTitleBarStatus() {
+<span class="fc" id="L1296">    }</span>
+
+    /// Indicates the time (in milliseconds) afterwhich the dialog will be disposed
+    /// implicitly
+    ///
+    /// #### Parameters
+    ///
+    /// - `time`: a milliseconds time used to dispose the dialog
+    @Override
+    public void setTimeout(long time) {
+<span class="fc" id="L1306">        this.time = System.currentTimeMillis() + time;</span>
+<span class="fc" id="L1307">        super.registerAnimatedInternal(this);</span>
+<span class="fc" id="L1308">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void setTransitions(Transition transition) {
+<span class="nc" id="L1313">        setTransitionInAnimator(transition);</span>
+<span class="nc" id="L1314">        setTransitionOutAnimator(transition);</span>
+<span class="nc" id="L1315">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void configureCommands(Command[] cmds, boolean commandsAsButtons) {
+<span class="nc bnc" id="L1320" title="All 2 branches missed.">        if (cmds == null) {</span>
+<span class="nc" id="L1321">            return;</span>
+        }
+<span class="nc bnc" id="L1323" title="All 2 branches missed.">        if (commandsAsButtons) {</span>
+<span class="nc" id="L1324">            placeButtonCommands(cmds);</span>
+        } else {
+<span class="nc bnc" id="L1326" title="All 2 branches missed.">            for (Command cmd : cmds) {</span>
+<span class="nc" id="L1327">                addCommand(cmd);</span>
+            }
+        }
+<span class="nc bnc" id="L1330" title="All 4 branches missed.">        if (cmds.length == 1 || cmds.length == 2) {</span>
+<span class="nc" id="L1331">            setBackCommand(cmds[0]);</span>
+        }
+<span class="nc" id="L1333">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    void sizeChangedInternal(int w, int h) {
+<span class="nc bnc" id="L1338" title="All 2 branches missed.">        if (disposeOnRotation) {</span>
+<span class="nc" id="L1339">            disposedDueToRotation = true;</span>
+<span class="nc" id="L1340">            dispose();</span>
+<span class="nc" id="L1341">            Form frm = getPreviousForm();</span>
+<span class="nc bnc" id="L1342" title="All 2 branches missed.">            if (frm != null) {</span>
+<span class="nc" id="L1343">                frm.sizeChangedInternal(w, h);</span>
+            }
+<span class="nc" id="L1345">            return;</span>
+        }
+<span class="nc" id="L1347">        autoAdjust(w, h);</span>
+<span class="nc" id="L1348">        super.sizeChangedInternal(w, h);</span>
+<span class="nc" id="L1349">        Form frm = getPreviousForm();</span>
+<span class="nc bnc" id="L1350" title="All 2 branches missed.">        if (frm != null) {</span>
+<span class="nc" id="L1351">            frm.sizeChangedInternal(w, h);</span>
+        }
+<span class="nc" id="L1353">    }</span>
+
+    /// Auto adjust size of the dialog.
+    /// This method is triggered from a sizeChanged event.
+    ///
+    /// #### Parameters
+    ///
+    /// - `w`: width of the screen
+    ///
+    /// - `h`: height of the screen
+    protected void autoAdjust(int w, int h) {
+<span class="nc bnc" id="L1364" title="All 2 branches missed.">        if (autoAdjustDialogSize) {</span>
+<span class="nc" id="L1365">            growOrShrinkImpl(w, h);</span>
+        }
+<span class="nc" id="L1367">    }</span>
+
+    private void addButtonBar(Container c) {
+<span class="fc" id="L1370">        super.getContentPane().addComponent(BorderLayout.SOUTH, c);</span>
+<span class="fc" id="L1371">    }</span>
+
+    /// Places the given commands in the dialog command area, this is very useful for touch devices.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmds`: the commands to place
+    ///
+    /// #### Deprecated
+    ///
+    /// this method shouldn't be invoked externally, it should have been private
+    public void placeButtonCommands(Command[] cmds) {
+<span class="fc" id="L1383">        buttonCommands = cmds;</span>
+        Container buttonArea;
+<span class="fc" id="L1385">        boolean commandGrid = getUIManager().isThemeConstant(&quot;dlgCommandGridBool&quot;, false);</span>
+<span class="fc bfc" id="L1386" title="All 2 branches covered.">        if (commandGrid) {</span>
+<span class="fc" id="L1387">            buttonArea = new Container(new GridLayout(1, cmds.length));</span>
+        } else {
+<span class="fc" id="L1389">            buttonArea = new Container(new FlowLayout(CENTER));</span>
+        }
+<span class="fc" id="L1391">        buttonArea.setUIID(&quot;DialogCommandArea&quot;);</span>
+<span class="fc bfc" id="L1392" title="All 2 branches covered.">        if (commandGrid) {</span>
+            // Native dialog actions are card chrome rather than inset body
+            // content. Keep the theme's top spacing, but let the grid and its
+            // separators meet the left, right, and bottom card edges.
+<span class="fc" id="L1396">            super.getContentPane().getAllStyles().setPadding(0, 0, 0, 0);</span>
+<span class="fc" id="L1397">            Style commandAreaStyle = buttonArea.getAllStyles();</span>
+<span class="fc" id="L1398">            commandAreaStyle.setPadding(LEFT, 0);</span>
+<span class="fc" id="L1399">            commandAreaStyle.setPadding(RIGHT, 0);</span>
+<span class="fc" id="L1400">            commandAreaStyle.setPadding(BOTTOM, 0);</span>
+        }
+<span class="fc" id="L1402">        String uiid = getUIManager().getThemeConstant(&quot;dlgButtonCommandUIID&quot;, null);</span>
+<span class="fc" id="L1403">        addButtonBar(buttonArea);</span>
+<span class="pc bpc" id="L1404" title="1 of 2 branches missed.">        if (cmds.length &gt; 0) {</span>
+<span class="fc" id="L1405">            String lineColor = getUIManager().getThemeConstant(</span>
+<span class="pc bpc" id="L1406" title="1 of 2 branches missed.">                    Boolean.TRUE.equals(Display.getInstance().isDarkMode())</span>
+                            ? &quot;dlgInvisibleButtonsDark&quot; : &quot;dlgInvisibleButtons&quot;,
+<span class="fc" id="L1408">                    getUIManager().getThemeConstant(&quot;dlgInvisibleButtons&quot;, null));</span>
+<span class="pc bpc" id="L1409" title="1 of 2 branches missed.">            if (cmds.length &gt; 3) {</span>
+<span class="nc" id="L1410">                lineColor = null;</span>
+            }
+<span class="fc" id="L1412">            int largest = Integer.parseInt(getUIManager().getThemeConstant(&quot;dlgCommandButtonSizeInt&quot;, &quot;0&quot;));</span>
+<span class="fc bfc" id="L1413" title="All 2 branches covered.">            for (int iter = 0; iter &lt; cmds.length; iter++) {</span>
+<span class="fc" id="L1414">                Button b = new Button(cmds[iter]);</span>
+<span class="pc bpc" id="L1415" title="1 of 2 branches missed.">                if (uiid != null) {</span>
+<span class="nc" id="L1416">                    b.setUIID(uiid);</span>
+                }
+
+                // special case for dialog butons uppercase on Android
+<span class="pc bpc" id="L1420" title="1 of 2 branches missed.">                if (Button.isCapsTextDefault()) {</span>
+<span class="nc" id="L1421">                    b.setCapsText(true);</span>
+                }
+
+<span class="fc" id="L1424">                largest = Math.max(b.getPreferredW(), largest);</span>
+<span class="pc bpc" id="L1425" title="3 of 4 branches missed.">                if (lineColor != null &amp;&amp; lineColor.length() &gt; 0) {</span>
+<span class="nc" id="L1426">                    int color = Integer.parseInt(lineColor, 16);</span>
+<span class="nc" id="L1427">                    Border brd = null;</span>
+<span class="nc bnc" id="L1428" title="All 2 branches missed.">                    if (iter &lt; cmds.length - 1) {</span>
+<span class="nc" id="L1429">                        brd = Border.createCompoundBorder(Border.createLineBorder(1, color), null, null, Border.createLineBorder(1, color));</span>
+                    } else {
+<span class="nc" id="L1431">                        brd = Border.createCompoundBorder(Border.createLineBorder(1, color), null, null, null);</span>
+                    }
+<span class="nc" id="L1433">                    b.getUnselectedStyle().setBorder(brd);</span>
+<span class="nc" id="L1434">                    b.getSelectedStyle().setBorder(brd);</span>
+<span class="nc" id="L1435">                    b.getPressedStyle().setBorder(brd);</span>
+                }
+<span class="fc" id="L1437">                buttonArea.addComponent(b);</span>
+
+            }
+<span class="fc bfc" id="L1440" title="All 2 branches covered.">            for (int iter = 0; iter &lt; cmds.length; iter++) {</span>
+<span class="fc" id="L1441">                buttonArea.getComponentAt(iter).setPreferredW(largest);</span>
+            }
+<span class="fc" id="L1443">            buttonArea.getComponentAt(0).requestFocus();</span>
+        }
+<span class="fc" id="L1445">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void keyReleased(int keyCode) {
+<span class="nc bnc" id="L1450" title="All 2 branches missed.">        if (commandsAsButtons) {</span>
+<span class="nc bnc" id="L1451" title="All 2 branches missed.">            if (MenuBar.isLSK(keyCode)) {</span>
+<span class="nc bnc" id="L1452" title="All 4 branches missed.">                if (buttonCommands != null &amp;&amp; buttonCommands.length &gt; 0) {</span>
+<span class="nc" id="L1453">                    dispatchCommand(buttonCommands[0], new ActionEvent(buttonCommands[0], ActionEvent.Type.KeyRelease));</span>
+<span class="nc" id="L1454">                    return;</span>
+                }
+            }
+<span class="nc bnc" id="L1457" title="All 2 branches missed.">            if (MenuBar.isRSK(keyCode)) {</span>
+<span class="nc bnc" id="L1458" title="All 4 branches missed.">                if (buttonCommands != null &amp;&amp; buttonCommands.length &gt; 1) {</span>
+<span class="nc" id="L1459">                    dispatchCommand(buttonCommands[1], new ActionEvent(buttonCommands[1], ActionEvent.Type.KeyRelease));</span>
+<span class="nc" id="L1460">                    return;</span>
+                }
+            }
+        }
+<span class="nc" id="L1464">        super.keyReleased(keyCode);</span>
+<span class="nc" id="L1465">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void onShow() {
+<span class="fc bfc" id="L1470" title="All 2 branches covered.">        if (dialogType &gt; 0) {</span>
+<span class="fc" id="L1471">            Display.getInstance().playDialogSound(dialogType);</span>
+        }
+<span class="fc" id="L1473">    }</span>
+
+    @Override
+    void onShowCompletedImpl() {
+<span class="fc" id="L1477">        pressedOutOfBounds = false;</span>
+<span class="fc" id="L1478">        disposedDueToRotation = false;</span>
+<span class="fc" id="L1479">        setLightweightMode(false);</span>
+<span class="fc" id="L1480">        onShowCompleted();</span>
+<span class="fc bfc" id="L1481" title="All 2 branches covered.">        if (isDisposed()) {</span>
+<span class="fc" id="L1482">            disposeImpl();</span>
+        }
+<span class="fc bfc" id="L1484" title="All 2 branches covered.">        if (showListener != null) {</span>
+<span class="fc" id="L1485">            showListener.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Show));</span>
+        }
+<span class="fc" id="L1487">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void showBack() {
+<span class="nc" id="L1492">        showImpl(true);</span>
+<span class="nc" id="L1493">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void setScrollable(boolean scrollable) {
+<span class="fc" id="L1498">        getContentPane().setScrollable(scrollable);</span>
+<span class="fc" id="L1499">    }</span>
+
+    /// The default version of show modal shows the dialog occupying the center portion
+    /// of the screen.
+    @Override
+    public void show() {
+<span class="fc" id="L1505">        showImpl(false);</span>
+<span class="fc" id="L1506">    }</span>
+
+    /// The default version of show modal shows the dialog occupying the center portion
+    /// of the screen.
+    private void showImpl(boolean reverse) {
+<span class="pc bpc" id="L1511" title="3 of 6 branches missed.">        if (modal &amp;&amp; Display.isInitialized() &amp;&amp; Display.getInstance().isMinimized()) {</span>
+<span class="nc" id="L1512">            Log.p(&quot;Modal dialogs cannot be displayed on a minimized app&quot;);</span>
+<span class="nc" id="L1513">            return;</span>
+        }
+        // this behavior allows a use case where dialogs of various sizes are layered
+        // one on top of the other
+<span class="fc" id="L1517">        setDisposed(false);</span>
+<span class="pc bpc" id="L1518" title="1 of 2 branches missed.">        if (top &gt; -1) {</span>
+<span class="nc" id="L1519">            show(top, bottom, left, right, includeTitle, modal);</span>
+        } else {
+<span class="pc bpc" id="L1521" title="1 of 2 branches missed.">            if (modal) {</span>
+<span class="pc bpc" id="L1522" title="1 of 2 branches missed.">                if (getDialogPosition() == null) {</span>
+<span class="fc" id="L1523">                    super.showModal(reverse);</span>
+                } else {
+<span class="nc" id="L1525">                    showPacked(getDialogPosition(), true);</span>
+                }
+            } else {
+<span class="nc" id="L1528">                showModeless();</span>
+            }
+        }
+<span class="fc" id="L1531">    }</span>
+
+    /// Shows a modeless dialog which is useful for some simpler use cases such as
+    /// progress indication etc...
+    public void showModeless() {
+        // this behavior allows a use case where dialogs of various sizes are layered
+        // one on top of the other
+<span class="fc" id="L1538">        modal = false;</span>
+<span class="fc" id="L1539">        setDisposed(false);</span>
+<span class="pc bpc" id="L1540" title="1 of 2 branches missed.">        if (top &gt; -1) {</span>
+<span class="nc" id="L1541">            show(top, bottom, left, right, includeTitle, false);</span>
+        } else {
+<span class="fc bfc" id="L1543" title="All 2 branches covered.">            if (getDialogPosition() == null) {</span>
+<span class="fc" id="L1544">                showDialog(false, false);</span>
+            } else {
+<span class="fc" id="L1546">                showPacked(getDialogPosition(), false);</span>
+            }
+        }
+<span class="fc" id="L1549">    }</span>
+
+    @Override
+    void showModal(int top, int bottom, int left, int right, boolean includeTitle, boolean modal, boolean reverse) {
+<span class="pc bpc" id="L1553" title="2 of 4 branches missed.">        if (Display.isInitialized() &amp;&amp; Display.getInstance().isMinimized()) {</span>
+<span class="nc" id="L1554">            Log.p(&quot;Modal dialogs cannot be displayed on a minimized app&quot;);</span>
+<span class="nc" id="L1555">            return;</span>
+        }
+<span class="fc" id="L1557">        this.top = top;</span>
+<span class="fc" id="L1558">        this.bottom = bottom;</span>
+<span class="fc" id="L1559">        this.left = left;</span>
+<span class="fc" id="L1560">        this.right = right;</span>
+
+        // hide the title if no text is there to allow the styles of the dialog title to disappear
+<span class="pc bpc" id="L1563" title="2 of 4 branches missed.">        if (dialogTitle != null &amp;&amp; getUIManager().isThemeConstant(&quot;hideEmptyTitleBool&quot;, false)) {</span>
+<span class="nc bnc" id="L1564" title="All 2 branches missed.">            boolean b = dialogTitle.getText().length() &gt; 0;</span>
+<span class="nc" id="L1565">            getTitleArea().setVisible(b);</span>
+<span class="nc" id="L1566">            getTitleComponent().setVisible(b);</span>
+        }
+<span class="fc" id="L1568">        super.showModal(top, bottom, left, right, includeTitle, modal, reverse);</span>
+<span class="fc" id="L1569">    }</span>
+
+    /// A popup dialog is shown with the context of a component and  its selection, it is disposed seamlessly if the back button is pressed
+    /// or if the user touches outside its bounds. It can optionally provide an arrow in the theme to point at the context component. The popup
+    /// dialog has the PopupDialog style by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `c`: the context component which is used to position the dialog and can also be pointed at
+    ///
+    /// #### Returns
+    ///
+    /// the command that might have been triggered by the user within the dialog if commands are placed in the dialog
+    public Command showPopupDialog(Component c) {
+<span class="fc" id="L1583">        Rectangle componentPos = c.getSelectedRect();</span>
+<span class="fc" id="L1584">        componentPos.setX(componentPos.getX() - c.getScrollX());</span>
+<span class="fc" id="L1585">        componentPos.setY(componentPos.getY() - c.getScrollY());</span>
+
+<span class="fc" id="L1587">        return showPopupDialog(componentPos);</span>
+    }
+
+    /// A popup dialog is shown with the context of a component and  its selection, it is disposed seamlessly if the back button is pressed
+    /// or if the user touches outside its bounds. It can optionally provide an arrow in the theme to point at the context component. The popup
+    /// dialog has the PopupDialog style by default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rect`: the screen rectangle to which the popup should point
+    ///
+    /// #### Returns
+    ///
+    /// the command that might have been triggered by the user within the dialog if commands are placed in the dialog
+    public Command showPopupDialog(Rectangle rect) {
+<span class="pc bpc" id="L1602" title="1 of 2 branches missed.">        if (&quot;Dialog&quot;.equals(getDialogUIID())) {</span>
+<span class="fc" id="L1603">            setDialogUIID(&quot;PopupDialog&quot;);</span>
+<span class="pc bpc" id="L1604" title="1 of 2 branches missed.">            if (&quot;DialogTitle&quot;.equals(getTitleComponent().getUIID())) {</span>
+<span class="fc" id="L1605">                getTitleComponent().setUIID(&quot;PopupDialogTitle&quot;);</span>
+            }
+<span class="fc" id="L1607">            getContentPane().setUIID(&quot;PopupContentPane&quot;);</span>
+        }
+
+<span class="fc" id="L1610">        disposeOnRotation = true;</span>
+<span class="fc" id="L1611">        disposeWhenPointerOutOfBounds = true;</span>
+<span class="fc" id="L1612">        Command backCommand = null;</span>
+<span class="pc bpc" id="L1613" title="1 of 2 branches missed.">        if (getBackCommand() == null) {</span>
+<span class="fc" id="L1614">            backCommand = new Command(&quot;Back&quot;);</span>
+<span class="fc" id="L1615">            setBackCommand(backCommand);</span>
+        }
+
+<span class="fc" id="L1618">        Component contentPane = super.getContentPane();</span>
+<span class="fc" id="L1619">        Label title = super.getTitleComponent();</span>
+
+<span class="fc" id="L1621">        int menuHeight = calcMenuHeight();</span>
+<span class="fc" id="L1622">        UIManager manager = getUIManager();</span>
+
+        // hide the title if no text is there to allow the styles of the dialog title to disappear, we need this code here since otherwise the
+        // preferred size logic of the dialog won't work with large title borders
+<span class="pc bpc" id="L1626" title="2 of 4 branches missed.">        if (dialogTitle != null &amp;&amp; manager.isThemeConstant(&quot;hideEmptyTitleBool&quot;, false)) {</span>
+<span class="nc bnc" id="L1627" title="All 2 branches missed.">            boolean b = getTitle().length() &gt; 0;</span>
+<span class="nc" id="L1628">            getTitleArea().setVisible(b);</span>
+<span class="nc" id="L1629">            getTitleComponent().setVisible(b);</span>
+<span class="nc bnc" id="L1630" title="All 4 branches missed.">            if (!b &amp;&amp; manager.isThemeConstant(&quot;shrinkPopupTitleBool&quot;, true)) {</span>
+<span class="nc" id="L1631">                getTitleComponent().setPreferredSize(new Dimension(0, 0));</span>
+<span class="nc" id="L1632">                getTitleComponent().getStyle().setBorder(null);</span>
+<span class="nc" id="L1633">                getTitleArea().setPreferredSize(new Dimension(0, 0));</span>
+<span class="nc bnc" id="L1634" title="All 2 branches missed.">                if (getContentPane().getClientProperty(&quot;$ENLARGED_POP&quot;) == null) {</span>
+<span class="nc" id="L1635">                    getContentPane().putClientProperty(&quot;$ENLARGED_POP&quot;, Boolean.TRUE);</span>
+<span class="nc" id="L1636">                    int cpPaddingTop = getContentPane().getStyle().getPaddingTop();</span>
+<span class="nc" id="L1637">                    int titlePT = getTitleComponent().getStyle().getPaddingTop();</span>
+<span class="nc" id="L1638">                    byte[] pu = getContentPane().getStyle().getPaddingUnit();</span>
+<span class="nc bnc" id="L1639" title="All 2 branches missed.">                    if (pu == null) {</span>
+<span class="nc" id="L1640">                        pu = new byte[4];</span>
+                    }
+<span class="nc" id="L1642">                    pu[0] = Style.UNIT_TYPE_PIXELS;</span>
+<span class="nc" id="L1643">                    getContentPane().getStyle().setPaddingUnit(pu);</span>
+<span class="nc" id="L1644">                    int pop = Display.getInstance().convertToPixels(manager.getThemeConstant(&quot;popupNoTitleAddPaddingInt&quot;, 1), false);</span>
+<span class="nc" id="L1645">                    getContentPane().getStyle().setPadding(TOP, pop + cpPaddingTop + titlePT);</span>
+                }
+            }
+        }
+
+        // allows a text area to recalculate its preferred size if embedded within a dialog
+<span class="fc" id="L1651">        revalidate();</span>
+
+<span class="fc" id="L1653">        Style contentPaneStyle = getDialogStyle();</span>
+
+<span class="fc" id="L1655">        boolean restoreArrow = false;</span>
+<span class="pc bpc" id="L1656" title="1 of 2 branches missed.">        if (manager.isThemeConstant(getDialogUIID() + &quot;ArrowBool&quot;, false)) {</span>
+<span class="nc" id="L1657">            Image t = manager.getThemeImageConstant(getDialogUIID() + &quot;ArrowTopImage&quot;);</span>
+<span class="nc" id="L1658">            Image b = manager.getThemeImageConstant(getDialogUIID() + &quot;ArrowBottomImage&quot;);</span>
+<span class="nc" id="L1659">            Image l = manager.getThemeImageConstant(getDialogUIID() + &quot;ArrowLeftImage&quot;);</span>
+<span class="nc" id="L1660">            Image r = manager.getThemeImageConstant(getDialogUIID() + &quot;ArrowRightImage&quot;);</span>
+<span class="nc" id="L1661">            Border border = contentPaneStyle.getBorder();</span>
+<span class="nc bnc" id="L1662" title="All 2 branches missed.">            if (border != null) {</span>
+<span class="nc" id="L1663">                border.setImageBorderSpecialTile(t, b, l, r, rect);</span>
+<span class="nc" id="L1664">                restoreArrow = true;</span>
+            }
+<span class="nc" id="L1666">        } else {</span>
+<span class="fc" id="L1667">            Border border = contentPaneStyle.getBorder();</span>
+<span class="pc bpc" id="L1668" title="1 of 2 branches missed.">            if (border != null) {</span>
+<span class="fc" id="L1669">                border.setTrackComponent(rect);</span>
+            }
+        }
+<span class="fc" id="L1672">        int prefHeight = contentPane.getPreferredH();</span>
+<span class="fc" id="L1673">        int prefWidth = contentPane.getPreferredW();</span>
+<span class="pc bpc" id="L1674" title="1 of 2 branches missed.">        if (contentPaneStyle.getBorder() != null) {</span>
+<span class="fc" id="L1675">            prefWidth = Math.max(contentPaneStyle.getBorder().getMinimumWidth(), prefWidth);</span>
+<span class="fc" id="L1676">            prefHeight = Math.max(contentPaneStyle.getBorder().getMinimumHeight(), prefHeight);</span>
+        }
+
+<span class="fc" id="L1679">        prefWidth += getUIManager().getLookAndFeel().getVerticalScrollWidth();</span>
+
+<span class="fc" id="L1681">        int availableHeight = Display.getInstance().getDisplayHeight() - menuHeight - title.getPreferredH();</span>
+<span class="fc" id="L1682">        int availableWidth = Display.getInstance().getDisplayWidth();</span>
+<span class="fc" id="L1683">        int width = Math.min(availableWidth, prefWidth);</span>
+<span class="fc" id="L1684">        int x = 0;</span>
+<span class="fc" id="L1685">        int y = 0;</span>
+        Command result;
+
+        boolean showPortrait;
+<span class="pc bpc" id="L1689" title="1 of 2 branches missed.">        if (popupDirectionBiasPortrait != null) {</span>
+<span class="nc" id="L1690">            showPortrait = popupDirectionBiasPortrait.booleanValue();</span>
+        } else {
+<span class="fc" id="L1692">            showPortrait = Display.getInstance().isPortrait();</span>
+        }
+
+        // if we don't have enough space then disregard device orientation
+<span class="pc bpc" id="L1696" title="1 of 2 branches missed.">        if (showPortrait) {</span>
+<span class="pc bpc" id="L1697" title="1 of 2 branches missed.">            if (availableHeight &lt; (availableWidth - rect.getWidth()) / 2) {</span>
+<span class="nc" id="L1698">                showPortrait = false;</span>
+            }
+        } else {
+<span class="nc bnc" id="L1701" title="All 2 branches missed.">            if (availableHeight / 2 &gt; availableWidth - rect.getWidth()) {</span>
+<span class="nc" id="L1702">                showPortrait = true;</span>
+            }
+        }
+<span class="pc bpc" id="L1705" title="1 of 2 branches missed.">        if (showPortrait) {</span>
+<span class="pc bpc" id="L1706" title="1 of 2 branches missed.">            if (width &lt; availableWidth) {</span>
+<span class="fc" id="L1707">                int idealX = rect.getX() - width / 2 + rect.getSize().getWidth() / 2;</span>
+
+                // if the ideal position is less than 0 just use 0
+<span class="pc bpc" id="L1710" title="1 of 2 branches missed.">                if (idealX &gt; 0) {</span>
+                    // if the idealX is too far to the right just align to the right
+<span class="pc bpc" id="L1712" title="1 of 2 branches missed.">                    if (idealX + width &gt; availableWidth) {</span>
+<span class="nc" id="L1713">                        x = availableWidth - width;</span>
+                    } else {
+<span class="fc" id="L1715">                        x = idealX;</span>
+                    }
+                }
+            }
+<span class="pc bpc" id="L1719" title="1 of 2 branches missed.">            if (rect.getY() &lt; availableHeight / 2) {</span>
+                // popup downwards
+<span class="pc bpc" id="L1721" title="2 of 4 branches missed.">                if (&quot;PopupDialog&quot;.equals(getDialogUIID()) &amp;&amp; isUIIDByPopupPosition) {</span>
+<span class="nc" id="L1722">                    getContentPane().setUIID(&quot;PopupContentPaneDownwards&quot;);</span>
+                }
+<span class="fc" id="L1724">                y = rect.getY() + rect.getSize().getHeight();</span>
+<span class="fc" id="L1725">                int height = Math.min(prefHeight, availableHeight - y);</span>
+<span class="fc" id="L1726">                result = show(y, availableHeight - height - y, x, availableWidth - width - x, true, true);</span>
+<span class="fc" id="L1727">            } else {</span>
+                // popup upwards
+<span class="nc bnc" id="L1729" title="All 4 branches missed.">                if (&quot;PopupDialog&quot;.equals(getDialogUIID()) &amp;&amp; isUIIDByPopupPosition) {</span>
+<span class="nc" id="L1730">                    getContentPane().setUIID(&quot;PopupContentPaneUpwards&quot;);</span>
+                }
+<span class="nc" id="L1732">                int height = Math.min(prefHeight, availableHeight - (availableHeight - rect.getY()));</span>
+<span class="nc" id="L1733">                y = rect.getY() - height;</span>
+<span class="nc" id="L1734">                result = show(y, availableHeight - height - y, x, availableWidth - width - x, true, true);</span>
+<span class="nc" id="L1735">            }</span>
+        } else {
+<span class="nc" id="L1737">            int height = Math.min(prefHeight, availableHeight);</span>
+<span class="nc bnc" id="L1738" title="All 2 branches missed.">            if (height &lt; availableHeight) {</span>
+<span class="nc" id="L1739">                int idealY = rect.getY() - height / 2 + rect.getSize().getHeight() / 2;</span>
+
+                // if the ideal position is less than 0 just use 0
+<span class="nc bnc" id="L1742" title="All 2 branches missed.">                if (idealY &gt; 0) {</span>
+                    // if the idealY is too far up just align to the top
+<span class="nc bnc" id="L1744" title="All 2 branches missed.">                    if (idealY + height &gt; availableHeight) {</span>
+<span class="nc" id="L1745">                        y = availableHeight - height;</span>
+                    } else {
+<span class="nc" id="L1747">                        y = idealY;</span>
+                    }
+                }
+            }
+
+
+<span class="nc bnc" id="L1753" title="All 2 branches missed.">            if (prefWidth &gt; rect.getX()) {</span>
+                // popup right
+<span class="nc bnc" id="L1755" title="All 4 branches missed.">                if (&quot;PopupDialog&quot;.equals(getDialogUIID()) &amp;&amp; isUIIDByPopupPosition) {</span>
+<span class="nc" id="L1756">                    getContentPane().setUIID(&quot;PopupContentPaneRight&quot;);</span>
+                }
+<span class="nc" id="L1758">                x = rect.getX() + rect.getSize().getWidth();</span>
+<span class="nc bnc" id="L1759" title="All 2 branches missed.">                if (x + prefWidth &gt; availableWidth) {</span>
+<span class="nc" id="L1760">                    x = availableWidth - prefWidth;</span>
+                }
+
+<span class="nc" id="L1763">                width = Math.min(prefWidth, availableWidth - x);</span>
+<span class="nc" id="L1764">                result = show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x), true, true);</span>
+            } else {
+                // popup left
+<span class="nc bnc" id="L1767" title="All 4 branches missed.">                if (&quot;PopupDialog&quot;.equals(getDialogUIID()) &amp;&amp; isUIIDByPopupPosition) {</span>
+<span class="nc" id="L1768">                    getContentPane().setUIID(&quot;PopupContentPaneLeft&quot;);</span>
+                }
+<span class="nc" id="L1770">                width = Math.min(prefWidth, availableWidth - (availableWidth - rect.getX()));</span>
+<span class="nc" id="L1771">                x = rect.getX() - width;</span>
+<span class="nc" id="L1772">                result = show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x), true, true);</span>
+            }
+        }
+
+<span class="pc bpc" id="L1776" title="1 of 2 branches missed.">        if (restoreArrow) {</span>
+<span class="nc" id="L1777">            contentPaneStyle.getBorder().clearImageBorderSpecialTile();</span>
+        }
+
+<span class="pc bpc" id="L1780" title="1 of 2 branches missed.">        if (result == backCommand) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L1781">            return null;</span>
+        }
+<span class="fc" id="L1783">        return result;</span>
+    }
+
+    private int calcMenuHeight() {
+<span class="pc bpc" id="L1787" title="1 of 2 branches missed.">        if (getSoftButtonCount() &gt; 1) {</span>
+<span class="fc" id="L1788">            Component menuBar = getSoftButton(0).getParent();</span>
+<span class="fc" id="L1789">            Style menuStyle = menuBar.getStyle();</span>
+<span class="fc" id="L1790">            return menuBar.getPreferredH() + menuStyle.getVerticalMargins();</span>
+        }
+<span class="nc" id="L1792">        return 0;</span>
+    }
+
+    /// Convenience method to show a dialog sized to match its content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `position`: one of the values from the BorderLayout class e.g. BorderLayout.CENTER, BorderLayout.NORTH etc.
+    ///
+    /// - `modal`: whether the dialog should be modal or modaless
+    ///
+    /// #### Returns
+    ///
+    /// the command selected if the dialog is modal and disposed via a command
+    public Command showPacked(String position, boolean modal) {
+<span class="fc" id="L1807">        return showPackedImpl(position, modal, false);</span>
+    }
+
+    /// Convenience method to show a dialog stretched to one of the sides
+    ///
+    /// #### Parameters
+    ///
+    /// - `position`: one of the values from the BorderLayout class except for center e.g. BorderLayout.NORTH, BorderLayout.EAST etc.
+    ///
+    /// - `modal`: whether the dialog should be modal or modaless
+    ///
+    /// #### Returns
+    ///
+    /// the command selected if the dialog is modal and disposed via a command
+    public Command showStretched(String position, boolean modal) {
+<span class="nc" id="L1822">        return showPackedImpl(position, modal, true);</span>
+    }
+
+    /// Convenience method to show a dialog stretched to one of the sides
+    ///
+    /// #### Parameters
+    ///
+    /// - `position`: one of the values from the BorderLayout class except for center e.g. BorderLayout.NORTH, BorderLayout.EAST etc.
+    ///
+    /// - `modal`: whether the dialog should be modal or modaless
+    ///
+    /// #### Returns
+    ///
+    /// the command selected if the dialog is modal and disposed via a command
+    ///
+    /// #### Deprecated
+    ///
+    /// due to typo use showStretched instead
+    public Command showStetched(String position, boolean modal) {
+<span class="nc" id="L1841">        return showPackedImpl(position, modal, true);</span>
+    }
+
+    /// Returns the preferred size of the dialog, this allows developers to position a dialog
+    /// manually in arbitrary positions.
+    ///
+    /// #### Returns
+    ///
+    /// the preferred size of this dialog
+    public Dimension getDialogPreferredSize() {
+<span class="fc" id="L1851">        Component contentPane = super.getContentPane();</span>
+<span class="fc" id="L1852">        Style contentPaneStyle = getDialogStyle();</span>
+<span class="fc" id="L1853">        int width = Display.getInstance().getDisplayWidth();</span>
+<span class="fc" id="L1854">        int prefHeight = contentPane.getPreferredH();</span>
+<span class="fc" id="L1855">        int prefWidth = contentPane.getPreferredW();</span>
+<span class="fc" id="L1856">        prefWidth = Math.min(prefWidth, width);</span>
+<span class="pc bpc" id="L1857" title="1 of 2 branches missed.">        if (contentPaneStyle.getBorder() != null) {</span>
+<span class="nc" id="L1858">            prefWidth = Math.max(contentPaneStyle.getBorder().getMinimumWidth(), prefWidth);</span>
+<span class="nc" id="L1859">            prefHeight = Math.max(contentPaneStyle.getBorder().getMinimumHeight(), prefHeight);</span>
+        }
+<span class="fc" id="L1861">        return new Dimension(prefWidth, prefHeight);</span>
+    }
+
+    /// Convenience method to show a dialog sized to match its content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `position`: one of the values from the BorderLayout class e.g. BorderLayout.CENTER, BorderLayout.NORTH etc.
+    ///
+    /// - `modal`: whether the dialog should be modal or modaless
+    ///
+    /// #### Returns
+    ///
+    /// the command selected if the dialog is modal and disposed via a command
+    private Command showPackedImpl(String position, boolean modal, boolean stretch) {
+<span class="pc bpc" id="L1876" title="1 of 2 branches missed.">        if (getTitle() == null) {</span>
+<span class="nc" id="L1877">            setTitle(&quot;&quot;);</span>
+        }
+<span class="fc" id="L1879">        this.position = position;</span>
+<span class="fc" id="L1880">        int height = Display.getInstance().getDisplayHeight();</span>
+<span class="fc" id="L1881">        int width = Display.getInstance().getDisplayWidth();</span>
+<span class="pc bpc" id="L1882" title="1 of 2 branches missed.">        if (top &gt; -1) {</span>
+<span class="nc" id="L1883">            refreshTheme();</span>
+        }
+<span class="fc" id="L1885">        Component contentPane = super.getContentPane();</span>
+<span class="pc bpc" id="L1886" title="2 of 4 branches missed.">        if (dialogTitle != null &amp;&amp; getUIManager().isThemeConstant(&quot;hideEmptyTitleBool&quot;, false)) {</span>
+<span class="nc bnc" id="L1887" title="All 2 branches missed.">            boolean b = getTitle().length() &gt; 0;</span>
+<span class="nc" id="L1888">            getTitleArea().setVisible(b);</span>
+<span class="nc" id="L1889">            getTitleComponent().setVisible(b);</span>
+        }
+<span class="fc" id="L1891">        Style contentPaneStyle = contentPane.getStyle();</span>
+
+<span class="fc" id="L1893">        revalidate();</span>
+
+<span class="fc" id="L1895">        int prefWidth = contentPane.getPreferredW();</span>
+<span class="fc" id="L1896">        prefWidth = Math.min(prefWidth, width);</span>
+        // Cap the packed dialog width so a long body wraps into a centered card
+        // instead of stretching to a full-width strip on wide screens (tablet /
+        // desktop / landscape). Two optional, theme-driven caps, both density-robust:
+        //  - dialogMaxWidthPercentInt: a percentage of the screen width (the primary
+        //    guard; behaves the same on any device, so an iOS-style ~72% alert reads
+        //    correctly on a phone AND stays a card on a wide desktop).
+        //  - dialogMaxWidthMMInt: an absolute millimetre cap that tightens it further
+        //    on very wide low-density screens (NOTE: CN1's convertToPixels treats its
+        //    unit as millimetres, so this is physical, not iOS-point, width).
+        // Unset (0) keeps the legacy full-width behaviour.
+<span class="fc" id="L1907">        int origPrefWidth = prefWidth;</span>
+<span class="fc" id="L1908">        int maxPct = getUIManager().getThemeConstant(&quot;dialogMaxWidthPercentInt&quot;, 0);</span>
+<span class="pc bpc" id="L1909" title="3 of 4 branches missed.">        if (maxPct &gt; 0 &amp;&amp; maxPct &lt; 100) {</span>
+<span class="nc" id="L1910">            prefWidth = Math.min(prefWidth, width * maxPct / 100);</span>
+        }
+<span class="fc" id="L1912">        int maxWidthMM = getUIManager().getThemeConstant(&quot;dialogMaxWidthMMInt&quot;, 0);</span>
+<span class="pc bpc" id="L1913" title="1 of 2 branches missed.">        if (maxWidthMM &gt; 0) {</span>
+<span class="nc" id="L1914">            int maxWidthPx = Display.getInstance().convertToPixels(maxWidthMM, true);</span>
+<span class="nc bnc" id="L1915" title="All 2 branches missed.">            if (maxWidthPx &gt; 0) {</span>
+<span class="nc" id="L1916">                prefWidth = Math.min(prefWidth, maxWidthPx);</span>
+            }
+        }
+<span class="pc bpc" id="L1919" title="1 of 2 branches missed.">        if (prefWidth &lt; origPrefWidth) {</span>
+            // Re-measure at the capped width so the wrapped body reports its true
+            // (taller) height. Merely invalidating preferred sizes is NOT enough:
+            // a TextArea derives its preferred height from rows wrapped at its
+            // CURRENT width, and the children still hold their stale (uncapped)
+            // widths -- reporting the unwrapped, shorter height and clipping the
+            // body behind the commands wherever the cap binds. Lay the content
+            // out at the capped width first so nested text actually wraps.
+<span class="nc" id="L1927">            contentPane.setWidth(prefWidth);</span>
+<span class="nc" id="L1928">            contentPane.setHeight(height);</span>
+<span class="nc" id="L1929">            ((Container) contentPane).layoutContainer();</span>
+<span class="nc" id="L1930">            contentPane.setShouldCalcPreferredSize(true);</span>
+        }
+<span class="fc" id="L1932">        int prefHeight = contentPane.getPreferredH();</span>
+<span class="pc bpc" id="L1933" title="1 of 2 branches missed.">        if (contentPaneStyle.getBorder() != null) {</span>
+<span class="nc" id="L1934">            prefWidth = Math.max(contentPaneStyle.getBorder().getMinimumWidth(), prefWidth);</span>
+<span class="nc" id="L1935">            prefHeight = Math.max(contentPaneStyle.getBorder().getMinimumHeight(), prefHeight);</span>
+        }
+<span class="fc" id="L1937">        int topBottom = Math.max(0, (height - prefHeight) / 2);</span>
+<span class="fc" id="L1938">        int leftRight = Math.max(0, (width - prefWidth) / 2);</span>
+
+<span class="pc bpc" id="L1940" title="1 of 2 branches missed.">        if (BorderLayout.CENTER.equals(position)) {</span>
+<span class="fc" id="L1941">            show(topBottom, topBottom, leftRight, leftRight, true, modal);</span>
+<span class="fc" id="L1942">            return lastCommandPressed;</span>
+        }
+<span class="nc bnc" id="L1944" title="All 2 branches missed.">        if (BorderLayout.EAST.equals(position)) {</span>
+<span class="nc bnc" id="L1945" title="All 2 branches missed.">            if (stretch) {</span>
+<span class="nc" id="L1946">                show(0, 0, Math.max(0, width - prefWidth), 0, true, modal);</span>
+            } else {
+<span class="nc" id="L1948">                show(topBottom, topBottom, Math.max(0, width - prefWidth), 0, true, modal);</span>
+            }
+<span class="nc" id="L1950">            return lastCommandPressed;</span>
+        }
+<span class="nc bnc" id="L1952" title="All 2 branches missed.">        if (BorderLayout.WEST.equals(position)) {</span>
+<span class="nc bnc" id="L1953" title="All 2 branches missed.">            if (stretch) {</span>
+<span class="nc" id="L1954">                show(0, 0, 0, Math.max(0, width - prefWidth), true, modal);</span>
+            } else {
+<span class="nc" id="L1956">                show(topBottom, topBottom, 0, Math.max(0, width - prefWidth), true, modal);</span>
+            }
+<span class="nc" id="L1958">            return lastCommandPressed;</span>
+        }
+<span class="nc bnc" id="L1960" title="All 2 branches missed.">        if (BorderLayout.NORTH.equals(position)) {</span>
+<span class="nc bnc" id="L1961" title="All 2 branches missed.">            if (stretch) {</span>
+<span class="nc" id="L1962">                show(0, Math.max(0, height - prefHeight), 0, 0, true, modal);</span>
+            } else {
+<span class="nc" id="L1964">                show(0, Math.max(0, height - prefHeight), leftRight, leftRight, true, modal);</span>
+            }
+<span class="nc" id="L1966">            return lastCommandPressed;</span>
+        }
+<span class="nc bnc" id="L1968" title="All 2 branches missed.">        if (BorderLayout.SOUTH.equals(position)) {</span>
+<span class="nc bnc" id="L1969" title="All 2 branches missed.">            if (stretch) {</span>
+<span class="nc" id="L1970">                show(Math.max(0, height - prefHeight), 0, 0, 0, true, modal);</span>
+            } else {
+<span class="nc" id="L1972">                show(Math.max(0, height - prefHeight), 0, leftRight, leftRight, true, modal);</span>
+            }
+<span class="nc" id="L1974">            return lastCommandPressed;</span>
+        }
+<span class="nc" id="L1976">        throw new IllegalArgumentException(&quot;Unknown position: &quot; + position);</span>
+    }
+
+    /// Closes the current form and returns to the previous form, releasing the
+    /// EDT in the process
+    @Override
+    public void dispose() {
+<span class="fc bfc" id="L1983" title="All 2 branches covered.">        if (isDisposed()) {</span>
+<span class="fc" id="L1984">            return;</span>
+        }
+<span class="fc" id="L1986">        setDisposed(true);</span>
+
+        // the dispose parent method might send us back to the form while the command
+        // within the dialog might be directing us to another form causing a &quot;blip&quot;
+<span class="pc bpc" id="L1990" title="1 of 2 branches missed.">        if (!menu) {</span>
+<span class="fc" id="L1991">            super.dispose();</span>
+        }
+<span class="fc" id="L1993">    }</span>
+
+    /// Shows a modal dialog and returns the command pressed within the modal dialog
+    ///
+    /// #### Returns
+    ///
+    /// last command pressed in the modal dialog
+    @Override
+    public Command showDialog() {
+<span class="nc" id="L2002">        lastCommandPressed = null;</span>
+<span class="nc" id="L2003">        show();</span>
+<span class="nc" id="L2004">        return lastCommandPressed;</span>
+    }
+
+    /// Invoked to allow subclasses of form to handle a command from one point
+    /// rather than implementing many command instances
+    ///
+    /// #### Parameters
+    ///
+    /// - `cmd`: the action command
+    @Override
+    protected void actionCommand(Command cmd) {
+        // this is important... In a case of nested dialogs based on commands/events a command might be
+        // blocked by a different dialog, so when that dialog is disposed (as a result of a command) going
+        // back to this dialog will block that command from proceeding and it can be fired again later
+        // E.g.:
+        // Dialog A has a command which triggers dialog B on top.
+        // User presses Cancel in dialog B
+        // Dialog A is shown as a result of dialog B dispose method
+        // Cancel command event firing is blocked since the dialog B dispose method is now blocking on dialog A show()...
+        // When dialog A is disposed using the OK command the OK command is sent correctly and causes dispose
+        // EDT is released which also releases the Cancel for dialog B to keep processing...
+        // Cancel for dialog B proceeds in the event chain reaching this method....
+        // lastCommandPressed can be overrwritten if this check isn't made!!!
+<span class="pc bpc" id="L2027" title="2 of 4 branches missed.">        if (!autoDispose || lastCommandPressed == null) {</span>
+<span class="fc" id="L2028">            lastCommandPressed = cmd;</span>
+        }
+<span class="pc bpc" id="L2030" title="3 of 6 branches missed.">        if (menu || (autoDispose &amp;&amp; cmd.isDisposesDialog())) {</span>
+<span class="fc" id="L2031">            dispose();</span>
+        }
+<span class="fc" id="L2033">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public boolean animate() {
+<span class="fc" id="L2038">        isTimedOut();</span>
+<span class="fc" id="L2039">        return false;</span>
+    }
+
+    private boolean isTimedOut() {
+<span class="fc bfc" id="L2043" title="All 4 branches covered.">        if (time != 0 &amp;&amp; System.currentTimeMillis() &gt;= time) {</span>
+<span class="fc" id="L2044">            time = 0;</span>
+<span class="fc" id="L2045">            dispose();</span>
+<span class="fc" id="L2046">            deregisterAnimatedInternal(this);</span>
+<span class="fc" id="L2047">            return true;</span>
+        }
+<span class="fc" id="L2049">        return false;</span>
+    }
+
+    /// Indicates that this is a menu preventing getCurrent() from ever returning this class
+    @Override
+    boolean isMenu() {
+<span class="fc" id="L2055">        return menu;</span>
+    }
+
+    /// Indicates that this is a menu preventing getCurrent() from ever returning this class
+    void setMenu(boolean menu) {
+<span class="nc" id="L2060">        this.menu = menu;</span>
+<span class="nc" id="L2061">    }</span>
+
+    /// Prevent a menu from adding the select button
+    void addSelectCommand() {
+<span class="nc bnc" id="L2065" title="All 2 branches missed.">        if (!menu) {</span>
+<span class="nc" id="L2066">            getMenuBar().addSelectCommand(getSelectCommandText());</span>
+        }
+<span class="nc" id="L2068">    }</span>
+
+    /// Allows us to indicate disposed state for dialogs
+    @Override
+    boolean isDisposed() {
+<span class="pc bpc" id="L2073" title="1 of 4 branches missed.">        return disposed || isTimedOut();</span>
+    }
+
+    /// Allows us to indicate disposed state for dialogs
+    void setDisposed(boolean disposed) {
+<span class="fc" id="L2078">        this.disposed = disposed;</span>
+<span class="fc" id="L2079">    }</span>
+
+    /// Determines whether the execution of a command on this dialog implicitly
+    /// disposes the dialog. This defaults to true which is a sensible default for
+    /// simple dialogs.
+    ///
+    /// #### Returns
+    ///
+    /// true if this dialog disposes on any command
+    public boolean isAutoDispose() {
+<span class="fc" id="L2089">        return autoDispose;</span>
+    }
+
+    /// Determines whether the execution of a command on this dialog implicitly
+    /// disposes the dialog. This defaults to true which is a sensible default for
+    /// simple dialogs.
+    ///
+    /// #### Parameters
+    ///
+    /// - `autoDispose`: true if this dialog disposes on any command
+    public final void setAutoDispose(boolean autoDispose) {
+<span class="fc" id="L2100">        this.autoDispose = autoDispose;</span>
+<span class="fc" id="L2101">    }</span>
+
+    /// The type of the dialog can be one of TYPE_WARNING, TYPE_INFO,
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    ///
+    /// #### Returns
+    ///
+    /// @return can be one of TYPE_WARNING, TYPE_INFO,
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    public int getDialogType() {
+<span class="nc" id="L2111">        return dialogType;</span>
+    }
+
+    /// The type of the dialog can be one of TYPE_WARNING, TYPE_INFO,
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    ///
+    /// #### Parameters
+    ///
+    /// - `dialogType`: @param dialogType can be one of TYPE_WARNING, TYPE_INFO,
+    /// TYPE_ERROR, TYPE_CONFIRMATION or TYPE_ALARM
+    @Override
+    public void setDialogType(int dialogType) {
+<span class="nc" id="L2123">        this.dialogType = dialogType;</span>
+<span class="nc" id="L2124">    }</span>
+
+    /// This flag indicates if the dialog should be disposed if a pointer
+    /// released event occurred out of the dialog content.
+    ///
+    /// #### Returns
+    ///
+    /// true if the dialog should dispose
+    public boolean isDisposeWhenPointerOutOfBounds() {
+<span class="fc" id="L2133">        return disposeWhenPointerOutOfBounds;</span>
+    }
+
+    /// This flag indicates if the dialog should be disposed if a pointer
+    /// released event occurred out of the dialog content.
+    ///
+    /// #### Parameters
+    ///
+    /// - `disposeWhenPointerOutOfBounds`
+    public final void setDisposeWhenPointerOutOfBounds(boolean disposeWhenPointerOutOfBounds) {
+<span class="fc" id="L2143">        this.disposeWhenPointerOutOfBounds = disposeWhenPointerOutOfBounds;</span>
+<span class="fc" id="L2144">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerReleased(int x, int y) {
+<span class="fc" id="L2149">        super.pointerReleased(x, y);</span>
+<span class="fc bfc" id="L2150" title="All 4 branches covered.">        if (disposeWhenPointerOutOfBounds &amp;&amp;</span>
+                pressedOutOfBounds &amp;&amp;
+<span class="pc bpc" id="L2152" title="1 of 2 branches missed.">                !getTitleComponent().containsOrOwns(x, y) &amp;&amp;</span>
+<span class="pc bpc" id="L2153" title="1 of 2 branches missed.">                !getContentPane().containsOrOwns(x, y) &amp;&amp;</span>
+<span class="pc bpc" id="L2154" title="1 of 2 branches missed.">                !getMenuBar().containsOrOwns(x, y)) {</span>
+<span class="fc" id="L2155">            dispose();</span>
+        }
+<span class="fc" id="L2157">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerPressed(int x, int y) {
+<span class="fc" id="L2162">        super.pointerPressed(x, y);</span>
+<span class="pc bpc" id="L2163" title="1 of 2 branches missed.">        pressedOutOfBounds = !getTitleComponent().containsOrOwns(x, y) &amp;&amp;</span>
+<span class="fc bfc" id="L2164" title="All 2 branches covered.">                !getContentPane().containsOrOwns(x, y) &amp;&amp;</span>
+<span class="pc bpc" id="L2165" title="1 of 2 branches missed.">                !getMenuBar().containsOrOwns(x, y);</span>
+<span class="fc" id="L2166">    }</span>
+
+    /// Returns true if a dialog that was disposed did it because of a pointer out of bounds
+    ///
+    /// #### Returns
+    ///
+    /// true when a dialog was disposed due to pointer out of bounds.
+    public boolean wasDisposedDueToOutOfBoundsTouch() {
+<span class="nc" id="L2174">        return pressedOutOfBounds;</span>
+    }
+
+    /// Screen orientation position for the upcoming dialog. By default
+    /// the dialog will be shown at hardcoded coordinates, this method allows us
+    /// to pack the dialog appropriately in one of the border layout based locations
+    /// see BorderLayout for futher details.
+    ///
+    /// #### Returns
+    ///
+    /// the dialogPosition
+    public String getDialogPosition() {
+<span class="fc" id="L2186">        return dialogPosition;</span>
+    }
+
+    /// Screen orientation position for the upcoming dialog. By default
+    /// the dialog will be shown at hardcoded coordinates, this method allows us
+    /// to pack the dialog appropriately in one of the border layout based locations
+    /// see BorderLayout for futher details.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dialogPosition`: the dialogPosition to set
+    public void setDialogPosition(String dialogPosition) {
+<span class="nc" id="L2198">        this.dialogPosition = dialogPosition;</span>
+<span class="nc" id="L2199">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    void repaint(Component cmp) {
+<span class="pc bpc" id="L2204" title="1 of 2 branches missed.">        if (getParent() != null) {</span>
+<span class="nc" id="L2205">            super.repaint(cmp);</span>
+<span class="nc" id="L2206">            return;</span>
+        }
+<span class="pc bpc" id="L2208" title="3 of 8 branches missed.">        if (isVisible() &amp;&amp; !disposed &amp;&amp; (isMenu() || CN.getCurrentForm() == this)) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L2209">            Display.getInstance().repaint(cmp);</span>
+        }
+<span class="fc" id="L2211">    }</span>
+
+    /// Allows a dialog component to grow or shrink to its new preferred size
+    public void growOrShrink() {
+<span class="nc" id="L2215">        getDialogComponent().setShouldCalcPreferredSize(true);</span>
+<span class="nc" id="L2216">        growOrShrinkImpl(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());</span>
+<span class="nc" id="L2217">        forceRevalidate();</span>
+<span class="nc" id="L2218">    }</span>
+
+    private void growOrShrinkImpl(int w, int h) {
+<span class="nc" id="L2221">        Component contentPane = super.getContentPane();</span>
+<span class="nc" id="L2222">        Component title = super.getTitleComponent();</span>
+<span class="nc" id="L2223">        int prefHeight = contentPane.getPreferredH();</span>
+<span class="nc" id="L2224">        int prefWidth = contentPane.getPreferredW();</span>
+<span class="nc" id="L2225">        Style contentPaneStyle = contentPane.getStyle();</span>
+<span class="nc" id="L2226">        Style titleStyle = title.getStyle();</span>
+
+        // if the dialog is packed we can scale it far more accurately based on intention
+<span class="nc bnc" id="L2229" title="All 2 branches missed.">        if (position != null) {</span>
+<span class="nc" id="L2230">            int menuHeight = 0;</span>
+<span class="nc bnc" id="L2231" title="All 2 branches missed.">            if (getSoftButtonCount() &gt; 1) {</span>
+<span class="nc" id="L2232">                Component menuBar = getSoftButton(0).getParent();</span>
+<span class="nc" id="L2233">                Style menuStyle = menuBar.getStyle();</span>
+<span class="nc" id="L2234">                menuHeight = menuBar.getPreferredH() + menuStyle.getVerticalMargins();</span>
+            }
+<span class="nc" id="L2236">            prefWidth = Math.min(prefWidth, w);</span>
+<span class="nc" id="L2237">            h = h - menuHeight - title.getPreferredH(); // - titleStyle.getMargin(false, TOP) - titleStyle.getMargin(false, BOTTOM);</span>
+<span class="nc" id="L2238">            int topBottom = Math.max(0, (h - prefHeight) / 2);</span>
+<span class="nc" id="L2239">            int leftRight = Math.max(0, (w - prefWidth) / 2);</span>
+<span class="nc" id="L2240">            int top = topBottom;</span>
+<span class="nc" id="L2241">            int bottom = topBottom;</span>
+<span class="nc" id="L2242">            int left = leftRight;</span>
+<span class="nc" id="L2243">            int right = leftRight;</span>
+
+<span class="nc bnc" id="L2245" title="All 2 branches missed.">            if (BorderLayout.EAST.equals(position)) {</span>
+<span class="nc" id="L2246">                left = Math.max(0, w - prefWidth);</span>
+<span class="nc" id="L2247">                right = 0;</span>
+            } else {
+<span class="nc bnc" id="L2249" title="All 2 branches missed.">                if (BorderLayout.WEST.equals(position)) {</span>
+<span class="nc" id="L2250">                    right = 0;</span>
+<span class="nc" id="L2251">                    left = Math.max(0, w - prefWidth);</span>
+                } else {
+<span class="nc bnc" id="L2253" title="All 2 branches missed.">                    if (BorderLayout.NORTH.equals(position)) {</span>
+<span class="nc" id="L2254">                        top = 0;</span>
+<span class="nc" id="L2255">                        bottom = Math.max(0, h - prefHeight);</span>
+                    } else {
+<span class="nc bnc" id="L2257" title="All 2 branches missed.">                        if (BorderLayout.SOUTH.equals(position)) {</span>
+<span class="nc" id="L2258">                            top = Math.max(0, h - prefHeight);</span>
+<span class="nc" id="L2259">                            bottom = 0;</span>
+                        }
+                    }
+                }
+            }
+
+<span class="nc" id="L2265">            titleStyle.setMargin(Component.TOP, 0, true);</span>
+<span class="nc" id="L2266">            titleStyle.setMargin(Component.BOTTOM, 0, true);</span>
+<span class="nc" id="L2267">            titleStyle.setMargin(Component.LEFT, 0, true);</span>
+<span class="nc" id="L2268">            titleStyle.setMargin(Component.RIGHT, 0, true);</span>
+
+<span class="nc" id="L2270">            contentPaneStyle.setMargin(Component.TOP, top, true);</span>
+<span class="nc" id="L2271">            contentPaneStyle.setMargin(Component.BOTTOM, bottom, true);</span>
+<span class="nc" id="L2272">            contentPaneStyle.setMargin(Component.LEFT, left, true);</span>
+<span class="nc" id="L2273">            contentPaneStyle.setMargin(Component.RIGHT, right, true);</span>
+<span class="nc" id="L2274">        } else {</span>
+<span class="nc" id="L2275">            int oldW = getWidth();</span>
+<span class="nc" id="L2276">            int oldH = getHeight();</span>
+<span class="nc bnc" id="L2277" title="All 4 branches missed.">            if (oldW != w || oldH != h) {</span>
+                // try to preserve the old size of the dialog if we still have room for it...
+<span class="nc bnc" id="L2279" title="All 4 branches missed.">                if (prefWidth &lt;= w &amp;&amp; prefHeight &lt;= h) {</span>
+<span class="nc" id="L2280">                    float oldLeftRightDistRatio = 1;</span>
+<span class="nc bnc" id="L2281" title="All 2 branches missed.">                    if (left + right != 0) {</span>
+<span class="nc" id="L2282">                        oldLeftRightDistRatio = ((float) left) / ((float) left + right);</span>
+                    }
+<span class="nc" id="L2284">                    float oldTopBottomDistRatio = 1;</span>
+<span class="nc bnc" id="L2285" title="All 2 branches missed.">                    if (left + right != 0) {</span>
+<span class="nc" id="L2286">                        oldTopBottomDistRatio = ((float) top) / ((float) top + bottom);</span>
+                    }
+<span class="nc" id="L2288">                    top = Math.max(0, (int) ((h - prefHeight) * oldTopBottomDistRatio));</span>
+<span class="nc" id="L2289">                    left = Math.max(0, (int) ((w - prefWidth) * oldLeftRightDistRatio));</span>
+<span class="nc" id="L2290">                    bottom = Math.max(0, (h - prefHeight) - top);</span>
+<span class="nc" id="L2291">                    right = Math.max(0, (w - prefWidth) - left);</span>
+
+<span class="nc" id="L2293">                    titleStyle.setMargin(Component.TOP, 0, true);</span>
+<span class="nc" id="L2294">                    titleStyle.setMargin(Component.BOTTOM, 0, true);</span>
+<span class="nc" id="L2295">                    titleStyle.setMargin(Component.LEFT, 0, true);</span>
+<span class="nc" id="L2296">                    titleStyle.setMargin(Component.RIGHT, 0, true);</span>
+
+<span class="nc" id="L2298">                    contentPaneStyle.setMargin(Component.TOP, top, true);</span>
+<span class="nc" id="L2299">                    contentPaneStyle.setMargin(Component.BOTTOM, bottom, true);</span>
+<span class="nc" id="L2300">                    contentPaneStyle.setMargin(Component.LEFT, left, true);</span>
+<span class="nc" id="L2301">                    contentPaneStyle.setMargin(Component.RIGHT, right, true);</span>
+<span class="nc" id="L2302">                } else {</span>
+<span class="nc" id="L2303">                    float ratioW = ((float) w) / ((float) oldW);</span>
+<span class="nc" id="L2304">                    float ratioH = ((float) h) / ((float) oldH);</span>
+
+<span class="nc" id="L2306">                    Style s = getDialogStyle();</span>
+
+<span class="nc" id="L2308">                    s.setMargin(TOP, (int) (s.getMarginTop() * ratioH));</span>
+<span class="nc" id="L2309">                    s.setMargin(BOTTOM, (int) (s.getMarginBottom() * ratioH));</span>
+<span class="nc" id="L2310">                    s.setMargin(LEFT, (int) (s.getMarginLeft(isRTL()) * ratioW));</span>
+<span class="nc" id="L2311">                    s.setMargin(RIGHT, (int) (s.getMarginRight(isRTL()) * ratioW));</span>
+
+<span class="nc" id="L2313">                    titleStyle.setMargin(TOP, (int) (titleStyle.getMarginTop() * ratioH));</span>
+<span class="nc" id="L2314">                    titleStyle.setMargin(LEFT, (int) (titleStyle.getMarginLeft(isRTL()) * ratioW));</span>
+<span class="nc" id="L2315">                    titleStyle.setMargin(RIGHT, (int) (titleStyle.getMarginRight(isRTL()) * ratioW));</span>
+                }
+            }
+        }
+<span class="nc" id="L2319">    }</span>
+
+    /// Indicates if we want to enforce directional bias for the popup dialog. If null this field is ignored but if
+    /// its set to a value it biases the system towards a fixed direction for the popup dialog.
+    ///
+    /// #### Returns
+    ///
+    /// the popupDirectionBiasPortrait
+    public Boolean getPopupDirectionBiasPortrait() {
+<span class="nc" id="L2328">        return popupDirectionBiasPortrait;</span>
+    }
+
+    /// Indicates if we want to enforce directional bias for the popup dialog. If null this field is ignored but if
+    /// its set to a value it biases the system towards a fixed direction for the popup dialog.
+    ///
+    /// #### Parameters
+    ///
+    /// - `popupDirectionBiasPortrait`: the popupDirectionBiasPortrait to set
+    public void setPopupDirectionBiasPortrait(Boolean popupDirectionBiasPortrait) {
+<span class="nc" id="L2338">        this.popupDirectionBiasPortrait = popupDirectionBiasPortrait;</span>
+<span class="nc" id="L2339">    }</span>
+
+    /// Returns true if the dialog was disposed automatically due to device rotation
+    ///
+    /// #### Returns
+    ///
+    /// the disposedDueToRotation value
+    public boolean wasDisposedDueToRotation() {
+<span class="nc" id="L2347">        return disposedDueToRotation;</span>
+    }
+
+    /// Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
+    /// blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+    /// only should be used
+    ///
+    /// #### Returns
+    ///
+    /// the blurBackgroundRadius
+    public float getBlurBackgroundRadius() {
+<span class="fc" id="L2358">        return blurBackgroundRadius;</span>
+    }
+
+    /// Dialog background can be blurred using a Gaussian blur effect, this sets the radius of the Gaussian
+    /// blur. -1 is a special case value that indicates that no blurring should take effect and the default tint mode
+    /// only should be used. Notice that this value can be set using the theme constant: `dialogBlurRadiusInt`
+    ///
+    /// #### Parameters
+    ///
+    /// - `blurBackgroundRadius`: the blurBackgroundRadius to set
+    public void setBlurBackgroundRadius(float blurBackgroundRadius) {
+<span class="nc" id="L2369">        this.blurBackgroundRadius = blurBackgroundRadius;</span>
+<span class="nc" id="L2370">    }</span>
+
+    /// In case of a blur effect we need to do something different...
+    /// {@inheritDoc}
+    @Override
+    void initDialogBgPainter(Painter p, Form previousForm) {
+<span class="pc bpc" id="L2376" title="3 of 4 branches missed.">        if (getBlurBackgroundRadius() &gt; 0 &amp;&amp; Display.impl.isGaussianBlurSupported()) {</span>
+<span class="nc" id="L2377">            Image img = Image.createImage(previousForm.getWidth(), previousForm.getHeight());</span>
+<span class="nc" id="L2378">            Graphics g = img.getGraphics();</span>
+<span class="nc" id="L2379">            previousForm.paintComponent(g, true);</span>
+<span class="nc" id="L2380">            img = Display.getInstance().gaussianBlurImage(img, blurBackgroundRadius);</span>
+<span class="nc" id="L2381">            getUnselectedStyle().setBgImage(img);</span>
+<span class="nc" id="L2382">            getUnselectedStyle().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FILL);</span>
+<span class="nc" id="L2383">        } else {</span>
+<span class="fc" id="L2384">            super.initDialogBgPainter(p, previousForm);</span>
+        }
+<span class="fc" id="L2386">    }</span>
+
+    /// Allows to use the UIIDs &quot;PopupContentPaneDownwards&quot;,
+    /// &quot;PopupContentPaneUpwards&quot;, &quot;PopupContentPaneRight&quot;,
+    /// &quot;PopupContentPaneLeft&quot; (instead of the default UIID &quot;PopupContentPane&quot;)
+    /// to style the PopupDialog more accurately based on the position of the
+    /// dialog popup compared to the context component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: to enable
+    public void setUIIDByPopupPosition(boolean b) {
+<span class="nc" id="L2398">        this.isUIIDByPopupPosition = b;</span>
+<span class="nc" id="L2399">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

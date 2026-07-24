@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ChainShape.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.collision.shapes</a> &gt; <span class="el_source">ChainShape.java</span></div><h1>ChainShape.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.collision.shapes;
+
+
+import com.codename1.gaming.physics.box2d.collision.AABB;
+import com.codename1.gaming.physics.box2d.collision.RayCastInput;
+import com.codename1.gaming.physics.box2d.collision.RayCastOutput;
+import com.codename1.gaming.physics.box2d.common.MathUtils;
+import com.codename1.gaming.physics.box2d.common.Rot;
+import com.codename1.gaming.physics.box2d.common.Settings;
+import com.codename1.gaming.physics.box2d.common.Transform;
+import com.codename1.gaming.physics.box2d.common.Vec2;
+
+/// A chain shape is a free form sequence of line segments. The chain has two-sided collision, so you
+/// can use inside and outside collision. Therefore, you may use any winding order. Since there may
+/// be many vertices, they are allocated using Alloc. Connectivity information is used to create
+/// smooth collisions. WARNING The chain will not collide properly if there are self-intersections.
+///
+/// @author Daniel
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">public class ChainShape extends Shape {</span>
+
+  public Vec2[] m_vertices;
+  public int m_count;
+<span class="fc" id="L46">  public final Vec2 m_prevVertex = new Vec2(), m_nextVertex = new Vec2();</span>
+<span class="fc" id="L47">  public boolean m_hasPrevVertex = false, m_hasNextVertex = false;</span>
+
+<span class="fc" id="L49">  private final EdgeShape pool0 = new EdgeShape();</span>
+
+  public ChainShape() {
+<span class="fc" id="L52">    super(ShapeType.CHAIN);</span>
+<span class="fc" id="L53">    m_vertices = null;</span>
+<span class="fc" id="L54">    m_radius = Settings.polygonRadius;</span>
+<span class="fc" id="L55">    m_count = 0;</span>
+<span class="fc" id="L56">  }</span>
+
+  public int getChildCount() {
+<span class="fc" id="L59">    return m_count - 1;</span>
+  }
+
+  /// Get a child edge.
+  public void getChildEdge(EdgeShape edge, int index) {
+<span class="pc bpc" id="L64" title="3 of 6 branches missed.">    assert (0 &lt;= index &amp;&amp; index &lt; m_count - 1);</span>
+<span class="fc" id="L65">    edge.m_radius = m_radius;</span>
+    
+<span class="fc" id="L67">    final Vec2 v0 = m_vertices[index + 0];</span>
+<span class="fc" id="L68">    final Vec2 v1 = m_vertices[index + 1];</span>
+<span class="fc" id="L69">    edge.m_vertex1.x = v0.x;</span>
+<span class="fc" id="L70">    edge.m_vertex1.y = v0.y;</span>
+<span class="fc" id="L71">    edge.m_vertex2.x = v1.x;</span>
+<span class="fc" id="L72">    edge.m_vertex2.y = v1.y;</span>
+
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">    if (index &gt; 0) {</span>
+<span class="nc" id="L75">      Vec2 v = m_vertices[index - 1];</span>
+<span class="nc" id="L76">      edge.m_vertex0.x = v.x;</span>
+<span class="nc" id="L77">      edge.m_vertex0.y = v.y;</span>
+<span class="nc" id="L78">      edge.m_hasVertex0 = true;</span>
+<span class="nc" id="L79">    } else {</span>
+<span class="fc" id="L80">      edge.m_vertex0.x = m_prevVertex.x;</span>
+<span class="fc" id="L81">      edge.m_vertex0.y = m_prevVertex.y;</span>
+<span class="fc" id="L82">      edge.m_hasVertex0 = m_hasPrevVertex;</span>
+    }
+
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">    if (index &lt; m_count - 2) {</span>
+<span class="fc" id="L86">      Vec2 v = m_vertices[index + 2];</span>
+<span class="fc" id="L87">      edge.m_vertex3.x = v.x;</span>
+<span class="fc" id="L88">      edge.m_vertex3.y = v.y;</span>
+<span class="fc" id="L89">      edge.m_hasVertex3 = true;</span>
+<span class="fc" id="L90">    } else {</span>
+<span class="nc" id="L91">      edge.m_vertex3.x = m_nextVertex.x;</span>
+<span class="nc" id="L92">      edge.m_vertex3.y = m_nextVertex.y;</span>
+<span class="nc" id="L93">      edge.m_hasVertex3 = m_hasNextVertex;</span>
+    }
+<span class="fc" id="L95">  }</span>
+
+  public boolean testPoint(Transform xf, Vec2 p) {
+<span class="nc" id="L98">    return false;</span>
+  }
+
+  public boolean raycast(RayCastOutput output, RayCastInput input, Transform xf, int childIndex) {
+<span class="nc bnc" id="L102" title="All 4 branches missed.">    assert (childIndex &lt; m_count);</span>
+
+<span class="nc" id="L104">    final EdgeShape edgeShape = pool0;</span>
+
+<span class="nc" id="L106">    int i1 = childIndex;</span>
+<span class="nc" id="L107">    int i2 = childIndex + 1;</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">    if (i2 == m_count) {</span>
+<span class="nc" id="L109">      i2 = 0;</span>
+    }
+<span class="nc" id="L111">    Vec2 v = m_vertices[i1];</span>
+<span class="nc" id="L112">    edgeShape.m_vertex1.x = v.x;</span>
+<span class="nc" id="L113">    edgeShape.m_vertex1.y = v.y;</span>
+<span class="nc" id="L114">    Vec2 v1 = m_vertices[i2];</span>
+<span class="nc" id="L115">    edgeShape.m_vertex2.x = v1.x;</span>
+<span class="nc" id="L116">    edgeShape.m_vertex2.y = v1.y;</span>
+
+<span class="nc" id="L118">    return edgeShape.raycast(output, input, xf, 0);</span>
+  }
+
+  public void computeAABB(AABB aabb, Transform xf, int childIndex) {
+<span class="pc bpc" id="L122" title="2 of 4 branches missed.">    assert (childIndex &lt; m_count);</span>
+<span class="fc" id="L123">    final Vec2 lower = aabb.lowerBound;</span>
+<span class="fc" id="L124">    final Vec2 upper = aabb.upperBound;</span>
+    
+<span class="fc" id="L126">    int i1 = childIndex;</span>
+<span class="fc" id="L127">    int i2 = childIndex + 1;</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">    if (i2 == m_count) {</span>
+<span class="nc" id="L129">      i2 = 0;</span>
+    }
+
+<span class="fc" id="L132">    final Vec2 vi1 = m_vertices[i1];</span>
+<span class="fc" id="L133">    final Vec2 vi2 = m_vertices[i2];</span>
+<span class="fc" id="L134">    final Rot xfq = xf.q;</span>
+<span class="fc" id="L135">    final Vec2 xfp = xf.p;</span>
+<span class="fc" id="L136">    float v1x = (xfq.c * vi1.x - xfq.s * vi1.y) + xfp.x;</span>
+<span class="fc" id="L137">    float v1y = (xfq.s * vi1.x + xfq.c * vi1.y) + xfp.y;</span>
+<span class="fc" id="L138">    float v2x = (xfq.c * vi2.x - xfq.s * vi2.y) + xfp.x;</span>
+<span class="fc" id="L139">    float v2y = (xfq.s * vi2.x + xfq.c * vi2.y) + xfp.y;</span>
+
+<span class="fc bfc" id="L141" title="All 2 branches covered.">    lower.x = v1x &lt; v2x ? v1x : v2x;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">    lower.y = v1y &lt; v2y ? v1y : v2y;</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">    upper.x = v1x &gt; v2x ? v1x : v2x;</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">    upper.y = v1y &gt; v2y ? v1y : v2y;</span>
+<span class="fc" id="L145">  }</span>
+
+  public void computeMass(MassData massData, float density) {
+<span class="fc" id="L148">    massData.mass = 0.0f;</span>
+<span class="fc" id="L149">    massData.center.setZero();</span>
+<span class="fc" id="L150">    massData.I = 0.0f;</span>
+<span class="fc" id="L151">  }</span>
+
+  public Shape clone() {
+<span class="fc" id="L154">    ChainShape clone = new ChainShape();</span>
+<span class="fc" id="L155">    clone.createChain(m_vertices, m_count);</span>
+<span class="fc" id="L156">    clone.m_prevVertex.set(m_prevVertex);</span>
+<span class="fc" id="L157">    clone.m_nextVertex.set(m_nextVertex);</span>
+<span class="fc" id="L158">    clone.m_hasPrevVertex = m_hasPrevVertex;</span>
+<span class="fc" id="L159">    clone.m_hasNextVertex = m_hasNextVertex;</span>
+<span class="fc" id="L160">    return clone;</span>
+  }
+
+  /// Create a loop. This automatically adjusts connectivity.
+  ///
+  /// @param vertices an array of vertices, these are copied
+  /// @param count the vertex count
+  public void createLoop(final Vec2[] vertices, int count) {
+<span class="pc bpc" id="L168" title="3 of 6 branches missed.">    assert (m_vertices == null &amp;&amp; m_count == 0);</span>
+<span class="pc bpc" id="L169" title="2 of 4 branches missed.">    assert (count &gt;= 3);</span>
+<span class="fc" id="L170">    m_count = count + 1;</span>
+<span class="fc" id="L171">    m_vertices = new Vec2[m_count];</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">    for (int i = 1; i &lt; count; i++) {</span>
+<span class="fc" id="L173">      Vec2 v1 = vertices[i - 1];</span>
+<span class="fc" id="L174">      Vec2 v2 = vertices[i];</span>
+      // If the code crashes here, it means your vertices are too close together.
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">      if (MathUtils.distanceSquared(v1, v2) &lt; Settings.linearSlop * Settings.linearSlop) {</span>
+<span class="nc" id="L177">        throw new RuntimeException(&quot;Vertices of chain shape are too close together&quot;);</span>
+      }
+    }
+<span class="fc bfc" id="L180" title="All 2 branches covered.">    for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L181">      m_vertices[i] = new Vec2(vertices[i]);</span>
+    }
+<span class="fc" id="L183">    m_vertices[count] = new Vec2(m_vertices[0]);</span>
+<span class="fc" id="L184">    m_prevVertex.set(m_vertices[m_count - 2]);</span>
+<span class="fc" id="L185">    m_nextVertex.set(m_vertices[1]);</span>
+<span class="fc" id="L186">    m_hasPrevVertex = true;</span>
+<span class="fc" id="L187">    m_hasNextVertex = true;</span>
+<span class="fc" id="L188">  }</span>
+
+  /// Create a chain with isolated end vertices.
+  ///
+  /// @param vertices an array of vertices, these are copied
+  /// @param count the vertex count
+  public void createChain(final Vec2 vertices[], int count) {
+<span class="pc bpc" id="L195" title="3 of 6 branches missed.">    assert (m_vertices == null &amp;&amp; m_count == 0);</span>
+<span class="pc bpc" id="L196" title="2 of 4 branches missed.">    assert (count &gt;= 2);</span>
+<span class="fc" id="L197">    m_count = count;</span>
+<span class="fc" id="L198">    m_vertices = new Vec2[m_count];</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">    for (int i = 1; i &lt; m_count; i++) {</span>
+<span class="fc" id="L200">      Vec2 v1 = vertices[i - 1];</span>
+<span class="fc" id="L201">      Vec2 v2 = vertices[i];</span>
+      // If the code crashes here, it means your vertices are too close together.
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">      if (MathUtils.distanceSquared(v1, v2) &lt; Settings.linearSlop * Settings.linearSlop) {</span>
+<span class="nc" id="L204">        throw new RuntimeException(&quot;Vertices of chain shape are too close together&quot;);</span>
+      }
+    }
+<span class="fc bfc" id="L207" title="All 2 branches covered.">    for (int i = 0; i &lt; m_count; i++) {</span>
+<span class="fc" id="L208">      m_vertices[i] = new Vec2(vertices[i]);</span>
+    }
+<span class="fc" id="L210">    m_hasPrevVertex = false;</span>
+<span class="fc" id="L211">    m_hasNextVertex = false;</span>
+<span class="fc" id="L212">  }</span>
+
+  /// Establish connectivity to a vertex that precedes the first vertex. Don't call this for loops.
+  ///
+  /// @param prevVertex
+  public void setPrevVertex(final Vec2 prevVertex) {
+<span class="fc" id="L218">    m_prevVertex.set(prevVertex);</span>
+<span class="fc" id="L219">    m_hasPrevVertex = true;</span>
+<span class="fc" id="L220">  }</span>
+
+  /// Establish connectivity to a vertex that follows the last vertex. Don't call this for loops.
+  ///
+  /// @param nextVertex
+  public void setNextVertex(final Vec2 nextVertex) {
+<span class="fc" id="L226">    m_nextVertex.set(nextVertex);</span>
+<span class="fc" id="L227">    m_hasNextVertex = true;</span>
+<span class="fc" id="L228">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

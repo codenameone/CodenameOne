@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Surfaces.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.surfaces</a> &gt; <span class="el_source">Surfaces.java</span></div><h1>Surfaces.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.surfaces;
+
+import com.codename1.io.Log;
+import com.codename1.surfaces.spi.SurfaceBridge;
+import com.codename1.ui.Display;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// The static entry point for external surfaces: home-screen widgets and live activities -- the
+/// two faces of one concept, a live source of information that resides outside your app. Declare
+/// your widget kinds and register an action handler in `init()`, then publish content whenever
+/// your data changes:
+///
+/// ```java
+/// Surfaces.registerWidgetKind(new WidgetKind(&quot;delivery_status&quot;)
+///         .setDisplayName(&quot;Delivery&quot;).setDescription(&quot;Track your order&quot;));
+/// Surfaces.setActionHandler(evt -&gt; showOrder(evt.getParams()));
+/// ...
+/// Surfaces.publish(&quot;delivery_status&quot;, new WidgetTimeline()
+///         .setContent(layout).addEntry(new Date(), state));
+/// ```
+///
+/// #### How surfaces render
+///
+/// Surfaces render while your app process may be dead: the published timeline is serialized (a
+/// JSON descriptor plus PNG blobs) and persisted where the platform renderer can reach it -- the
+/// iOS widget extension, the Android widget provider or a desktop surface window. Layouts embed
+/// `${key}` placeholders resolved from each timeline entry's state map, and `SurfaceDynamicText`
+/// countdowns tick natively on the OS clock with no app wakeups. To refresh content periodically
+/// implement `com.codename1.background.BackgroundFetch` and re-publish there.
+///
+/// Widget kinds must also be declared at build time in the project's `surfaces.json` resource --
+/// the platform widget galleries are compiled into the native app. See the package documentation.
+///
+/// #### Zero cost when unused
+///
+/// Merely referencing this package makes the build inject the native plumbing (the WidgetKit
+/// extension and app group on iOS, the widget receivers on Android). Apps that never touch
+/// `com.codename1.surfaces` get none of it. On the simulator the Widgets preview window renders
+/// published surfaces; on unsupported ports the API is an inert no-op.
+public final class Surfaces {
+    private static SurfaceBridge bridge;
+    private static boolean bridgeOverridden;
+    private static SurfaceActionHandler actionHandler;
+<span class="fc" id="L70">    private static final List&lt;SurfaceActionEvent&gt; pendingActions =</span>
+            new ArrayList&lt;SurfaceActionEvent&gt;();
+<span class="fc" id="L72">    private static final List&lt;WidgetKind&gt; registeredKinds = new ArrayList&lt;WidgetKind&gt;();</span>
+
+    private Surfaces() {
+    }
+
+    /// Returns true when this platform can render home-screen (or desktop) widgets.
+    ///
+    /// #### Returns
+    ///
+    /// true when widgets are supported
+    public static boolean areWidgetsSupported() {
+<span class="nc" id="L83">        SurfaceBridge b = bridgeInternal();</span>
+<span class="nc bnc" id="L84" title="All 4 branches missed.">        return b != null &amp;&amp; b.areWidgetsSupported();</span>
+    }
+
+    /// Declares a widget kind at runtime. Call once per kind, typically from `init()`. The id must
+    /// match a kind declared in the project's `surfaces.json` build-time manifest; a mismatch logs
+    /// a prominent warning on supporting platforms.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kind`: the kind declaration
+    public static void registerWidgetKind(WidgetKind kind) {
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (kind == null) {</span>
+<span class="nc" id="L96">            return;</span>
+        }
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        for (WidgetKind k : registeredKinds) {</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            if (k.getId().equals(kind.getId())) {</span>
+<span class="nc" id="L100">                registeredKinds.remove(k);</span>
+<span class="nc" id="L101">                break;</span>
+            }
+<span class="nc" id="L103">        }</span>
+<span class="fc" id="L104">        registeredKinds.add(kind);</span>
+<span class="fc" id="L105">        SurfaceBridge b = bridgeInternal();</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (b != null) {</span>
+<span class="fc" id="L107">            b.registerWidgetKind(SurfaceSerializer.serializeKind(kind));</span>
+        }
+<span class="fc" id="L109">    }</span>
+
+    /// Returns the widget kinds registered so far.
+    public static List&lt;WidgetKind&gt; getRegisteredKinds() {
+<span class="nc" id="L113">        return new ArrayList&lt;WidgetKind&gt;(registeredKinds);</span>
+    }
+
+    /// Publishes a widget kind's content, atomically replacing any previously published timeline
+    /// and asking the platform to re-render the kind's widget instances. A no-op on platforms
+    /// without widget support.
+    ///
+    /// #### Threading
+    ///
+    /// Callable from any thread -- including
+    /// `com.codename1.background.BackgroundFetch#performBackgroundFetch(long, com.codename1.util.Callback)`
+    /// callbacks while the app UI is not running (on Android the fetch runs in a background
+    /// service with no Activity at all). Publishing is data-only: the timeline is serialized,
+    /// persisted where the platform renderer can reach it and the renderer is poked
+    /// asynchronously; no step blocks on the EDT or the platform UI thread. Implementing
+    /// background fetch and re-publishing there is the intended way to keep widgets fresh; see
+    /// the `com.codename1.surfaces.spi` package documentation for the per-platform background
+    /// update story.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kindId`: the widget kind id
+    /// - `timeline`: the content to publish
+    public static void publish(String kindId, WidgetTimeline timeline) {
+<span class="fc" id="L137">        SurfaceBridge b = bridgeInternal();</span>
+<span class="pc bpc" id="L138" title="1 of 4 branches missed.">        if (b == null || !b.areWidgetsSupported()) {</span>
+<span class="fc" id="L139">            return;</span>
+        }
+<span class="fc" id="L141">        Map&lt;String, byte[]&gt; images = new LinkedHashMap&lt;String, byte[]&gt;();</span>
+<span class="fc" id="L142">        String json = SurfaceSerializer.serializeTimeline(kindId, timeline, images);</span>
+<span class="fc" id="L143">        b.publishWidgetTimeline(kindId, json, images);</span>
+<span class="fc" id="L144">    }</span>
+
+    /// Asks the platform to re-render widgets from their already-published timelines.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kindId`: the kind to reload, or null for all kinds
+    public static void reloadWidgets(String kindId) {
+<span class="fc" id="L152">        SurfaceBridge b = bridgeInternal();</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (b != null) {</span>
+<span class="fc" id="L154">            b.reloadWidgets(kindId);</span>
+        }
+<span class="fc" id="L156">    }</span>
+
+    /// Returns the number of widget instances of a kind the user placed on the platform surface,
+    /// or 0 when none exist or the platform cannot tell. Useful to skip publishing work when no
+    /// widget is installed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kindId`: the widget kind id
+    ///
+    /// #### Returns
+    ///
+    /// the installed instance count, or 0
+    public static int getInstalledWidgetCount(String kindId) {
+<span class="fc" id="L170">        SurfaceBridge b = bridgeInternal();</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        return b == null ? 0 : b.getInstalledWidgetCount(kindId);</span>
+    }
+
+    /// Registers the single handler receiving surface action events on the EDT. Registration
+    /// flushes any actions queued before it (e.g. the tap that cold-started the app), in arrival
+    /// order, with their cold-start flag set.
+    ///
+    /// #### Parameters
+    ///
+    /// - `handler`: the handler, or null to clear
+    public static void setActionHandler(SurfaceActionHandler handler) {
+        // Install the handler and drain the cold-start queue atomically under the same lock
+        // dispatchAction() uses, so an in-flight dispatch cannot observe a null handler and then
+        // enqueue an event after this method already flushed an empty queue (which would strand
+        // it forever). Either dispatch's read-and-enqueue happens entirely before this install
+        // (the event is drained here) or entirely after (dispatch sees the handler and delivers).
+<span class="fc" id="L187">        List&lt;SurfaceActionEvent&gt; queued = null;</span>
+<span class="fc" id="L188">        synchronized (pendingActions) {</span>
+<span class="fc" id="L189">            actionHandler = handler;</span>
+<span class="pc bpc" id="L190" title="1 of 4 branches missed.">            if (handler != null &amp;&amp; !pendingActions.isEmpty()) {</span>
+<span class="fc" id="L191">                queued = new ArrayList&lt;SurfaceActionEvent&gt;(pendingActions);</span>
+<span class="fc" id="L192">                pendingActions.clear();</span>
+            }
+<span class="fc" id="L194">        }</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (queued != null) {</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">            for (SurfaceActionEvent evt : queued) {</span>
+<span class="fc" id="L197">                deliver(handler, evt);</span>
+<span class="fc" id="L198">            }</span>
+        }
+<span class="fc" id="L200">    }</span>
+
+    // --- framework/port entry points -----------------------------------------
+
+    /// Framework/port entry point: delivers a surface action to the app. Ports call this after
+    /// decoding their platform payload (deep link, intent extras, window click). Handles EDT
+    /// marshaling; when no handler is registered yet the event is queued and flagged cold start.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the widget kind id or live activity type
+    /// - `actionId`: the action id of the tapped node
+    /// - `params`: the action parameters, may be null
+    public static void dispatchAction(String source, String actionId, Map&lt;String, Object&gt; params) {
+<span class="fc" id="L214">        SurfaceActionEvent evt = new SurfaceActionEvent(source, actionId, params);</span>
+        SurfaceActionHandler h;
+        // Read the handler and decide queue-vs-deliver atomically under the same lock
+        // setActionHandler() installs it and drains under -- see the note there.
+<span class="fc" id="L218">        synchronized (pendingActions) {</span>
+<span class="fc" id="L219">            h = actionHandler;</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            if (h == null) {</span>
+<span class="fc" id="L221">                evt.setColdStart(true);</span>
+<span class="fc" id="L222">                pendingActions.add(evt);</span>
+<span class="fc" id="L223">                return;</span>
+            }
+<span class="fc" id="L225">        }</span>
+<span class="fc" id="L226">        deliver(h, evt);</span>
+<span class="fc" id="L227">    }</span>
+
+    /// Framework/port/test entry point: overrides the bridge resolved from the platform port.
+    /// Passing null restores platform resolution.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the bridge, or null to resolve from the platform again
+    public static void setBridge(SurfaceBridge b) {
+<span class="fc" id="L236">        bridge = b;</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">        bridgeOverridden = b != null;</span>
+<span class="fc" id="L238">    }</span>
+
+    static SurfaceBridge bridgeInternal() {
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        if (bridgeOverridden) {</span>
+<span class="fc" id="L242">            return bridge;</span>
+        }
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (!Display.isInitialized()) {</span>
+<span class="fc" id="L245">            return null;</span>
+        }
+        try {
+<span class="nc" id="L248">            return Display.getInstance().getSurfaceBridge();</span>
+<span class="nc" id="L249">        } catch (Throwable t) {</span>
+<span class="nc" id="L250">            Log.e(t);</span>
+<span class="nc" id="L251">            return null;</span>
+        }
+    }
+
+    /// Test seam: clears the bridge override, handler, queued actions and registered kinds.
+    static void reset() {
+<span class="fc" id="L257">        bridge = null;</span>
+<span class="fc" id="L258">        bridgeOverridden = false;</span>
+<span class="fc" id="L259">        synchronized (pendingActions) {</span>
+<span class="fc" id="L260">            actionHandler = null;</span>
+<span class="fc" id="L261">            pendingActions.clear();</span>
+<span class="fc" id="L262">        }</span>
+<span class="fc" id="L263">        registeredKinds.clear();</span>
+<span class="fc" id="L264">    }</span>
+
+    private static void deliver(final SurfaceActionHandler h, final SurfaceActionEvent evt) {
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if (h == null) {</span>
+<span class="nc" id="L268">            return;</span>
+        }
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">        if (Display.isInitialized()) {</span>
+<span class="nc" id="L271">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L274">                    h.onSurfaceAction(evt);</span>
+<span class="nc" id="L275">                }</span>
+            });
+        } else {
+<span class="fc" id="L278">            h.onSurfaceAction(evt);</span>
+        }
+<span class="fc" id="L280">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

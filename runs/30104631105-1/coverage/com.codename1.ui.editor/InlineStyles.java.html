@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InlineStyles.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.editor</a> &gt; <span class="el_source">InlineStyles.java</span></div><h1>InlineStyles.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.editor;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// The per character inline style model for the pure rich text editor. It keeps one `TextStyle`
+/// reference for every character in the document, kept in lockstep with the text through `#applyEdit`.
+/// Runs of identical style are coalesced only at render time, which keeps edits simple and correct at
+/// the cost of one reference per character (rich documents are small enough for this to be a non issue).
+public final class InlineStyles {
+    /// A transform applied to a character's style, used to toggle bold, set a color, etc.
+    public interface StyleTransform {
+        /// Returns the new style for a character that currently has `current`.
+        TextStyle apply(TextStyle current);
+    }
+
+<span class="fc" id="L40">    private final List&lt;TextStyle&gt; perChar = new ArrayList&lt;TextStyle&gt;();</span>
+
+    /// Creates a model of the given length, all default style.
+<span class="fc" id="L43">    public InlineStyles(int length) {</span>
+<span class="fc" id="L44">        reset(length);</span>
+<span class="fc" id="L45">    }</span>
+
+    /// Resets the model to the given length, all default style.
+    public void reset(int length) {
+<span class="fc" id="L49">        perChar.clear();</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L51">            perChar.add(TextStyle.DEFAULT);</span>
+        }
+<span class="fc" id="L53">    }</span>
+
+    /// Returns the number of characters covered.
+    public int length() {
+<span class="fc" id="L57">        return perChar.size();</span>
+    }
+
+    /// Returns the style of the character at `index`, or the default style out of range.
+    public TextStyle styleAt(int index) {
+<span class="pc bpc" id="L62" title="2 of 4 branches missed.">        if (index &lt; 0 || index &gt;= perChar.size()) {</span>
+<span class="nc" id="L63">            return TextStyle.DEFAULT;</span>
+        }
+<span class="fc" id="L65">        return perChar.get(index);</span>
+    }
+
+    /// Keeps the model in sync with a text replacement: removes `removedLen` styles at `start` and
+    /// inserts `insertedLen` copies of `style`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: the offset of the edit
+    ///
+    /// - `removedLen`: number of characters removed
+    ///
+    /// - `insertedLen`: number of characters inserted
+    ///
+    /// - `style`: the style applied to the inserted characters
+    public void applyEdit(int start, int removedLen, int insertedLen, TextStyle style) {
+<span class="fc" id="L81">        start = clamp(start);</span>
+<span class="fc" id="L82">        int end = clamp(start + removedLen);</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (end &gt; start) {</span>
+<span class="fc" id="L84">            perChar.subList(start, end).clear();</span>
+        }
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (insertedLen &gt; 0) {</span>
+<span class="fc" id="L87">            List&lt;TextStyle&gt; ins = new ArrayList&lt;TextStyle&gt;(insertedLen);</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            TextStyle s = style == null ? TextStyle.DEFAULT : style;</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">            for (int i = 0; i &lt; insertedLen; i++) {</span>
+<span class="fc" id="L90">                ins.add(s);</span>
+            }
+<span class="fc" id="L92">            perChar.addAll(Math.min(start, perChar.size()), ins);</span>
+        }
+<span class="fc" id="L94">    }</span>
+
+    /// Sets the style of a single character.
+    public void setAt(int index, TextStyle style) {
+<span class="pc bpc" id="L98" title="2 of 4 branches missed.">        if (index &gt;= 0 &amp;&amp; index &lt; perChar.size()) {</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">            perChar.set(index, style == null ? TextStyle.DEFAULT : style);</span>
+        }
+<span class="fc" id="L101">    }</span>
+
+    /// Applies a transform to every character's style in `[start, end)`.
+    public void transformRange(int start, int end, StyleTransform t) {
+<span class="fc" id="L105">        start = clamp(start);</span>
+<span class="fc" id="L106">        end = clamp(end);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (int i = start; i &lt; end; i++) {</span>
+<span class="fc" id="L108">            perChar.set(i, t.apply(perChar.get(i)));</span>
+        }
+<span class="fc" id="L110">    }</span>
+
+    /// True when every character in `[start, end)` satisfies the predicate. An empty range checks the
+    /// character just before the caret (the style typing would continue with).
+    public boolean allInRange(int start, int end, StylePredicate p) {
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (start &gt;= end) {</span>
+<span class="nc" id="L116">            int probe = start - 1;</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">            return p.test(styleAt(probe &lt; 0 ? 0 : probe));</span>
+        }
+<span class="fc" id="L119">        start = clamp(start);</span>
+<span class="fc" id="L120">        end = clamp(end);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (int i = start; i &lt; end; i++) {</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            if (!p.test(perChar.get(i))) {</span>
+<span class="fc" id="L123">                return false;</span>
+            }
+        }
+<span class="fc" id="L126">        return true;</span>
+    }
+
+    /// A predicate over a style, used by `#allInRange`.
+    public interface StylePredicate {
+        /// Returns true when `style` satisfies the predicate.
+        boolean test(TextStyle style);
+    }
+
+    private int clamp(int v) {
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (v &lt; 0) {</span>
+<span class="nc" id="L137">            return 0;</span>
+        }
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (v &gt; perChar.size()) {</span>
+<span class="nc" id="L140">            return perChar.size();</span>
+        }
+<span class="fc" id="L142">        return v;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TextInputConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">TextInputConfig.java</span></div><h1>TextInputConfig.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui;
+
+/// Immutable configuration handed to the platform when a `TextInputClient` binds to the low level text
+/// input source (see `com.codename1.impl.CodenameOneImplementation#startTextInput`). It tells the
+/// platform which soft keyboard flavor to present and how aggressive autocorrect / autocapitalization
+/// should be. A source editor typically disables autocorrect and autocapitalization so it does not
+/// mangle code, whereas a prose editor leaves them on.
+///
+/// The constraint constants mirror the `TextArea` constraint bits so the same keyboard mapping the
+/// framework already uses for native fields applies here.
+<span class="fc" id="L34">public final class TextInputConfig {</span>
+    /// The action label shown on the keyboard's return key: a plain newline / carriage return.
+    public static final int ACTION_DEFAULT = 0;
+
+    /// The action label shown on the keyboard's return key: a &quot;done&quot; affordance that finishes editing.
+    public static final int ACTION_DONE = 1;
+
+    /// The action label shown on the keyboard's return key: a &quot;next&quot; affordance moving to the next field.
+    public static final int ACTION_NEXT = 2;
+
+    /// The action label shown on the keyboard's return key: a &quot;search&quot; affordance.
+    public static final int ACTION_SEARCH = 3;
+
+    /// The action label shown on the keyboard's return key: a &quot;send&quot; affordance.
+    public static final int ACTION_SEND = 4;
+
+<span class="fc" id="L50">    private int constraint = TextArea.ANY;</span>
+<span class="fc" id="L51">    private boolean autoCorrect = true;</span>
+<span class="fc" id="L52">    private boolean autoCapitalize = true;</span>
+<span class="fc" id="L53">    private boolean multiline = true;</span>
+<span class="fc" id="L54">    private int actionType = ACTION_DEFAULT;</span>
+
+    /// Returns the `TextArea` style constraint bits describing the keyboard type.
+    public int getConstraint() {
+<span class="fc" id="L58">        return constraint;</span>
+    }
+
+    /// Sets the `TextArea` style constraint bits describing the keyboard type.
+    ///
+    /// #### Parameters
+    ///
+    /// - `constraint`: one of the `TextArea` constraint constants
+    ///
+    /// Returns this instance for chaining.
+    public TextInputConfig setConstraint(int constraint) {
+<span class="fc" id="L69">        this.constraint = constraint;</span>
+<span class="fc" id="L70">        return this;</span>
+    }
+
+    /// True when the platform should apply autocorrect / predictive text.
+    public boolean isAutoCorrect() {
+<span class="nc" id="L75">        return autoCorrect;</span>
+    }
+
+    /// Enables or disables platform autocorrect / predictive text. Disable this for source code.
+    ///
+    /// Returns this instance for chaining.
+    public TextInputConfig setAutoCorrect(boolean autoCorrect) {
+<span class="fc" id="L82">        this.autoCorrect = autoCorrect;</span>
+<span class="fc" id="L83">        return this;</span>
+    }
+
+    /// True when the platform should auto capitalize.
+    public boolean isAutoCapitalize() {
+<span class="nc" id="L88">        return autoCapitalize;</span>
+    }
+
+    /// Enables or disables platform auto capitalization. Disable this for source code.
+    ///
+    /// Returns this instance for chaining.
+    public TextInputConfig setAutoCapitalize(boolean autoCapitalize) {
+<span class="fc" id="L95">        this.autoCapitalize = autoCapitalize;</span>
+<span class="fc" id="L96">        return this;</span>
+    }
+
+    /// True when the editor accepts multiple lines (the return key inserts a newline).
+    public boolean isMultiline() {
+<span class="fc" id="L101">        return multiline;</span>
+    }
+
+    /// Sets whether the editor accepts multiple lines.
+    ///
+    /// Returns this instance for chaining.
+    public TextInputConfig setMultiline(boolean multiline) {
+<span class="fc" id="L108">        this.multiline = multiline;</span>
+<span class="fc" id="L109">        return this;</span>
+    }
+
+    /// Returns the return key action type, one of the `ACTION_*` constants.
+    public int getActionType() {
+<span class="nc" id="L114">        return actionType;</span>
+    }
+
+    /// Sets the return key action type, one of the `ACTION_*` constants.
+    ///
+    /// Returns this instance for chaining.
+    public TextInputConfig setActionType(int actionType) {
+<span class="fc" id="L121">        this.actionType = actionType;</span>
+<span class="fc" id="L122">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

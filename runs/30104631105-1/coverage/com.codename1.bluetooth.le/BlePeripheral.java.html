@@ -1,0 +1,785 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BlePeripheral.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.bluetooth.le</a> &gt; <span class="el_source">BlePeripheral.java</span></div><h1>BlePeripheral.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.bluetooth.le;
+
+import com.codename1.bluetooth.BluetoothDevice;
+import com.codename1.bluetooth.BluetoothError;
+import com.codename1.bluetooth.BluetoothException;
+import com.codename1.bluetooth.BluetoothUuid;
+import com.codename1.bluetooth.gatt.GattCharacteristic;
+import com.codename1.bluetooth.gatt.GattDescriptor;
+import com.codename1.bluetooth.gatt.GattNotificationListener;
+import com.codename1.bluetooth.gatt.GattService;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.AsyncResult;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.TimerTask;
+
+/// A remote BLE peripheral: connection lifecycle, GATT client operations
+/// and L2CAP channels. Obtained from scans
+/// ([ScanResult#getPeripheral()]) or from
+/// [BluetoothLE#getPeripheral(String)].
+///
+/// All operations return independent `AsyncResource` handles and may be
+/// issued concurrently -- an internal per-peripheral queue serializes them
+/// toward the platform stack (which only allows one in-flight GATT request
+/// per connection) and applies a safety timeout so a lost platform
+/// callback can never wedge the queue. Operations on *different*
+/// peripherals run fully concurrently.
+///
+/// Ports subclass this and implement the protected `do*` methods; they
+/// report events through the `fire*` methods, which are safe to call from
+/// any thread. All application-facing callbacks are delivered on the EDT.
+public abstract class BlePeripheral extends BluetoothDevice {
+
+<span class="fc" id="L60">    private final GattOperationQueue queue = new GattOperationQueue();</span>
+<span class="fc" id="L61">    private final Object stateLock = new Object();</span>
+<span class="fc" id="L62">    private ConnectionState state = ConnectionState.DISCONNECTED;</span>
+    private AsyncResource&lt;BlePeripheral&gt; pendingConnect;
+    private TimerTask connectTimeout;
+    private java.util.Timer connectTimeoutTimer;
+    private ArrayList&lt;ConnectionListener&gt; connectionListeners;
+    private ArrayList&lt;GattService&gt; services;
+<span class="fc" id="L68">    private final HashMap&lt;GattCharacteristic, ArrayList&lt;GattNotificationListener&gt;&gt;</span>
+            subscriptions =
+            new HashMap&lt;GattCharacteristic, ArrayList&lt;GattNotificationListener&gt;&gt;();
+<span class="fc" id="L71">    private final HashSet&lt;GattCharacteristic&gt; armed =</span>
+            new HashSet&lt;GattCharacteristic&gt;();
+<span class="fc" id="L73">    private final HashMap&lt;GattCharacteristic, AsyncResource&lt;Boolean&gt;&gt; armOps =</span>
+            new HashMap&lt;GattCharacteristic, AsyncResource&lt;Boolean&gt;&gt;();
+<span class="fc" id="L75">    private int mtu = 23;</span>
+
+    /// Ports construct subclasses; application code receives instances
+    /// from scans and [BluetoothLE].
+<span class="fc" id="L79">    protected BlePeripheral() {</span>
+<span class="fc" id="L80">    }</span>
+
+    // ------------------------------------------------------------------
+    // connection lifecycle
+    // ------------------------------------------------------------------
+
+    /// Connects with default [ConnectionOptions].
+    public final AsyncResource&lt;BlePeripheral&gt; connect() {
+<span class="fc" id="L88">        return connect(new ConnectionOptions());</span>
+    }
+
+    /// Establishes a connection. Resolves with this peripheral once
+    /// connected or fails with a [BluetoothException]. Calling `connect`
+    /// while already [ConnectionState#CONNECTING] returns the existing
+    /// attempt's handle; while [ConnectionState#CONNECTED] it resolves
+    /// immediately.
+    public final AsyncResource&lt;BlePeripheral&gt; connect(ConnectionOptions options) {
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        final ConnectionOptions opts =</span>
+                options == null ? new ConnectionOptions() : options;
+        final AsyncResource&lt;BlePeripheral&gt; out;
+<span class="fc" id="L100">        synchronized (stateLock) {</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            if (state == ConnectionState.CONNECTED) {</span>
+<span class="fc" id="L102">                AsyncResource&lt;BlePeripheral&gt; done =</span>
+                        new AsyncResource&lt;BlePeripheral&gt;();
+<span class="fc" id="L104">                done.complete(this);</span>
+<span class="fc" id="L105">                return done;</span>
+            }
+<span class="pc bpc" id="L107" title="1 of 4 branches missed.">            if (state == ConnectionState.CONNECTING &amp;&amp; pendingConnect != null) {</span>
+<span class="fc" id="L108">                return pendingConnect;</span>
+            }
+<span class="fc" id="L110">            out = new AsyncResource&lt;BlePeripheral&gt;();</span>
+<span class="fc" id="L111">            pendingConnect = out;</span>
+<span class="fc" id="L112">        }</span>
+<span class="fc" id="L113">        out.onResult(new AsyncResult&lt;BlePeripheral&gt;() {</span>
+            @Override
+            public void onReady(BlePeripheral value, Throwable err) {
+<span class="fc" id="L116">                connectFinished(out, err);</span>
+<span class="fc" id="L117">            }</span>
+        });
+<span class="fc" id="L119">        setState(ConnectionState.CONNECTING, null);</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (opts.getTimeout() &gt; 0) {</span>
+<span class="nc" id="L121">            TimerTask t = connectTimeoutTask(out, opts.getTimeout());</span>
+<span class="nc" id="L122">            synchronized (stateLock) {</span>
+<span class="nc" id="L123">                connectTimeout = t;</span>
+<span class="nc" id="L124">                connectTimeoutTimer =</span>
+<span class="nc" id="L125">                        GattOperationQueue.schedule(t, opts.getTimeout());</span>
+<span class="nc" id="L126">            }</span>
+        }
+        try {
+<span class="fc" id="L129">            doConnect(opts, out);</span>
+<span class="nc" id="L130">        } catch (RuntimeException ex) {</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">            if (!out.isDone()) {</span>
+<span class="nc" id="L132">                out.error(new BluetoothException(BluetoothError.CONNECTION_FAILED,</span>
+                        &quot;Connect failed to start: &quot; + ex, ex));
+            }
+<span class="fc" id="L135">        }</span>
+<span class="fc" id="L136">        return out;</span>
+    }
+
+    // Static so the TimerTask doesn't carry a synthetic outer-BlePeripheral
+    // reference (SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static TimerTask connectTimeoutTask(
+            final AsyncResource&lt;BlePeripheral&gt; out, final int timeout) {
+<span class="nc" id="L143">        return new TimerTask() {</span>
+            @Override
+            public void run() {
+<span class="nc bnc" id="L146" title="All 2 branches missed.">                if (!out.isDone()) {</span>
+<span class="nc" id="L147">                    out.error(new BluetoothException(BluetoothError.TIMEOUT,</span>
+                            &quot;Connect attempt timed out after &quot; + timeout
+                                    + &quot;ms&quot;));
+                }
+<span class="nc" id="L151">            }</span>
+        };
+    }
+
+    private void connectFinished(AsyncResource&lt;BlePeripheral&gt; out,
+            Throwable err) {
+<span class="fc" id="L157">        synchronized (stateLock) {</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">            if (pendingConnect == out) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L159">                pendingConnect = null;</span>
+            }
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">            if (connectTimeout != null) {</span>
+<span class="nc" id="L162">                connectTimeout.cancel();</span>
+<span class="nc" id="L163">                connectTimeout = null;</span>
+            }
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">            if (connectTimeoutTimer != null) {</span>
+<span class="nc" id="L166">                connectTimeoutTimer.cancel();</span>
+<span class="nc" id="L167">                connectTimeoutTimer = null;</span>
+            }
+<span class="fc" id="L169">        }</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (err == null) {</span>
+<span class="fc" id="L171">            setState(ConnectionState.CONNECTED, null);</span>
+        } else {
+            // abort a possibly still ongoing platform attempt (timeout or
+            // cancellation path)
+            try {
+<span class="fc" id="L176">                doDisconnect();</span>
+<span class="nc" id="L177">            } catch (RuntimeException ignored) {</span>
+<span class="fc" id="L178">            }</span>
+<span class="fc" id="L179">            setState(ConnectionState.DISCONNECTED, asBluetoothException(err,</span>
+                    BluetoothError.CONNECTION_FAILED));
+        }
+<span class="fc" id="L182">    }</span>
+
+    /// Disconnects. A no-op while already disconnected; an in-flight
+    /// connect attempt is aborted with
+    /// [BluetoothError#USER_CANCELED].
+    public final void disconnect() {
+        AsyncResource&lt;BlePeripheral&gt; pending;
+<span class="fc" id="L189">        synchronized (stateLock) {</span>
+<span class="pc bpc" id="L190" title="1 of 4 branches missed.">            if (state == ConnectionState.DISCONNECTED</span>
+                    || state == ConnectionState.DISCONNECTING) {
+<span class="fc" id="L192">                return;</span>
+            }
+<span class="fc" id="L194">            pending = pendingConnect;</span>
+<span class="fc" id="L195">        }</span>
+<span class="pc bpc" id="L196" title="1 of 4 branches missed.">        if (pending != null &amp;&amp; !pending.isDone()) {</span>
+<span class="fc" id="L197">            pending.error(new BluetoothException(BluetoothError.USER_CANCELED,</span>
+                    &quot;disconnect() called during connect&quot;));
+<span class="fc" id="L199">            return;</span>
+        }
+<span class="fc" id="L201">        setState(ConnectionState.DISCONNECTING, null);</span>
+        try {
+<span class="fc" id="L203">            doDisconnect();</span>
+<span class="nc" id="L204">        } catch (RuntimeException ignored) {</span>
+<span class="fc" id="L205">        }</span>
+<span class="fc" id="L206">    }</span>
+
+    /// The current connection state.
+    public final ConnectionState getConnectionState() {
+<span class="fc" id="L210">        synchronized (stateLock) {</span>
+<span class="fc" id="L211">            return state;</span>
+        }
+    }
+
+    /// Registers a listener notified on the EDT of every connection state
+    /// transition.
+    public final void addConnectionListener(ConnectionListener l) {
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">        if (l == null) {</span>
+<span class="nc" id="L219">            return;</span>
+        }
+<span class="fc" id="L221">        synchronized (stateLock) {</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">            if (connectionListeners == null) {</span>
+<span class="fc" id="L223">                connectionListeners = new ArrayList&lt;ConnectionListener&gt;();</span>
+            }
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">            if (!connectionListeners.contains(l)) {</span>
+<span class="fc" id="L226">                connectionListeners.add(l);</span>
+            }
+<span class="fc" id="L228">        }</span>
+<span class="fc" id="L229">    }</span>
+
+    /// Removes a listener added via
+    /// [#addConnectionListener(ConnectionListener)].
+    public final void removeConnectionListener(ConnectionListener l) {
+<span class="nc" id="L234">        synchronized (stateLock) {</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">            if (connectionListeners != null) {</span>
+<span class="nc" id="L236">                connectionListeners.remove(l);</span>
+            }
+<span class="nc" id="L238">        }</span>
+<span class="nc" id="L239">    }</span>
+
+    // ------------------------------------------------------------------
+    // GATT client
+    // ------------------------------------------------------------------
+
+    /// Discovers the peripheral's services. Resolves with the service list
+    /// (also cached -- see [#getServices()]) or fails with a
+    /// [BluetoothException].
+    public final AsyncResource&lt;List&lt;GattService&gt;&gt; discoverServices() {
+<span class="fc" id="L249">        final AsyncResource&lt;List&lt;GattService&gt;&gt; out =</span>
+                new AsyncResource&lt;List&lt;GattService&gt;&gt;();
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        if (failIfNotConnected(out)) {</span>
+<span class="fc" id="L252">            return out;</span>
+        }
+<span class="fc" id="L254">        out.onResult(new AsyncResult&lt;List&lt;GattService&gt;&gt;() {</span>
+            @Override
+            public void onReady(List&lt;GattService&gt; value, Throwable err) {
+<span class="pc bpc" id="L257" title="2 of 4 branches missed.">                if (err == null &amp;&amp; value != null) {</span>
+<span class="fc" id="L258">                    synchronized (stateLock) {</span>
+<span class="fc" id="L259">                        services = new ArrayList&lt;GattService&gt;(value);</span>
+<span class="fc" id="L260">                    }</span>
+                }
+<span class="fc" id="L262">            }</span>
+        });
+<span class="fc" id="L264">        queue.enqueue(new GattOperationQueue.Op(out) {</span>
+            @Override
+            void start() {
+<span class="fc" id="L267">                doDiscoverServices(out);</span>
+<span class="fc" id="L268">            }</span>
+        });
+<span class="fc" id="L270">        return out;</span>
+    }
+
+    /// The cached service list from the last [#discoverServices()] call;
+    /// empty before discovery.
+    public final List&lt;GattService&gt; getServices() {
+<span class="fc" id="L276">        synchronized (stateLock) {</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">            return services == null</span>
+                    ? new ArrayList&lt;GattService&gt;()
+                    : new ArrayList&lt;GattService&gt;(services);
+        }
+    }
+
+    /// The first cached service with the given UUID, or `null`.
+    public final GattService getService(BluetoothUuid uuid) {
+<span class="fc" id="L285">        List&lt;GattService&gt; list = getServices();</span>
+<span class="fc" id="L286">        int size = list.size();</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        for (int i = 0; i &lt; size; i++) {</span>
+<span class="fc" id="L288">            GattService s = list.get(i);</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">            if (s.getUuid().equals(uuid)) {</span>
+<span class="fc" id="L290">                return s;</span>
+            }
+        }
+<span class="fc" id="L293">        return null;</span>
+    }
+
+    /// Convenience for `getService(service).getCharacteristic(characteristic)`
+    /// that returns `null` instead of throwing when either is absent.
+    public final GattCharacteristic getCharacteristic(BluetoothUuid service,
+            BluetoothUuid characteristic) {
+<span class="fc" id="L300">        GattService s = getService(service);</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        return s == null ? null : s.getCharacteristic(characteristic);</span>
+    }
+
+    /// Reads a characteristic value; prefer the convenience
+    /// [GattCharacteristic#read()].
+    public final AsyncResource&lt;byte[]&gt; readCharacteristic(
+            final GattCharacteristic c) {
+<span class="fc" id="L308">        final AsyncResource&lt;byte[]&gt; out = new AsyncResource&lt;byte[]&gt;();</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">        if (failIfNotConnected(out)) {</span>
+<span class="fc" id="L310">            return out;</span>
+        }
+<span class="fc" id="L312">        queue.enqueue(new GattOperationQueue.Op(out) {</span>
+            @Override
+            void start() {
+<span class="fc" id="L315">                doReadCharacteristic(c, out);</span>
+<span class="fc" id="L316">            }</span>
+        });
+<span class="fc" id="L318">        return out;</span>
+    }
+
+    /// Writes a characteristic value; prefer the convenience
+    /// [GattCharacteristic#write(byte[])] /
+    /// [GattCharacteristic#writeWithoutResponse(byte[])].
+    public final AsyncResource&lt;Boolean&gt; writeCharacteristic(
+            final GattCharacteristic c, final byte[] value,
+            final boolean withResponse) {
+<span class="fc" id="L327">        final AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">        if (failIfNotConnected(out)) {</span>
+<span class="fc" id="L329">            return out;</span>
+        }
+<span class="fc" id="L331">        queue.enqueue(new GattOperationQueue.Op(out) {</span>
+            @Override
+            void start() {
+<span class="fc" id="L334">                doWriteCharacteristic(c, value, withResponse, out);</span>
+<span class="fc" id="L335">            }</span>
+        });
+<span class="fc" id="L337">        return out;</span>
+    }
+
+    /// Reads a descriptor value; prefer the convenience
+    /// [GattDescriptor#read()].
+    public final AsyncResource&lt;byte[]&gt; readDescriptor(final GattDescriptor d) {
+<span class="nc" id="L343">        final AsyncResource&lt;byte[]&gt; out = new AsyncResource&lt;byte[]&gt;();</span>
+<span class="nc bnc" id="L344" title="All 2 branches missed.">        if (failIfNotConnected(out)) {</span>
+<span class="nc" id="L345">            return out;</span>
+        }
+<span class="nc" id="L347">        queue.enqueue(new GattOperationQueue.Op(out) {</span>
+            @Override
+            void start() {
+<span class="nc" id="L350">                doReadDescriptor(d, out);</span>
+<span class="nc" id="L351">            }</span>
+        });
+<span class="nc" id="L353">        return out;</span>
+    }
+
+    /// Writes a descriptor value; prefer the convenience
+    /// [GattDescriptor#write(byte[])].
+    public final AsyncResource&lt;Boolean&gt; writeDescriptor(final GattDescriptor d,
+            final byte[] value) {
+<span class="nc" id="L360">        final AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="nc bnc" id="L361" title="All 2 branches missed.">        if (failIfNotConnected(out)) {</span>
+<span class="nc" id="L362">            return out;</span>
+        }
+<span class="nc" id="L364">        queue.enqueue(new GattOperationQueue.Op(out) {</span>
+            @Override
+            void start() {
+<span class="nc" id="L367">                doWriteDescriptor(d, value, out);</span>
+<span class="nc" id="L368">            }</span>
+        });
+<span class="nc" id="L370">        return out;</span>
+    }
+
+    /// Subscribes a listener to a characteristic's notifications; prefer
+    /// the convenience
+    /// [GattCharacteristic#subscribe(GattNotificationListener)]. The CCCD
+    /// is written only on the transition from zero to one listener.
+    public final AsyncResource&lt;Boolean&gt; subscribe(final GattCharacteristic c,
+            GattNotificationListener l) {
+<span class="fc" id="L379">        final AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        if (l == null) {</span>
+<span class="fc" id="L381">            out.error(new BluetoothException(BluetoothError.UNKNOWN,</span>
+                    &quot;subscribe requires a listener&quot;));
+<span class="fc" id="L383">            return out;</span>
+        }
+<span class="fc bfc" id="L385" title="All 2 branches covered.">        if (failIfNotConnected(out)) {</span>
+<span class="fc" id="L386">            return out;</span>
+        }
+<span class="fc" id="L388">        AsyncResource&lt;Boolean&gt; arm = null;</span>
+<span class="fc" id="L389">        boolean startArm = false;</span>
+<span class="fc" id="L390">        synchronized (subscriptions) {</span>
+<span class="fc" id="L391">            ArrayList&lt;GattNotificationListener&gt; list = subscriptions.get(c);</span>
+<span class="fc bfc" id="L392" title="All 2 branches covered.">            if (list == null) {</span>
+<span class="fc" id="L393">                list = new ArrayList&lt;GattNotificationListener&gt;();</span>
+<span class="fc" id="L394">                subscriptions.put(c, list);</span>
+            }
+<span class="fc bfc" id="L396" title="All 2 branches covered.">            if (!list.contains(l)) {</span>
+<span class="fc" id="L397">                list.add(l);</span>
+            }
+<span class="fc bfc" id="L399" title="All 2 branches covered.">            if (armed.contains(c)) {</span>
+<span class="fc" id="L400">                out.complete(Boolean.TRUE);</span>
+<span class="fc" id="L401">                return out;</span>
+            }
+<span class="fc" id="L403">            arm = armOps.get(c);</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">            if (arm == null) {</span>
+<span class="fc" id="L405">                arm = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="fc" id="L406">                armOps.put(c, arm);</span>
+<span class="fc" id="L407">                startArm = true;</span>
+            }
+<span class="fc" id="L409">        }</span>
+<span class="fc" id="L410">        arm.addListener(out);</span>
+<span class="fc bfc" id="L411" title="All 2 branches covered.">        if (startArm) {</span>
+<span class="fc" id="L412">            final AsyncResource&lt;Boolean&gt; armRes = arm;</span>
+<span class="fc" id="L413">            arm.onResult(new AsyncResult&lt;Boolean&gt;() {</span>
+                @Override
+                public void onReady(Boolean value, Throwable err) {
+<span class="fc" id="L416">                    synchronized (subscriptions) {</span>
+<span class="fc" id="L417">                        armOps.remove(c);</span>
+<span class="fc bfc" id="L418" title="All 2 branches covered.">                        if (err == null) {</span>
+<span class="fc" id="L419">                            armed.add(c);</span>
+                        }
+<span class="fc" id="L421">                    }</span>
+<span class="fc" id="L422">                    checkDisarm(c);</span>
+<span class="fc" id="L423">                }</span>
+            });
+<span class="pc bpc" id="L425" title="1 of 4 branches missed.">            final boolean indication = !c.canNotify() &amp;&amp; c.canIndicate();</span>
+<span class="fc" id="L426">            queue.enqueue(new GattOperationQueue.Op(armRes) {</span>
+                @Override
+                void start() {
+<span class="fc" id="L429">                    doSetNotifications(c, true, indication, armRes);</span>
+<span class="fc" id="L430">                }</span>
+            });
+        }
+<span class="fc" id="L433">        return out;</span>
+    }
+
+    /// Removes a notification listener; prefer the convenience
+    /// [GattCharacteristic#unsubscribe(GattNotificationListener)]. The
+    /// CCCD is disarmed when the last listener is removed.
+    public final AsyncResource&lt;Boolean&gt; unsubscribe(GattCharacteristic c,
+            GattNotificationListener l) {
+<span class="fc" id="L441">        synchronized (subscriptions) {</span>
+<span class="fc" id="L442">            ArrayList&lt;GattNotificationListener&gt; list = subscriptions.get(c);</span>
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">            if (list != null) {</span>
+<span class="fc" id="L444">                list.remove(l);</span>
+<span class="fc bfc" id="L445" title="All 2 branches covered.">                if (list.isEmpty()) {</span>
+<span class="fc" id="L446">                    subscriptions.remove(c);</span>
+                }
+            }
+<span class="fc" id="L449">        }</span>
+<span class="fc" id="L450">        return checkDisarm(c);</span>
+    }
+
+    /// `true` while notifications are armed for the characteristic.
+    public final boolean isSubscribed(GattCharacteristic c) {
+<span class="fc" id="L455">        synchronized (subscriptions) {</span>
+<span class="fc" id="L456">            return armed.contains(c);</span>
+        }
+    }
+
+    private AsyncResource&lt;Boolean&gt; checkDisarm(final GattCharacteristic c) {
+<span class="fc" id="L461">        final AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+        boolean needDisarm;
+<span class="fc" id="L463">        synchronized (subscriptions) {</span>
+<span class="fc" id="L464">            boolean hasListeners = subscriptions.containsKey(c);</span>
+<span class="fc" id="L465">            boolean armInFlight = armOps.containsKey(c);</span>
+<span class="pc bpc" id="L466" title="2 of 6 branches missed.">            needDisarm = !hasListeners &amp;&amp; !armInFlight &amp;&amp; armed.contains(c);</span>
+<span class="fc bfc" id="L467" title="All 2 branches covered.">            if (needDisarm) {</span>
+<span class="fc" id="L468">                armed.remove(c);</span>
+            }
+<span class="fc" id="L470">        }</span>
+<span class="fc bfc" id="L471" title="All 2 branches covered.">        if (!needDisarm) {</span>
+<span class="fc" id="L472">            out.complete(Boolean.TRUE);</span>
+<span class="fc" id="L473">            return out;</span>
+        }
+<span class="pc bpc" id="L475" title="1 of 2 branches missed.">        if (getConnectionState() != ConnectionState.CONNECTED) {</span>
+<span class="nc" id="L476">            out.complete(Boolean.TRUE);</span>
+<span class="nc" id="L477">            return out;</span>
+        }
+<span class="pc bpc" id="L479" title="3 of 4 branches missed.">        final boolean indication = !c.canNotify() &amp;&amp; c.canIndicate();</span>
+<span class="fc" id="L480">        queue.enqueue(new GattOperationQueue.Op(out) {</span>
+            @Override
+            void start() {
+<span class="fc" id="L483">                doSetNotifications(c, false, indication, out);</span>
+<span class="fc" id="L484">            }</span>
+        });
+<span class="fc" id="L486">        return out;</span>
+    }
+
+    /// Reads the current RSSI of the connection.
+    public final AsyncResource&lt;Integer&gt; readRssi() {
+<span class="fc" id="L491">        final AsyncResource&lt;Integer&gt; out = new AsyncResource&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L492" title="All 2 branches covered.">        if (failIfNotConnected(out)) {</span>
+<span class="fc" id="L493">            return out;</span>
+        }
+<span class="fc" id="L495">        queue.enqueue(new GattOperationQueue.Op(out) {</span>
+            @Override
+            void start() {
+<span class="fc" id="L498">                doReadRssi(out);</span>
+<span class="fc" id="L499">            }</span>
+        });
+<span class="fc" id="L501">        return out;</span>
+    }
+
+    /// Requests an MTU; resolves with the granted value (which may be
+    /// smaller). iOS negotiates the MTU itself -- there the request
+    /// resolves immediately with the current value.
+    public final AsyncResource&lt;Integer&gt; requestMtu(final int mtu) {
+<span class="fc" id="L508">        final AsyncResource&lt;Integer&gt; out = new AsyncResource&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L509" title="All 2 branches covered.">        if (failIfNotConnected(out)) {</span>
+<span class="fc" id="L510">            return out;</span>
+        }
+<span class="fc" id="L512">        out.onResult(new AsyncResult&lt;Integer&gt;() {</span>
+            @Override
+            public void onReady(Integer value, Throwable err) {
+<span class="pc bpc" id="L515" title="2 of 4 branches missed.">                if (err == null &amp;&amp; value != null) {</span>
+<span class="fc" id="L516">                    BlePeripheral.this.mtu = value.intValue();</span>
+                }
+<span class="fc" id="L518">            }</span>
+        });
+<span class="fc" id="L520">        queue.enqueue(new GattOperationQueue.Op(out) {</span>
+            @Override
+            void start() {
+<span class="fc" id="L523">                doRequestMtu(mtu, out);</span>
+<span class="fc" id="L524">            }</span>
+        });
+<span class="fc" id="L526">        return out;</span>
+    }
+
+    /// The current MTU of the connection; `23` (the BLE default) until a
+    /// larger value was negotiated.
+    public final int getMtu() {
+<span class="fc" id="L532">        return mtu;</span>
+    }
+
+    /// Requests a connection-interval preference; a successful no-op on
+    /// platforms that manage intervals themselves (iOS).
+    public final AsyncResource&lt;Boolean&gt; requestConnectionPriority(
+            final ConnectionPriority priority) {
+<span class="nc" id="L539">        final AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="nc bnc" id="L540" title="All 2 branches missed.">        if (failIfNotConnected(out)) {</span>
+<span class="nc" id="L541">            return out;</span>
+        }
+<span class="nc" id="L543">        queue.enqueue(new GattOperationQueue.Op(out) {</span>
+            @Override
+            void start() {
+<span class="nc" id="L546">                doRequestConnectionPriority(priority, out);</span>
+<span class="nc" id="L547">            }</span>
+        });
+<span class="nc" id="L549">        return out;</span>
+    }
+
+    /// Initiates bonding/pairing. On iOS bonding is OS-managed (triggered
+    /// by encrypted characteristics), so the request resolves `true`
+    /// without user interaction.
+    public final AsyncResource&lt;Boolean&gt; createBond() {
+<span class="nc" id="L556">        final AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="nc" id="L557">        queue.enqueue(new GattOperationQueue.Op(out) {</span>
+            @Override
+            void start() {
+<span class="nc" id="L560">                doCreateBond(out);</span>
+<span class="nc" id="L561">            }</span>
+        });
+<span class="nc" id="L563">        return out;</span>
+    }
+
+    /// Opens an L2CAP connection-oriented channel to the given PSM. Not
+    /// serialized with GATT operations. On Android this establishes its
+    /// own link and does not require [#connect()] first; on iOS the
+    /// peripheral must be connected.
+    public final AsyncResource&lt;L2capChannel&gt; openL2capChannel(int psm,
+            boolean secure) {
+<span class="nc" id="L572">        final AsyncResource&lt;L2capChannel&gt; out =</span>
+                new AsyncResource&lt;L2capChannel&gt;();
+        try {
+<span class="nc" id="L575">            doOpenL2cap(psm, secure, out);</span>
+<span class="nc" id="L576">        } catch (RuntimeException ex) {</span>
+<span class="nc bnc" id="L577" title="All 2 branches missed.">            if (!out.isDone()) {</span>
+<span class="nc" id="L578">                out.error(new BluetoothException(BluetoothError.IO_ERROR,</span>
+                        &quot;L2CAP open failed: &quot; + ex, ex));
+            }
+<span class="nc" id="L581">        }</span>
+<span class="nc" id="L582">        return out;</span>
+    }
+
+    // ------------------------------------------------------------------
+    // port SPI -- one queued operation is in flight at a time
+    // ------------------------------------------------------------------
+
+    /// Establishes the platform connection and completes/fails `out`.
+    protected abstract void doConnect(ConnectionOptions options,
+            AsyncResource&lt;BlePeripheral&gt; out);
+
+    /// Tears down the platform connection;
+    /// [#fireConnectionStateChanged(ConnectionState, BluetoothException)]
+    /// reports the resulting `DISCONNECTED` transition.
+    protected abstract void doDisconnect();
+
+    /// Performs service discovery and completes `out` with the discovered
+    /// [GattService] list (constructed via the public gatt-package
+    /// constructors).
+    protected abstract void doDiscoverServices(
+            AsyncResource&lt;List&lt;GattService&gt;&gt; out);
+
+    /// Reads a characteristic and completes `out` with its value.
+    protected abstract void doReadCharacteristic(GattCharacteristic c,
+            AsyncResource&lt;byte[]&gt; out);
+
+    /// Writes a characteristic and completes `out` once acknowledged
+    /// (`withResponse`) or queued to the controller.
+    protected abstract void doWriteCharacteristic(GattCharacteristic c,
+            byte[] value, boolean withResponse, AsyncResource&lt;Boolean&gt; out);
+
+    /// Reads a descriptor and completes `out` with its value.
+    protected abstract void doReadDescriptor(GattDescriptor d,
+            AsyncResource&lt;byte[]&gt; out);
+
+    /// Writes a descriptor and completes `out` once acknowledged.
+    protected abstract void doWriteDescriptor(GattDescriptor d, byte[] value,
+            AsyncResource&lt;Boolean&gt; out);
+
+    /// Arms or disarms notifications/indications (including the CCCD
+    /// write) and completes `out` once done.
+    protected abstract void doSetNotifications(GattCharacteristic c,
+            boolean enable, boolean indication, AsyncResource&lt;Boolean&gt; out);
+
+    /// Reads the connection RSSI and completes `out`.
+    protected abstract void doReadRssi(AsyncResource&lt;Integer&gt; out);
+
+    /// Requests an MTU and completes `out` with the granted value.
+    protected abstract void doRequestMtu(int mtu, AsyncResource&lt;Integer&gt; out);
+
+    /// Requests a connection-interval preference and completes `out`.
+    protected abstract void doRequestConnectionPriority(
+            ConnectionPriority priority, AsyncResource&lt;Boolean&gt; out);
+
+    /// Initiates bonding and completes `out` when the bond state settles.
+    protected abstract void doCreateBond(AsyncResource&lt;Boolean&gt; out);
+
+    /// Opens an L2CAP channel and completes `out` with it. Called
+    /// directly (not through the operation queue).
+    protected abstract void doOpenL2cap(int psm, boolean secure,
+            AsyncResource&lt;L2capChannel&gt; out);
+
+    // ------------------------------------------------------------------
+    // port event entry points -- safe to call from any thread
+    // ------------------------------------------------------------------
+
+    /// Reports an (unsolicited) connection state transition -- link loss,
+    /// remote disconnect, or connection established outside a pending
+    /// connect call. `reason` is `null` for app-requested transitions.
+    protected final void fireConnectionStateChanged(ConnectionState newState,
+            BluetoothException reason) {
+<span class="fc" id="L653">        setState(newState, reason);</span>
+<span class="fc" id="L654">    }</span>
+
+    /// Delivers a notification/indication value to the subscribed
+    /// listeners on the EDT. Ports must pass the canonical
+    /// [GattCharacteristic] instance from the discovered database.
+    protected final void fireNotification(final GattCharacteristic c,
+            final byte[] value) {
+        final Object[] snapshot;
+<span class="fc" id="L662">        synchronized (subscriptions) {</span>
+<span class="fc" id="L663">            ArrayList&lt;GattNotificationListener&gt; list = subscriptions.get(c);</span>
+<span class="pc bpc" id="L664" title="2 of 4 branches missed.">            if (list == null || list.isEmpty()) {</span>
+<span class="nc" id="L665">                return;</span>
+            }
+<span class="fc" id="L667">            snapshot = list.toArray();</span>
+<span class="fc" id="L668">        }</span>
+<span class="fc" id="L669">        dispatchNotification(snapshot, c, value);</span>
+<span class="fc" id="L670">    }</span>
+
+    // The dispatch helpers are static so their Runnables don't carry a
+    // synthetic outer-BlePeripheral reference (SpotBugs
+    // SIC_INNER_SHOULD_BE_STATIC_ANON).
+    private static void dispatchNotification(final Object[] snapshot,
+            final GattCharacteristic c, final byte[] value) {
+<span class="fc" id="L677">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc bfc" id="L680" title="All 2 branches covered.">                for (Object listener : snapshot) {</span>
+<span class="fc" id="L681">                    ((GattNotificationListener) listener)</span>
+<span class="fc" id="L682">                            .valueChanged(c, value);</span>
+                }
+<span class="fc" id="L684">            }</span>
+        });
+<span class="fc" id="L686">    }</span>
+
+    /// Invalidates the cached service database (iOS
+    /// `didModifyServices`); the app should re-run
+    /// [#discoverServices()].
+    protected final void fireServicesInvalidated() {
+<span class="fc" id="L692">        synchronized (stateLock) {</span>
+<span class="fc" id="L693">            services = null;</span>
+<span class="fc" id="L694">        }</span>
+<span class="fc" id="L695">    }</span>
+
+    /// Adjusts the safety timeout applied to each queued GATT operation
+    /// (default 30000ms; `0` disables).
+    protected final void setOperationTimeout(int millis) {
+<span class="fc" id="L700">        queue.setTimeoutMillis(millis);</span>
+<span class="fc" id="L701">    }</span>
+
+    /// Records the negotiated MTU -- for ports whose platform reports MTU
+    /// changes outside a [#requestMtu(int)] call.
+    protected final void setMtu(int mtu) {
+<span class="nc" id="L706">        this.mtu = mtu;</span>
+<span class="nc" id="L707">    }</span>
+
+    // ------------------------------------------------------------------
+    // internals
+    // ------------------------------------------------------------------
+
+    private void setState(ConnectionState newState, BluetoothException reason) {
+<span class="fc" id="L714">        AsyncResource&lt;BlePeripheral&gt; pending = null;</span>
+        final Object[] snapshot;
+<span class="fc" id="L716">        synchronized (stateLock) {</span>
+<span class="fc bfc" id="L717" title="All 2 branches covered.">            if (state == newState) {</span>
+<span class="fc" id="L718">                return;</span>
+            }
+<span class="fc" id="L720">            state = newState;</span>
+<span class="fc bfc" id="L721" title="All 4 branches covered.">            if (newState == ConnectionState.CONNECTED</span>
+                    || newState == ConnectionState.DISCONNECTED) {
+<span class="fc" id="L723">                pending = pendingConnect;</span>
+            }
+<span class="fc bfc" id="L725" title="All 2 branches covered.">            snapshot = connectionListeners == null</span>
+<span class="pc bpc" id="L726" title="1 of 2 branches missed.">                    || connectionListeners.isEmpty()</span>
+<span class="fc" id="L727">                    ? null : connectionListeners.toArray();</span>
+<span class="fc" id="L728">        }</span>
+<span class="fc bfc" id="L729" title="All 2 branches covered.">        if (newState == ConnectionState.DISCONNECTED) {</span>
+<span class="fc bfc" id="L730" title="All 2 branches covered.">            BluetoothException failReason = reason != null ? reason</span>
+                    : new BluetoothException(BluetoothError.NOT_CONNECTED,
+                            &quot;Peripheral disconnected&quot;);
+<span class="fc" id="L733">            queue.failAll(failReason);</span>
+<span class="fc" id="L734">            synchronized (subscriptions) {</span>
+<span class="fc" id="L735">                armed.clear();</span>
+<span class="fc" id="L736">            }</span>
+<span class="pc bpc" id="L737" title="3 of 4 branches missed.">            if (pending != null &amp;&amp; !pending.isDone()) {</span>
+<span class="nc bnc" id="L738" title="All 2 branches missed.">                pending.error(reason != null ? reason</span>
+                        : new BluetoothException(
+                                BluetoothError.CONNECTION_FAILED,
+                                &quot;Disconnected while connecting&quot;));
+            }
+<span class="fc bfc" id="L743" title="All 2 branches covered.">        } else if (newState == ConnectionState.CONNECTED) {</span>
+<span class="pc bpc" id="L744" title="1 of 4 branches missed.">            if (pending != null &amp;&amp; !pending.isDone()) {</span>
+<span class="fc" id="L745">                pending.complete(this);</span>
+            }
+        }
+<span class="fc bfc" id="L748" title="All 2 branches covered.">        if (snapshot != null) {</span>
+<span class="fc" id="L749">            dispatchConnectionEvent(snapshot,</span>
+                    new ConnectionEvent(this, newState, reason));
+        }
+<span class="fc" id="L752">    }</span>
+
+    private static void dispatchConnectionEvent(final Object[] snapshot,
+            final ConnectionEvent ev) {
+<span class="fc" id="L756">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc bfc" id="L759" title="All 2 branches covered.">                for (Object listener : snapshot) {</span>
+<span class="fc" id="L760">                    ((ConnectionListener) listener)</span>
+<span class="fc" id="L761">                            .connectionStateChanged(ev);</span>
+                }
+<span class="fc" id="L763">            }</span>
+        });
+<span class="fc" id="L765">    }</span>
+
+    private boolean failIfNotConnected(AsyncResource&lt;?&gt; out) {
+<span class="fc bfc" id="L768" title="All 2 branches covered.">        if (getConnectionState() != ConnectionState.CONNECTED) {</span>
+<span class="fc" id="L769">            out.error(new BluetoothException(BluetoothError.NOT_CONNECTED,</span>
+                    &quot;Peripheral is not connected&quot;));
+<span class="fc" id="L771">            return true;</span>
+        }
+<span class="fc" id="L773">        return false;</span>
+    }
+
+    private static BluetoothException asBluetoothException(Throwable t,
+            BluetoothError fallback) {
+<span class="fc bfc" id="L778" title="All 2 branches covered.">        if (t instanceof BluetoothException) {</span>
+<span class="fc" id="L779">            return (BluetoothException) t;</span>
+        }
+<span class="pc bpc" id="L781" title="1 of 2 branches missed.">        return new BluetoothException(fallback,</span>
+<span class="fc" id="L782">                t == null ? null : t.toString(), t);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

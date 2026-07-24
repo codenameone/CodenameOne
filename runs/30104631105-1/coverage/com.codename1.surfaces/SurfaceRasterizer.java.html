@@ -1,0 +1,1276 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SurfaceRasterizer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.surfaces</a> &gt; <span class="el_source">SurfaceRasterizer.java</span></div><h1>SurfaceRasterizer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.surfaces;
+
+import com.codename1.io.Log;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.Stroke;
+import com.codename1.ui.geom.GeneralPath;
+
+import java.io.ByteArrayInputStream;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A shared software renderer for desktop ports (the JavaSE simulator, the native Windows and
+/// Linux ports): draws a parsed surface descriptor node into a mutable Codename One `Image` using
+/// only `Graphics` primitives -- no `Container`/`Label` components and no theme dependence, so the
+/// output looks the same on every desktop surface. Must run on the EDT (it creates images and
+/// measures fonts).
+///
+/// The input is the wire format produced by `SurfaceSerializer` parsed back with
+/// `com.codename1.io.JSONParser` -- numbers may arrive as `Double` or `Long`, both are handled.
+/// Alongside the pixels the rasterizer returns the absolute hit rectangles of every node carrying
+/// an `action`, plus the epoch time when a re-render is due for time-driven content (countdowns,
+/// clocks, date-interval progress).
+public final class SurfaceRasterizer {
+    /// Rendering fidelity note: image `tint` is intentionally not applied by this preview
+    /// rasterizer -- template-image tinting requires per-pixel masking that core `Graphics`
+    /// primitives do not offer cheaply. The image renders untinted, which is acceptable preview
+    /// fidelity for desktop surfaces; mobile platforms tint natively.
+    private static final int ROLE_LABEL_LIGHT = 0xff1c1c1e;
+    private static final int ROLE_LABEL_DARK = 0xffffffff;
+    // solid approximations of the translucent iOS secondary label colors, avoiding
+    // alpha-blend complexity in the preview
+    private static final int ROLE_SECONDARY_LIGHT = 0xff6c6c70;
+    private static final int ROLE_SECONDARY_DARK = 0xffaeaeb2;
+    private static final int ROLE_BACKGROUND_LIGHT = 0xffffffff;
+    private static final int ROLE_BACKGROUND_DARK = 0xff1c1c1e;
+    private static final int ROLE_ACCENT = 0xff007aff;
+
+    private static final int DEFAULT_FONT_SIZE = 14;
+    private static final long MINUTE_MILLIS = 60000L;
+<span class="fc" id="L68">    private static final String[] MONTHS = {</span>
+        &quot;Jan&quot;, &quot;Feb&quot;, &quot;Mar&quot;, &quot;Apr&quot;, &quot;May&quot;, &quot;Jun&quot;,
+        &quot;Jul&quot;, &quot;Aug&quot;, &quot;Sep&quot;, &quot;Oct&quot;, &quot;Nov&quot;, &quot;Dec&quot;
+    };
+
+    /// Decoded PNGs keyed by their content-hash wire name; the name uniquely identifies the bytes
+    /// so entries never go stale. Trimmed when it grows past a small cap.
+<span class="fc" id="L75">    private static final Map&lt;String, Image&gt; decodedImages = new HashMap&lt;String, Image&gt;();</span>
+    private static final int DECODED_IMAGE_CACHE_CAP = 48;
+
+    private SurfaceRasterizer() {
+    }
+
+    /// The absolute bounds of a node that carries a tap action, in pixels of the rasterized image.
+    public static class ActionRect {
+        private final int x;
+        private final int y;
+        private final int width;
+        private final int height;
+        private final String actionId;
+        private final Map&lt;String, Object&gt; params;
+
+        ActionRect(int x, int y, int width, int height, String actionId,
+<span class="nc" id="L91">                Map&lt;String, Object&gt; params) {</span>
+<span class="nc" id="L92">            this.x = x;</span>
+<span class="nc" id="L93">            this.y = y;</span>
+<span class="nc" id="L94">            this.width = width;</span>
+<span class="nc" id="L95">            this.height = height;</span>
+<span class="nc" id="L96">            this.actionId = actionId;</span>
+<span class="nc" id="L97">            this.params = params;</span>
+<span class="nc" id="L98">        }</span>
+
+        /// Returns the left edge in pixels.
+        public int getX() {
+<span class="nc" id="L102">            return x;</span>
+        }
+
+        /// Returns the top edge in pixels.
+        public int getY() {
+<span class="nc" id="L107">            return y;</span>
+        }
+
+        /// Returns the width in pixels.
+        public int getWidth() {
+<span class="nc" id="L112">            return width;</span>
+        }
+
+        /// Returns the height in pixels.
+        public int getHeight() {
+<span class="nc" id="L117">            return height;</span>
+        }
+
+        /// Returns the app-defined action id.
+        public String getActionId() {
+<span class="nc" id="L122">            return actionId;</span>
+        }
+
+        /// Returns the action parameters, or null.
+        public Map&lt;String, Object&gt; getParams() {
+<span class="nc" id="L127">            return params;</span>
+        }
+    }
+
+    /// The output of a rasterization pass: pixels, action hit rectangles and the next re-render
+    /// deadline.
+    public static class Result {
+        private final Image image;
+        private final int[] argb;
+        private final List&lt;ActionRect&gt; actions;
+        private final long nextTickMillis;
+
+<span class="nc" id="L139">        Result(Image image, int[] argb, List&lt;ActionRect&gt; actions, long nextTickMillis) {</span>
+<span class="nc" id="L140">            this.image = image;</span>
+<span class="nc" id="L141">            this.argb = argb;</span>
+<span class="nc" id="L142">            this.actions = actions;</span>
+<span class="nc" id="L143">            this.nextTickMillis = nextTickMillis;</span>
+<span class="nc" id="L144">        }</span>
+
+        /// Returns the rasterized image.
+        public Image getImage() {
+<span class="nc" id="L148">            return image;</span>
+        }
+
+        /// Returns the width*height ARGB pixels of the rasterized image.
+        public int[] getArgb() {
+<span class="nc" id="L153">            return argb;</span>
+        }
+
+        /// Returns the hit rectangles of every node that carries an action, in image pixels.
+        public List&lt;ActionRect&gt; getActions() {
+<span class="nc" id="L158">            return actions;</span>
+        }
+
+        /// Returns 0 when the content is static; otherwise the epoch millis when a re-render is
+        /// due -- a one second cadence while a timer countdown or a date-interval progress is
+        /// visible, the next minute boundary for clock and relative text.
+        public long getNextTickMillis() {
+<span class="nc" id="L165">            return nextTickMillis;</span>
+        }
+    }
+
+    /// Rasterizes a descriptor node into a transparent image of the requested size. Must run on
+    /// the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: a parsed descriptor node map as produced by the serializer and parsed back with
+    ///   `com.codename1.io.JSONParser`
+    /// - `state`: the current entry's state map, may be null
+    /// - `images`: PNG blobs keyed by wire name, may be null
+    /// - `width`: target width in pixels
+    /// - `height`: target height in pixels
+    /// - `dark`: true to resolve dark-mode colors
+    /// - `now`: the current epoch millis used for dynamic text and interval progress
+    ///
+    /// #### Returns
+    ///
+    /// the rasterization result
+    public static Result rasterize(Map&lt;String, Object&gt; node, Map&lt;String, Object&gt; state,
+            Map&lt;String, byte[]&gt; images, int width, int height, boolean dark, long now) {
+<span class="nc" id="L188">        Image target = Image.createImage(width, height, 0);</span>
+<span class="nc" id="L189">        List&lt;ActionRect&gt; actions = new ArrayList&lt;ActionRect&gt;();</span>
+<span class="nc" id="L190">        long[] tick = new long[1];</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (node != null) {</span>
+<span class="nc" id="L192">            LNode root = build(node);</span>
+<span class="nc" id="L193">            measure(root, state, images, now);</span>
+<span class="nc" id="L194">            arrange(root, 0, 0, width, height);</span>
+<span class="nc" id="L195">            Graphics g = target.getGraphics();</span>
+<span class="nc" id="L196">            draw(g, root, state, images, dark, now, actions, tick);</span>
+        }
+<span class="nc" id="L198">        return new Result(target, target.getRGB(), actions, tick[0]);</span>
+    }
+
+    // --- timeline helpers shared by all desktop ports -------------------------
+
+    /// Returns the timeline entry whose date most recently passed, or the first entry when none
+    /// passed yet, or null for an entry-less document.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timelineDoc`: a parsed timeline JSON document
+    /// - `now`: the current epoch millis
+    ///
+    /// #### Returns
+    ///
+    /// the active entry map (`date`, `state`), or null
+    public static Map&lt;String, Object&gt; currentEntry(Map&lt;String, Object&gt; timelineDoc, long now) {
+<span class="fc" id="L215">        List&lt;Map&lt;String, Object&gt;&gt; entries = entriesOf(timelineDoc);</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        if (entries.isEmpty()) {</span>
+<span class="fc" id="L217">            return null;</span>
+        }
+<span class="fc" id="L219">        Map&lt;String, Object&gt; current = null;</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        for (Map&lt;String, Object&gt; e : entries) {</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">            if (asLong(e.get(&quot;date&quot;), 0) &lt;= now) {</span>
+<span class="fc" id="L222">                current = e;</span>
+            }
+<span class="fc" id="L224">        }</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        if (current == null) {</span>
+<span class="fc" id="L226">            current = entries.get(0);</span>
+        }
+<span class="fc" id="L228">        return current;</span>
+    }
+
+    /// Returns the epoch millis of the next entry flip after `now`, or 0 when no future entry
+    /// exists.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timelineDoc`: a parsed timeline JSON document
+    /// - `now`: the current epoch millis
+    ///
+    /// #### Returns
+    ///
+    /// the next flip time, or 0
+    public static long nextEntryFlip(Map&lt;String, Object&gt; timelineDoc, long now) {
+<span class="fc" id="L243">        long next = 0;</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        for (Map&lt;String, Object&gt; e : entriesOf(timelineDoc)) {</span>
+<span class="fc" id="L245">            long date = asLong(e.get(&quot;date&quot;), 0);</span>
+<span class="pc bpc" id="L246" title="1 of 6 branches missed.">            if (date &gt; now &amp;&amp; (next == 0 || date &lt; next)) {</span>
+<span class="fc" id="L247">                next = date;</span>
+            }
+<span class="fc" id="L249">        }</span>
+<span class="fc" id="L250">        return next;</span>
+    }
+
+    /// Picks the layout of a timeline document for a size name (`small` / `medium` / `large` /
+    /// `lockscreen`): the explicit per-size layout when present, else the `default` layout, else
+    /// null.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timelineDoc`: a parsed timeline JSON document
+    /// - `sizeName`: the wire-format size name
+    ///
+    /// #### Returns
+    ///
+    /// the layout's root node map, or null
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public static Map&lt;String, Object&gt; layoutForSize(Map&lt;String, Object&gt; timelineDoc,
+            String sizeName) {
+<span class="fc bfc" id="L268" title="All 2 branches covered.">        if (timelineDoc == null) {</span>
+<span class="fc" id="L269">            return null;</span>
+        }
+<span class="fc" id="L271">        Object layoutsObj = timelineDoc.get(&quot;layouts&quot;);</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (!(layoutsObj instanceof Map)) {</span>
+<span class="fc" id="L273">            return null;</span>
+        }
+<span class="fc" id="L275">        Map&lt;String, Object&gt; layouts = (Map&lt;String, Object&gt;) layoutsObj;</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        Object layout = sizeName == null ? null : layouts.get(sizeName);</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        if (!(layout instanceof Map)) {</span>
+<span class="fc" id="L278">            layout = layouts.get(&quot;default&quot;);</span>
+        }
+<span class="fc bfc" id="L280" title="All 2 branches covered.">        return layout instanceof Map ? (Map&lt;String, Object&gt;) layout : null;</span>
+    }
+
+    // --- dynamic text ----------------------------------------------------------
+
+    /// Formats a dynamic-text value the way the OS-native views would show it. Package-private so
+    /// unit tests can cover the formatting without a `Display`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`: the wire style name (`timerDown`, `timerUp`, `time`, `date`, `relative`)
+    /// - `dateMillis`: the target epoch millis
+    /// - `now`: the current epoch millis
+    static String formatDynamicText(String style, long dateMillis, long now) {
+<span class="fc bfc" id="L294" title="All 2 branches covered.">        if (&quot;timerUp&quot;.equals(style)) {</span>
+<span class="fc" id="L295">            return formatTimer(now - dateMillis);</span>
+        }
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (&quot;time&quot;.equals(style)) {</span>
+<span class="fc" id="L298">            Calendar c = Calendar.getInstance();</span>
+<span class="fc" id="L299">            c.setTime(new Date(dateMillis));</span>
+<span class="fc" id="L300">            int hour = c.get(Calendar.HOUR);</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">            if (hour == 0) {</span>
+<span class="fc" id="L302">                hour = 12;</span>
+            }
+<span class="fc" id="L304">            int minute = c.get(Calendar.MINUTE);</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">            String ampm = c.get(Calendar.AM_PM) == Calendar.AM ? &quot;AM&quot; : &quot;PM&quot;;</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">            return hour + &quot;:&quot; + (minute &lt; 10 ? &quot;0&quot; : &quot;&quot;) + minute + &quot; &quot; + ampm;</span>
+        }
+<span class="fc bfc" id="L308" title="All 2 branches covered.">        if (&quot;date&quot;.equals(style)) {</span>
+<span class="fc" id="L309">            Calendar c = Calendar.getInstance();</span>
+<span class="fc" id="L310">            c.setTime(new Date(dateMillis));</span>
+<span class="fc" id="L311">            return MONTHS[c.get(Calendar.MONTH)] + &quot; &quot; + c.get(Calendar.DAY_OF_MONTH);</span>
+        }
+<span class="fc bfc" id="L313" title="All 2 branches covered.">        if (&quot;relative&quot;.equals(style)) {</span>
+<span class="fc" id="L314">            return formatRelative(dateMillis, now);</span>
+        }
+        // timerDown is the default style
+<span class="fc" id="L317">        return formatTimer(dateMillis - now);</span>
+    }
+
+    private static String formatTimer(long millis) {
+<span class="fc" id="L321">        long total = millis / 1000;</span>
+<span class="fc bfc" id="L322" title="All 2 branches covered.">        if (total &lt; 0) {</span>
+<span class="fc" id="L323">            total = 0;</span>
+        }
+<span class="fc" id="L325">        long hours = total / 3600;</span>
+<span class="fc" id="L326">        long minutes = (total % 3600) / 60;</span>
+<span class="fc" id="L327">        long seconds = total % 60;</span>
+<span class="fc" id="L328">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">        if (hours &gt; 0) {</span>
+<span class="fc" id="L330">            sb.append(hours).append(':');</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">            if (minutes &lt; 10) {</span>
+<span class="fc" id="L332">                sb.append('0');</span>
+            }
+        }
+<span class="fc" id="L335">        sb.append(minutes).append(':');</span>
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">        if (seconds &lt; 10) {</span>
+<span class="fc" id="L337">            sb.append('0');</span>
+        }
+<span class="fc" id="L339">        sb.append(seconds);</span>
+<span class="fc" id="L340">        return sb.toString();</span>
+    }
+
+    private static String formatRelative(long dateMillis, long now) {
+<span class="fc" id="L344">        long diff = dateMillis - now;</span>
+<span class="fc bfc" id="L345" title="All 2 branches covered.">        boolean future = diff &gt;= 0;</span>
+<span class="fc" id="L346">        long minutes = Math.abs(diff) / MINUTE_MILLIS;</span>
+        String amount;
+<span class="fc bfc" id="L348" title="All 2 branches covered.">        if (minutes &lt; 60) {</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">            if (minutes &lt; 1) {</span>
+<span class="fc" id="L350">                return &quot;now&quot;;</span>
+            }
+<span class="fc" id="L352">            amount = minutes + &quot; min&quot;;</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">        } else if (minutes &lt; 24 * 60) {</span>
+<span class="fc" id="L354">            amount = (minutes / 60) + &quot; hr&quot;;</span>
+        } else {
+<span class="fc" id="L356">            long days = minutes / (24 * 60);</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">            amount = days + (days == 1 ? &quot; day&quot; : &quot; days&quot;);</span>
+        }
+<span class="fc bfc" id="L359" title="All 2 branches covered.">        return future ? &quot;in &quot; + amount : amount + &quot; ago&quot;;</span>
+    }
+
+    // --- internal layout tree --------------------------------------------------
+
+    private static final class LNode {
+        Map&lt;String, Object&gt; map;
+        String type;
+        List&lt;LNode&gt; children;
+        int prefW;
+        int prefH;
+        int x;
+        int y;
+        int w;
+        int h;
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static LNode build(Map&lt;String, Object&gt; map) {
+<span class="nc" id="L378">        LNode n = new LNode();</span>
+<span class="nc" id="L379">        n.map = map;</span>
+<span class="nc" id="L380">        Object t = map.get(&quot;t&quot;);</span>
+<span class="nc bnc" id="L381" title="All 2 branches missed.">        n.type = t instanceof String ? (String) t : &quot;box&quot;;</span>
+<span class="nc" id="L382">        n.children = new ArrayList&lt;LNode&gt;();</span>
+<span class="nc" id="L383">        Object ch = map.get(&quot;ch&quot;);</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">        if (ch instanceof List) {</span>
+<span class="nc bnc" id="L385" title="All 2 branches missed.">            for (Object child : (List&lt;Object&gt;) ch) {</span>
+<span class="nc bnc" id="L386" title="All 2 branches missed.">                if (child instanceof Map) {</span>
+<span class="nc" id="L387">                    n.children.add(build((Map&lt;String, Object&gt;) child));</span>
+                }
+<span class="nc" id="L389">            }</span>
+        }
+<span class="nc" id="L391">        return n;</span>
+    }
+
+    private static void measure(LNode n, Map&lt;String, Object&gt; state, Map&lt;String, byte[]&gt; images,
+            long now) {
+<span class="nc bnc" id="L396" title="All 2 branches missed.">        for (LNode child : n.children) {</span>
+<span class="nc" id="L397">            measure(child, state, images, now);</span>
+<span class="nc" id="L398">        }</span>
+<span class="nc" id="L399">        int cw = 0;</span>
+<span class="nc" id="L400">        int chh = 0;</span>
+<span class="nc bnc" id="L401" title="All 2 branches missed.">        if (&quot;col&quot;.equals(n.type)) {</span>
+<span class="nc" id="L402">            int spacing = asInt(n.map.get(&quot;spacing&quot;), 0);</span>
+<span class="nc bnc" id="L403" title="All 2 branches missed.">            for (LNode child : n.children) {</span>
+<span class="nc" id="L404">                cw = Math.max(cw, child.prefW);</span>
+<span class="nc" id="L405">                chh += child.prefH;</span>
+<span class="nc" id="L406">            }</span>
+<span class="nc bnc" id="L407" title="All 2 branches missed.">            if (n.children.size() &gt; 1) {</span>
+<span class="nc" id="L408">                chh += spacing * (n.children.size() - 1);</span>
+            }
+<span class="nc bnc" id="L410" title="All 2 branches missed.">        } else if (&quot;row&quot;.equals(n.type)) {</span>
+<span class="nc" id="L411">            int spacing = asInt(n.map.get(&quot;spacing&quot;), 0);</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">            for (LNode child : n.children) {</span>
+<span class="nc" id="L413">                chh = Math.max(chh, child.prefH);</span>
+<span class="nc" id="L414">                cw += child.prefW;</span>
+<span class="nc" id="L415">            }</span>
+<span class="nc bnc" id="L416" title="All 2 branches missed.">            if (n.children.size() &gt; 1) {</span>
+<span class="nc" id="L417">                cw += spacing * (n.children.size() - 1);</span>
+            }
+<span class="nc bnc" id="L419" title="All 2 branches missed.">        } else if (&quot;box&quot;.equals(n.type)) {</span>
+<span class="nc bnc" id="L420" title="All 2 branches missed.">            for (LNode child : n.children) {</span>
+<span class="nc" id="L421">                cw = Math.max(cw, child.prefW);</span>
+<span class="nc" id="L422">                chh = Math.max(chh, child.prefH);</span>
+<span class="nc" id="L423">            }</span>
+<span class="nc bnc" id="L424" title="All 2 branches missed.">        } else if (&quot;text&quot;.equals(n.type)) {</span>
+<span class="nc" id="L425">            Font f = fontOf(n.map);</span>
+<span class="nc" id="L426">            String s = interpolate(asString(n.map.get(&quot;text&quot;), &quot;&quot;), state);</span>
+<span class="nc" id="L427">            cw = f.stringWidth(s);</span>
+<span class="nc" id="L428">            chh = f.getHeight();</span>
+<span class="nc bnc" id="L429" title="All 2 branches missed.">        } else if (&quot;dyn&quot;.equals(n.type)) {</span>
+<span class="nc" id="L430">            Font f = fontOf(n.map);</span>
+<span class="nc" id="L431">            String s = dynamicTextOf(n.map, state, now);</span>
+<span class="nc" id="L432">            cw = f.stringWidth(s);</span>
+<span class="nc" id="L433">            chh = f.getHeight();</span>
+<span class="nc bnc" id="L434" title="All 2 branches missed.">        } else if (&quot;img&quot;.equals(n.type)) {</span>
+<span class="nc" id="L435">            Image img = decodeImage(asString(n.map.get(&quot;name&quot;), null), images);</span>
+<span class="nc bnc" id="L436" title="All 2 branches missed.">            if (img != null) {</span>
+<span class="nc" id="L437">                cw = img.getWidth();</span>
+<span class="nc" id="L438">                chh = img.getHeight();</span>
+            } else {
+<span class="nc" id="L440">                cw = 24;</span>
+<span class="nc" id="L441">                chh = 24;</span>
+            }
+<span class="nc bnc" id="L443" title="All 2 branches missed.">        } else if (&quot;prog&quot;.equals(n.type)) {</span>
+<span class="nc bnc" id="L444" title="All 2 branches missed.">            if (&quot;circular&quot;.equals(n.map.get(&quot;style&quot;))) {</span>
+<span class="nc" id="L445">                cw = 28;</span>
+<span class="nc" id="L446">                chh = 28;</span>
+            } else {
+<span class="nc" id="L448">                cw = 120;</span>
+<span class="nc" id="L449">                chh = 6;</span>
+            }
+<span class="nc bnc" id="L451" title="All 2 branches missed.">        } else if (&quot;vec&quot;.equals(n.type)) {</span>
+            // the natural size of a vector node is its view box, in dips
+<span class="nc" id="L453">            cw = asInt(n.map.get(&quot;vw&quot;), 0);</span>
+<span class="nc" id="L454">            chh = asInt(n.map.get(&quot;vh&quot;), 0);</span>
+<span class="nc bnc" id="L455" title="All 2 branches missed.">        } else if (&quot;spacer&quot;.equals(n.type)) {</span>
+            // the min length applies along the parent's axis; using it on both axes is harmless
+            // because the cross axis of a spacer never dominates a real sibling
+<span class="nc" id="L458">            int min = asInt(n.map.get(&quot;min&quot;), 0);</span>
+<span class="nc" id="L459">            cw = min;</span>
+<span class="nc" id="L460">            chh = min;</span>
+        }
+<span class="nc" id="L462">        int[] pad = paddingOf(n.map);</span>
+<span class="nc" id="L463">        n.prefW = cw + pad[1] + pad[3];</span>
+<span class="nc" id="L464">        n.prefH = chh + pad[0] + pad[2];</span>
+<span class="nc" id="L465">        int fixedW = asInt(n.map.get(&quot;w&quot;), 0);</span>
+<span class="nc" id="L466">        int fixedH = asInt(n.map.get(&quot;h&quot;), 0);</span>
+<span class="nc bnc" id="L467" title="All 2 branches missed.">        if (fixedW &gt; 0) {</span>
+<span class="nc" id="L468">            n.prefW = fixedW;</span>
+        }
+<span class="nc bnc" id="L470" title="All 2 branches missed.">        if (fixedH &gt; 0) {</span>
+<span class="nc" id="L471">            n.prefH = fixedH;</span>
+        }
+<span class="nc" id="L473">    }</span>
+
+    private static void arrange(LNode n, int x, int y, int w, int h) {
+<span class="nc" id="L476">        n.x = x;</span>
+<span class="nc" id="L477">        n.y = y;</span>
+<span class="nc" id="L478">        n.w = w;</span>
+<span class="nc" id="L479">        n.h = h;</span>
+<span class="nc bnc" id="L480" title="All 2 branches missed.">        if (n.children.isEmpty()) {</span>
+<span class="nc" id="L481">            return;</span>
+        }
+<span class="nc" id="L483">        int[] pad = paddingOf(n.map);</span>
+<span class="nc" id="L484">        int cx = x + pad[3];</span>
+<span class="nc" id="L485">        int cy = y + pad[0];</span>
+<span class="nc" id="L486">        int cw = Math.max(0, w - pad[1] - pad[3]);</span>
+<span class="nc" id="L487">        int ch = Math.max(0, h - pad[0] - pad[2]);</span>
+<span class="nc bnc" id="L488" title="All 2 branches missed.">        if (&quot;col&quot;.equals(n.type)) {</span>
+<span class="nc" id="L489">            arrangeLinear(n, cx, cy, cw, ch, true);</span>
+<span class="nc bnc" id="L490" title="All 2 branches missed.">        } else if (&quot;row&quot;.equals(n.type)) {</span>
+<span class="nc" id="L491">            arrangeLinear(n, cx, cy, cw, ch, false);</span>
+        } else {
+            // box: overlay children aligned by their own alignment, default center
+<span class="nc bnc" id="L494" title="All 2 branches missed.">            for (LNode child : n.children) {</span>
+<span class="nc" id="L495">                int bw = Math.min(child.prefW, cw);</span>
+<span class="nc" id="L496">                int bh = Math.min(child.prefH, ch);</span>
+<span class="nc" id="L497">                int[] align = alignmentOf(child.map);</span>
+<span class="nc" id="L498">                int bx = alignPos(align[0], cx, cw, bw);</span>
+<span class="nc" id="L499">                int by = alignPos(align[1], cy, ch, bh);</span>
+<span class="nc" id="L500">                arrange(child, bx, by, bw, bh);</span>
+<span class="nc" id="L501">            }</span>
+        }
+<span class="nc" id="L503">    }</span>
+
+    private static void arrangeLinear(LNode n, int cx, int cy, int cw, int ch, boolean vertical) {
+<span class="nc" id="L506">        int spacing = asInt(n.map.get(&quot;spacing&quot;), 0);</span>
+<span class="nc bnc" id="L507" title="All 2 branches missed.">        int contentMain = vertical ? ch : cw;</span>
+<span class="nc" id="L508">        int naturalSum = 0;</span>
+<span class="nc" id="L509">        int totalWeight = 0;</span>
+<span class="nc bnc" id="L510" title="All 2 branches missed.">        for (LNode child : n.children) {</span>
+<span class="nc bnc" id="L511" title="All 2 branches missed.">            naturalSum += vertical ? child.prefH : child.prefW;</span>
+<span class="nc" id="L512">            totalWeight += weightOf(child);</span>
+<span class="nc" id="L513">        }</span>
+<span class="nc bnc" id="L514" title="All 2 branches missed.">        if (n.children.size() &gt; 1) {</span>
+<span class="nc" id="L515">            naturalSum += spacing * (n.children.size() - 1);</span>
+        }
+<span class="nc" id="L517">        int leftover = Math.max(0, contentMain - naturalSum);</span>
+<span class="nc bnc" id="L518" title="All 2 branches missed.">        int cursor = vertical ? cy : cx;</span>
+<span class="nc bnc" id="L519" title="All 2 branches missed.">        for (LNode child : n.children) {</span>
+<span class="nc" id="L520">            int weight = weightOf(child);</span>
+<span class="nc" id="L521">            int extra = 0;</span>
+<span class="nc bnc" id="L522" title="All 4 branches missed.">            if (weight &gt; 0 &amp;&amp; totalWeight &gt; 0) {</span>
+<span class="nc" id="L523">                extra = leftover * weight / totalWeight;</span>
+            }
+<span class="nc" id="L525">            int[] align = alignmentOf(child.map);</span>
+<span class="nc bnc" id="L526" title="All 2 branches missed.">            if (vertical) {</span>
+<span class="nc" id="L527">                int mainSize = child.prefH + extra;</span>
+<span class="nc" id="L528">                int crossSize = Math.min(child.prefW, cw);</span>
+<span class="nc" id="L529">                int bx = alignPos(align[0], cx, cw, crossSize);</span>
+<span class="nc" id="L530">                arrange(child, bx, cursor, crossSize, mainSize);</span>
+<span class="nc" id="L531">                cursor += mainSize + spacing;</span>
+<span class="nc" id="L532">            } else {</span>
+<span class="nc" id="L533">                int mainSize = child.prefW + extra;</span>
+<span class="nc" id="L534">                int crossSize = Math.min(child.prefH, ch);</span>
+<span class="nc" id="L535">                int by = alignPos(align[1], cy, ch, crossSize);</span>
+<span class="nc" id="L536">                arrange(child, cursor, by, mainSize, crossSize);</span>
+<span class="nc" id="L537">                cursor += mainSize + spacing;</span>
+            }
+<span class="nc" id="L539">        }</span>
+<span class="nc" id="L540">    }</span>
+
+    /// Spacers flex by default (implied weight 1) so they absorb leftover space even without an
+    /// explicit weight.
+    private static int weightOf(LNode n) {
+<span class="nc" id="L545">        int weight = asInt(n.map.get(&quot;weight&quot;), 0);</span>
+<span class="nc bnc" id="L546" title="All 4 branches missed.">        if (weight == 0 &amp;&amp; &quot;spacer&quot;.equals(n.type)) {</span>
+<span class="nc" id="L547">            return 1;</span>
+        }
+<span class="nc" id="L549">        return weight;</span>
+    }
+
+    private static int alignPos(int align, int start, int available, int size) {
+<span class="nc bnc" id="L553" title="All 2 branches missed.">        if (align &lt; 0) {</span>
+<span class="nc" id="L554">            return start;</span>
+        }
+<span class="nc bnc" id="L556" title="All 2 branches missed.">        if (align &gt; 0) {</span>
+<span class="nc" id="L557">            return start + available - size;</span>
+        }
+<span class="nc" id="L559">        return start + (available - size) / 2;</span>
+    }
+
+    // --- drawing ----------------------------------------------------------------
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static void draw(Graphics g, LNode n, Map&lt;String, Object&gt; state,
+            Map&lt;String, byte[]&gt; images, boolean dark, long now, List&lt;ActionRect&gt; actions,
+            long[] tick) {
+<span class="nc" id="L568">        int[] savedClip = g.getClip();</span>
+<span class="nc" id="L569">        g.clipRect(n.x, n.y, n.w, n.h);</span>
+<span class="nc" id="L570">        Object bg = n.map.get(&quot;bg&quot;);</span>
+<span class="nc bnc" id="L571" title="All 2 branches missed.">        if (bg != null) {</span>
+<span class="nc" id="L572">            int argb = resolveColor(bg, dark, 0);</span>
+<span class="nc" id="L573">            int corner = asInt(n.map.get(&quot;corner&quot;), 0);</span>
+<span class="nc" id="L574">            setPaint(g, argb);</span>
+<span class="nc bnc" id="L575" title="All 2 branches missed.">            if (corner &gt; 0) {</span>
+<span class="nc" id="L576">                g.fillRoundRect(n.x, n.y, n.w, n.h, corner * 2, corner * 2);</span>
+            } else {
+<span class="nc" id="L578">                g.fillRect(n.x, n.y, n.w, n.h);</span>
+            }
+<span class="nc" id="L580">            g.setAlpha(255);</span>
+        }
+<span class="nc" id="L582">        Object action = n.map.get(&quot;action&quot;);</span>
+<span class="nc bnc" id="L583" title="All 2 branches missed.">        if (action instanceof Map) {</span>
+<span class="nc" id="L584">            Map&lt;String, Object&gt; a = (Map&lt;String, Object&gt;) action;</span>
+<span class="nc" id="L585">            Object id = a.get(&quot;id&quot;);</span>
+<span class="nc bnc" id="L586" title="All 2 branches missed.">            if (id instanceof String) {</span>
+<span class="nc" id="L587">                Object p = a.get(&quot;p&quot;);</span>
+<span class="nc bnc" id="L588" title="All 2 branches missed.">                actions.add(new ActionRect(n.x, n.y, n.w, n.h, (String) id,</span>
+                        p instanceof Map ? (Map&lt;String, Object&gt;) p : null));
+            }
+        }
+<span class="nc" id="L592">        int[] pad = paddingOf(n.map);</span>
+<span class="nc" id="L593">        int cx = n.x + pad[3];</span>
+<span class="nc" id="L594">        int cy = n.y + pad[0];</span>
+<span class="nc" id="L595">        int cw = Math.max(0, n.w - pad[1] - pad[3]);</span>
+<span class="nc" id="L596">        int ch = Math.max(0, n.h - pad[0] - pad[2]);</span>
+<span class="nc bnc" id="L597" title="All 2 branches missed.">        if (&quot;text&quot;.equals(n.type)) {</span>
+<span class="nc" id="L598">            drawText(g, n.map, interpolate(asString(n.map.get(&quot;text&quot;), &quot;&quot;), state),</span>
+                    cx, cy, cw, ch, dark);
+<span class="nc bnc" id="L600" title="All 2 branches missed.">        } else if (&quot;dyn&quot;.equals(n.type)) {</span>
+<span class="nc" id="L601">            drawText(g, n.map, dynamicTextOf(n.map, state, now), cx, cy, cw, ch, dark);</span>
+<span class="nc" id="L602">            registerDynTick(n.map, tick, now);</span>
+<span class="nc bnc" id="L603" title="All 2 branches missed.">        } else if (&quot;img&quot;.equals(n.type)) {</span>
+<span class="nc" id="L604">            drawImageNode(g, n.map, images, cx, cy, cw, ch);</span>
+<span class="nc bnc" id="L605" title="All 2 branches missed.">        } else if (&quot;prog&quot;.equals(n.type)) {</span>
+<span class="nc" id="L606">            drawProgress(g, n.map, state, cx, cy, cw, ch, dark, now, tick);</span>
+<span class="nc bnc" id="L607" title="All 2 branches missed.">        } else if (&quot;vec&quot;.equals(n.type)) {</span>
+<span class="nc" id="L608">            drawVector(g, n.map, state, cx, cy, cw, ch, dark);</span>
+        } else {
+<span class="nc bnc" id="L610" title="All 2 branches missed.">            for (LNode child : n.children) {</span>
+<span class="nc" id="L611">                draw(g, child, state, images, dark, now, actions, tick);</span>
+<span class="nc" id="L612">            }</span>
+        }
+<span class="nc" id="L614">        g.setClip(savedClip);</span>
+<span class="nc" id="L615">    }</span>
+
+    private static void drawText(Graphics g, Map&lt;String, Object&gt; map, String text, int cx, int cy,
+            int cw, int ch, boolean dark) {
+<span class="nc bnc" id="L619" title="All 4 branches missed.">        if (text == null || text.length() == 0) {</span>
+<span class="nc" id="L620">            return;</span>
+        }
+<span class="nc" id="L622">        Font f = fontOf(map);</span>
+<span class="nc" id="L623">        g.setFont(f);</span>
+<span class="nc bnc" id="L624" title="All 2 branches missed.">        setPaint(g, resolveColor(map.get(&quot;color&quot;), dark,</span>
+                dark ? ROLE_LABEL_DARK : ROLE_LABEL_LIGHT));
+<span class="nc" id="L626">        int tw = f.stringWidth(text);</span>
+<span class="nc" id="L627">        int th = f.getHeight();</span>
+<span class="nc" id="L628">        int tx = cx + Math.max(0, (cw - tw) / 2);</span>
+<span class="nc" id="L629">        int ty = cy + Math.max(0, (ch - th) / 2);</span>
+<span class="nc" id="L630">        g.drawString(text, tx, ty);</span>
+<span class="nc" id="L631">        g.setAlpha(255);</span>
+<span class="nc" id="L632">    }</span>
+
+    private static void drawImageNode(Graphics g, Map&lt;String, Object&gt; map,
+            Map&lt;String, byte[]&gt; images, int cx, int cy, int cw, int ch) {
+<span class="nc" id="L636">        Image img = decodeImage(asString(map.get(&quot;name&quot;), null), images);</span>
+<span class="nc bnc" id="L637" title="All 6 branches missed.">        if (img == null || cw &lt;= 0 || ch &lt;= 0) {</span>
+<span class="nc" id="L638">            return;</span>
+        }
+        // NOTE: the tint attribute is ignored here, see the class comment
+<span class="nc" id="L641">        String scale = asString(map.get(&quot;scale&quot;), &quot;fit&quot;);</span>
+<span class="nc" id="L642">        int iw = img.getWidth();</span>
+<span class="nc" id="L643">        int ih = img.getHeight();</span>
+<span class="nc bnc" id="L644" title="All 2 branches missed.">        if (&quot;center&quot;.equals(scale)) {</span>
+<span class="nc" id="L645">            g.drawImage(img, cx + (cw - iw) / 2, cy + (ch - ih) / 2);</span>
+<span class="nc" id="L646">            return;</span>
+        }
+<span class="nc" id="L648">        double ratioFit = Math.min((double) cw / iw, (double) ch / ih);</span>
+<span class="nc" id="L649">        double ratioFill = Math.max((double) cw / iw, (double) ch / ih);</span>
+<span class="nc bnc" id="L650" title="All 2 branches missed.">        double ratio = &quot;fill&quot;.equals(scale) ? ratioFill : ratioFit;</span>
+<span class="nc" id="L651">        int dw = Math.max(1, (int) (iw * ratio));</span>
+<span class="nc" id="L652">        int dh = Math.max(1, (int) (ih * ratio));</span>
+<span class="nc" id="L653">        g.drawImage(img, cx + (cw - dw) / 2, cy + (ch - dh) / 2, dw, dh);</span>
+<span class="nc" id="L654">    }</span>
+
+    private static void drawProgress(Graphics g, Map&lt;String, Object&gt; map,
+            Map&lt;String, Object&gt; state, int cx, int cy, int cw, int ch, boolean dark, long now,
+            long[] tick) {
+<span class="nc bnc" id="L659" title="All 4 branches missed.">        if (cw &lt;= 0 || ch &lt;= 0) {</span>
+<span class="nc" id="L660">            return;</span>
+        }
+<span class="nc" id="L662">        double fraction = progressFraction(map, state, now, tick);</span>
+<span class="nc" id="L663">        int color = resolveColor(map.get(&quot;color&quot;), dark, ROLE_ACCENT);</span>
+<span class="nc bnc" id="L664" title="All 2 branches missed.">        if (&quot;circular&quot;.equals(map.get(&quot;style&quot;))) {</span>
+<span class="nc" id="L665">            int d = Math.min(cw, ch);</span>
+<span class="nc" id="L666">            int px = cx + (cw - d) / 2;</span>
+<span class="nc" id="L667">            int py = cy + (ch - d) / 2;</span>
+<span class="nc" id="L668">            setPaint(g, color);</span>
+<span class="nc" id="L669">            g.setAlpha(51);</span>
+<span class="nc" id="L670">            g.fillArc(px, py, d, d, 0, 360);</span>
+<span class="nc" id="L671">            g.setAlpha(alphaOf(color));</span>
+            // start at 12 o'clock and sweep clockwise
+<span class="nc" id="L673">            g.fillArc(px, py, d, d, 90, -(int) Math.round(360 * fraction));</span>
+<span class="nc" id="L674">        } else {</span>
+<span class="nc" id="L675">            int barH = Math.min(ch, 6);</span>
+<span class="nc" id="L676">            int by = cy + (ch - barH) / 2;</span>
+<span class="nc" id="L677">            setPaint(g, color);</span>
+<span class="nc" id="L678">            g.setAlpha(51);</span>
+<span class="nc" id="L679">            g.fillRoundRect(cx, by, cw, barH, barH, barH);</span>
+<span class="nc" id="L680">            g.setAlpha(alphaOf(color));</span>
+<span class="nc" id="L681">            int fillW = (int) Math.round(cw * fraction);</span>
+<span class="nc bnc" id="L682" title="All 2 branches missed.">            if (fillW &gt; 0) {</span>
+<span class="nc" id="L683">                g.fillRoundRect(cx, by, fillW, barH, barH, barH);</span>
+            }
+        }
+<span class="nc" id="L686">        g.setAlpha(255);</span>
+<span class="nc" id="L687">    }</span>
+
+    private static double progressFraction(Map&lt;String, Object&gt; map, Map&lt;String, Object&gt; state,
+            long now, long[] tick) {
+<span class="nc" id="L691">        double fraction = 0;</span>
+<span class="nc" id="L692">        String valueKey = asString(map.get(&quot;valueKey&quot;), null);</span>
+<span class="nc" id="L693">        Object startObj = map.get(&quot;start&quot;);</span>
+<span class="nc bnc" id="L694" title="All 2 branches missed.">        if (valueKey != null) {</span>
+<span class="nc bnc" id="L695" title="All 2 branches missed.">            Object v = state == null ? null : state.get(valueKey);</span>
+<span class="nc bnc" id="L696" title="All 2 branches missed.">            if (v instanceof Number) {</span>
+<span class="nc" id="L697">                fraction = ((Number) v).doubleValue();</span>
+            }
+<span class="nc bnc" id="L699" title="All 4 branches missed.">        } else if (startObj instanceof Number &amp;&amp; map.get(&quot;end&quot;) instanceof Number) {</span>
+<span class="nc" id="L700">            long start = asLong(startObj, 0);</span>
+<span class="nc" id="L701">            long end = asLong(map.get(&quot;end&quot;), 0);</span>
+<span class="nc bnc" id="L702" title="All 2 branches missed.">            if (end &gt; start) {</span>
+<span class="nc" id="L703">                fraction = (now - start) / (double) (end - start);</span>
+<span class="nc bnc" id="L704" title="All 2 branches missed.">                if (now &lt; end) {</span>
+                    // the interval animates on the OS clock; tick every second while it runs
+<span class="nc" id="L706">                    requestTick(tick, now + 1000);</span>
+                }
+            }
+<span class="nc bnc" id="L709" title="All 2 branches missed.">        } else if (map.get(&quot;value&quot;) instanceof Number) {</span>
+<span class="nc" id="L710">            fraction = ((Number) map.get(&quot;value&quot;)).doubleValue();</span>
+        }
+<span class="nc bnc" id="L712" title="All 2 branches missed.">        if (fraction &lt; 0) {</span>
+<span class="nc" id="L713">            return 0;</span>
+        }
+<span class="nc bnc" id="L715" title="All 2 branches missed.">        if (fraction &gt; 1) {</span>
+<span class="nc" id="L716">            return 1;</span>
+        }
+<span class="nc" id="L718">        return fraction;</span>
+    }
+
+    private static void registerDynTick(Map&lt;String, Object&gt; map, long[] tick, long now) {
+<span class="nc" id="L722">        Object style = map.get(&quot;style&quot;);</span>
+<span class="nc bnc" id="L723" title="All 4 branches missed.">        if (&quot;timerDown&quot;.equals(style) || &quot;timerUp&quot;.equals(style)) {</span>
+<span class="nc" id="L724">            requestTick(tick, now + 1000);</span>
+<span class="nc bnc" id="L725" title="All 4 branches missed.">        } else if (&quot;time&quot;.equals(style) || &quot;relative&quot;.equals(style)) {</span>
+<span class="nc" id="L726">            requestTick(tick, now - now % MINUTE_MILLIS + MINUTE_MILLIS);</span>
+        }
+<span class="nc" id="L728">    }</span>
+
+    private static void requestTick(long[] tick, long when) {
+<span class="nc bnc" id="L731" title="All 4 branches missed.">        if (tick[0] == 0 || when &lt; tick[0]) {</span>
+<span class="nc" id="L732">            tick[0] = when;</span>
+        }
+<span class="nc" id="L734">    }</span>
+
+    private static String dynamicTextOf(Map&lt;String, Object&gt; map, Map&lt;String, Object&gt; state,
+            long now) {
+<span class="nc" id="L738">        long date = 0;</span>
+<span class="nc" id="L739">        String dateKey = asString(map.get(&quot;dateKey&quot;), null);</span>
+<span class="nc bnc" id="L740" title="All 2 branches missed.">        if (dateKey != null) {</span>
+<span class="nc bnc" id="L741" title="All 2 branches missed.">            Object v = state == null ? null : state.get(dateKey);</span>
+<span class="nc bnc" id="L742" title="All 2 branches missed.">            if (v instanceof Number) {</span>
+<span class="nc" id="L743">                date = ((Number) v).longValue();</span>
+            } else {
+<span class="nc" id="L745">                return &quot;&quot;;</span>
+            }
+<span class="nc bnc" id="L747" title="All 2 branches missed.">        } else if (map.get(&quot;date&quot;) instanceof Number) {</span>
+<span class="nc" id="L748">            date = asLong(map.get(&quot;date&quot;), 0);</span>
+        } else {
+<span class="nc" id="L750">            return &quot;&quot;;</span>
+        }
+<span class="nc" id="L752">        return formatDynamicText(asString(map.get(&quot;style&quot;), &quot;timerDown&quot;), date, now);</span>
+    }
+
+    // --- vector nodes -----------------------------------------------------------------
+
+    /// Renders a `vec` node. The view box scales to the node's content bounds preserving aspect
+    /// ratio (centered). Rotation groups are applied by transforming the geometry mathematically
+    /// -- every point runs through a software affine matrix -- rather than through
+    /// `Graphics.rotate`, so the output is identical on every desktop surface regardless of
+    /// affine support. Curves (ellipses, arcs, round corners) are sampled into short segments and
+    /// rendered through `GeneralPath` + `fillShape`/`drawShape` when the port supports shapes
+    /// (JavaSE, Windows and Linux all do). Without shape support the renderer falls back to 1px
+    /// primitives: geometry still *positions* through the transform, but ellipse/arc orientation
+    /// stays axis-aligned and stroke widths collapse to one pixel.
+    ///
+    /// Text ops draw unrotated at their transformed anchor point (middle of `x`, baseline at
+    /// `y`); rotating glyphs is not portably possible with core `Graphics`, and clock/gauge
+    /// labels are typically upright anyway.
+    ///
+    /// A vector node never requests a tick by itself: a state-driven rotation (`degKey`) only
+    /// changes when the timeline entry flips, so clocks publish per-minute entries.
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static void drawVector(Graphics g, Map&lt;String, Object&gt; map, Map&lt;String, Object&gt; state,
+            int cx, int cy, int cw, int ch, boolean dark) {
+<span class="nc" id="L776">        double vw = asDouble(map.get(&quot;vw&quot;), 0);</span>
+<span class="nc" id="L777">        double vh = asDouble(map.get(&quot;vh&quot;), 0);</span>
+<span class="nc" id="L778">        Object opsObj = map.get(&quot;ops&quot;);</span>
+<span class="nc bnc" id="L779" title="All 10 branches missed.">        if (vw &lt;= 0 || vh &lt;= 0 || cw &lt;= 0 || ch &lt;= 0 || !(opsObj instanceof List)) {</span>
+<span class="nc" id="L780">            return;</span>
+        }
+<span class="nc" id="L782">        double scale = Math.min(cw / vw, ch / vh);</span>
+<span class="nc bnc" id="L783" title="All 2 branches missed.">        if (scale &lt;= 0) {</span>
+<span class="nc" id="L784">            return;</span>
+        }
+        // affine {m00, m01, m10, m11, tx, ty}: px = m00*x + m01*y + tx, py = m10*x + m11*y + ty
+<span class="nc" id="L787">        double[] t = new double[] {</span>
+            scale, 0, 0, scale,
+            cx + (cw - vw * scale) / 2,
+            cy + (ch - vh * scale) / 2
+        };
+<span class="nc" id="L792">        drawVectorOps(g, (List&lt;Object&gt;) opsObj, t, scale, state, dark);</span>
+<span class="nc" id="L793">        g.setAlpha(255);</span>
+<span class="nc" id="L794">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static void drawVectorOps(Graphics g, List&lt;Object&gt; ops, double[] t, double scale,
+            Map&lt;String, Object&gt; state, boolean dark) {
+<span class="nc" id="L799">        boolean shapes = g.isShapeSupported();</span>
+<span class="nc bnc" id="L800" title="All 2 branches missed.">        for (Object rawOp : ops) {</span>
+<span class="nc bnc" id="L801" title="All 2 branches missed.">            if (!(rawOp instanceof Map)) {</span>
+<span class="nc" id="L802">                continue;</span>
+            }
+<span class="nc" id="L804">            Map&lt;String, Object&gt; op = (Map&lt;String, Object&gt;) rawOp;</span>
+<span class="nc" id="L805">            String o = asString(op.get(&quot;o&quot;), &quot;&quot;);</span>
+<span class="nc bnc" id="L806" title="All 2 branches missed.">            if (&quot;rot&quot;.equals(o)) {</span>
+<span class="nc" id="L807">                double deg = asDouble(op.get(&quot;deg&quot;), 0);</span>
+<span class="nc" id="L808">                String degKey = asString(op.get(&quot;degKey&quot;), null);</span>
+<span class="nc bnc" id="L809" title="All 2 branches missed.">                if (degKey != null) {</span>
+<span class="nc bnc" id="L810" title="All 2 branches missed.">                    Object v = state == null ? null : state.get(degKey);</span>
+<span class="nc bnc" id="L811" title="All 2 branches missed.">                    deg = v instanceof Number ? ((Number) v).doubleValue() : 0;</span>
+                }
+<span class="nc" id="L813">                double[] rotated = composeRotation(t, deg, asDouble(op.get(&quot;px&quot;), 0),</span>
+<span class="nc" id="L814">                        asDouble(op.get(&quot;py&quot;), 0));</span>
+<span class="nc" id="L815">                Object nested = op.get(&quot;ops&quot;);</span>
+<span class="nc bnc" id="L816" title="All 2 branches missed.">                if (nested instanceof List) {</span>
+<span class="nc" id="L817">                    drawVectorOps(g, (List&lt;Object&gt;) nested, rotated, scale, state, dark);</span>
+                }
+                continue;
+            }
+<span class="nc bnc" id="L821" title="All 2 branches missed.">            int argb = resolveColor(op.get(&quot;c&quot;), dark, dark ? ROLE_LABEL_DARK : ROLE_LABEL_LIGHT);</span>
+<span class="nc" id="L822">            setPaint(g, argb);</span>
+<span class="nc bnc" id="L823" title="All 2 branches missed.">            if (&quot;fillRect&quot;.equals(o)) {</span>
+<span class="nc" id="L824">                double x = asDouble(op.get(&quot;x&quot;), 0);</span>
+<span class="nc" id="L825">                double y = asDouble(op.get(&quot;y&quot;), 0);</span>
+<span class="nc" id="L826">                double w = asDouble(op.get(&quot;w&quot;), 0);</span>
+<span class="nc" id="L827">                double h = asDouble(op.get(&quot;h&quot;), 0);</span>
+<span class="nc" id="L828">                fillVectorPoly(g, shapes, t, new double[] {x, y, x + w, y, x + w, y + h, x, y + h});</span>
+<span class="nc bnc" id="L829" title="All 2 branches missed.">            } else if (&quot;fillRoundRect&quot;.equals(o)) {</span>
+<span class="nc" id="L830">                fillVectorPoly(g, shapes, t, roundRectOutline(op));</span>
+<span class="nc bnc" id="L831" title="All 2 branches missed.">            } else if (&quot;fillEllipse&quot;.equals(o)) {</span>
+<span class="nc" id="L832">                fillVectorPoly(g, shapes, t, ellipseOutline(op, 0, 360, false));</span>
+<span class="nc bnc" id="L833" title="All 2 branches missed.">            } else if (&quot;fillArc&quot;.equals(o)) {</span>
+<span class="nc" id="L834">                fillVectorPoly(g, shapes, t, ellipseOutline(op,</span>
+<span class="nc" id="L835">                        asDouble(op.get(&quot;start&quot;), 0), asDouble(op.get(&quot;sweep&quot;), 0), true));</span>
+<span class="nc bnc" id="L836" title="All 2 branches missed.">            } else if (&quot;strokeEllipse&quot;.equals(o)) {</span>
+<span class="nc" id="L837">                strokeVectorPoly(g, shapes, t, ellipseOutline(op, 0, 360, false), true,</span>
+<span class="nc" id="L838">                        asDouble(op.get(&quot;sw&quot;), 1) * scale);</span>
+<span class="nc bnc" id="L839" title="All 2 branches missed.">            } else if (&quot;strokeArc&quot;.equals(o)) {</span>
+<span class="nc" id="L840">                strokeVectorPoly(g, shapes, t, ellipseOutline(op,</span>
+<span class="nc" id="L841">                        asDouble(op.get(&quot;start&quot;), 0), asDouble(op.get(&quot;sweep&quot;), 0), false), false,</span>
+<span class="nc" id="L842">                        asDouble(op.get(&quot;sw&quot;), 1) * scale);</span>
+<span class="nc bnc" id="L843" title="All 2 branches missed.">            } else if (&quot;line&quot;.equals(o)) {</span>
+<span class="nc" id="L844">                strokeVectorPoly(g, shapes, t, new double[] {</span>
+<span class="nc" id="L845">                        asDouble(op.get(&quot;x1&quot;), 0), asDouble(op.get(&quot;y1&quot;), 0),</span>
+<span class="nc" id="L846">                        asDouble(op.get(&quot;x2&quot;), 0), asDouble(op.get(&quot;y2&quot;), 0)</span>
+<span class="nc" id="L847">                }, false, asDouble(op.get(&quot;sw&quot;), 1) * scale);</span>
+<span class="nc bnc" id="L848" title="All 2 branches missed.">            } else if (&quot;fillPath&quot;.equals(o)) {</span>
+<span class="nc" id="L849">                fillVectorPoly(g, shapes, t, pointsOf(op));</span>
+<span class="nc bnc" id="L850" title="All 2 branches missed.">            } else if (&quot;strokePath&quot;.equals(o)) {</span>
+<span class="nc" id="L851">                strokeVectorPoly(g, shapes, t, pointsOf(op), asBoolean(op.get(&quot;close&quot;)),</span>
+<span class="nc" id="L852">                        asDouble(op.get(&quot;sw&quot;), 1) * scale);</span>
+<span class="nc bnc" id="L853" title="All 2 branches missed.">            } else if (&quot;text&quot;.equals(o)) {</span>
+<span class="nc" id="L854">                drawVectorText(g, op, t, scale, state);</span>
+            }
+<span class="nc" id="L856">        }</span>
+<span class="nc" id="L857">    }</span>
+
+    private static void drawVectorText(Graphics g, Map&lt;String, Object&gt; op, double[] t,
+            double scale, Map&lt;String, Object&gt; state) {
+<span class="nc" id="L861">        String text = interpolate(asString(op.get(&quot;text&quot;), &quot;&quot;), state);</span>
+<span class="nc bnc" id="L862" title="All 4 branches missed.">        if (text == null || text.length() == 0) {</span>
+<span class="nc" id="L863">            return;</span>
+        }
+<span class="nc" id="L865">        int px = (int) Math.round(asDouble(op.get(&quot;size&quot;), DEFAULT_FONT_SIZE) * scale);</span>
+<span class="nc" id="L866">        Font f = fontFor(Math.max(1, px), asString(op.get(&quot;fw&quot;), &quot;regular&quot;));</span>
+<span class="nc" id="L867">        g.setFont(f);</span>
+<span class="nc" id="L868">        double[] anchor = transformPoint(t, asDouble(op.get(&quot;x&quot;), 0), asDouble(op.get(&quot;y&quot;), 0));</span>
+        // anchor middle horizontally, baseline vertically; drawString draws from the top
+<span class="nc" id="L870">        int tx = (int) Math.round(anchor[0] - f.stringWidth(text) / 2.0);</span>
+<span class="nc" id="L871">        int ty = (int) Math.round(anchor[1] - f.getAscent());</span>
+<span class="nc" id="L872">        g.drawString(text, tx, ty);</span>
+<span class="nc" id="L873">    }</span>
+
+    private static void fillVectorPoly(Graphics g, boolean shapes, double[] t, double[] pts) {
+<span class="nc bnc" id="L876" title="All 2 branches missed.">        if (pts.length &lt; 6) {</span>
+<span class="nc" id="L877">            return;</span>
+        }
+<span class="nc bnc" id="L879" title="All 2 branches missed.">        if (shapes) {</span>
+<span class="nc" id="L880">            g.fillShape(transformedPath(t, pts, true));</span>
+<span class="nc" id="L881">            return;</span>
+        }
+<span class="nc" id="L883">        int n = pts.length / 2;</span>
+<span class="nc" id="L884">        int[] xs = new int[n];</span>
+<span class="nc" id="L885">        int[] ys = new int[n];</span>
+<span class="nc" id="L886">        transformToArrays(t, pts, xs, ys);</span>
+<span class="nc" id="L887">        g.fillPolygon(xs, ys, n);</span>
+<span class="nc" id="L888">    }</span>
+
+    private static void strokeVectorPoly(Graphics g, boolean shapes, double[] t, double[] pts,
+            boolean close, double strokeWidthPx) {
+<span class="nc bnc" id="L892" title="All 2 branches missed.">        if (pts.length &lt; 4) {</span>
+<span class="nc" id="L893">            return;</span>
+        }
+<span class="nc bnc" id="L895" title="All 2 branches missed.">        if (shapes) {</span>
+<span class="nc" id="L896">            Stroke stroke = new Stroke((float) Math.max(1, strokeWidthPx), Stroke.CAP_ROUND,</span>
+                    Stroke.JOIN_ROUND, 1f);
+<span class="nc" id="L898">            g.drawShape(transformedPath(t, pts, close), stroke);</span>
+<span class="nc" id="L899">            return;</span>
+        }
+        // primitive fallback: 1px segments
+<span class="nc" id="L902">        int n = pts.length / 2;</span>
+<span class="nc" id="L903">        int[] xs = new int[n];</span>
+<span class="nc" id="L904">        int[] ys = new int[n];</span>
+<span class="nc" id="L905">        transformToArrays(t, pts, xs, ys);</span>
+<span class="nc bnc" id="L906" title="All 2 branches missed.">        for (int i = 1; i &lt; n; i++) {</span>
+<span class="nc" id="L907">            g.drawLine(xs[i - 1], ys[i - 1], xs[i], ys[i]);</span>
+        }
+<span class="nc bnc" id="L909" title="All 4 branches missed.">        if (close &amp;&amp; n &gt; 2) {</span>
+<span class="nc" id="L910">            g.drawLine(xs[n - 1], ys[n - 1], xs[0], ys[0]);</span>
+        }
+<span class="nc" id="L912">    }</span>
+
+    private static GeneralPath transformedPath(double[] t, double[] pts, boolean close) {
+<span class="nc" id="L915">        GeneralPath path = new GeneralPath();</span>
+<span class="nc" id="L916">        double[] p = transformPoint(t, pts[0], pts[1]);</span>
+<span class="nc" id="L917">        path.moveTo((float) p[0], (float) p[1]);</span>
+<span class="nc bnc" id="L918" title="All 2 branches missed.">        for (int i = 2; i + 1 &lt; pts.length; i += 2) {</span>
+<span class="nc" id="L919">            p = transformPoint(t, pts[i], pts[i + 1]);</span>
+<span class="nc" id="L920">            path.lineTo((float) p[0], (float) p[1]);</span>
+        }
+<span class="nc bnc" id="L922" title="All 2 branches missed.">        if (close) {</span>
+<span class="nc" id="L923">            path.closePath();</span>
+        }
+<span class="nc" id="L925">        return path;</span>
+    }
+
+    private static void transformToArrays(double[] t, double[] pts, int[] xs, int[] ys) {
+<span class="nc bnc" id="L929" title="All 2 branches missed.">        for (int i = 0; i &lt; xs.length; i++) {</span>
+<span class="nc" id="L930">            double[] p = transformPoint(t, pts[i * 2], pts[i * 2 + 1]);</span>
+<span class="nc" id="L931">            xs[i] = (int) Math.round(p[0]);</span>
+<span class="nc" id="L932">            ys[i] = (int) Math.round(p[1]);</span>
+        }
+<span class="nc" id="L934">    }</span>
+
+    /// Samples the outline of an ellipse/arc op into a poly-line, in view-box coordinates. For
+    /// a pie the center is prepended so closing the path produces the slice.
+    private static double[] ellipseOutline(Map&lt;String, Object&gt; op, double startDeg,
+            double sweepDeg, boolean pie) {
+<span class="nc" id="L940">        double cx = asDouble(op.get(&quot;cx&quot;), 0);</span>
+<span class="nc" id="L941">        double cy = asDouble(op.get(&quot;cy&quot;), 0);</span>
+<span class="nc" id="L942">        double rx = asDouble(op.get(&quot;rx&quot;), 0);</span>
+<span class="nc" id="L943">        double ry = asDouble(op.get(&quot;ry&quot;), 0);</span>
+<span class="nc" id="L944">        double sweep = sweepDeg;</span>
+<span class="nc bnc" id="L945" title="All 2 branches missed.">        if (Math.abs(sweep) &gt;= 360) {</span>
+<span class="nc bnc" id="L946" title="All 2 branches missed.">            sweep = sweep &lt; 0 ? -360 : 360;</span>
+        }
+        // one segment every ~4 degrees keeps small widget curves smooth without excess points
+<span class="nc" id="L949">        int segs = Math.max(8, Math.min(90, (int) Math.ceil(Math.abs(sweep) / 4)));</span>
+<span class="nc bnc" id="L950" title="All 2 branches missed.">        int extra = pie ? 1 : 0;</span>
+<span class="nc" id="L951">        double[] pts = new double[(segs + 1 + extra) * 2];</span>
+<span class="nc bnc" id="L952" title="All 2 branches missed.">        if (pie) {</span>
+<span class="nc" id="L953">            pts[0] = cx;</span>
+<span class="nc" id="L954">            pts[1] = cy;</span>
+        }
+<span class="nc bnc" id="L956" title="All 2 branches missed.">        for (int i = 0; i &lt;= segs; i++) {</span>
+<span class="nc" id="L957">            double rad = clockRadians(startDeg + sweep * i / segs);</span>
+<span class="nc" id="L958">            pts[(i + extra) * 2] = cx + rx * Math.cos(rad);</span>
+<span class="nc" id="L959">            pts[(i + extra) * 2 + 1] = cy + ry * Math.sin(rad);</span>
+        }
+<span class="nc" id="L961">        return pts;</span>
+    }
+
+    /// Samples the outline of a rounded rectangle op, corners as quarter arcs.
+    private static double[] roundRectOutline(Map&lt;String, Object&gt; op) {
+<span class="nc" id="L966">        double x = asDouble(op.get(&quot;x&quot;), 0);</span>
+<span class="nc" id="L967">        double y = asDouble(op.get(&quot;y&quot;), 0);</span>
+<span class="nc" id="L968">        double w = asDouble(op.get(&quot;w&quot;), 0);</span>
+<span class="nc" id="L969">        double h = asDouble(op.get(&quot;h&quot;), 0);</span>
+<span class="nc" id="L970">        double r = Math.max(0, Math.min(asDouble(op.get(&quot;corner&quot;), 0), Math.min(w, h) / 2));</span>
+<span class="nc bnc" id="L971" title="All 2 branches missed.">        if (r &lt;= 0) {</span>
+<span class="nc" id="L972">            return new double[] {x, y, x + w, y, x + w, y + h, x, y + h};</span>
+        }
+<span class="nc" id="L974">        int segs = 6;</span>
+        // corner centers in paint order starting after the top-left corner, with the clock
+        // start angle of each quarter arc
+<span class="nc" id="L977">        double[] centers = {</span>
+            x + w - r, y + r, 0,
+            x + w - r, y + h - r, 90,
+            x + r, y + h - r, 180,
+            x + r, y + r, 270
+        };
+<span class="nc" id="L983">        double[] pts = new double[4 * (segs + 1) * 2];</span>
+<span class="nc" id="L984">        int idx = 0;</span>
+<span class="nc bnc" id="L985" title="All 2 branches missed.">        for (int corner = 0; corner &lt; 4; corner++) {</span>
+<span class="nc" id="L986">            double ccx = centers[corner * 3];</span>
+<span class="nc" id="L987">            double ccy = centers[corner * 3 + 1];</span>
+<span class="nc" id="L988">            double start = centers[corner * 3 + 2];</span>
+<span class="nc bnc" id="L989" title="All 2 branches missed.">            for (int i = 0; i &lt;= segs; i++) {</span>
+<span class="nc" id="L990">                double rad = clockRadians(start + 90.0 * i / segs);</span>
+<span class="nc" id="L991">                pts[idx++] = ccx + r * Math.cos(rad);</span>
+<span class="nc" id="L992">                pts[idx++] = ccy + r * Math.sin(rad);</span>
+            }
+        }
+<span class="nc" id="L995">        return pts;</span>
+    }
+
+    private static double[] pointsOf(Map&lt;String, Object&gt; op) {
+<span class="nc" id="L999">        Object ptsObj = op.get(&quot;pts&quot;);</span>
+<span class="nc bnc" id="L1000" title="All 2 branches missed.">        if (!(ptsObj instanceof List)) {</span>
+<span class="nc" id="L1001">            return new double[0];</span>
+        }
+<span class="nc" id="L1003">        List&lt;?&gt; list = (List&lt;?&gt;) ptsObj;</span>
+<span class="nc" id="L1004">        int n = list.size() - list.size() % 2;</span>
+<span class="nc" id="L1005">        double[] pts = new double[n];</span>
+<span class="nc bnc" id="L1006" title="All 2 branches missed.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc" id="L1007">            pts[i] = asDouble(list.get(i), 0);</span>
+        }
+<span class="nc" id="L1009">        return pts;</span>
+    }
+
+    /// Converts a clock-convention angle (degrees, 0 = 12 o'clock, clockwise positive) to screen
+    /// radians measured from 3 o'clock advancing clockwise (y grows downward), the convention of
+    /// the sampling math: a point at clock angle `d` sits at
+    /// `(cx + r*cos(clockRadians(d)), cy + r*sin(clockRadians(d)))`. Package-private for unit
+    /// tests.
+    static double clockRadians(double clockDegrees) {
+<span class="fc" id="L1018">        return Math.toRadians(clockDegrees - 90);</span>
+    }
+
+    /// Converts a clock-convention start angle to the `Graphics.fillArc`/`drawArc` convention
+    /// (degrees, 0 = 3 o'clock, counterclockwise positive). Used by the primitive fallback and
+    /// kept as a documented, testable helper of the platform conversion. Package-private for
+    /// unit tests.
+    static int cn1ArcStartDegrees(double clockStartDeg) {
+<span class="fc" id="L1026">        return (int) Math.round(90 - clockStartDeg);</span>
+    }
+
+    /// Converts a clockwise-positive sweep to the counterclockwise-positive
+    /// `Graphics.fillArc`/`drawArc` sweep. Package-private for unit tests.
+    static int cn1ArcSweepDegrees(double clockSweepDeg) {
+<span class="fc" id="L1032">        return (int) Math.round(-clockSweepDeg);</span>
+    }
+
+    /// Composes a clockwise-on-screen rotation about a pivot (both in the source coordinate
+    /// space) onto an affine `{m00, m01, m10, m11, tx, ty}`. Package-private for unit tests.
+    static double[] composeRotation(double[] t, double clockwiseDeg, double px, double py) {
+<span class="fc" id="L1038">        double a = Math.toRadians(clockwiseDeg);</span>
+<span class="fc" id="L1039">        double cos = Math.cos(a);</span>
+<span class="fc" id="L1040">        double sin = Math.sin(a);</span>
+        // local matrix: translate(px, py) * rotate(a) * translate(-px, -py); with y growing
+        // downward the standard rotation matrix advances clockwise on screen
+<span class="fc" id="L1043">        double m00 = cos;</span>
+<span class="fc" id="L1044">        double m01 = -sin;</span>
+<span class="fc" id="L1045">        double m10 = sin;</span>
+<span class="fc" id="L1046">        double m11 = cos;</span>
+<span class="fc" id="L1047">        double mtx = px - cos * px + sin * py;</span>
+<span class="fc" id="L1048">        double mty = py - sin * px - cos * py;</span>
+<span class="fc" id="L1049">        return new double[] {</span>
+            t[0] * m00 + t[1] * m10,
+            t[0] * m01 + t[1] * m11,
+            t[2] * m00 + t[3] * m10,
+            t[2] * m01 + t[3] * m11,
+            t[0] * mtx + t[1] * mty + t[4],
+            t[2] * mtx + t[3] * mty + t[5]
+        };
+    }
+
+    /// Applies an affine `{m00, m01, m10, m11, tx, ty}` to a point. Package-private for unit
+    /// tests.
+    static double[] transformPoint(double[] t, double x, double y) {
+<span class="fc" id="L1062">        return new double[] {</span>
+            t[0] * x + t[1] * y + t[4],
+            t[2] * x + t[3] * y + t[5]
+        };
+    }
+
+    // --- attribute helpers --------------------------------------------------------
+
+    /// Replaces `${key}` placeholders with `String.valueOf` of the state value; missing keys
+    /// render as an empty string. Package-private for unit tests.
+    static String interpolate(String text, Map&lt;String, Object&gt; state) {
+<span class="pc bpc" id="L1073" title="1 of 4 branches missed.">        if (text == null || text.indexOf(&quot;${&quot;) &lt; 0) {</span>
+<span class="fc" id="L1074">            return text;</span>
+        }
+<span class="fc" id="L1076">        StringBuilder sb = new StringBuilder(text.length());</span>
+<span class="fc" id="L1077">        int i = 0;</span>
+<span class="fc" id="L1078">        int len = text.length();</span>
+<span class="fc bfc" id="L1079" title="All 2 branches covered.">        while (i &lt; len) {</span>
+<span class="fc" id="L1080">            int start = text.indexOf(&quot;${&quot;, i);</span>
+<span class="fc bfc" id="L1081" title="All 2 branches covered.">            if (start &lt; 0) {</span>
+<span class="fc" id="L1082">                sb.append(text.substring(i));</span>
+<span class="fc" id="L1083">                break;</span>
+            }
+<span class="fc" id="L1085">            int end = text.indexOf('}', start + 2);</span>
+<span class="fc bfc" id="L1086" title="All 2 branches covered.">            if (end &lt; 0) {</span>
+<span class="fc" id="L1087">                sb.append(text.substring(i));</span>
+<span class="fc" id="L1088">                break;</span>
+            }
+<span class="fc" id="L1090">            sb.append(text.substring(i, start));</span>
+<span class="fc" id="L1091">            String key = text.substring(start + 2, end);</span>
+<span class="fc bfc" id="L1092" title="All 2 branches covered.">            Object value = state == null ? null : state.get(key);</span>
+<span class="fc bfc" id="L1093" title="All 2 branches covered.">            if (value != null) {</span>
+<span class="fc" id="L1094">                sb.append(String.valueOf(value));</span>
+            }
+<span class="fc" id="L1096">            i = end + 1;</span>
+<span class="fc" id="L1097">        }</span>
+<span class="fc" id="L1098">        return sb.toString();</span>
+    }
+
+    /// Resolves a wire color (`{&quot;l&quot;:..,&quot;d&quot;:..}` pair or `{&quot;role&quot;:..}`) to ARGB. Package-private
+    /// for unit tests.
+    @SuppressWarnings(&quot;unchecked&quot;)
+    static int resolveColor(Object colorObj, boolean dark, int fallback) {
+<span class="fc bfc" id="L1105" title="All 2 branches covered.">        if (!(colorObj instanceof Map)) {</span>
+<span class="fc" id="L1106">            return fallback;</span>
+        }
+<span class="fc" id="L1108">        Map&lt;String, Object&gt; m = (Map&lt;String, Object&gt;) colorObj;</span>
+<span class="fc" id="L1109">        Object role = m.get(&quot;role&quot;);</span>
+<span class="fc bfc" id="L1110" title="All 2 branches covered.">        if (role instanceof String) {</span>
+<span class="fc bfc" id="L1111" title="All 2 branches covered.">            if (&quot;label&quot;.equals(role)) {</span>
+<span class="fc bfc" id="L1112" title="All 2 branches covered.">                return dark ? ROLE_LABEL_DARK : ROLE_LABEL_LIGHT;</span>
+            }
+<span class="pc bpc" id="L1114" title="1 of 2 branches missed.">            if (&quot;secondaryLabel&quot;.equals(role)) {</span>
+<span class="nc bnc" id="L1115" title="All 2 branches missed.">                return dark ? ROLE_SECONDARY_DARK : ROLE_SECONDARY_LIGHT;</span>
+            }
+<span class="pc bpc" id="L1117" title="1 of 2 branches missed.">            if (&quot;background&quot;.equals(role)) {</span>
+<span class="nc bnc" id="L1118" title="All 2 branches missed.">                return dark ? ROLE_BACKGROUND_DARK : ROLE_BACKGROUND_LIGHT;</span>
+            }
+<span class="pc bpc" id="L1120" title="1 of 2 branches missed.">            if (&quot;accent&quot;.equals(role)) {</span>
+<span class="fc" id="L1121">                return ROLE_ACCENT;</span>
+            }
+<span class="nc" id="L1123">            return fallback;</span>
+        }
+<span class="fc bfc" id="L1125" title="All 2 branches covered.">        Object v = dark ? m.get(&quot;d&quot;) : m.get(&quot;l&quot;);</span>
+<span class="pc bpc" id="L1126" title="1 of 2 branches missed.">        if (v instanceof Number) {</span>
+<span class="fc" id="L1127">            return (int) ((Number) v).longValue();</span>
+        }
+<span class="nc" id="L1129">        return fallback;</span>
+    }
+
+    /// Applies an ARGB color to the graphics: RGB via `setColor`, alpha via `setAlpha`. The
+    /// alpha byte is honored verbatim (a fully transparent color draws nothing), matching how
+    /// the iOS and Android renderers consume the same wire value.
+    private static void setPaint(Graphics g, int argb) {
+<span class="nc" id="L1136">        g.setColor(argb &amp; 0xffffff);</span>
+<span class="nc" id="L1137">        g.setAlpha(alphaOf(argb));</span>
+<span class="nc" id="L1138">    }</span>
+
+    private static int alphaOf(int argb) {
+<span class="nc" id="L1141">        return (argb &gt;&gt;&gt; 24) &amp; 0xff;</span>
+    }
+
+    private static Font fontOf(Map&lt;String, Object&gt; map) {
+<span class="nc" id="L1145">        int size = asInt(map.get(&quot;size&quot;), 0);</span>
+<span class="nc bnc" id="L1146" title="All 2 branches missed.">        return fontFor(size &lt;= 0 ? DEFAULT_FONT_SIZE : size,</span>
+<span class="nc" id="L1147">                asString(map.get(&quot;fw&quot;), &quot;regular&quot;));</span>
+    }
+
+    private static Font fontFor(int px, String weight) {
+<span class="nc bnc" id="L1151" title="All 4 branches missed.">        boolean bold = &quot;semibold&quot;.equals(weight) || &quot;bold&quot;.equals(weight);</span>
+        try {
+            // exact pixel sizing with weights when the port ships native: fonts
+            String name;
+<span class="nc bnc" id="L1155" title="All 2 branches missed.">            if (bold) {</span>
+<span class="nc" id="L1156">                name = &quot;native:MainBold&quot;;</span>
+<span class="nc bnc" id="L1157" title="All 2 branches missed.">            } else if (&quot;light&quot;.equals(weight)) {</span>
+<span class="nc" id="L1158">                name = &quot;native:MainLight&quot;;</span>
+            } else {
+<span class="nc" id="L1160">                name = &quot;native:MainRegular&quot;;</span>
+            }
+<span class="nc" id="L1162">            Font f = Font.createTrueTypeFont(name, name);</span>
+<span class="nc bnc" id="L1163" title="All 2 branches missed.">            if (f != null) {</span>
+<span class="nc" id="L1164">                return f.derive(px, Font.STYLE_PLAIN);</span>
+            }
+<span class="nc" id="L1166">        } catch (Throwable ignored) {</span>
+            // fall through to the coarse system font buckets
+<span class="nc" id="L1168">        }</span>
+        int bucket;
+<span class="nc bnc" id="L1170" title="All 2 branches missed.">        if (px &lt;= 12) {</span>
+<span class="nc" id="L1171">            bucket = Font.SIZE_SMALL;</span>
+<span class="nc bnc" id="L1172" title="All 2 branches missed.">        } else if (px &lt;= 18) {</span>
+<span class="nc" id="L1173">            bucket = Font.SIZE_MEDIUM;</span>
+        } else {
+<span class="nc" id="L1175">            bucket = Font.SIZE_LARGE;</span>
+        }
+<span class="nc bnc" id="L1177" title="All 2 branches missed.">        return Font.createSystemFont(Font.FACE_SYSTEM,</span>
+                bold ? Font.STYLE_BOLD : Font.STYLE_PLAIN, bucket);
+    }
+
+    private static int[] paddingOf(Map&lt;String, Object&gt; map) {
+<span class="nc" id="L1182">        int[] pad = new int[4];</span>
+<span class="nc" id="L1183">        Object p = map.get(&quot;pad&quot;);</span>
+<span class="nc bnc" id="L1184" title="All 2 branches missed.">        if (p instanceof List) {</span>
+<span class="nc" id="L1185">            List&lt;?&gt; list = (List&lt;?&gt;) p;</span>
+<span class="nc bnc" id="L1186" title="All 4 branches missed.">            for (int i = 0; i &lt; 4 &amp;&amp; i &lt; list.size(); i++) {</span>
+<span class="nc" id="L1187">                pad[i] = asInt(list.get(i), 0);</span>
+            }
+        }
+<span class="nc" id="L1190">        return pad;</span>
+    }
+
+    /// Returns `{horizontal, vertical}` alignment components, each -1 (leading/top), 0 (center)
+    /// or 1 (trailing/bottom). Defaults to center.
+    private static int[] alignmentOf(Map&lt;String, Object&gt; map) {
+<span class="nc" id="L1196">        String a = asString(map.get(&quot;align&quot;), &quot;center&quot;);</span>
+<span class="nc" id="L1197">        int hAlign = 0;</span>
+<span class="nc" id="L1198">        int vAlign = 0;</span>
+<span class="nc bnc" id="L1199" title="All 6 branches missed.">        if (&quot;leading&quot;.equals(a) || &quot;topLeading&quot;.equals(a) || &quot;bottomLeading&quot;.equals(a)) {</span>
+<span class="nc" id="L1200">            hAlign = -1;</span>
+<span class="nc bnc" id="L1201" title="All 6 branches missed.">        } else if (&quot;trailing&quot;.equals(a) || &quot;topTrailing&quot;.equals(a) || &quot;bottomTrailing&quot;.equals(a)) {</span>
+<span class="nc" id="L1202">            hAlign = 1;</span>
+        }
+<span class="nc bnc" id="L1204" title="All 6 branches missed.">        if (&quot;top&quot;.equals(a) || &quot;topLeading&quot;.equals(a) || &quot;topTrailing&quot;.equals(a)) {</span>
+<span class="nc" id="L1205">            vAlign = -1;</span>
+<span class="nc bnc" id="L1206" title="All 6 branches missed.">        } else if (&quot;bottom&quot;.equals(a) || &quot;bottomLeading&quot;.equals(a) || &quot;bottomTrailing&quot;.equals(a)) {</span>
+<span class="nc" id="L1207">            vAlign = 1;</span>
+        }
+<span class="nc" id="L1209">        return new int[] {hAlign, vAlign};</span>
+    }
+
+    private static Image decodeImage(String name, Map&lt;String, byte[]&gt; images) {
+<span class="nc bnc" id="L1213" title="All 6 branches missed.">        if (name == null || name.length() == 0 || images == null) {</span>
+<span class="nc" id="L1214">            return null;</span>
+        }
+<span class="nc" id="L1216">        Image cached = decodedImages.get(name);</span>
+<span class="nc bnc" id="L1217" title="All 2 branches missed.">        if (cached != null) {</span>
+<span class="nc" id="L1218">            return cached;</span>
+        }
+<span class="nc" id="L1220">        byte[] data = images.get(name);</span>
+<span class="nc bnc" id="L1221" title="All 2 branches missed.">        if (data == null) {</span>
+<span class="nc" id="L1222">            return null;</span>
+        }
+        try {
+<span class="nc" id="L1225">            Image img = Image.createImage(new ByteArrayInputStream(data));</span>
+<span class="nc bnc" id="L1226" title="All 2 branches missed.">            if (decodedImages.size() &gt;= DECODED_IMAGE_CACHE_CAP) {</span>
+<span class="nc" id="L1227">                decodedImages.clear();</span>
+            }
+<span class="nc" id="L1229">            decodedImages.put(name, img);</span>
+<span class="nc" id="L1230">            return img;</span>
+<span class="nc" id="L1231">        } catch (Throwable t) {</span>
+<span class="nc" id="L1232">            Log.e(t);</span>
+<span class="nc" id="L1233">            return null;</span>
+        }
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static List&lt;Map&lt;String, Object&gt;&gt; entriesOf(Map&lt;String, Object&gt; timelineDoc) {
+<span class="fc" id="L1239">        List&lt;Map&lt;String, Object&gt;&gt; result = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc bfc" id="L1240" title="All 2 branches covered.">        if (timelineDoc == null) {</span>
+<span class="fc" id="L1241">            return result;</span>
+        }
+<span class="fc" id="L1243">        Object entries = timelineDoc.get(&quot;entries&quot;);</span>
+<span class="fc bfc" id="L1244" title="All 2 branches covered.">        if (entries instanceof List) {</span>
+<span class="fc bfc" id="L1245" title="All 2 branches covered.">            for (Object e : (List&lt;Object&gt;) entries) {</span>
+<span class="pc bpc" id="L1246" title="1 of 2 branches missed.">                if (e instanceof Map) {</span>
+<span class="fc" id="L1247">                    result.add((Map&lt;String, Object&gt;) e);</span>
+                }
+<span class="fc" id="L1249">            }</span>
+        }
+<span class="fc" id="L1251">        return result;</span>
+    }
+
+    private static int asInt(Object o, int def) {
+<span class="nc bnc" id="L1255" title="All 2 branches missed.">        return o instanceof Number ? ((Number) o).intValue() : def;</span>
+    }
+
+    private static long asLong(Object o, long def) {
+<span class="pc bpc" id="L1259" title="1 of 2 branches missed.">        return o instanceof Number ? ((Number) o).longValue() : def;</span>
+    }
+
+    private static double asDouble(Object o, double def) {
+<span class="nc bnc" id="L1263" title="All 2 branches missed.">        return o instanceof Number ? ((Number) o).doubleValue() : def;</span>
+    }
+
+    /// JSONParser hands booleans back as the strings &quot;true&quot;/&quot;false&quot; unless configured
+    /// otherwise; accept both representations.
+    private static boolean asBoolean(Object o) {
+<span class="nc bnc" id="L1269" title="All 4 branches missed.">        return Boolean.TRUE.equals(o) || &quot;true&quot;.equals(o);</span>
+    }
+
+    private static String asString(Object o, String def) {
+<span class="nc bnc" id="L1273" title="All 2 branches missed.">        return o instanceof String ? (String) o : def;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

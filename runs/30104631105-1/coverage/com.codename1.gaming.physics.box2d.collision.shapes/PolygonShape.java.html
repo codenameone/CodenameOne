@@ -1,0 +1,578 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolygonShape.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.collision.shapes</a> &gt; <span class="el_source">PolygonShape.java</span></div><h1>PolygonShape.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.collision.shapes;
+
+import com.codename1.gaming.physics.box2d.collision.AABB;
+import com.codename1.gaming.physics.box2d.collision.RayCastInput;
+import com.codename1.gaming.physics.box2d.collision.RayCastOutput;
+import com.codename1.gaming.physics.box2d.common.MathUtils;
+import com.codename1.gaming.physics.box2d.common.Rot;
+import com.codename1.gaming.physics.box2d.common.Settings;
+import com.codename1.gaming.physics.box2d.common.Transform;
+import com.codename1.gaming.physics.box2d.common.Vec2;
+import com.codename1.gaming.physics.box2d.pooling.arrays.IntArray;
+import com.codename1.gaming.physics.box2d.pooling.arrays.Vec2Array;
+
+/// A convex polygon shape. Polygons have a maximum number of vertices equal to _maxPolygonVertices.
+/// In most cases you should not need many vertices for a convex polygon.
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">public class PolygonShape extends Shape {</span>
+  /// Dump lots of debug information.
+  private final static boolean m_debug = false;
+
+  /// Local position of the shape centroid in parent body frame.
+<span class="fc" id="L44">  public final Vec2 m_centroid = new Vec2();</span>
+
+  /// The vertices of the shape. Note: use getVertexCount(), not m_vertices.length, to get number of
+  /// active vertices.
+  public final Vec2 m_vertices[];
+
+  /// The normals of the shape. Note: use getVertexCount(), not m_normals.length, to get number of
+  /// active normals.
+  public final Vec2 m_normals[];
+
+  /// Number of active vertices in the shape.
+  public int m_count;
+
+  // pooling
+<span class="fc" id="L58">  private final Vec2 pool1 = new Vec2();</span>
+<span class="fc" id="L59">  private final Vec2 pool2 = new Vec2();</span>
+<span class="fc" id="L60">  private final Vec2 pool3 = new Vec2();</span>
+<span class="fc" id="L61">  private final Vec2 pool4 = new Vec2();</span>
+<span class="fc" id="L62">  private Transform poolt1 = new Transform();</span>
+
+  public PolygonShape() {
+<span class="fc" id="L65">    super(ShapeType.POLYGON);</span>
+
+<span class="fc" id="L67">    m_count = 0;</span>
+<span class="fc" id="L68">    m_vertices = new Vec2[Settings.maxPolygonVertices];</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">    for (int i = 0; i &lt; m_vertices.length; i++) {</span>
+<span class="fc" id="L70">      m_vertices[i] = new Vec2();</span>
+    }
+<span class="fc" id="L72">    m_normals = new Vec2[Settings.maxPolygonVertices];</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">    for (int i = 0; i &lt; m_normals.length; i++) {</span>
+<span class="fc" id="L74">      m_normals[i] = new Vec2();</span>
+    }
+<span class="fc" id="L76">    setRadius(Settings.polygonRadius);</span>
+<span class="fc" id="L77">    m_centroid.setZero();</span>
+<span class="fc" id="L78">  }</span>
+
+  public final Shape clone() {
+<span class="fc" id="L81">    PolygonShape shape = new PolygonShape();</span>
+<span class="fc" id="L82">    shape.m_centroid.set(this.m_centroid);</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">    for (int i = 0; i &lt; shape.m_normals.length; i++) {</span>
+<span class="fc" id="L84">      shape.m_normals[i].set(m_normals[i]);</span>
+<span class="fc" id="L85">      shape.m_vertices[i].set(m_vertices[i]);</span>
+    }
+<span class="fc" id="L87">    shape.setRadius(this.getRadius());</span>
+<span class="fc" id="L88">    shape.m_count = this.m_count;</span>
+<span class="fc" id="L89">    return shape;</span>
+  }
+
+  /// Create a convex hull from the given array of points. The count must be in the range [3,
+  /// Settings.maxPolygonVertices].
+  ///
+  /// @warning the points may be re-ordered, even if they form a convex polygon
+  /// @warning collinear points are handled but not removed. Collinear points may lead to poor
+  ///          stacking behavior.
+  public final void set(final Vec2[] vertices, final int count) {
+<span class="fc" id="L99">    set(vertices, count, null, null);</span>
+<span class="fc" id="L100">  }</span>
+
+  /// Create a convex hull from the given array of points. The count must be in the range [3,
+  /// Settings.maxPolygonVertices]. This method takes an arraypool for pooling
+  ///
+  /// @warning the points may be re-ordered, even if they form a convex polygon
+  /// @warning collinear points are handled but not removed. Collinear points may lead to poor
+  ///          stacking behavior.
+  public final void set(final Vec2[] verts, final int num, final Vec2Array vecPool,
+      final IntArray intPool) {
+<span class="pc bpc" id="L110" title="3 of 6 branches missed.">    assert (3 &lt;= num &amp;&amp; num &lt;= Settings.maxPolygonVertices);</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">    if (num &lt; 3) {</span>
+<span class="nc" id="L112">      setAsBox(1.0f, 1.0f);</span>
+<span class="nc" id="L113">      return;</span>
+    }
+
+<span class="fc" id="L116">    int n = MathUtils.min(num, Settings.maxPolygonVertices);</span>
+
+    // Copy the vertices into a local buffer
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">    Vec2[] ps = (vecPool != null) ? vecPool.get(n) : new Vec2[n];</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">    for (int i = 0; i &lt; n; ++i) {</span>
+<span class="fc" id="L121">      ps[i] = verts[i];</span>
+    }
+
+    // Create the convex hull using the Gift wrapping algorithm
+    // http://en.wikipedia.org/wiki/Gift_wrapping_algorithm
+
+    // Find the right most point on the hull
+<span class="fc" id="L128">    int i0 = 0;</span>
+<span class="fc" id="L129">    float x0 = ps[0].x;</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">    for (int i = 1; i &lt; num; ++i) {</span>
+<span class="fc" id="L131">      float x = ps[i].x;</span>
+<span class="fc bfc" id="L132" title="All 6 branches covered.">      if (x &gt; x0 || (x == x0 &amp;&amp; ps[i].y &lt; ps[i0].y)) {</span>
+<span class="fc" id="L133">        i0 = i;</span>
+<span class="fc" id="L134">        x0 = x;</span>
+      }
+    }
+
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">    int[] hull =</span>
+        (intPool != null)
+<span class="pc" id="L140">            ? intPool.get(Settings.maxPolygonVertices)</span>
+            : new int[Settings.maxPolygonVertices];
+<span class="fc" id="L142">    int m = 0;</span>
+<span class="fc" id="L143">    int ih = i0;</span>
+
+    while (true) {
+<span class="fc" id="L146">      hull[m] = ih;</span>
+
+<span class="fc" id="L148">      int ie = 0;</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">      for (int j = 1; j &lt; n; ++j) {</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (ie == ih) {</span>
+<span class="fc" id="L151">          ie = j;</span>
+<span class="fc" id="L152">          continue;</span>
+        }
+
+<span class="fc" id="L155">        Vec2 r = pool1.set(ps[ie]).subLocal(ps[hull[m]]);</span>
+<span class="fc" id="L156">        Vec2 v = pool2.set(ps[j]).subLocal(ps[hull[m]]);</span>
+<span class="fc" id="L157">        float c = Vec2.cross(r, v);</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (c &lt; 0.0f) {</span>
+<span class="fc" id="L159">          ie = j;</span>
+        }
+
+        // Collinearity check
+<span class="pc bpc" id="L163" title="1 of 4 branches missed.">        if (c == 0.0f &amp;&amp; v.lengthSquared() &gt; r.lengthSquared()) {</span>
+<span class="nc" id="L164">          ie = j;</span>
+        }
+      }
+
+<span class="fc" id="L168">      ++m;</span>
+<span class="fc" id="L169">      ih = ie;</span>
+
+<span class="fc bfc" id="L171" title="All 2 branches covered.">      if (ie == i0) {</span>
+<span class="fc" id="L172">        break;</span>
+      }
+<span class="fc" id="L174">    }</span>
+
+<span class="fc" id="L176">    this.m_count = m;</span>
+
+    // Copy vertices.
+<span class="fc bfc" id="L179" title="All 2 branches covered.">    for (int i = 0; i &lt; m_count; ++i) {</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">      if (m_vertices[i] == null) {</span>
+<span class="nc" id="L181">        m_vertices[i] = new Vec2();</span>
+      }
+<span class="fc" id="L183">      m_vertices[i].set(ps[hull[i]]);</span>
+    }
+
+<span class="fc" id="L186">    final Vec2 edge = pool1;</span>
+
+    // Compute normals. Ensure the edges have non-zero length.
+<span class="fc bfc" id="L189" title="All 2 branches covered.">    for (int i = 0; i &lt; m_count; ++i) {</span>
+<span class="fc" id="L190">      final int i1 = i;</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">      final int i2 = i + 1 &lt; m_count ? i + 1 : 0;</span>
+<span class="fc" id="L192">      edge.set(m_vertices[i2]).subLocal(m_vertices[i1]);</span>
+
+<span class="pc bpc" id="L194" title="2 of 4 branches missed.">      assert (edge.lengthSquared() &gt; Settings.EPSILON * Settings.EPSILON);</span>
+<span class="fc" id="L195">      Vec2.crossToOutUnsafe(edge, 1f, m_normals[i]);</span>
+<span class="fc" id="L196">      m_normals[i].normalize();</span>
+    }
+
+    // Compute the polygon centroid.
+<span class="fc" id="L200">    computeCentroidToOut(m_vertices, m_count, m_centroid);</span>
+<span class="fc" id="L201">  }</span>
+
+  /// Build vertices to represent an axis-aligned box.
+  ///
+  /// @param hx the half-width.
+  /// @param hy the half-height.
+  public final void setAsBox(final float hx, final float hy) {
+<span class="fc" id="L208">    m_count = 4;</span>
+<span class="fc" id="L209">    m_vertices[0].set(-hx, -hy);</span>
+<span class="fc" id="L210">    m_vertices[1].set(hx, -hy);</span>
+<span class="fc" id="L211">    m_vertices[2].set(hx, hy);</span>
+<span class="fc" id="L212">    m_vertices[3].set(-hx, hy);</span>
+<span class="fc" id="L213">    m_normals[0].set(0.0f, -1.0f);</span>
+<span class="fc" id="L214">    m_normals[1].set(1.0f, 0.0f);</span>
+<span class="fc" id="L215">    m_normals[2].set(0.0f, 1.0f);</span>
+<span class="fc" id="L216">    m_normals[3].set(-1.0f, 0.0f);</span>
+<span class="fc" id="L217">    m_centroid.setZero();</span>
+<span class="fc" id="L218">  }</span>
+
+  /// Build vertices to represent an oriented box.
+  ///
+  /// @param hx the half-width.
+  /// @param hy the half-height.
+  /// @param center the center of the box in local coordinates.
+  /// @param angle the rotation of the box in local coordinates.
+  public final void setAsBox(final float hx, final float hy, final Vec2 center, final float angle) {
+<span class="nc" id="L227">    m_count = 4;</span>
+<span class="nc" id="L228">    m_vertices[0].set(-hx, -hy);</span>
+<span class="nc" id="L229">    m_vertices[1].set(hx, -hy);</span>
+<span class="nc" id="L230">    m_vertices[2].set(hx, hy);</span>
+<span class="nc" id="L231">    m_vertices[3].set(-hx, hy);</span>
+<span class="nc" id="L232">    m_normals[0].set(0.0f, -1.0f);</span>
+<span class="nc" id="L233">    m_normals[1].set(1.0f, 0.0f);</span>
+<span class="nc" id="L234">    m_normals[2].set(0.0f, 1.0f);</span>
+<span class="nc" id="L235">    m_normals[3].set(-1.0f, 0.0f);</span>
+<span class="nc" id="L236">    m_centroid.set(center);</span>
+
+<span class="nc" id="L238">    final Transform xf = poolt1;</span>
+<span class="nc" id="L239">    xf.p.set(center);</span>
+<span class="nc" id="L240">    xf.q.set(angle);</span>
+
+    // Transform vertices and normals.
+<span class="nc bnc" id="L243" title="All 2 branches missed.">    for (int i = 0; i &lt; m_count; ++i) {</span>
+<span class="nc" id="L244">      Transform.mulToOut(xf, m_vertices[i], m_vertices[i]);</span>
+<span class="nc" id="L245">      Rot.mulToOut(xf.q, m_normals[i], m_normals[i]);</span>
+    }
+<span class="nc" id="L247">  }</span>
+
+  public int getChildCount() {
+<span class="fc" id="L250">    return 1;</span>
+  }
+
+  public final boolean testPoint(final Transform xf, final Vec2 p) {
+    float tempx, tempy;
+<span class="fc" id="L255">    final Rot xfq = xf.q;</span>
+
+<span class="fc" id="L257">    tempx = p.x - xf.p.x;</span>
+<span class="fc" id="L258">    tempy = p.y - xf.p.y;</span>
+<span class="fc" id="L259">    final float pLocalx = xfq.c * tempx + xfq.s * tempy;</span>
+<span class="fc" id="L260">    final float pLocaly = -xfq.s * tempx + xfq.c * tempy;</span>
+
+    if (m_debug) {
+      System.out.println(&quot;--testPoint debug--&quot;);
+      System.out.println(&quot;Vertices: &quot;);
+      for (int i = 0; i &lt; m_count; ++i) {
+        System.out.println(m_vertices[i]);
+      }
+      System.out.println(&quot;pLocal: &quot; + pLocalx + &quot;, &quot; + pLocaly);
+    }
+
+<span class="fc bfc" id="L271" title="All 2 branches covered.">    for (int i = 0; i &lt; m_count; ++i) {</span>
+<span class="fc" id="L272">      Vec2 vertex = m_vertices[i];</span>
+<span class="fc" id="L273">      Vec2 normal = m_normals[i];</span>
+<span class="fc" id="L274">      tempx = pLocalx - vertex.x;</span>
+<span class="fc" id="L275">      tempy = pLocaly - vertex.y;</span>
+<span class="fc" id="L276">      final float dot = normal.x * tempx + normal.y * tempy;</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">      if (dot &gt; 0.0f) {</span>
+<span class="fc" id="L278">        return false;</span>
+      }
+    }
+
+<span class="fc" id="L282">    return true;</span>
+  }
+
+  public final void computeAABB(final AABB aabb, final Transform xf, int childIndex) {
+<span class="fc" id="L286">    final Vec2 lower = aabb.lowerBound;</span>
+<span class="fc" id="L287">    final Vec2 upper = aabb.upperBound;</span>
+<span class="fc" id="L288">    final Vec2 v1 = m_vertices[0];</span>
+<span class="fc" id="L289">    final Rot xfq = xf.q;</span>
+<span class="fc" id="L290">    final Vec2 xfp = xf.p;</span>
+    float vx, vy;
+<span class="fc" id="L292">    lower.x = (xfq.c * v1.x - xfq.s * v1.y) + xfp.x;</span>
+<span class="fc" id="L293">    lower.y = (xfq.s * v1.x + xfq.c * v1.y) + xfp.y;</span>
+<span class="fc" id="L294">    upper.x = lower.x;</span>
+<span class="fc" id="L295">    upper.y = lower.y;</span>
+
+<span class="fc bfc" id="L297" title="All 2 branches covered.">    for (int i = 1; i &lt; m_count; ++i) {</span>
+<span class="fc" id="L298">      Vec2 v2 = m_vertices[i];</span>
+      // Vec2 v = Mul(xf, m_vertices[i]);
+<span class="fc" id="L300">      vx = (xfq.c * v2.x - xfq.s * v2.y) + xfp.x;</span>
+<span class="fc" id="L301">      vy = (xfq.s * v2.x + xfq.c * v2.y) + xfp.y;</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">      lower.x = lower.x &lt; vx ? lower.x : vx;</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">      lower.y = lower.y &lt; vy ? lower.y : vy;</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">      upper.x = upper.x &gt; vx ? upper.x : vx;</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">      upper.y = upper.y &gt; vy ? upper.y : vy;</span>
+    }
+
+<span class="fc" id="L308">    lower.x -= m_radius;</span>
+<span class="fc" id="L309">    lower.y -= m_radius;</span>
+<span class="fc" id="L310">    upper.x += m_radius;</span>
+<span class="fc" id="L311">    upper.y += m_radius;</span>
+<span class="fc" id="L312">  }</span>
+
+  /// Get the vertex count.
+  ///
+  /// @return
+  public final int getVertexCount() {
+<span class="fc" id="L318">    return m_count;</span>
+  }
+
+  /// Get a vertex by index.
+  ///
+  /// @param index
+  /// @return
+  public final Vec2 getVertex(final int index) {
+<span class="nc bnc" id="L326" title="All 6 branches missed.">    assert (0 &lt;= index &amp;&amp; index &lt; m_count);</span>
+<span class="nc" id="L327">    return m_vertices[index];</span>
+  }
+
+  public final boolean raycast(RayCastOutput output, RayCastInput input, Transform xf,
+      int childIndex) {
+<span class="fc" id="L332">    final Rot xfq = xf.q;</span>
+<span class="fc" id="L333">    final Vec2 xfp = xf.p;</span>
+    float tempx, tempy;
+    // b2Vec2 p1 = b2MulT(xf.q, input.p1 - xf.p);
+    // b2Vec2 p2 = b2MulT(xf.q, input.p2 - xf.p);
+<span class="fc" id="L337">    tempx = input.p1.x - xfp.x;</span>
+<span class="fc" id="L338">    tempy = input.p1.y - xfp.y;</span>
+<span class="fc" id="L339">    final float p1x = xfq.c * tempx + xfq.s * tempy;</span>
+<span class="fc" id="L340">    final float p1y = -xfq.s * tempx + xfq.c * tempy;</span>
+
+<span class="fc" id="L342">    tempx = input.p2.x - xfp.x;</span>
+<span class="fc" id="L343">    tempy = input.p2.y - xfp.y;</span>
+<span class="fc" id="L344">    final float p2x = xfq.c * tempx + xfq.s * tempy;</span>
+<span class="fc" id="L345">    final float p2y = -xfq.s * tempx + xfq.c * tempy;</span>
+
+<span class="fc" id="L347">    final float dx = p2x - p1x;</span>
+<span class="fc" id="L348">    final float dy = p2y - p1y;</span>
+
+<span class="fc" id="L350">    float lower = 0, upper = input.maxFraction;</span>
+
+<span class="fc" id="L352">    int index = -1;</span>
+
+<span class="fc bfc" id="L354" title="All 2 branches covered.">    for (int i = 0; i &lt; m_count; ++i) {</span>
+<span class="fc" id="L355">      Vec2 normal = m_normals[i];</span>
+<span class="fc" id="L356">      Vec2 vertex = m_vertices[i];</span>
+      // p = p1 + a * d
+      // dot(normal, p - v) = 0
+      // dot(normal, p1 - v) + a * dot(normal, d) = 0
+<span class="fc" id="L360">      float tempxn = vertex.x - p1x;</span>
+<span class="fc" id="L361">      float tempyn = vertex.y - p1y;</span>
+<span class="fc" id="L362">      final float numerator = normal.x * tempxn + normal.y * tempyn;</span>
+<span class="fc" id="L363">      final float denominator = normal.x * dx + normal.y * dy;</span>
+
+<span class="fc bfc" id="L365" title="All 2 branches covered.">      if (denominator == 0.0f) {</span>
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">        if (numerator &lt; 0.0f) {</span>
+<span class="nc" id="L367">          return false;</span>
+        }
+      } else {
+        // Note: we want this predicate without division:
+        // lower &lt; numerator / denominator, where denominator &lt; 0
+        // Since denominator &lt; 0, we have to flip the inequality:
+        // lower &lt; numerator / denominator &lt;==&gt; denominator * lower &gt;
+        // numerator.
+<span class="pc bpc" id="L375" title="1 of 4 branches missed.">        if (denominator &lt; 0.0f &amp;&amp; numerator &lt; lower * denominator) {</span>
+          // Increase lower.
+          // The segment enters this half-space.
+<span class="fc" id="L378">          lower = numerator / denominator;</span>
+<span class="fc" id="L379">          index = i;</span>
+<span class="pc bpc" id="L380" title="2 of 4 branches missed.">        } else if (denominator &gt; 0.0f &amp;&amp; numerator &lt; upper * denominator) {</span>
+          // Decrease upper.
+          // The segment exits this half-space.
+<span class="fc" id="L383">          upper = numerator / denominator;</span>
+        }
+      }
+
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">      if (upper &lt; lower) {</span>
+<span class="nc" id="L388">        return false;</span>
+      }
+    }
+
+<span class="pc bpc" id="L392" title="3 of 6 branches missed.">    assert (0.0f &lt;= lower &amp;&amp; lower &lt;= input.maxFraction);</span>
+
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">    if (index &gt;= 0) {</span>
+<span class="fc" id="L395">      output.fraction = lower;</span>
+      // normal = Mul(xf.R, m_normals[index]);
+<span class="fc" id="L397">      Vec2 normal = m_normals[index];</span>
+<span class="fc" id="L398">      Vec2 out = output.normal;</span>
+<span class="fc" id="L399">      out.x = xfq.c * normal.x - xfq.s * normal.y;</span>
+<span class="fc" id="L400">      out.y = xfq.s * normal.x + xfq.c * normal.y;</span>
+<span class="fc" id="L401">      return true;</span>
+    }
+<span class="nc" id="L403">    return false;</span>
+  }
+
+  public final void computeCentroidToOut(final Vec2[] vs, final int count, final Vec2 out) {
+<span class="pc bpc" id="L407" title="2 of 4 branches missed.">    assert (count &gt;= 3);</span>
+
+<span class="fc" id="L409">    out.set(0.0f, 0.0f);</span>
+<span class="fc" id="L410">    float area = 0.0f;</span>
+
+    // pRef is the reference point for forming triangles.
+    // It's location doesn't change the result (except for rounding error).
+<span class="fc" id="L414">    final Vec2 pRef = pool1;</span>
+<span class="fc" id="L415">    pRef.setZero();</span>
+
+<span class="fc" id="L417">    final Vec2 e1 = pool2;</span>
+<span class="fc" id="L418">    final Vec2 e2 = pool3;</span>
+
+<span class="fc" id="L420">    final float inv3 = 1.0f / 3.0f;</span>
+
+<span class="fc bfc" id="L422" title="All 2 branches covered.">    for (int i = 0; i &lt; count; ++i) {</span>
+      // Triangle vertices.
+<span class="fc" id="L424">      final Vec2 p1 = pRef;</span>
+<span class="fc" id="L425">      final Vec2 p2 = vs[i];</span>
+<span class="fc bfc" id="L426" title="All 2 branches covered.">      final Vec2 p3 = i + 1 &lt; count ? vs[i + 1] : vs[0];</span>
+
+<span class="fc" id="L428">      e1.set(p2).subLocal(p1);</span>
+<span class="fc" id="L429">      e2.set(p3).subLocal(p1);</span>
+
+<span class="fc" id="L431">      final float D = Vec2.cross(e1, e2);</span>
+
+<span class="fc" id="L433">      final float triangleArea = 0.5f * D;</span>
+<span class="fc" id="L434">      area += triangleArea;</span>
+
+      // Area weighted centroid
+<span class="fc" id="L437">      e1.set(p1).addLocal(p2).addLocal(p3).mulLocal(triangleArea * inv3);</span>
+<span class="fc" id="L438">      out.addLocal(e1);</span>
+    }
+
+    // Centroid
+<span class="pc bpc" id="L442" title="2 of 4 branches missed.">    assert (area &gt; Settings.EPSILON);</span>
+<span class="fc" id="L443">    out.mulLocal(1.0f / area);</span>
+<span class="fc" id="L444">  }</span>
+
+  public void computeMass(final MassData massData, float density) {
+    // Polygon mass, centroid, and inertia.
+    // Let rho be the polygon density in mass per unit area.
+    // Then:
+    // mass = rho * int(dA)
+    // centroid.x = (1/mass) * rho * int(x * dA)
+    // centroid.y = (1/mass) * rho * int(y * dA)
+    // I = rho * int((x*x + y*y) * dA)
+    //
+    // We can compute these integrals by summing all the integrals
+    // for each triangle of the polygon. To evaluate the integral
+    // for a single triangle, we make a change of variables to
+    // the (u,v) coordinates of the triangle:
+    // x = x0 + e1x * u + e2x * v
+    // y = y0 + e1y * u + e2y * v
+    // where 0 &lt;= u &amp;&amp; 0 &lt;= v &amp;&amp; u + v &lt;= 1.
+    //
+    // We integrate u from [0,1-v] and then v from [0,1].
+    // We also need to use the Jacobian of the transformation:
+    // D = cross(e1, e2)
+    //
+    // Simplification: triangle centroid = (1/3) * (p1 + p2 + p3)
+    //
+    // The rest of the derivation is handled by computer algebra.
+
+<span class="pc bpc" id="L471" title="2 of 4 branches missed.">    assert (m_count &gt;= 3);</span>
+
+<span class="fc" id="L473">    final Vec2 center = pool1;</span>
+<span class="fc" id="L474">    center.setZero();</span>
+<span class="fc" id="L475">    float area = 0.0f;</span>
+<span class="fc" id="L476">    float I = 0.0f;</span>
+
+    // pRef is the reference point for forming triangles.
+    // It's location doesn't change the result (except for rounding error).
+<span class="fc" id="L480">    final Vec2 s = pool2;</span>
+<span class="fc" id="L481">    s.setZero();</span>
+    // This code would put the reference point inside the polygon.
+<span class="fc bfc" id="L483" title="All 2 branches covered.">    for (int i = 0; i &lt; m_count; ++i) {</span>
+<span class="fc" id="L484">      s.addLocal(m_vertices[i]);</span>
+    }
+<span class="fc" id="L486">    s.mulLocal(1.0f / m_count);</span>
+
+<span class="fc" id="L488">    final float k_inv3 = 1.0f / 3.0f;</span>
+
+<span class="fc" id="L490">    final Vec2 e1 = pool3;</span>
+<span class="fc" id="L491">    final Vec2 e2 = pool4;</span>
+
+<span class="fc bfc" id="L493" title="All 2 branches covered.">    for (int i = 0; i &lt; m_count; ++i) {</span>
+      // Triangle vertices.
+<span class="fc" id="L495">      e1.set(m_vertices[i]).subLocal(s);</span>
+<span class="fc bfc" id="L496" title="All 2 branches covered.">      e2.set(s).negateLocal().addLocal(i + 1 &lt; m_count ? m_vertices[i + 1] : m_vertices[0]);</span>
+
+<span class="fc" id="L498">      final float D = Vec2.cross(e1, e2);</span>
+
+<span class="fc" id="L500">      final float triangleArea = 0.5f * D;</span>
+<span class="fc" id="L501">      area += triangleArea;</span>
+
+      // Area weighted centroid
+<span class="fc" id="L504">      center.x += triangleArea * k_inv3 * (e1.x + e2.x);</span>
+<span class="fc" id="L505">      center.y += triangleArea * k_inv3 * (e1.y + e2.y);</span>
+
+<span class="fc" id="L507">      final float ex1 = e1.x, ey1 = e1.y;</span>
+<span class="fc" id="L508">      final float ex2 = e2.x, ey2 = e2.y;</span>
+
+<span class="fc" id="L510">      float intx2 = ex1 * ex1 + ex2 * ex1 + ex2 * ex2;</span>
+<span class="fc" id="L511">      float inty2 = ey1 * ey1 + ey2 * ey1 + ey2 * ey2;</span>
+
+<span class="fc" id="L513">      I += (0.25f * k_inv3 * D) * (intx2 + inty2);</span>
+    }
+
+    // Total mass
+<span class="fc" id="L517">    massData.mass = density * area;</span>
+
+    // Center of mass
+<span class="pc bpc" id="L520" title="2 of 4 branches missed.">    assert (area &gt; Settings.EPSILON);</span>
+<span class="fc" id="L521">    center.mulLocal(1.0f / area);</span>
+<span class="fc" id="L522">    massData.center.set(center).addLocal(s);</span>
+
+    // Inertia tensor relative to the local origin (point s)
+<span class="fc" id="L525">    massData.I = I * density;</span>
+
+    // Shift to center of mass then to original body origin.
+<span class="fc" id="L528">    massData.I += massData.mass * (Vec2.dot(massData.center, massData.center));</span>
+<span class="fc" id="L529">  }</span>
+
+  /// Validate convexity. This is a very time consuming operation.
+  ///
+  /// @return
+  public boolean validate() {
+<span class="nc bnc" id="L535" title="All 2 branches missed.">    for (int i = 0; i &lt; m_count; ++i) {</span>
+<span class="nc" id="L536">      int i1 = i;</span>
+<span class="nc bnc" id="L537" title="All 2 branches missed.">      int i2 = i &lt; m_count - 1 ? i1 + 1 : 0;</span>
+<span class="nc" id="L538">      Vec2 p = m_vertices[i1];</span>
+<span class="nc" id="L539">      Vec2 e = pool1.set(m_vertices[i2]).subLocal(p);</span>
+
+<span class="nc bnc" id="L541" title="All 2 branches missed.">      for (int j = 0; j &lt; m_count; ++j) {</span>
+<span class="nc bnc" id="L542" title="All 4 branches missed.">        if (j == i1 || j == i2) {</span>
+<span class="nc" id="L543">          continue;</span>
+        }
+
+<span class="nc" id="L546">        Vec2 v = pool2.set(m_vertices[j]).subLocal(p);</span>
+<span class="nc" id="L547">        float c = Vec2.cross(e, v);</span>
+<span class="nc bnc" id="L548" title="All 2 branches missed.">        if (c &lt; 0.0f) {</span>
+<span class="nc" id="L549">          return false;</span>
+        }
+      }
+    }
+
+<span class="nc" id="L554">    return true;</span>
+  }
+
+  /// Get the vertices in local coordinates.
+  public Vec2[] getVertices() {
+<span class="nc" id="L559">    return m_vertices;</span>
+  }
+
+  /// Get the edge normal vectors. There is one for each vertex.
+  public Vec2[] getNormals() {
+<span class="nc" id="L564">    return m_normals;</span>
+  }
+
+  /// Get the centroid and apply the supplied transform.
+  public Vec2 centroid(final Transform xf) {
+<span class="nc" id="L569">    return Transform.mul(xf, m_centroid);</span>
+  }
+
+  /// Get the centroid and apply the supplied transform.
+  public Vec2 centroidToOut(final Transform xf, final Vec2 out) {
+<span class="nc" id="L574">    Transform.mulToOutUnsafe(xf, m_centroid, out);</span>
+<span class="nc" id="L575">    return out;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

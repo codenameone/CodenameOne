@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PiiScrubber.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crash</a> &gt; <span class="el_source">PiiScrubber.java</span></div><h1>PiiScrubber.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crash;
+
+/// Default PII scrubber for {@link CrashProtection} uploads. Designed to
+/// be subclassed: override {@link #scrubMessage(String)} or
+/// {@link #scrubFrame(String, String)} to extend the behaviour, then
+/// register the subclass with {@link CrashProtection#setScrubber(PiiScrubber)}.
+///
+/// Default behaviour applied to exception message strings only:
+///
+/// 1. Emails partially redacted: the local part is truncated to its first
+///    three characters followed by `***`, the domain is preserved.
+///    Example: `johndoe@example.com` becomes `joh***@example.com`.
+/// 2. Runs of six or more consecutive digits are replaced with `[num]`,
+///    catching phone numbers, long IDs, etc.
+/// 3. URLs are NOT scrubbed (they routinely carry useful debugging
+///    context; if a particular app embeds tokens in URLs it can opt-in
+///    to URL scrubbing by overriding this class).
+///
+/// Stack frames are not scrubbed by default. Class and method names do
+/// not carry PII; subclasses that emit synthetic frames containing user
+/// data may override {@link #scrubFrame(String, String)}.
+<span class="nc" id="L44">public class PiiScrubber {</span>
+
+    /// Scrubs PII from a free-form message, typically an exception message.
+    /// The default implementation applies email partial redaction and
+    /// long-digit-run masking.
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`: original message; may be `null`.
+    ///
+    /// #### Returns
+    ///
+    /// scrubbed message, or `null` if `message` is `null`.
+    public String scrubMessage(String message) {
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        if (message == null) {</span>
+<span class="nc" id="L59">            return null;</span>
+        }
+<span class="nc" id="L61">        String result = scrubEmails(message);</span>
+<span class="nc" id="L62">        result = scrubDigitRuns(result);</span>
+<span class="nc" id="L63">        return result;</span>
+    }
+
+    /// Scrubs PII from a single stack frame. Default implementation
+    /// returns the original method name unchanged.
+    ///
+    /// #### Parameters
+    ///
+    /// - `className`: fully-qualified class name of the frame.
+    /// - `methodName`: method name of the frame.
+    ///
+    /// #### Returns
+    ///
+    /// the (possibly modified) method name to upload.
+    public String scrubFrame(String className, String methodName) {
+<span class="nc" id="L78">        return methodName;</span>
+    }
+
+    /// Replaces all occurrences of an email-like substring with the form
+    /// `&lt;first-three&gt;***@&lt;domain&gt;`. Local parts shorter than three
+    /// characters are not padded; the original prefix is preserved and
+    /// followed by `***`. The domain (including TLD) is preserved verbatim.
+    ///
+    /// This implementation is character-driven rather than regex-based
+    /// to stay compatible with the Java 5 source level enforced by the
+    /// core framework module.
+    protected static String scrubEmails(String s) {
+<span class="nc bnc" id="L90" title="All 4 branches missed.">        if (s == null || s.indexOf('@') &lt; 0) {</span>
+<span class="nc" id="L91">            return s;</span>
+        }
+<span class="nc" id="L93">        int len = s.length();</span>
+<span class="nc" id="L94">        StringBuilder out = new StringBuilder(len);</span>
+<span class="nc" id="L95">        int i = 0;</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        while (i &lt; len) {</span>
+<span class="nc" id="L97">            char c = s.charAt(i);</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            if (c == '@') {</span>
+<span class="nc" id="L99">                int localStart = i;</span>
+<span class="nc bnc" id="L100" title="All 4 branches missed.">                while (localStart &gt; 0 &amp;&amp; isEmailLocalChar(s.charAt(localStart - 1))) {</span>
+<span class="nc" id="L101">                    localStart--;</span>
+                }
+<span class="nc" id="L103">                int domainEnd = i + 1;</span>
+<span class="nc bnc" id="L104" title="All 4 branches missed.">                while (domainEnd &lt; len &amp;&amp; isEmailDomainChar(s.charAt(domainEnd))) {</span>
+<span class="nc" id="L105">                    domainEnd++;</span>
+                }
+<span class="nc" id="L107">                String local = s.substring(localStart, i);</span>
+<span class="nc" id="L108">                String domain = s.substring(i + 1, domainEnd);</span>
+<span class="nc bnc" id="L109" title="All 4 branches missed.">                if (local.length() &gt; 0 &amp;&amp; isValidDomain(domain)) {</span>
+<span class="nc" id="L110">                    int alreadyWritten = i - localStart;</span>
+<span class="nc" id="L111">                    int outBaseLen = out.length() - alreadyWritten;</span>
+<span class="nc" id="L112">                    out.setLength(outBaseLen);</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                    int keep = local.length() &lt; 3 ? local.length() : 3;</span>
+<span class="nc" id="L114">                    out.append(local, 0, keep);</span>
+<span class="nc" id="L115">                    out.append(&quot;***@&quot;);</span>
+<span class="nc" id="L116">                    out.append(domain);</span>
+<span class="nc" id="L117">                    i = domainEnd;</span>
+<span class="nc" id="L118">                    continue;</span>
+                }
+            }
+<span class="nc" id="L121">            out.append(c);</span>
+<span class="nc" id="L122">            i++;</span>
+<span class="nc" id="L123">        }</span>
+<span class="nc" id="L124">        return out.toString();</span>
+    }
+
+    private static boolean isEmailLocalChar(char c) {
+<span class="nc bnc" id="L128" title="All 4 branches missed.">        if (c &gt;= 'a' &amp;&amp; c &lt;= 'z') {</span>
+<span class="nc" id="L129">            return true;</span>
+        }
+<span class="nc bnc" id="L131" title="All 4 branches missed.">        if (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') {</span>
+<span class="nc" id="L132">            return true;</span>
+        }
+<span class="nc bnc" id="L134" title="All 4 branches missed.">        if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="nc" id="L135">            return true;</span>
+        }
+<span class="nc bnc" id="L137" title="All 8 branches missed.">        return c == '.' || c == '_' || c == '+' || c == '-';</span>
+    }
+
+    private static boolean isEmailDomainChar(char c) {
+<span class="nc bnc" id="L141" title="All 4 branches missed.">        if (c &gt;= 'a' &amp;&amp; c &lt;= 'z') {</span>
+<span class="nc" id="L142">            return true;</span>
+        }
+<span class="nc bnc" id="L144" title="All 4 branches missed.">        if (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') {</span>
+<span class="nc" id="L145">            return true;</span>
+        }
+<span class="nc bnc" id="L147" title="All 4 branches missed.">        if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="nc" id="L148">            return true;</span>
+        }
+<span class="nc bnc" id="L150" title="All 4 branches missed.">        return c == '.' || c == '-';</span>
+    }
+
+    private static boolean isValidDomain(String domain) {
+<span class="nc" id="L154">        int dot = domain.indexOf('.');</span>
+<span class="nc bnc" id="L155" title="All 4 branches missed.">        if (dot &lt; 1 || dot == domain.length() - 1) {</span>
+<span class="nc" id="L156">            return false;</span>
+        }
+<span class="nc" id="L158">        int afterDot = domain.length() - dot - 1;</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        return afterDot &gt;= 2;</span>
+    }
+
+    /// Replaces every run of six or more consecutive ASCII digits with
+    /// the literal token `[num]`.
+    protected static String scrubDigitRuns(String s) {
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L166">            return null;</span>
+        }
+<span class="nc" id="L168">        int len = s.length();</span>
+<span class="nc" id="L169">        StringBuilder out = null;</span>
+<span class="nc" id="L170">        int i = 0;</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        while (i &lt; len) {</span>
+<span class="nc" id="L172">            char c = s.charAt(i);</span>
+<span class="nc bnc" id="L173" title="All 4 branches missed.">            if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="nc" id="L174">                int j = i + 1;</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">                while (j &lt; len) {</span>
+<span class="nc" id="L176">                    char d = s.charAt(j);</span>
+<span class="nc bnc" id="L177" title="All 4 branches missed.">                    if (d &lt; '0' || d &gt; '9') {</span>
+<span class="nc" id="L178">                        break;</span>
+                    }
+<span class="nc" id="L180">                    j++;</span>
+<span class="nc" id="L181">                }</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">                if (j - i &gt;= 6) {</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">                    if (out == null) {</span>
+<span class="nc" id="L184">                        out = new StringBuilder(len);</span>
+<span class="nc" id="L185">                        out.append(s, 0, i);</span>
+                    }
+<span class="nc" id="L187">                    out.append(&quot;[num]&quot;);</span>
+<span class="nc" id="L188">                    i = j;</span>
+<span class="nc" id="L189">                    continue;</span>
+                }
+<span class="nc bnc" id="L191" title="All 2 branches missed.">                if (out != null) {</span>
+<span class="nc" id="L192">                    out.append(s, i, j);</span>
+                }
+<span class="nc" id="L194">                i = j;</span>
+<span class="nc" id="L195">                continue;</span>
+            }
+<span class="nc bnc" id="L197" title="All 2 branches missed.">            if (out != null) {</span>
+<span class="nc" id="L198">                out.append(c);</span>
+            }
+<span class="nc" id="L200">            i++;</span>
+<span class="nc" id="L201">        }</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">        return out == null ? s : out.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

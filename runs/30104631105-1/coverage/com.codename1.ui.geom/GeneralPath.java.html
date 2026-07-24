@@ -1,0 +1,3374 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GeneralPath.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.geom</a> &gt; <span class="el_source">GeneralPath.java</span></div><h1>GeneralPath.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.geom;
+
+
+import com.codename1.io.Log;
+import com.codename1.ui.Transform;
+import com.codename1.ui.geom.Geometry.BezierCurve;
+import com.codename1.util.MathUtil;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+
+/// A general geometric path, consisting of any number of subpaths constructed
+/// out of straight lines and cubic or quadratic Bezier curves. The inside of the
+/// curve is defined for drawing purposes by a winding rule. Either the
+/// `#WIND_EVEN_ODD` or `#WIND_NON_ZERO` winding rule can be chosen.
+///
+/// A drawing of a GeneralPath
+///
+/// The `#WIND_EVEN_ODD` winding rule defines a point as inside a path if:
+/// A ray from the point towards infinity in an arbitrary direction intersects
+/// the path an odd number of times. Points A and C in the
+/// image are considered to be outside the path. (both intersect twice) Point
+/// B intersects once, and is inside.
+///
+/// The `#WIND_NON_ZERO` winding rule defines a point as inside a path if:
+/// The path intersects the ray in an equal number of opposite directions. Point
+/// `A` in the image is outside (one intersection in the 'up' direction,
+/// one in the 'down' direction) Point B in the image is inside (one
+/// intersection 'down') Point C in the image is inside (two intersections in the
+/// 'down' direction)
+///
+/// ```java
+/// Form hi = new Form(&quot;Shape&quot;);
+///
+/// // We create a 50 x 100 shape, this is arbitrary since we can scale it easily
+/// GeneralPath path = new GeneralPath();
+/// path.moveTo(20,0);
+/// path.lineTo(30, 0);
+/// path.lineTo(30, 100);
+/// path.lineTo(20, 100);
+/// path.lineTo(20, 15);
+/// path.lineTo(5, 40);
+/// path.lineTo(5, 25);
+/// path.lineTo(20,0);
+///
+/// hi.getContentPane().getUnselectedStyle().setBgPainter(new Painter() {
+///     public void paint(Graphics g, Rectangle rect) {
+///         g.setColor(0xff);
+///         float widthRatio = ((float) rect.getWidth()) / 50f;
+///         float heightRatio = ((float) rect.getHeight()) / 100f;
+///         g.scale(widthRatio, heightRatio);
+///         g.translate((int) (((float) rect.getX()) / widthRatio), (int) (((float) rect.getY()) / heightRatio));
+///         g.fillShape(path);
+///         g.resetAffine();
+///     }
+/// });
+///
+/// hi.show();
+/// ```
+///
+/// Note: This description and image were copied from [the GNU classpath](http://developer.classpath.org/doc/java/awt/geom/GeneralPath.html)
+/// docs). License here http://www.gnu.org/licenses/licenses.html#FDL
+///
+/// @author shannah
+///
+/// #### See also
+///
+/// - com.codename1.ui.Graphics#drawShape
+///
+/// - com.codename1.ui.Graphics#fillShape
+public final class GeneralPath implements Shape {
+
+    /// Same constant as `PathIterator#WIND_EVEN_ODD`
+    public static final int WIND_EVEN_ODD = PathIterator.WIND_EVEN_ODD;
+    /// Same constant as `PathIterator#WIND_NON_ZERO`
+    public static final int WIND_NON_ZERO = PathIterator.WIND_NON_ZERO;
+    /// The buffers size
+    private static final int BUFFER_SIZE = 10;
+    /// The buffers capacity
+    private static final int BUFFER_CAPACITY = 10;
+    private static final int MAX_POOL_SIZE = 20;
+<span class="fc" id="L104">    private static final ArrayList&lt;GeneralPath&gt; pathPool = new ArrayList&lt;GeneralPath&gt;();</span>
+<span class="fc" id="L105">    private static final ArrayList&lt;Rectangle&gt; rectPool = new ArrayList&lt;Rectangle&gt;();</span>
+<span class="fc" id="L106">    private static final ArrayList&lt;float[]&gt; floatPool = new ArrayList&lt;float[]&gt;();</span>
+<span class="fc" id="L107">    private static final ArrayList&lt;boolean[]&gt; boolPool = new ArrayList&lt;boolean[]&gt;();</span>
+<span class="fc" id="L108">    private static final ArrayList&lt;Iterator&gt; iteratorPool = new ArrayList&lt;Iterator&gt;();</span>
+    /// The space amount in points buffer for different segmenet's types
+<span class="fc" id="L110">    private static final int[] pointShift = {</span>
+            2, // MOVETO
+            2, // LINETO
+            4, // QUADTO
+            6, // CUBICTO
+            0}; // CLOSE
+<span class="fc" id="L116">    private static final Pt tmpV1 = new Pt();</span>
+<span class="fc" id="L117">    private static final Pt tmpV2 = new Pt();</span>
+    /// The point's types buffer
+    byte[] types;
+    /// The points buffer
+    float[] points;
+    /// The point's type buffer size
+    int typeSize;
+    /// The points buffer size
+    int pointSize;
+    /// The path rule
+    int rule;
+
+    /// Constructs a GeneralPath with the default (`#WIND_NON_ZERO`)
+    /// winding rule and initial capacity (10).
+    public GeneralPath() {
+<span class="fc" id="L132">        this(WIND_NON_ZERO, BUFFER_SIZE);</span>
+<span class="fc" id="L133">    }</span>
+
+
+    /// Constructs a GeneralPath with a specific winding rule and the default
+    /// initial capacity (10).
+    ///
+    /// #### Parameters
+    ///
+    /// - `rule`: @param rule The winding rule. One of `#WIND_NON_ZERO` and
+    /// `#WIND_EVEN_ODD`
+    ///
+    /// #### See also
+    ///
+    /// - #WIND_NON_ZERO
+    ///
+    /// - #WIND_EVEN_ODD
+    public GeneralPath(int rule) {
+<span class="nc" id="L150">        this(rule, BUFFER_SIZE);</span>
+<span class="nc" id="L151">    }</span>
+
+    /// Constructs a GeneralPath with a specific winding rule and the initial
+    /// capacity. The initial capacity should be the approximate number of path
+    /// segments to be used.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rule`: @param rule            The winding rule. (`#WIND_NON_ZERO` or
+    /// `#WIND_EVEN_ODD`).
+    ///
+    /// - `initialCapacity`: the inital capacity, in path segments
+<span class="fc" id="L163">    public GeneralPath(int rule, int initialCapacity) {</span>
+<span class="fc" id="L164">        setWindingRule(rule);</span>
+<span class="fc" id="L165">        types = new byte[initialCapacity];</span>
+<span class="fc" id="L166">        points = new float[initialCapacity * 2];</span>
+<span class="fc" id="L167">    }</span>
+
+    /// Constructs a GeneralPath from an arbitrary shape object. The Shapes
+    /// PathIterator path and winding rule will be used.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shape`
+    public GeneralPath(Shape shape) {
+<span class="nc" id="L176">        this(WIND_NON_ZERO, BUFFER_SIZE);</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        if (shape.getClass() == GeneralPath.class) {</span>
+<span class="nc" id="L178">            setPath((GeneralPath) shape, null);</span>
+        } else {
+<span class="nc" id="L180">            PathIterator p = shape.getPathIterator();</span>
+<span class="nc" id="L181">            setWindingRule(p.getWindingRule());</span>
+<span class="nc" id="L182">            append(p, false);</span>
+        }
+<span class="nc" id="L184">    }</span>
+
+    private static ArrayList&lt;GeneralPath&gt; pathPool() {
+<span class="fc" id="L187">        return pathPool;</span>
+    }
+
+    // END Alpha Mask Caching Functionality
+    //--------------------------------------------------------------------------
+
+    private static ArrayList&lt;Rectangle&gt; rectPool() {
+<span class="fc" id="L194">        return rectPool;</span>
+    }
+
+    private static ArrayList&lt;float[]&gt; floatPool() {
+<span class="fc" id="L198">        return floatPool;</span>
+    }
+
+    private static ArrayList&lt;boolean[]&gt; boolPool() {
+<span class="fc" id="L202">        return boolPool;</span>
+    }
+
+    private static ArrayList&lt;Iterator&gt; iteratorPool() {
+<span class="fc" id="L206">        return iteratorPool;</span>
+    }
+
+    // These are package protected for ODD
+
+    private static synchronized GeneralPath createPathFromPool() {
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (!pathPool().isEmpty()) {</span>
+<span class="fc" id="L213">            GeneralPath out = pathPool.remove(pathPool.size() - 1);</span>
+<span class="fc" id="L214">            out.reset();</span>
+<span class="fc" id="L215">            return out;</span>
+        }
+<span class="fc" id="L217">        return new GeneralPath();</span>
+    }
+
+    private static synchronized Rectangle createRectFromPool() {
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (!rectPool().isEmpty()) {</span>
+<span class="fc" id="L222">            return rectPool.remove(rectPool.size() - 1);</span>
+        }
+<span class="fc" id="L224">        return new Rectangle();</span>
+    }
+
+    private static synchronized float[] createFloatArrayFromPool(int size) {
+<span class="fc" id="L228">        int len = floatPool().size();</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L230">            float[] arr = floatPool.get(i);</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">            if (arr.length == size) {</span>
+<span class="fc" id="L232">                return floatPool.remove(i);</span>
+            }
+        }
+<span class="fc" id="L235">        return new float[size];</span>
+    }
+
+    private static synchronized boolean[] createBoolArrayFromPool(int size) {
+<span class="fc" id="L239">        int len = boolPool().size();</span>
+<span class="pc bfc" id="L240" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L241">            boolean[] arr = boolPool.get(i);</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">            if (arr.length == size) {</span>
+<span class="fc" id="L243">                return boolPool.remove(i);</span>
+            }
+        }
+<span class="fc" id="L246">        return new boolean[size];</span>
+    }
+
+    private static synchronized Iterator createIteratorFromPool(GeneralPath p, Transform t) {
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        if (!iteratorPool().isEmpty()) {</span>
+<span class="fc" id="L251">            Iterator it = iteratorPool.remove(iteratorPool.size() - 1);</span>
+<span class="fc" id="L252">            it.p = p;</span>
+<span class="fc" id="L253">            it.transform = t;</span>
+<span class="fc" id="L254">            it.reset();</span>
+<span class="fc" id="L255">            return it;</span>
+        }
+<span class="fc" id="L257">        return (Iterator) p.getPathIterator(t);</span>
+
+    }
+
+    /// Returns a GeneralPath to the reusable object pool for GeneralPaths.
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: The path to recycle.
+    ///
+    /// #### See also
+    ///
+    /// - #createFromPool()
+    public static synchronized void recycle(GeneralPath p) {
+<span class="pc bpc" id="L271" title="1 of 4 branches missed.">        if (pathPool().size() &gt;= MAX_POOL_SIZE || p == null) {</span>
+<span class="fc" id="L272">            return;</span>
+        }
+<span class="fc" id="L274">        pathPool.add(p);</span>
+<span class="fc" id="L275">    }</span>
+
+    private static synchronized void recycle(Rectangle r) {
+<span class="pc bpc" id="L278" title="2 of 4 branches missed.">        if (rectPool.size() &gt;= MAX_POOL_SIZE || r == null) {</span>
+<span class="nc" id="L279">            return;</span>
+        }
+<span class="fc" id="L281">        rectPool.add(r);</span>
+<span class="fc" id="L282">    }</span>
+
+    private static synchronized void recycle(float[] a) {
+<span class="pc bpc" id="L285" title="2 of 4 branches missed.">        if (floatPool().size() &gt;= MAX_POOL_SIZE || a == null) {</span>
+<span class="nc" id="L286">            return;</span>
+        }
+<span class="fc" id="L288">        floatPool.add(a);</span>
+<span class="fc" id="L289">    }</span>
+
+    private static synchronized void recycle(boolean[] b) {
+<span class="pc bpc" id="L292" title="2 of 4 branches missed.">        if (boolPool().size() &gt;= MAX_POOL_SIZE || b == null) {</span>
+<span class="nc" id="L293">            return;</span>
+        }
+<span class="fc" id="L295">        boolPool.add(b);</span>
+<span class="fc" id="L296">    }</span>
+
+    private static synchronized void recycle(Iterator it) {
+<span class="pc bpc" id="L299" title="2 of 4 branches missed.">        if (iteratorPool().size() &gt;= MAX_POOL_SIZE || it == null) {</span>
+<span class="nc" id="L300">            return;</span>
+        }
+<span class="fc" id="L302">        iteratorPool.add(it);</span>
+<span class="fc" id="L303">    }</span>
+
+    /// Creates a new GeneralPath from an object Pool.  This is useful
+    /// if you need to create a temporary General path that you wish
+    /// to dispose of after using.
+    ///
+    /// You should return this object back to the pool when you are done
+    /// using the `#recycle(com.codename1.ui.geom.GeneralPath)` method.
+    public static GeneralPath createFromPool() {
+<span class="fc" id="L312">        return createPathFromPool();</span>
+    }
+
+    /// Checks to see if the set of points form a convex polygon.
+    /// if
+    ///
+    /// #### Parameters
+    ///
+    /// - `xPoints`: The x coordinates of the polygon.
+    ///
+    /// - `yPoints`: The y coordinates of the polygon.
+    ///
+    /// #### Returns
+    ///
+    /// True if the points comprise a convex polygon.
+    public static boolean isConvexPolygon(float[] xPoints, float[] yPoints) {
+<span class="fc" id="L328">        int len = xPoints.length;</span>
+<span class="fc" id="L329">        Pt[] p = new Pt[len];</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L331">            Pt point = new Pt();</span>
+<span class="fc" id="L332">            point.x = xPoints[i];</span>
+<span class="fc" id="L333">            point.y = yPoints[i];</span>
+<span class="fc" id="L334">            p[i] = point;</span>
+        }
+<span class="fc bfc" id="L336" title="All 2 branches covered.">        return detectPolygonType(p, len) == 1;</span>
+
+    }
+
+    public static boolean isConvexPolygon(int[] xPoints, int[] yPoints) {
+<span class="nc" id="L341">        int len = xPoints.length;</span>
+<span class="nc" id="L342">        Pt[] p = new Pt[len];</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L344">            Pt point = new Pt();</span>
+<span class="nc" id="L345">            point.x = xPoints[i];</span>
+<span class="nc" id="L346">            point.y = yPoints[i];</span>
+<span class="nc" id="L347">            p[i] = point;</span>
+        }
+<span class="nc bnc" id="L349" title="All 2 branches missed.">        return detectPolygonType(p, len) == 1;</span>
+
+    }
+
+    // 1 = convex, -1 = concave, 0 = not polygon
+    private static int detectPolygonType(Pt[] p, int numVertices) {
+<span class="fc" id="L355">        Pt v1 = tmpV1;</span>
+<span class="fc" id="L356">        Pt v2 = tmpV2;</span>
+
+        double detValue;
+        double curDetValue;
+        int i;
+
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">        if (numVertices &lt; 3) {</span>
+<span class="nc" id="L363">            return 0;</span>
+        }
+
+<span class="fc" id="L366">        v1 = calcVector(p[0], p[numVertices - 1], v1);</span>
+<span class="fc" id="L367">        v2 = calcVector(p[1], p[0], v2);</span>
+<span class="fc" id="L368">        detValue = calcDeterminant(v1, v2);</span>
+
+<span class="fc bfc" id="L370" title="All 2 branches covered.">        for (i = 1; i &lt; numVertices - 1; i++) {</span>
+<span class="fc" id="L371">            v2.clone(v1);</span>
+<span class="fc" id="L372">            v2 = calcVector(p[i + 1], p[i], v2);</span>
+<span class="fc" id="L373">            curDetValue = calcDeterminant(v1, v2);</span>
+
+<span class="fc bfc" id="L375" title="All 2 branches covered.">            if ((curDetValue * detValue) &lt; 0.0) {</span>
+<span class="fc" id="L376">                return -1;</span>
+            }
+
+        }
+
+<span class="fc" id="L381">        v1 = v2;</span>
+<span class="fc" id="L382">        v2 = calcVector(p[0], p[numVertices - 1], v2);</span>
+<span class="fc" id="L383">        curDetValue = calcDeterminant(v1, v2);</span>
+
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">        if ((curDetValue * detValue) &lt; 0.0) {</span>
+<span class="nc" id="L386">            return -1;</span>
+        } else {
+<span class="fc" id="L388">            return 1;</span>
+        }
+
+    }
+
+    private static double calcDeterminant(Pt p1, Pt p2) {
+<span class="fc" id="L394">        return (p1.x * p2.y - p1.y * p2.x);</span>
+    }
+
+    private static Pt calcVector(Pt p0, Pt p1, Pt out) {
+<span class="fc" id="L398">        Pt p = out;</span>
+
+<span class="fc" id="L400">        p.x = p0.x - p1.x;</span>
+<span class="fc" id="L401">        p.y = p0.y - p1.y;</span>
+<span class="fc" id="L402">        return (p);</span>
+    }
+
+    /// Checks to see if this path forms a polygon.
+    ///
+    /// #### Returns
+    ///
+    /// True if the path is a polygon.
+    public boolean isPolygon() {
+
+<span class="nc bnc" id="L412" title="All 2 branches missed.">        if (isRectangle()) {</span>
+<span class="nc" id="L413">            return true;</span>
+        }
+<span class="nc" id="L415">        Iterator it = createIteratorFromPool(this, null);</span>
+<span class="nc" id="L416">        float[] curr = createFloatArrayFromPool(6);</span>
+<span class="nc" id="L417">        float[] firstPoint = createFloatArrayFromPool(2);</span>
+        try {
+<span class="nc" id="L419">            boolean firstMove = false;</span>
+<span class="nc" id="L420">            int cmd = -1;</span>
+<span class="nc bnc" id="L421" title="All 2 branches missed.">            while (!it.isDone()) {</span>
+<span class="nc bnc" id="L422" title="All 3 branches missed.">                switch (cmd = it.currentSegment(curr)) {</span>
+                    case PathIterator.SEG_MOVETO: {
+<span class="nc bnc" id="L424" title="All 2 branches missed.">                        if (firstMove) {</span>
+<span class="nc" id="L425">                            return false;</span>
+                        }
+<span class="nc" id="L427">                        firstMove = true;</span>
+<span class="nc" id="L428">                        firstPoint[0] = curr[0];</span>
+<span class="nc" id="L429">                        firstPoint[1] = curr[1];</span>
+<span class="nc" id="L430">                        break;</span>
+                    }
+                    case PathIterator.SEG_CUBICTO:
+                    case PathIterator.SEG_QUADTO:
+<span class="nc" id="L434">                        return false;</span>
+                    default:
+                        break;
+                }
+<span class="nc" id="L438">                it.next();</span>
+            }
+
+<span class="nc bnc" id="L441" title="All 6 branches missed.">            return cmd == PathIterator.SEG_CLOSE || (curr[0] == firstPoint[0] &amp;&amp; curr[1] == firstPoint[1]);</span>
+
+        } finally {
+<span class="nc" id="L444">            recycle(it);</span>
+<span class="nc" id="L445">            recycle(curr);</span>
+<span class="nc" id="L446">            recycle(firstPoint);</span>
+        }
+
+    }
+
+    /// Returns the number of path commands in this path.
+    ///
+    /// #### Returns
+    ///
+    /// The number of path commands in this path.
+    public int getTypesSize() {
+<span class="nc" id="L457">        return typeSize;</span>
+    }
+
+    /// Returns the number of points in this path.
+    ///
+    /// #### Returns
+    ///
+    /// The number of points in this path.
+    public int getPointsSize() {
+<span class="fc" id="L466">        return pointSize;</span>
+    }
+
+    /// Returns a copy of the types (aka path commands) in this path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: An array to copy the path commands into.
+    public void getTypes(byte[] out) {
+<span class="nc" id="L475">        System.arraycopy(types, 0, out, 0, Math.min(types.length, out.length));</span>
+<span class="nc" id="L476">    }</span>
+
+    /// Returns a copy of the points in this path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: An array to copy the points into.
+    public void getPoints(float[] out) {
+<span class="nc" id="L484">        System.arraycopy(points, 0, out, 0, Math.min(points.length, out.length));</span>
+<span class="nc" id="L485">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L489">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L490">        sb.append(&quot;[General Path: &quot;);</span>
+<span class="nc" id="L491">        Iterator it = createIteratorFromPool(this, null);</span>
+<span class="nc" id="L492">        float[] buf = createFloatArrayFromPool(6); //new float[6];</span>
+        try {
+<span class="nc bnc" id="L494" title="All 2 branches missed.">            while (!it.isDone()) {</span>
+<span class="nc" id="L495">                int type = it.currentSegment(buf);</span>
+<span class="nc bnc" id="L496" title="All 6 branches missed.">                switch (type) {</span>
+                    case PathIterator.SEG_MOVETO:
+<span class="nc" id="L498">                        sb.append(&quot;Move (&quot; + buf[0] + &quot;,&quot; + buf[1] + &quot;), &quot;);</span>
+<span class="nc" id="L499">                        break;</span>
+                    case PathIterator.SEG_LINETO:
+<span class="nc" id="L501">                        sb.append(&quot;Line (&quot; + buf[0] + &quot;,&quot; + buf[1] + &quot;), &quot;);</span>
+<span class="nc" id="L502">                        break;</span>
+                    case PathIterator.SEG_CUBICTO:
+<span class="nc" id="L504">                        sb.append(&quot;Curve (&quot; + buf[0] + &quot;,&quot; + buf[1] + &quot;..&quot; + buf[2] + &quot;,&quot; + buf[3] + &quot;..&quot; + buf[4] + &quot;,&quot; + buf[5] + &quot;)&quot;);</span>
+<span class="nc" id="L505">                        break;</span>
+                    case PathIterator.SEG_QUADTO:
+<span class="nc" id="L507">                        sb.append(&quot;Curve (&quot; + buf[0] + &quot;,&quot; + buf[1] + &quot;..&quot; + buf[2] + &quot;,&quot; + buf[3] + &quot;)&quot;);</span>
+<span class="nc" id="L508">                        break;</span>
+                    case PathIterator.SEG_CLOSE:
+<span class="nc" id="L510">                        sb.append(&quot; CLOSE]&quot;);</span>
+<span class="nc" id="L511">                        break;</span>
+                    default:
+                        break;
+                }
+<span class="nc" id="L515">                it.next();</span>
+<span class="nc" id="L516">            }</span>
+        } finally {
+<span class="nc" id="L518">            recycle(buf);</span>
+<span class="nc" id="L519">            recycle(it);</span>
+        }
+<span class="nc" id="L521">        return sb.toString();</span>
+    }
+
+    public boolean equals(Shape shape, Transform t) {
+<span class="pc bpc" id="L525" title="1 of 4 branches missed.">        if (t != null &amp;&amp; !t.isIdentity()) {</span>
+<span class="fc" id="L526">            GeneralPath p = createPathFromPool();</span>
+<span class="fc" id="L527">            p.setShape(shape, t);</span>
+            try {
+<span class="fc" id="L529">                return equals(p, null);</span>
+            } finally {
+<span class="fc" id="L531">                recycle(p);</span>
+            }
+        }
+<span class="pc bpc" id="L534" title="1 of 2 branches missed.">        if (shape == this) {</span>
+<span class="nc" id="L535">            return true;</span>
+        }
+<span class="pc bpc" id="L537" title="1 of 2 branches missed.">        if (shape instanceof Rectangle) {</span>
+<span class="nc" id="L538">            Rectangle r = (Rectangle) shape;</span>
+<span class="nc" id="L539">            Rectangle tmpRect = createRectFromPool();</span>
+            try {
+<span class="nc" id="L541">                getBounds(tmpRect);</span>
+<span class="nc" id="L542">                return r.equals(tmpRect);</span>
+            } finally {
+<span class="nc" id="L544">                recycle(tmpRect);</span>
+            }
+<span class="pc bpc" id="L546" title="1 of 2 branches missed.">        } else if (shape instanceof GeneralPath) {</span>
+<span class="fc" id="L547">            GeneralPath tmpPath = (GeneralPath) shape;</span>
+<span class="pc bpc" id="L548" title="1 of 4 branches missed.">            return Arrays.equals(points, tmpPath.points) &amp;&amp; Arrays.equals(types, tmpPath.types);</span>
+        } else {
+<span class="nc" id="L550">            GeneralPath tmpPath2 = createPathFromPool();</span>
+            try {
+<span class="nc" id="L552">                tmpPath2.setShape(shape, null);</span>
+<span class="nc" id="L553">                return equals(tmpPath2, null);</span>
+            } finally {
+<span class="nc" id="L555">                recycle(tmpPath2);</span>
+            }
+        }
+    }
+
+    /// Returns the path's current winding rule.
+    ///
+    /// #### Returns
+    ///
+    /// `#WIND_NON_ZERO` or `#WIND_EVEN_ODD`
+    public int getWindingRule() {
+<span class="fc" id="L566">        return rule;</span>
+    }
+
+    /// Sets the path's winding rule, which controls which areas are considered
+    /// 'inside' or 'outside' the path on drawing. Valid rules are
+    /// `#WIND_EVEN_ODD` for an even-odd winding rule, or
+    /// `#WIND_NON_ZERO` for a non-zero winding rule.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rule`: the rule. (`#WIND_NON_ZERO` or `#WIND_EVEN_ODD`).
+    public void setWindingRule(int rule) {
+<span class="fc bfc" id="L578" title="All 4 branches covered.">        if (rule != WIND_EVEN_ODD &amp;&amp; rule != WIND_NON_ZERO) {</span>
+            // awt.209=Invalid winding rule value
+<span class="fc" id="L580">            throw new IllegalArgumentException(&quot;Invalid winding rule&quot;); //$NON-NLS-1$</span>
+        }
+<span class="fc" id="L582">        this.rule = rule;</span>
+<span class="fc" id="L583">    }</span>
+
+    /// Checks points and types buffer size to add pointCount points. If
+    /// necessary realloc buffers to enlarge size.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pointCount`: - the point count to be added in buffer
+    private void checkBuf(int pointCount, boolean checkMove) {
+<span class="fc bfc" id="L592" title="All 4 branches covered.">        if (checkMove &amp;&amp; typeSize == 0) {</span>
+            // awt.20A=First segment should be SEG_MOVETO type
+<span class="fc" id="L594">            throw new IndexOutOfBoundsException(&quot;First segment must be a moveto&quot;); //$NON-NLS-1$</span>
+        }
+<span class="fc bfc" id="L596" title="All 2 branches covered.">        if (typeSize == types.length) {</span>
+<span class="fc" id="L597">            byte[] tmp = new byte[typeSize + BUFFER_CAPACITY];</span>
+<span class="fc" id="L598">            System.arraycopy(types, 0, tmp, 0, typeSize);</span>
+<span class="fc" id="L599">            types = tmp;</span>
+        }
+<span class="fc bfc" id="L601" title="All 2 branches covered.">        if (pointSize + pointCount &gt; points.length) {</span>
+<span class="fc" id="L602">            float[] tmp = new float[pointSize + Math.max(BUFFER_CAPACITY * 2, pointCount)];</span>
+<span class="fc" id="L603">            System.arraycopy(points, 0, tmp, 0, pointSize);</span>
+<span class="fc" id="L604">            points = tmp;</span>
+        }
+<span class="fc" id="L606">    }</span>
+
+    public void moveTo(double x, double y) {
+<span class="fc" id="L609">        moveTo((float) x, (float) y);</span>
+<span class="fc" id="L610">    }</span>
+
+    /// Adds a new point to a path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x-coordinate.
+    ///
+    /// - `y`: the y-coordinate.
+    public void moveTo(float x, float y) {
+<span class="fc bfc" id="L620" title="All 4 branches covered.">        if (typeSize &gt; 0 &amp;&amp; types[typeSize - 1] == PathIterator.SEG_MOVETO) {</span>
+<span class="fc" id="L621">            points[pointSize - 2] = x;</span>
+<span class="fc" id="L622">            points[pointSize - 1] = y;</span>
+        } else {
+<span class="fc" id="L624">            checkBuf(2, false);</span>
+<span class="fc" id="L625">            types[typeSize++] = PathIterator.SEG_MOVETO;</span>
+<span class="fc" id="L626">            points[pointSize++] = x;</span>
+<span class="fc" id="L627">            points[pointSize++] = y;</span>
+        }
+<span class="fc" id="L629">    }</span>
+
+    public void lineTo(double x, double y) {
+<span class="fc" id="L632">        lineTo((float) x, (float) y);</span>
+<span class="fc" id="L633">    }</span>
+
+    /// Appends a straight line to the current path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: x coordinate of the line endpoint.
+    ///
+    /// - `y`: y coordinate of the line endpoint.
+    public void lineTo(float x, float y) {
+<span class="fc" id="L643">        checkBuf(2, true);</span>
+<span class="fc" id="L644">        types[typeSize++] = PathIterator.SEG_LINETO;</span>
+<span class="fc" id="L645">        points[pointSize++] = x;</span>
+<span class="fc" id="L646">        points[pointSize++] = y;</span>
+<span class="fc" id="L647">    }</span>
+
+    public void quadTo(double x1, double y1, double x2, double y2) {
+<span class="fc" id="L650">        quadTo((float) x1, (float) y1, (float) x2, (float) y2);</span>
+<span class="fc" id="L651">    }</span>
+
+    /// Appends a quadratic Bezier curve to the current path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x1`: x coordinate of the control point
+    ///
+    /// - `y1`: y coordinate of the control point
+    ///
+    /// - `x2`: x coordinate of the curve endpoint.
+    ///
+    /// - `y2`: y coordinate of the curve endpoint.
+    public void quadTo(float x1, float y1, float x2, float y2) {
+<span class="fc" id="L665">        checkBuf(4, true);</span>
+<span class="fc" id="L666">        types[typeSize++] = PathIterator.SEG_QUADTO;</span>
+<span class="fc" id="L667">        points[pointSize++] = x1;</span>
+<span class="fc" id="L668">        points[pointSize++] = y1;</span>
+<span class="fc" id="L669">        points[pointSize++] = x2;</span>
+<span class="fc" id="L670">        points[pointSize++] = y2;</span>
+<span class="fc" id="L671">    }</span>
+
+    public void curveTo(double x1, double y1, double x2, double y2, double x3, double y3) {
+<span class="nc" id="L674">        curveTo((float) x1, (float) y1, (float) x2, (float) y2, (float) x3, (float) y3);</span>
+<span class="nc" id="L675">    }</span>
+
+
+//    private static void addBezierArcToPath(GeneralPath path, double cx, double cy,
+//                                          double startX, double startY, double endX, double endY) {
+//        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY, false);
+//    }
+
+    /// Appends a cubic Bezier curve to the current path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x1`: x coordinate of the first control point
+    ///
+    /// - `y1`: y coordinate of the first control point
+    ///
+    /// - `x2`: x coordinate of the second control point
+    ///
+    /// - `y2`: y coordinate of the second control point
+    ///
+    /// - `x3`: x coordinate of the curve endpoint.
+    ///
+    /// - `y3`: y coordinate of the curve endpoint.
+    public void curveTo(float x1, float y1, float x2, float y2, float x3, float y3) {
+<span class="fc" id="L699">        checkBuf(6, true);</span>
+<span class="fc" id="L700">        types[typeSize++] = PathIterator.SEG_CUBICTO;</span>
+<span class="fc" id="L701">        points[pointSize++] = x1;</span>
+<span class="fc" id="L702">        points[pointSize++] = y1;</span>
+<span class="fc" id="L703">        points[pointSize++] = x2;</span>
+<span class="fc" id="L704">        points[pointSize++] = y2;</span>
+<span class="fc" id="L705">        points[pointSize++] = x3;</span>
+<span class="fc" id="L706">        points[pointSize++] = y3;</span>
+<span class="fc" id="L707">    }</span>
+
+    /// Draws an elliptical arc on the path given the provided bounds.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: Left x coord of bounding rect.
+    ///
+    /// - `y`: Top y coordof bounding rect.
+    ///
+    /// - `w`: Width of bounding rect.
+    ///
+    /// - `h`: Height of bounding rect.
+    ///
+    /// - `startAngle`: Start angle on ellipse in radians.  Counter-clockwise from 3-o'clock.
+    ///
+    /// - `sweepAngle`: Sweep angle in radians. Counter-clockwise.
+    public void arc(float x, float y, float w, float h, float startAngle, float sweepAngle) {
+
+<span class="fc" id="L726">        arc(x, y, w, h, startAngle, sweepAngle, false);</span>
+<span class="fc" id="L727">    }</span>
+
+    /// Adds a circular arc to the given path by approximating it through a cubic Bezier curve, splitting it if
+    /// necessary. The precision of the approximation can be adjusted through `pointsOnCircle` and
+    /// `overlapPoints` parameters.
+    ///
+    /// **Example:** imagine an arc starting from 0? and sweeping 100? with a value of
+    /// `pointsOnCircle` equal to 12 (threshold -&gt; 360? / 12 = 30?):
+    ///
+    /// - if `overlapPoints` is `true`, it will be split as following:
+    ///
+    /// - from 0? to 30? (sweep 30?)
+    ///
+    /// - from 30? to 60? (sweep 30?)
+    ///
+    /// - from 60? to 90? (sweep 30?)
+    ///
+    /// - from 90? to 100? (sweep 10?)
+    ///
+    /// - if `overlapPoints` is `false`, it will be split into 4 equal arcs:
+    ///
+    /// - from 0? to 25? (sweep 25?)
+    ///
+    /// - from 25? to 50? (sweep 25?)
+    ///
+    /// - from 50? to 75? (sweep 25?)
+    ///
+    /// - from 75? to 100? (sweep 25?)
+    ///
+    /// For a technical explanation:
+    /// [http://hansmuller-flex.blogspot.de/2011/10/more-about-approximating-circular-arcs.html](http://hansmuller-flex.blogspot.de/2011/10/more-about-approximating-circular-arcs.html)
+    ///
+    /// #### Parameters
+    ///
+    /// - `center`: The center of the circle.
+    ///
+    /// - `radius`: The radius of the circle.
+    ///
+    /// - `startAngleRadians`: The starting angle on the circle (in radians).
+    ///
+    /// - `sweepAngleRadians`: How long to make the total arc (in radians).
+    ///
+    /// - `pointsOnCircle`: @param pointsOnCircle    Defines a *threshold* (360? /`pointsOnCircle`) to split the Bezier arc to
+    /// better approximate a circular arc, depending also on the value of `overlapPoints`.
+    /// The suggested number to have a reasonable approximation of a circle is at least 4 (90?).
+    /// Less than 1 will be ignored (the arc will not be split).
+    ///
+    /// - `overlapPoints`: @param overlapPoints     Given the *threshold* defined through `pointsOnCircle`:
+    ///
+    ///
+    ///
+    /// - if `true`, split the arc on every angle which is a multiple of the
+    /// *threshold* (yields better results if drawing precision is required,
+    /// especially when stacking multiple arcs, but can potentially use more points)
+    ///
+    /// - if `false`, split the arc equally so that each part is shorter than
+    /// the *threshold*
+    ///
+    /// - `addToPath`: An existing path where to add the arc to, or `null` to create a new path.
+    ///
+    /// #### See also
+    ///
+    /// - #createBezierArcDegrees(android.graphics.PointF, float, float, float, int, boolean, android.graphics.Path)
+//    private static void createBezierArcRadians(float cx, float cy, float radiusX, float radiusY, double startAngleRadians,
+//                                              double sweepAngleRadians, int pointsOnCircle, boolean overlapPoints,
+//                                              GeneralPath addToPath, boolean joinPath)
+//    {
+//        final GeneralPath path = addToPath;
+//        if (sweepAngleRadians == 0d) { return; }
+// 
+//        float radius = radiusX;
+//        float yScale = radiusY / radius;
+//        
+//        if (pointsOnCircle &gt;= 1)
+//        {
+//            final double threshold = Math.PI * 2d / pointsOnCircle;
+//            if (Math.abs(sweepAngleRadians) &gt; threshold)
+//            {
+//                double angle = normalizeRadians(startAngleRadians);
+//                //PointF end, start = pointFromAngleRadians(center, radius, angle);
+//                double endX, endY;
+//                double startX = cx + radius * Math.cos(angle);
+//                double startY = cy + radius * Math.sin(angle) * yScale;
+//                if (joinPath) {
+//                    path.lineTo(startX, startY);
+//                } else {
+//                    path.moveTo(startX, startY);
+//                }
+//                if (overlapPoints)
+//                {
+//                    final boolean cw = sweepAngleRadians &gt; 0; // clockwise?
+//                    final double angleEnd = angle + sweepAngleRadians;
+//                    while (true)
+//                    {
+//                        double next = (cw ? Math.ceil(angle / threshold) : Math.floor(angle / threshold)) * threshold;
+//                        if (angle == next) { next += threshold * (cw ? 1d : -1d); }
+//                        final boolean isEnd = cw ? angleEnd &lt;= next : angleEnd &gt;= next;
+//                        //end = pointFromAngleRadians(center, radius, isEnd ? angleEnd : next);
+//                        endX = cx + radius * Math.cos(isEnd ? angleEnd : next);
+//                        endY = cy + radius * Math.sin(isEnd ? angleEnd : next) *yScale;
+//                        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
+//                        if (isEnd) { break; }
+//                        angle = next;
+//                        startX = endX;
+//                        startY = endY;
+//                    }
+//                }
+//                else
+//                {
+//                    final int n = Math.abs((int)Math.ceil(sweepAngleRadians / threshold));
+//                    final double sweep = sweepAngleRadians / (double)n;
+//                    for (int i = 0;
+//                         i &lt; n;
+//                         i++, startX = endX, startY = endY)
+//                    {
+//                        angle += sweep;
+//                        //end = pointFromAngleRadians(center, radius, angle);
+//                        endX = cx + radius * Math.cos(angle);
+//                        endY = cy + radius * Math.sin(angle) * yScale;
+//                        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
+//                    }
+//                    
+//                }
+//                return;
+//            }
+//        }
+// 
+//        startAngleRadians = normalizeRadians(startAngleRadians);
+//        double startX = cx + radius * Math.cos(startAngleRadians);
+//        double startY = cy + radius * Math.sin(startAngleRadians) * yScale;
+//        
+//        double endX = cx + radius * Math.cos(startAngleRadians + sweepAngleRadians);
+//        double endY = cy + radius * Math.sin(startAngleRadians + sweepAngleRadians) * yScale;
+//        if (joinPath) {
+//            path.lineTo(startX, startY);
+//        } else {
+//            path.moveTo(startX, startY);
+//        }
+//        addBezierArcToPath(path, cx, cy, startX, startY, endX, endY);
+//        
+//    }
+
+    /// Normalize the input radians in the range 360? &gt; x &gt;= 0?.
+    ///
+    /// #### Parameters
+    ///
+    /// - `radians`: The angle to normalize (in radians).
+    ///
+    /// #### Returns
+    ///
+    /// The angle normalized in the range 360? &gt; x &gt;= 0?.
+//    private static double normalizeRadians(double radians)
+//    {
+//        double PI2 = Math.PI*2d;
+//        radians %= PI2;
+//        if (radians &lt; 0d) { radians += PI2; }
+//        if (radians == PI2) { radians = 0d; }
+//        return radians;
+//    }
+
+    /// Draws an elliptical arc on the path given the provided bounds.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: Left x coord of bounding rect.
+    ///
+    /// - `y`: Top y coordof bounding rect.
+    ///
+    /// - `w`: Width of bounding rect.
+    ///
+    /// - `h`: Height of bounding rect.
+    ///
+    /// - `startAngle`: Start angle on ellipse in radians.  Counter-clockwise from 3-o'clock.
+    ///
+    /// - `sweepAngle`: Sweep angle in radians. Counter-clockwise.
+    ///
+    /// - `joinPath`: If true, then this will join the arc to the existing path with a line.
+    public void arc(float x, float y, float w, float h, float startAngle, float sweepAngle, boolean joinPath) {
+
+<span class="fc" id="L906">        Ellipse e = new Ellipse();</span>
+<span class="fc" id="L907">        Ellipse.initWithBounds(e, x, y, w, h);</span>
+<span class="fc" id="L908">        e.addToPath(this, -startAngle, -sweepAngle, joinPath);</span>
+<span class="fc" id="L909">    }</span>
+
+    /// Draws an elliptical arc on the path given the provided bounds.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: Left x coord of bounding rect.
+    ///
+    /// - `y`: Top y coordof bounding rect.
+    ///
+    /// - `w`: Width of bounding rect.
+    ///
+    /// - `h`: Height of bounding rect.
+    ///
+    /// - `startAngle`: Start angle on ellipse in radians.  Counter-clockwise from 3-o'clock.
+    ///
+    /// - `sweepAngle`: Sweep angle in radians. Counter-clockwise.
+    public void arc(double x, double y, double w, double h, double startAngle, double sweepAngle) {
+<span class="fc" id="L927">        arc(x, y, w, h, startAngle, sweepAngle, false);</span>
+<span class="fc" id="L928">    }</span>
+
+    /// Draws an elliptical arc on the path given the provided bounds.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: Left x coord of bounding rect.
+    ///
+    /// - `y`: Top y coordof bounding rect.
+    ///
+    /// - `w`: Width of bounding rect.
+    ///
+    /// - `h`: Height of bounding rect.
+    ///
+    /// - `startAngle`: Start angle on ellipse in radians.  Counter-clockwise from 3-o'clock.
+    ///
+    /// - `sweepAngle`: Sweep angle in radians. Counter-clockwise.
+    ///
+    /// - `joinPath`: If true then this will join the arc to the existing path with a line.
+    public void arc(double x, double y, double w, double h, double startAngle, double sweepAngle, boolean joinPath) {
+<span class="fc" id="L948">        arc((float) x, (float) y, (float) w, (float) h, (float) startAngle, (float) sweepAngle, joinPath);</span>
+<span class="fc" id="L949">    }</span>
+
+    /// Adds an arc to the path.  This method uses an approximation of an arc using
+    /// a cubic path.  It is not a precise arc.
+    ///
+    /// Note:  The arc is drawn counter-clockwise around the center point.  See `double, double, double, boolean)`
+    /// to draw clockwise.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cX`: The x-coordinate of the oval center.
+    ///
+    /// - `cY`: The y-coordinate of the oval center.
+    ///
+    /// - `endX`: The end X coordinate.
+    ///
+    /// - `endY`: The end Y coordinate.
+    public void arcTo(float cX, float cY, float endX, float endY) {
+<span class="nc" id="L967">        arcTo(cX, cY, endX, endY, false);</span>
+<span class="nc" id="L968">    }</span>
+
+    /// Adds an arc to the path.  This method uses an approximation of an arc using
+    /// a cubic path.  It is not a precise arc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cX`: The x-coordinate of the oval center.
+    ///
+    /// - `cY`: The y-coordinate of the oval center.
+    ///
+    /// - `endX`: The end X coordinate.
+    ///
+    /// - `endY`: The end Y coordinate.
+    ///
+    /// - `clockwise`: If true, the arc is drawn clockwise around the center point.
+    public void arcTo(float cX, float cY, float endX, float endY, boolean clockwise) {
+<span class="pc bpc" id="L985" title="1 of 2 branches missed.">        if (pointSize &lt; 2) {</span>
+<span class="nc" id="L986">            throw new RuntimeException(&quot;Cannot add arc to path if it doesn't already have a starting point.&quot;);</span>
+
+        }
+<span class="fc" id="L989">        float startX = points[pointSize - 2];</span>
+<span class="fc" id="L990">        float startY = points[pointSize - 1];</span>
+
+<span class="fc" id="L992">        float dx = endX - cX;</span>
+<span class="fc" id="L993">        float dy = endY - cY;</span>
+<span class="fc" id="L994">        double r2 = Math.sqrt(dx * dx + dy * dy);</span>
+<span class="fc" id="L995">        double dx1 = startX - cX;</span>
+<span class="fc" id="L996">        double dy1 = startY - cY;</span>
+<span class="fc" id="L997">        double r1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);</span>
+<span class="pc bpc" id="L998" title="1 of 2 branches missed.">        if (Math.abs(r1 - r2) &gt; 1) {</span>
+<span class="nc" id="L999">            Log.e(new RuntimeException(&quot;arcTo() called with start and end points that don't lie on the same arc r1=&quot; + r1 + &quot;, r2=&quot; + r2));</span>
+
+        }
+<span class="fc" id="L1002">        Ellipse e = new Ellipse();</span>
+<span class="fc" id="L1003">        Ellipse.initWithBounds(e, cX - r2, cY - r2, r2 * 2, r2 * 2);</span>
+<span class="fc" id="L1004">        double startAngle = e.getAngleAtPoint(startX, startY);</span>
+<span class="fc" id="L1005">        double endAngle = e.getAngleAtPoint(endX, endY);</span>
+<span class="fc" id="L1006">        double sweepAngle = endAngle - startAngle;</span>
+<span class="fc bfc" id="L1007" title="All 4 branches covered.">        if (clockwise &amp;&amp; sweepAngle &gt; 0) {</span>
+<span class="fc" id="L1008">            sweepAngle = -sweepAngle;</span>
+<span class="pc bpc" id="L1009" title="1 of 4 branches missed.">        } else if (!clockwise &amp;&amp; sweepAngle &gt; 0) {</span>
+<span class="fc" id="L1010">            sweepAngle = 2 * Math.PI - sweepAngle;</span>
+        }
+
+<span class="fc" id="L1013">        arc(cX - r2, cY - r2, r2 * 2, r2 * 2, -startAngle, sweepAngle, true);</span>
+<span class="fc" id="L1014">        lineTo(endX, endY);</span>
+<span class="fc" id="L1015">    }</span>
+
+    /// Adds an arc to the path.  This method uses an approximation of an arc using
+    /// a cubic path.  It is not a precise arc.
+    ///
+    /// Note:  The arc is drawn counter-clockwise around the center point.  See `double, double, double, boolean)`
+    /// to draw clockwise.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cX`: The x-coordinate of the oval center.
+    ///
+    /// - `cY`: The y-coordinate of the oval center.
+    ///
+    /// - `endX`: The end X coordinate.
+    ///
+    /// - `endY`: The end Y coordinate.
+    public void arcTo(double cX, double cY, double endX, double endY) {
+<span class="fc" id="L1033">        arcTo(cX, cY, endX, endY, false);</span>
+<span class="fc" id="L1034">    }</span>
+
+    /// Adds an arc to the path.  This method uses an approximation of an arc using
+    /// a cubic path.  It is not a precise arc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cX`: The x-coordinate of the oval center.
+    ///
+    /// - `cY`: The y-coordinate of the oval center.
+    ///
+    /// - `endX`: The end X coordinate.
+    ///
+    /// - `endY`: The end Y coordinate.
+    ///
+    /// - `clockwise`: If true, the arc is drawn clockwise around the center point.
+    public void arcTo(double cX, double cY, double endX, double endY, boolean clockwise) {
+<span class="fc" id="L1051">        arcTo((float) cX, (float) cY, (float) endX, (float) endY, clockwise);</span>
+<span class="fc" id="L1052">    }</span>
+
+    /// Closes the current subpath by drawing a line back to the point of the
+    /// last moveTo, unless the path is already closed.
+    public void closePath() {
+<span class="pc bpc" id="L1057" title="2 of 4 branches missed.">        if (typeSize == 0 || types[typeSize - 1] != PathIterator.SEG_CLOSE) {</span>
+<span class="fc" id="L1058">            checkBuf(0, true);</span>
+<span class="fc" id="L1059">            types[typeSize++] = PathIterator.SEG_CLOSE;</span>
+        }
+<span class="fc" id="L1061">    }</span>
+
+    /// Appends the segments of a Shape to the path. If connect is
+    /// true, the new path segments are connected to the existing one
+    /// with a line. The winding rule of the Shape is ignored.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shape`: the shape (null not permitted).
+    ///
+    /// - `connect`: whether to connect the new shape to the existing path.
+    public void append(Shape shape, boolean connect) {
+<span class="pc bpc" id="L1073" title="1 of 2 branches missed.">        if (shape.getClass() == GeneralPath.class) {</span>
+<span class="fc" id="L1074">            Iterator it = createIteratorFromPool((GeneralPath) shape, null);</span>
+            try {
+<span class="fc" id="L1076">                append(it, connect);</span>
+            } finally {
+<span class="fc" id="L1078">                recycle(it);</span>
+            }
+<span class="fc" id="L1080">        } else {</span>
+<span class="nc" id="L1081">            PathIterator p = shape.getPathIterator();</span>
+<span class="nc" id="L1082">            append(p, connect);</span>
+        }
+
+<span class="fc" id="L1085">    }</span>
+
+    /// Appends the segments of a PathIterator to this GeneralPath. Optionally,
+    /// the initial `PathIterator#SEG_MOVETO` segment of the appended path
+    /// is changed into a `PathIterator#SEG_LINETO` segment.
+    ///
+    /// #### Parameters
+    ///
+    /// - `path`: @param path    the PathIterator specifying which segments shall be appended
+    /// (null not permitted).
+    ///
+    /// - `connect`: @param connect true for substituting the initial
+    /// `PathIterator#SEG_MOVETO` segment by a
+    /// `PathIterator#SEG_LINETO`, or false for not performing any
+    /// substitution. If this `GeneralPath` is currently empty, connect is
+    /// assumed to be false, thus leaving the initial
+    /// `PathIterator#SEG_MOVETO` unchanged.
+    public void append(PathIterator path, boolean connect) {
+<span class="fc" id="L1103">        float[] coords = createFloatArrayFromPool(6); //new float[6];</span>
+<span class="fc" id="L1104">        append(path, connect, coords);</span>
+<span class="fc" id="L1105">        recycle(coords);</span>
+<span class="fc" id="L1106">    }</span>
+
+    private void append(PathIterator path, boolean connect, float[] tmpCoordsBuf) {
+<span class="fc" id="L1109">        float[] coords = tmpCoordsBuf;</span>
+<span class="fc bfc" id="L1110" title="All 2 branches covered.">        while (!path.isDone()) {</span>
+
+<span class="pc bpc" id="L1112" title="3 of 6 branches missed.">            switch (path.currentSegment(coords)) {</span>
+                case PathIterator.SEG_MOVETO:
+<span class="pc bpc" id="L1114" title="1 of 4 branches missed.">                    if (!connect || typeSize == 0) {</span>
+<span class="fc" id="L1115">                        moveTo(coords[0], coords[1]);</span>
+<span class="fc" id="L1116">                        break;</span>
+                    }
+<span class="pc bpc" id="L1118" title="4 of 6 branches missed.">                    if (types[typeSize - 1] != PathIterator.SEG_CLOSE</span>
+                            &amp;&amp; points[pointSize - 2] == coords[0]
+                            &amp;&amp; points[pointSize - 1] == coords[1]) {
+<span class="nc" id="L1121">                        break;</span>
+                    }
+                    // NO BREAK;
+                case PathIterator.SEG_LINETO:
+<span class="fc" id="L1125">                    lineTo(coords[0], coords[1]);</span>
+<span class="fc" id="L1126">                    break;</span>
+                case PathIterator.SEG_QUADTO:
+<span class="nc" id="L1128">                    quadTo(coords[0], coords[1], coords[2], coords[3]);</span>
+<span class="nc" id="L1129">                    break;</span>
+                case PathIterator.SEG_CUBICTO:
+<span class="nc" id="L1131">                    curveTo(coords[0], coords[1], coords[2], coords[3], coords[4], coords[5]);</span>
+<span class="nc" id="L1132">                    break;</span>
+                case PathIterator.SEG_CLOSE:
+<span class="fc" id="L1134">                    closePath();</span>
+<span class="fc" id="L1135">                    break;</span>
+                default:
+                    break;
+            }
+<span class="fc" id="L1139">            path.next();</span>
+<span class="fc" id="L1140">            connect = false;</span>
+        }
+<span class="fc" id="L1142">    }</span>
+
+    /// Returns the current appending point of the path.
+    ///
+    /// #### Returns
+    ///
+    /// @return 2-element array of the form `[x,y]` representing `x`
+    /// and `y` coordinate of the current appending point of the path..
+    public float[] getCurrentPoint() {
+<span class="fc bfc" id="L1151" title="All 2 branches covered.">        if (typeSize == 0) {</span>
+<span class="fc" id="L1152">            return null;</span>
+        }
+<span class="fc" id="L1154">        float[] out = new float[2];</span>
+<span class="fc" id="L1155">        getCurrentPoint(out);</span>
+<span class="fc" id="L1156">        return out;</span>
+    }
+
+    /// Sets the coordinates of the given point to the current point in the path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `point`: Out parameter.  Will be filled with the coords of the current point.
+    public void getCurrentPoint(float[] point) {
+<span class="pc bpc" id="L1165" title="1 of 2 branches missed.">        if (typeSize == 0) {</span>
+<span class="nc" id="L1166">            throw new RuntimeException(&quot;Cannot get point because the size of this command is 0&quot;);</span>
+        }
+<span class="fc" id="L1168">        int j = pointSize - 2;</span>
+<span class="fc bfc" id="L1169" title="All 2 branches covered.">        if (types[typeSize - 1] == PathIterator.SEG_CLOSE) {</span>
+
+<span class="fc bfc" id="L1171" title="All 2 branches covered.">            for (int i = typeSize - 2; i &gt; 0; i--) {</span>
+<span class="fc" id="L1172">                int type = types[i];</span>
+<span class="pc bpc" id="L1173" title="1 of 2 branches missed.">                if (type == PathIterator.SEG_MOVETO) {</span>
+<span class="nc" id="L1174">                    break;</span>
+                }
+<span class="fc" id="L1176">                j -= pointShift[type];</span>
+            }
+        }
+<span class="fc" id="L1179">        point[0] = points[j];</span>
+<span class="fc" id="L1180">        point[1] = points[j + 1];</span>
+        //return new float[]{points[j], points[j + 1]};
+<span class="fc" id="L1182">    }</span>
+
+    /// Resets the path. All points and segments are destroyed.
+    public void reset() {
+<span class="fc" id="L1186">        typeSize = 0;</span>
+<span class="fc" id="L1187">        pointSize = 0;</span>
+<span class="fc" id="L1188">    }</span>
+
+    /// Returns the path's bounding box, in float precision.
+    ///
+    /// #### Returns
+    ///
+    /// 4-element array of the form `[x, y, width, height]`.
+    @Override
+    public float[] getBounds2D() {
+<span class="fc" id="L1197">        float[] out = new float[4];</span>
+<span class="fc" id="L1198">        getBounds2D(out);</span>
+<span class="fc" id="L1199">        return out;</span>
+    }
+
+    /// Sets the 4-element array to the bounding box coordinates of the path.  x, y, width, height.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: 4-element float[] array.
+    public void getBounds2D(float[] out) {
+        float rx1;
+        float ry1;
+        float rx2;
+        float ry2;
+<span class="fc bfc" id="L1212" title="All 2 branches covered.">        if (pointSize == 0) {</span>
+<span class="fc" id="L1213">            rx1 = ry1 = rx2 = ry2 = 0.0f;</span>
+        } else {
+<span class="fc" id="L1215">            int i = pointSize - 1;</span>
+<span class="fc" id="L1216">            ry1 = ry2 = points[i--];</span>
+<span class="fc" id="L1217">            rx1 = rx2 = points[i--];</span>
+<span class="fc bfc" id="L1218" title="All 2 branches covered.">            while (i &gt; 0) {</span>
+<span class="fc" id="L1219">                float y = points[i--];</span>
+<span class="fc" id="L1220">                float x = points[i--];</span>
+<span class="fc bfc" id="L1221" title="All 2 branches covered.">                if (x &lt; rx1) {</span>
+<span class="fc" id="L1222">                    rx1 = x;</span>
+<span class="fc bfc" id="L1223" title="All 2 branches covered.">                } else if (x &gt; rx2) {</span>
+<span class="fc" id="L1224">                    rx2 = x;</span>
+                }
+<span class="fc bfc" id="L1226" title="All 2 branches covered.">                if (y &lt; ry1) {</span>
+<span class="fc" id="L1227">                    ry1 = y;</span>
+<span class="fc bfc" id="L1228" title="All 2 branches covered.">                } else if (y &gt; ry2) {</span>
+<span class="fc" id="L1229">                    ry2 = y;</span>
+                }
+<span class="fc" id="L1231">            }</span>
+        }
+<span class="fc" id="L1233">        out[0] = rx1;</span>
+<span class="fc" id="L1234">        out[1] = ry1;</span>
+<span class="fc" id="L1235">        out[2] = rx2 - rx1;</span>
+<span class="fc" id="L1236">        out[3] = ry2 - ry1;</span>
+<span class="fc" id="L1237">    }</span>
+
+    /// Returns the path's bounding box.
+    ///
+    /// #### Returns
+    ///
+    /// The bounding box of the path.
+    @Override
+    public Rectangle getBounds() {
+        // NOTE (SJH20180614): If the path contains bezier curves,  may be larger than drawn bounds.
+        // See note in getBounds(Rectangle) for more details.
+<span class="fc" id="L1248">        float[] r = getBounds2D();</span>
+<span class="fc" id="L1249">        int x1 = (int) Math.floor(r[0]);</span>
+<span class="fc" id="L1250">        int y1 = (int) Math.floor(r[1]);</span>
+<span class="fc" id="L1251">        int x2 = (int) Math.ceil(r[0] + r[2]);</span>
+<span class="fc" id="L1252">        int y2 = (int) Math.ceil(r[1] + r[3]);</span>
+<span class="fc" id="L1253">        return new Rectangle(x1, y1, x2 - x1, y2 - y1);</span>
+    }
+
+    /// Sets the coordinates of the provided rectangle to the bounding box of this path.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`
+    public void getBounds(Rectangle out) {
+        // NOTE (SJH20180614): If the path contains bezier curves, this bounds
+        // may be much larger than the actual drawn bounds because it includes
+        // the control points in the bounds (and control points are not actually
+        // drawn.
+        // We can get an accurate bounds for the bezier curves using BezierCurve.getBoundingRect()
+        // but this is a relatively expensive operation as it must solve cubic or quadratic
+        // equations for each curve.
+        // This this method is used inside the Graphics clipping functionality
+        // we need to make sure it's fast.
+
+        float rx1;
+        float ry1;
+        float rx2;
+        float ry2;
+<span class="pc bpc" id="L1276" title="1 of 2 branches missed.">        if (pointSize == 0) {</span>
+<span class="nc" id="L1277">            rx1 = ry1 = rx2 = ry2 = 0.0f;</span>
+        } else {
+<span class="fc" id="L1279">            int i = pointSize - 1;</span>
+<span class="fc" id="L1280">            ry1 = ry2 = points[i--];</span>
+<span class="fc" id="L1281">            rx1 = rx2 = points[i--];</span>
+<span class="fc bfc" id="L1282" title="All 2 branches covered.">            while (i &gt; 0) {</span>
+<span class="fc" id="L1283">                float y = points[i--];</span>
+<span class="fc" id="L1284">                float x = points[i--];</span>
+<span class="fc bfc" id="L1285" title="All 2 branches covered.">                if (x &lt; rx1) {</span>
+<span class="fc" id="L1286">                    rx1 = x;</span>
+<span class="fc bfc" id="L1287" title="All 2 branches covered.">                } else if (x &gt; rx2) {</span>
+<span class="fc" id="L1288">                    rx2 = x;</span>
+                }
+<span class="fc bfc" id="L1290" title="All 2 branches covered.">                if (y &lt; ry1) {</span>
+<span class="fc" id="L1291">                    ry1 = y;</span>
+<span class="fc bfc" id="L1292" title="All 2 branches covered.">                } else if (y &gt; ry2) {</span>
+<span class="fc" id="L1293">                    ry2 = y;</span>
+                }
+<span class="fc" id="L1295">            }</span>
+        }
+<span class="fc" id="L1297">        int x1 = (int) Math.floor(rx1);</span>
+<span class="fc" id="L1298">        int y1 = (int) Math.floor(ry1);</span>
+<span class="fc" id="L1299">        int x2 = (int) Math.ceil(rx2);</span>
+<span class="fc" id="L1300">        int y2 = (int) Math.ceil(ry2);</span>
+<span class="fc" id="L1301">        out.setX(x1);</span>
+<span class="fc" id="L1302">        out.setY(y1);</span>
+<span class="fc" id="L1303">        out.setWidth(x2 - x1);</span>
+<span class="fc" id="L1304">        out.setHeight(y2 - y1);</span>
+
+<span class="fc" id="L1306">    }</span>
+
+    /// Checks to see if this path is a rectangle.
+    ///
+    /// #### Returns
+    ///
+    /// True if this path forms a rectangle.  False otherwise.
+    @Override
+    public boolean isRectangle() {
+        // NOTE (SJH20180614): This is used extensively in clipping.   We can probably
+        // do this more efficiently without needing to call getBounds()
+<span class="fc" id="L1317">        float[] tmpPointsBuf = createFloatArrayFromPool(6);</span>
+<span class="fc" id="L1318">        boolean[] tmpCornersBuf = createBoolArrayFromPool(4);</span>
+<span class="fc" id="L1319">        Iterator it = createIteratorFromPool(this, null);</span>
+<span class="fc" id="L1320">        Rectangle bounds = createRectFromPool();</span>
+        try {
+<span class="fc" id="L1322">            getBounds(bounds);</span>
+<span class="pc bpc" id="L1323" title="1 of 2 branches missed.">            if (tmpPointsBuf.length != 6) {</span>
+<span class="nc" id="L1324">                throw new RuntimeException(&quot;points buffer must be length 6&quot;);</span>
+            }
+<span class="fc" id="L1326">            float[] buf = tmpPointsBuf;</span>
+<span class="pc bpc" id="L1327" title="1 of 2 branches missed.">            if (tmpCornersBuf.length != 4) {</span>
+<span class="nc" id="L1328">                throw new RuntimeException(&quot;corners buffer must be length 4&quot;);</span>
+            }
+<span class="fc" id="L1330">            boolean[] corners = tmpCornersBuf;</span>
+<span class="fc" id="L1331">            int prevX = 0;</span>
+<span class="fc" id="L1332">            int prevY = 0;</span>
+<span class="fc bfc" id="L1333" title="All 2 branches covered.">            while (!it.isDone()) {</span>
+<span class="fc" id="L1334">                int type = it.currentSegment(buf);</span>
+
+                // Rectangulars only support moves, lines, and closes
+<span class="fc bfc" id="L1337" title="All 6 branches covered.">                if (type != PathIterator.SEG_CLOSE &amp;&amp; type != PathIterator.SEG_LINETO &amp;&amp; type != PathIterator.SEG_MOVETO) {</span>
+<span class="fc" id="L1338">                    return false;</span>
+                }
+
+
+                // Get the current point
+<span class="fc" id="L1343">                int x = (int) buf[0];</span>
+<span class="fc" id="L1344">                int y = (int) buf[1];</span>
+
+                // Make sure there are no diagonal lines
+<span class="pc bpc" id="L1347" title="1 of 6 branches missed.">                if (type == PathIterator.SEG_LINETO &amp;&amp; !(x == prevX || y == prevY)) {</span>
+<span class="nc" id="L1348">                    return false;</span>
+                }
+
+                // Make sure point is on the perimeter.
+<span class="pc bpc" id="L1352" title="3 of 8 branches missed.">                if (x != bounds.getX() &amp;&amp; y != bounds.getY() &amp;&amp; x != bounds.getX() + bounds.getWidth() &amp;&amp; y != bounds.getY() + bounds.getHeight()) {</span>
+<span class="nc" id="L1353">                    return false;</span>
+                }
+
+                // Make sure that all corners are accounted for.
+<span class="fc bfc" id="L1357" title="All 2 branches covered.">                for (int i = 0; i &lt; 4; i++) {</span>
+<span class="fc bfc" id="L1358" title="All 2 branches covered.">                    if (corners[i]) {</span>
+<span class="fc" id="L1359">                        continue;</span>
+                    }
+<span class="pc bpc" id="L1361" title="1 of 5 branches missed.">                    switch (i) {</span>
+                        case 0:
+<span class="pc bpc" id="L1363" title="2 of 4 branches missed.">                            corners[i] = (x == bounds.getX() &amp;&amp; y == bounds.getY());</span>
+<span class="fc" id="L1364">                            break;</span>
+                        case 1:
+<span class="pc bpc" id="L1366" title="1 of 4 branches missed.">                            corners[i] = (x == bounds.getX() + bounds.getWidth() &amp;&amp; y == bounds.getY());</span>
+<span class="fc" id="L1367">                            break;</span>
+                        case 2:
+<span class="fc bfc" id="L1369" title="All 4 branches covered.">                            corners[i] = (x == bounds.getX() + bounds.getWidth() &amp;&amp; y == bounds.getY() + bounds.getHeight());</span>
+<span class="fc" id="L1370">                            break;</span>
+                        case 3:
+<span class="fc bfc" id="L1372" title="All 4 branches covered.">                            corners[i] = (x == bounds.getX() &amp;&amp; y == bounds.getY() + bounds.getHeight());</span>
+<span class="fc" id="L1373">                            break;</span>
+                        default:
+                            break;
+                    }
+                }
+
+<span class="fc" id="L1379">                prevX = x;</span>
+<span class="fc" id="L1380">                prevY = y;</span>
+<span class="fc" id="L1381">                it.next();</span>
+<span class="fc" id="L1382">            }</span>
+
+<span class="pc bpc" id="L1384" title="4 of 8 branches missed.">            return corners[0] &amp;&amp; corners[1] &amp;&amp; corners[2] &amp;&amp; corners[3];</span>
+        } finally {
+<span class="fc" id="L1386">            recycle(tmpPointsBuf);</span>
+<span class="fc" id="L1387">            recycle(tmpCornersBuf);</span>
+<span class="fc" id="L1388">            recycle(it);</span>
+<span class="fc" id="L1389">            recycle(bounds);</span>
+        }
+    }
+
+    /// {{@inheritDoc}}
+    @Override
+    public PathIterator getPathIterator() {
+<span class="fc" id="L1396">        return new Iterator(this);</span>
+    }
+
+    /// {{@inheritDoc}}
+    @Override
+    public PathIterator getPathIterator(Transform m) {
+<span class="fc" id="L1402">        Iterator out = (Iterator) getPathIterator();</span>
+<span class="fc" id="L1403">        out.transform = m;</span>
+<span class="fc" id="L1404">        return out;</span>
+    }
+
+    /// Returns a shape formed by transforming the current shape with the provided
+    /// transform.
+    ///
+    /// Note: If `com.codename1.ui.Transform#isSupported` is false, this may throw a RuntimeException.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m`: The transform to be used to transform the shape.
+    ///
+    /// #### Returns
+    ///
+    /// The transformed shape.
+    public Shape createTransformedShape(Transform m) {
+
+<span class="fc" id="L1421">        GeneralPath out = new GeneralPath();</span>
+<span class="fc" id="L1422">        out.setPath(this, m);</span>
+<span class="fc" id="L1423">        return out;</span>
+    }
+
+    /// Sets this path to be identical to the provided path `p` with the given
+    /// Transform `t` applied to it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: The path to copy.
+    ///
+    /// - `t`: The transform to apply to all points in the path.
+    public void setPath(GeneralPath p, Transform t) {
+<span class="fc" id="L1435">        typeSize = p.typeSize;</span>
+<span class="fc" id="L1436">        pointSize = p.pointSize;</span>
+<span class="fc" id="L1437">        rule = p.rule;</span>
+<span class="pc bpc" id="L1438" title="1 of 4 branches missed.">        if (points == null || points.length &lt; pointSize) {</span>
+<span class="fc" id="L1439">            points = new float[pointSize];</span>
+        }
+<span class="pc bpc" id="L1441" title="1 of 4 branches missed.">        if (types == null || types.length &lt; typeSize) {</span>
+<span class="fc" id="L1442">            types = new byte[typeSize];</span>
+        }
+<span class="fc" id="L1444">        System.arraycopy(p.types, 0, types, 0, typeSize);</span>
+<span class="pc bpc" id="L1445" title="1 of 4 branches missed.">        if (t == null || t.isIdentity()) {</span>
+<span class="fc" id="L1446">            System.arraycopy(p.points, 0, points, 0, pointSize);</span>
+
+        } else {
+<span class="fc" id="L1449">            t.transformPoints(2, p.points, 0, points, 0, pointSize / 2);</span>
+
+        }
+
+<span class="fc" id="L1453">    }</span>
+
+    /// Sets this path to be a rectangle with the provided bounds, but with
+    /// the given transform applied to it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: Rectangle to copy.
+    ///
+    /// - `t`: The transform to apply to the points in in `r`.
+    public void setRect(Rectangle r, Transform t) {
+<span class="fc" id="L1464">        reset();</span>
+<span class="fc" id="L1465">        int x = r.getX();</span>
+<span class="fc" id="L1466">        int y = r.getY();</span>
+<span class="fc" id="L1467">        Dimension size = r.getSize();</span>
+<span class="fc" id="L1468">        int w = size.getWidth();</span>
+<span class="fc" id="L1469">        int h = size.getHeight();</span>
+
+<span class="fc bfc" id="L1471" title="All 2 branches covered.">        if (t == null) {</span>
+<span class="fc" id="L1472">            moveTo(x, y);</span>
+<span class="fc" id="L1473">            lineTo(x + w, y);</span>
+<span class="fc" id="L1474">            lineTo(x + w, y + h);</span>
+<span class="fc" id="L1475">            lineTo(x, y + h);</span>
+<span class="fc" id="L1476">            closePath();</span>
+        } else {
+<span class="fc" id="L1478">            float[] pointBuffer = createFloatArrayFromPool(6);</span>
+            try {
+<span class="fc" id="L1480">                pointBuffer[0] = x;</span>
+<span class="fc" id="L1481">                pointBuffer[1] = y;</span>
+<span class="fc" id="L1482">                pointBuffer[2] = 0;</span>
+<span class="fc" id="L1483">                t.transformPoint(pointBuffer, pointBuffer);</span>
+<span class="fc" id="L1484">                moveTo(pointBuffer[0], pointBuffer[1]);</span>
+<span class="fc" id="L1485">                pointBuffer[0] = x + w;</span>
+<span class="fc" id="L1486">                pointBuffer[1] = y;</span>
+<span class="fc" id="L1487">                pointBuffer[2] = 0;</span>
+<span class="fc" id="L1488">                t.transformPoint(pointBuffer, pointBuffer);</span>
+<span class="fc" id="L1489">                lineTo(pointBuffer[0], pointBuffer[1]);</span>
+<span class="fc" id="L1490">                pointBuffer[0] = x + w;</span>
+<span class="fc" id="L1491">                pointBuffer[1] = y + h;</span>
+<span class="fc" id="L1492">                pointBuffer[2] = 0;</span>
+<span class="fc" id="L1493">                t.transformPoint(pointBuffer, pointBuffer);</span>
+<span class="fc" id="L1494">                lineTo(pointBuffer[0], pointBuffer[1]);</span>
+<span class="fc" id="L1495">                pointBuffer[0] = x;</span>
+<span class="fc" id="L1496">                pointBuffer[1] = y + h;</span>
+<span class="fc" id="L1497">                pointBuffer[2] = 0;</span>
+<span class="fc" id="L1498">                t.transformPoint(pointBuffer, pointBuffer);</span>
+<span class="fc" id="L1499">                lineTo(pointBuffer[0], pointBuffer[1]);</span>
+<span class="fc" id="L1500">                closePath();</span>
+            } finally {
+<span class="fc" id="L1502">                recycle(pointBuffer);</span>
+            }
+        }
+<span class="fc" id="L1505">    }</span>
+
+    /// Sets this path to be a copy of the provided shape, but with the provided
+    /// transform applied to it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `s`: The shape to copy.
+    ///
+    /// - `t`: The transform to apply to all points in the shape.
+    public void setShape(Shape s, Transform t) {
+<span class="fc bfc" id="L1516" title="All 2 branches covered.">        if (s.getClass() == GeneralPath.class) {</span>
+<span class="fc" id="L1517">            setPath((GeneralPath) s, t);</span>
+<span class="pc bpc" id="L1518" title="1 of 2 branches missed.">        } else if (s.getClass() == Rectangle.class) {</span>
+<span class="fc" id="L1519">            setRect((Rectangle) s, t);</span>
+        } else {
+<span class="nc" id="L1521">            reset();</span>
+<span class="nc" id="L1522">            append(s.getPathIterator(t), false);</span>
+        }
+<span class="fc" id="L1524">    }</span>
+
+    /// Sets the current path to the intersection of itself and the provided rectangle.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rect`: The rectangle to intersect with this path.
+    ///
+    /// #### Returns
+    ///
+    /// @return True if `rect` intersects the current path.  False otherwise.  If there is no intersection, the
+    /// path will be reset to be empty.
+    public boolean intersect(Rectangle rect) {
+<span class="fc" id="L1537">        GeneralPath intersectionScratchPath = createPathFromPool();</span>
+        try {
+<span class="fc" id="L1539">            Shape result = ShapeUtil.intersection(rect, this, intersectionScratchPath);</span>
+<span class="fc bfc" id="L1540" title="All 2 branches covered.">            if (result != null) {</span>
+<span class="fc" id="L1541">                this.setPath(intersectionScratchPath, null);</span>
+<span class="fc" id="L1542">                return true;</span>
+            }
+<span class="fc" id="L1544">            reset();</span>
+<span class="fc" id="L1545">            return false;</span>
+
+        } finally {
+<span class="fc" id="L1548">            recycle(intersectionScratchPath);</span>
+        }
+    }
+
+    public boolean intersect(int x, int y, int w, int h) {
+<span class="nc" id="L1553">        Rectangle r = createRectFromPool();</span>
+        try {
+<span class="nc" id="L1555">            r.setBounds(x, y, w, h);</span>
+<span class="nc" id="L1556">            return intersect(r);</span>
+        } finally {
+<span class="nc" id="L1558">            recycle(r);</span>
+        }
+    }
+
+    /// Transforms the current path in place using the given transform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `m`: The transform to apply to the path.
+    public void transform(Transform m) {
+<span class="pc bpc" id="L1568" title="1 of 4 branches missed.">        if (m != null &amp;&amp; !m.isIdentity()) {</span>
+<span class="fc" id="L1569">            m.transformPoints(2, points, 0, points, 0, pointSize / 2);</span>
+        }
+<span class="fc" id="L1571">    }</span>
+
+    /// Resets this path to be the intersection of itself with the given shape.  Note that only
+    /// `com.codename1.ui.geom.Rectangle`s are current supported.  If you pass any other
+    /// shape, it will throw a RuntimeException.
+    ///
+    /// Note: If `com.codename1.ui.TransformisSupported` is false, this will throw a Runtime Exception
+    ///
+    /// #### Parameters
+    ///
+    /// - `shape`: The shape to intersect with the current shape.
+    public void intersect(Shape shape) {
+        //Log.p(&quot;Start intersect&quot;);
+<span class="nc bnc" id="L1584" title="All 2 branches missed.">        if (!(shape instanceof Rectangle)) {</span>
+<span class="nc" id="L1585">            throw new RuntimeException(&quot;GeneralPath.intersect() only supports Rectangles&quot;);</span>
+        }
+<span class="nc" id="L1587">        intersect((Rectangle) shape);</span>
+<span class="nc" id="L1588">    }</span>
+
+    /// {{@inheritDoc}}
+    @Override
+    public Shape intersection(Rectangle rect) {
+<span class="nc" id="L1593">        Shape out = ShapeUtil.intersection(rect, this);</span>
+<span class="nc bnc" id="L1594" title="All 2 branches missed.">        if (out == null) {</span>
+<span class="nc" id="L1595">            return new Rectangle(rect.getX(), rect.getY(), 0, 0);</span>
+        }
+<span class="nc" id="L1597">        return out;</span>
+    }
+
+    /// Checks cross count according to path rule to define is it point inside shape or not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cross`: - the point cross count
+    ///
+    /// #### Returns
+    ///
+    /// true if point is inside path, or false otherwise
+    boolean isInside(int cross) {
+<span class="pc bpc" id="L1610" title="1 of 2 branches missed.">        if (rule == WIND_NON_ZERO) {</span>
+<span class="fc" id="L1611">            return ShapeUtil.isInsideNonZero(cross);</span>
+        }
+<span class="nc" id="L1613">        return ShapeUtil.isInsideEvenOdd(cross);</span>
+    }
+
+    /// Checks if the given point is contained in the current shape.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: The x coordinate to check
+    ///
+    /// - `y`: The y coordinate to check
+    ///
+    /// #### Returns
+    ///
+    /// True if the point is inside the shape.
+    public boolean contains(float x, float y) {
+<span class="fc" id="L1628">        return isInside(ShapeUtil.crossShape(this, x, y));</span>
+    }
+
+    /// {{@inheritDoc}}
+    @Override
+    public boolean contains(int x, int y) {
+<span class="fc" id="L1634">        return contains((float) x, (float) y);</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `path`
+    ///
+    /// - `cx`
+    ///
+    /// - `cy`
+    ///
+    /// - `startX`
+    ///
+    /// - `startY`
+    ///
+    /// - `endX`
+    ///
+    /// - `endY`
+    ///
+    /// - `clockwise`
+//    private static void addBezierArcToPath(GeneralPath path, double cx, double cy,
+//                                          double startX, double startY, double endX, double endY, boolean clockwise) {
+//        if ( startX != endX || startY != endY ){
+//            double ax = startX - cx;
+//            double ay = startY - cy;
+//            double bx = endX - cx;
+//            double by = endY- cy;
+//
+//            final double r1s = ax * ax + ay * ay;
+//            final double r2s = bx * bx + by * by;
+//            double ellipseScaleY = 0;
+//            if (Math.abs(r1s - r2s) &gt; 2) {
+//                // This is not a circle
+//                // Let's get the arc for the circle
+//                ellipseScaleY = Math.sqrt(((ax*ax) - (bx*bx)) / (by*by - ay*ay));
+//                startY = cy + ellipseScaleY * (startY-cy);
+//                endY = cy + ellipseScaleY * (endY-cy);
+//
+//                ay = startY - cy;
+//                by = endY - cy;
+//            } else {
+//                double startAngle = MathUtil.atan2(ay, ax);
+//                double endAngle = MathUtil.atan2(by, bx);
+//
+//                double dist = Math.abs(endAngle - startAngle);
+//                if (clockwise) {
+//                    if (startAngle &gt; endAngle) {
+//                        dist = Math.PI*2-dist;
+//                    }
+//                } else {
+//                    if (startAngle &lt; endAngle) {
+//                        dist = Math.PI*2-dist;
+//                    }
+//                }
+//
+//                //System.out.println(&quot;dist: &quot;+dist+&quot; startAngle: &quot;+startAngle+&quot; endAngle: &quot;+endAngle);
+//                if (dist &gt; Math.PI/3) {
+//                    // We bisect
+//                    double r = Math.sqrt(r1s);
+//                    double bisectAngle = (startAngle + endAngle)/2;
+//                    if (clockwise) {
+//                        if (startAngle &gt; endAngle) {
+//                            bisectAngle += Math.PI;
+//                        }
+//                    } else {
+//                        if (startAngle &lt; endAngle) {
+//                            bisectAngle += Math.PI;
+//                        }
+//                    }
+//                    double bisectX = cx + r * Math.cos(bisectAngle);
+//                    double bisectY = cy + r * Math.sin(bisectAngle);
+//                    addBezierArcToPath(path, cx, cy, startX, startY, bisectX, bisectY, clockwise);
+//                    addBezierArcToPath(path, cx, cy, bisectX, bisectY, endX, endY, clockwise);
+//                    return;
+//                }
+//
+//
+//            }
+//
+//            final double q1 = r1s; //ax * ax + ay * ay;
+//            final double q2 = q1 + ax * bx + ay * by;
+//            final double k2 = 4d / 3d * (Math.sqrt(2d * q1 * q2) - q2) / (ax * by - ay * bx);
+//            final float x2 = (float)(cx + ax - k2 * ay);
+//            float y2 = (float)(cy + ay + k2 * ax);
+//            final float x3 = (float)(cx + bx + k2 * by);
+//             float y3 = (float)(cy + by - k2 * bx);
+//            if (ellipseScaleY != 0) {
+//                y2 = (float)(cy + (y2-cy)/ellipseScaleY);
+//                y3 = (float)(cy + (y3-cy)/ellipseScaleY);
+//                endY = (float)(cy + (endY-cy)/ellipseScaleY);
+//            }
+//            path.curveTo(x2, y2, x3, y3, endX, endY);
+//
+//        }
+//    }
+
+
+<span class="fc" id="L1731">    static class Ellipse {</span>
+<span class="fc" id="L1732">        private final EPoint _tmp1 = new EPoint();</span>
+        private double a;
+        private double b;
+        private double cx;
+        private double cy;
+
+        static void initWithBounds(Ellipse e, double x, double y, double w, double h) {
+<span class="fc" id="L1739">            e.cx = x + w / 2;</span>
+<span class="fc" id="L1740">            e.cy = y + h / 2;</span>
+<span class="fc" id="L1741">            e.a = w / 2;</span>
+<span class="fc" id="L1742">            e.b = h / 2;</span>
+<span class="fc" id="L1743">        }</span>
+
+        static void initWithPerimeterPoints(Ellipse e, double cx, double cy, double p1x, double p1y, double p2x, double p2y) {
+
+            /*
+            e.cx = cx;
+            e.cy = cy;
+            double x1 = p1x-cx;
+            double y1 = p1y-cy;
+            double x2 = p2x-cx;
+            double y2 = p2y-cy;
+            double x1s = x1*x1;
+            double x2s = x2*x2;
+            double y1s = y1*y1;
+            double y2s = y2*y2;
+            if (Math.abs(x1s-x2s) &lt; 0.001 ||Math.abs(y1s-y2s) &lt; 0.001) {
+                a = b = Math.max(Math.sqrt(Math.abs(y2)));
+            }
+            if (Math.abs(x1s-x2s) &gt; 0.001) {
+                e.b = Math.sqrt((x1s*y2s-x2s-y1s)/(x1s-x2s));
+                double bs = e.b*e.b;
+                e.a = Math.sqrt(x1s*bs/(bs-y1s));
+            } else {
+                e.a = Math.sqrt((y1s*x2s-y2s-x1s)/(y1s-y2s));
+                double as = e.a*e.a;
+                e.b = Math.sqrt(y1s*as/(as-x1s));
+            }
+            */
+
+<span class="nc" id="L1772">        }</span>
+
+        @Override
+        public String toString() {
+
+<span class="nc" id="L1777">            return &quot;Ellipse center=(&quot; + cx + &quot;,&quot; + cy + &quot;) a=&quot; + a + &quot;, b=&quot; + b + &quot;)&quot;;</span>
+        }
+
+        void getPointAtAngle(double theta, EPoint out) {
+<span class="fc" id="L1781">            double tanTheta = Math.tan(theta);</span>
+<span class="fc" id="L1782">            double tanThetas = tanTheta * tanTheta;</span>
+<span class="fc" id="L1783">            double bs = b * b;</span>
+<span class="fc" id="L1784">            double as = a * a;</span>
+<span class="fc" id="L1785">            double x = a * b / Math.sqrt(bs + as * tanThetas);</span>
+<span class="fc bfc" id="L1786" title="All 2 branches covered.">            if (Math.cos(theta) &lt; 0) {</span>
+<span class="fc" id="L1787">                x = -x;</span>
+            }
+<span class="fc" id="L1789">            double y = a * b / Math.sqrt(as + bs / tanThetas);</span>
+<span class="fc bfc" id="L1790" title="All 2 branches covered.">            if (Math.sin(theta) &lt; 0) {</span>
+<span class="fc" id="L1791">                y = -y;</span>
+            }
+<span class="fc" id="L1793">            out.x = x + cx;</span>
+<span class="fc" id="L1794">            out.y = y + cy;</span>
+<span class="fc" id="L1795">        }</span>
+
+        double getAngleAtPoint(double px, double py) {
+<span class="fc" id="L1798">            px -= cx;</span>
+<span class="fc" id="L1799">            py -= cy;</span>
+
+<span class="fc" id="L1801">            return MathUtil.atan2(py, px);</span>
+        }
+
+        void addToPath(GeneralPath p, double startAngle, double sweepAngle, boolean join) {
+<span class="fc" id="L1805">            getPointAtAngle(startAngle, _tmp1);</span>
+<span class="fc bfc" id="L1806" title="All 2 branches covered.">            if (join) {</span>
+
+<span class="fc" id="L1808">                p.lineTo(_tmp1.x, _tmp1.y);</span>
+            } else {
+<span class="fc" id="L1810">                p.moveTo(_tmp1.x, _tmp1.y);</span>
+            }
+<span class="fc" id="L1812">            addToPath(p, startAngle, sweepAngle);</span>
+<span class="pc bpc" id="L1813" title="1 of 4 branches missed.">            if (!join &amp;&amp; Math.abs(Math.abs(sweepAngle) - Math.PI * 2) &lt; 0.001) {</span>
+<span class="fc" id="L1814">                p.closePath();</span>
+            }
+<span class="fc" id="L1816">        }</span>
+
+        private void addToPath(GeneralPath p, double startAngle, double sweepAngle) {
+            //double _2pi = Math.PI*2;
+<span class="fc" id="L1820">            double absSweepAngle = Math.abs(sweepAngle);</span>
+<span class="fc bfc" id="L1821" title="All 2 branches covered.">            if (absSweepAngle &lt; 0.0001) {</span>
+                // Basically zero sweep angle so we won't draw anytything here.
+                // IOS seemed to choke when we tried to draw too small an arc
+<span class="fc" id="L1824">                return;</span>
+            }
+<span class="fc bfc" id="L1826" title="All 2 branches covered.">            if (absSweepAngle &gt; Math.PI / 4) {</span>
+                //double halfAngle = sweepAngle/2;
+<span class="fc" id="L1828">                double diff = Math.PI / 4;</span>
+<span class="fc bfc" id="L1829" title="All 2 branches covered.">                if (sweepAngle &lt; 0) {</span>
+<span class="fc" id="L1830">                    diff = -diff;</span>
+                }
+<span class="fc" id="L1832">                addToPath(p, startAngle, diff);</span>
+<span class="fc" id="L1833">                addToPath(p, startAngle + diff, sweepAngle - diff);</span>
+<span class="fc" id="L1834">            } else {</span>
+<span class="fc" id="L1835">                getPointAtAngle(startAngle + sweepAngle, _tmp1);</span>
+                //System.out.println(&quot;Line to &quot;+_tmp1.x+&quot;, &quot;+_tmp1.y);
+<span class="fc" id="L1837">                EPoint controlPoint = new EPoint();</span>
+<span class="fc" id="L1838">                calculateBezierControlPoint(startAngle, sweepAngle, controlPoint);</span>
+<span class="fc" id="L1839">                p.quadTo(controlPoint.x, controlPoint.y, _tmp1.x, _tmp1.y);</span>
+                //p.lineTo(_tmp1.x, _tmp1.y);
+            }
+<span class="fc" id="L1842">        }</span>
+
+        private void calculateBezierControlPoint(double startAngle, double sweepAngle, EPoint point) {
+<span class="fc" id="L1845">            EPoint p1 = new EPoint();</span>
+
+<span class="fc" id="L1847">            getPointAtAngle(startAngle, p1);</span>
+<span class="fc" id="L1848">            p1.x -= cx;</span>
+<span class="fc" id="L1849">            p1.y -= cy;</span>
+
+<span class="fc" id="L1851">            EPoint p2 = new EPoint();</span>
+<span class="fc" id="L1852">            getPointAtAngle(startAngle + sweepAngle, p2);</span>
+<span class="fc" id="L1853">            p2.x -= cx;</span>
+<span class="fc" id="L1854">            p2.y -= cy;</span>
+
+            //System.out.println(&quot;p1: &quot;+p1.x+&quot;, &quot;+p1.y+&quot;, p2:&quot;+p2.x+&quot;,&quot;+p2.y);
+<span class="fc" id="L1857">            double x1s = p1.x * p1.x;</span>
+<span class="fc" id="L1858">            double y1s = p1.y * p1.y;</span>
+<span class="fc" id="L1859">            double x2s = p2.x * p2.x;</span>
+<span class="fc" id="L1860">            double y2s = p2.y * p2.y;</span>
+
+<span class="fc" id="L1862">            double as = a * a;</span>
+<span class="fc" id="L1863">            double bs = b * b;</span>
+            //point.x = (x2s*bs/(p2.y*as) + p2.y - x1s*bs/(p1.y*as) - p1.y) / (-p1.x*bs/(p1.y*as) + p2.x*bs/(p2.y*as));
+            //point.y = (-p1.x*bs/(p1.y*as))*point.x + x1s*bs/(p1.y*as) + p1.y;
+
+
+<span class="fc" id="L1868">            point.x = -(p1.y * (-as * y2s - bs * x2s) + as * y1s * p2.y + bs * x1s * p2.y) / (bs * p2.x * p1.y - bs * p1.x * p2.y);</span>
+<span class="fc" id="L1869">            point.y = (p1.x * (-as * y2s - bs * x2s) + as * p2.x * y1s + bs * x1s * p2.x) / (as * p2.x * p1.y - as * p1.x * p2.y);</span>
+
+<span class="fc" id="L1871">            point.x += cx;</span>
+<span class="fc" id="L1872">            point.y += cy;</span>
+            //System.out.println(&quot;control: &quot;+point.x+&quot;,&quot;+point.y);
+<span class="fc" id="L1874">        }</span>
+
+
+    }
+
+<span class="fc" id="L1879">    static class EPoint {</span>
+        double x;
+        double y;
+    }
+
+    /// @author shannah
+    final static class ShapeUtil {
+        private ShapeUtil() {
+        }
+
+        /// Rectangle cross segment
+        public static final int CROSSING = 255;
+        /// Allowable tolerance for bounds comparison
+        static final double DELTA = 1E-5;
+        /// If roots have distance less then `ROOT_DELTA` they are double
+        static final double ROOT_DELTA = 1E-10;
+        /// Unknown crossing result
+        static final int UNKNOWN = 254;
+
+        /// Generates the intersection of a given shape and a given rectangle.  Only supported convex polygons.
+        ///
+        /// #### Parameters
+        ///
+        /// - `r`: A rectangle.
+        ///
+        /// - `s`: A shape
+        ///
+        /// #### Returns
+        ///
+        /// @return The shape that is the intersected area of the shape and
+        /// rectangle.
+        static Shape intersection(Rectangle r, Shape s) {
+<span class="nc" id="L1911">            return intersection(r, s, new GeneralPath());</span>
+        }
+
+        private static Shape intersection(Rectangle r, Shape s, GeneralPath out) {
+<span class="pc bpc" id="L1915" title="2 of 4 branches missed.">            if (r.getWidth() == 0 || r.getHeight() == 0) {</span>
+<span class="nc" id="L1916">                out.setRect(r, null);</span>
+<span class="nc" id="L1917">                return out;</span>
+            }
+<span class="fc" id="L1919">            Rectangle2D rect2D = null;</span>
+<span class="fc" id="L1920">            Shape segmentedShape = segmentShape(r, s);</span>
+<span class="fc" id="L1921">            Iterator it = createIteratorFromPool((GeneralPath) segmentedShape, null);</span>
+            //GeneralPath out = new GeneralPath();
+<span class="fc" id="L1923">            float[] buf = createFloatArrayFromPool(6); //new float[6];</span>
+            try {
+<span class="fc" id="L1925">                boolean started = false;</span>
+<span class="fc" id="L1926">                float x1 = r.getX();</span>
+<span class="fc" id="L1927">                float x2 = r.getX() + r.getWidth();</span>
+<span class="fc" id="L1928">                float y1 = r.getY();</span>
+<span class="fc" id="L1929">                float y2 = r.getY() + r.getHeight();</span>
+
+<span class="fc" id="L1931">                float minX = -1;</span>
+<span class="fc" id="L1932">                float minY = -1;</span>
+<span class="fc" id="L1933">                float maxX = -1;</span>
+<span class="fc" id="L1934">                float maxY = -1;</span>
+
+<span class="fc" id="L1936">                float prevX = 0;</span>
+<span class="fc" id="L1937">                float prevY = 0;</span>
+<span class="fc" id="L1938">                double origPrevX = 0;</span>
+<span class="fc" id="L1939">                double origPrevY = 0;</span>
+<span class="fc" id="L1940">                BezierCurve curve = null;</span>
+
+<span class="fc" id="L1942">                double epsilon = 0.01;</span>
+
+<span class="fc bfc" id="L1944" title="All 2 branches covered.">                while (!it.isDone()) {</span>
+<span class="fc" id="L1945">                    int type = it.currentSegment(buf);</span>
+
+<span class="pc bpc" id="L1947" title="2 of 4 branches missed.">                    switch (type) {</span>
+
+                        case PathIterator.SEG_CLOSE:
+                            //System.out.println(&quot;Closing path&quot;);
+<span class="fc" id="L1951">                            out.closePath();</span>
+<span class="fc" id="L1952">                            break;</span>
+                        case PathIterator.SEG_CUBICTO:
+                        case PathIterator.SEG_QUADTO:
+<span class="nc bnc" id="L1955" title="All 2 branches missed.">                            if (rect2D == null) {</span>
+<span class="nc" id="L1956">                                rect2D = new Rectangle2D(r.getX(), r.getY(), r.getWidth(), r.getHeight());</span>
+                            }
+<span class="nc bnc" id="L1958" title="All 2 branches missed.">                            curve = type == PathIterator.SEG_QUADTO ? new BezierCurve(origPrevX, origPrevY, buf[0], buf[1], buf[2], buf[3]) :</span>
+                                    new BezierCurve(origPrevX, origPrevY, buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
+                            //Point2D curveStart = curve.getStartPoint();
+<span class="nc" id="L1961">                            Point2D curveEnd = curve.getEndPoint();</span>
+<span class="nc" id="L1962">                            Rectangle2D boundingRect = curve.getBoundingRect();</span>
+<span class="nc bnc" id="L1963" title="All 4 branches missed.">                            if (!started || (boundingRect.getX() &lt; minX)) {</span>
+<span class="nc" id="L1964">                                minX = (float) boundingRect.getX();</span>
+                            }
+<span class="nc bnc" id="L1966" title="All 4 branches missed.">                            if (!started || (boundingRect.getX() + boundingRect.getWidth() &gt; maxX)) {</span>
+<span class="nc" id="L1967">                                maxX = (float) (boundingRect.getX() + boundingRect.getWidth());</span>
+                            }
+
+<span class="nc bnc" id="L1970" title="All 4 branches missed.">                            if (!started || (boundingRect.getY() &lt; minY)) {</span>
+<span class="nc" id="L1971">                                minY = (float) (boundingRect.getY());</span>
+                            }
+<span class="nc bnc" id="L1973" title="All 4 branches missed.">                            if (!started || (boundingRect.getY() + boundingRect.getHeight() &gt; maxY)) {</span>
+<span class="nc" id="L1974">                                maxY = (float) (boundingRect.getY() + boundingRect.getHeight());</span>
+                            }
+<span class="nc bnc" id="L1976" title="All 2 branches missed.">                            if (rect2D.contains(curve.x(0.5), curve.y(0.5))) {</span>
+                                // It is fully inside, we can just add it to the out path
+<span class="nc" id="L1978">                                curve.addToPath(out, false);</span>
+<span class="nc" id="L1979">                                prevX = (float) curveEnd.getX();</span>
+<span class="nc" id="L1980">                                prevY = (float) curveEnd.getY();</span>
+<span class="nc" id="L1981">                                origPrevX = curveEnd.getX();</span>
+<span class="nc" id="L1982">                                origPrevY = curveEnd.getY();</span>
+<span class="nc" id="L1983">                                started = true;</span>
+                            } else {
+                                // It is fully outside.
+                                // We will simply draw a line on the edge of the rectangle
+                                // border
+
+                                // Store end point of shadow lines into (buf[0], buf[1])
+<span class="nc bnc" id="L1990" title="All 2 branches missed.">                                if (curveEnd.getX() &lt; x1) {</span>
+<span class="nc" id="L1991">                                    buf[0] = x1;</span>
+<span class="nc bnc" id="L1992" title="All 2 branches missed.">                                } else if (curveEnd.getX() &gt; x2) {</span>
+<span class="nc" id="L1993">                                    buf[0] = x2;</span>
+                                } else {
+<span class="nc" id="L1995">                                    buf[0] = (float) curveEnd.getX();</span>
+                                }
+<span class="nc bnc" id="L1997" title="All 2 branches missed.">                                if (curveEnd.getY() &lt; y1) {</span>
+<span class="nc" id="L1998">                                    buf[1] = y1;</span>
+<span class="nc bnc" id="L1999" title="All 2 branches missed.">                                } else if (curveEnd.getY() &gt; y2) {</span>
+<span class="nc" id="L2000">                                    buf[1] = y2;</span>
+                                } else {
+<span class="nc" id="L2002">                                    buf[1] = (float) curveEnd.getY();</span>
+                                }
+
+                                // Since the curve was segmented on the rect, the starting point
+                                // of the curve must also be on the edge of the rectangle.
+
+<span class="nc bnc" id="L2008" title="All 4 branches missed.">                                if (Math.abs(buf[0] - prevX) &lt; epsilon || Math.abs(buf[1] - prevY) &lt; epsilon) {</span>
+                                    // Same edge.. we can just do a single line
+<span class="nc" id="L2010">                                    out.lineTo(buf[0], buf[1]);</span>
+                                } else {
+                                    // Different edge.  We can't do a single line.
+<span class="nc bnc" id="L2013" title="All 2 branches missed.">                                    if (Math.abs(buf[0] - x1) &lt; epsilon) {</span>
+<span class="nc" id="L2014">                                        out.lineTo(x1, prevY);</span>
+<span class="nc" id="L2015">                                        out.lineTo(buf[0], buf[1]);</span>
+<span class="nc bnc" id="L2016" title="All 2 branches missed.">                                    } else if (Math.abs(buf[0] - x2) &lt; epsilon) {</span>
+<span class="nc" id="L2017">                                        out.lineTo(x2, prevY);</span>
+<span class="nc" id="L2018">                                        out.lineTo(buf[0], buf[1]);</span>
+<span class="nc bnc" id="L2019" title="All 2 branches missed.">                                    } else if (Math.abs(buf[1] - y1) &lt; epsilon) {</span>
+<span class="nc" id="L2020">                                        out.lineTo(prevX, y1);</span>
+<span class="nc" id="L2021">                                        out.lineTo(buf[0], buf[1]);</span>
+<span class="nc bnc" id="L2022" title="All 2 branches missed.">                                    } else if (Math.abs(buf[1] - y2) &lt; epsilon) {</span>
+<span class="nc" id="L2023">                                        out.lineTo(prevX, y2);</span>
+<span class="nc" id="L2024">                                        out.lineTo(buf[0], buf[1]);</span>
+                                    } else {
+<span class="nc" id="L2026">                                        Log.p(&quot;buf=&quot; + Arrays.toString(buf));</span>
+<span class="nc" id="L2027">                                        Log.p(&quot;Curve: &quot; + curve);</span>
+<span class="nc" id="L2028">                                        Log.p(&quot;Rect: &quot; + rect2D);</span>
+<span class="nc" id="L2029">                                        Log.p(&quot;type: &quot; + type);</span>
+<span class="nc" id="L2030">                                        throw new RuntimeException(&quot;Unexpected shape segmentation on curve-&quot;);</span>
+                                    }
+
+                                }
+
+<span class="nc" id="L2035">                                prevX = buf[0];</span>
+<span class="nc" id="L2036">                                prevY = buf[1];</span>
+<span class="nc" id="L2037">                                origPrevX = curveEnd.getX();</span>
+<span class="nc" id="L2038">                                origPrevY = curveEnd.getY();</span>
+<span class="nc" id="L2039">                                started = true;</span>
+
+                            }
+
+
+<span class="nc" id="L2044">                            break;</span>
+                        case PathIterator.SEG_MOVETO:
+                        case PathIterator.SEG_LINETO:
+<span class="fc" id="L2047">                            origPrevX = buf[0];</span>
+<span class="fc" id="L2048">                            origPrevY = buf[1];</span>
+<span class="fc bfc" id="L2049" title="All 2 branches covered.">                            if (buf[0] &lt; x1) {</span>
+<span class="fc" id="L2050">                                buf[0] = x1;</span>
+<span class="pc bpc" id="L2051" title="1 of 2 branches missed.">                            } else if (buf[0] &gt; x2) {</span>
+<span class="nc" id="L2052">                                buf[0] = x2;</span>
+                            }
+<span class="fc bfc" id="L2054" title="All 2 branches covered.">                            if (buf[1] &lt; y1) {</span>
+<span class="fc" id="L2055">                                buf[1] = y1;</span>
+<span class="pc bpc" id="L2056" title="1 of 2 branches missed.">                            } else if (buf[1] &gt; y2) {</span>
+<span class="nc" id="L2057">                                buf[1] = y2;</span>
+                            }
+
+<span class="pc bpc" id="L2060" title="1 of 4 branches missed.">                            if (!started || (buf[0] &lt; minX)) {</span>
+<span class="fc" id="L2061">                                minX = buf[0];</span>
+                            }
+<span class="fc bfc" id="L2063" title="All 4 branches covered.">                            if (!started || (buf[0] &gt; maxX)) {</span>
+<span class="fc" id="L2064">                                maxX = buf[0];</span>
+                            }
+
+<span class="pc bpc" id="L2067" title="1 of 4 branches missed.">                            if (!started || (buf[1] &lt; minY)) {</span>
+<span class="fc" id="L2068">                                minY = buf[1];</span>
+                            }
+<span class="fc bfc" id="L2070" title="All 4 branches covered.">                            if (!started || (buf[1] &gt; maxY)) {</span>
+<span class="fc" id="L2071">                                maxY = buf[1];</span>
+                            }
+
+<span class="fc bfc" id="L2074" title="All 2 branches covered.">                            if (type == PathIterator.SEG_MOVETO) {</span>
+
+                                //System.out.println(&quot;Moving to &quot;+buf[0]+&quot;,&quot;+buf[1]);
+<span class="fc" id="L2077">                                out.moveTo(buf[0], buf[1]);</span>
+                            } else { // type == PathITerator.SEG_LINETO
+
+<span class="fc bfc" id="L2080" title="All 4 branches covered.">                                if (prevX != buf[0] || prevY != buf[1]) {</span>
+                                    //System.out.println(&quot;Line to &quot;+buf[0]+&quot;,&quot;+buf[1]);
+<span class="fc" id="L2082">                                    out.lineTo(buf[0], buf[1]);</span>
+                                }
+                            }
+<span class="fc" id="L2085">                            prevX = buf[0];</span>
+<span class="fc" id="L2086">                            prevY = buf[1];</span>
+<span class="fc" id="L2087">                            started = true;</span>
+                            //count++;
+<span class="fc" id="L2089">                            break;</span>
+                        default:
+<span class="nc" id="L2091">                            throw new RuntimeException(&quot;Unsupported segment type for intersection &quot; + type);</span>
+                    }
+<span class="fc" id="L2093">                    it.next();</span>
+
+<span class="fc" id="L2095">                }</span>
+
+<span class="pc bpc" id="L2097" title="1 of 4 branches missed.">                if (maxX - minX &lt;= 1f || maxY - minY &lt;= 1f) {</span>
+<span class="fc" id="L2098">                    return null;</span>
+                }
+
+<span class="fc" id="L2101">                return out;</span>
+            } finally {
+<span class="fc" id="L2103">                recycle(it);</span>
+<span class="fc" id="L2104">                recycle(buf);</span>
+            }
+
+        }
+
+        /// Segments a given shape so that all points of the shape that intersect the
+        /// provided rectangle edges are nodes of the shape path. This operation
+        /// makes it easier to form the intersection.
+        ///
+        /// Only supports convex polygons.
+        ///
+        /// #### Parameters
+        ///
+        /// - `r`: A rectangle.
+        ///
+        /// - `s`: A shape
+        ///
+        /// #### Returns
+        ///
+        /// @return A shape that is identical to the input shape except that it may
+        /// include additional path segments so that all points of intersection are
+        /// start/end points of a segment.
+        static Shape segmentShape(Rectangle r, Shape s) {
+<span class="fc" id="L2127">            return segmentShape(r, s, new GeneralPath());</span>
+        }
+
+        private static GeneralPath segmentShape(Rectangle r, Shape s, GeneralPath out) {
+<span class="fc" id="L2131">            Rectangle2D rect2D = null;</span>
+<span class="fc" id="L2132">            java.util.List&lt;BezierCurve&gt; curveSegments = null;</span>
+<span class="fc" id="L2133">            BezierCurve curve = null;</span>
+<span class="fc" id="L2134">            GeneralPath tmpGeneralPath = null;</span>
+<span class="pc bpc" id="L2135" title="1 of 2 branches missed.">            if (s.getClass() != GeneralPath.class) {</span>
+<span class="nc" id="L2136">                tmpGeneralPath = createPathFromPool();</span>
+<span class="nc" id="L2137">                tmpGeneralPath.setShape(s, null);</span>
+<span class="nc" id="L2138">                s = tmpGeneralPath;</span>
+            }
+<span class="fc" id="L2140">            float[] tmp = null;</span>
+<span class="fc" id="L2141">            Iterator it = createIteratorFromPool((GeneralPath) s, null);</span>
+            //GeneralPath out = new GeneralPath();
+<span class="fc" id="L2143">            float[] buf = createFloatArrayFromPool(6); // buffer to hold segment coordinates from PathIterator.currentSegment</span>
+<span class="fc" id="L2144">            float[] curr = createFloatArrayFromPool(2);    // Placeholder for current point</span>
+<span class="fc" id="L2145">            float[] prev = createFloatArrayFromPool(2);   // Placeholder for previous point</span>
+<span class="fc" id="L2146">            float[] mark = createFloatArrayFromPool(2);   // Placeholder for the moveTo point</span>
+            //float[] buf4 = new float[4];    // Reusable buffer to hold two points.
+<span class="fc" id="L2148">            float[] intersects = createFloatArrayFromPool(9);</span>
+            try {
+<span class="fc" id="L2150">                float prevX = -1;               // Placeholder for previous X coord.</span>
+<span class="fc" id="L2151">                float prevY = -1;               // Placeholder for previous Y coord.</span>
+<span class="fc" id="L2152">                float currX = 0;                // Placeholder for current X coord.</span>
+<span class="fc" id="L2153">                float currY = 0;                // Placeholder for current Y coord.</span>
+                //float[] intersects = null;      // Placeholder for intersection points
+<span class="fc bfc" id="L2155" title="All 2 branches covered.">                while (!it.isDone()) {</span>
+
+<span class="fc" id="L2157">                    int type = it.currentSegment(buf);</span>
+<span class="pc bpc" id="L2158" title="3 of 6 branches missed.">                    switch (type) {</span>
+
+                        case PathIterator.SEG_MOVETO:
+                            // Move to segment is transferred straight through
+<span class="fc" id="L2162">                            prevX = prev[0] = mark[0] = buf[0];</span>
+<span class="fc" id="L2163">                            prevY = prev[1] = mark[1] = buf[1];</span>
+<span class="fc" id="L2164">                            out.moveTo(prevX, prevY);</span>
+
+                            //System.out.println(&quot;Moving to &quot;+prevX+&quot;,&quot;+prevY);
+<span class="fc" id="L2167">                            break;</span>
+
+                        case PathIterator.SEG_QUADTO:
+<span class="nc bnc" id="L2170" title="All 2 branches missed.">                            if (rect2D == null) {</span>
+<span class="nc" id="L2171">                                rect2D = new Rectangle2D(r.getX(), r.getY(), r.getWidth(), r.getHeight());</span>
+                            }
+<span class="nc" id="L2173">                            currX = curr[0] = buf[2];</span>
+<span class="nc" id="L2174">                            currY = curr[1] = buf[3];</span>
+<span class="nc" id="L2175">                            curve = new BezierCurve(prevX, prevY, buf[0], buf[1], currX, currY);</span>
+<span class="nc bnc" id="L2176" title="All 2 branches missed.">                            if (curveSegments == null) {</span>
+<span class="nc" id="L2177">                                curveSegments = new ArrayList&lt;BezierCurve&gt;();</span>
+                            } else {
+<span class="nc" id="L2179">                                curveSegments.clear();</span>
+                            }
+<span class="nc" id="L2181">                            curve.segment(rect2D, curveSegments);</span>
+<span class="nc bnc" id="L2182" title="All 2 branches missed.">                            for (BezierCurve segment : curveSegments) {</span>
+<span class="nc" id="L2183">                                segment.addToPath(out, true);</span>
+<span class="nc" id="L2184">                            }</span>
+<span class="nc" id="L2185">                            prevX = currX;</span>
+<span class="nc" id="L2186">                            prevY = currY;</span>
+<span class="nc" id="L2187">                            tmp = curr;</span>
+<span class="nc" id="L2188">                            curr = prev;</span>
+<span class="nc" id="L2189">                            prev = tmp;</span>
+
+<span class="nc" id="L2191">                            break;</span>
+                        case PathIterator.SEG_CUBICTO:
+<span class="nc bnc" id="L2193" title="All 2 branches missed.">                            if (rect2D == null) {</span>
+<span class="nc" id="L2194">                                rect2D = new Rectangle2D(r.getX(), r.getY(), r.getWidth(), r.getHeight());</span>
+                            }
+<span class="nc" id="L2196">                            currX = curr[0] = buf[4];</span>
+<span class="nc" id="L2197">                            currY = curr[1] = buf[5];</span>
+<span class="nc" id="L2198">                            curve = new BezierCurve(prevX, prevY, buf[0], buf[1], buf[2], buf[3], currX, currY);</span>
+<span class="nc bnc" id="L2199" title="All 2 branches missed.">                            if (curveSegments == null) {</span>
+<span class="nc" id="L2200">                                curveSegments = new ArrayList&lt;BezierCurve&gt;();</span>
+                            } else {
+<span class="nc" id="L2202">                                curveSegments.clear();</span>
+                            }
+<span class="nc" id="L2204">                            curve.segment(rect2D, curveSegments);</span>
+<span class="nc bnc" id="L2205" title="All 2 branches missed.">                            for (BezierCurve segment : curveSegments) {</span>
+<span class="nc" id="L2206">                                segment.addToPath(out, true);</span>
+<span class="nc" id="L2207">                            }</span>
+                            // Set current position to prev for next iteration.
+<span class="nc" id="L2209">                            prevX = currX;</span>
+<span class="nc" id="L2210">                            prevY = currY;</span>
+<span class="nc" id="L2211">                            tmp = curr;</span>
+<span class="nc" id="L2212">                            curr = prev;</span>
+<span class="nc" id="L2213">                            prev = tmp;</span>
+<span class="nc" id="L2214">                            break;</span>
+                        case PathIterator.SEG_LINETO:
+                            // Line Segment may need to be partitioned if it crosses
+                            // an edge of the rectangle.
+<span class="fc" id="L2218">                            currX = curr[0] = buf[0];</span>
+<span class="fc" id="L2219">                            currY = curr[1] = buf[1];</span>
+
+                            // Check if line intersects rectangle
+<span class="fc" id="L2222">                            intersectLineWithRectAsHash(prevX, prevY, currX, currY, r, intersects);</span>
+                            //System.out.println(&quot;Looking for intersections between &quot;+prevX+&quot;,&quot;+prevY+&quot; and &quot;+currX+&quot;,&quot;+currY);
+                            //System.out.println(&quot;Intersects: &quot;+intersects[0]+&quot;, &quot;+intersects[1]+&quot;  &quot;+intersects[2]+&quot;,&quot;+intersects[3]);
+<span class="fc bfc" id="L2225" title="All 2 branches covered.">                            if (intersects[8] &gt;= 1) {</span>
+<span class="fc" id="L2226">                                int num = (int) intersects[8];</span>
+<span class="fc" id="L2227">                                int len = num * 2;</span>
+<span class="fc bfc" id="L2228" title="All 2 branches covered.">                                for (int i = 0; i &lt; len; i += 2) {</span>
+<span class="fc" id="L2229">                                    out.lineTo(intersects[i], intersects[i + 1]);</span>
+
+                                }
+
+                            }
+                            //System.out.println(&quot;Line to &quot;+currX+&quot;,&quot;+currY);
+<span class="fc" id="L2235">                            out.lineTo(currX, currY);</span>
+
+                            // Set current position to prev for next iteration.
+<span class="fc" id="L2238">                            prevX = currX;</span>
+<span class="fc" id="L2239">                            prevY = currY;</span>
+<span class="fc" id="L2240">                            tmp = curr;</span>
+<span class="fc" id="L2241">                            curr = prev;</span>
+<span class="fc" id="L2242">                            prev = tmp;</span>
+
+<span class="fc" id="L2244">                            break;</span>
+                        case PathIterator.SEG_CLOSE:
+
+                            // Closing the path.  Need to check if there is an intersection
+                            // on this last closing path.
+<span class="fc" id="L2249">                            currX = curr[0] = mark[0];</span>
+<span class="fc" id="L2250">                            currY = curr[1] = mark[1];</span>
+<span class="fc" id="L2251">                            intersectLineWithRectAsHash(prevX, prevY, currX, currY, r, intersects);</span>
+<span class="fc bfc" id="L2252" title="All 2 branches covered.">                            if (intersects[8] &gt;= 1) {</span>
+<span class="fc" id="L2253">                                int num = (int) intersects[8];</span>
+<span class="fc" id="L2254">                                int len = num * 2;</span>
+<span class="fc bfc" id="L2255" title="All 2 branches covered.">                                for (int i = 0; i &lt; len; i += 2) {</span>
+<span class="fc" id="L2256">                                    out.lineTo(intersects[i], intersects[i + 1]);</span>
+
+                                }
+
+                            }
+<span class="fc" id="L2261">                            out.closePath();</span>
+
+<span class="fc" id="L2263">                            break;</span>
+                        default:
+<span class="nc" id="L2265">                            throw new RuntimeException(&quot;Unsupported path segment type: &quot; + type);</span>
+                    }
+<span class="fc" id="L2267">                    it.next();</span>
+<span class="fc" id="L2268">                }</span>
+<span class="fc" id="L2269">                return out;</span>
+            } finally {
+<span class="fc" id="L2271">                recycle(it);</span>
+<span class="fc" id="L2272">                recycle(buf);</span>
+<span class="fc" id="L2273">                recycle(curr);</span>
+<span class="fc" id="L2274">                recycle(prev);</span>
+<span class="fc" id="L2275">                recycle(mark);</span>
+<span class="fc" id="L2276">                recycle(intersects);</span>
+<span class="fc" id="L2277">                recycle(tmpGeneralPath);</span>
+            }
+        }
+
+        private static float[] intersectLineWithRectAsHash(float x1, float y1, float x2, float y2, Rectangle rect,
+                                                           float[] out
+        ) {
+            //float[] out = new float[9]; // max 4 points here
+<span class="fc" id="L2285">            float[] x = createFloatArrayFromPool(4);</span>
+            try {
+                //float[] y = new float[4];
+<span class="fc" id="L2288">                float rx1 = rect.getX();</span>
+<span class="fc" id="L2289">                float ry1 = rect.getY();</span>
+<span class="fc" id="L2290">                float rx2 = rect.getX() + rect.getWidth();</span>
+<span class="fc" id="L2291">                float ry2 = rect.getY() + rect.getHeight();</span>
+
+<span class="fc" id="L2293">                float dx = x2 - x1;</span>
+<span class="fc" id="L2294">                float dy = y2 - y1;</span>
+<span class="fc" id="L2295">                int num = 0;</span>
+
+<span class="fc" id="L2297">                float minY = Math.min(y1, y2);</span>
+<span class="fc" id="L2298">                float maxY = Math.max(y1, y2);</span>
+<span class="fc" id="L2299">                float minX = Math.min(x1, x2);</span>
+<span class="fc" id="L2300">                float maxX = Math.max(x1, x2);</span>
+<span class="fc" id="L2301">                int i = 0;</span>
+<span class="fc bfc" id="L2302" title="All 2 branches covered.">                if (isZero(dx)) {</span>
+<span class="pc bpc" id="L2303" title="1 of 4 branches missed.">                    if (ry1 &gt; minY &amp;&amp; ry1 &lt; maxY) {</span>
+<span class="fc" id="L2304">                        num++;</span>
+<span class="fc" id="L2305">                        x[i++] = ry1;</span>
+                        //out[i++] = ry1;
+                    }
+<span class="pc bpc" id="L2308" title="2 of 4 branches missed.">                    if (ry2 &gt; minY &amp;&amp; ry2 &lt; maxY) {</span>
+<span class="nc" id="L2309">                        num++;</span>
+<span class="nc" id="L2310">                        x[i++] = ry2;</span>
+                        //out[i++] = ry2;
+                    }
+
+<span class="fc" id="L2314">                    Arrays.sort(x, 0, num);</span>
+<span class="fc bfc" id="L2315" title="All 2 branches covered.">                    if (y1 &lt;= y2) {</span>
+<span class="fc bfc" id="L2316" title="All 2 branches covered.">                        for (i = 0; i &lt; num; i++) {</span>
+<span class="fc" id="L2317">                            int j = 2 * i;</span>
+<span class="fc" id="L2318">                            out[j] = x1;</span>
+<span class="fc" id="L2319">                            out[j + 1] = x[i];</span>
+                        }
+                    } else {
+<span class="fc bfc" id="L2322" title="All 2 branches covered.">                        for (i = 0; i &lt; num; i++) {</span>
+<span class="fc" id="L2323">                            int j = 2 * (num - i - 1);</span>
+<span class="fc" id="L2324">                            out[j] = x1;</span>
+<span class="fc" id="L2325">                            out[j + 1] = x[i];</span>
+                        }
+                    }
+
+
+<span class="fc" id="L2330">                    out[8] = num;</span>
+
+
+<span class="pc bpc" id="L2333" title="1 of 2 branches missed.">                } else if (isZero(dy)) {</span>
+<span class="pc bpc" id="L2334" title="1 of 4 branches missed.">                    if (rx1 &gt; minX &amp;&amp; rx1 &lt; maxX) {</span>
+<span class="fc" id="L2335">                        num++;</span>
+<span class="fc" id="L2336">                        x[i++] = rx1;</span>
+                        //out[i++] = y1;
+                    }
+<span class="pc bpc" id="L2339" title="2 of 4 branches missed.">                    if (rx2 &gt; minX &amp;&amp; rx2 &lt; maxX) {</span>
+<span class="nc" id="L2340">                        num++;</span>
+<span class="nc" id="L2341">                        x[i++] = rx2;</span>
+                        //out[i++] = y1;
+                    }
+<span class="fc" id="L2344">                    Arrays.sort(x, 0, num);</span>
+<span class="fc bfc" id="L2345" title="All 2 branches covered.">                    if (x1 &lt;= x2) {</span>
+<span class="fc bfc" id="L2346" title="All 2 branches covered.">                        for (i = 0; i &lt; num; i++) {</span>
+<span class="fc" id="L2347">                            int j = 2 * i;</span>
+<span class="fc" id="L2348">                            out[j] = x[i];</span>
+<span class="fc" id="L2349">                            out[j + 1] = y1;</span>
+                        }
+                    } else {
+<span class="fc bfc" id="L2352" title="All 2 branches covered.">                        for (i = 0; i &lt; num; i++) {</span>
+<span class="fc" id="L2353">                            int j = 2 * (num - i - 1);</span>
+<span class="fc" id="L2354">                            out[j] = x[i];</span>
+<span class="fc" id="L2355">                            out[j + 1] = y1;</span>
+                        }
+                    }
+<span class="fc" id="L2358">                    out[8] = num;</span>
+                } else {
+<span class="nc" id="L2360">                    float m = dy / dx;</span>
+
+<span class="nc bnc" id="L2362" title="All 4 branches missed.">                    if (rx1 &gt; minX &amp;&amp; rx1 &lt; maxX) {</span>
+<span class="nc" id="L2363">                        num++;</span>
+<span class="nc" id="L2364">                        x[i] = rx1;</span>
+                        //y[i] = y1+(rx1-x1)*m;
+<span class="nc" id="L2366">                        i++;</span>
+                    }
+<span class="nc bnc" id="L2368" title="All 4 branches missed.">                    if (rx2 &gt; minX &amp;&amp; rx2 &lt; maxX) {</span>
+<span class="nc" id="L2369">                        num++;</span>
+<span class="nc" id="L2370">                        x[i] = rx2;</span>
+                        //y[i++] = y1+(rx2-x1)*m;
+<span class="nc" id="L2372">                        i++;</span>
+                    }
+<span class="nc bnc" id="L2374" title="All 4 branches missed.">                    if (ry1 &gt; minY &amp;&amp; ry1 &lt; maxY) {</span>
+<span class="nc" id="L2375">                        num++;</span>
+<span class="nc" id="L2376">                        x[i] = x1 + (ry1 - y1) / m;</span>
+                        //out[i++] = ry1;
+<span class="nc" id="L2378">                        i++;</span>
+                    }
+<span class="nc bnc" id="L2380" title="All 4 branches missed.">                    if (ry2 &gt; minY &amp;&amp; ry2 &lt; maxY) {</span>
+<span class="nc" id="L2381">                        num++;</span>
+<span class="nc" id="L2382">                        x[i] = x1 + (ry2 - y1) / m;</span>
+                        //out[i++] = ry2;
+<span class="nc" id="L2384">                        i++;</span>
+                    }
+
+<span class="nc" id="L2387">                    Arrays.sort(x, 0, num);</span>
+<span class="nc bnc" id="L2388" title="All 2 branches missed.">                    if (x1 &lt; x2) {</span>
+<span class="nc bnc" id="L2389" title="All 2 branches missed.">                        for (i = 0; i &lt; num; i++) {</span>
+<span class="nc" id="L2390">                            int j = 2 * i;</span>
+<span class="nc" id="L2391">                            out[j] = x[i];</span>
+<span class="nc" id="L2392">                            out[j + 1] = y1 + (x[i] - x1) * m;</span>
+                        }
+                    } else {
+<span class="nc bnc" id="L2395" title="All 2 branches missed.">                        for (i = 0; i &lt; num; i++) {</span>
+<span class="nc" id="L2396">                            int j = 2 * (num - i - 1);</span>
+<span class="nc" id="L2397">                            out[j] = x[i];</span>
+<span class="nc" id="L2398">                            out[j + 1] = y1 + (x[i] - x1) * m;</span>
+                        }
+                    }
+<span class="nc" id="L2401">                    out[8] = num;</span>
+                }
+<span class="fc" id="L2403">                return out;</span>
+            } finally {
+<span class="fc" id="L2405">                recycle(x);</span>
+            }
+
+        }
+
+        /// Solves quadratic equation
+        ///
+        /// #### Parameters
+        ///
+        /// - `eqn`: - the coefficients of the equation
+        ///
+        /// - `res`: - the roots of the equation
+        ///
+        /// #### Returns
+        ///
+        /// a number of roots
+        public static int solveQuad(double[] eqn, double[] res) {
+<span class="fc" id="L2422">            double a = eqn[2];</span>
+<span class="fc" id="L2423">            double b = eqn[1];</span>
+<span class="fc" id="L2424">            double c = eqn[0];</span>
+<span class="fc" id="L2425">            int rc = 0;</span>
+<span class="fc bfc" id="L2426" title="All 2 branches covered.">            if (isZero(a)) {</span>
+<span class="fc bfc" id="L2427" title="All 2 branches covered.">                if (isZero(b)) {</span>
+<span class="fc" id="L2428">                    return -1;</span>
+                }
+<span class="fc" id="L2430">                res[rc++] = -c / b;</span>
+            } else {
+<span class="fc" id="L2432">                double d = b * b - 4.0 * a * c;</span>
+                // d &lt; 0.0
+<span class="fc bfc" id="L2434" title="All 2 branches covered.">                if (d &lt; 0.0) {</span>
+<span class="fc" id="L2435">                    return 0;</span>
+                }
+<span class="fc" id="L2437">                d = Math.sqrt(d);</span>
+<span class="fc" id="L2438">                res[rc++] = (-b + d) / (a * 2.0);</span>
+                // d != 0.0
+<span class="fc bfc" id="L2440" title="All 2 branches covered.">                if (!isZero(d)) {</span>
+<span class="fc" id="L2441">                    res[rc++] = (-b - d) / (a * 2.0);</span>
+                }
+            }
+<span class="fc" id="L2444">            return fixRoots(res, rc);</span>
+        }
+
+        /// Solves cubic equation
+        ///
+        /// #### Parameters
+        ///
+        /// - `eqn`: - the coefficients of the equation
+        ///
+        /// - `res`: - the roots of the equation
+        ///
+        /// #### Returns
+        ///
+        /// a number of roots
+        public static int solveCubic(double[] eqn, double[] res) {
+<span class="fc" id="L2459">            double d = eqn[3];</span>
+<span class="pc bpc" id="L2460" title="1 of 2 branches missed.">            if (isZero(d)) {</span>
+<span class="fc" id="L2461">                return solveQuad(eqn, res);</span>
+            }
+<span class="nc" id="L2463">            double a = eqn[2] / d;</span>
+<span class="nc" id="L2464">            double b = eqn[1] / d;</span>
+<span class="nc" id="L2465">            double c = eqn[0] / d;</span>
+<span class="nc" id="L2466">            int rc = 0;</span>
+
+<span class="nc" id="L2468">            double q = (a * a - 3.0 * b) / 9.0;</span>
+<span class="nc" id="L2469">            double r = (2.0 * a * a * a - 9.0 * a * b + 27.0 * c) / 54.0;</span>
+<span class="nc" id="L2470">            double q3 = q * q * q;</span>
+<span class="nc" id="L2471">            double r2 = r * r;</span>
+<span class="nc" id="L2472">            double n = -a / 3.0;</span>
+
+<span class="nc bnc" id="L2474" title="All 2 branches missed.">            if (r2 &lt; q3) {</span>
+
+<span class="nc" id="L2476">                double t = MathUtil.acos(r / Math.sqrt(q3)) / 3.0;</span>
+<span class="nc" id="L2477">                double p = 2.0 * Math.PI / 3.0;</span>
+<span class="nc" id="L2478">                double m = -2.0 * Math.sqrt(q);</span>
+<span class="nc" id="L2479">                res[rc++] = m * Math.cos(t) + n;</span>
+<span class="nc" id="L2480">                res[rc++] = m * Math.cos(t + p) + n;</span>
+<span class="nc" id="L2481">                res[rc++] = m * Math.cos(t - p) + n;</span>
+<span class="nc" id="L2482">            } else {</span>
+//          Debug.println(&quot;r2 &gt;= q3 (&quot; + r2 + &quot;/&quot; + q3 + &quot;)&quot;);
+
+<span class="nc" id="L2485">                double powed = MathUtil.pow(Math.abs(r) + Math.sqrt(r2 - q3), 1.0 / 3.0);</span>
+
+<span class="nc bnc" id="L2487" title="All 2 branches missed.">                if (r &gt; 0.0) {</span>
+<span class="nc" id="L2488">                    powed = -powed;</span>
+                }
+//          if (A == 0.0) {
+<span class="nc bnc" id="L2491" title="All 4 branches missed.">                if (-ROOT_DELTA &lt; powed &amp;&amp; powed &lt; ROOT_DELTA) {</span>
+<span class="nc" id="L2492">                    res[rc++] = n;</span>
+                } else {
+<span class="nc" id="L2494">                    double qPowed = q / powed;</span>
+<span class="nc" id="L2495">                    res[rc++] = powed + qPowed + n;</span>
+//              if (r2 == q3) {
+<span class="nc" id="L2497">                    double delta = r2 - q3;</span>
+<span class="nc bnc" id="L2498" title="All 4 branches missed.">                    if (-ROOT_DELTA &lt; delta &amp;&amp; delta &lt; ROOT_DELTA) {</span>
+<span class="nc" id="L2499">                        res[rc++] = -(powed + qPowed) / 2.0 + n;</span>
+                    }
+                }
+
+            }
+<span class="nc" id="L2504">            return fixRoots(res, rc);</span>
+        }
+
+        /// Excludes double roots. Roots are double if they lies enough close with each other.
+        ///
+        /// #### Parameters
+        ///
+        /// - `res`: - the roots
+        ///
+        /// - `rc`: - the roots count
+        ///
+        /// #### Returns
+        ///
+        /// new roots count
+        static int fixRoots(double[] res, int rc) {
+<span class="fc" id="L2519">            int tc = 0;</span>
+<span class="fc bfc" id="L2520" title="All 2 branches covered.">            for (int i = 0; i &lt; rc; i++) {</span>
+                out:
+                {
+<span class="fc bfc" id="L2523" title="All 2 branches covered.">                    for (int j = i + 1; j &lt; rc; j++) {</span>
+<span class="pc bpc" id="L2524" title="1 of 2 branches missed.">                        if (isZero(res[i] - res[j])) {</span>
+<span class="nc" id="L2525">                            break out;</span>
+                        }
+                    }
+<span class="fc" id="L2528">                    res[tc++] = res[i];</span>
+                }
+            }
+<span class="fc" id="L2531">            return tc;</span>
+        }
+
+        /// Returns how many times ray from point (x,y) cross line.
+        public static int crossLine(double x1, double y1, double x2, double y2, double x, double y) {
+
+            // LEFT/RIGHT/UP/EMPTY
+<span class="pc bpc" id="L2538" title="1 of 12 branches missed.">            if ((x &lt; x1 &amp;&amp; x &lt; x2) ||</span>
+                    (x &gt; x1 &amp;&amp; x &gt; x2) ||
+                    (y &gt; y1 &amp;&amp; y &gt; y2) ||
+<span class="pc bpc" id="L2541" title="1 of 2 branches missed.">                    (isZero(x1 - x2))) {</span>
+<span class="fc" id="L2542">                return 0;</span>
+            }
+
+            // DOWN
+<span class="pc bpc" id="L2546" title="2 of 4 branches missed.">            if (!(y &lt; y1 &amp;&amp; y &lt; y2)) {</span>
+                // INSIDE
+<span class="nc bnc" id="L2548" title="All 2 branches missed.">                if ((y2 - y1) * (x - x1) / (x2 - x1) &lt;= y - y1) {</span>
+                    // INSIDE-UP
+<span class="nc" id="L2550">                    return 0;</span>
+                }
+            }
+
+            // START
+<span class="pc bpc" id="L2555" title="1 of 2 branches missed.">            if (x == x1) {</span>
+<span class="nc bnc" id="L2556" title="All 2 branches missed.">                return x1 &lt; x2 ? 0 : -1;</span>
+            }
+
+            // END
+<span class="pc bpc" id="L2560" title="1 of 2 branches missed.">            if (x == x2) {</span>
+<span class="nc bnc" id="L2561" title="All 2 branches missed.">                return x1 &lt; x2 ? 1 : 0;</span>
+            }
+
+            // INSIDE-DOWN
+<span class="pc bpc" id="L2565" title="1 of 2 branches missed.">            return x1 &lt; x2 ? 1 : -1;</span>
+        }
+
+        /// Returns how many times ray from point (x,y) cross quard curve
+        public static int crossQuad(double x1, double y1, double cx, double cy, double x2, double y2, double x, double y) {
+
+            // LEFT/RIGHT/UP/EMPTY
+<span class="nc bnc" id="L2572" title="All 22 branches missed.">            if ((x &lt; x1 &amp;&amp; x &lt; cx &amp;&amp; x &lt; x2) ||</span>
+                    (x &gt; x1 &amp;&amp; x &gt; cx &amp;&amp; x &gt; x2) ||
+                    (y &gt; y1 &amp;&amp; y &gt; cy &amp;&amp; y &gt; y2) ||
+                    (x1 == cx &amp;&amp; cx == x2)) {
+<span class="nc" id="L2576">                return 0;</span>
+            }
+
+            // DOWN
+<span class="nc bnc" id="L2580" title="All 10 branches missed.">            if (y &lt; y1 &amp;&amp; y &lt; cy &amp;&amp; y &lt; y2 &amp;&amp; x != x1 &amp;&amp; x != x2) {</span>
+<span class="nc bnc" id="L2581" title="All 2 branches missed.">                if (x1 &lt; x2) {</span>
+<span class="nc bnc" id="L2582" title="All 4 branches missed.">                    return x1 &lt; x &amp;&amp; x &lt; x2 ? 1 : 0;</span>
+                }
+<span class="nc bnc" id="L2584" title="All 4 branches missed.">                return x2 &lt; x &amp;&amp; x &lt; x1 ? -1 : 0;</span>
+            }
+
+            // INSIDE
+<span class="nc" id="L2588">            QuadCurve c = new QuadCurve(x1, y1, cx, cy, x2, y2);</span>
+<span class="nc" id="L2589">            double px = x - x1;</span>
+<span class="nc" id="L2590">            double py = y - y1;</span>
+<span class="nc" id="L2591">            double[] res = new double[3];</span>
+<span class="nc" id="L2592">            int rc = c.solvePoint(res, px);</span>
+
+<span class="nc" id="L2594">            return c.cross(res, rc, py, py);</span>
+        }
+
+        /// Returns how many times ray from point (x,y) cross cubic curve
+        public static int crossCubic(double x1, double y1, double cx1, double cy1, double cx2, double cy2, double x2, double y2, double x, double y) {
+
+            // LEFT/RIGHT/UP/EMPTY
+<span class="pc bpc" id="L2601" title="23 of 30 branches missed.">            if ((x &lt; x1 &amp;&amp; x &lt; cx1 &amp;&amp; x &lt; cx2 &amp;&amp; x &lt; x2) ||</span>
+                    (x &gt; x1 &amp;&amp; x &gt; cx1 &amp;&amp; x &gt; cx2 &amp;&amp; x &gt; x2) ||
+                    (y &gt; y1 &amp;&amp; y &gt; cy1 &amp;&amp; y &gt; cy2 &amp;&amp; y &gt; y2) ||
+                    (x1 == cx1 &amp;&amp; cx1 == cx2 &amp;&amp; cx2 == x2)) {
+<span class="nc" id="L2605">                return 0;</span>
+            }
+
+            // DOWN
+<span class="pc bpc" id="L2609" title="11 of 12 branches missed.">            if (y &lt; y1 &amp;&amp; y &lt; cy1 &amp;&amp; y &lt; cy2 &amp;&amp; y &lt; y2 &amp;&amp; x != x1 &amp;&amp; x != x2) {</span>
+<span class="nc bnc" id="L2610" title="All 2 branches missed.">                if (x1 &lt; x2) {</span>
+<span class="nc bnc" id="L2611" title="All 4 branches missed.">                    return x1 &lt; x &amp;&amp; x &lt; x2 ? 1 : 0;</span>
+                }
+<span class="nc bnc" id="L2613" title="All 4 branches missed.">                return x2 &lt; x &amp;&amp; x &lt; x1 ? -1 : 0;</span>
+            }
+
+            // INSIDE
+<span class="fc" id="L2617">            CubicCurve c = new CubicCurve(x1, y1, cx1, cy1, cx2, cy2, x2, y2);</span>
+<span class="fc" id="L2618">            double px = x - x1;</span>
+<span class="fc" id="L2619">            double py = y - y1;</span>
+<span class="fc" id="L2620">            double[] res = new double[3];</span>
+<span class="fc" id="L2621">            int rc = c.solvePoint(res, px);</span>
+<span class="fc" id="L2622">            return c.cross(res, rc, py, py);</span>
+        }
+
+        /// Returns how many times ray from point (x,y) cross path
+        public static int crossPath(PathIterator p, double x, double y) {
+<span class="fc" id="L2627">            int cross = 0;</span>
+            double mx;
+            double my;
+            double cx;
+            double cy;
+<span class="fc" id="L2632">            mx = my = cx = cy = 0.0;</span>
+<span class="fc" id="L2633">            double[] coords = new double[6];</span>
+
+<span class="fc bfc" id="L2635" title="All 2 branches covered.">            while (!p.isDone()) {</span>
+<span class="pc bpc" id="L2636" title="2 of 6 branches missed.">                switch (p.currentSegment(coords)) {</span>
+                    case PathIterator.SEG_MOVETO:
+<span class="pc bpc" id="L2638" title="2 of 4 branches missed.">                        if (cx != mx || cy != my) {</span>
+<span class="nc" id="L2639">                            cross += crossLine(cx, cy, mx, my, x, y);</span>
+                        }
+<span class="fc" id="L2641">                        mx = cx = coords[0];</span>
+<span class="fc" id="L2642">                        my = cy = coords[1];</span>
+<span class="fc" id="L2643">                        break;</span>
+                    case PathIterator.SEG_LINETO:
+<span class="fc" id="L2645">                        cross += crossLine(cx, cy, cx = coords[0], cy = coords[1], x, y);</span>
+<span class="fc" id="L2646">                        break;</span>
+                    case PathIterator.SEG_QUADTO:
+<span class="nc" id="L2648">                        cross += crossQuad(cx, cy, coords[0], coords[1], cx = coords[2], cy = coords[3], x, y);</span>
+<span class="nc" id="L2649">                        break;</span>
+                    case PathIterator.SEG_CUBICTO:
+<span class="fc" id="L2651">                        cross += crossCubic(cx, cy, coords[0], coords[1], coords[2], coords[3], cx = coords[4], cy = coords[5], x, y);</span>
+<span class="fc" id="L2652">                        break;</span>
+                    case PathIterator.SEG_CLOSE:
+<span class="pc bpc" id="L2654" title="3 of 4 branches missed.">                        if (cy != my || cx != mx) {</span>
+<span class="fc" id="L2655">                            cross += crossLine(cx, cy, cx = mx, cy = my, x, y);</span>
+                        }
+                        break;
+                    default:
+<span class="nc" id="L2659">                        throw new IllegalStateException(&quot;Illegal General path segment: &quot; + p.currentSegment(coords));</span>
+                }
+
+                // checks if the point (x,y) is the vertex of shape with PathIterator p
+<span class="pc bpc" id="L2663" title="3 of 4 branches missed.">                if (x == cx &amp;&amp; y == cy) {</span>
+<span class="nc" id="L2664">                    cross = 0;</span>
+<span class="nc" id="L2665">                    cy = my;</span>
+<span class="nc" id="L2666">                    break;</span>
+                }
+<span class="fc" id="L2668">                p.next();</span>
+            }
+<span class="pc bpc" id="L2670" title="1 of 2 branches missed.">            if (cy != my) {</span>
+<span class="nc" id="L2671">                cross += crossLine(cx, cy, mx, my, x, y);</span>
+            }
+<span class="fc" id="L2673">            return cross;</span>
+        }
+
+        /// Returns how many times ray from point (x,y) cross shape
+        public static int crossShape(Shape s, double x, double y) {
+<span class="fc bfc" id="L2678" title="All 2 branches covered.">            if (!s.getBounds().contains((int) x, (int) y)) {</span>
+<span class="fc" id="L2679">                return 0;</span>
+            }
+
+<span class="fc" id="L2682">            return crossPath(s.getPathIterator(null), x, y);</span>
+        }
+
+        /// Returns true if value enough small
+        public static boolean isZero(double val) {
+<span class="fc bfc" id="L2687" title="All 4 branches covered.">            return -DELTA &lt; val &amp;&amp; val &lt; DELTA;</span>
+        }
+
+        /// Sort bound array
+        static void sortBound(double[] bound, int bc) {
+<span class="nc bnc" id="L2692" title="All 2 branches missed.">            for (int i = 0; i &lt; bc - 4; i += 4) {</span>
+<span class="nc" id="L2693">                int k = i;</span>
+<span class="nc bnc" id="L2694" title="All 2 branches missed.">                for (int j = i + 4; j &lt; bc; j += 4) {</span>
+<span class="nc bnc" id="L2695" title="All 2 branches missed.">                    if (bound[k] &gt; bound[j]) {</span>
+<span class="nc" id="L2696">                        k = j;</span>
+                    }
+                }
+<span class="nc bnc" id="L2699" title="All 2 branches missed.">                if (k != i) {</span>
+<span class="nc" id="L2700">                    double tmp = bound[i];</span>
+<span class="nc" id="L2701">                    bound[i] = bound[k];</span>
+<span class="nc" id="L2702">                    bound[k] = tmp;</span>
+<span class="nc" id="L2703">                    tmp = bound[i + 1];</span>
+<span class="nc" id="L2704">                    bound[i + 1] = bound[k + 1];</span>
+<span class="nc" id="L2705">                    bound[k + 1] = tmp;</span>
+<span class="nc" id="L2706">                    tmp = bound[i + 2];</span>
+<span class="nc" id="L2707">                    bound[i + 2] = bound[k + 2];</span>
+<span class="nc" id="L2708">                    bound[k + 2] = tmp;</span>
+<span class="nc" id="L2709">                    tmp = bound[i + 3];</span>
+<span class="nc" id="L2710">                    bound[i + 3] = bound[k + 3];</span>
+<span class="nc" id="L2711">                    bound[k + 3] = tmp;</span>
+                }
+            }
+<span class="nc" id="L2714">        }</span>
+
+        /// Returns are bounds intersect or not intersect rectangle
+        static int crossBound(double[] bound, int bc, double py1, double py2) {
+
+            // LEFT/RIGHT
+<span class="pc bpc" id="L2720" title="1 of 2 branches missed.">            if (bc == 0) {</span>
+<span class="nc" id="L2721">                return 0;</span>
+            }
+
+            // Check Y coordinate
+<span class="fc" id="L2725">            int up = 0;</span>
+<span class="fc" id="L2726">            int down = 0;</span>
+<span class="fc" id="L2727">            boolean intersects = false;</span>
+            // PMD Fix (AvoidBranchingStatementAsLastInLoop): Guard the loop with the intersects flag instead of breaking at the end.
+<span class="fc bfc" id="L2729" title="All 4 branches covered.">            for (int i = 2; i &lt; bc &amp;&amp; !intersects; i += 4) {</span>
+<span class="pc bpc" id="L2730" title="1 of 2 branches missed.">                if (bound[i] &lt; py1) {</span>
+<span class="nc" id="L2731">                    up++;</span>
+<span class="nc" id="L2732">                    continue;</span>
+                }
+<span class="pc bpc" id="L2734" title="1 of 2 branches missed.">                if (bound[i] &gt; py2) {</span>
+<span class="nc" id="L2735">                    down++;</span>
+<span class="nc" id="L2736">                    continue;</span>
+                }
+<span class="fc" id="L2738">                intersects = true;</span>
+            }
+
+<span class="pc bpc" id="L2741" title="1 of 2 branches missed.">            if (intersects) {</span>
+<span class="fc" id="L2742">                return CROSSING;</span>
+            }
+
+            // UP
+<span class="nc bnc" id="L2746" title="All 2 branches missed.">            if (down == 0) {</span>
+<span class="nc" id="L2747">                return 0;</span>
+            }
+
+<span class="nc bnc" id="L2750" title="All 2 branches missed.">            if (up != 0) {</span>
+                // bc &gt;= 2
+<span class="nc" id="L2752">                sortBound(bound, bc);</span>
+<span class="nc bnc" id="L2753" title="All 2 branches missed.">                boolean sign = bound[2] &gt; py2;</span>
+<span class="nc" id="L2754">                boolean crossing = false;</span>
+                // PMD Fix (AvoidBranchingStatementAsLastInLoop): Guard the loop with the crossing flag instead of breaking at the end.
+<span class="nc bnc" id="L2756" title="All 4 branches missed.">                for (int i = 6; i &lt; bc &amp;&amp; !crossing; i += 4) {</span>
+<span class="nc bnc" id="L2757" title="All 2 branches missed.">                    boolean sign2 = bound[i] &gt; py2;</span>
+<span class="nc bnc" id="L2758" title="All 4 branches missed.">                    if (sign != sign2 &amp;&amp; bound[i + 1] != bound[i - 3]) {</span>
+<span class="nc" id="L2759">                        crossing = true;</span>
+<span class="nc" id="L2760">                        sign = sign2;</span>
+<span class="nc" id="L2761">                        continue;</span>
+                    }
+<span class="nc" id="L2763">                    sign = sign2;</span>
+                }
+<span class="nc bnc" id="L2765" title="All 2 branches missed.">                if (crossing) {</span>
+<span class="nc" id="L2766">                    return CROSSING;</span>
+                }
+            }
+<span class="nc" id="L2769">            return UNKNOWN;</span>
+        }
+
+        /// Returns how many times rectangle stripe cross line or the are intersect
+        public static int intersectLine(double x1, double y1, double x2, double y2, double rx1, double ry1, double rx2, double ry2) {
+
+            // LEFT/RIGHT/UP
+<span class="nc bnc" id="L2776" title="All 12 branches missed.">            if ((rx2 &lt; x1 &amp;&amp; rx2 &lt; x2) ||</span>
+                    (rx1 &gt; x1 &amp;&amp; rx1 &gt; x2) ||
+                    (ry1 &gt; y1 &amp;&amp; ry1 &gt; y2)) {
+<span class="nc" id="L2779">                return 0;</span>
+            }
+
+            // DOWN
+<span class="nc bnc" id="L2783" title="All 4 branches missed.">            if (!(ry2 &lt; y1 &amp;&amp; ry2 &lt; y2)) {</span>
+
+                // INSIDE
+<span class="nc bnc" id="L2786" title="All 2 branches missed.">                if (x1 == x2) {</span>
+<span class="nc" id="L2787">                    return CROSSING;</span>
+                }
+
+                // Build bound
+                double bx1;
+                double bx2;
+<span class="nc bnc" id="L2793" title="All 2 branches missed.">                if (x1 &lt; x2) {</span>
+<span class="nc bnc" id="L2794" title="All 2 branches missed.">                    bx1 = x1 &lt; rx1 ? rx1 : x1;</span>
+<span class="nc bnc" id="L2795" title="All 2 branches missed.">                    bx2 = x2 &lt; rx2 ? x2 : rx2;</span>
+                } else {
+<span class="nc bnc" id="L2797" title="All 2 branches missed.">                    bx1 = x2 &lt; rx1 ? rx1 : x2;</span>
+<span class="nc bnc" id="L2798" title="All 2 branches missed.">                    bx2 = x1 &lt; rx2 ? x1 : rx2;</span>
+                }
+<span class="nc" id="L2800">                double k = (y2 - y1) / (x2 - x1);</span>
+<span class="nc" id="L2801">                double by1 = k * (bx1 - x1) + y1;</span>
+<span class="nc" id="L2802">                double by2 = k * (bx2 - x1) + y1;</span>
+
+                // BOUND-UP
+<span class="nc bnc" id="L2805" title="All 4 branches missed.">                if (by1 &lt; ry1 &amp;&amp; by2 &lt; ry1) {</span>
+<span class="nc" id="L2806">                    return 0;</span>
+                }
+
+                // BOUND-DOWN
+<span class="nc bnc" id="L2810" title="All 4 branches missed.">                if (!(by1 &gt; ry2 &amp;&amp; by2 &gt; ry2)) {</span>
+<span class="nc" id="L2811">                    return CROSSING;</span>
+                }
+            }
+
+            // EMPTY
+<span class="nc bnc" id="L2816" title="All 2 branches missed.">            if (x1 == x2) {</span>
+<span class="nc" id="L2817">                return 0;</span>
+            }
+
+            // CURVE-START
+<span class="nc bnc" id="L2821" title="All 2 branches missed.">            if (rx1 == x1) {</span>
+<span class="nc bnc" id="L2822" title="All 2 branches missed.">                return x1 &lt; x2 ? 0 : -1;</span>
+            }
+
+            // CURVE-END
+<span class="nc bnc" id="L2826" title="All 2 branches missed.">            if (rx1 == x2) {</span>
+<span class="nc bnc" id="L2827" title="All 2 branches missed.">                return x1 &lt; x2 ? 1 : 0;</span>
+            }
+
+<span class="nc bnc" id="L2830" title="All 2 branches missed.">            if (x1 &lt; x2) {</span>
+<span class="nc bnc" id="L2831" title="All 4 branches missed.">                return x1 &lt; rx1 &amp;&amp; rx1 &lt; x2 ? 1 : 0;</span>
+            }
+<span class="nc bnc" id="L2833" title="All 4 branches missed.">            return x2 &lt; rx1 &amp;&amp; rx1 &lt; x1 ? -1 : 0;</span>
+
+        }
+
+        /// Returns how many times rectangle stripe cross quad curve or the are intersect
+        public static int intersectQuad(double x1, double y1, double cx, double cy, double x2, double y2, double rx1, double ry1, double rx2, double ry2) {
+
+            // LEFT/RIGHT/UP ------------------------------------------------------
+<span class="pc bpc" id="L2841" title="9 of 18 branches missed.">            if ((rx2 &lt; x1 &amp;&amp; rx2 &lt; cx &amp;&amp; rx2 &lt; x2) ||</span>
+                    (rx1 &gt; x1 &amp;&amp; rx1 &gt; cx &amp;&amp; rx1 &gt; x2) ||
+                    (ry1 &gt; y1 &amp;&amp; ry1 &gt; cy &amp;&amp; ry1 &gt; y2)) {
+<span class="fc" id="L2844">                return 0;</span>
+            }
+
+            // DOWN ---------------------------------------------------------------
+<span class="pc bpc" id="L2848" title="9 of 10 branches missed.">            if (ry2 &lt; y1 &amp;&amp; ry2 &lt; cy &amp;&amp; ry2 &lt; y2 &amp;&amp; rx1 != x1 &amp;&amp; rx1 != x2) {</span>
+<span class="nc bnc" id="L2849" title="All 2 branches missed.">                if (x1 &lt; x2) {</span>
+<span class="nc bnc" id="L2850" title="All 4 branches missed.">                    return x1 &lt; rx1 &amp;&amp; rx1 &lt; x2 ? 1 : 0;</span>
+                }
+<span class="nc bnc" id="L2852" title="All 4 branches missed.">                return x2 &lt; rx1 &amp;&amp; rx1 &lt; x1 ? -1 : 0;</span>
+            }
+
+            // INSIDE -------------------------------------------------------------
+<span class="fc" id="L2856">            QuadCurve c = new QuadCurve(x1, y1, cx, cy, x2, y2);</span>
+<span class="fc" id="L2857">            double px1 = rx1 - x1;</span>
+<span class="fc" id="L2858">            double py1 = ry1 - y1;</span>
+<span class="fc" id="L2859">            double px2 = rx2 - x1;</span>
+<span class="fc" id="L2860">            double py2 = ry2 - y1;</span>
+
+<span class="fc" id="L2862">            double[] res1 = new double[3];</span>
+<span class="fc" id="L2863">            double[] res2 = new double[3];</span>
+<span class="fc" id="L2864">            int rc1 = c.solvePoint(res1, px1);</span>
+<span class="fc" id="L2865">            int rc2 = c.solvePoint(res2, px2);</span>
+
+            // INSIDE-LEFT/RIGHT
+<span class="pc bpc" id="L2868" title="3 of 4 branches missed.">            if (rc1 == 0 &amp;&amp; rc2 == 0) {</span>
+<span class="nc" id="L2869">                return 0;</span>
+            }
+
+            // Build bound --------------------------------------------------------
+<span class="fc" id="L2873">            double minX = px1 - DELTA;</span>
+<span class="fc" id="L2874">            double maxX = px2 + DELTA;</span>
+<span class="fc" id="L2875">            double[] bound = new double[28];</span>
+<span class="fc" id="L2876">            int bc = 0;</span>
+            // Add roots
+<span class="fc" id="L2878">            bc = c.addBound(bound, bc, res1, rc1, minX, maxX, false, 0);</span>
+<span class="fc" id="L2879">            bc = c.addBound(bound, bc, res2, rc2, minX, maxX, false, 1);</span>
+            // Add extremal points`
+<span class="fc" id="L2881">            rc2 = c.solveExtrem(res2);</span>
+<span class="fc" id="L2882">            bc = c.addBound(bound, bc, res2, rc2, minX, maxX, true, 2);</span>
+            // Add start and end
+<span class="pc bpc" id="L2884" title="1 of 4 branches missed.">            if (rx1 &lt; x1 &amp;&amp; x1 &lt; rx2) {</span>
+<span class="nc" id="L2885">                bound[bc++] = 0.0;</span>
+<span class="nc" id="L2886">                bound[bc++] = 0.0;</span>
+<span class="nc" id="L2887">                bound[bc++] = 0.0;</span>
+<span class="nc" id="L2888">                bound[bc++] = 4;</span>
+            }
+<span class="pc bpc" id="L2890" title="2 of 4 branches missed.">            if (rx1 &lt; x2 &amp;&amp; x2 &lt; rx2) {</span>
+<span class="nc" id="L2891">                bound[bc++] = 1.0;</span>
+<span class="nc" id="L2892">                bound[bc++] = c.ax;</span>
+<span class="nc" id="L2893">                bound[bc++] = c.ay;</span>
+<span class="nc" id="L2894">                bound[bc++] = 5;</span>
+            }
+            // End build bound ----------------------------------------------------
+
+<span class="fc" id="L2898">            int cross = crossBound(bound, bc, py1, py2);</span>
+<span class="pc bpc" id="L2899" title="1 of 2 branches missed.">            if (cross != UNKNOWN) {</span>
+<span class="fc" id="L2900">                return cross;</span>
+            }
+<span class="nc" id="L2902">            return c.cross(res1, rc1, py1, py2);</span>
+        }
+
+        /// Returns how many times rectangle stripe cross cubic curve or the are intersect
+        public static int intersectCubic(double x1, double y1, double cx1, double cy1, double cx2, double cy2, double x2, double y2, double rx1, double ry1, double rx2, double ry2) {
+
+            // LEFT/RIGHT/UP
+<span class="nc bnc" id="L2909" title="All 24 branches missed.">            if ((rx2 &lt; x1 &amp;&amp; rx2 &lt; cx1 &amp;&amp; rx2 &lt; cx2 &amp;&amp; rx2 &lt; x2) ||</span>
+                    (rx1 &gt; x1 &amp;&amp; rx1 &gt; cx1 &amp;&amp; rx1 &gt; cx2 &amp;&amp; rx1 &gt; x2) ||
+                    (ry1 &gt; y1 &amp;&amp; ry1 &gt; cy1 &amp;&amp; ry1 &gt; cy2 &amp;&amp; ry1 &gt; y2)) {
+<span class="nc" id="L2912">                return 0;</span>
+            }
+
+            // DOWN
+<span class="nc bnc" id="L2916" title="All 12 branches missed.">            if (ry2 &lt; y1 &amp;&amp; ry2 &lt; cy1 &amp;&amp; ry2 &lt; cy2 &amp;&amp; ry2 &lt; y2 &amp;&amp; rx1 != x1 &amp;&amp; rx1 != x2) {</span>
+<span class="nc bnc" id="L2917" title="All 2 branches missed.">                if (x1 &lt; x2) {</span>
+<span class="nc bnc" id="L2918" title="All 4 branches missed.">                    return x1 &lt; rx1 &amp;&amp; rx1 &lt; x2 ? 1 : 0;</span>
+                }
+<span class="nc bnc" id="L2920" title="All 4 branches missed.">                return x2 &lt; rx1 &amp;&amp; rx1 &lt; x1 ? -1 : 0;</span>
+            }
+
+            // INSIDE
+<span class="nc" id="L2924">            CubicCurve c = new CubicCurve(x1, y1, cx1, cy1, cx2, cy2, x2, y2);</span>
+<span class="nc" id="L2925">            double px1 = rx1 - x1;</span>
+<span class="nc" id="L2926">            double py1 = ry1 - y1;</span>
+<span class="nc" id="L2927">            double px2 = rx2 - x1;</span>
+<span class="nc" id="L2928">            double py2 = ry2 - y1;</span>
+
+<span class="nc" id="L2930">            double[] res1 = new double[3];</span>
+<span class="nc" id="L2931">            double[] res2 = new double[3];</span>
+<span class="nc" id="L2932">            int rc1 = c.solvePoint(res1, px1);</span>
+<span class="nc" id="L2933">            int rc2 = c.solvePoint(res2, px2);</span>
+
+            // LEFT/RIGHT
+<span class="nc bnc" id="L2936" title="All 4 branches missed.">            if (rc1 == 0 &amp;&amp; rc2 == 0) {</span>
+<span class="nc" id="L2937">                return 0;</span>
+            }
+
+<span class="nc" id="L2940">            double minX = px1 - DELTA;</span>
+<span class="nc" id="L2941">            double maxX = px2 + DELTA;</span>
+
+            // Build bound --------------------------------------------------------
+<span class="nc" id="L2944">            double[] bound = new double[40];</span>
+<span class="nc" id="L2945">            int bc = 0;</span>
+            // Add roots
+<span class="nc" id="L2947">            bc = c.addBound(bound, bc, res1, rc1, minX, maxX, false, 0);</span>
+<span class="nc" id="L2948">            bc = c.addBound(bound, bc, res2, rc2, minX, maxX, false, 1);</span>
+            // Add extrimal points
+<span class="nc" id="L2950">            rc2 = c.solveExtremX(res2);</span>
+<span class="nc" id="L2951">            bc = c.addBound(bound, bc, res2, rc2, minX, maxX, true, 2);</span>
+<span class="nc" id="L2952">            rc2 = c.solveExtremY(res2);</span>
+<span class="nc" id="L2953">            bc = c.addBound(bound, bc, res2, rc2, minX, maxX, true, 4);</span>
+            // Add start and end
+<span class="nc bnc" id="L2955" title="All 4 branches missed.">            if (rx1 &lt; x1 &amp;&amp; x1 &lt; rx2) {</span>
+<span class="nc" id="L2956">                bound[bc++] = 0.0;</span>
+<span class="nc" id="L2957">                bound[bc++] = 0.0;</span>
+<span class="nc" id="L2958">                bound[bc++] = 0.0;</span>
+<span class="nc" id="L2959">                bound[bc++] = 6;</span>
+            }
+<span class="nc bnc" id="L2961" title="All 4 branches missed.">            if (rx1 &lt; x2 &amp;&amp; x2 &lt; rx2) {</span>
+<span class="nc" id="L2962">                bound[bc++] = 1.0;</span>
+<span class="nc" id="L2963">                bound[bc++] = c.ax;</span>
+<span class="nc" id="L2964">                bound[bc++] = c.ay;</span>
+<span class="nc" id="L2965">                bound[bc++] = 7;</span>
+            }
+            // End build bound ----------------------------------------------------
+
+<span class="nc" id="L2969">            int cross = crossBound(bound, bc, py1, py2);</span>
+<span class="nc bnc" id="L2970" title="All 2 branches missed.">            if (cross != UNKNOWN) {</span>
+<span class="nc" id="L2971">                return cross;</span>
+            }
+<span class="nc" id="L2973">            return c.cross(res1, rc1, py1, py2);</span>
+        }
+
+        /// Returns how many times rectangle stripe cross path or the are intersect
+        public static int intersectPath(PathIterator p, double x, double y, double w, double h) {
+
+<span class="nc" id="L2979">            int cross = 0;</span>
+            int count;
+            double mx;
+            double my;
+            double cx;
+            double cy;
+<span class="nc" id="L2985">            mx = my = cx = cy = 0.0;</span>
+<span class="nc" id="L2986">            double[] coords = new double[6];</span>
+
+<span class="nc" id="L2988">            double rx1 = x;</span>
+<span class="nc" id="L2989">            double ry1 = y;</span>
+<span class="nc" id="L2990">            double rx2 = x + w;</span>
+<span class="nc" id="L2991">            double ry2 = y + h;</span>
+
+<span class="nc bnc" id="L2993" title="All 2 branches missed.">            while (!p.isDone()) {</span>
+<span class="nc" id="L2994">                count = 0;</span>
+<span class="nc bnc" id="L2995" title="All 6 branches missed.">                switch (p.currentSegment(coords)) {</span>
+                    case PathIterator.SEG_MOVETO:
+<span class="nc bnc" id="L2997" title="All 4 branches missed.">                        if (cx != mx || cy != my) {</span>
+<span class="nc" id="L2998">                            count = intersectLine(cx, cy, mx, my, rx1, ry1, rx2, ry2);</span>
+                        }
+<span class="nc" id="L3000">                        mx = cx = coords[0];</span>
+<span class="nc" id="L3001">                        my = cy = coords[1];</span>
+<span class="nc" id="L3002">                        break;</span>
+                    case PathIterator.SEG_LINETO:
+<span class="nc" id="L3004">                        count = intersectLine(cx, cy, cx = coords[0], cy = coords[1], rx1, ry1, rx2, ry2);</span>
+<span class="nc" id="L3005">                        break;</span>
+                    case PathIterator.SEG_QUADTO:
+<span class="nc" id="L3007">                        count = intersectQuad(cx, cy, coords[0], coords[1], cx = coords[2], cy = coords[3], rx1, ry1, rx2, ry2);</span>
+<span class="nc" id="L3008">                        break;</span>
+                    case PathIterator.SEG_CUBICTO:
+<span class="nc" id="L3010">                        count = intersectCubic(cx, cy, coords[0], coords[1], coords[2], coords[3], cx = coords[4], cy = coords[5], rx1, ry1, rx2, ry2);</span>
+<span class="nc" id="L3011">                        break;</span>
+                    case PathIterator.SEG_CLOSE:
+<span class="nc bnc" id="L3013" title="All 4 branches missed.">                        if (cy != my || cx != mx) {</span>
+<span class="nc" id="L3014">                            count = intersectLine(cx, cy, mx, my, rx1, ry1, rx2, ry2);</span>
+                        }
+<span class="nc" id="L3016">                        cx = mx;</span>
+<span class="nc" id="L3017">                        cy = my;</span>
+<span class="nc" id="L3018">                        break;</span>
+                    default:
+<span class="nc" id="L3020">                        throw new IllegalStateException(&quot;Illegal General path segment: &quot; + p.currentSegment(coords));</span>
+                }
+<span class="nc bnc" id="L3022" title="All 2 branches missed.">                if (count == CROSSING) {</span>
+<span class="nc" id="L3023">                    return CROSSING;</span>
+                }
+<span class="nc" id="L3025">                cross += count;</span>
+<span class="nc" id="L3026">                p.next();</span>
+            }
+<span class="nc bnc" id="L3028" title="All 2 branches missed.">            if (cy != my) {</span>
+<span class="nc" id="L3029">                count = intersectLine(cx, cy, mx, my, rx1, ry1, rx2, ry2);</span>
+<span class="nc bnc" id="L3030" title="All 2 branches missed.">                if (count == CROSSING) {</span>
+<span class="nc" id="L3031">                    return CROSSING;</span>
+                }
+<span class="nc" id="L3033">                cross += count;</span>
+            }
+<span class="nc" id="L3035">            return cross;</span>
+        }
+
+        /// Returns how many times rectangle stripe cross shape or the are intersect
+        public static int intersectShape(Shape s, double x, double y, double w, double h) {
+<span class="nc bnc" id="L3040" title="All 2 branches missed.">            if (!s.getBounds().intersects((int) x, (int) y, (int) w, (int) h)) {</span>
+<span class="nc" id="L3041">                return 0;</span>
+            }
+<span class="nc" id="L3043">            return intersectPath(s.getPathIterator(null), x, y, w, h);</span>
+        }
+
+        /// Returns true if cross count correspond inside location for non zero path rule
+        public static boolean isInsideNonZero(int cross) {
+<span class="fc bfc" id="L3048" title="All 2 branches covered.">            return cross != 0;</span>
+        }
+
+        /// Returns true if cross count correspond inside location for even-odd path rule
+        public static boolean isInsideEvenOdd(int cross) {
+<span class="nc bnc" id="L3053" title="All 2 branches missed.">            return (cross &amp; 1) != 0;</span>
+        }
+
+        /// QuadCurve class provides basic functionality to find curve crossing and calculating bounds
+        public static class QuadCurve {
+
+            double ax;
+            double ay;
+            double bx;
+            double by;
+            double axCoeff;
+            double ayCoeff;
+            double bxCoeff;
+            double byCoeff;
+
+<span class="fc" id="L3068">            public QuadCurve(double x1, double y1, double cx, double cy, double x2, double y2) {</span>
+<span class="fc" id="L3069">                ax = x2 - x1;</span>
+<span class="fc" id="L3070">                ay = y2 - y1;</span>
+<span class="fc" id="L3071">                bx = cx - x1;</span>
+<span class="fc" id="L3072">                by = cy - y1;</span>
+
+<span class="fc" id="L3074">                bxCoeff = bx + bx;   // Bx = 2.0 * bx</span>
+<span class="fc" id="L3075">                axCoeff = ax - bxCoeff;   // Ax = ax - 2.0 * bx</span>
+
+<span class="fc" id="L3077">                byCoeff = by + by;   // By = 2.0 * by</span>
+<span class="fc" id="L3078">                ayCoeff = ay - byCoeff;   // Ay = ay - 2.0 * by</span>
+<span class="fc" id="L3079">            }</span>
+
+            int cross(double[] res, int rc, double py1, double py2) {
+<span class="nc" id="L3082">                int cross = 0;</span>
+
+<span class="nc bnc" id="L3084" title="All 2 branches missed.">                for (int i = 0; i &lt; rc; i++) {</span>
+<span class="nc" id="L3085">                    double t = res[i];</span>
+
+                    // CURVE-OUTSIDE
+<span class="nc bnc" id="L3088" title="All 4 branches missed.">                    if (t &lt; -DELTA || t &gt; 1 + DELTA) {</span>
+<span class="nc" id="L3089">                        continue;</span>
+                    }
+                    // CURVE-START
+<span class="nc bnc" id="L3092" title="All 2 branches missed.">                    if (t &lt; DELTA) {</span>
+<span class="nc bnc" id="L3093" title="All 6 branches missed.">                        if (py1 &lt; 0.0 &amp;&amp; (!isZero(bx) ? bx : ax - bx) &lt; 0.0) {</span>
+<span class="nc" id="L3094">                            cross--;</span>
+                        }
+                        continue;
+                    }
+                    // CURVE-END
+<span class="nc bnc" id="L3099" title="All 2 branches missed.">                    if (t &gt; 1 - DELTA) {</span>
+<span class="nc bnc" id="L3100" title="All 6 branches missed.">                        if (py1 &lt; ay &amp;&amp; (!isZero(ax - bx) ? ax - bx : bx) &gt; 0.0) {</span>
+<span class="nc" id="L3101">                            cross++;</span>
+                        }
+                        continue;
+                    }
+                    // CURVE-INSIDE
+<span class="nc" id="L3106">                    double ry = t * (t * ayCoeff + byCoeff);</span>
+                    // ry = t * t * Ay + t * By
+<span class="nc bnc" id="L3108" title="All 2 branches missed.">                    if (ry &gt; py2) {</span>
+<span class="nc" id="L3109">                        double rxt = t * axCoeff + bx;</span>
+                        // rxt = 2.0 * t * Ax + Bx = 2.0 * t * Ax + 2.0 * bx
+<span class="nc bnc" id="L3111" title="All 4 branches missed.">                        if (rxt &gt; -DELTA &amp;&amp; rxt &lt; DELTA) {</span>
+<span class="nc" id="L3112">                            continue;</span>
+                        }
+<span class="nc bnc" id="L3114" title="All 2 branches missed.">                        cross += rxt &gt; 0.0 ? 1 : -1;</span>
+                    }
+                } // for
+
+<span class="nc" id="L3118">                return cross;</span>
+            }
+
+            int solvePoint(double[] res, double px) {
+<span class="fc" id="L3122">                double[] eqn = {-px, bxCoeff, axCoeff};</span>
+<span class="fc" id="L3123">                return solveQuad(eqn, res);</span>
+            }
+
+            int solveExtrem(double[] res) {
+<span class="fc" id="L3127">                int rc = 0;</span>
+<span class="pc bpc" id="L3128" title="1 of 2 branches missed.">                if (!isZero(axCoeff)) {</span>
+<span class="nc" id="L3129">                    res[rc++] = -bxCoeff / (axCoeff + axCoeff);</span>
+                }
+<span class="pc bpc" id="L3131" title="1 of 2 branches missed.">                if (!isZero(ayCoeff)) {</span>
+<span class="fc" id="L3132">                    res[rc++] = -byCoeff / (ayCoeff + ayCoeff);</span>
+                }
+<span class="fc" id="L3134">                return rc;</span>
+            }
+
+            int addBound(double[] bound, int bc, double[] res, int rc, double minX, double maxX, boolean changeId, int id) {
+<span class="fc bfc" id="L3138" title="All 2 branches covered.">                for (int i = 0; i &lt; rc; i++) {</span>
+<span class="fc" id="L3139">                    double t = res[i];</span>
+<span class="pc bpc" id="L3140" title="1 of 4 branches missed.">                    if (t &gt; -DELTA &amp;&amp; t &lt; 1 + DELTA) {</span>
+<span class="fc" id="L3141">                        double rx = t * (t * axCoeff + bxCoeff);</span>
+<span class="pc bpc" id="L3142" title="2 of 4 branches missed.">                        if (minX &lt;= rx &amp;&amp; rx &lt;= maxX) {</span>
+<span class="fc" id="L3143">                            bound[bc++] = t;</span>
+<span class="fc" id="L3144">                            bound[bc++] = rx;</span>
+<span class="fc" id="L3145">                            bound[bc++] = t * (t * ayCoeff + byCoeff);</span>
+<span class="fc" id="L3146">                            bound[bc++] = id;</span>
+<span class="fc bfc" id="L3147" title="All 2 branches covered.">                            if (changeId) {</span>
+<span class="fc" id="L3148">                                id++;</span>
+                            }
+                        }
+                    }
+                }
+<span class="fc" id="L3153">                return bc;</span>
+            }
+
+        }
+
+        /// CubicCurve class provides basic functionality to find curve crossing and calculating bounds
+        public static class CubicCurve {
+
+            double ax;
+            double ay;
+            double bx;
+            double by;
+            double cx;
+            double cy;
+            double axCoeff;
+            double ayCoeff;
+            double bxCoeff;
+            double byCoeff;
+            double cxCoeff;
+            double cyCoeff;
+            double axCoeff3;
+            double bxCoeff2;
+
+<span class="fc" id="L3176">            public CubicCurve(double x1, double y1, double cx1, double cy1, double cx2, double cy2, double x2, double y2) {</span>
+<span class="fc" id="L3177">                ax = x2 - x1;</span>
+<span class="fc" id="L3178">                ay = y2 - y1;</span>
+<span class="fc" id="L3179">                bx = cx1 - x1;</span>
+<span class="fc" id="L3180">                by = cy1 - y1;</span>
+<span class="fc" id="L3181">                cx = cx2 - x1;</span>
+<span class="fc" id="L3182">                cy = cy2 - y1;</span>
+
+<span class="fc" id="L3184">                cxCoeff = bx + bx + bx;           // Cx = 3.0 * bx</span>
+<span class="fc" id="L3185">                bxCoeff = cx + cx + cx - cxCoeff - cxCoeff; // Bx = 3.0 * cx - 6.0 * bx</span>
+<span class="fc" id="L3186">                axCoeff = ax - bxCoeff - cxCoeff;           // Ax = ax - 3.0 * cx + 3.0 * bx</span>
+
+<span class="fc" id="L3188">                cyCoeff = by + by + by;           // Cy = 3.0 * by</span>
+<span class="fc" id="L3189">                byCoeff = cy + cy + cy - cyCoeff - cyCoeff; // By = 3.0 * cy - 6.0 * by</span>
+<span class="fc" id="L3190">                ayCoeff = ay - byCoeff - cyCoeff;           // Ay = ay - 3.0 * cy + 3.0 * by</span>
+
+<span class="fc" id="L3192">                axCoeff3 = axCoeff + axCoeff + axCoeff;</span>
+<span class="fc" id="L3193">                bxCoeff2 = bxCoeff + bxCoeff;</span>
+<span class="fc" id="L3194">            }</span>
+
+            int cross(double[] res, int rc, double py1, double py2) {
+<span class="fc" id="L3197">                int cross = 0;</span>
+<span class="fc bfc" id="L3198" title="All 2 branches covered.">                for (int i = 0; i &lt; rc; i++) {</span>
+<span class="fc" id="L3199">                    double t = res[i];</span>
+
+                    // CURVE-OUTSIDE
+<span class="pc bpc" id="L3202" title="2 of 4 branches missed.">                    if (t &lt; -DELTA || t &gt; 1 + DELTA) {</span>
+<span class="nc" id="L3203">                        continue;</span>
+                    }
+                    // CURVE-START
+<span class="pc bpc" id="L3206" title="1 of 2 branches missed.">                    if (t &lt; DELTA) {</span>
+<span class="nc bnc" id="L3207" title="All 8 branches missed.">                        if (py1 &lt; 0.0 &amp;&amp; (!isZero(bx) ? bx : (!isZero(cx - bx) ? cx - bx : ax - cx)) &lt; 0.0) {</span>
+<span class="nc" id="L3208">                            cross--;</span>
+                        }
+                        continue;
+                    }
+                    // CURVE-END
+<span class="pc bpc" id="L3213" title="1 of 2 branches missed.">                    if (t &gt; 1 - DELTA) {</span>
+<span class="nc bnc" id="L3214" title="All 8 branches missed.">                        if (py1 &lt; ay &amp;&amp; (!isZero(ax - cx) ? ax - cx : (!isZero(cx - bx) ? cx - bx : bx)) &gt; 0.0) {</span>
+<span class="nc" id="L3215">                            cross++;</span>
+                        }
+                        continue;
+                    }
+                    // CURVE-INSIDE
+<span class="fc" id="L3220">                    double ry = t * (t * (t * ayCoeff + byCoeff) + cyCoeff);</span>
+                    // ry = t * t * t * Ay + t * t * By + t * Cy
+<span class="fc bfc" id="L3222" title="All 2 branches covered.">                    if (ry &gt; py2) {</span>
+<span class="fc" id="L3223">                        double rxt = t * (t * axCoeff3 + bxCoeff2) + cxCoeff;</span>
+                        // rxt = 3.0 * t * t * Ax + 2.0 * t * Bx + Cx
+<span class="pc bpc" id="L3225" title="3 of 4 branches missed.">                        if (rxt &gt; -DELTA &amp;&amp; rxt &lt; DELTA) {</span>
+<span class="nc" id="L3226">                            rxt = t * (axCoeff3 + axCoeff3) + bxCoeff2;</span>
+                            // rxt = 6.0 * t * Ax + 2.0 * Bx
+<span class="nc bnc" id="L3228" title="All 4 branches missed.">                            if (rxt &lt; -DELTA || rxt &gt; DELTA) {</span>
+                                // Inflection point
+<span class="nc" id="L3230">                                continue;</span>
+                            }
+<span class="nc" id="L3232">                            rxt = ax;</span>
+                        }
+<span class="pc bpc" id="L3234" title="1 of 2 branches missed.">                        cross += rxt &gt; 0.0 ? 1 : -1;</span>
+                    }
+                } //for
+
+<span class="fc" id="L3238">                return cross;</span>
+            }
+
+            int solvePoint(double[] res, double px) {
+<span class="fc" id="L3242">                double[] eqn = {-px, cxCoeff, bxCoeff, axCoeff};</span>
+<span class="fc" id="L3243">                return solveCubic(eqn, res);</span>
+            }
+
+            int solveExtremX(double[] res) {
+<span class="nc" id="L3247">                double[] eqn = {cxCoeff, bxCoeff2, axCoeff3};</span>
+<span class="nc" id="L3248">                return solveQuad(eqn, res);</span>
+            }
+
+            int solveExtremY(double[] res) {
+<span class="nc" id="L3252">                double[] eqn = {cyCoeff, byCoeff + byCoeff, ayCoeff + ayCoeff + ayCoeff};</span>
+<span class="nc" id="L3253">                return solveQuad(eqn, res);</span>
+            }
+
+            int addBound(double[] bound, int bc, double[] res, int rc, double minX, double maxX, boolean changeId, int id) {
+<span class="nc bnc" id="L3257" title="All 2 branches missed.">                for (int i = 0; i &lt; rc; i++) {</span>
+<span class="nc" id="L3258">                    double t = res[i];</span>
+<span class="nc bnc" id="L3259" title="All 4 branches missed.">                    if (t &gt; -DELTA &amp;&amp; t &lt; 1 + DELTA) {</span>
+<span class="nc" id="L3260">                        double rx = t * (t * (t * axCoeff + bxCoeff) + cxCoeff);</span>
+<span class="nc bnc" id="L3261" title="All 4 branches missed.">                        if (minX &lt;= rx &amp;&amp; rx &lt;= maxX) {</span>
+<span class="nc" id="L3262">                            bound[bc++] = t;</span>
+<span class="nc" id="L3263">                            bound[bc++] = rx;</span>
+<span class="nc" id="L3264">                            bound[bc++] = t * (t * (t * ayCoeff + byCoeff) + cyCoeff);</span>
+<span class="nc" id="L3265">                            bound[bc++] = id;</span>
+<span class="nc bnc" id="L3266" title="All 2 branches missed.">                            if (changeId) {</span>
+<span class="nc" id="L3267">                                id++;</span>
+                            }
+                        }
+                    }
+                }
+<span class="nc" id="L3272">                return bc;</span>
+            }
+
+        }
+//}
+
+    }
+
+    private static class Pt {
+
+        double x;
+        double y;
+
+        void clone(Pt target) {
+<span class="fc" id="L3286">            target.x = x;</span>
+<span class="fc" id="L3287">            target.y = y;</span>
+<span class="fc" id="L3288">        }</span>
+    }
+
+    /*
+     * GeneralPath path iterator
+     */
+    private static class Iterator implements PathIterator {
+
+        /// The current cursor position in types buffer
+        int typeIndex;
+
+        /// The current cursor position in points buffer
+        int pointIndex;
+
+        /// The source GeneralPath object
+        GeneralPath p;
+
+        Transform transform;
+
+        /// Constructs a new GeneralPath.Iterator for given general path
+        ///
+        /// #### Parameters
+        ///
+        /// - `path`: - the source GeneralPath object
+<span class="fc" id="L3312">        Iterator(GeneralPath path) {</span>
+<span class="fc" id="L3313">            this.p = path;</span>
+
+<span class="fc" id="L3315">        }</span>
+
+        private void reset() {
+<span class="fc" id="L3318">            typeIndex = 0;</span>
+<span class="fc" id="L3319">            pointIndex = 0;</span>
+<span class="fc" id="L3320">        }</span>
+
+        @Override
+        public int getWindingRule() {
+<span class="nc" id="L3324">            return p.getWindingRule();</span>
+        }
+
+        @Override
+        public boolean isDone() {
+<span class="fc bfc" id="L3329" title="All 2 branches covered.">            return typeIndex &gt;= p.typeSize;</span>
+        }
+
+        @Override
+        public void next() {
+<span class="fc" id="L3334">            typeIndex++;</span>
+<span class="fc" id="L3335">        }</span>
+
+        @Override
+        public int currentSegment(double[] coords) {
+<span class="fc" id="L3339">            float[] fcoords = createFloatArrayFromPool(6);</span>
+            try {
+<span class="fc" id="L3341">                int res = currentSegment(fcoords);</span>
+<span class="fc" id="L3342">                int type = p.types[typeIndex];</span>
+<span class="fc" id="L3343">                int count = GeneralPath.pointShift[type];</span>
+
+<span class="fc bfc" id="L3345" title="All 2 branches covered.">                for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L3346">                    coords[i] = fcoords[i];</span>
+                }
+<span class="fc" id="L3348">                return res;</span>
+            } finally {
+<span class="fc" id="L3350">                recycle(fcoords);</span>
+            }
+        }
+
+        @Override
+        public int currentSegment(float[] coords) {
+<span class="pc bpc" id="L3356" title="1 of 2 branches missed.">            if (isDone()) {</span>
+                // awt.4B=Iterator out of bounds
+<span class="nc" id="L3358">                throw new IndexOutOfBoundsException(&quot;Path done&quot;); //$NON-NLS-1$</span>
+            }
+<span class="fc" id="L3360">            int type = p.types[typeIndex];</span>
+<span class="fc" id="L3361">            int count = GeneralPath.pointShift[type];</span>
+<span class="fc bfc" id="L3362" title="All 2 branches covered.">            if (transform == null) {</span>
+<span class="fc" id="L3363">                System.arraycopy(p.points, pointIndex, coords, 0, count);</span>
+            } else {
+<span class="fc" id="L3365">                transform.transformPoints(2, p.points, pointIndex, coords, 0, count / 2);</span>
+            }
+<span class="fc" id="L3367">            pointIndex += count;</span>
+<span class="fc" id="L3368">            return type;</span>
+        }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

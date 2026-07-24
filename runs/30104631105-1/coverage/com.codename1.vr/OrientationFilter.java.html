@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OrientationFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.vr</a> &gt; <span class="el_source">OrientationFilter.java</span></div><h1>OrientationFilter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.vr;
+
+import com.codename1.gpu.Quaternion;
+import com.codename1.util.MathUtil;
+
+/// Deterministic complementary sensor-fusion filter that turns raw gyroscope,
+/// accelerometer and magnetometer readings into a device orientation
+/// quaternion. Pure math with no platform dependencies, so the same inputs
+/// always produce the same orientation on every platform.
+///
+/// The gyroscope drives the orientation between samples; the accelerometer
+/// slowly corrects accumulated tilt drift toward gravity and the magnetometer
+/// (when available) corrects yaw drift toward magnetic north. The blend is
+/// controlled by `#setGyroWeight(float)`.
+///
+/// Conventions: the device frame has X right, Y up and Z toward the user
+/// (the `com.codename1.sensors` convention); the world frame is Y up with -Z
+/// forward. The output quaternion rotates device-frame vectors into the world
+/// frame.
+<span class="fc" id="L42">public final class OrientationFilter {</span>
+<span class="fc" id="L43">    private final float[] q = Quaternion.identity();</span>
+<span class="fc" id="L44">    private float gyroWeight = 0.98f;</span>
+
+    // Scratch buffers, allocated once.
+<span class="fc" id="L47">    private final float[] v = new float[3];</span>
+<span class="fc" id="L48">    private final float[] correction = new float[4];</span>
+
+    /// Sets the complementary blend coefficient in `(0, 1]`: the fraction of
+    /// each update that trusts the integrated gyroscope over the
+    /// accelerometer/magnetometer reference. Higher values are smoother but
+    /// drift-correct more slowly. Default `0.98`.
+    public void setGyroWeight(float w) {
+<span class="fc bfc" id="L55" title="All 4 branches covered.">        if (w &lt;= 0f || w &gt; 1f) {</span>
+<span class="fc" id="L56">            throw new IllegalArgumentException(&quot;gyroWeight must be in (0, 1]&quot;);</span>
+        }
+<span class="fc" id="L58">        this.gyroWeight = w;</span>
+<span class="fc" id="L59">    }</span>
+
+    /// The complementary blend coefficient.
+    public float getGyroWeight() {
+<span class="nc" id="L63">        return gyroWeight;</span>
+    }
+
+    /// Advances the filter by one sensor sample.
+    ///
+    /// #### Parameters
+    ///
+    /// - `gx`, `gy`, `gz`: gyroscope rotation rates around the device axes in
+    ///   radians per second; pass zeros when no gyroscope exists
+    ///
+    /// - `ax`, `ay`, `az`: accelerometer reading including gravity in meters
+    ///   per second squared; pass zeros (or NaN) to skip tilt correction
+    ///
+    /// - `mx`, `my`, `mz`: magnetometer reading in microtesla; pass NaN to
+    ///   skip yaw correction
+    ///
+    /// - `dtSeconds`: the time since the previous update
+    public void update(float gx, float gy, float gz,
+                       float ax, float ay, float az,
+                       float mx, float my, float mz,
+                       float dtSeconds) {
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (dtSeconds &lt;= 0f) {</span>
+<span class="nc" id="L85">            return;</span>
+        }
+        // 1. Gyro integration: body-frame rates compose on the right.
+<span class="fc" id="L88">        Quaternion.integrateGyro(q, gx, gy, gz, dtSeconds, q);</span>
+
+<span class="fc" id="L90">        float blend = 1f - gyroWeight;</span>
+
+        // 2. Tilt correction toward gravity. At rest the accelerometer
+        // measures the reaction to gravity along the device's world-up
+        // direction, so rotating the normalized reading into the world frame
+        // should give (0, 1, 0).
+<span class="fc" id="L96">        float alen = (float) Math.sqrt(ax * ax + ay * ay + az * az);</span>
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">        if (!isNaN(alen) &amp;&amp; alen &gt; 1e-6f) {</span>
+<span class="fc" id="L98">            v[0] = ax / alen;</span>
+<span class="fc" id="L99">            v[1] = ay / alen;</span>
+<span class="fc" id="L100">            v[2] = az / alen;</span>
+<span class="fc" id="L101">            Quaternion.rotateVector(q, v);</span>
+            // Rotation carrying the measured up vector onto world up.
+<span class="fc" id="L103">            applyWorldCorrection(v[0], v[1], v[2], 0f, 1f, 0f, blend);</span>
+        }
+
+        // 3. Yaw correction toward magnetic north. Only the horizontal
+        // component of the field is used, and only the world-Y rotation is
+        // corrected so the magnetometer can never disturb pitch or roll.
+<span class="pc bpc" id="L109" title="2 of 6 branches missed.">        if (!isNaN(mx) &amp;&amp; !isNaN(my) &amp;&amp; !isNaN(mz)) {</span>
+<span class="fc" id="L110">            float mlen = (float) Math.sqrt(mx * mx + my * my + mz * mz);</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">            if (mlen &gt; 1e-6f) {</span>
+<span class="fc" id="L112">                v[0] = mx / mlen;</span>
+<span class="fc" id="L113">                v[1] = my / mlen;</span>
+<span class="fc" id="L114">                v[2] = mz / mlen;</span>
+<span class="fc" id="L115">                Quaternion.rotateVector(q, v);</span>
+<span class="fc" id="L116">                float hx = v[0];</span>
+<span class="fc" id="L117">                float hz = v[2];</span>
+<span class="fc" id="L118">                float hlen = (float) Math.sqrt(hx * hx + hz * hz);</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">                if (hlen &gt; 1e-6f) {</span>
+                    // Angle of the horizontal field from world north (-Z). A
+                    // yaw drift of epsilon shows up here as -epsilon, so
+                    // applying the measured angle directly cancels the drift.
+<span class="fc" id="L123">                    float yawError = (float) MathUtil.atan2(hx, -hz);</span>
+<span class="fc" id="L124">                    Quaternion.setAxisAngle(correction, yawError * blend, 0f, 1f, 0f);</span>
+<span class="fc" id="L125">                    Quaternion.multiply(correction, q, q);</span>
+<span class="fc" id="L126">                    Quaternion.normalize(q);</span>
+                }
+            }
+        }
+<span class="fc" id="L130">    }</span>
+
+    /// Applies a world-frame rotation moving `from` a fraction of the way
+    /// toward `to`.
+    private void applyWorldCorrection(float fx, float fy, float fz,
+                                      float tx, float ty, float tz, float fraction) {
+<span class="fc" id="L136">        float cx = fy * tz - fz * ty;</span>
+<span class="fc" id="L137">        float cy = fz * tx - fx * tz;</span>
+<span class="fc" id="L138">        float cz = fx * ty - fy * tx;</span>
+<span class="fc" id="L139">        float clen = (float) Math.sqrt(cx * cx + cy * cy + cz * cz);</span>
+<span class="fc" id="L140">        float dot = fx * tx + fy * ty + fz * tz;</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (clen &lt; 1e-6f) {</span>
+<span class="fc" id="L142">            return;</span>
+        }
+<span class="fc" id="L144">        float angle = (float) MathUtil.atan2(clen, dot);</span>
+<span class="fc" id="L145">        Quaternion.setAxisAngle(correction, angle * fraction, cx, cy, cz);</span>
+<span class="fc" id="L146">        Quaternion.multiply(correction, q, q);</span>
+<span class="fc" id="L147">        Quaternion.normalize(q);</span>
+<span class="fc" id="L148">    }</span>
+
+    private static boolean isNaN(float f) {
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        return f != f;</span>
+    }
+
+    /// Copies the current orientation quaternion into `quatOut4` as
+    /// `{x, y, z, w}`.
+    public void getOrientation(float[] quatOut4) {
+<span class="fc" id="L157">        Quaternion.copy(q, quatOut4);</span>
+<span class="fc" id="L158">    }</span>
+
+    /// The current orientation quaternion as a newly allocated array.
+    public float[] getOrientation() {
+<span class="fc" id="L162">        float[] out = new float[4];</span>
+<span class="fc" id="L163">        getOrientation(out);</span>
+<span class="fc" id="L164">        return out;</span>
+    }
+
+    /// Resets the filter to the identity orientation.
+    public void reset() {
+<span class="fc" id="L169">        Quaternion.setIdentity(q);</span>
+<span class="fc" id="L170">    }</span>
+
+    /// Rotates the orientation around world up so the current forward
+    /// direction becomes the new &quot;straight ahead&quot;, keeping pitch and roll.
+    /// Use to let the user recenter the view.
+    public void recenterYaw() {
+        // The device -Z axis in world space is the current forward direction.
+<span class="fc" id="L177">        v[0] = 0f;</span>
+<span class="fc" id="L178">        v[1] = 0f;</span>
+<span class="fc" id="L179">        v[2] = -1f;</span>
+<span class="fc" id="L180">        Quaternion.rotateVector(q, v);</span>
+<span class="fc" id="L181">        float hlen = (float) Math.sqrt(v[0] * v[0] + v[2] * v[2]);</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        if (hlen &lt; 1e-6f) {</span>
+            // Looking straight up or down; yaw is undefined.
+<span class="nc" id="L184">            return;</span>
+        }
+        // A device yaw of theta puts the forward vector at atan2 angle
+        // -theta, so applying the measured angle directly cancels the yaw.
+<span class="fc" id="L188">        float yaw = (float) MathUtil.atan2(v[0], -v[2]);</span>
+<span class="fc" id="L189">        Quaternion.setAxisAngle(correction, yaw, 0f, 1f, 0f);</span>
+<span class="fc" id="L190">        Quaternion.multiply(correction, q, q);</span>
+<span class="fc" id="L191">        Quaternion.normalize(q);</span>
+<span class="fc" id="L192">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

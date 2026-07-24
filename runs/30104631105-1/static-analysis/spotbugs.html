@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SpotBugs Findings</title>
+  <style>body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;padding:1.5rem;max-width:960px;margin:auto;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #d0d7de;padding:0.5rem;text-align:left;}th{background:#f6f8fa;}code{background:#f3f4f6;padding:0.1rem 0.3rem;border-radius:4px;}caption{font-weight:600;margin-bottom:0.75rem;text-align:left;}</style>
+</head>
+<body>
+  <h1>SpotBugs Findings</h1>
+  <table>
+    <caption>Reported findings</caption>
+    <thead>
+      <tr>
+        <th scope="col">Severity</th>
+        <th scope="col">Location</th>
+        <th scope="col">Message</th>
+        <th scope="col">Rule</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Normal</td>
+        <td><code>android: com/codename1/impl/android/AndroidCalendarSource.java:122</code></td>
+        <td>com.codename1.impl.android.AndroidCalendarSource.queryEventsBlocking(CalendarQuery) uses the same code for two branches</td>
+        <td><code>DB_DUPLICATE_BRANCHES</code></td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+</html>

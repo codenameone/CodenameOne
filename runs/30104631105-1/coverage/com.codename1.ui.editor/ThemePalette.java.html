@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ThemePalette.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.editor</a> &gt; <span class="el_source">ThemePalette.java</span></div><h1>ThemePalette.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.editor;
+
+/// The color palette for the pure code editor, mirroring the light (GitHub style) and dark (VS Code
+/// style) themes used by the previous `BrowserComponent` backend so switching backends is visually
+/// consistent.
+public final class ThemePalette {
+    /// The GitHub style light palette.
+<span class="fc" id="L31">    public static final ThemePalette LIGHT = new ThemePalette(</span>
+            0xffffff, 0x24292e, 0xb3d4fc,
+            0xd73a49, 0x032f62, 0x6a737d, 0x005cc5,
+            0xf6f8fa, 0xb0b6bd,
+            0xe51400, 0xe36209, 0x1a73e8);
+
+    /// The VS Code style dark palette.
+<span class="fc" id="L38">    public static final ThemePalette DARK = new ThemePalette(</span>
+            0x1e1e1e, 0xd4d4d4, 0x264f78,
+            0x569cd6, 0xce9178, 0x6a9955, 0xb5cea8,
+            0x252526, 0x6e7681,
+            0xf14c4c, 0xcca700, 0x3794ff);
+
+    private final int background;
+    private final int foreground;
+    private final int selection;
+    private final int keyword;
+    private final int string;
+    private final int comment;
+    private final int number;
+    private final int gutterBackground;
+    private final int gutterForeground;
+    private final int errorColor;
+    private final int warningColor;
+    private final int infoColor;
+
+    private ThemePalette(int background, int foreground, int selection, int keyword, int string,
+                         int comment, int number, int gutterBackground, int gutterForeground,
+<span class="fc" id="L59">                         int errorColor, int warningColor, int infoColor) {</span>
+<span class="fc" id="L60">        this.background = background;</span>
+<span class="fc" id="L61">        this.foreground = foreground;</span>
+<span class="fc" id="L62">        this.selection = selection;</span>
+<span class="fc" id="L63">        this.keyword = keyword;</span>
+<span class="fc" id="L64">        this.string = string;</span>
+<span class="fc" id="L65">        this.comment = comment;</span>
+<span class="fc" id="L66">        this.number = number;</span>
+<span class="fc" id="L67">        this.gutterBackground = gutterBackground;</span>
+<span class="fc" id="L68">        this.gutterForeground = gutterForeground;</span>
+<span class="fc" id="L69">        this.errorColor = errorColor;</span>
+<span class="fc" id="L70">        this.warningColor = warningColor;</span>
+<span class="fc" id="L71">        this.infoColor = infoColor;</span>
+<span class="fc" id="L72">    }</span>
+
+    /// Returns the palette for the given theme id (`&quot;dark&quot;` returns the dark palette, anything else the
+    /// light palette).
+    public static ThemePalette forName(String theme) {
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        return &quot;dark&quot;.equals(theme) ? DARK : LIGHT;</span>
+    }
+
+    /// Returns the color for the given `Tokenizer` token kind.
+    public int colorForKind(int kind) {
+<span class="pc bpc" id="L82" title="6 of 7 branches missed.">        switch (kind) {</span>
+            case Tokenizer.KEYWORD:
+<span class="fc" id="L84">                return keyword;</span>
+            case Tokenizer.STRING:
+<span class="nc" id="L86">                return string;</span>
+            case Tokenizer.COMMENT:
+<span class="nc" id="L88">                return comment;</span>
+            case Tokenizer.NUMBER:
+<span class="nc" id="L90">                return number;</span>
+            case Tokenizer.TYPE:
+<span class="nc" id="L92">                return keyword;</span>
+            case Tokenizer.PROPERTY:
+<span class="nc" id="L94">                return string;</span>
+            default:
+<span class="nc" id="L96">                return foreground;</span>
+        }
+    }
+
+    /// The editor background color.
+    public int getBackground() {
+<span class="fc" id="L102">        return background;</span>
+    }
+
+    /// The default text color.
+    public int getForeground() {
+<span class="fc" id="L107">        return foreground;</span>
+    }
+
+    /// The selection highlight color.
+    public int getSelection() {
+<span class="fc" id="L112">        return selection;</span>
+    }
+
+    /// The gutter background color.
+    public int getGutterBackground() {
+<span class="fc" id="L117">        return gutterBackground;</span>
+    }
+
+    /// The gutter text color.
+    public int getGutterForeground() {
+<span class="fc" id="L122">        return gutterForeground;</span>
+    }
+
+    /// The error diagnostic color.
+    public int getErrorColor() {
+<span class="nc" id="L127">        return errorColor;</span>
+    }
+
+    /// The warning diagnostic color.
+    public int getWarningColor() {
+<span class="nc" id="L132">        return warningColor;</span>
+    }
+
+    /// The info diagnostic color.
+    public int getInfoColor() {
+<span class="nc" id="L137">        return infoColor;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

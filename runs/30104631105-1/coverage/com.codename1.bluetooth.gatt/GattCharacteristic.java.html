@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GattCharacteristic.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.bluetooth.gatt</a> &gt; <span class="el_source">GattCharacteristic.java</span></div><h1>GattCharacteristic.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.bluetooth.gatt;
+
+import com.codename1.bluetooth.BluetoothUuid;
+import com.codename1.util.AsyncResource;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// A characteristic of a remote [GattService] -- the unit of data exchange
+/// with a BLE peripheral. Read, write and subscribe operations are routed
+/// through the owning peripheral's internal operation queue, so any number
+/// of calls may be issued concurrently; they execute in order.
+///
+/// Instances are constructed by the port during service discovery;
+/// application code never creates them.
+public class GattCharacteristic {
+
+    /// The characteristic supports broadcast (bit `0x01`).
+    public static final int PROPERTY_BROADCAST = 0x01;
+    /// The characteristic can be read (bit `0x02`).
+    public static final int PROPERTY_READ = 0x02;
+    /// The characteristic can be written without response (bit `0x04`).
+    public static final int PROPERTY_WRITE_WITHOUT_RESPONSE = 0x04;
+    /// The characteristic can be written with response (bit `0x08`).
+    public static final int PROPERTY_WRITE = 0x08;
+    /// The characteristic supports notifications (bit `0x10`).
+    public static final int PROPERTY_NOTIFY = 0x10;
+    /// The characteristic supports indications (bit `0x20`).
+    public static final int PROPERTY_INDICATE = 0x20;
+    /// The characteristic supports signed writes (bit `0x40`).
+    public static final int PROPERTY_SIGNED_WRITE = 0x40;
+    /// The characteristic has extended properties (bit `0x80`).
+    public static final int PROPERTY_EXTENDED_PROPS = 0x80;
+
+    private final GattService service;
+    private final BluetoothUuid uuid;
+    private final int properties;
+    private final int instanceId;
+<span class="fc" id="L61">    private final ArrayList&lt;GattDescriptor&gt; descriptors =</span>
+            new ArrayList&lt;GattDescriptor&gt;();
+
+    /// Constructed by ports during service discovery; not application API.
+    public GattCharacteristic(GattService service, BluetoothUuid uuid,
+<span class="fc" id="L66">            int properties, int instanceId) {</span>
+<span class="fc" id="L67">        this.service = service;</span>
+<span class="fc" id="L68">        this.uuid = uuid;</span>
+<span class="fc" id="L69">        this.properties = properties;</span>
+<span class="fc" id="L70">        this.instanceId = instanceId;</span>
+<span class="fc" id="L71">    }</span>
+
+    /// The UUID identifying this characteristic.
+    public BluetoothUuid getUuid() {
+<span class="fc" id="L75">        return uuid;</span>
+    }
+
+    /// The service this characteristic belongs to.
+    public GattService getService() {
+<span class="fc" id="L80">        return service;</span>
+    }
+
+    /// The raw `PROPERTY_*` bitmask as advertised by the peripheral.
+    public int getProperties() {
+<span class="nc" id="L85">        return properties;</span>
+    }
+
+    /// Disambiguates multiple instances of the same characteristic UUID
+    /// within one service.
+    public int getInstanceId() {
+<span class="nc" id="L91">        return instanceId;</span>
+    }
+
+    /// `true` when [#PROPERTY_READ] is set.
+    public boolean canRead() {
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        return (properties &amp; PROPERTY_READ) != 0;</span>
+    }
+
+    /// `true` when [#PROPERTY_WRITE] is set.
+    public boolean canWrite() {
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        return (properties &amp; PROPERTY_WRITE) != 0;</span>
+    }
+
+    /// `true` when [#PROPERTY_WRITE_WITHOUT_RESPONSE] is set.
+    public boolean canWriteWithoutResponse() {
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        return (properties &amp; PROPERTY_WRITE_WITHOUT_RESPONSE) != 0;</span>
+    }
+
+    /// `true` when [#PROPERTY_NOTIFY] is set.
+    public boolean canNotify() {
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        return (properties &amp; PROPERTY_NOTIFY) != 0;</span>
+    }
+
+    /// `true` when [#PROPERTY_INDICATE] is set.
+    public boolean canIndicate() {
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        return (properties &amp; PROPERTY_INDICATE) != 0;</span>
+    }
+
+    /// The descriptors of this characteristic, in discovery order.
+    public List&lt;GattDescriptor&gt; getDescriptors() {
+<span class="nc" id="L121">        return new ArrayList&lt;GattDescriptor&gt;(descriptors);</span>
+    }
+
+    /// The first descriptor with the given UUID, or `null`.
+    public GattDescriptor getDescriptor(BluetoothUuid uuid) {
+<span class="fc" id="L126">        int size = descriptors.size();</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        for (int i = 0; i &lt; size; i++) {</span>
+<span class="fc" id="L128">            GattDescriptor d = descriptors.get(i);</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (d.getUuid().equals(uuid)) {</span>
+<span class="fc" id="L130">                return d;</span>
+            }
+        }
+<span class="nc" id="L133">        return null;</span>
+    }
+
+    /// Called by ports while building the discovered GATT database; not
+    /// application API.
+    public void addDescriptor(GattDescriptor descriptor) {
+<span class="fc" id="L139">        descriptors.add(descriptor);</span>
+<span class="fc" id="L140">    }</span>
+
+    /// Reads the current value. Resolves with the raw bytes on the EDT or
+    /// fails with a [com.codename1.bluetooth.BluetoothException].
+    public AsyncResource&lt;byte[]&gt; read() {
+<span class="fc" id="L145">        return service.getPeripheral().readCharacteristic(this);</span>
+    }
+
+    /// Writes the value with response. Resolves `true` on the EDT once the
+    /// peripheral acknowledged the write.
+    public AsyncResource&lt;Boolean&gt; write(byte[] value) {
+<span class="fc" id="L151">        return service.getPeripheral().writeCharacteristic(this, value, true);</span>
+    }
+
+    /// Writes the value without response. Resolves `true` once the value
+    /// was queued to the controller -- there is no remote acknowledgement.
+    public AsyncResource&lt;Boolean&gt; writeWithoutResponse(byte[] value) {
+<span class="nc" id="L157">        return service.getPeripheral().writeCharacteristic(this, value, false);</span>
+    }
+
+    /// Subscribes to value changes. The first listener triggers the CCCD
+    /// write that arms notifications (indications are used when the
+    /// characteristic only supports [#PROPERTY_INDICATE]); the returned
+    /// resource resolves `true` once armed. Additional listeners resolve
+    /// immediately. Values stream to the listener on the EDT until
+    /// [#unsubscribe(GattNotificationListener)] or disconnection.
+    public AsyncResource&lt;Boolean&gt; subscribe(GattNotificationListener l) {
+<span class="fc" id="L167">        return service.getPeripheral().subscribe(this, l);</span>
+    }
+
+    /// Removes a listener added via
+    /// [#subscribe(GattNotificationListener)]. When the last listener is
+    /// removed the CCCD is written to disarm notifications; the returned
+    /// resource resolves once done.
+    public AsyncResource&lt;Boolean&gt; unsubscribe(GattNotificationListener l) {
+<span class="nc" id="L175">        return service.getPeripheral().unsubscribe(this, l);</span>
+    }
+
+    /// `true` while notifications/indications are armed for this
+    /// characteristic.
+    public boolean isSubscribed() {
+<span class="fc" id="L181">        return service.getPeripheral().isSubscribed(this);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L186">        return &quot;GattCharacteristic(&quot; + uuid + &quot;)&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Json.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.level</a> &gt; <span class="el_source">Json.java</span></div><h1>Json.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming.level;
+
+import java.util.List;
+import java.util.Map;
+
+/// Small JSON coercion + emit helpers for the level format. `com.codename1.io.JSONParser`
+/// parses (numbers come back as `Double`, flags as `String` unless configured), but the
+/// framework has no canonical writer, so this emits one. Package-private on purpose.
+final class Json {
+    private Json() {
+    }
+
+    // ---- reading / coercion --------------------------------------------------
+
+    static double num(Object v, double def) {
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (v instanceof Number) {</span>
+<span class="fc" id="L39">            return ((Number) v).doubleValue();</span>
+        }
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (v instanceof String) {</span>
+            try {
+<span class="nc" id="L43">                return Double.parseDouble((String) v);</span>
+<span class="nc" id="L44">            } catch (NumberFormatException ignore) {</span>
+<span class="nc" id="L45">                return def;</span>
+            }
+        }
+<span class="fc" id="L48">        return def;</span>
+    }
+
+    static int intval(Object v, int def) {
+<span class="fc" id="L52">        return (int) Math.round(num(v, def));</span>
+    }
+
+    static boolean bool(Object v, boolean def) {
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (v instanceof Boolean) {</span>
+<span class="nc" id="L57">            return ((Boolean) v).booleanValue();</span>
+        }
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (v instanceof String) {</span>
+<span class="fc" id="L60">            String s = ((String) v).trim();</span>
+<span class="pc bpc" id="L61" title="1 of 4 branches missed.">            if (&quot;true&quot;.equalsIgnoreCase(s) || &quot;1&quot;.equals(s)) {</span>
+<span class="fc" id="L62">                return true;</span>
+            }
+<span class="pc bpc" id="L64" title="3 of 4 branches missed.">            if (&quot;false&quot;.equalsIgnoreCase(s) || &quot;0&quot;.equals(s)) {</span>
+<span class="fc" id="L65">                return false;</span>
+            }
+        }
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (v instanceof Number) {</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">            return ((Number) v).doubleValue() != 0;</span>
+        }
+<span class="fc" id="L71">        return def;</span>
+    }
+
+    static String str(Object v, String def) {
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        return v == null ? def : v.toString();</span>
+    }
+
+    /// Coerces a color: an ARGB `Number`, or a CSS-style hex string (`#rgb`, `#rrggbb`
+    /// or `#aarrggbb`). A 6-digit hex is made opaque. Falls back to `def`.
+    static int color(Object v, int def) {
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (v instanceof Number) {</span>
+<span class="nc" id="L82">            return ((Number) v).intValue();</span>
+        }
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (v instanceof String) {</span>
+<span class="fc" id="L85">            String s = ((String) v).trim();</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            if (s.startsWith(&quot;#&quot;)) {</span>
+<span class="fc" id="L87">                s = s.substring(1);</span>
+            }
+            try {
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">                if (s.length() == 3) {</span>
+<span class="nc" id="L91">                    int r = Integer.parseInt(s.substring(0, 1), 16);</span>
+<span class="nc" id="L92">                    int g = Integer.parseInt(s.substring(1, 2), 16);</span>
+<span class="nc" id="L93">                    int b = Integer.parseInt(s.substring(2, 3), 16);</span>
+<span class="nc" id="L94">                    return 0xff000000 | (r * 17 &lt;&lt; 16) | (g * 17 &lt;&lt; 8) | (b * 17);</span>
+                }
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">                if (s.length() == 6) {</span>
+<span class="fc" id="L97">                    return 0xff000000 | (int) (Long.parseLong(s, 16) &amp; 0xffffff);</span>
+                }
+<span class="nc bnc" id="L99" title="All 2 branches missed.">                if (s.length() == 8) {</span>
+<span class="nc" id="L100">                    return (int) (Long.parseLong(s, 16) &amp; 0xffffffffL);</span>
+                }
+<span class="nc" id="L102">            } catch (NumberFormatException ignore) {</span>
+<span class="nc" id="L103">                return def;</span>
+<span class="nc" id="L104">            }</span>
+        }
+<span class="nc" id="L106">        return def;</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    static Map&lt;String, Object&gt; asMap(Object v) {
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (v instanceof Map) {</span>
+<span class="fc" id="L112">            return (Map&lt;String, Object&gt;) v;</span>
+        }
+<span class="fc" id="L114">        return null;</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    static List&lt;Object&gt; asList(Object v) {
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (v instanceof List) {</span>
+<span class="fc" id="L120">            return (List&lt;Object&gt;) v;</span>
+        }
+<span class="fc" id="L122">        return null;</span>
+    }
+
+    // ---- writing -------------------------------------------------------------
+
+    static void writeString(StringBuilder sb, String s) {
+<span class="fc" id="L128">        sb.append('&quot;');</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L130">            char c = s.charAt(i);</span>
+<span class="pc bpc" id="L131" title="5 of 6 branches missed.">            switch (c) {</span>
+                case '&quot;':
+<span class="nc" id="L133">                    sb.append(&quot;\\\&quot;&quot;);</span>
+<span class="nc" id="L134">                    break;</span>
+                case '\\':
+<span class="nc" id="L136">                    sb.append(&quot;\\\\&quot;);</span>
+<span class="nc" id="L137">                    break;</span>
+                case '\n':
+<span class="nc" id="L139">                    sb.append(&quot;\\n&quot;);</span>
+<span class="nc" id="L140">                    break;</span>
+                case '\r':
+<span class="nc" id="L142">                    sb.append(&quot;\\r&quot;);</span>
+<span class="nc" id="L143">                    break;</span>
+                case '\t':
+<span class="nc" id="L145">                    sb.append(&quot;\\t&quot;);</span>
+<span class="nc" id="L146">                    break;</span>
+                default:
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                    if (c &lt; 0x20) {</span>
+<span class="nc" id="L149">                        sb.append(&quot;\\u&quot;);</span>
+<span class="nc" id="L150">                        String hex = Integer.toHexString(c);</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                        for (int p = hex.length(); p &lt; 4; p++) {</span>
+<span class="nc" id="L152">                            sb.append('0');</span>
+                        }
+<span class="nc" id="L154">                        sb.append(hex);</span>
+<span class="nc" id="L155">                    } else {</span>
+<span class="fc" id="L156">                        sb.append(c);</span>
+                    }
+            }
+        }
+<span class="fc" id="L160">        sb.append('&quot;');</span>
+<span class="fc" id="L161">    }</span>
+
+    /// Writes a number, collapsing whole doubles to integers so files stay clean
+    /// (`160` rather than `160.0`).
+    static void writeNumber(StringBuilder sb, double value) {
+<span class="pc bpc" id="L166" title="2 of 4 branches missed.">        if (!Double.isInfinite(value) &amp;&amp; !Double.isNaN(value)</span>
+<span class="pc bpc" id="L167" title="1 of 4 branches missed.">                &amp;&amp; value == Math.floor(value) &amp;&amp; Math.abs(value) &lt; 9.007199254740992E15) {</span>
+<span class="fc" id="L168">            sb.append(Long.toString((long) value));</span>
+        } else {
+<span class="fc" id="L170">            sb.append(Double.toString(value));</span>
+        }
+<span class="fc" id="L172">    }</span>
+
+    /// Writes an arbitrary property-bag value (Number / Boolean / String / Map / List /
+    /// null) as JSON.
+    @SuppressWarnings(&quot;unchecked&quot;)
+    static void writeValue(StringBuilder sb, Object v) {
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (v == null) {</span>
+<span class="nc" id="L179">            sb.append(&quot;null&quot;);</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        } else if (v instanceof Number) {</span>
+<span class="fc" id="L181">            writeNumber(sb, ((Number) v).doubleValue());</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        } else if (v instanceof Boolean) {</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">            sb.append(((Boolean) v).booleanValue() ? &quot;true&quot; : &quot;false&quot;);</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        } else if (v instanceof Map) {</span>
+<span class="fc" id="L185">            sb.append('{');</span>
+<span class="fc" id="L186">            boolean first = true;</span>
+<span class="fc" id="L187">            Map&lt;String, Object&gt; m = (Map&lt;String, Object&gt;) v;</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">            for (Map.Entry&lt;String, Object&gt; e : m.entrySet()) {</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">                if (!first) {</span>
+<span class="fc" id="L190">                    sb.append(',');</span>
+                }
+<span class="fc" id="L192">                first = false;</span>
+<span class="fc" id="L193">                writeString(sb, e.getKey());</span>
+<span class="fc" id="L194">                sb.append(':');</span>
+<span class="fc" id="L195">                writeValue(sb, e.getValue());</span>
+<span class="fc" id="L196">            }</span>
+<span class="fc" id="L197">            sb.append('}');</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        } else if (v instanceof List) {</span>
+<span class="nc" id="L199">            sb.append('[');</span>
+<span class="nc" id="L200">            List&lt;Object&gt; l = (List&lt;Object&gt;) v;</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">            for (int i = 0; i &lt; l.size(); i++) {</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">                if (i &gt; 0) {</span>
+<span class="nc" id="L203">                    sb.append(',');</span>
+                }
+<span class="nc" id="L205">                writeValue(sb, l.get(i));</span>
+            }
+<span class="nc" id="L207">            sb.append(']');</span>
+<span class="nc" id="L208">        } else {</span>
+<span class="fc" id="L209">            writeString(sb, v.toString());</span>
+        }
+<span class="fc" id="L211">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

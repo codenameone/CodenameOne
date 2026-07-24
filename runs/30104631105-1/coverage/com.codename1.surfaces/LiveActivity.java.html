@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LiveActivity.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.surfaces</a> &gt; <span class="el_source">LiveActivity.java</span></div><h1>LiveActivity.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.surfaces;
+
+import com.codename1.surfaces.spi.SurfaceBridge;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/// A running live activity: an ongoing-state surface (delivery, timer, ride, score) presented on
+/// the iOS lock screen and Dynamic Island, as an ongoing Android notification, or as a floating
+/// pill window on desktop. Start it with a descriptor and an initial state, then push fresh state
+/// maps as the situation evolves -- updates ship only the state, the layout is re-interpolated on
+/// the surface:
+///
+/// ```java
+/// LiveActivity delivery = LiveActivity.start(descriptor, initialState);
+/// ...
+/// delivery.update(stateMap(&quot;Arriving now&quot;, eta, 1.0f));
+/// delivery.end(null);
+/// ```
+///
+/// On platforms without live activity support `start(...)` returns an inert handle whose methods
+/// are safe no-ops ([#isActive()] returns false), so app code needs no platform checks.
+public final class LiveActivity {
+    private final String id;
+    private boolean active;
+
+<span class="fc" id="L49">    private LiveActivity(String id) {</span>
+<span class="fc" id="L50">        this.id = id;</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        this.active = id != null;</span>
+<span class="fc" id="L52">    }</span>
+
+    /// Returns true when this platform can present live activities.
+    ///
+    /// #### Returns
+    ///
+    /// true when live activities are supported
+    public static boolean isSupported() {
+<span class="fc" id="L60">        SurfaceBridge b = Surfaces.bridgeInternal();</span>
+<span class="pc bpc" id="L61" title="2 of 4 branches missed.">        return b != null &amp;&amp; b.isLiveActivitySupported();</span>
+    }
+
+    /// Starts a live activity. On unsupported platforms (or when the platform refuses, e.g. the
+    /// user disabled live activities) this returns an inert handle rather than throwing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `descriptor`: the activity layout and regions
+    /// - `initialState`: the initial state map, may be null
+    ///
+    /// #### Returns
+    ///
+    /// a handle to the running activity; check [#isActive()] to know whether it is live
+    public static LiveActivity start(LiveActivityDescriptor descriptor,
+            Map&lt;String, Object&gt; initialState) {
+<span class="fc" id="L77">        SurfaceBridge b = Surfaces.bridgeInternal();</span>
+<span class="pc bpc" id="L78" title="1 of 4 branches missed.">        if (b == null || !b.isLiveActivitySupported()) {</span>
+<span class="fc" id="L79">            return new LiveActivity(null);</span>
+        }
+<span class="fc" id="L81">        Map&lt;String, byte[]&gt; images = new LinkedHashMap&lt;String, byte[]&gt;();</span>
+<span class="fc" id="L82">        String json = SurfaceSerializer.serializeLiveActivity(descriptor, initialState, images);</span>
+<span class="fc" id="L83">        return new LiveActivity(b.startLiveActivity(json, images));</span>
+    }
+
+    /// Pushes a fresh state map to the running activity. A no-op on an inert or ended handle.
+    ///
+    /// #### Parameters
+    ///
+    /// - `state`: the new state map
+    public void update(Map&lt;String, Object&gt; state) {
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (!active) {</span>
+<span class="fc" id="L93">            return;</span>
+        }
+<span class="fc" id="L95">        SurfaceBridge b = Surfaces.bridgeInternal();</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (b != null) {</span>
+<span class="fc" id="L97">            b.updateLiveActivity(id, SurfaceSerializer.serializeState(state));</span>
+        }
+<span class="fc" id="L99">    }</span>
+
+    /// Ends the activity, optionally showing a final state before the platform dismisses the
+    /// surface. A no-op on an inert or already-ended handle.
+    ///
+    /// #### Parameters
+    ///
+    /// - `finalState`: the final state to show, or null to keep the last state
+    public void end(Map&lt;String, Object&gt; finalState) {
+<span class="fc" id="L108">        end(finalState, false);</span>
+<span class="fc" id="L109">    }</span>
+
+    /// Ends the activity.
+    ///
+    /// #### Parameters
+    ///
+    /// - `finalState`: the final state to show, or null to keep the last state
+    /// - `dismissImmediately`: true to remove the surface right away instead of letting the
+    ///   platform linger on the final state
+    public void end(Map&lt;String, Object&gt; finalState, boolean dismissImmediately) {
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (!active) {</span>
+<span class="fc" id="L120">            return;</span>
+        }
+<span class="fc" id="L122">        active = false;</span>
+<span class="fc" id="L123">        SurfaceBridge b = Surfaces.bridgeInternal();</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (b != null) {</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">            b.endLiveActivity(id,</span>
+<span class="fc" id="L126">                    finalState == null ? null : SurfaceSerializer.serializeState(finalState),</span>
+                    dismissImmediately);
+        }
+<span class="fc" id="L129">    }</span>
+
+    /// Returns true while the activity is running (false for inert handles and after `end`).
+    public boolean isActive() {
+<span class="fc" id="L133">        return active;</span>
+    }
+
+    /// Returns the platform id of the activity, or null for inert handles. Action events from
+    /// this activity carry the descriptor's activity type as their source.
+    public String getId() {
+<span class="fc" id="L139">        return id;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

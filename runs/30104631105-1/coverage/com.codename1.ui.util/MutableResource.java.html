@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MutableResource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.util</a> &gt; <span class="el_source">MutableResource.java</span></div><h1>MutableResource.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ */
+package com.codename1.ui.util;
+
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Image;
+import com.codename1.ui.animations.Timeline;
+
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Hashtable;
+
+/// Mutable variant of {@link Resources} intended for non-designer environments.
+///
+/// This class provides a minimal API for programmatically editing resource files
+/// inside Codename One core code where JavaSE/Swing designer classes are not available.
+///
+/// ## Supported resource categories
+///
+/// - `IMAGE`
+/// - `DATA`
+/// - `L10N`
+/// - `THEME` (in-memory editing only; save serialization is intentionally limited)
+///
+/// ## Explicitly unsupported categories
+///
+/// The following are intentionally rejected with `UnsupportedOperationException`
+/// when read or written:
+///
+/// - Timeline
+/// - Indexed images
+/// - SVG
+/// - GUI Builder UI resources
+public class MutableResource extends Resources {
+    private static final short MINOR_VERSION = 12;
+    private static final short MAJOR_VERSION = 1;
+
+    private boolean modified;
+
+    /// Creates an empty mutable resource container.
+    public MutableResource() {
+<span class="fc" id="L49">        super();</span>
+<span class="fc" id="L50">    }</span>
+
+    /// Creates a mutable resource container by loading a resource stream.
+    ///
+    /// @param input source stream containing a `.res` payload.
+    /// @throws IOException if the stream cannot be parsed.
+    MutableResource(InputStream input) throws IOException {
+<span class="fc" id="L57">        super();</span>
+<span class="nc" id="L58">        openFile(input);</span>
+<span class="nc" id="L59">    }</span>
+
+    /// Opens a mutable resource from an input stream.
+    ///
+    /// @param resource source stream.
+    /// @return loaded mutable resource.
+    /// @throws IOException if parsing fails.
+    public static MutableResource open(InputStream resource) throws IOException {
+<span class="nc" id="L67">        return new MutableResource(resource);</span>
+    }
+
+    @Override
+    void startingEntry(String id, byte magic) {
+<span class="pc bpc" id="L72" title="2 of 8 branches missed.">        if (magic == MAGIC_TIMELINE || magic == MAGIC_SVG || magic == MAGIC_INDEXED_IMAGE_LEGACY || magic == MAGIC_UI) {</span>
+<span class="fc" id="L73">            throw new UnsupportedOperationException(&quot;Unsupported resource type in MutableResource: &quot; + Integer.toHexString(magic &amp; 0xff));</span>
+        }
+<span class="fc" id="L75">    }</span>
+
+    @Override
+    Image createImage(DataInputStream input) throws IOException {
+<span class="pc bpc" id="L79" title="3 of 4 branches missed.">        if (majorVersion == 0 &amp;&amp; minorVersion == 0) {</span>
+<span class="nc" id="L80">            return super.createImage(input);</span>
+        }
+<span class="fc" id="L82">        int type = input.readByte() &amp; 0xff;</span>
+<span class="pc bpc" id="L83" title="3 of 4 branches missed.">        switch (type) {</span>
+            case 0xF1:
+            case 0xF2: {
+<span class="nc" id="L86">                byte[] data = new byte[input.readInt()];</span>
+<span class="nc" id="L87">                input.readFully(data, 0, data.length);</span>
+<span class="nc" id="L88">                int width = input.readInt();</span>
+<span class="nc" id="L89">                int height = input.readInt();</span>
+<span class="nc" id="L90">                boolean opaque = input.readBoolean();</span>
+<span class="nc" id="L91">                return EncodedImage.create(data, width, height, opaque);</span>
+            }
+            case 0xF6:
+<span class="nc" id="L94">                return readMultiImage(input, false);</span>
+            case 0xEF:
+            case 0xF3:
+            case 0xF5:
+            case 0xF7:
+<span class="fc" id="L99">                throw new UnsupportedOperationException(&quot;Unsupported image subtype in MutableResource: &quot; + Integer.toHexString(type));</span>
+            default:
+<span class="nc" id="L101">                throw new IOException(&quot;Illegal type while creating image: &quot; + Integer.toHexString(type));</span>
+        }
+    }
+
+    @Override
+    public void setImage(String name, Image value) {
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (value instanceof Timeline) {</span>
+<span class="nc" id="L108">            throw new UnsupportedOperationException(&quot;Timeline resources are not supported in MutableResource&quot;);</span>
+        }
+<span class="pc bpc" id="L110" title="2 of 4 branches missed.">        if (value != null &amp;&amp; value.isSVG()) {</span>
+<span class="nc" id="L111">            throw new UnsupportedOperationException(&quot;SVG resources are not supported in MutableResource&quot;);</span>
+        }
+<span class="fc" id="L113">        setResource(name, MAGIC_IMAGE, value);</span>
+<span class="fc" id="L114">        modified = true;</span>
+<span class="fc" id="L115">    }</span>
+
+    public void setData(String name, byte[] data) {
+<span class="fc" id="L118">        setResource(name, MAGIC_DATA, data);</span>
+<span class="fc" id="L119">        modified = true;</span>
+<span class="fc" id="L120">    }</span>
+
+    public void setTheme(String name, Hashtable theme) {
+<span class="fc" id="L123">        setResource(name, MAGIC_THEME, theme);</span>
+<span class="fc" id="L124">        modified = true;</span>
+<span class="fc" id="L125">    }</span>
+
+    public void setThemeProperty(String themeName, String key, Object value) {
+<span class="fc" id="L128">        Hashtable theme = getTheme(themeName);</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (theme == null) {</span>
+<span class="fc" id="L130">            theme = new Hashtable();</span>
+        }
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L133">            theme.remove(key);</span>
+        } else {
+<span class="fc" id="L135">            theme.put(key, value);</span>
+        }
+<span class="fc" id="L137">        setResource(themeName, MAGIC_THEME, theme);</span>
+<span class="fc" id="L138">        modified = true;</span>
+<span class="fc" id="L139">    }</span>
+
+    public void setL10N(String name, Hashtable l10n) {
+<span class="fc" id="L142">        setResource(name, MAGIC_L10N, l10n);</span>
+<span class="fc" id="L143">        modified = true;</span>
+<span class="fc" id="L144">    }</span>
+
+    public byte[] getDataByteArray(String id) {
+<span class="nc" id="L147">        return (byte[]) getResourceObject(id);</span>
+    }
+
+    public boolean containsResource(String name) {
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        return getResourceObject(name) != null;</span>
+    }
+
+    public boolean isModified() {
+<span class="nc" id="L155">        return modified;</span>
+    }
+
+    public void setUi(String name, byte[] data) {
+<span class="fc" id="L159">        throw new UnsupportedOperationException(&quot;GUI Builder resources are not supported in MutableResource&quot;);</span>
+    }
+
+    public void setTimeline(String name, Timeline timeline) {
+<span class="fc" id="L163">        throw new UnsupportedOperationException(&quot;Timeline resources are not supported in MutableResource&quot;);</span>
+    }
+
+    public void setIndexedImage(String name, Image image) {
+<span class="fc" id="L167">        throw new UnsupportedOperationException(&quot;Indexed image resources are not supported in MutableResource&quot;);</span>
+    }
+
+    public void setSVG(String name, Image image) {
+<span class="fc" id="L171">        throw new UnsupportedOperationException(&quot;SVG resources are not supported in MutableResource&quot;);</span>
+    }
+
+    @Override
+    public void clear() {
+<span class="fc" id="L176">        super.clear();</span>
+<span class="fc" id="L177">        modified = false;</span>
+<span class="fc" id="L178">    }</span>
+
+    public void save(OutputStream out) throws IOException {
+<span class="fc" id="L181">        String[] resourceNames = getResourceNames();</span>
+<span class="fc" id="L182">        Arrays.sort(resourceNames);</span>
+
+<span class="fc" id="L184">        DataOutputStream output = new DataOutputStream(out);</span>
+<span class="fc" id="L185">        output.writeShort(resourceNames.length + 1);</span>
+<span class="fc" id="L186">        output.writeByte(MAGIC_HEADER);</span>
+<span class="fc" id="L187">        output.writeUTF(&quot;&quot;);</span>
+<span class="fc" id="L188">        output.writeShort(6);</span>
+<span class="fc" id="L189">        output.writeShort(MAJOR_VERSION);</span>
+<span class="fc" id="L190">        output.writeShort(MINOR_VERSION);</span>
+<span class="fc" id="L191">        output.writeShort(0);</span>
+
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        for (String resourceName : resourceNames) {</span>
+<span class="fc" id="L194">            byte magic = getResourceType(resourceName);</span>
+<span class="fc" id="L195">            Object value = getResourceObject(resourceName);</span>
+<span class="pc bpc" id="L196" title="4 of 8 branches missed.">            if (magic == MAGIC_UI || magic == MAGIC_TIMELINE || magic == MAGIC_SVG || magic == MAGIC_INDEXED_IMAGE_LEGACY) {</span>
+<span class="nc" id="L197">                throw new UnsupportedOperationException(&quot;Unsupported resource type in MutableResource: &quot; + Integer.toHexString(magic &amp; 0xff));</span>
+            }
+<span class="fc" id="L199">            output.writeByte(magic);</span>
+<span class="fc" id="L200">            output.writeUTF(resourceName);</span>
+<span class="pc bpc" id="L201" title="1 of 4 branches missed.">            switch (magic) {</span>
+                case MAGIC_IMAGE:
+<span class="fc" id="L203">                    writeImage(output, (Image) value);</span>
+<span class="fc" id="L204">                    break;</span>
+                case MAGIC_DATA:
+<span class="fc" id="L206">                    byte[] data = (byte[]) value;</span>
+<span class="fc" id="L207">                    output.writeInt(data.length);</span>
+<span class="fc" id="L208">                    output.write(data);</span>
+<span class="fc" id="L209">                    break;</span>
+                case MAGIC_L10N:
+<span class="fc" id="L211">                    saveL10N(output, (Hashtable) value);</span>
+<span class="fc" id="L212">                    break;</span>
+                default:
+<span class="nc" id="L214">                    throw new IOException(&quot;MutableResource save() currently supports IMAGE/DATA/L10N only. Unsupported type: &quot; + Integer.toHexString(magic &amp; 0xff));</span>
+            }
+        }
+<span class="fc" id="L217">        modified = false;</span>
+<span class="fc" id="L218">    }</span>
+
+    protected void writeImage(DataOutputStream output, Image image) throws IOException {
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">        if (image instanceof Timeline) {</span>
+<span class="nc" id="L222">            throw new UnsupportedOperationException(&quot;Timeline resources are not supported in MutableResource&quot;);</span>
+        }
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (image.isSVG()) {</span>
+<span class="nc" id="L225">            throw new UnsupportedOperationException(&quot;SVG resources are not supported in MutableResource&quot;);</span>
+        }
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        EncodedImage enc = image instanceof EncodedImage ? (EncodedImage) image : EncodedImage.createFromImage(image, false);</span>
+<span class="fc" id="L228">        byte[] bytes = enc.getImageData();</span>
+<span class="fc" id="L229">        output.writeByte(0xF1);</span>
+<span class="fc" id="L230">        output.writeInt(bytes.length);</span>
+<span class="fc" id="L231">        output.write(bytes);</span>
+<span class="fc" id="L232">        output.writeInt(enc.getWidth());</span>
+<span class="fc" id="L233">        output.writeInt(enc.getHeight());</span>
+<span class="fc" id="L234">        output.writeBoolean(enc.isOpaque());</span>
+<span class="fc" id="L235">    }</span>
+
+    protected void saveL10N(DataOutputStream output, Hashtable l10n) throws IOException {
+<span class="fc" id="L238">        ArrayList keys = new ArrayList();</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        for (Object locale : l10n.keySet()) {</span>
+<span class="fc" id="L240">            Hashtable current = (Hashtable) l10n.get(locale);</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">            for (Object key : current.keySet()) {</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">                if (!keys.contains(key)) {</span>
+<span class="fc" id="L243">                    keys.add(key);</span>
+                }
+<span class="fc" id="L245">            }</span>
+<span class="fc" id="L246">        }</span>
+
+<span class="fc" id="L248">        output.writeShort(keys.size());</span>
+<span class="fc" id="L249">        output.writeShort(l10n.size());</span>
+
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        for (Object key : keys) {</span>
+<span class="fc" id="L252">            output.writeUTF((String) key);</span>
+<span class="fc" id="L253">        }</span>
+
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        for (Object locale : l10n.keySet()) {</span>
+<span class="fc" id="L256">            Hashtable currentLanguage = (Hashtable) l10n.get(locale);</span>
+<span class="fc" id="L257">            output.writeUTF((String) locale);</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">            for (Object key : keys) {</span>
+<span class="fc" id="L259">                String k = (String) currentLanguage.get(key);</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">                output.writeUTF(k == null ? &quot;&quot; : k);</span>
+<span class="fc" id="L261">            }</span>
+<span class="fc" id="L262">        }</span>
+<span class="fc" id="L263">    }</span>
+
+    @Override
+    public InputStream getData(String id) {
+<span class="nc" id="L267">        byte[] data = getDataByteArray(id);</span>
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        if (data == null) {</span>
+<span class="nc" id="L269">            return null;</span>
+        }
+<span class="nc" id="L271">        return new ByteArrayInputStream(data);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

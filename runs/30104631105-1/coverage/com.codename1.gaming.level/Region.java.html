@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Region.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.level</a> &gt; <span class="el_source">Region.java</span></div><h1>Region.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming.level;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A loadable area of a large world: its own streaming `Terrain`, placed `GameElement`s and a
+/// world-space origin (`#getOriginX()`,`#getOriginZ()` in tile units). Regions are linked to
+/// neighbours by named edges (`#link(String,String)`, e.g. &quot;east&quot; -&gt; &quot;desert-2&quot;), so a
+/// `GameWorld` can stream the adjacent regions in and out for seamless transitions as the
+/// player crosses a boundary. A region serializes independently as its own document.
+public class Region {
+    private String id;
+    private String name;
+    private double originX;
+    private double originZ;
+    private double width;     // span in tile units (0 = unbounded)
+    private double depth;
+<span class="pc" id="L42">    private final List&lt;GameElement&gt; elements = new ArrayList&lt;GameElement&gt;();</span>
+<span class="pc" id="L43">    private final Map&lt;String, String&gt; neighbors = new LinkedHashMap&lt;String, String&gt;();</span>
+<span class="pc" id="L44">    private final Map&lt;String, Object&gt; props = new LinkedHashMap&lt;String, Object&gt;();</span>
+    private transient StreamingTerrain terrain;
+
+<span class="nc" id="L47">    public Region() {</span>
+<span class="nc" id="L48">    }</span>
+
+<span class="fc" id="L50">    public Region(String id, String name) {</span>
+<span class="fc" id="L51">        this.id = id;</span>
+<span class="fc" id="L52">        this.name = name;</span>
+<span class="fc" id="L53">    }</span>
+
+    public String getId() {
+<span class="fc" id="L56">        return id;</span>
+    }
+
+    public Region setId(String id) {
+<span class="nc" id="L60">        this.id = id;</span>
+<span class="nc" id="L61">        return this;</span>
+    }
+
+    public String getName() {
+<span class="nc" id="L65">        return name;</span>
+    }
+
+    public Region setName(String name) {
+<span class="nc" id="L69">        this.name = name;</span>
+<span class="nc" id="L70">        return this;</span>
+    }
+
+    public double getOriginX() {
+<span class="nc" id="L74">        return originX;</span>
+    }
+
+    public double getOriginZ() {
+<span class="nc" id="L78">        return originZ;</span>
+    }
+
+    public Region setOrigin(double x, double z) {
+<span class="fc" id="L82">        this.originX = x;</span>
+<span class="fc" id="L83">        this.originZ = z;</span>
+<span class="fc" id="L84">        return this;</span>
+    }
+
+    public double getWidth() {
+<span class="fc" id="L88">        return width;</span>
+    }
+
+    public double getDepth() {
+<span class="nc" id="L92">        return depth;</span>
+    }
+
+    public Region setSpan(double width, double depth) {
+<span class="fc" id="L96">        this.width = width;</span>
+<span class="fc" id="L97">        this.depth = depth;</span>
+<span class="fc" id="L98">        return this;</span>
+    }
+
+    /// The region's streaming terrain (created lazily; chunk-paged so a region can be huge).
+    public StreamingTerrain terrain() {
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (terrain == null) {</span>
+<span class="fc" id="L104">            terrain = new StreamingTerrain();</span>
+        }
+<span class="fc" id="L106">        return terrain;</span>
+    }
+
+    public Region setTerrain(StreamingTerrain terrain) {
+<span class="nc" id="L110">        this.terrain = terrain;</span>
+<span class="nc" id="L111">        return this;</span>
+    }
+
+    public List&lt;GameElement&gt; elements() {
+<span class="fc" id="L115">        return elements;</span>
+    }
+
+    /// Returns true if the world point (tile units) falls inside this region's bounds; an
+    /// unbounded region (width/depth 0) contains everything at/after its origin only loosely
+    /// (callers use neighbor links for transitions instead).
+    public boolean contains(double worldX, double worldZ) {
+<span class="pc bpc" id="L122" title="2 of 4 branches missed.">        if (width &lt;= 0 || depth &lt;= 0) {</span>
+<span class="nc" id="L123">            return false;</span>
+        }
+<span class="pc bpc" id="L125" title="3 of 8 branches missed.">        return worldX &gt;= originX &amp;&amp; worldX &lt; originX + width</span>
+                &amp;&amp; worldZ &gt;= originZ &amp;&amp; worldZ &lt; originZ + depth;
+    }
+
+    /// Links a named edge of this region to a neighbouring region id.
+    public Region link(String edge, String neighborRegionId) {
+<span class="fc" id="L131">        neighbors.put(edge, neighborRegionId);</span>
+<span class="fc" id="L132">        return this;</span>
+    }
+
+    public Map&lt;String, String&gt; neighbors() {
+<span class="fc" id="L136">        return neighbors;</span>
+    }
+
+    public Map&lt;String, Object&gt; props() {
+<span class="nc" id="L140">        return props;</span>
+    }
+
+    public String toJson() {
+<span class="fc" id="L144">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L145">        sb.append(&quot;{\&quot;id\&quot;:&quot;);</span>
+<span class="fc" id="L146">        Json.writeString(sb, id);</span>
+<span class="fc" id="L147">        sb.append(&quot;,\&quot;name\&quot;:&quot;);</span>
+<span class="fc" id="L148">        Json.writeString(sb, name);</span>
+<span class="fc" id="L149">        sb.append(&quot;,\&quot;originX\&quot;:&quot;);</span>
+<span class="fc" id="L150">        Json.writeNumber(sb, originX);</span>
+<span class="fc" id="L151">        sb.append(&quot;,\&quot;originZ\&quot;:&quot;);</span>
+<span class="fc" id="L152">        Json.writeNumber(sb, originZ);</span>
+<span class="fc" id="L153">        sb.append(&quot;,\&quot;width\&quot;:&quot;);</span>
+<span class="fc" id="L154">        Json.writeNumber(sb, width);</span>
+<span class="fc" id="L155">        sb.append(&quot;,\&quot;depth\&quot;:&quot;);</span>
+<span class="fc" id="L156">        Json.writeNumber(sb, depth);</span>
+<span class="fc" id="L157">        sb.append(&quot;,\&quot;neighbors\&quot;:&quot;);</span>
+<span class="fc" id="L158">        Json.writeValue(sb, neighbors);</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        if (!props.isEmpty()) {</span>
+<span class="nc" id="L160">            sb.append(&quot;,\&quot;props\&quot;:&quot;);</span>
+<span class="nc" id="L161">            Json.writeValue(sb, props);</span>
+        }
+<span class="fc" id="L163">        sb.append(&quot;,\&quot;elements\&quot;:[&quot;);</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        for (int i = 0; i &lt; elements.size(); i++) {</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">            if (i &gt; 0) {</span>
+<span class="nc" id="L166">                sb.append(',');</span>
+            }
+<span class="fc" id="L168">            elements.get(i).write(sb);</span>
+        }
+<span class="fc" id="L170">        sb.append(&quot;],\&quot;chunks\&quot;:[&quot;);</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">        if (terrain != null) {</span>
+            // persist resident chunks inline (small regions); large ones use a ChunkProvider
+<span class="fc" id="L173">            boolean first = true;</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">            for (TerrainChunk c : terrain.residentChunks()) {</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">                if (!first) {</span>
+<span class="nc" id="L176">                    sb.append(',');</span>
+                }
+<span class="fc" id="L178">                first = false;</span>
+<span class="fc" id="L179">                c.write(sb);</span>
+<span class="fc" id="L180">            }</span>
+        }
+<span class="fc" id="L182">        sb.append(&quot;]}&quot;);</span>
+<span class="fc" id="L183">        return sb.toString();</span>
+    }
+
+    public static Region fromJson(String json) {
+        try {
+<span class="fc" id="L188">            return fromMap(com.codename1.io.JSONParser.parseJSON(json));</span>
+<span class="nc" id="L189">        } catch (java.io.IOException ex) {</span>
+<span class="nc" id="L190">            throw new RuntimeException(&quot;bad region json&quot;, ex);</span>
+        }
+    }
+
+    static Region fromMap(Map&lt;String, Object&gt; root) {
+<span class="fc" id="L195">        Region r = new Region(Json.str(root.get(&quot;id&quot;), null), Json.str(root.get(&quot;name&quot;), null));</span>
+<span class="fc" id="L196">        r.setOrigin(Json.num(root.get(&quot;originX&quot;), 0), Json.num(root.get(&quot;originZ&quot;), 0));</span>
+<span class="fc" id="L197">        r.setSpan(Json.num(root.get(&quot;width&quot;), 0), Json.num(root.get(&quot;depth&quot;), 0));</span>
+<span class="fc" id="L198">        Map&lt;String, Object&gt; nb = Json.asMap(root.get(&quot;neighbors&quot;));</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">        if (nb != null) {</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            for (Map.Entry&lt;String, Object&gt; e : nb.entrySet()) {</span>
+<span class="fc" id="L201">                r.neighbors.put(e.getKey(), Json.str(e.getValue(), null));</span>
+<span class="fc" id="L202">            }</span>
+        }
+<span class="fc" id="L204">        Map&lt;String, Object&gt; p = Json.asMap(root.get(&quot;props&quot;));</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        if (p != null) {</span>
+<span class="nc" id="L206">            r.props.putAll(p);</span>
+        }
+<span class="fc" id="L208">        List&lt;Object&gt; els = Json.asList(root.get(&quot;elements&quot;));</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (els != null) {</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">            for (Object elementEntry : els) {</span>
+<span class="fc" id="L211">                Map&lt;String, Object&gt; em = Json.asMap(elementEntry);</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                if (em != null) {</span>
+<span class="fc" id="L213">                    r.elements.add(GameElement.read(em));</span>
+                }
+<span class="fc" id="L215">            }</span>
+        }
+<span class="fc" id="L217">        List&lt;Object&gt; chunks = Json.asList(root.get(&quot;chunks&quot;));</span>
+<span class="pc bpc" id="L218" title="2 of 4 branches missed.">        if (chunks != null &amp;&amp; !chunks.isEmpty()) {</span>
+<span class="fc" id="L219">            StreamingTerrain.MemoryChunkProvider mem = new StreamingTerrain.MemoryChunkProvider();</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            for (Object chunkEntry : chunks) {</span>
+<span class="fc" id="L221">                Map&lt;String, Object&gt; cm = Json.asMap(chunkEntry);</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">                if (cm != null) {</span>
+<span class="fc" id="L223">                    mem.saveChunk(TerrainChunk.read(cm));</span>
+                }
+<span class="fc" id="L225">            }</span>
+<span class="fc" id="L226">            r.terrain = new StreamingTerrain(mem, 64);</span>
+        }
+<span class="fc" id="L228">        return r;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

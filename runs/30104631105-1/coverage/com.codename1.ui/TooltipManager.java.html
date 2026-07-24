@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TooltipManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">TooltipManager.java</span></div><h1>TooltipManager.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.components.InteractionDialog;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.util.UITimer;
+
+/// Central management for tooltips, this class can be derived/customized
+/// to override the default tooltip behavior.
+///
+/// @author Shai Almog
+public class TooltipManager {
+    private static TooltipManager instance;
+
+<span class="fc" id="L36">    private int tooltipShowDelay = 500;</span>
+
+    private InteractionDialog currentTooltip;
+    private UITimer pendingTooltip;
+    private Component currentComponent;
+<span class="fc" id="L41">    private String dialogUIID = &quot;TooltipDialog&quot;;</span>
+<span class="fc" id="L42">    private String textUIID = &quot;Tooltip&quot;;</span>
+
+    /// Default tooltip manager
+<span class="fc" id="L45">    protected TooltipManager() {</span>
+<span class="fc" id="L46">    }</span>
+
+    static TooltipManager getInstance() {
+<span class="fc" id="L49">        return instance;</span>
+    }
+
+    /// Immediately hides any showing or pending tooltip. Call this before tearing down /
+    /// rebuilding a Form so a tooltip anchored to a removed component can't be stranded in
+    /// the popup layer (a full-size layered pane there would swallow pointer events).
+    public static void hideTooltip() {
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        if (instance != null) {</span>
+<span class="nc" id="L57">            instance.clearTooltip();</span>
+        }
+<span class="nc" id="L59">    }</span>
+
+    /// Enables the tooltip manager and default tooltip behavior
+    public static void enableTooltips() {
+<span class="fc" id="L63">        instance = new TooltipManager();</span>
+<span class="fc" id="L64">    }</span>
+
+    /// Enables the tooltip manager with a custom subclass
+    ///
+    /// #### Parameters
+    ///
+    /// - `custom`: customized subclass of this class
+    public static void enableTooltips(TooltipManager custom) {
+<span class="fc" id="L72">        instance = custom;</span>
+<span class="fc" id="L73">    }</span>
+
+    /// Invoked to dispose the current tooltip when the pointer moves
+    protected void clearTooltip() {
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (currentTooltip != null) {</span>
+<span class="fc" id="L78">            currentTooltip.dispose();</span>
+<span class="fc" id="L79">            currentTooltip = null;</span>
+        }
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (pendingTooltip != null) {</span>
+<span class="nc" id="L82">            pendingTooltip.cancel();</span>
+<span class="nc" id="L83">            pendingTooltip = null;</span>
+        }
+<span class="fc" id="L85">        currentComponent = null;</span>
+<span class="fc" id="L86">    }</span>
+
+    /// Gets ready to show the tooltip, this method implements the delay
+    /// before the actual showing of the tooltip. It's invoked internally
+    /// by the framework
+    ///
+    /// #### Parameters
+    ///
+    /// - `tip`: the tooltip text
+    ///
+    /// - `cmp`: the component
+    protected void prepareTooltip(final String tip, final Component cmp) {
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (currentComponent == cmp) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L99">            return;</span>
+        }
+<span class="nc" id="L101">        clearTooltip();</span>
+<span class="nc" id="L102">        currentComponent = cmp;</span>
+<span class="nc" id="L103">        pendingTooltip = new UITimer(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L106">                showTooltip(tip, cmp);</span>
+<span class="nc" id="L107">                pendingTooltip = null;</span>
+<span class="nc" id="L108">            }</span>
+        });
+<span class="nc" id="L110">        Form f = cmp.getComponentForm();</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        if (f != null) {</span>
+<span class="nc" id="L112">            pendingTooltip.schedule(tooltipShowDelay, false, f);</span>
+        }
+<span class="nc" id="L114">    }</span>
+
+    /// Shows the actual tooltip, this is invoked when the time for the tooltip
+    /// elapses. It shows the tooltip UI immediately
+    ///
+    /// #### Parameters
+    ///
+    /// - `tip`: the tooltip text
+    ///
+    /// - `cmp`: the component
+    protected void showTooltip(final String tip, final Component cmp) {
+        // The anchor may have been removed (e.g. the form was rebuilt) between scheduling and
+        // now -- showing a popup on a detached component throws and can wedge the UI, so bail.
+<span class="fc" id="L127">        Form f = cmp.getComponentForm();</span>
+<span class="pc bpc" id="L128" title="2 of 4 branches missed.">        if (f == null || f != Display.getInstance().getCurrent()) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L129">            clearTooltip();</span>
+<span class="nc" id="L130">            return;</span>
+        }
+<span class="fc" id="L132">        currentTooltip = new InteractionDialog(new BorderLayout());</span>
+
+<span class="fc" id="L134">        TextArea text = new TextArea(tip);</span>
+<span class="fc" id="L135">        text.setGrowByContent(true);</span>
+<span class="fc" id="L136">        text.setEditable(false);</span>
+<span class="fc" id="L137">        text.setFocusable(false);</span>
+<span class="fc" id="L138">        text.setActAsLabel(true);</span>
+<span class="fc" id="L139">        text.setUIID(textUIID);</span>
+<span class="fc" id="L140">        currentTooltip.setUIID(dialogUIID);</span>
+<span class="fc" id="L141">        currentTooltip.setDialogUIID(&quot;Container&quot;);</span>
+<span class="fc" id="L142">        currentTooltip.add(BorderLayout.CENTER, text);</span>
+<span class="fc" id="L143">        currentTooltip.setAnimateShow(false);</span>
+<span class="fc" id="L144">        currentTooltip.showPopupDialog(cmp, true);</span>
+<span class="fc" id="L145">    }</span>
+
+    /// The time in milliseconds between the pointer stopping and the showing
+    /// of the tooltip
+    ///
+    /// #### Returns
+    ///
+    /// the tooltipShowDelay
+    public int getTooltipShowDelay() {
+<span class="fc" id="L154">        return tooltipShowDelay;</span>
+    }
+
+    /// The time in milliseconds between the pointer stopping and the showing
+    /// of the tooltip
+    ///
+    /// #### Parameters
+    ///
+    /// - `tooltipShowDelay`: the tooltipShowDelay to set
+    public void setTooltipShowDelay(int tooltipShowDelay) {
+<span class="fc" id="L164">        this.tooltipShowDelay = tooltipShowDelay;</span>
+<span class="fc" id="L165">    }</span>
+
+    /// UIID of the tooltip dialog
+    ///
+    /// #### Returns
+    ///
+    /// the dialogUIID
+    public String getDialogUIID() {
+<span class="fc" id="L173">        return dialogUIID;</span>
+    }
+
+    /// UIID of the tooltip dialog
+    ///
+    /// #### Parameters
+    ///
+    /// - `dialogUIID`: the dialogUIID to set
+    public void setDialogUIID(String dialogUIID) {
+<span class="fc" id="L182">        this.dialogUIID = dialogUIID;</span>
+<span class="fc" id="L183">    }</span>
+
+    /// UIID of the tooltip text body
+    ///
+    /// #### Returns
+    ///
+    /// the textUIID
+    public String getTextUIID() {
+<span class="fc" id="L191">        return textUIID;</span>
+    }
+
+    /// UIID of the tooltip text body
+    ///
+    /// #### Parameters
+    ///
+    /// - `textUIID`: the textUIID to set
+    public void setTextUIID(String textUIID) {
+<span class="fc" id="L200">        this.textUIID = textUIID;</span>
+<span class="fc" id="L201">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

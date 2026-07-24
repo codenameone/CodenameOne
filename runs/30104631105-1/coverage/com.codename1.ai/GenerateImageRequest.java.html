@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GenerateImageRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai</a> &gt; <span class="el_source">GenerateImageRequest.java</span></div><h1>GenerateImageRequest.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai;
+
+/// Request payload for [ImageGenerator#generate(GenerateImageRequest)].
+public final class GenerateImageRequest {
+    private final String prompt;
+    private String model;
+<span class="fc" id="L29">    private String size = &quot;1024x1024&quot;;</span>
+    private String style;
+    private String quality;
+<span class="fc" id="L32">    private int count = 1;</span>
+    private Long seed;
+
+<span class="fc" id="L35">    public GenerateImageRequest(String prompt) {</span>
+<span class="fc bfc" id="L36" title="All 4 branches covered.">        if (prompt == null || prompt.length() == 0) {</span>
+<span class="fc" id="L37">            throw new IllegalArgumentException(&quot;prompt is required&quot;);</span>
+        }
+<span class="fc" id="L39">        this.prompt = prompt;</span>
+<span class="fc" id="L40">    }</span>
+
+    public String getPrompt() {
+<span class="fc" id="L43">        return prompt;</span>
+    }
+
+    public String getModel() {
+<span class="fc" id="L47">        return model;</span>
+    }
+
+    public GenerateImageRequest setModel(String model) {
+<span class="fc" id="L51">        this.model = model;</span>
+<span class="fc" id="L52">        return this;</span>
+    }
+
+    public String getSize() {
+<span class="fc" id="L56">        return size;</span>
+    }
+
+    /// `&quot;1024x1024&quot;`, `&quot;1024x1792&quot;`, `&quot;1792x1024&quot;` for DALL-E 3.
+    /// Default is `&quot;1024x1024&quot;`.
+    public GenerateImageRequest setSize(String size) {
+<span class="fc" id="L62">        this.size = size;</span>
+<span class="fc" id="L63">        return this;</span>
+    }
+
+    public String getStyle() {
+<span class="fc" id="L67">        return style;</span>
+    }
+
+    public GenerateImageRequest setStyle(String style) {
+<span class="fc" id="L71">        this.style = style;</span>
+<span class="fc" id="L72">        return this;</span>
+    }
+
+    public String getQuality() {
+<span class="fc" id="L76">        return quality;</span>
+    }
+
+    public GenerateImageRequest setQuality(String quality) {
+<span class="fc" id="L80">        this.quality = quality;</span>
+<span class="fc" id="L81">        return this;</span>
+    }
+
+    public int getCount() {
+<span class="fc" id="L85">        return count;</span>
+    }
+
+    /// Number of images to generate (DALL-E 3 supports 1; older
+    /// models up to 10).
+    public GenerateImageRequest setCount(int count) {
+<span class="fc" id="L91">        this.count = Math.max(1, count);</span>
+<span class="fc" id="L92">        return this;</span>
+    }
+
+    public Long getSeed() {
+<span class="fc" id="L96">        return seed;</span>
+    }
+
+    public GenerateImageRequest setSeed(Long seed) {
+<span class="fc" id="L100">        this.seed = seed;</span>
+<span class="fc" id="L101">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

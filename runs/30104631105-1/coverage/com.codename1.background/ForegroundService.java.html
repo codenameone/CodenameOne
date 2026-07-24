@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ForegroundService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.background</a> &gt; <span class="el_source">ForegroundService.java</span></div><h1>ForegroundService.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.background;
+
+import com.codename1.ui.Display;
+
+/// Runs a long lived task while a persistent system notification is shown to the user.
+/// This is an Android foreground service. On iOS, which has no foreground service concept,
+/// the task runs under a limited background execution window accompanied by a local
+/// notification (best effort); check `#isSupported()` to detect full support.
+///
+/// Usage
+/// ```java
+/// ForegroundService svc = ForegroundService.start(&quot;downloads&quot;, &quot;Downloading&quot;, &quot;Please wait&quot;, null,
+///     service -&gt; {
+///         for (int i = 0; i &lt;= 100; i++) {
+///             service.updateNotification(&quot;Downloading&quot;, i + &quot;%&quot;);
+///             // ... do a chunk of work ...
+///         }
+///     });
+/// // the service auto-stops when the task returns, or call svc.stop() early
+/// ```
+public final class ForegroundService {
+
+    /// The long running task executed by a foreground service.
+    public interface Task {
+
+        /// Runs the work. The accompanying notification remains visible until this method
+        /// returns or `ForegroundService#stop()` is called.
+        ///
+        /// #### Parameters
+        ///
+        /// - `service`: the running service, used to update the notification or stop early
+        void run(ForegroundService service);
+    }
+
+    private Object nativeHandle;
+    private boolean running;
+
+    private ForegroundService() {
+    }
+
+    /// Starts a foreground service that shows a persistent notification and runs the task
+    /// on a background thread.
+    ///
+    /// #### Parameters
+    ///
+    /// - `channelId`: the notification channel id to post the notification on
+    ///
+    /// - `title`: the notification title
+    ///
+    /// - `body`: the notification body
+    ///
+    /// - `iconName`: the small icon resource name, or null for the default app icon
+    ///
+    /// - `task`: the work to run
+    ///
+    /// #### Returns
+    ///
+    /// the running service handle
+    public static ForegroundService start(String channelId, String title, String body, String iconName, Task task) {
+<span class="fc" id="L82">        ForegroundService svc = new ForegroundService();</span>
+<span class="fc" id="L83">        svc.nativeHandle = Display.getInstance().startForegroundService(channelId, title, body, iconName, task, svc);</span>
+<span class="fc" id="L84">        svc.running = true;</span>
+<span class="fc" id="L85">        return svc;</span>
+    }
+
+    /// Updates the text of the foreground service notification.
+    ///
+    /// #### Parameters
+    ///
+    /// - `title`: the new title
+    ///
+    /// - `body`: the new body
+    public void updateNotification(String title, String body) {
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (running) {</span>
+<span class="fc" id="L97">            Display.getInstance().updateForegroundServiceNotification(nativeHandle, title, body);</span>
+        }
+<span class="fc" id="L99">    }</span>
+
+    /// Stops the service and removes its notification.
+    public void stop() {
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (running) {</span>
+<span class="fc" id="L104">            running = false;</span>
+<span class="fc" id="L105">            Display.getInstance().stopForegroundService(nativeHandle);</span>
+        }
+<span class="fc" id="L107">    }</span>
+
+    /// Returns true if the service is currently running.
+    ///
+    /// #### Returns
+    ///
+    /// true if running
+    public boolean isRunning() {
+<span class="fc" id="L115">        return running;</span>
+    }
+
+    /// Returns true if the current platform fully supports foreground services.
+    ///
+    /// #### Returns
+    ///
+    /// true if foreground services are supported
+    public static boolean isSupported() {
+<span class="fc" id="L124">        return Display.getInstance().isForegroundServiceSupported();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

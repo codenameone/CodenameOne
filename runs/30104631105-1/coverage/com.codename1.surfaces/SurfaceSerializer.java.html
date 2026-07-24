@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SurfaceSerializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.surfaces</a> &gt; <span class="el_source">SurfaceSerializer.java</span></div><h1>SurfaceSerializer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.surfaces;
+
+import com.codename1.io.JSONWriter;
+import com.codename1.io.Log;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Image;
+import com.codename1.ui.util.ImageIO;
+
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/// Serializes surface descriptors to the canonical wire format shared by every port: a compact
+/// JSON document plus PNG blobs named by content hash. This class is an internal seam between the
+/// core API and the platform bridges -- it is public only because ports live in separate
+/// artifacts; apps never call it.
+///
+/// The wire format is versioned (`&quot;v&quot;: 1`) and deterministic: node maps preserve build order,
+/// state maps are emitted with sorted keys, timeline entries are sorted ascending by date and
+/// image names derive from a hash of the PNG bytes (identical art always gets the same name).
+public final class SurfaceSerializer {
+    private static final int PAYLOAD_WARN_BYTES = 200 * 1024;
+
+    private SurfaceSerializer() {
+    }
+
+    /// Serializes a widget timeline.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kindId`: the widget kind id the timeline belongs to
+    /// - `timeline`: the timeline to serialize
+    /// - `imagesOut`: receives PNG blobs keyed by registered name
+    ///
+    /// #### Returns
+    ///
+    /// the timeline JSON
+    public static String serializeTimeline(String kindId, WidgetTimeline timeline,
+            Map&lt;String, byte[]&gt; imagesOut) {
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (timeline.getDefaultContent() == null</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                &amp;&amp; timeline.getContent(WidgetSize.SMALL) == null</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                &amp;&amp; timeline.getContent(WidgetSize.MEDIUM) == null</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">                &amp;&amp; timeline.getContent(WidgetSize.LARGE) == null</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">                &amp;&amp; timeline.getContent(WidgetSize.LOCKSCREEN) == null) {</span>
+<span class="fc" id="L71">            throw new IllegalArgumentException(&quot;A widget timeline needs content: call &quot;</span>
+                    + &quot;setContent(...) before publishing&quot;);
+        }
+<span class="fc" id="L74">        Map&lt;String, Object&gt; doc = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L75">        doc.put(&quot;v&quot;, Integer.valueOf(1));</span>
+<span class="fc" id="L76">        doc.put(&quot;kind&quot;, kindId);</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        doc.put(&quot;reload&quot;, timeline.getReloadPolicy() == WidgetTimeline.RELOAD_NEVER ? &quot;never&quot; : &quot;atEnd&quot;);</span>
+
+<span class="fc" id="L79">        Map&lt;String, Object&gt; layouts = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L80">        SurfaceNode def = timeline.getDefaultContent();</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (def != null) {</span>
+<span class="fc" id="L82">            layouts.put(&quot;default&quot;, def.toMap(imagesOut, 0));</span>
+        }
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (WidgetSize size : WidgetSize.values()) {</span>
+<span class="fc" id="L85">            SurfaceNode content = timeline.getExplicitContent(size);</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">            if (content != null) {</span>
+<span class="fc" id="L87">                layouts.put(size.getJsonName(), content.toMap(imagesOut, 0));</span>
+            }
+        }
+<span class="fc" id="L90">        doc.put(&quot;layouts&quot;, layouts);</span>
+
+<span class="fc" id="L92">        List&lt;WidgetTimeline.Entry&gt; entries =</span>
+<span class="fc" id="L93">                new ArrayList&lt;WidgetTimeline.Entry&gt;(timeline.getEntries());</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (entries.isEmpty()) {</span>
+<span class="fc" id="L95">            entries.add(new WidgetTimeline.Entry(new Date(),</span>
+                    new LinkedHashMap&lt;String, Object&gt;()));
+        }
+<span class="fc" id="L98">        sortEntries(entries);</span>
+<span class="fc" id="L99">        List&lt;Object&gt; entryList = new ArrayList&lt;Object&gt;(entries.size());</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        for (WidgetTimeline.Entry e : entries) {</span>
+<span class="fc" id="L101">            Map&lt;String, Object&gt; em = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L102">            em.put(&quot;date&quot;, Long.valueOf(e.getDate().getTime()));</span>
+<span class="fc" id="L103">            em.put(&quot;state&quot;, sortedCopy(e.getState()));</span>
+<span class="fc" id="L104">            entryList.add(em);</span>
+<span class="fc" id="L105">        }</span>
+<span class="fc" id="L106">        doc.put(&quot;entries&quot;, entryList);</span>
+<span class="fc" id="L107">        doc.put(&quot;images&quot;, referencedImageNames(layouts, imagesOut));</span>
+<span class="fc" id="L108">        return emit(doc, imagesOut);</span>
+    }
+
+    /// Serializes a live activity descriptor together with its initial state.
+    ///
+    /// #### Parameters
+    ///
+    /// - `descriptor`: the descriptor to serialize
+    /// - `state`: the initial state map, may be null
+    /// - `imagesOut`: receives PNG blobs keyed by registered name
+    ///
+    /// #### Returns
+    ///
+    /// the descriptor JSON
+    public static String serializeLiveActivity(LiveActivityDescriptor descriptor,
+            Map&lt;String, Object&gt; state, Map&lt;String, byte[]&gt; imagesOut) {
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (descriptor.getContent() == null) {</span>
+<span class="nc" id="L125">            throw new IllegalArgumentException(&quot;A live activity needs content: call &quot;</span>
+                    + &quot;setContent(...) before starting it&quot;);
+        }
+<span class="fc" id="L128">        Map&lt;String, Object&gt; doc = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L129">        doc.put(&quot;v&quot;, Integer.valueOf(1));</span>
+<span class="fc" id="L130">        doc.put(&quot;type&quot;, descriptor.getActivityType());</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (descriptor.getTint() != null) {</span>
+<span class="fc" id="L132">            doc.put(&quot;tint&quot;, colorMap(descriptor.getTint()));</span>
+        }
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (descriptor.getAndroidChannelId() != null) {</span>
+<span class="fc" id="L135">            Map&lt;String, Object&gt; android = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L136">            android.put(&quot;channel&quot;, descriptor.getAndroidChannelId());</span>
+<span class="fc" id="L137">            doc.put(&quot;android&quot;, android);</span>
+        }
+<span class="fc" id="L139">        doc.put(&quot;content&quot;, descriptor.getContent().toMap(imagesOut, 0));</span>
+<span class="fc" id="L140">        Map&lt;String, Object&gt; island = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L141">        putRegion(island, &quot;compactLeading&quot;, descriptor.getCompactLeading(), imagesOut);</span>
+<span class="fc" id="L142">        putRegion(island, &quot;compactTrailing&quot;, descriptor.getCompactTrailing(), imagesOut);</span>
+<span class="fc" id="L143">        putRegion(island, &quot;minimal&quot;, descriptor.getMinimal(), imagesOut);</span>
+<span class="fc" id="L144">        putRegion(island, &quot;expandedLeading&quot;, descriptor.getExpandedLeading(), imagesOut);</span>
+<span class="fc" id="L145">        putRegion(island, &quot;expandedTrailing&quot;, descriptor.getExpandedTrailing(), imagesOut);</span>
+<span class="fc" id="L146">        putRegion(island, &quot;expandedCenter&quot;, descriptor.getExpandedCenter(), imagesOut);</span>
+<span class="fc" id="L147">        putRegion(island, &quot;expandedBottom&quot;, descriptor.getExpandedBottom(), imagesOut);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (!island.isEmpty()) {</span>
+<span class="fc" id="L149">            doc.put(&quot;island&quot;, island);</span>
+        }
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        doc.put(&quot;state&quot;, sortedCopy(state == null ? new LinkedHashMap&lt;String, Object&gt;() : state));</span>
+<span class="fc" id="L152">        Map&lt;String, Object&gt; rendered = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L153">        rendered.put(&quot;content&quot;, doc.get(&quot;content&quot;));</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (!island.isEmpty()) {</span>
+<span class="fc" id="L155">            rendered.put(&quot;island&quot;, island);</span>
+        }
+<span class="fc" id="L157">        doc.put(&quot;images&quot;, referencedImageNames(rendered, imagesOut));</span>
+<span class="fc" id="L158">        return emit(doc, imagesOut);</span>
+    }
+
+    /// Serializes a state map with sorted keys.
+    ///
+    /// #### Parameters
+    ///
+    /// - `state`: the state map, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the state JSON
+    public static String serializeState(Map&lt;String, Object&gt; state) {
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        return JSONWriter.toJson(sortedCopy(state == null</span>
+                ? new LinkedHashMap&lt;String, Object&gt;() : state));
+    }
+
+    /// Serializes a widget kind declaration.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kind`: the kind to serialize
+    ///
+    /// #### Returns
+    ///
+    /// the kind JSON
+    public static String serializeKind(WidgetKind kind) {
+<span class="fc" id="L185">        Map&lt;String, Object&gt; doc = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L186">        doc.put(&quot;id&quot;, kind.getId());</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (kind.getDisplayName() != null) {</span>
+<span class="fc" id="L188">            doc.put(&quot;name&quot;, kind.getDisplayName());</span>
+        }
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (kind.getDescription() != null) {</span>
+<span class="nc" id="L191">            doc.put(&quot;description&quot;, kind.getDescription());</span>
+        }
+<span class="fc" id="L193">        List&lt;Object&gt; sizes = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        for (WidgetSize s : kind.getSupportedSizes()) {</span>
+<span class="fc" id="L195">            sizes.add(s.getJsonName());</span>
+<span class="fc" id="L196">        }</span>
+<span class="fc" id="L197">        doc.put(&quot;sizes&quot;, sizes);</span>
+<span class="fc" id="L198">        return JSONWriter.toJson(doc);</span>
+    }
+
+    // --- package-private helpers used by the node model ----------------------
+
+    /// Serializes a color to its wire form.
+    static Map&lt;String, Object&gt; colorMap(SurfaceColor color) {
+<span class="fc" id="L205">        Map&lt;String, Object&gt; m = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (color.getRole() != null) {</span>
+<span class="fc" id="L207">            m.put(&quot;role&quot;, color.getRole());</span>
+        } else {
+<span class="fc" id="L209">            m.put(&quot;l&quot;, Integer.valueOf(color.getLight()));</span>
+<span class="fc" id="L210">            m.put(&quot;d&quot;, Integer.valueOf(color.getDark()));</span>
+        }
+<span class="fc" id="L212">        return m;</span>
+    }
+
+    /// Copies a state or parameter map into a key-sorted map so serialization is deterministic
+    /// regardless of the map implementation the app supplied.
+    static Map&lt;String, Object&gt; sortedCopy(Map&lt;String, Object&gt; map) {
+<span class="fc" id="L218">        Map&lt;String, Object&gt; sorted = new TreeMap&lt;String, Object&gt;();</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (map != null) {</span>
+<span class="fc" id="L220">            sorted.putAll(map);</span>
+        }
+<span class="fc" id="L222">        return sorted;</span>
+    }
+
+    /// Encodes an image to PNG, names the blob by content hash and registers it in `images`.
+    /// Returns the registered name, or null when encoding failed.
+    static String registerImage(Image image, Map&lt;String, byte[]&gt; images) {
+<span class="nc" id="L228">        return registerImageBytes(encode(image), images);</span>
+    }
+
+    /// Names a PNG blob by content hash and registers it in `images`. Returns the registered
+    /// name, or null for a null blob.
+    static String registerImageBytes(byte[] data, Map&lt;String, byte[]&gt; images) {
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">        if (data == null) {</span>
+<span class="nc" id="L235">            return null;</span>
+        }
+<span class="fc" id="L237">        String name = &quot;img&quot; + fnv1a(data);</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        if (!images.containsKey(name)) {</span>
+<span class="fc" id="L239">            images.put(name, data);</span>
+        }
+<span class="fc" id="L241">        return name;</span>
+    }
+
+    // --- internals ------------------------------------------------------------
+
+    private static void putRegion(Map&lt;String, Object&gt; island, String key, SurfaceNode node,
+            Map&lt;String, byte[]&gt; images) {
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        if (node != null) {</span>
+<span class="fc" id="L249">            island.put(key, node.toMap(images, 0));</span>
+        }
+<span class="fc" id="L251">    }</span>
+
+    /// The document's `images` list names EVERY image the descriptor references -- both blobs
+    /// registered by this publish and `SurfaceImage(registeredName)` references to blobs shipped
+    /// earlier. Bridges use it to garbage collect persisted blobs the replacement timeline no
+    /// longer references, so it must be the complete reference set, sorted for determinism.
+    private static List&lt;Object&gt; referencedImageNames(Object serializedTree,
+            Map&lt;String, byte[]&gt; imagesOut) {
+<span class="fc" id="L259">        java.util.TreeSet&lt;String&gt; names = new java.util.TreeSet&lt;String&gt;(imagesOut.keySet());</span>
+<span class="fc" id="L260">        collectImageNames(serializedTree, names);</span>
+<span class="fc" id="L261">        return new ArrayList&lt;Object&gt;(names);</span>
+    }
+
+    private static void collectImageNames(Object node, java.util.Set&lt;String&gt; out) {
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        if (node instanceof Map) {</span>
+<span class="fc" id="L266">            Map&lt;?, ?&gt; m = (Map&lt;?, ?&gt;) node;</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">            if (&quot;img&quot;.equals(m.get(&quot;t&quot;))) {</span>
+<span class="fc" id="L268">                Object name = m.get(&quot;name&quot;);</span>
+<span class="pc bpc" id="L269" title="2 of 4 branches missed.">                if (name instanceof String &amp;&amp; ((String) name).length() &gt; 0) {</span>
+<span class="fc" id="L270">                    out.add((String) name);</span>
+                }
+            }
+<span class="fc bfc" id="L273" title="All 2 branches covered.">            for (Object value : m.values()) {</span>
+<span class="fc" id="L274">                collectImageNames(value, out);</span>
+<span class="fc" id="L275">            }</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        } else if (node instanceof List) {</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">            for (Object value : (List&lt;?&gt;) node) {</span>
+<span class="fc" id="L278">                collectImageNames(value, out);</span>
+<span class="fc" id="L279">            }</span>
+        }
+<span class="fc" id="L281">    }</span>
+
+    private static String emit(Map&lt;String, Object&gt; doc, Map&lt;String, byte[]&gt; images) {
+<span class="fc" id="L284">        String json = JSONWriter.toJson(doc);</span>
+<span class="fc" id="L285">        int total = json.length();</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">        for (byte[] blob : images.values()) {</span>
+<span class="fc" id="L287">            total += blob.length;</span>
+<span class="fc" id="L288">        }</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">        if (total &gt; PAYLOAD_WARN_BYTES) {</span>
+<span class="nc" id="L290">            Log.p(&quot;Surfaces: the published payload is &quot; + (total / 1024) + &quot;kb; widget renderers &quot;</span>
+                    + &quot;run under tight memory and transaction budgets, consider smaller images&quot;);
+        }
+<span class="fc" id="L293">        return json;</span>
+    }
+
+    private static byte[] encode(Image img) {
+<span class="nc bnc" id="L297" title="All 2 branches missed.">        if (img == null) {</span>
+<span class="nc" id="L298">            return null;</span>
+        }
+        try {
+<span class="nc bnc" id="L301" title="All 2 branches missed.">            if (img instanceof EncodedImage) {</span>
+<span class="nc" id="L302">                return ((EncodedImage) img).getImageData();</span>
+            }
+<span class="nc" id="L304">            ImageIO io = ImageIO.getImageIO();</span>
+<span class="nc bnc" id="L305" title="All 2 branches missed.">            if (io != null) {</span>
+<span class="nc" id="L306">                ByteArrayOutputStream bo = new ByteArrayOutputStream();</span>
+<span class="nc" id="L307">                io.save(img, bo, ImageIO.FORMAT_PNG, 1f);</span>
+<span class="nc" id="L308">                return bo.toByteArray();</span>
+            }
+<span class="nc" id="L310">        } catch (Throwable t) {</span>
+<span class="nc" id="L311">            Log.e(t);</span>
+<span class="nc" id="L312">        }</span>
+<span class="nc" id="L313">        return null;</span>
+    }
+
+<span class="fc" id="L316">    private static final char[] HEX_DIGITS = &quot;0123456789abcdef&quot;.toCharArray();</span>
+
+    private static String fnv1a(byte[] data) {
+<span class="fc" id="L319">        long hash = 0xcbf29ce484222325L;</span>
+<span class="fc bfc" id="L320" title="All 2 branches covered.">        for (byte b : data) {</span>
+<span class="fc" id="L321">            hash ^= b &amp; 0xff;</span>
+<span class="fc" id="L322">            hash *= 0x100000001b3L;</span>
+        }
+        // formatted by hand: the CLDC bootclasspath the Ant core build compiles
+        // against has no Long.toHexString
+<span class="fc" id="L326">        char[] hex = new char[16];</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">        for (int i = 15; i &gt;= 0; i--) {</span>
+<span class="fc" id="L328">            hex[i] = HEX_DIGITS[(int) (hash &amp; 0xf)];</span>
+<span class="fc" id="L329">            hash &gt;&gt;&gt;= 4;</span>
+        }
+<span class="fc" id="L331">        return new String(hex);</span>
+    }
+
+    private static void sortEntries(List&lt;WidgetTimeline.Entry&gt; entries) {
+        // insertion sort keeps this dependency-free and stable; timelines are short
+<span class="fc bfc" id="L336" title="All 2 branches covered.">        for (int i = 1; i &lt; entries.size(); i++) {</span>
+<span class="fc" id="L337">            WidgetTimeline.Entry e = entries.get(i);</span>
+<span class="fc" id="L338">            int j = i - 1;</span>
+<span class="fc bfc" id="L339" title="All 4 branches covered.">            while (j &gt;= 0 &amp;&amp; entries.get(j).getDate().getTime() &gt; e.getDate().getTime()) {</span>
+<span class="fc" id="L340">                entries.set(j + 1, entries.get(j));</span>
+<span class="fc" id="L341">                j--;</span>
+            }
+<span class="fc" id="L343">            entries.set(j + 1, e);</span>
+        }
+<span class="fc" id="L345">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

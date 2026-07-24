@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SurfaceProgress.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.surfaces</a> &gt; <span class="el_source">SurfaceProgress.java</span></div><h1>SurfaceProgress.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.surfaces;
+
+import java.util.Date;
+import java.util.Map;
+
+/// A progress indicator node. The value is a fraction between 0 and 1, supplied either literally,
+/// by state-map key, or as a date interval the OS animates natively (iOS only; other platforms
+/// freeze the interval's value as of the last refresh).
+///
+/// Determinate `STYLE_CIRCULAR` progress falls back to a linear bar on Android app widgets, which
+/// only support indeterminate circular spinners.
+public class SurfaceProgress extends SurfaceNode {
+    /// A horizontal progress bar.
+    public static final int STYLE_LINEAR = 0;
+
+    /// A circular gauge. Falls back to linear on Android app widgets.
+    public static final int STYLE_CIRCULAR = 1;
+
+    private final int style;
+<span class="fc" id="L42">    private float value = -1;</span>
+    private String valueKey;
+    private Date intervalStart;
+    private Date intervalEnd;
+    private SurfaceColor color;
+
+    /// Creates a progress node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `style`: `STYLE_LINEAR` or `STYLE_CIRCULAR`
+<span class="fc" id="L53">    public SurfaceProgress(int style) {</span>
+<span class="fc" id="L54">        this.style = style;</span>
+<span class="fc" id="L55">    }</span>
+
+    /// Sets a literal progress value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the progress fraction between 0 and 1
+    ///
+    /// #### Returns
+    ///
+    /// this progress node, for chaining
+    public SurfaceProgress setValue(float value) {
+<span class="nc" id="L67">        this.value = value;</span>
+<span class="nc" id="L68">        return this;</span>
+    }
+
+    /// Reads the progress value from the state map. The state value is a `Number` between 0 and 1.
+    ///
+    /// #### Parameters
+    ///
+    /// - `valueStateKey`: the state-map key holding the fraction
+    ///
+    /// #### Returns
+    ///
+    /// this progress node, for chaining
+    public SurfaceProgress setValueState(String valueStateKey) {
+<span class="fc" id="L81">        this.valueKey = valueStateKey;</span>
+<span class="fc" id="L82">        return this;</span>
+    }
+
+    /// Animates progress across a date interval on the OS clock without app wakeups. Only iOS
+    /// renders this natively; other platforms display the interval's fraction as of their last
+    /// refresh.
+    ///
+    /// #### Parameters
+    ///
+    /// - `start`: interval start
+    /// - `end`: interval end
+    ///
+    /// #### Returns
+    ///
+    /// this progress node, for chaining
+    public SurfaceProgress setDateInterval(Date start, Date end) {
+<span class="nc" id="L98">        this.intervalStart = start;</span>
+<span class="nc" id="L99">        this.intervalEnd = end;</span>
+<span class="nc" id="L100">        return this;</span>
+    }
+
+    /// Sets the indicator color.
+    ///
+    /// #### Parameters
+    ///
+    /// - `color`: the color
+    ///
+    /// #### Returns
+    ///
+    /// this progress node, for chaining
+    public SurfaceProgress setColor(SurfaceColor color) {
+<span class="fc" id="L113">        this.color = color;</span>
+<span class="fc" id="L114">        return this;</span>
+    }
+
+    /// Returns `STYLE_LINEAR` or `STYLE_CIRCULAR`.
+    public int getStyle() {
+<span class="nc" id="L119">        return style;</span>
+    }
+
+    /// Returns the literal progress fraction, or -1 when unset.
+    public float getValue() {
+<span class="nc" id="L124">        return value;</span>
+    }
+
+    /// Returns the state-map key of the progress value, or null.
+    public String getValueKey() {
+<span class="nc" id="L129">        return valueKey;</span>
+    }
+
+    /// Returns the animated interval start, or null.
+    public Date getIntervalStart() {
+<span class="nc" id="L134">        return intervalStart;</span>
+    }
+
+    /// Returns the animated interval end, or null.
+    public Date getIntervalEnd() {
+<span class="nc" id="L139">        return intervalEnd;</span>
+    }
+
+    /// Returns the indicator color, or null for the platform default.
+    public SurfaceColor getColor() {
+<span class="nc" id="L144">        return color;</span>
+    }
+
+    @Override
+    public SurfaceProgress setPadding(int all) {
+<span class="nc" id="L149">        super.setPadding(all);</span>
+<span class="nc" id="L150">        return this;</span>
+    }
+
+    @Override
+    public SurfaceProgress setPadding(int top, int right, int bottom, int left) {
+<span class="nc" id="L155">        super.setPadding(top, right, bottom, left);</span>
+<span class="nc" id="L156">        return this;</span>
+    }
+
+    @Override
+    public SurfaceProgress setBackground(SurfaceColor background) {
+<span class="nc" id="L161">        super.setBackground(background);</span>
+<span class="nc" id="L162">        return this;</span>
+    }
+
+    @Override
+    public SurfaceProgress setCornerRadius(int radius) {
+<span class="nc" id="L167">        super.setCornerRadius(radius);</span>
+<span class="nc" id="L168">        return this;</span>
+    }
+
+    @Override
+    public SurfaceProgress setAlignment(SurfaceAlignment alignment) {
+<span class="nc" id="L173">        super.setAlignment(alignment);</span>
+<span class="nc" id="L174">        return this;</span>
+    }
+
+    @Override
+    public SurfaceProgress setWeight(int weight) {
+<span class="nc" id="L179">        super.setWeight(weight);</span>
+<span class="nc" id="L180">        return this;</span>
+    }
+
+    @Override
+    public SurfaceProgress setSize(int widthDips, int heightDips) {
+<span class="nc" id="L185">        super.setSize(widthDips, heightDips);</span>
+<span class="nc" id="L186">        return this;</span>
+    }
+
+    @Override
+    public SurfaceProgress setAction(String actionId) {
+<span class="nc" id="L191">        super.setAction(actionId);</span>
+<span class="nc" id="L192">        return this;</span>
+    }
+
+    @Override
+    public SurfaceProgress setAction(String actionId, Map&lt;String, Object&gt; params) {
+<span class="nc" id="L197">        super.setAction(actionId, params);</span>
+<span class="nc" id="L198">        return this;</span>
+    }
+
+    @Override
+    String getType() {
+<span class="fc" id="L203">        return &quot;prog&quot;;</span>
+    }
+
+    @Override
+    void serializeContent(Map&lt;String, Object&gt; out, Map&lt;String, byte[]&gt; images, int depth) {
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        if (style == STYLE_CIRCULAR) {</span>
+<span class="nc" id="L209">            out.put(&quot;style&quot;, &quot;circular&quot;);</span>
+        } else {
+<span class="fc" id="L211">            out.put(&quot;style&quot;, &quot;linear&quot;);</span>
+        }
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        if (valueKey != null) {</span>
+<span class="fc" id="L214">            out.put(&quot;valueKey&quot;, valueKey);</span>
+<span class="nc bnc" id="L215" title="All 4 branches missed.">        } else if (intervalStart != null &amp;&amp; intervalEnd != null) {</span>
+<span class="nc" id="L216">            out.put(&quot;start&quot;, Long.valueOf(intervalStart.getTime()));</span>
+<span class="nc" id="L217">            out.put(&quot;end&quot;, Long.valueOf(intervalEnd.getTime()));</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">        } else if (value &gt;= 0) {</span>
+<span class="nc" id="L219">            out.put(&quot;value&quot;, Double.valueOf(value));</span>
+        }
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (color != null) {</span>
+<span class="fc" id="L222">            out.put(&quot;color&quot;, SurfaceSerializer.colorMap(color));</span>
+        }
+<span class="fc" id="L224">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
