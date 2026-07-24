@@ -119,9 +119,8 @@ final class AndroidCalendarSource extends LocalCalendarSource {
         List<String> args = new ArrayList<String>();
         boolean expandInstances = query != null
                 && (query.getStartTime() != null || query.getEndTime() != null);
-        String calendarColumn = expandInstances ? Instances.CALENDAR_ID : Events.CALENDAR_ID;
         if (query != null && query.getCalendarId() != null) {
-            where.append(" AND ").append(calendarColumn).append("=?");
+            where.append(" AND ").append(Events.CALENDAR_ID).append("=?");
             args.add(query.getCalendarId());
         }
         where.append(" AND ").append(Events.DELETED).append("=0");
