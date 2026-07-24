@@ -1148,6 +1148,7 @@
       }
     },
     "pixel-perfect-is-a-test": {
+<<<<<<< Updated upstream
       "hashnode": {
         "url": "https://hashnode.com/edit/cmrz2ih9400000ahx0rcydwno",
         "published": true,
@@ -1157,6 +1158,20 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-07-24T15:01:14+00:00"
+=======
+      "devto": {
+        "id": 4225026,
+        "url": "https://dev.to/codenameone/own-your-pixels-native-fidelity-on-your-schedule-2gf",
+        "syndicated_at": "2026-07-24T15:28:08+00:00"
+      },
+      "foojay": {
+        "id": 125063,
+        "url": "https://foojay.io/wp-admin/post.php?post=125063&action=edit",
+        "preview_url": "https://foojay.io/?p=125063",
+        "featured_media_id": 125062,
+        "yoast_meta_set": true,
+        "syndicated_at": "2026-07-24T15:28:58+00:00"
+>>>>>>> Stashed changes
       }
     }
   }
