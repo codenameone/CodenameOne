@@ -1010,7 +1010,10 @@ void codenameOneGCMark() {
     // per collection cycle. Costs one cached getenv when disabled. Used by
     // LargeArrayGcIntegrationTest to assert the issue-5425 fix deterministically
     // (cycle COUNT is load-independent, unlike wall-clock phase timings) and
-    // generally useful for diagnosing trigger storms on device.
+    // generally useful for diagnosing trigger storms on device. DELIBERATELY
+    // outside the CN1_DISABLE_BIBOP guard: -DCN1_DISABLE_BIBOP A/B builds need
+    // the same observable so cycle counts can be compared across both collector
+    // shapes; with the env var unset this is behavior-identical either way.
     {
         static int cn1LogCycles = -1;
         if(cn1LogCycles < 0) cn1LogCycles = getenv("CN1_GC_LOG_CYCLES") ? 1 : 0;
@@ -1810,7 +1813,7 @@ long long cn1_instr_allocCount = 0;
 #ifndef CN1_LEGACY_GC_TRIGGER_BYTES
 #define CN1_LEGACY_GC_TRIGGER_BYTES (24*1024*1024)
 #endif
-_Atomic long cn1LegacyBytesSinceGc = 0;
+static _Atomic long cn1LegacyBytesSinceGc = 0;
 #endif
 
 JAVA_BOOLEAN java_lang_System_isHighFrequencyGC___R_boolean(CODENAME_ONE_THREAD_STATE) {
