@@ -3945,9 +3945,19 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     // asynchronous (sets forceGc + notifies the GC thread) exactly as in the
     // BiBOP path. nativeAllocationMode save/restore matches cn1BibopMaybeGc:
     // we may already be inside a caller's native-allocation bracket.
-    long __legacyBytes = atomic_fetch_add_explicit(&cn1LegacyBytesSinceGc, (long)size,
-                                                   memory_order_relaxed) + (long)size;
-    if(__legacyBytes > CN1_LEGACY_GC_TRIGGER_BYTES && !gcCurrentlyRunning
+    // EDGE-triggered on the threshold crossing: level-triggering here would
+    // call System.gc() (a lock+notify) on EVERY legacy allocation between the
+    // crossing and the cycle start that resets the counter -- avoidable
+    // overhead that is itself a mini-storm on large-array churn. At most one
+    // schedule per cycle window; a crossing that lands while a cycle is
+    // already running just sets forceGc for the GC thread's next loop pass
+    // (which is why there is deliberately no !gcCurrentlyRunning suppression:
+    // suppressing would LOSE the edge and delay collection up to the 30s
+    // idle wait).
+    long __prevLegacyBytes = atomic_fetch_add_explicit(&cn1LegacyBytesSinceGc, (long)size,
+                                                       memory_order_relaxed);
+    if(__prevLegacyBytes <= CN1_LEGACY_GC_TRIGGER_BYTES
+       && __prevLegacyBytes + (long)size > CN1_LEGACY_GC_TRIGGER_BYTES
        && constantPoolObjects != 0
 #ifndef CN1_CONSERVATIVE_GC_ROOTS
        // Mirror cn1BibopMaybeGc's gate exactly: without conservative roots a

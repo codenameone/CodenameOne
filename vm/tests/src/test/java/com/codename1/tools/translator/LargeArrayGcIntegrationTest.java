@@ -267,7 +267,12 @@ class LargeArrayGcIntegrationTest {
             output = reader.lines().collect(Collectors.joining("\n"));
         }
         int exit = process.waitFor();
-        assertEquals(0, exit, "Command failed: " + executable + "\nOutput:\n" + output);
+        if (exit != 0) {
+            // Controlled message: the retry logic keys on the VM_RUN_EXIT marker
+            // instead of JUnit's assertion-message format, which is not a stable API.
+            throw new AssertionFailedError(
+                    "VM_RUN_EXIT(" + exit + ") for " + executable + "\nOutput:\n" + output);
+        }
         return output;
     }
 
@@ -276,6 +281,8 @@ class LargeArrayGcIntegrationTest {
         if (message == null) {
             return false;
         }
-        return message.contains("but was: <139>") || message.contains("Segmentation fault");
+        // 139 = 128+SIGSEGV from the shell-style exit code the JVM reports for a
+        // crashed child process.
+        return message.contains("VM_RUN_EXIT(139)") || message.contains("Segmentation fault");
     }
 }
