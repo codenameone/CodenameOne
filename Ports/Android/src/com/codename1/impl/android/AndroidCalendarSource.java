@@ -54,6 +54,8 @@ import java.util.TimeZone;
 
 /** Android Calendar Provider integration. */
 final class AndroidCalendarSource extends LocalCalendarSource {
+    // Events and Instances use the same Calendar Provider selection column.
+    private static final String CALENDAR_ID_SELECTION_COLUMN = Events.CALENDAR_ID;
     private static final String[] EVENT_COLUMNS = {Events._ID, Events.CALENDAR_ID, Events.TITLE,
             Events.DESCRIPTION, Events.EVENT_LOCATION, Events.DTSTART, Events.DTEND, Events.DURATION,
             Events.EVENT_TIMEZONE, Events.ALL_DAY, Events.RRULE, Events.STATUS, Events.AVAILABILITY,
@@ -120,7 +122,7 @@ final class AndroidCalendarSource extends LocalCalendarSource {
         boolean expandInstances = query != null
                 && (query.getStartTime() != null || query.getEndTime() != null);
         if (query != null && query.getCalendarId() != null) {
-            where.append(" AND ").append(Events.CALENDAR_ID).append("=?");
+            where.append(" AND ").append(CALENDAR_ID_SELECTION_COLUMN).append("=?");
             args.add(query.getCalendarId());
         }
         where.append(" AND ").append(Events.DELETED).append("=0");

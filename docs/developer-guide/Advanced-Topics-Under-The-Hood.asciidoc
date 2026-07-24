@@ -803,7 +803,7 @@ If you explicitly lower the target SDK (for example: `android.targetSDKVersion=2
 .Install UI when using the old permissions system
 image::img/marshmallow-permissions-level21.png[Install UI when using the old permissions system,scaledwidth=20%]
 
-When you keep the default target (API 33+) the installer defers to the runtime permission flow and the installation UI looks like this instead:
+When you keep the default target (API 36+) the installer defers to the runtime permission flow and the installation UI looks like this instead:
 
 .Install UI when using the new permissions system
 image::img/marshmallow-permissions-level23.png[Install UI when using the new permissions system,scaledwidth=20%]
