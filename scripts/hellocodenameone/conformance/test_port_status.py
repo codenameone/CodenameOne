@@ -110,6 +110,27 @@ class PortStatusTest(unittest.TestCase):
         self.assertEqual("fail", report["tests"]["StringApiTest"]["status"])
         self.assertEqual(["suite-error"], report["tests"]["StringApiTest"]["reasons"])
 
+    def test_strict_report_errors_reject_failures_missing_tests_and_incomplete_suite(self):
+        report = {
+            "suite_finished": False,
+            "summary": {"pass": 10, "fail": 2, "skip": 1, "not-run": 3},
+        }
+        self.assertEqual(
+            [
+                "suite did not emit its completion marker",
+                "2 test(s) failed",
+                "3 test(s) did not run",
+            ],
+            port_status.strict_report_errors(report),
+        )
+
+    def test_strict_report_errors_allows_complete_report_with_skips(self):
+        report = {
+            "suite_finished": True,
+            "summary": {"pass": 10, "fail": 0, "skip": 1, "not-run": 0},
+        }
+        self.assertEqual([], port_status.strict_report_errors(report))
+
 
 if __name__ == "__main__":
     unittest.main()

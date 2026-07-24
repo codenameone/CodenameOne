@@ -83,11 +83,11 @@ import org.xeustechnologies.jtar.TarOutputStream;
  */
 public class AndroidGradleBuilder extends Executor {
 
-    private float MIN_GRADLE_VERSION=6;
+    private String minimumGradleVersion = "6";
 
     private String gradleDistributionUrl = "https://services.gradle.org/distributions/gradle-6.8.3-bin.zip";
 
-    private String gradle8DistributionUrl = "https://services.gradle.org/distributions/gradle-8.1-bin.zip";
+    private String gradle8DistributionUrl = "https://services.gradle.org/distributions/gradle-8.13-bin.zip";
     public boolean PREFER_MANAGED_GRADLE=true;
 
     private boolean rootCheck = false;
@@ -607,7 +607,7 @@ public class AndroidGradleBuilder extends Executor {
         }
         if (useGradle8) {
             getGradleJavaHome(); // will throw build exception if JAVA17_HOME is not set
-            MIN_GRADLE_VERSION = 8;
+            minimumGradleVersion = "8.13";
             gradleDistributionUrl = gradle8DistributionUrl;
             if (!useJava8SourceLevel) {
                 log("NOTICE: Enabling Java 8 source level for Gradle 8 build because RetroLambda is not supported on Java 17, which is required for gradle 8.");
@@ -615,7 +615,7 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
         if (newFirebaseMessaging && !useGradle8) {
-            throw new BuildException("android.newFirebaseMessaging requires gradle version 8.1 or higher.  Please remove the android.gradleVersion build hint");
+            throw new BuildException("android.newFirebaseMessaging requires Gradle 8.13 or higher. Please remove the android.gradleVersion build hint");
         }
         debug("Request Args: ");
         debug("-----------------");
@@ -918,7 +918,7 @@ public class AndroidGradleBuilder extends Executor {
         debug("FOUND gradleVersion "+gradleVersion);
         int gradleVersionInt = parseVersionStringAsInt(gradleVersion);
         debug("Found gradleVersionInt="+gradleVersionInt);
-        if (gradleVersionInt <  MIN_GRADLE_VERSION) {
+        if (compareVersions(gradleVersion, minimumGradleVersion) < 0) {
             // The minimum version is too low.
             if (managedGradleHome.exists()) {
                 gradleExe = new File(managedGradleHome, path("bin", "gradle"+bat)).getAbsolutePath();
@@ -930,7 +930,7 @@ public class AndroidGradleBuilder extends Executor {
                 gradleVersionInt = parseVersionStringAsInt(gradleVersion);
 
             }
-            if (gradleVersionInt < MIN_GRADLE_VERSION) {
+            if (compareVersions(gradleVersion, minimumGradleVersion) < 0) {
                 if (managedGradleHome.exists()) {
                     delTree(managedGradleHome);
                 }
@@ -991,8 +991,8 @@ public class AndroidGradleBuilder extends Executor {
                     throw new BuildException("Failed to get gradle version even after downloading it from "+gradleDistributionUrl+".  Something must have gone wrong with the gradle installation.");
                 }
                 gradleVersionInt = parseVersionStringAsInt(gradleVersion);
-                if (gradleVersionInt < MIN_GRADLE_VERSION) {
-                    throw new BuildException("Required gradle version is "+MIN_GRADLE_VERSION+" but found version "+gradleVersion);
+                if (compareVersions(gradleVersion, minimumGradleVersion) < 0) {
+                    throw new BuildException("Required Gradle version is "+minimumGradleVersion+" but found version "+gradleVersion);
                 }
             }
         }
@@ -4872,7 +4872,7 @@ public class AndroidGradleBuilder extends Executor {
             }else if (gradleVersionInt < 8) {
                 gradleDependency = "classpath 'com.android.tools.build:gradle:4.1.1'\n";
             } else {
-                gradleDependency = "classpath 'com.android.tools.build:gradle:8.1.0'\n";
+                gradleDependency = "classpath 'com.android.tools.build:gradle:8.13.2'\n";
             }
         }
         boolean hasKotlinSources = hasSourceFileWithExtension(new File(projectDir, "src/main/java"), ".kt");
@@ -4898,17 +4898,30 @@ public class AndroidGradleBuilder extends Executor {
         String compileSdkVersion = "'android-21'";
 
         int projectJavaVersion = parseVersionStringAsInt(request.getArg("java.version", "8"));
+        String coreLibraryDesugaringOption = useGradle8
+                ? "        coreLibraryDesugaringEnabled true\n"
+                : "";
         String javaCompileOptions = "";
         if (projectJavaVersion >= 17 && useGradle8) {
             javaCompileOptions = "    compileOptions {\n" +
+                    coreLibraryDesugaringOption +
                     "        sourceCompatibility JavaVersion.toVersion(17)\n" +
                     "        targetCompatibility JavaVersion.toVersion(17)\n" +
                     "    }\n";
         } else if(useJava8SourceLevel) {
             javaCompileOptions = "    compileOptions {\n" +
+                    coreLibraryDesugaringOption +
                     "        sourceCompatibility JavaVersion.VERSION_1_8\n" +
                     "        targetCompatibility JavaVersion.VERSION_1_8\n" +
                     "    }\n";
+        }
+
+        String coreLibraryDesugaringDependency = "";
+        if (useGradle8
+                && !additionalDependencies.contains("com.android.tools:desugar_jdk_libs")
+                && !request.getArg("android.gradleDep", "").contains("com.android.tools:desugar_jdk_libs")) {
+            coreLibraryDesugaringDependency =
+                    "    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'\n";
         }
 
         String mavenCentral = "";
@@ -5113,6 +5126,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "}\n"
                 + "\n"
                 + "dependencies {\n"
+                + coreLibraryDesugaringDependency
                 + "    "+compile+" fileTree(dir: 'libs', include: ['*.jar'])\n"
                 + request.getArg("android.supportv4Dep",supportV4Default) + "\n"
                 + kotlinRuntimeDependency
@@ -5195,7 +5209,6 @@ public class AndroidGradleBuilder extends Executor {
         Integer compileSdkInt = parseSdkInt(compileSdkVersion);
         if (compileSdkInt != null && compileSdkInt >= 35) {
             gradlePropertiesObject.setProperty("android.suppressUnsupportedCompileSdk", String.valueOf(compileSdkInt));
-            gradlePropertiesObject.setProperty("android.experimental.androidTest.useUnifiedTestPlatform", "false");
         }
 
         // Configure R8 optimization mode to prevent reflection issues
@@ -5912,7 +5925,7 @@ public class AndroidGradleBuilder extends Executor {
         return String.valueOf(Math.max(Integer.parseInt(a), Integer.parseInt(b)));
     }
 
-    private static int compareVersions(String v1, String v2) {
+    static int compareVersions(String v1, String v2) {
         String v1p1 = v1.indexOf(".") == -1 ? v1 : v1.substring(0, v1.indexOf("."));
         String v2p1 = v2.indexOf(".") == -1 ? v2 : v2.substring(0, v2.indexOf("."));
         int i1 = Integer.parseInt(v1p1);

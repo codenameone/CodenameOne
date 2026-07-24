@@ -116,6 +116,11 @@ jobs:
       # so the GoogleWebMap screenshot test renders a live Google map; absent
       # (e.g. fork PRs with no access to the secret) the test skips.
       GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+      # The device runner reports logical test failures through CN1SS log
+      # markers, not through the launcher instrumentation test. Make the
+      # normalized report authoritative so a red port-status test cannot leave
+      # the Android workflow green and then be published from master.
+      CN1SS_FAIL_ON_TEST_FAILURE: '1'
     steps:
       - uses: actions/checkout@v6
       - name: Set TMPDIR

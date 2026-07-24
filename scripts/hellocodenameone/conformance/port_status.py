@@ -521,6 +521,20 @@ def normalize(
     return report
 
 
+def strict_report_errors(report: dict) -> list[str]:
+    errors: list[str] = []
+    if not report.get("suite_finished"):
+        errors.append("suite did not emit its completion marker")
+    summary = report.get("summary", {})
+    failed = int(summary.get("fail", 0))
+    not_run = int(summary.get("not-run", 0))
+    if failed:
+        errors.append(f"{failed} test(s) failed")
+    if not_run:
+        errors.append(f"{not_run} test(s) did not run")
+    return errors
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -541,6 +555,11 @@ def build_parser() -> argparse.ArgumentParser:
     normalize_parser.add_argument("--commit", default=os.environ.get("GITHUB_SHA", ""))
     normalize_parser.add_argument("--generated-at", default=utc_now())
     normalize_parser.add_argument("--binary-size", type=int)
+    normalize_parser.add_argument(
+        "--fail-on-test-failure",
+        action="store_true",
+        help="return nonzero after writing the report if tests fail, do not run, or the suite is incomplete",
+    )
     return parser
 
 
@@ -571,6 +590,14 @@ def main() -> int:
             f"Wrote {args.output}: "
             + ", ".join(f"{key}={value}" for key, value in report["summary"].items())
         )
+        if args.fail_on_test_failure:
+            strict_errors = strict_report_errors(report)
+            if strict_errors:
+                print(
+                    "port-status strict gate: " + "; ".join(strict_errors),
+                    file=sys.stderr,
+                )
+                return 2
         return 0
     except ContractError as exc:
         print(f"port-status: {exc}", file=sys.stderr)
