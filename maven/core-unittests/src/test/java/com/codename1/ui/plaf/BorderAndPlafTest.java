@@ -8,6 +8,7 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.Stroke;
+import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.plaf.StyleParser.BorderInfo;
 import com.codename1.ui.plaf.StyleParser.FontInfo;
 import com.codename1.ui.plaf.StyleParser.ImageInfo;
@@ -116,6 +117,40 @@ class BorderAndPlafTest extends UITestBase {
         assertEquals(1.5f, bounds[1], 0.001f);
         assertEquals(17f, bounds[2], 0.001f);
         assertEquals(7f, bounds[3], 0.001f);
+    }
+
+    @FormTest
+    void testRoundRectBorderMirrorsAsymmetricCornersInRTL() {
+        RoundRectBorder border = RoundRectBorder.create()
+                .cornerRadius(4f)
+                .topLeftMode(false)
+                .bottomLeftMode(false)
+                .topRightMode(true)
+                .bottomRightMode(true);
+
+        Label label = new Label();
+        label.setRTL(true);
+        label.setWidth(30);
+        label.setHeight(20);
+        label.getStyle().setBackgroundType(Style.BACKGROUND_NONE);
+        label.getStyle().setBgTransparency(0xff);
+        label.getStyle().setBgColor(0);
+        label.getStyle().setBorder(border);
+
+        implementation.setShapeSupported(true);
+        implementation.resetShapeTracking();
+        border.paintBorderBackground(Image.createImage(30, 20).getGraphics(), label);
+
+        assertTrue(implementation.wasFillShapeInvoked());
+        PathIterator path = implementation.getLastFillShape().getPathIterator();
+        float[] coordinates = new float[6];
+        assertEquals(PathIterator.SEG_MOVETO, path.currentSegment(coordinates));
+        assertTrue(coordinates[0] > 0,
+                "RTL should start after the mirrored rounded top-left corner");
+        path.next();
+        assertEquals(PathIterator.SEG_LINETO, path.currentSegment(coordinates));
+        assertEquals(30f, coordinates[0], 0.001f,
+                "RTL should mirror the square top-left corner to the top-right");
     }
 
     @FormTest
