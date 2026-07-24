@@ -1818,7 +1818,9 @@ long long cn1_instr_allocCount = 0;
 #ifndef CN1_LEGACY_GC_TRIGGER_BYTES
 #define CN1_LEGACY_GC_TRIGGER_BYTES (24*1024*1024)
 #endif
-static _Atomic long cn1LegacyBytesSinceGc = 0;
+// long long, NOT long: on the Windows LLP64 target long is 32-bit and this
+// counter accumulates raw allocation bytes between cycle resets.
+static _Atomic long long cn1LegacyBytesSinceGc = 0;
 #endif
 
 JAVA_BOOLEAN java_lang_System_isHighFrequencyGC___R_boolean(CODENAME_ONE_THREAD_STATE) {
@@ -3959,10 +3961,11 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     // (which is why there is deliberately no !gcCurrentlyRunning suppression:
     // suppressing would LOSE the edge and delay collection up to the 30s
     // idle wait).
-    long prevLegacyBytes = atomic_fetch_add_explicit(&cn1LegacyBytesSinceGc, (long)size,
-                                                     memory_order_relaxed);
+    long long prevLegacyBytes = atomic_fetch_add_explicit(&cn1LegacyBytesSinceGc,
+                                                          (long long)size,
+                                                          memory_order_relaxed);
     if(prevLegacyBytes <= CN1_LEGACY_GC_TRIGGER_BYTES
-       && prevLegacyBytes + (long)size > CN1_LEGACY_GC_TRIGGER_BYTES
+       && prevLegacyBytes + (long long)size > CN1_LEGACY_GC_TRIGGER_BYTES
        && constantPoolObjects != 0
 #ifndef CN1_CONSERVATIVE_GC_ROOTS
        // Mirror cn1BibopMaybeGc's gate exactly: without conservative roots a

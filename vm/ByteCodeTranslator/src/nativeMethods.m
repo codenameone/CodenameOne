@@ -2081,6 +2081,13 @@ static JAVA_LONG cn1SleepNowMicros(void) {
 }
 
 JAVA_VOID java_lang_Thread_sleep___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG millis) {
+    // Park per the CN1_YIELD_THREAD contract (cn1_globals.h): capture SP +
+    // callee-saved registers FIRST, then publish threadActive=FALSE. Under
+    // CN1_CONSERVATIVE_GC_ROOTS this lets the collector scan the sleeper's
+    // native stack cooperatively; on Windows there is NO signal-stop fallback,
+    // so without the capture a sleeping thread's native-stack roots would go
+    // unscanned for the cycle. No-op when conservative roots are off.
+    CN1_GC_PARK_CAPTURE(threadStateData);
     threadStateData->threadActive = JAVA_FALSE;
     // usleep()/nanosleep() return EINTR when any signal lands, and POSIX never
     // restarts them (SA_RESTART explicitly excludes them). The conservative-roots
@@ -2123,6 +2130,11 @@ JAVA_VOID java_lang_Thread_sleep___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG mil
         usleep(1000);
     }
     threadStateData->threadActive = JAVA_TRUE;
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+    // Mirror CN1_RESUME_THREAD: drop the capture so a stale SP can never
+    // satisfy the scanner's cooperative path after this frame unwinds.
+    threadStateData->gcParkCaptured = JAVA_FALSE;
+#endif
 }
 
 JAVA_OBJECT java_lang_Thread_currentThread___R_java_lang_Thread(CODENAME_ONE_THREAD_STATE) {
