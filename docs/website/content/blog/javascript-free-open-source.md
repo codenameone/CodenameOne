@@ -22,7 +22,7 @@ The Codename One JavaScript port is now open source and available on every plan,
 - [ParparVM garbage collection](#issue-5425-dave-was-right-about-our-collector): A real application exposed a benchmark gap, redundant collection cycles, and a broken first fix.
 - [Calendar](#calendar-api-local-calendars-cloud-sync-and-conflicts): The new API covers device and cloud calendars, recurrence, tasks, incremental sync, offline mutations, and conflict handling.
 - [Bluetooth](#bluetooth-is-now-part-of-the-core): Bluetooth moved into the core with BLE, GATT, L2CAP, RFCOMM, Web Bluetooth, desktop radios, and a scriptable simulator.
-- [Text editing](#pure-codename-one-text-editing): `EditField`, `RichTextArea`, and `CodeEditor` can edit and paint text without placing a native field over the component.
+- [Text editing](#pure-codename-one-text-editing): `EditField`, `RichTextArea`, and `CodeEditor` can edit and paint text without placing a native field over the component. The new clipboard model carries rich text, images, and file references alongside a plain-text fallback.
 - [Rich text](#lightweight-rich-text-without-a-web-view): `RichTextComponent` renders HTML, Markdown, AsciiDoc, RTF, and styled Java runs without a web view.
 - [Compact strings](#compact-strings-in-parparvm): Strings now use a `byte[]` when every character fits, cutting their character storage in half without adding a second backing-array pointer.
 - [Account, website, and videos](#account-website-and-video-updates): The authorization migration is complete, the redesigned site is live, and the weekly posts now generate explainer videos.
@@ -190,7 +190,11 @@ notes.setRows(5);
 form.add(notes);
 ```
 
-[PR #5386](https://github.com/codenameone/CodenameOne/pull/5386) adds the port bindings and portable editor engine. {{< post-link path="/blog/text-input-without-native-overlay" text="Read the text-input article for composition, UTF-16 offsets, bidirectional hit testing, and the native-overlay tradeoff." >}}
+This work also replaces the text-only clipboard assumption. A `ClipboardContent` can carry several representations of one item: plain text, HTML, RTF, Markdown, AsciiDoc, PNG, JPEG, GIF, and file references. The port publishes the formats its system clipboard supports while retaining plain text for older code and applications that do not understand the richer payload.
+
+`RichTextArea` uses that negotiation directly. Copying a formatted selection publishes plain text, HTML, RTF, Markdown, and AsciiDoc together. Pasting chooses the richest text representation it understands, while a clipboard image becomes an inline image instead of a filename or discarded payload.
+
+[PR #5386](https://github.com/codenameone/CodenameOne/pull/5386) adds the port bindings and portable editor engine. {{< post-link path="/blog/text-input-without-native-overlay" text="Read the text-input article for composition, UTF-16 offsets, bidirectional hit testing, rich clipboard negotiation, and the native-overlay tradeoff." >}}
 
 ## Lightweight rich text without a web view
 

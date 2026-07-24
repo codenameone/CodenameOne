@@ -4,8 +4,8 @@ slug: text-input-without-native-overlay
 url: /blog/text-input-without-native-overlay/
 date: '2026-07-27'
 author: Shai Almog
-description: "Codename One can now edit text inside its lightweight component layer through a semantic text-input contract. EditField, RichTextArea, and CodeEditor keep painting, selection, bidirectional layout, and document state portable while the OS supplies keyboard and IME events."
-feed_html: '<img src="https://www.codenameone.com/blog/text-input-without-native-overlay.jpg" alt="Pure Codename One text editing driven by a platform input method" /> A semantic port contract lets Codename One own text painting, selection, rich editing, and bidirectional layout while the platform supplies keyboard and IME operations.'
+description: "Codename One can now edit text inside its lightweight component layer through a semantic text-input contract. EditField, RichTextArea, and CodeEditor keep painting, selection, bidirectional layout, rich clipboard data, and document state portable while the OS supplies keyboard and IME events."
+feed_html: '<img src="https://www.codenameone.com/blog/text-input-without-native-overlay.jpg" alt="Pure Codename One text editing driven by a platform input method" /> A semantic port contract lets Codename One own text painting, selection, rich editing, clipboard formats, and bidirectional layout while the platform supplies keyboard and IME operations.'
 series: ["release-2026-07-24"]
 ---
 
@@ -67,6 +67,27 @@ form.show();
 ![Rich text and code editors painted by the lightweight editing engine](/blog/text-input-without-native-overlay/editors-overview.png)
 
 Text input is now a port-level capability that does not require a visible native field.
+
+## The clipboard carries several representations at once
+
+The old clipboard API usually moved a `String`. That remains valid, but it cannot preserve formatting or describe an image or file.
+
+`ClipboardContent` represents one clipboard item through several MIME types. Include plain text as the fallback, then add the richer forms you can produce:
+
+```java
+ClipboardContent content = new ClipboardContent()
+        .setData(ClipboardContent.MIME_TEXT, "Codename One")
+        .setData(ClipboardContent.MIME_HTML, "<b>Codename One</b>")
+        .setData(ClipboardContent.MIME_MARKDOWN, "**Codename One**");
+
+Display.getInstance().copyToClipboard(content);
+```
+
+The same container supports RTF, AsciiDoc, PNG, JPEG, GIF, and local file references. Each port maps the representations its system clipboard exposes. Code that still calls `copyToClipboard("text")` or expects plain text continues to work.
+
+`RichTextArea` publishes five text representations when you copy a formatted selection: plain text, HTML, RTF, Markdown, and AsciiDoc. On paste, it selects the richest format it understands and imports the formatting into its document model. If the clipboard contains PNG, JPEG, or GIF bytes, the editor inserts the image inline as a self-contained data URI.
+
+This is format negotiation, not a private editor clipboard. Other applications can paste the native formats a port publishes, and application code can inspect the available types through `Display.getInstance().getClipboardContent()`.
 
 ## Bidirectional text uses one layout for paint and hit testing
 
