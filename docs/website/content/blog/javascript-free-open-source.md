@@ -27,7 +27,7 @@ The Codename One JavaScript port is now open source and available on every plan,
 - [Compact strings](#compact-strings-in-parparvm): Strings now use a `byte[]` when every character fits, cutting their character storage in half without adding a second backing-array pointer.
 - [Account, website, and videos](#account-website-and-video-updates): The authorization migration is complete, the redesigned site is live, and the weekly posts now generate explainer videos.
 
-## Why we built the ParparVM JavaScript port?
+## Why we built the ParparVM JavaScript port
 
 Our original web port used [TeaVM](https://teavm.org/), which is a fantastic project. TeaVM took Java bytecode, supported the threading model Codename One needed, and produced a browser application at a time when that combination looked close to impossible.
 
