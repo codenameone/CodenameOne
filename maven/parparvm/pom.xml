@@ -74,6 +74,7 @@
 
         <codename1.javaapi.src.dir>../../vm/JavaAPI/src</codename1.javaapi.src.dir>
         <codename1.javascriptport.src.dir>../../Ports/JavaScriptPort/src/main/java</codename1.javascriptport.src.dir>
+        <codename1.javascriptport.webapp.dir>../../Ports/JavaScriptPort/src/main/webapp</codename1.javascriptport.webapp.dir>
         <javaapi.compiler.source>1.8</javaapi.compiler.source>
         <javaapi.compiler.target>1.8</javaapi.compiler.target>
 
@@ -199,8 +200,24 @@
                                     <fileset dir="${project.build.directory}/api-classes"/>
                                 </zip>
                                 <copy tofile="${project.build.directory}/bundle/parparvm-compiler.jar" file="${project.build.directory}/${project.build.finalName}-jar-with-dependencies.jar"/>
-                                <jar destfile="${project.build.directory}/bundle/JavaScriptPort.jar"
-                                     basedir="${project.build.directory}/javascript-port-classes"/>
+                                <!-- JavaScriptPort.jar carries the compiled port classes AND,
+                                     under webapp/, the JavaScript-port runtime web assets
+                                     (port.js, js/, css/, style.css, sw.js, manifest*, assets/).
+                                     The Maven plugin extracts webapp/ and hands it to the
+                                     translator via -Dcodename1.javascriptport.webapp so that
+                                     builds running OUTSIDE a CN1 source checkout still bundle
+                                     port.js (the worker-side native bindings). Without this,
+                                     JavascriptBundleWriter.locateJavaScriptPortWebApp() finds
+                                     nothing off-repo and the app ships without port.js and
+                                     fails to boot. index.html is emitted by the translator, so
+                                     it (and the servlet-only WEB-INF) are excluded here. -->
+                                <jar destfile="${project.build.directory}/bundle/JavaScriptPort.jar">
+                                    <fileset dir="${project.build.directory}/javascript-port-classes"/>
+                                    <zipfileset dir="${codename1.javascriptport.webapp.dir}" prefix="webapp">
+                                        <exclude name="index.html"/>
+                                        <exclude name="WEB-INF/**"/>
+                                    </zipfileset>
+                                </jar>
                                 <zip destfile="${project.build.directory}/${project.build.finalName}-bundle.jar">
                                     <fileset dir="${project.build.directory}/bundle"/>
                                 </zip>

@@ -55,6 +55,12 @@ public class JavaScriptBuilder extends Executor {
     private File jsDistDir;
     private File jsOutputZip;
     private File jsDeployableArtifact;
+    // Directory holding the JavaScript-port web assets (port.js, js/, style.css,
+    // ...) for this build. Handed to the translator via the
+    // -Dcodename1.javascriptport.webapp override so it bundles port.js (the
+    // worker-side native bindings) even when the build runs outside a CN1
+    // source checkout. Set by stageJavaScriptPort.
+    private File jsPortWebApp;
 
     @Override
     protected String getDeviceIdCode() {
@@ -237,6 +243,22 @@ public class JavaScriptBuilder extends Executor {
                     fos.close();
                 }
                 unzip(jar, stageClasses, stageClasses, stageClasses);
+                // JavaScriptPort.jar carries the port webapp under webapp/. Move it
+                // OUT of the translate-input tree (stageClasses) so the translator
+                // doesn't re-copy it into the bundle; it is handed to the translator
+                // via -Dcodename1.javascriptport.webapp in runByteCodeTranslator.
+                File stagedWebApp = new File(stageClasses, "webapp");
+                if (stagedWebApp.isDirectory()) {
+                    File dest = new File(tmpDir, "port-webapp");
+                    if (dest.exists()) {
+                        delTree(dest, true);
+                    }
+                    if (!stagedWebApp.renameTo(dest)) {
+                        copyTree(stagedWebApp, dest);
+                        delTree(stagedWebApp, true);
+                    }
+                    jsPortWebApp = dest;
+                }
                 return stageClasses;
             } finally {
                 bundled.close();
@@ -275,6 +297,12 @@ public class JavaScriptBuilder extends Executor {
             throw new BuildException("Failed to compile JavaScript port sources");
         }
         copyTree(portClasses, stageClasses);
+        // Source-checkout build: the webapp sits next to the sources at
+        // src/main/webapp (portSources is src/main/java).
+        File srcWebApp = new File(portSources.getParentFile(), "webapp");
+        if (srcWebApp.isDirectory()) {
+            jsPortWebApp = srcWebApp;
+        }
         return stageClasses;
     }
 
@@ -656,6 +684,15 @@ public class JavaScriptBuilder extends Executor {
                     }
                 }
             }
+        }
+        // Hand the translator the JavaScript-port webapp (port.js, js/, style.css,
+        // ...) so it bundles port.js -- the worker-side native bindings that make
+        // Window.current() etc. resolve. Off-repo builds can't find it via the
+        // translator's own source-tree walk, so we pass the copy staged from
+        // JavaScriptPort.jar. An explicit override in CN1_TRANSLATOR_OPTS wins.
+        if (jsPortWebApp != null && jsPortWebApp.isDirectory()
+                && (translatorOpts == null || !translatorOpts.contains("codename1.javascriptport.webapp"))) {
+            extraOpts.add("-Dcodename1.javascriptport.webapp=" + jsPortWebApp.getAbsolutePath());
         }
         // Default heap; a -Xmx in CN1_TRANSLATOR_OPTS takes precedence (apps
         // that disable tree-shaking, e.g. the Playground, emit a much larger
