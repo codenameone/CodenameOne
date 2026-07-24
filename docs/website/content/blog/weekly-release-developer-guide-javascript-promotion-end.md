@@ -11,6 +11,8 @@ author: Shai Almog
 
 ![Header Image](/blog/weekly-release-developer-guide-javascript-promotion-end/documention.jpg)
 
+> **Update, July 24, 2026:** JavaScript builds are now open source, available on every account tier, and buildable locally without a Codename One account. The original promotion details below are preserved as published. See the [current announcement](/blog/javascript-free-open-source/).
+
 We just made our first weekly release today, in the coming weeks when you send a build or update the client  
 libraries you should get a new version every Friday. We hope this will help us provide better consistency between  
 the docs/device builds and the simulator.

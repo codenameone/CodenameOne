@@ -11,6 +11,8 @@ author: Shai Almog
 
 ![Header Image](/blog/a-thank-you-an-important-update-on-android-builds/html5-banner.jpg)
 
+> **Update, July 24, 2026:** JavaScript builds are now open source, available on every account tier, and buildable locally without a Codename One account. The original post below is preserved as published. See the [current announcement](/blog/javascript-free-open-source/).
+
 We’d like to thank all of you who signed up to the pro subscription, the release of 3.3 is the perfect time to  
 do that. So we are opening up the JavaScript build target for 1 year until March 1st 2017 to all current pro subscribers!  
 If you have a pro subscription you can start sending a JavaScript build right away and experiment with porting  

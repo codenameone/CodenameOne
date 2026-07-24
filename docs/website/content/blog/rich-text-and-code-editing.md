@@ -10,6 +10,8 @@ feed_html: '<img src="https://www.codenameone.com/blog/rich-text-and-code-editin
 
 ![Rich Text And Code Editing: RichTextArea And A Syntax-Highlighting CodeEditor](/blog/rich-text-and-code-editing.jpg)
 
+> **Update, July 27, 2026:** [PR #5386](https://github.com/codenameone/CodenameOne/pull/5386) replaced the default web-view editor backend described below with a pure Codename One editing engine and low-level input contract. The original post is preserved as published. Read [Text Input Without a Native Overlay](/blog/text-input-without-native-overlay/) for the current architecture.
+
 [Friday's post](/blog/funding-open-source-without-the-bait-and-switch/) covered how we fund this work without the bait-and-switch; today is the engineering side of the same week, with two new visual editors.
 
 PR #5272 adds two components: `RichTextArea`, a WYSIWYG rich text editor, and `CodeEditor`, an IDE-style code editor with syntax highlighting. They are different on the surface and identical underneath, which is the part worth explaining first.

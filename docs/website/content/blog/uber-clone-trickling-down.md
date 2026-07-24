@@ -11,6 +11,8 @@ author: Shai Almog
 
 ![Header Image](/blog/uber-clone-trickling-down/build-real-world-full-stack-mobile-apps-in-java.jpg)
 
+> **Update, July 24, 2026:** JavaScript builds are now open source, available on every account tier, and buildable locally without a Codename One account. The original post below is preserved as published. See the [current announcement](/blog/javascript-free-open-source/).
+
 I hope you all had a great time over the holidays, I was working a lot but was able to enjoy the relative quiet of the holiday period to get some stuff done. There are a lot of new features I’d like to update you about and I will over the next few weeks (albeit slower than usual). Despite my best efforts I still didn’t finish the full Uber clone app course but I’m getting REALLY close. There isn’t that much work left to do though and I’m starting to trickle out the module lessons.
 
 I hope to be done with this before the middle of January but I suck at deadlines…​ I’ll make this up by doing two modules in February and by the fact that the Uber course will have roughly 30 lessons which is a HUGE amount of content.

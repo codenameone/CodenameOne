@@ -27,6 +27,19 @@ These limits apply to cloud builds only.
 
 You can still use generated apps commercially. Paid plans mainly add higher quotas and advanced cloud features.
 
+### Are JavaScript builds limited to a paid plan?
+No. The ParparVM JavaScript target is open source and available for cloud builds on every account tier, including Free.
+
+You can also build it locally without a Codename One account:
+
+```bash
+mvn -pl javascript package \
+  -Dcodename1.platform=javascript \
+  -Dcodename1.buildTarget=local-javascript
+```
+
+ParparVM is the default. Add the `javascript.port=teavm` build hint (`codename1.arg.javascript.port=teavm` in `codenameone_settings.properties`) if you need to compare a regression with the original TeaVM target.
+
 ### Can I cancel or change plan anytime?
 Yes. Codename One includes a 30-day money-back guarantee for paid purchases.
 

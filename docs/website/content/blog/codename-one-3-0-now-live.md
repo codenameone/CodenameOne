@@ -11,6 +11,8 @@ author: Shai Almog
 
 ![Header Image](/blog/codename-one-3-0-now-live/CodenameOne-Horizontal.png)
 
+> **Update, July 24, 2026:** JavaScript builds are now open source, available on every account tier, and buildable locally without a Codename One account. The original release announcement below is preserved as published. See the [current announcement](/blog/javascript-free-open-source/).
+
 We are thrilled to announce the immediate availability of Codename One 3.0!  
 To celebrate this release we are giving away a **$100 rebate discount** for annual pro  
 subscriptions and **$300 rebate discount** for annual enterprise subscriptions.   

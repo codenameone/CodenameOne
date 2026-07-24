@@ -11,6 +11,8 @@ author: Shai Almog
 
 ![Header Image](/blog/javascript-beta-interactiondialog-popup/html5-banner.jpg)
 
+> **Update, July 24, 2026:** JavaScript builds are now open source, available on every account tier, and buildable locally without a Codename One account. The original post below is preserved as published. See the [current announcement](/blog/javascript-free-open-source/).
+
 The JavaScript port is nearing beta stage which will start next week it’s already added support for most API’s  
 including SQL support and many other features. Once the JavaScript port is in beta it will become an enterprise  
 only feature so if you haven’t tried it yet you have one week to try your app. 

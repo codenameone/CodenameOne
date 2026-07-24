@@ -11,6 +11,8 @@ author: Shai Almog
 
 ![Header Image](/blog/web-app-build-target/web-app-build-target-1.png)
 
+> **Update, July 24, 2026:** JavaScript builds are now open source, available on every account tier, and buildable locally without a Codename One account. The original post below is preserved as published. See the [current announcement](/blog/javascript-free-open-source/).
+
   
   
   

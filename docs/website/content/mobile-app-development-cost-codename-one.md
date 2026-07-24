@@ -6,6 +6,8 @@ slug: "mobile-app-development-cost-codename-one"
 
 # Pricing: Unlimited number of apps, no royalties, no restrictions!
 
+> **Update, July 24, 2026:** This archived pricing page is preserved for historical context. JavaScript builds are now open source, available on every account tier, and buildable locally without a Codename One account. See the [current pricing page](/pricing/) and the [announcement](/blog/javascript-free-open-source/).
+
 Simple Fair Transparent Pricing, 30 day money back guarantee you can cancel at any time...
 
 1. [Home](/)
