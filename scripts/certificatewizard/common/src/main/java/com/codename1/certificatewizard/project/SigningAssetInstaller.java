@@ -90,8 +90,13 @@ public final class SigningAssetInstaller {
             // through tooling that predates the debug/release split keep working.
             updates.put("codename1.ios.appext.CN1Widgets.provision", releaseProfilePath);
             updates.put("codename1.ios.release.appext.CN1Widgets.provision", releaseProfilePath);
-        }
-        if (debugProfilePath != null) {
+            // Blank rather than skip the debug key when no development profile was
+            // produced: a stale path left by an earlier wizard run would otherwise keep
+            // overriding the unqualified fallback for debug device builds. A blank
+            // qualified key is dropped during build-type resolution.
+            updates.put("codename1.ios.debug.appext.CN1Widgets.provision",
+                    debugProfilePath == null ? "" : debugProfilePath);
+        } else if (debugProfilePath != null) {
             updates.put("codename1.ios.debug.appext.CN1Widgets.provision", debugProfilePath);
         }
         if (updates.isEmpty()) {

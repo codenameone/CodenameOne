@@ -275,9 +275,11 @@ class CertificateWizardModelTest {
     }
 
     @Test
-    void widgetExtensionSigningWithoutDevelopmentProfileOmitsDebugKey() throws Exception {
+    void widgetExtensionSigningWithoutDevelopmentProfileClearsStaleDebugKey() throws Exception {
         Path settings = Files.createTempFile("cn1-settings", ".properties");
-        Files.writeString(settings, "codename1.packageName=com.example.app\n", StandardCharsets.UTF_8);
+        Files.writeString(settings, "codename1.packageName=com.example.app\n"
+                + "codename1.ios.debug.appext.CN1Widgets.provision=/tmp/stale-dev.mobileprovision\n",
+                StandardCharsets.UTF_8);
         SigningAssetInstaller.applyWidgetExtensionSigning(settings.toString(), "group.com.example.app",
                 "/tmp/CN1Widgets.mobileprovision", null);
         String written = Files.readString(settings, StandardCharsets.UTF_8);
@@ -285,7 +287,8 @@ class CertificateWizardModelTest {
                 "codename1.ios.appext.CN1Widgets.provision=/tmp/CN1Widgets.mobileprovision"));
         assertTrue(written.contains(
                 "codename1.ios.release.appext.CN1Widgets.provision=/tmp/CN1Widgets.mobileprovision"));
-        assertFalse(written.contains("codename1.ios.debug.appext.CN1Widgets.provision"));
+        assertFalse(written.contains("stale-dev.mobileprovision"));
+        assertTrue(written.contains("codename1.ios.debug.appext.CN1Widgets.provision=\n"));
     }
 
     @Test
