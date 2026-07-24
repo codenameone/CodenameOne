@@ -122,6 +122,21 @@ The fresh-page-stack grace scheme this audit was written against reported
 `gcAllocedSinceSweep`-pruned registry walk reports zero doomed across the
 suite. `StormAB` (sustained single-thread storm) and `LoadLoop` (repeated
 dictionary build/drop) are the matching wall-time/RSS A/B drivers.
+`TimerLatency` is the sleep/timer fidelity probe for the Thread.sleep
+signal-truncation defect (a single usleep was EINTR'd by the collector's
+sleeping-thread stop signal, cutting Thread.sleep(3000) to ~20ms and firing
+every java.util.Timer task almost immediately): it must print
+`TIMER_LATENCY_OK`. If `max_early_ms` exceeds 50 or `min_sleep1500_ms` comes
+out truncated, the regression is back.
+`LargeArrayLoad` models the FINAL issue-5425 Dtest shape -- a persistent
+small-object survivor set plus a retained LARGE (>CN1_BIBOP_MAX_OBJECT,
+legacy-path) byte[] phase that produces no garbage -- and guards the
+legacy-allocation GC-trigger storm (its CI twin is
+`LargeArrayGcIntegrationTest` in `vm/tests`). Run it with
+`CN1_GC_LOG_CYCLES=1` and count `[GC-CYCLE]` stderr lines: collection must be
+volume-driven (~6 cycles on this workload), not re-armed at wall-clock
+cadence by the pre-BiBOP 1MB high-frequency threshold (15 cycles when
+regressed).
 
 `ClinitThrow` is a standalone liveness reproducer (not byte-identical to the
 host JVM by design — ParparVM's initialization-failure semantics differ): a

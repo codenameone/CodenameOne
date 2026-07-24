@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.components.ToastBar;
@@ -107,6 +129,18 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
         Form f = Display.getInstance().getCurrent();
         Object tbc = (f != null) ? f.getClientProperty("ToastBarComponent") : null;
         boolean shown = isToastComponentShown(tbc);
+        // Diagnostic trace for the Linux GTK CI miss (issue 5425 PR): the suite
+        // times this test out with the screenshot never emitted; these probes
+        // (1/s + every state reset) show which wait the choreography dies in.
+        // CN1SS:WARN prefix so the Linux gate's failure dump surfaces them.
+        if (waitedMs > 0 && (waitedMs % 1000) == 0) {
+            System.out.println("CN1SS:WARN:test=ToastBarTopPosition probe phase=await-shown"
+                    + " waitedMs=" + waitedMs + " shown=" + shown
+                    + " tbc=" + (tbc == null ? "null" : "present")
+                    + " y=" + (tbc instanceof Component ? ((Component) tbc).getY() : -1)
+                    + " h=" + (tbc instanceof Component ? ((Component) tbc).getHeight() : -1)
+                    + " stable=" + stableGeometryPolls);
+        }
         if (shown) {
             Component c = (Component) tbc;
             if (c.getY() == lastToastY && c.getHeight() == lastToastH) {
@@ -127,6 +161,8 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
         }
         if (!shown && waitedMs > 0 && (waitedMs % 3000) == 0) {
             // the show did not take (toast left at height 0) -> re-issue it
+            System.out.println("CN1SS:WARN:test=ToastBarTopPosition probe phase=await-shown RESET"
+                    + " waitedMs=" + waitedMs + " (re-issuing showToast)");
             showToast();
         }
         UITimer.timer(250, false, parent, () -> awaitToastShown(parent, waitedMs + 250));
@@ -158,6 +194,11 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
                 return;
             }
             boolean rendered = containsRenderedToastBar(screen);
+            if (waitedMs > 0 && (waitedMs % 1000) == 0) {
+                System.out.println("CN1SS:WARN:test=ToastBarTopPosition probe phase=await-render"
+                        + " waitedMs=" + waitedMs + " rendered=" + rendered
+                        + " imgW=" + screen.getWidth() + " imgH=" + screen.getHeight());
+            }
             if (rendered || waitedMs >= 12000) {
                 if (!rendered) {
                     System.out.println("CN1SS:WARN:test=ToastBarTopPosition rendered toast not detected at capture bound");
@@ -167,6 +208,8 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
             }
             screen.dispose();
             if (waitedMs > 0 && (waitedMs % 3000) == 0 && !isToastComponentShown(tbc)) {
+                System.out.println("CN1SS:WARN:test=ToastBarTopPosition probe phase=await-render RESET"
+                        + " waitedMs=" + waitedMs + " (toast vanished; re-showing + restarting waits)");
                 showToast();
                 awaitToastShown(parent, 0);
                 return;

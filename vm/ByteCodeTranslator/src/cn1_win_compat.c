@@ -1,4 +1,26 @@
 /*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+/*
  * Win32 implementation of the minimal POSIX surface declared in
  * cn1_win_compat.h. See that header for the rationale. Entirely gated on
  * _WIN32 so this is an empty translation unit on every other platform (it is
@@ -236,6 +258,20 @@ int usleep(unsigned int usec) {
     /* Millisecond granularity is sufficient for the runtime's polling loops. */
     Sleep((DWORD)((usec + 999) / 1000));
     return 0;
+}
+
+long long cn1_monotonic_micros(void) {
+    /* QPC is Win32's monotonic clock. The divide is split so ticks * 1e6
+       cannot overflow 64 bits at multi-GHz tick rates over long uptimes.
+       No cached static for the frequency: QueryPerformanceFrequency is a
+       cheap userspace read of a boot constant, and a lazily-written shared
+       static would be a formal C data race across concurrent sleepers. */
+    LARGE_INTEGER freq;
+    LARGE_INTEGER count;
+    QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&count);
+    return (count.QuadPart / freq.QuadPart) * 1000000LL
+         + ((count.QuadPart % freq.QuadPart) * 1000000LL) / freq.QuadPart;
 }
 
 int gettimeofday(struct timeval* tv, void* tz) {

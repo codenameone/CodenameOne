@@ -5274,7 +5274,11 @@ bindNative(["cn1_java_lang_Thread_currentThread_R_java_lang_Thread", "cn1_java_l
   }
   return jvm.mainThreadObject || null;
 });
-bindNative(["cn1_java_lang_Thread_sleep_long", "cn1_java_lang_Thread_sleep___long"], function*(millis) {
+// sleepImpl is the current native (Thread.sleep(long) became a Java wrapper
+// that adds the negative-millis IllegalArgumentException guard); the plain
+// sleep aliases stay bound for previously-translated bundles.
+bindNative(["cn1_java_lang_Thread_sleepImpl_long", "cn1_java_lang_Thread_sleepImpl___long",
+            "cn1_java_lang_Thread_sleep_long", "cn1_java_lang_Thread_sleep___long"], function*(millis) {
   const resumed = yield { op: "sleep", millis: millis || 0 };
   if (resumed && resumed.interrupted) {
     yield* throwInterruptedException();

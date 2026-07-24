@@ -446,6 +446,16 @@ jobs:
             set -e
             if [ "$gate_rc" -ne 0 ]; then
               echo "[linux-gtk-$arch] FATAL: screenshot gate failed (rc=$gate_rc)"; fail=1
+              # Surface the app's own per-test diagnostics for the failure triage:
+              # a missing screenshot means a test never emitted -- its CN1SS:WARN/ERR
+              # lines (and any test the runner aborted) are the only evidence, and
+              # they live in the app log, not the job log.
+              if [ -f "$raw/app-output.log" ]; then
+                echo "[linux-gtk-$arch] ---- CN1SS diagnostics from app-output.log ----"
+                grep -nE "CN1SS:WARN|CN1SS:ERR|CN1SS:INFO:test=ToastBar|timed out|TIMEOUT|watchdog" "$raw/app-output.log" | tail -80 || true
+                echo "[linux-gtk-$arch] ---- last 40 app log lines ----"
+                tail -40 "$raw/app-output.log" || true
+              fi
             fi
             # A streamed screenshot with no committed golden keeps the baselines out
             # of sync; the central gate treats it as "extra" and ignores it, so fail here.

@@ -2066,13 +2066,78 @@ JAVA_VOID java_lang_Thread_releaseThreadNativeResources___long(CODENAME_ONE_THRE
     }
 }
 
-JAVA_VOID java_lang_Thread_sleep___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG millis) {
+// Monotonic microsecond clock for the sleep deadline. Monotonic on BOTH
+// targets: the MSVC / clang-cl side goes through the QueryPerformanceCounter
+// shim in cn1_win_compat (gettimeofday here would tie the deadline to the
+// wall clock, so a system time step would stretch or cut a sleep-in-progress).
+static JAVA_LONG cn1SleepNowMicros(void) {
+#ifdef _WIN32
+    return (JAVA_LONG)cn1_monotonic_micros();
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (((JAVA_LONG)ts.tv_sec) * 1000000LL) + (JAVA_LONG)(ts.tv_nsec / 1000);
+#endif
+}
+
+// Bound to Thread.sleepImpl: the public Thread.sleep(long) is Java code that
+// throws IllegalArgumentException for negative millis (per the JDK contract)
+// before delegating here, so millis is always >= 0 at this point.
+JAVA_VOID java_lang_Thread_sleepImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG millis) {
+    // Park per the CN1_YIELD_THREAD contract (cn1_globals.h): capture SP +
+    // callee-saved registers FIRST, then publish threadActive=FALSE. Under
+    // CN1_CONSERVATIVE_GC_ROOTS this lets the collector scan the sleeper's
+    // native stack cooperatively; on Windows there is NO signal-stop fallback,
+    // so without the capture a sleeping thread's native-stack roots would go
+    // unscanned for the cycle. No-op when conservative roots are off.
+    CN1_GC_PARK_CAPTURE(threadStateData);
     threadStateData->threadActive = JAVA_FALSE;
-    usleep((JAVA_INT)(millis * 1000));
+    // usleep()/nanosleep() return EINTR when any signal lands, and POSIX never
+    // restarts them (SA_RESTART explicitly excludes them). The conservative-roots
+    // collector SIGNAL-STOPS sleeping threads every cycle to scan their native
+    // stacks (a sleeper has no cooperative park capture), so the old single
+    // usleep() call effectively slept only until the next collection or any other
+    // process signal: Thread.sleep(600000) was measured returning after ~20ms on
+    // the Linux port under allocation churn. java.util.Timer schedules through
+    // Thread.sleep, so every TimerTask fired almost immediately -- observed as
+    // ToastBar's "practically unexpiring" status dismissing itself mid-test
+    // (issue-5425 PR, ToastBarTopPosition CI failure). Sleep on a monotonic
+    // deadline and resume across early wakeups. Chunked below 1s because POSIX
+    // allows usleep() to reject arguments >= 1000000 outright (EINVAL on musl),
+    // which silently turned long sleeps into no-ops on those libcs.
+    // INTERRUPT SEMANTICS UNCHANGED: this VM has never delivered
+    // InterruptedException from sleep (interrupt() only sets the flag), so the
+    // resume loop deliberately does NOT exit early on it -- waking without the
+    // exception would be a third behavior, neither historical nor Java's.
+    // Proper interrupt delivery is a separate change.
+    // Saturate instead of overflowing: Thread.sleep(Long.MAX_VALUE) is a real
+    // "park this thread" idiom, and millis * 1000 would wrap negative and make
+    // it return immediately.
+    JAVA_LONG now = cn1SleepNowMicros();
+    JAVA_LONG maxMicros = 0x7fffffffffffffffLL;
+    JAVA_LONG deltaMicros = (millis > maxMicros / 1000) ? maxMicros : millis * 1000;
+    JAVA_LONG deadline = (deltaMicros > maxMicros - now) ? maxMicros : now + deltaMicros;
+    for(;;) {
+        JAVA_LONG remainMicros = deadline - cn1SleepNowMicros();
+        if(remainMicros <= 0) {
+            break;
+        }
+        if(remainMicros > 500000) {
+            remainMicros = 500000;
+        }
+        // JAVA_INT cast, not useconds_t: the MSVC/clang-cl target's cn1_win_compat
+        // usleep shim has no useconds_t typedef (same reason the old code cast here)
+        usleep((JAVA_INT)remainMicros);
+    }
     while(threadStateData->threadBlockedByGC) {
         usleep(1000);
     }
     threadStateData->threadActive = JAVA_TRUE;
+#ifdef CN1_CONSERVATIVE_GC_ROOTS
+    // Mirror CN1_RESUME_THREAD: drop the capture so a stale SP can never
+    // satisfy the scanner's cooperative path after this frame unwinds.
+    threadStateData->gcParkCaptured = JAVA_FALSE;
+#endif
 }
 
 JAVA_OBJECT java_lang_Thread_currentThread___R_java_lang_Thread(CODENAME_ONE_THREAD_STATE) {

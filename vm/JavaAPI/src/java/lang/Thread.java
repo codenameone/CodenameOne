@@ -247,7 +247,14 @@ public class Thread implements java.lang.Runnable{
     /**
      * Causes the currently executing thread to sleep (temporarily cease execution) for the specified number of milliseconds. The thread does not lose ownership of any monitors.
      */
-    public static native void sleep(long millis) throws java.lang.InterruptedException;
+    public static void sleep(long millis) throws java.lang.InterruptedException {
+        if (millis < 0) {
+            throw new IllegalArgumentException("timeout value is negative");
+        }
+        sleepImpl(millis);
+    }
+
+    private static native void sleepImpl(long millis);
 
     public static void sleep(long millis, int nanos) throws java.lang.InterruptedException {
         if (millis < 0) {
