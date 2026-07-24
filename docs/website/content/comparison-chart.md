@@ -20,6 +20,7 @@ $0/mo
 - Royalty Free
 - iOS Builds
 - Android Builds
+- JavaScript App Generation
 - Windows Phone Builds
 - Blackberry Builds
 
@@ -60,7 +61,6 @@ $3,799 Annually
 $399/mo
 
 - High Priority Builds
-- JavaScript App Generation
 - Versioning (6 months)
 - Continuous Integration
 - Office Hours/Phone Support

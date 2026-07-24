@@ -11,6 +11,8 @@ author: Shai Almog
 
 ![Header Image](/blog/codename-one-3-6-now-live-special-sale/codenameone-3-6.jpg)
 
+> **Update, July 24, 2026:** JavaScript builds are now open source, available on every account tier, and buildable locally without a Codename One account. The original release announcement and promotion below are preserved as published. See the [current announcement](/blog/javascript-free-open-source/).
+
 [Codename One](/), the "industry defining" **Write Once Run Anywhere native mobile app platform for Java developers** has just published version 3.6.  
 We’re thrilled with this release whose key features are offline build support and official support for UWP (Universal Windows Platform). Starting with this release we are changing the scope for Codename One: Instead of trying to be "as good as native" we’d like to aim to be "better than native".
 

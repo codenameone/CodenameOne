@@ -11,6 +11,8 @@ author: Shai Almog
 
 ![Header Image](/blog/questions-of-the-week-39/qanda-friday2.jpg)
 
+> **Update, July 24, 2026:** JavaScript builds are now open source, available on every account tier, and buildable locally without a Codename One account. The original promotion discussion below is preserved as published. See the [current announcement](/blog/javascript-free-open-source/).
+
 We are [ending the enterprise annual promotion](/blog/codename-one-3-6-now-live-special-sale.html) today so if you didn’t sign up for this special deal this is literally your last chance. This is important as the JavaScript build promotion will expire soon so I suggest taking advantage of this!  
 We had a lot of updates and new features this week but we decided in advance to skip the update right after the release and so we’ll push them out only next week.
 

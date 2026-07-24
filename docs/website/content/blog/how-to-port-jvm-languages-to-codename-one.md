@@ -11,6 +11,8 @@ author: Steve Hannah
 
 ![Header Image](/blog/how-to-port-jvm-languages-to-codename-one/kotlin_800x320.png)
 
+> **Update, July 24, 2026:** JavaScript builds are now open source, available on every account tier, and buildable locally without a Codename One account. The original post and archived comments below are preserved as published. See the [current announcement](/blog/javascript-free-open-source/).
+
 As you may have already read, we have just added support for Kotlin in Codename One. In this post, I elaborate on some of the behind the scene work that was involved in bringing Kotlin to Codename One.
 
 ## What is a JVM Language?

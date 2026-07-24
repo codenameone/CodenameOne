@@ -12,6 +12,8 @@ description: Due to popular demand, we are officially providing local build supp
   One account required.
 ---
 
+> **Update, July 24, 2026:** Local JavaScript builds are now supported too. The ParparVM target is open source, available on every account tier, and buildable without a Codename One account. The original post below is preserved as published. See the [current announcement](/blog/javascript-free-open-source/).
+
 Due to popular demand, we are officially providing local build support for iOS, Android and cross-platform JavaSE Desktop apps. No build server or Codename One account required.
 
 The Build Server has been a fundamental building block of Codename One from the very beginning. In the fractured world of mobile development where you need the latest Mac running the Latest Xcode to build for iOS, and the latest Windows running the latest Visual Studio to build for Windows, the build server reduced your system requirements to JDK 8 and an IDE. In general, this was a big win, and it makes mobile app development much more pleasant.

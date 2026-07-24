@@ -6,6 +6,8 @@ slug: "codename-one-3-0-release-notes"
 
 # Codename One 3.0 Release Notes
 
+> **Update, July 24, 2026:** These release notes preserve the plan and implementation details from Codename One 3.0. JavaScript builds are now open source, available on every account tier, and buildable locally with the ParparVM target. See the [current announcement](/blog/javascript-free-open-source/).
+
 1. Home
 2. 3.0 Release Notes
 
