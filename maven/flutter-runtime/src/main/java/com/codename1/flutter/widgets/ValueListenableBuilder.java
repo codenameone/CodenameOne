@@ -3,13 +3,15 @@ package com.codename1.flutter.widgets;
 import com.codename1.flutter.BuildContext;
 import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.Widget;
+import com.codename1.flutter.foundation.ValueListenable;
 
 /**
  * Rebuilds part of the tree whenever a {@code ValueListenable} changes —
  * Flutter's {@code ValueListenableBuilder<T>}. The {@code builder} is a
- * three-argument closure {@code (context, value, child)}; this pass renders the
- * optional pass-through {@code child}, with listenable subscription and rebuild
- * deferred to the state layer. The listenable and builder are held for shape.
+ * three-argument closure {@code (context, value, child)} that produces the
+ * subtree; {@code build} invokes it with the listenable's current value and the
+ * optional pass-through {@code child}. (Re-invoking on value change is deferred
+ * to the state layer; the current-value frame is correct.)
  *
  * @param <T> the value type the listenable exposes
  */
@@ -36,7 +38,14 @@ public class ValueListenableBuilder<T> extends StatelessWidget {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public Widget build(BuildContext context) {
+        if (builder instanceof dart.runtime.Funcs.Func3) {
+            T value = valueListenable instanceof ValueListenable
+                    ? ((ValueListenable<T>) valueListenable).value() : null;
+            return ((dart.runtime.Funcs.Func3<BuildContext, T, Widget, Widget>) builder)
+                    .call(context, value, child);
+        }
         return child;
     }
 }

@@ -23,6 +23,10 @@ public class StatefulElement extends ComposedElement {
     @Override
     protected void firstBuild() {
         state.initState();
+        // Flutter runs didChangeDependencies right after initState and before the first
+        // build; widgets that create controllers there (e.g. a PageController sized from
+        // MediaQuery) rely on it having run before build reads them.
+        state.didChangeDependencies();
         super.firstBuild();
     }
 

@@ -5664,18 +5664,45 @@ public final class JavaEmitter {
     private Out stubCallOut(Ast.MethodDecl m, Call c, String callee, Ctx ctx, TypeRef substReturn) {
         String args = stubMethodArgs(m, c.args, ctx);
         TypeRef rt = m.returnType;
-        if (rt != null && !c.typeArgs.isEmpty() && !isConcreteType(rt)) {
-            // Recover the dropped <T> witness as a trailing T.class token; the
-            // Java runtime method's Class<T> parameter lets javac infer the
-            // return type, so no cast is needed (and a leading cast '(' would
-            // trip statementize into wrapping a void setter call).
-            TypeRef sub = c.typeArgs.get(0);
-            String token = javaType(sub, true, ctx) + ".class";
-            String all = args.isEmpty() ? token : args + ", " + token;
-            return new Out(callee + "(" + all + ")", sub);
+        if (rt != null && !isConcreteType(rt)) {
+            // The stub method returns one of its own type parameters, so the runtime
+            // method takes a trailing Class<T> witness. Recover T from the explicit
+            // <T> at the call site, or — when it was inferred and dropped (the common
+            // `X.of(context) => context.dependOnInheritedWidgetOfExactType()` shape) —
+            // from the enclosing method's return type.
+            TypeRef sub = null;
+            if (!c.typeArgs.isEmpty()) {
+                sub = c.typeArgs.get(0);
+            } else if (INFERRED_WITNESS_METHODS.contains(m.name)
+                    && ctx.methodReturnType != null && isConcreteType(ctx.methodReturnType)
+                    && !ctx.methodReturnType.is("void") && !ctx.methodReturnType.is("dynamic")) {
+                // A BuildContext ancestor lookup (`X.of(context) =>
+                // context.dependOnInheritedWidgetOfExactType()`) whose <T> was inferred
+                // from and dropped by the enclosing return type. Recover it from there.
+                sub = ctx.methodReturnType;
+            }
+            if (sub != null) {
+                // The Java runtime method's Class<T> parameter lets javac infer the
+                // return type, so no cast is needed (and a leading cast '(' would
+                // trip statementize into wrapping a void setter call).
+                String token = javaType(sub, true, ctx) + ".class";
+                String all = args.isEmpty() ? token : args + ", " + token;
+                return new Out(callee + "(" + all + ")", sub);
+            }
         }
         return new Out(callee + "(" + args + ")", substReturn != null ? substReturn : rt);
     }
+
+    /**
+     * BuildContext generic ancestor-lookup methods whose {@code <T>} is routinely inferred
+     * from the enclosing {@code static X? of(context) => ...} return type rather than written
+     * explicitly. For these, when no explicit type argument is present, the witness is recovered
+     * from {@code ctx.methodReturnType}.
+     */
+    private static final java.util.Set<String> INFERRED_WITNESS_METHODS = new java.util.HashSet<String>(
+            java.util.Arrays.asList("dependOnInheritedWidgetOfExactType",
+                    "findAncestorWidgetOfExactType", "findAncestorStateOfType",
+                    "findAncestorRenderObjectOfType", "getInheritedWidgetOfExactType"));
 
     private static final java.util.Set<String> CONCRETE_CORE = new java.util.HashSet<String>(
             java.util.Arrays.asList("int", "double", "bool", "String", "void", "num",
