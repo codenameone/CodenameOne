@@ -762,7 +762,7 @@ public class AndroidGradleBuilder extends Executor {
             maxBuildToolsVersionInt = Math.max(33, maxBuildToolsVersionInt);
             maxBuildToolsVersion = "" + maxBuildToolsVersionInt;
 
-            maxPlatformVersionInt = Math.max(33, maxPlatformVersionInt);
+            maxPlatformVersionInt = Math.max(36, maxPlatformVersionInt);
             maxPlatformVersion = "" + maxPlatformVersionInt;
         }
 
