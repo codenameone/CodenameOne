@@ -36,7 +36,7 @@ package com.codename1.impl.android;
  */
 public class StubUtil {
 
-    static boolean appIsRunning() {
+    public static boolean appIsRunning() {
         if (true) {
             //!return {{Stub}}.isRunning();
         }
@@ -47,7 +47,7 @@ public class StubUtil {
     }
 
 
-    static Class getAppStubClass() {
+    public static Class getAppStubClass() {
         if (true) {
             //!return {{Stub}}.class;
         }

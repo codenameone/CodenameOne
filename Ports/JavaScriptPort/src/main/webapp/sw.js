@@ -22,6 +22,11 @@ function findActionsForCategory(categoryId) {
   
 self.addEventListener('push', function(event) {
   var obj = event.data.json();
+
+  if (isV3Push(obj)) {
+      event.waitUntil(deliverV3Push(obj));
+      return;
+  }
   
   var chain = [];
   if (includesHiddenPush(obj)) {
@@ -78,12 +83,47 @@ self.addEventListener('push', function(event) {
   
 });
 
+function deliverV3Push(obj) {
+    return clients.matchAll({type: 'window', includeUncontrolled: true})
+      .then((windowClients) => {
+          var target = null;
+          for (var i = 0; i < windowClients.length; i++) {
+              if (windowClients[i].focused) {
+                  target = windowClients[i];
+                  break;
+              }
+              if (target === null && urlToOpen.indexOf(windowClients[i].url) >= 0) {
+                  target = windowClients[i];
+              }
+          }
+          var visualInBackground = includesVisualPush(obj)
+                  && (target === null || !target.focused);
+          if (target !== null && !visualInBackground) {
+              target.postMessage({type: 'push', data: obj, visual: false});
+          }
+          if (visualInBackground) {
+              return self.registration.showNotification(getNotificationTitle(obj), buildNotification(obj));
+          }
+      });
+}
+
+function safeV3Destination(data) {
+    if (!isV3Push(data) || !data.deepLink) {
+        return urlToOpen[0];
+    }
+    try {
+        var destination = new URL(data.deepLink, urlToOpen[0]);
+        var serviceWorkerOrigin = new URL(self.location.href).origin;
+        return destination.origin === serviceWorkerOrigin ? destination.href : urlToOpen[0];
+    } catch (error) {
+        return urlToOpen[0];
+    }
+}
+
 self.addEventListener('notificationclick', function(event) {
   const clickedNotification = event.notification;
   clickedNotification.close();
-  
-  // Do something as the result of the notification click
-  //const promiseChain = 
+  var openedWindow = false;
 
   const promiseChain = clients.matchAll({
     type: 'window',
@@ -109,15 +149,18 @@ self.addEventListener('notificationclick', function(event) {
           data.action = event.action;
       }
       pendingPushes.push({type: 'push', data: data, 'visual' : true});
-      return clients.openWindow(urlToOpen[0]);
+      openedWindow = true;
+      return clients.openWindow(safeV3Destination(data));
     }
   }).then((windowClient) => {
-      console.log("Posting push event on click "+event.notification.data);
-      var data = event.notification.data;
-      if (event.action) {
-          data.action = event.action;
+      if (!openedWindow && windowClient) {
+          console.log("Posting push event on click "+event.notification.data);
+          var data = event.notification.data;
+          if (event.action) {
+              data.action = event.action;
+          }
+          windowClient.postMessage({type: 'push', data: data, 'visual' : true});
       }
-      windowClient.postMessage({type: 'push', data: data, 'visual' : true});
   });
 
   
@@ -131,7 +174,7 @@ self.addEventListener('message', function(event){
         return;
     }
     if (pendingPushes.length > 0) {
-        var tmp = pendingPushes.slice();
+        var tmp = pendingPushes.splice(0, pendingPushes.length);
         const promiseChain = clients.matchAll({
             type: 'window',
             includeUncontrolled: true
@@ -171,6 +214,23 @@ function fireNotification(obj, event) {
 
 function buildNotification(data) {
     var n = {};
+    if (isV3Push(data)) {
+        n.body = data.body || '';
+        if (data.image) {
+            n.image = data.image;
+        }
+        n.data = data;
+        n.icon = data.icon || "icon.png";
+        n.badge = data.badge || "icon.png";
+        if (data.platform && data.platform.web) {
+            var web = data.platform.web;
+            if (web.icon) n.icon = web.icon;
+            if (web.badge) n.badge = web.badge;
+            if (web.actions) n.actions = web.actions;
+            if (web.requireInteraction !== undefined) n.requireInteraction = web.requireInteraction;
+        }
+        return n;
+    }
     if (data.alertBody !== undefined && data.alertTitle !== undefined) {
         n.body = data.alertBody;
     }
@@ -201,6 +261,9 @@ function buildNotification(data) {
 
 
 function getNotificationTitle(data) {
+    if (isV3Push(data)) {
+        return data.title || data.body || '';
+    }
     if (data.alertTitle) {
         return data.alertTitle;
     }
@@ -208,6 +271,9 @@ function getNotificationTitle(data) {
 }
 
 function includesHiddenPush(data) {
+    if (isV3Push(data)) {
+        return true;
+    }
     
     switch (data.messageType) {
         case 2:
@@ -221,6 +287,9 @@ function includesHiddenPush(data) {
 }
 
 function includesVisualPush(data) {
+    if (isV3Push(data)) {
+        return data.silent !== true && !!(data.title || data.body || data.image);
+    }
     switch (data.messageType) {
         case 0:
         case 1:
@@ -232,6 +301,10 @@ function includesVisualPush(data) {
             return true;
     }
     return false;
+}
+
+function isV3Push(data) {
+    return data && Number(data.schema) >= 3;
 }
 
 // When the user clicks a notification focus the window if it exists or open

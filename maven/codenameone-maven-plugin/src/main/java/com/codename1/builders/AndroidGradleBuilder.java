@@ -1118,6 +1118,7 @@ public class AndroidGradleBuilder extends Executor {
         File googleServicesJson = new File(appDir, "google-services.json");
 
         googleServicesJson = new File(libsDir.getParentFile(), "google-services.json");
+        File agconnectServicesJson = new File(libsDir.getParentFile(), "agconnect-services.json");
         if (!useJava8SourceLevel) {
             log("Running retrolambda on classes to support Java 6 source level.  Use the android.java8=true build hint to use Java 8 source level directly on Android, and avoid this step.");
             try {
@@ -1817,6 +1818,8 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         boolean useFCM = pushPermission && "fcm".equalsIgnoreCase(request.getArg("android.messagingService", "fcm"));
+        boolean useHMS = pushPermission && ("hms".equalsIgnoreCase(request.getArg("android.messagingService", "fcm"))
+                || "huawei".equalsIgnoreCase(request.getArg("android.messagingService", "fcm")));
         if (useFCM) {
             request.putArgument("android.fcm.minPlayServicesVersion", "12.0.1");
         }
@@ -1884,6 +1887,47 @@ public class AndroidGradleBuilder extends Executor {
                                 request.getArg("android.firebaseMessagingVersion", playServicesVersion) + "\"\n"
                 );
             }
+        }
+        if (useHMS) {
+            if (!agconnectServicesJson.exists()) {
+                error("agconnect-services.json not found. Huawei Push Kit builds require the AppGallery Connect configuration in native/android.", new RuntimeException());
+                return false;
+            }
+            if (!request.getArg("android.repositories", "").contains("developer.huawei.com/repo")) {
+                request.putArgument("android.repositories", request.getArg("android.repositories", "")
+                        + ";maven { url 'https://developer.huawei.com/repo/' }");
+            }
+            if (!request.getArg("android.topDependency", "").contains("com.huawei.agconnect:agcp")) {
+                request.putArgument("android.topDependency", request.getArg("android.topDependency", "")
+                        + "\n    classpath 'com.huawei.agconnect:agcp:1.6.0.300'\n");
+            }
+            if (!request.getArg("android.xgradle", "").contains("com.huawei.agconnect")) {
+                request.putArgument("android.xgradle", request.getArg("android.xgradle", "")
+                        + "\napply plugin: 'com.huawei.agconnect'\n");
+            }
+            if (!request.getArg("gradleDependencies", "").contains("com.huawei.hms:push")) {
+                request.putArgument("gradleDependencies", request.getArg("gradleDependencies", "")
+                        + "\n" + compile + " 'com.huawei.hms:push:"
+                        + request.getArg("android.hms.pushVersion", "6.3.0.302") + "'\n");
+            }
+            additionalMembers += "\n    @Override public void registerForPush(String ignored) {\n"
+                    + "        final android.app.Activity activity = this;\n"
+                    + "        new Thread(new Runnable() { public void run() { try {\n"
+                    + "            // Push Kit derives the app id from native/android/agconnect-services.json.\n"
+                    + "            String appId = com.huawei.agconnect.config.AGConnectServicesConfig.fromContext(activity).getString(\"client/app_id\");\n"
+                    + "            final String token = com.huawei.hms.aaid.HmsInstanceId.getInstance(activity).getToken(appId, \"HCM\");\n"
+                    + "            if (token != null && token.length() > 0) { com.codename1.io.Preferences.set(\"push_key\", \"cn1-hms-\" + token);\n"
+                    + "                final com.codename1.push.PushCallback cb = com.codename1.impl.CodenameOneImplementation.getPushCallback();\n"
+                    + "                if (cb != null) com.codename1.ui.Display.getInstance().callSerially(new Runnable(){ public void run(){ cb.registeredForPush(\"cn1-hms-\" + token); }}); }\n"
+                    + "        } catch (final Exception ex) { final com.codename1.push.PushCallback cb = com.codename1.impl.CodenameOneImplementation.getPushCallback();\n"
+                    + "            if (cb != null) com.codename1.ui.Display.getInstance().callSerially(new Runnable(){ public void run(){ cb.pushRegistrationError(ex.getMessage(), 0); }}); } }}).start();\n"
+                    + "    }\n"
+                    + "    @Override public void stopReceivingPush() {\n"
+                    + "        final android.app.Activity activity = this; new Thread(new Runnable(){ public void run(){ try {\n"
+                    + "            String appId = com.huawei.agconnect.config.AGConnectServicesConfig.fromContext(activity).getString(\"client/app_id\");\n"
+                    + "            com.huawei.hms.aaid.HmsInstanceId.getInstance(activity).deleteToken(appId, \"HCM\");\n"
+                    + "        } catch (Exception ex) { ex.printStackTrace(); } }}).start();\n"
+                    + "    }\n";
         }
 
         // Firebase Analytics (com.codename1.analytics.FirebaseAnalyticsProvider
@@ -2866,6 +2910,9 @@ public class AndroidGradleBuilder extends Executor {
                     .append(nativeThemeHint).append("\");\n");
         }
         String nativeThemeStubProps = nativeThemeProps.toString();
+        if (useHMS) {
+            nativeThemeStubProps += "        Display.getInstance().setProperty(\"cn1.push.transport\", \"huawei\");\n";
+        }
 
         String gcmSenderId = request.getArg("gcm.sender_id", null);
         if (gcmSenderId != null) {
@@ -3134,7 +3181,7 @@ public class AndroidGradleBuilder extends Executor {
                         "    <uses-permission android:name=\"android.permission.ACCESS_MOCK_LOCATION\"  android:required=\"false\" />\n");
             }
         }
-        if (pushPermission && !useFCM) {
+        if (pushPermission && !useFCM && !useHMS) {
             permissions += "<permission android:name=\"" + request.getPackageName() + ".permission.C2D_MESSAGE\" android:protectionLevel=\"signature\" />\n"
                     + "    <uses-permission android:name=\"" + request.getPackageName() + ".permission.C2D_MESSAGE\" />\n"
                     + "    <uses-permission android:name=\"com.google.android.c2dm.permission.RECEIVE\" />\n";
@@ -3387,6 +3434,10 @@ public class AndroidGradleBuilder extends Executor {
                     "              <action android:name=\"com.google.firebase.MESSAGING_EVENT\" />\n" +
                     "          </intent-filter>\n" +
                     "      </service>\n";
+        } else if (useHMS) {
+            pushManifestEntries = "<service android:name=\".CN1HuaweiMessagingService\" android:exported=\"false\">\n"
+                    + "  <intent-filter><action android:name=\"com.huawei.push.action.MESSAGING_EVENT\" /></intent-filter>\n"
+                    + "</service>\n<meta-data android:name=\"push_kit_auto_init_enabled\" android:value=\"true\" />\n";
         }
 
         String launchMode = request.getArg("android.activity.launchMode", "singleTop");
@@ -4027,8 +4078,8 @@ public class AndroidGradleBuilder extends Executor {
                         "                        @Override\n" +
                         "                        public void onComplete(com.google.android.gms.tasks.Task<String> task) {\n" +
                         "                            if (!task.isSuccessful()) {\n" +
-                        "                                if (i instanceof PushCallback) {\n" +
-                        "                                    ((PushCallback)i).pushRegistrationError(\"Failed to register push: \"+task.getException().getMessage(), 0);\n" +
+                        "                                if (com.codename1.impl.CodenameOneImplementation.getPushCallback() != null) {\n" +
+                        "                                    com.codename1.impl.CodenameOneImplementation.getPushCallback().pushRegistrationError(\"Failed to register push: \"+task.getException().getMessage(), 0);\n" +
                         "                                }\n" +
                         "                                return;\n" +
                         "                            }\n" +
@@ -4036,13 +4087,13 @@ public class AndroidGradleBuilder extends Executor {
                         "                            String token = task.getResult();\n" +
                         "                            try {\n" +
                         "                                com.codename1.io.Preferences.set(\"push_key\", \"cn1-fcm-\"+token);\n" +
-                        "                                if (i instanceof PushCallback) {\n" +
-                        "                                    ((PushCallback)i).registeredForPush(\"cn1-fcm-\"+token);\n" +
+                        "                                if (com.codename1.impl.CodenameOneImplementation.getPushCallback() != null) {\n" +
+                        "                                    com.codename1.impl.CodenameOneImplementation.getPushCallback().registeredForPush(\"cn1-fcm-\"+token);\n" +
                         "                                }\n" +
                         "\n" +
                         "                            } catch (Exception ex) {\n" +
-                        "                                if (i instanceof PushCallback) {\n" +
-                        "                                    ((PushCallback)i).pushRegistrationError(\"Failed to register push: \"+ex.getMessage(), 0);\n" +
+                        "                                if (com.codename1.impl.CodenameOneImplementation.getPushCallback() != null) {\n" +
+                        "                                    com.codename1.impl.CodenameOneImplementation.getPushCallback().pushRegistrationError(\"Failed to register push: \"+ex.getMessage(), 0);\n" +
                         "                                }\n" +
                         "                                System.out.println(\"Failed to get fcm token.\");\n" +
                         "                                ex.printStackTrace();\n" +
@@ -4055,8 +4106,8 @@ public class AndroidGradleBuilder extends Executor {
                         "                String token = com.google.firebase.iid.FirebaseInstanceId.getInstance().getToken();\n" +
                         "                if (token != null) {\n" +
                         "                    com.codename1.io.Preferences.set(\"push_key\", \"cn1-fcm-\"+token);\n" +
-                        "                    if (i instanceof PushCallback) {\n" +
-                        "                        ((PushCallback)i).registeredForPush(\"cn1-fcm-\"+token);\n" +
+                        "                    if (com.codename1.impl.CodenameOneImplementation.getPushCallback() != null) {\n" +
+                        "                        com.codename1.impl.CodenameOneImplementation.getPushCallback().registeredForPush(\"cn1-fcm-\"+token);\n" +
                         "                    }\n" +
                         "                } else {\n" +
                         "                    java.util.Timer timer = new java.util.Timer();\n" +
@@ -4067,8 +4118,8 @@ public class AndroidGradleBuilder extends Executor {
                         "                                    String token = com.google.firebase.iid.FirebaseInstanceId.getInstance().getToken();\n" +
                         "                                    if (token != null) {\n" +
                         "                                        com.codename1.io.Preferences.set(\"push_key\", \"cn1-fcm-\" + token);\n" +
-                        "                                        if (i instanceof PushCallback) {\n" +
-                        "                                            ((PushCallback) i).registeredForPush(\"cn1-fcm-\" + token);\n" +
+                        "                                        if (com.codename1.impl.CodenameOneImplementation.getPushCallback() != null) {\n" +
+                        "                                            com.codename1.impl.CodenameOneImplementation.getPushCallback().registeredForPush(\"cn1-fcm-\" + token);\n" +
                         "                                        }\n" +
                         "                                    }\n" +
                         "                                }\n" +
@@ -4077,8 +4128,8 @@ public class AndroidGradleBuilder extends Executor {
                         "                    }, 2000);\n" +
                         "                }\n" +
                         "            } catch (Exception ex) {\n" +
-                        "                if (i instanceof PushCallback) {\n" +
-                        "                    ((PushCallback)i).pushRegistrationError(\"Failed to register push: \"+ex.getMessage(), 0);\n" +
+                        "                if (com.codename1.impl.CodenameOneImplementation.getPushCallback() != null) {\n" +
+                        "                    com.codename1.impl.CodenameOneImplementation.getPushCallback().pushRegistrationError(\"Failed to register push: \"+ex.getMessage(), 0);\n" +
                         "                }\n" +
                         "                System.out.println(\"Failed to get fcm token.\");\n" +
                         "                ex.printStackTrace();\n" +
@@ -4088,8 +4139,8 @@ public class AndroidGradleBuilder extends Executor {
         try {
             stubSourceCode +=
                     "        }\n"
-                            + "        if(i instanceof PushCallback) {\n"
-                            + "            AndroidImplementation.firePendingPushes((PushCallback)i, this);\n"
+                            + "        if(com.codename1.impl.CodenameOneImplementation.getPushCallback() != null) {\n"
+                            + "            AndroidImplementation.firePendingPushes(com.codename1.impl.CodenameOneImplementation.getPushCallback(), this);\n"
                             + "        }\n"
                             + localNotificationCode
                             + "        Display.getInstance().callSerially(new Runnable(){\n"
@@ -4159,8 +4210,29 @@ public class AndroidGradleBuilder extends Executor {
                 throw new BuildException("Failed to update stub Util file", ex);
             }
         }
+        if (useHMS) {
+            File huaweiService = new File(stubFileSourceDir, "CN1HuaweiMessagingService.java");
+            String huaweiSource = "package " + request.getPackageName() + ";\n\n"
+                    + "public class CN1HuaweiMessagingService extends com.huawei.hms.push.HmsMessageService {\n"
+                    + "  @Override public void onNewToken(final String token) { super.onNewToken(token);\n"
+                    + "    com.codename1.io.Preferences.set(\"push_key\", \"cn1-hms-\" + token);\n"
+                    + "    final com.codename1.push.PushCallback cb = com.codename1.impl.CodenameOneImplementation.getPushCallback();\n"
+                    + "    if (cb != null) com.codename1.ui.Display.getInstance().callSerially(new Runnable(){ public void run(){ cb.registeredForPush(\"cn1-hms-\" + token); }});\n"
+                    + "  }\n"
+                    + "  @Override public void onMessageReceived(com.huawei.hms.push.RemoteMessage message) {\n"
+                    + "    String data = message.getData();\n"
+                    + "    if (data != null && data.length() > 0) com.codename1.impl.android.AndroidImplementation.handleV3Push(\n"
+                    + "        data, this, com.codename1.impl.android.StubUtil.appIsRunning(), com.codename1.impl.android.StubUtil.getAppStubClass());\n"
+                    + "  }\n"
+                    + "}\n";
+            try (FileOutputStream out = new FileOutputStream(huaweiService)) {
+                out.write(huaweiSource.getBytes(StandardCharsets.UTF_8));
+            } catch (IOException ex) {
+                throw new BuildException("Failed to generate Huawei Push Kit service", ex);
+            }
+        }
         boolean backgroundPushHandling = "true".equals(request.getArg("android.background_push_handling", "false"));
-        if (!useFCM) {
+        if (!useFCM && !useHMS) {
             File pushServiceFileSourceFile = new File(stubFileSourceDir, "PushNotificationService.java");
 
             String pushServiceOnCreate = "";
@@ -4201,10 +4273,11 @@ public class AndroidGradleBuilder extends Executor {
                     + "         if(" + handlePushImmediatelyCheck + ") {\n"
                     + "             " + request.getMainClass() + "Stub stub = " + request.getMainClass() + "Stub.getInstance();\n"
                     + "             final " + request.getMainClass() + " main = stub.getAppInstance();\n"
-                    + "             if(main instanceof PushCallback) {\n"
-                    + "                 return (PushCallback)main;\n"
-                    + "             }\n"
-                    + "         }\n"
+                            + "             if(main instanceof PushCallback) {\n"
+                            + "                 return (PushCallback)main;\n"
+                            + "             }\n"
+                            + "             return com.codename1.impl.CodenameOneImplementation.getPushCallback();\n"
+                            + "         }\n"
                     + "         return null;\n"
                     + "    }\n\n"
                     + "    public Class getStubClass() {\n"

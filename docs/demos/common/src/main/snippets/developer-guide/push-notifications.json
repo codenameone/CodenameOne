@@ -1,0 +1,64 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::push-notifications-json-001[]
+{
+  "schema": 3,
+  "title": "Order shipped",
+  "body": "Order 4815 is on its way",
+  "deepLink": "myapp://orders/4815",
+  "collapseKey": "order-4815",
+  "ttl": 3600,
+  "data": { "orderId": "4815" },
+  "platform": {
+    "apns": { "badge": 3, "sound": "default", "interruptionLevel": "time-sensitive" },
+    "fcm": { "channelId": "orders", "priority": "high" },
+    "huawei": { "channelId": "orders", "importance": "HIGH" },
+    "wns": { "type": "toast" },
+    "web": { "urgency": "high" }
+  }
+}
+// end::push-notifications-json-001[]
+
+// tag::push-notifications-json-002[]
+{
+  "enabled": true,
+  "trigger": {"event": "order.ready"},
+  "delaySeconds": 0,
+  "message": {
+    "schema": 3,
+    "title": "Order update",
+    "body": "Order ${event.orderId} is ready"
+  }
+}
+// end::push-notifications-json-002[]
+
+// tag::push-notifications-json-003[]
+{
+  "name": "order.ready",
+  "externalUserId": "customer-4815",
+  "properties": {"orderId": "4815"}
+}
+// end::push-notifications-json-003[]
+
+// tag::push-notifications-json-004[]
+{
+  "schema": 3,
+  "silent": true,
+  "surface": {
+    "operation": "widget",
+    "kind": "order-status",
+    "timeline": "{...serialized widget timeline...}"
+  }
+}
+// end::push-notifications-json-004[]
+
+// tag::push-notifications-json-005[]
+{
+  "externalUserId": "customer-4815",
+  "tags": {
+    "plan": "pro",
+    "region": "emea",
+    "testUser": "false"
+  }
+}
+// end::push-notifications-json-005[]

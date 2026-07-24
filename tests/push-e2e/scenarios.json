@@ -1,0 +1,32 @@
+[
+  {
+    "id": "foreground-visible",
+    "message": {"schema": 3, "title": "Foreground", "body": "Visible message"},
+    "requiredEvents": ["native_received", "listener_received"]
+  },
+  {
+    "id": "cold-start-deep-link",
+    "message": {"schema": 3, "title": "Cold start", "body": "Open fixture", "deepLink": "cn1push://fixture/cold"},
+    "requiredEvents": ["native_received", "listener_received", "opened"]
+  },
+  {
+    "id": "silent-data",
+    "message": {"schema": 3, "silent": true, "data": {"fixture": "silent"}},
+    "requiredEvents": ["native_received", "listener_received"]
+  },
+  {
+    "id": "collapse-and-ttl",
+    "message": {"schema": 3, "title": "Collapsed", "body": "Latest value", "collapseKey": "fixture-collapse", "ttl": 60},
+    "requiredEvents": ["native_received", "listener_received"]
+  },
+  {
+    "id": "widget-update",
+    "message": {"schema": 3, "silent": true, "surface": {"operation": "widget", "kind": "push-fixture", "timeline": "{\"revision\":7}"}},
+    "requiredEvents": ["native_received", "surface_applied", "listener_received"]
+  },
+  {
+    "id": "unicode-and-size-boundary",
+    "message": {"schema": 3, "title": "مرحبا 👋", "body": "Zażółć gęślą jaźń — こんにちは", "data": {"fixture": "unicode"}},
+    "requiredEvents": ["native_received", "listener_received"]
+  }
+]

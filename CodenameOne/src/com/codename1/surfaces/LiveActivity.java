@@ -83,6 +83,24 @@ public final class LiveActivity {
         return new LiveActivity(b.startLiveActivity(json, images));
     }
 
+    /// Push-framework entry point that updates an already-running native activity by id.
+    public static void updateRemote(String id, String stateJson) {
+        SurfaceBridge b = Surfaces.bridgeInternal();
+        if (b != null && id != null && stateJson != null) {
+            b.updateLiveActivity(id, stateJson);
+        }
+    }
+
+    /// Push-framework entry point that ends an already-running native activity by id.
+    /// `finalStateJson` may be null to keep the last published state, matching the
+    /// `SurfaceBridge` contract.
+    public static void endRemote(String id, String finalStateJson, boolean dismissImmediately) {
+        SurfaceBridge b = Surfaces.bridgeInternal();
+        if (b != null && id != null) {
+            b.endLiveActivity(id, finalStateJson, dismissImmediately);
+        }
+    }
+
     /// Pushes a fresh state map to the running activity. A no-op on an inert or ended handle.
     ///
     /// #### Parameters

@@ -100,6 +100,9 @@ jobs:
           cd maven
           mvn clean "$MVN_GOAL" -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true -Plocal-dev-javase $MVN_ARGS
           cd ..
+      - name: Run push service-worker contract
+        if: ${{ matrix.java-version == 8 }}
+        run: node tests/push-e2e/service-worker-contract.mjs
       - name: Build CSS compiler and smoke native-themes
         if: ${{ matrix.java-version == 8 }}
         run: |
