@@ -63,6 +63,11 @@ public class TimerLatency {
             final long scheduled = System.currentTimeMillis();
             final long delay = 100 + (i % 5) * 100;
             final int slot = i;
+            // One Timer per task is intentional, not an oversight: ParparVM's
+            // java.util.Timer spawns a dedicated thread per schedule() call
+            // anyway (see JavaAPI Timer.T), so a shared Timer would not reduce
+            // thread count -- and per-thread Thread.sleep is exactly the code
+            // path under test.
             new java.util.Timer().schedule(new java.util.TimerTask() {
                 public void run() {
                     long d = System.currentTimeMillis() - scheduled - delay;
