@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import port_status
 
@@ -130,6 +131,40 @@ class PortStatusTest(unittest.TestCase):
             "summary": {"pass": 10, "fail": 0, "skip": 1, "not-run": 0},
         }
         self.assertEqual([], port_status.strict_report_errors(report))
+
+    def test_strict_report_errors_rejects_malformed_summary_counts(self):
+        report = {
+            "suite_finished": True,
+            "summary": {"fail": None, "not-run": 0},
+        }
+        with self.assertRaisesRegex(
+            port_status.ContractError,
+            "Expected report summary 'fail' to be a non-negative integer",
+        ):
+            port_status.strict_report_errors(report)
+
+    def test_cli_strict_gate_writes_report_before_returning_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_path = Path(tmp) / "report.json"
+            argv = [
+                "port_status.py",
+                "normalize",
+                "--port",
+                "android",
+                "--output",
+                str(output_path),
+                "--generated-at",
+                "2026-07-24T00:00:00Z",
+                "--fail-on-test-failure",
+            ]
+            with patch.object(port_status.sys, "argv", argv):
+                exit_code = port_status.main()
+
+            self.assertEqual(port_status.STRICT_GATE_FAILED, exit_code)
+            self.assertTrue(output_path.is_file())
+            report = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertFalse(report["suite_finished"])
+            self.assertGreater(report["summary"]["not-run"], 0)
 
 
 if __name__ == "__main__":

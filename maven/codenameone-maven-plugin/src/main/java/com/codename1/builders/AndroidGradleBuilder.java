@@ -83,11 +83,17 @@ import org.xeustechnologies.jtar.TarOutputStream;
  */
 public class AndroidGradleBuilder extends Executor {
 
+    private static final String GRADLE_8_VERSION = "8.13";
+    private static final String ANDROID_GRADLE_PLUGIN_8_VERSION = "8.13.2";
+    private static final String DESUGAR_JDK_LIBS_VERSION = "2.1.5";
+    private static final String GRADLE_8_DISTRIBUTION_URL =
+            "https://services.gradle.org/distributions/gradle-" + GRADLE_8_VERSION + "-bin.zip";
+
     private String minimumGradleVersion = "6";
 
     private String gradleDistributionUrl = "https://services.gradle.org/distributions/gradle-6.8.3-bin.zip";
 
-    private String gradle8DistributionUrl = "https://services.gradle.org/distributions/gradle-8.13-bin.zip";
+    private String gradle8DistributionUrl = GRADLE_8_DISTRIBUTION_URL;
     public boolean PREFER_MANAGED_GRADLE=true;
 
     private boolean rootCheck = false;
@@ -607,7 +613,7 @@ public class AndroidGradleBuilder extends Executor {
         }
         if (useGradle8) {
             getGradleJavaHome(); // will throw build exception if JAVA17_HOME is not set
-            minimumGradleVersion = "8.13";
+            minimumGradleVersion = GRADLE_8_VERSION;
             gradleDistributionUrl = gradle8DistributionUrl;
             if (!useJava8SourceLevel) {
                 log("NOTICE: Enabling Java 8 source level for Gradle 8 build because RetroLambda is not supported on Java 17, which is required for gradle 8.");
@@ -4872,7 +4878,8 @@ public class AndroidGradleBuilder extends Executor {
             }else if (gradleVersionInt < 8) {
                 gradleDependency = "classpath 'com.android.tools.build:gradle:4.1.1'\n";
             } else {
-                gradleDependency = "classpath 'com.android.tools.build:gradle:8.13.2'\n";
+                gradleDependency = "classpath 'com.android.tools.build:gradle:" +
+                        ANDROID_GRADLE_PLUGIN_8_VERSION + "'\n";
             }
         }
         boolean hasKotlinSources = hasSourceFileWithExtension(new File(projectDir, "src/main/java"), ".kt");
@@ -4921,7 +4928,8 @@ public class AndroidGradleBuilder extends Executor {
                 && !additionalDependencies.contains("com.android.tools:desugar_jdk_libs")
                 && !request.getArg("android.gradleDep", "").contains("com.android.tools:desugar_jdk_libs")) {
             coreLibraryDesugaringDependency =
-                    "    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'\n";
+                    "    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:" +
+                            DESUGAR_JDK_LIBS_VERSION + "'\n";
         }
 
         String mavenCentral = "";

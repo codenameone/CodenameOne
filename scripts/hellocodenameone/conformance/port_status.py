@@ -24,6 +24,7 @@ RUNNER = REPO_ROOT / (
     "examples/hellocodenameone/tests/Cn1ssDeviceRunner.java"
 )
 COMMON_SOURCES = REPO_ROOT / "scripts/hellocodenameone/common/src/main"
+STRICT_GATE_FAILED = 10
 
 START_RE = re.compile(r"suite starting test=([A-Za-z0-9_]+)")
 FINISH_RE = re.compile(r"suite finished test=([A-Za-z0-9_]+)")
@@ -526,8 +527,20 @@ def strict_report_errors(report: dict) -> list[str]:
     if not report.get("suite_finished"):
         errors.append("suite did not emit its completion marker")
     summary = report.get("summary", {})
-    failed = int(summary.get("fail", 0))
-    not_run = int(summary.get("not-run", 0))
+    if not isinstance(summary, dict):
+        raise ContractError("Expected report summary to be an object")
+
+    counts: dict[str, int] = {}
+    for key in ("fail", "not-run"):
+        value = summary.get(key, 0)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ContractError(
+                f"Expected report summary {key!r} to be a non-negative integer"
+            )
+        counts[key] = value
+
+    failed = counts["fail"]
+    not_run = counts["not-run"]
     if failed:
         errors.append(f"{failed} test(s) failed")
     if not_run:
@@ -597,7 +610,7 @@ def main() -> int:
                     "port-status strict gate: " + "; ".join(strict_errors),
                     file=sys.stderr,
                 )
-                return 2
+                return STRICT_GATE_FAILED
         return 0
     except ContractError as exc:
         print(f"port-status: {exc}", file=sys.stderr)
