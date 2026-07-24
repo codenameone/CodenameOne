@@ -2066,9 +2066,51 @@ JAVA_VOID java_lang_Thread_releaseThreadNativeResources___long(CODENAME_ONE_THRE
     }
 }
 
+// Monotonic microsecond clock for the sleep deadline (wall clock on the MSVC /
+// clang-cl target, which lacks clock_gettime -- same fallback as nanoTime above).
+static JAVA_LONG cn1SleepNowMicros(void) {
+#ifdef _WIN32
+    struct timeval time;
+    gettimeofday(&time, NULL);
+    return (((JAVA_LONG)time.tv_sec) * 1000000LL) + (JAVA_LONG)time.tv_usec;
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (((JAVA_LONG)ts.tv_sec) * 1000000LL) + (JAVA_LONG)(ts.tv_nsec / 1000);
+#endif
+}
+
 JAVA_VOID java_lang_Thread_sleep___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG millis) {
     threadStateData->threadActive = JAVA_FALSE;
-    usleep((JAVA_INT)(millis * 1000));
+    // usleep()/nanosleep() return EINTR when any signal lands, and POSIX never
+    // restarts them (SA_RESTART explicitly excludes them). The conservative-roots
+    // collector SIGNAL-STOPS sleeping threads every cycle to scan their native
+    // stacks (a sleeper has no cooperative park capture), so the old single
+    // usleep() call effectively slept only until the next collection or any other
+    // process signal: Thread.sleep(600000) was measured returning after ~20ms on
+    // the Linux port under allocation churn. java.util.Timer schedules through
+    // Thread.sleep, so every TimerTask fired almost immediately -- observed as
+    // ToastBar's "practically unexpiring" status dismissing itself mid-test
+    // (issue-5425 PR, ToastBarTopPosition CI failure). Sleep on a monotonic
+    // deadline and resume across early wakeups. Chunked below 1s because POSIX
+    // allows usleep() to reject arguments >= 1000000 outright (EINVAL on musl),
+    // which silently turned long sleeps into no-ops on those libcs. Honors the
+    // interrupt flag so interrupt() now actually shortens a sleep instead of
+    // relying on an accidental EINTR.
+    JAVA_LONG deadline = cn1SleepNowMicros() + millis * 1000;
+    for(;;) {
+        if(threadStateData->interrupted) {
+            break;
+        }
+        JAVA_LONG remainMicros = deadline - cn1SleepNowMicros();
+        if(remainMicros <= 0) {
+            break;
+        }
+        if(remainMicros > 500000) {
+            remainMicros = 500000;
+        }
+        usleep((useconds_t)remainMicros);
+    }
     while(threadStateData->threadBlockedByGC) {
         usleep(1000);
     }
