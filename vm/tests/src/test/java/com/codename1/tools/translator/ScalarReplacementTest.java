@@ -163,10 +163,10 @@ class ScalarReplacementTest {
     /** The text of the first generated C function whose name contains {@code marker}. */
     private String cFunctionBody(String code, String marker) {
         int nameAt = code.indexOf(marker);
-        assertTrue(nameAt > 0, "generated code has no function matching " + marker + ":\n" + code);
+        assertTrue(nameAt >= 0, "generated code has no function matching " + marker + ":\n" + code);
         int start = code.indexOf('{', nameAt);
-        int end = code.indexOf("\n}", start);
-        assertTrue(start > 0 && end > start, "could not delimit the body of " + marker);
+        int end = code.indexOf("\n}", start + 1);
+        assertTrue(start >= 0 && end > start, "could not delimit the body of " + marker);
         return code.substring(start, end);
     }
 

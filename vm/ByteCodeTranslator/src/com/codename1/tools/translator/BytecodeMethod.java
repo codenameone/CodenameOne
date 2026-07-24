@@ -1292,13 +1292,20 @@ public class BytecodeMethod implements SignatureSet {
     // looks this up at emit time -- decoupling the analysis (raw, deterministic) from
     // the cross-class emission order. null == not an inlinable ctor.
     private com.codename1.tools.translator.bytecodes.InlinableConstructor inlinableCtorPlan;
-    private boolean inlinableCtorComputed;
+    private boolean rawPlansComputed;
 
-    public void computeInlinableConstructorPlan() {
-        if (inlinableCtorComputed) {
+    /**
+     * Snapshots every analysis whose answer must be read off the RAW instruction
+     * list. Called from Parser.MethodVisitorWrapper.visitEnd, before any
+     * optimize() folds opcodes into custom instructions -- so that a pass running
+     * over one class cannot get a different answer about another class depending
+     * on which of the two was optimized first.
+     */
+    public void computeRawMethodPlans() {
+        if (rawPlansComputed) {
             return;
         }
-        inlinableCtorComputed = true;
+        rawPlansComputed = true;
         if (constructor) {
             inlinableCtorPlan = com.codename1.tools.translator.bytecodes.InlinableConstructor.analyzeRaw(this, desc);
             // FUSED OBJECTS: snapshot the fused-construction plan from the same RAW
@@ -3600,8 +3607,8 @@ public class BytecodeMethod implements SignatureSet {
      *
      * The instruction-shape half runs at PARSE time (see
      * {@link #analyzeScalarConstructorRaw()}) because optimize() folds the
-     * ALOAD/xLOAD/PUTFIELD groups into opaque CustomIntructions -- reading the
-     * ctor's live list here would make the answer depend on whether X had
+     * ALOAD/xLOAD/PUTFIELD groups into opaque custom instructions -- reading
+     * the ctor's live list here would make the answer depend on whether X had
      * already been optimized, i.e. on class processing order. Only the
      * class-level bijection check, which needs the resolved field list, is
      * left for here.
@@ -3639,7 +3646,7 @@ public class BytecodeMethod implements SignatureSet {
     }
 
     // Shape half of srAnalyzeCtor, snapshotted from the RAW instruction list at
-    // parse time (called from computeInlinableConstructorPlan, exactly like the
+    // parse time (called from computeRawMethodPlans, exactly like the
     // InlinableConstructor / FusedConstructor plans next to it).
     private String[] srCtorMembers;
     private char[] srCtorQuals;
@@ -3809,7 +3816,7 @@ public class BytecodeMethod implements SignatureSet {
      *
      *  The shape itself is recognized at parse time ({@link #analyzeTrivialGetterRaw()}): by the
      *  time this call site is optimized the getter's own list may already have been folded into
-     *  CustomIntructions, and matching against that would make the decision depend on class
+     *  custom instructions, and matching against that would make the decision depend on class
      *  processing order. */
     private Field srTrivialGetterField(Invoke inv, ByteCodeClass x) {
         int op = inv.getOpcode();
