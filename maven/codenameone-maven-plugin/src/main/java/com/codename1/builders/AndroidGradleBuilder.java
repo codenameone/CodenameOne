@@ -760,7 +760,7 @@ public class AndroidGradleBuilder extends Executor {
 
         if (useGradle8) {
             // Build Tools and platform SDK versions are independent; compileSdk is
-            // clamped to targetSdk when the Gradle project is generated below.
+            // raised to at least targetSdk when the Gradle project is generated below.
             maxBuildToolsVersionInt = Math.max(33, maxBuildToolsVersionInt);
             maxBuildToolsVersion = "" + maxBuildToolsVersionInt;
 
