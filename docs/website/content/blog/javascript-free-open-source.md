@@ -39,7 +39,7 @@ Shared framework and runtime changes also trigger the ParparVM browser suite. Pu
 
 The port also keeps Java and browser code separate:
 
-The old route ran transpiled Java beside its JavaScript integration on the browser's main thread. The ParparVM route puts the transpiled Java application in a background Web Worker instead. The Java code has no `document`, no DOM, and no dependency on browser globals.
+The old route ran translated Java beside its JavaScript integration on the browser's main thread. The ParparVM route puts the translated Java application in a background Web Worker instead. The Java code has no `document`, no DOM, and no dependency on global browser objects.
 
 A thin message bridge connects the worker to the standard front-end `JavaScriptPort`, which runs on the browser's main thread. The port handles the canvas, DOM, clipboard, media, Web Bluetooth, and other browser APIs. Application-specific browser code stays under `native/JavaScript`.
 

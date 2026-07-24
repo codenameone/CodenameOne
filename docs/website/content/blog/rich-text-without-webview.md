@@ -19,7 +19,7 @@ A `SpanLabel` applies one style to wrapped text. A `BrowserComponent` renders a 
 
 A common screen mixes formatted text with buttons, images, forms, and other Codename One components inside one scrollable container. A `BrowserComponent` is a poor fit for that layout because it owns a rectangular native surface and its own page viewport. The browser's document height does not naturally become the height of a child inside the parent Codename One layout.
 
-`RichTextComponent` measures wrapped runs for the width it receives and reports the corresponding height. In the default `SizeMode.SHRINK`, it behaves like a `SpanLabel`: the parent container scrolls the rich text together with the components around it. `SizeMode.SCROLL` is available when the rich text should keep an assigned height and scroll its own content.
+`RichTextComponent` measures wrapped runs for the width it receives and reports the corresponding height. In the default `SizeMode.SHRINK`, it behaves like a `SpanLabel`: the parent container scrolls the rich text together with the surrounding components. `SizeMode.SCROLL` is available when the rich text should keep an assigned height and scroll its own content.
 
 {{< mermaid >}}
 flowchart TB

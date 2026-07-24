@@ -120,7 +120,7 @@ The API deliberately leaves Google and Microsoft webhooks to the application bac
 
 Google and Microsoft OAuth credentials also belong to your application. The provider classes never embed a shared Codename One client secret and never persist credentials on your behalf.
 
-CalDAV supports Basic, Bearer, and Digest authentication. Basic should only travel over HTTPS. Server implementations differ, so each asynchronous result can still report a collection-specific restriction.
+CalDAV supports Basic, Bearer, and Digest authentication. Basic should only travel over HTTPS. Server implementations differ. Each asynchronous result can still report a collection-specific restriction.
 
 ## Import and export use the same model
 
