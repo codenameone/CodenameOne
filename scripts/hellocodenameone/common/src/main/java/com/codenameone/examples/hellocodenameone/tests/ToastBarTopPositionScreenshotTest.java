@@ -133,7 +133,7 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
         // times this test out with the screenshot never emitted; these probes
         // (1/s + every state reset) show which wait the choreography dies in.
         // CN1SS:WARN prefix so the Linux gate's failure dump surfaces them.
-        if ((waitedMs % 1000) == 0) {
+        if (waitedMs > 0 && (waitedMs % 1000) == 0) {
             System.out.println("CN1SS:WARN:test=ToastBarTopPosition probe phase=await-shown"
                     + " waitedMs=" + waitedMs + " shown=" + shown
                     + " tbc=" + (tbc == null ? "null" : "present")
@@ -194,7 +194,7 @@ public class ToastBarTopPositionScreenshotTest extends BaseTest {
                 return;
             }
             boolean rendered = containsRenderedToastBar(screen);
-            if ((waitedMs % 1000) == 0) {
+            if (waitedMs > 0 && (waitedMs % 1000) == 0) {
                 System.out.println("CN1SS:WARN:test=ToastBarTopPosition probe phase=await-render"
                         + " waitedMs=" + waitedMs + " rendered=" + rendered
                         + " imgW=" + screen.getWidth() + " imgH=" + screen.getHeight());

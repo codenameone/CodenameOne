@@ -73,9 +73,25 @@ class LargeArrayGcIntegrationTest {
     void largeArrayLoadStaysFlatAcrossRounds() throws Exception {
         Parser.cleanup();
 
+        List<Path> tempDirs = new ArrayList<>();
+        try {
+            runLargeArrayLoad(tempDirs);
+        } finally {
+            // The translated CMake build tree is large; don't let repeated runs
+            // accumulate it on self-hosted runners.
+            for (Path dir : tempDirs) {
+                deleteRecursively(dir);
+            }
+        }
+    }
+
+    private void runLargeArrayLoad(List<Path> tempDirs) throws Exception {
         Path sourceDir = Files.createTempDirectory("large-array-gc-sources");
         Path classesDir = Files.createTempDirectory("large-array-gc-classes");
         Path javaApiDir = Files.createTempDirectory("large-array-gc-javaapi");
+        tempDirs.add(sourceDir);
+        tempDirs.add(classesDir);
+        tempDirs.add(javaApiDir);
 
         Path source = sourceDir.resolve("LargeArrayGcApp.java");
         Files.write(source, loadAppSource().getBytes(StandardCharsets.UTF_8));
@@ -117,6 +133,7 @@ class LargeArrayGcIntegrationTest {
         CompilerHelper.copyDirectory(javaApiDir, classesDir);
 
         Path outputDir = Files.createTempDirectory("large-array-gc-output");
+        tempDirs.add(outputDir);
         CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "LargeArrayGcApp");
 
         Path distDir = outputDir.resolve("dist");
@@ -175,6 +192,22 @@ class LargeArrayGcIntegrationTest {
         System.err.println("[LargeArrayGcIntegrationTest] cycles=" + cycles);
         System.err.println("[LargeArrayGcIntegrationTest] JavaSE\n" + javaOutput);
         System.err.println("[LargeArrayGcIntegrationTest] ParparVM\n" + vmOutput);
+    }
+
+    private static void deleteRecursively(Path root) {
+        if (root == null || !Files.exists(root)) {
+            return;
+        }
+        try (java.util.stream.Stream<Path> walk = Files.walk(root)) {
+            walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                } catch (java.io.IOException ignore) {
+                    // best effort -- a locked file must not fail the test
+                }
+            });
+        } catch (java.io.IOException ignore) {
+        }
     }
 
     private String loadAppSource() throws Exception {

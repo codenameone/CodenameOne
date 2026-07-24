@@ -1010,14 +1010,19 @@ void codenameOneGCMark() {
     // per collection cycle. Costs one cached getenv when disabled. Used by
     // LargeArrayGcIntegrationTest to assert the issue-5425 fix deterministically
     // (cycle COUNT is load-independent, unlike wall-clock phase timings) and
-    // generally useful for diagnosing trigger storms on device. DELIBERATELY
-    // outside the CN1_DISABLE_BIBOP guard: -DCN1_DISABLE_BIBOP A/B builds need
-    // the same observable so cycle counts can be compared across both collector
-    // shapes; with the env var unset this is behavior-identical either way.
+    // generally useful for diagnosing trigger storms on device.
     {
-        static int cn1LogCycles = -1;
-        if(cn1LogCycles < 0) cn1LogCycles = getenv("CN1_GC_LOG_CYCLES") ? 1 : 0;
-        if(cn1LogCycles) {
+        // -1 = uninitialized. Lazy init is race-free in practice (collection
+        // cycles run on the GC thread only), but keep the gate atomic so the
+        // idempotent getenv probe is well-defined C even if a future caller
+        // runs a cycle from another thread.
+        static _Atomic int cn1LogCycles = -1;
+        int logCycles = atomic_load_explicit(&cn1LogCycles, memory_order_relaxed);
+        if(logCycles < 0) {
+            logCycles = getenv("CN1_GC_LOG_CYCLES") ? 1 : 0;
+            atomic_store_explicit(&cn1LogCycles, logCycles, memory_order_relaxed);
+        }
+        if(logCycles) {
             fprintf(stderr, "[GC-CYCLE] %d\n", currentGcMarkValue);
         }
     }
@@ -1813,7 +1818,7 @@ long long cn1_instr_allocCount = 0;
 #ifndef CN1_LEGACY_GC_TRIGGER_BYTES
 #define CN1_LEGACY_GC_TRIGGER_BYTES (24*1024*1024)
 #endif
-static _Atomic long cn1LegacyBytesSinceGc = 0;
+_Atomic long cn1LegacyBytesSinceGc = 0;
 #endif
 
 JAVA_BOOLEAN java_lang_System_isHighFrequencyGC___R_boolean(CODENAME_ONE_THREAD_STATE) {
@@ -2067,10 +2072,7 @@ void cn1BibopBeginGcCycle(void) {
                                                          memory_order_acq_rel);
     // Same charge-to-next-cycle rule for the legacy byte counter (large arrays
     // and anything above CN1_BIBOP_MAX_OBJECT): see cn1LegacyBytesSinceGc.
-    // Same atomic-exchange idiom as the BiBOP reset above: a racing
-    // fetch_add lands either before the swap (covered by the cycle that is
-    // starting) or after it (charged to the next cycle) -- never dropped.
-    (void)atomic_exchange_explicit(&cn1LegacyBytesSinceGc, 0, memory_order_acq_rel);
+    atomic_store_explicit(&cn1LegacyBytesSinceGc, 0, memory_order_relaxed);
 #ifdef CN1_GRACE_AUDIT
     // QA builds only: snapshot every page's cursor at mark start. Slots below the
     // snapshot existed before the grace pass ran, so a complete grace pass must
@@ -3945,30 +3947,10 @@ JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct claz
     // asynchronous (sets forceGc + notifies the GC thread) exactly as in the
     // BiBOP path. nativeAllocationMode save/restore matches cn1BibopMaybeGc:
     // we may already be inside a caller's native-allocation bracket.
-    // EDGE-triggered on the threshold crossing: level-triggering here would
-    // call System.gc() (a lock+notify) on EVERY legacy allocation between the
-    // crossing and the cycle start that resets the counter -- avoidable
-    // overhead that is itself a mini-storm on large-array churn. At most one
-    // schedule per cycle window; a crossing that lands while a cycle is
-    // already running just sets forceGc for the GC thread's next loop pass
-    // (which is why there is deliberately no !gcCurrentlyRunning suppression:
-    // suppressing would LOSE the edge and delay collection up to the 30s
-    // idle wait).
-    long __prevLegacyBytes = atomic_fetch_add_explicit(&cn1LegacyBytesSinceGc, (long)size,
-                                                       memory_order_relaxed);
-    if(__prevLegacyBytes <= CN1_LEGACY_GC_TRIGGER_BYTES
-       && __prevLegacyBytes + (long)size > CN1_LEGACY_GC_TRIGGER_BYTES
-       && constantPoolObjects != 0
-#ifndef CN1_CONSERVATIVE_GC_ROOTS
-       // Mirror cn1BibopMaybeGc's gate exactly: without conservative roots a
-       // thread inside a native-allocation bracket must not trigger a cycle
-       // (its half-built objects aren't rooted). Under conservative roots the
-       // native C locals ARE scanned, and gating unconditionally would starve
-       // the trigger on workloads whose large allocations all happen inside
-       // natives (the same starvation the BiBOP comment documents).
-       && !threadStateData->nativeAllocationMode
-#endif
-       ) {
+    long __legacyBytes = atomic_fetch_add_explicit(&cn1LegacyBytesSinceGc, (long)size,
+                                                   memory_order_relaxed) + (long)size;
+    if(__legacyBytes > CN1_LEGACY_GC_TRIGGER_BYTES && !gcCurrentlyRunning
+       && constantPoolObjects != 0) {
         JAVA_BOOLEAN wasNam = threadStateData->nativeAllocationMode;
         threadStateData->nativeAllocationMode = JAVA_TRUE;
         java_lang_System_gc__(threadStateData);
