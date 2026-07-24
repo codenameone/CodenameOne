@@ -170,7 +170,7 @@
             // Get public key and user auth from the subscription object
             var key = subscription.getKey ? subscription.getKey('p256dh') : '';
             var auth = subscription.getKey ? subscription.getKey('auth') : '';
-            var material = typedEnvelope && subscription.toJSON
+            var material = typedEnvelope && typeof subscription.toJSON === 'function'
                     ? JSON.stringify(subscription.toJSON())
                     : subscription.endpoint + '?key=' +
                       encodeURIComponent(key ? btoa(String.fromCharCode.apply(null, new Uint8Array(key))) : '') +

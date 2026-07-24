@@ -7,6 +7,56 @@ import {fileURLToPath} from 'node:url';
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const source = fs.readFileSync(path.join(repository,
         'Ports/JavaScriptPort/src/main/webapp/sw.js'), 'utf8');
+const registrationSource = fs.readFileSync(path.join(repository,
+        'Ports/JavaScriptPort/src/main/webapp/js/push.js'), 'utf8');
+
+async function registrationScenario(subscription, typedEnvelope) {
+    let registeredId;
+    let registrationError;
+    const activeWorker = {
+        state: 'activated',
+        postMessage() {},
+        addEventListener() {}
+    };
+    const serviceWorkerRegistration = {
+        active: activeWorker,
+        update() {},
+        pushManager: {
+            getSubscription: async () => subscription
+        }
+    };
+    const sandbox = {
+        console,
+        Promise,
+        Uint8Array,
+        String,
+        encodeURIComponent,
+        Notification: {permission: 'granted'},
+        ServiceWorkerRegistration: function () {},
+        PushManager: function () {},
+        navigator: {
+            serviceWorker: {
+                register: async () => serviceWorkerRegistration,
+                ready: Promise.resolve(serviceWorkerRegistration),
+                addEventListener() {}
+            }
+        },
+        $: callback => callback()
+    };
+    sandbox.ServiceWorkerRegistration.prototype.showNotification = function () {};
+    sandbox.window = sandbox;
+    vm.createContext(sandbox);
+    vm.runInContext(registrationSource, sandbox, {filename: 'push.js'});
+    sandbox.cn1_registerPush(
+            id => { registeredId = id; },
+            error => { registrationError = error; },
+            () => {},
+            [],
+            typedEnvelope);
+    await new Promise(resolve => setImmediate(resolve));
+    await new Promise(resolve => setImmediate(resolve));
+    return {registeredId, registrationError};
+}
 
 async function pushScenario(envelope, windows) {
     const handlers = {};
@@ -91,5 +141,14 @@ result = await pushScenario({...visible, deepLink: 'https://attacker.example/phi
 await result.click(result.notifications[0]);
 assert.deepEqual(result.openedUrls, ['https://fixture/index.html'],
         'notification clicks must not navigate outside the application origin');
+
+result = await registrationScenario({
+    endpoint: 'https://push.example/subscription',
+    getKey: () => null,
+    toJSON: 'not-a-function'
+}, true);
+assert.equal(result.registrationError, undefined);
+assert.match(result.registeredId, /^cn1-web-/,
+        'typed registration must fall back safely when toJSON is not callable');
 
 console.log('push service-worker contract: PASS');
