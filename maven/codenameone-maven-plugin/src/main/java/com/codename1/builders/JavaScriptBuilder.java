@@ -55,6 +55,12 @@ public class JavaScriptBuilder extends Executor {
     private File jsDistDir;
     private File jsOutputZip;
     private File jsDeployableArtifact;
+    // Directory holding the JavaScript-port web assets (port.js, js/, style.css,
+    // ...) for this build. Handed to the translator via the
+    // -Dcodename1.javascriptport.webapp override so it bundles port.js (the
+    // worker-side native bindings) even when the build runs outside a CN1
+    // source checkout. Set by stageJavaScriptPort.
+    private File jsPortWebApp;
 
     @Override
     protected String getDeviceIdCode() {
@@ -224,6 +230,9 @@ public class JavaScriptBuilder extends Executor {
 
     private File stageJavaScriptPort(BuildRequest request, File portSources, File stageClasses, File portClasses)
             throws Exception {
+        // Recompute per build: a reused builder instance must not carry a
+        // previous target's webapp path when this one has none.
+        jsPortWebApp = null;
         // Prefer a pre-built JavaScriptPort.jar bundled as a plugin resource.
         InputStream bundled = getResourceAsStream("/JavaScriptPort.jar");
         if (bundled != null) {
@@ -237,6 +246,27 @@ public class JavaScriptBuilder extends Executor {
                     fos.close();
                 }
                 unzip(jar, stageClasses, stageClasses, stageClasses);
+                // JavaScriptPort.jar carries the port webapp under webapp/. Move it
+                // OUT of the translate-input tree (stageClasses) so the translator
+                // doesn't re-copy it into the bundle; it is handed to the translator
+                // via -Dcodename1.javascriptport.webapp in runByteCodeTranslator.
+                File stagedWebApp = new File(stageClasses, "webapp");
+                if (stagedWebApp.isDirectory()) {
+                    // tmpDir is this build's own work dir, so port-webapp is already
+                    // build-unique; clear any stale copy before moving.
+                    File dest = new File(tmpDir, "port-webapp");
+                    if (dest.exists()) {
+                        delTree(dest, true);
+                    }
+                    try {
+                        Files.move(stagedWebApp.toPath(), dest.toPath());
+                    } catch (IOException moveFailed) {
+                        // e.g. cross-device move: fall back to copy + delete.
+                        copyTree(stagedWebApp, dest);
+                        delTree(stagedWebApp, true);
+                    }
+                    jsPortWebApp = dest;
+                }
                 return stageClasses;
             } finally {
                 bundled.close();
@@ -275,6 +305,12 @@ public class JavaScriptBuilder extends Executor {
             throw new BuildException("Failed to compile JavaScript port sources");
         }
         copyTree(portClasses, stageClasses);
+        // Source-checkout build: the webapp sits next to the sources at
+        // src/main/webapp (portSources is src/main/java).
+        File srcWebApp = new File(portSources.getParentFile(), "webapp");
+        if (srcWebApp.isDirectory()) {
+            jsPortWebApp = srcWebApp;
+        }
         return stageClasses;
     }
 
@@ -656,6 +692,24 @@ public class JavaScriptBuilder extends Executor {
                     }
                 }
             }
+        }
+        // Hand the translator the JavaScript-port webapp (port.js, js/, style.css,
+        // ...) so it bundles port.js -- the worker-side native bindings that make
+        // Window.current() etc. resolve. Off-repo builds can't find it via the
+        // translator's own source-tree walk, so we pass the copy staged from
+        // JavaScriptPort.jar. An explicit override in CN1_TRANSLATOR_OPTS wins --
+        // detected by an actual -D token, not a loose substring match.
+        boolean webAppOverridden = false;
+        for (String opt : extraOpts) {
+            // Only a -Dkey=value form actually sets the property; a bare -Dkey
+            // does not, so it must NOT suppress the plugin-provided value.
+            if (opt.startsWith("-Dcodename1.javascriptport.webapp=")) {
+                webAppOverridden = true;
+                break;
+            }
+        }
+        if (jsPortWebApp != null && jsPortWebApp.isDirectory() && !webAppOverridden) {
+            extraOpts.add("-Dcodename1.javascriptport.webapp=" + jsPortWebApp.getAbsolutePath());
         }
         // Default heap; a -Xmx in CN1_TRANSLATOR_OPTS takes precedence (apps
         // that disable tree-shaking, e.g. the Playground, emit a much larger
