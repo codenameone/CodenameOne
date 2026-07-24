@@ -287,24 +287,28 @@ public class Executor {
                                 // Delay the starting of the CSS watcher to avoid compiling the CSS file while the theme is being loaded.
                                 final int simulatorReloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
                                 for (final String themePrefix : CSSWatcher.scanForThemePrefixes()) {
-                                    Timer t = new Timer(true);
+                                    final Timer timer = new Timer(true);
                                     TimerTask tt = new TimerTask() {
                                         @Override
                                         public void run() {
-                                            int currentReloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
-                                            if (currentReloadVersion != simulatorReloadVersion) {
-                                                return;
+                                            try {
+                                                int currentReloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
+                                                if (currentReloadVersion != simulatorReloadVersion) {
+                                                    return;
+                                                }
+                                                System.out.println("Starting CSS Watcher for prefix " + themePrefix);
+                                                CSSWatcher cssWatcher = new CSSWatcher(themePrefix);
+                                                if (!registerCSSWatcher(cssWatcher, simulatorReloadVersion)) {
+                                                    cssWatcher.stop();
+                                                    return;
+                                                }
+                                                cssWatcher.start();
+                                            } finally {
+                                                timer.cancel();
                                             }
-                                            System.out.println("Starting CSS Watcher for prefix " + themePrefix);
-                                            CSSWatcher cssWatcher = new CSSWatcher(themePrefix);
-                                            if (!registerCSSWatcher(cssWatcher, simulatorReloadVersion)) {
-                                                cssWatcher.stop();
-                                                return;
-                                            }
-                                            cssWatcher.start();
                                         }
                                     };
-                                    t.schedule(tt, 2000);
+                                    timer.schedule(tt, 2000);
                                 }
 
                             }
