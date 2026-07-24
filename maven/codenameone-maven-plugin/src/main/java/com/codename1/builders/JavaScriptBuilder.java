@@ -252,11 +252,16 @@ public class JavaScriptBuilder extends Executor {
                 // via -Dcodename1.javascriptport.webapp in runByteCodeTranslator.
                 File stagedWebApp = new File(stageClasses, "webapp");
                 if (stagedWebApp.isDirectory()) {
+                    // tmpDir is this build's own work dir, so port-webapp is already
+                    // build-unique; clear any stale copy before moving.
                     File dest = new File(tmpDir, "port-webapp");
                     if (dest.exists()) {
                         delTree(dest, true);
                     }
-                    if (!stagedWebApp.renameTo(dest)) {
+                    try {
+                        Files.move(stagedWebApp.toPath(), dest.toPath());
+                    } catch (IOException moveFailed) {
+                        // e.g. cross-device move: fall back to copy + delete.
                         copyTree(stagedWebApp, dest);
                         delTree(stagedWebApp, true);
                     }
@@ -696,8 +701,9 @@ public class JavaScriptBuilder extends Executor {
         // detected by an actual -D token, not a loose substring match.
         boolean webAppOverridden = false;
         for (String opt : extraOpts) {
-            if (opt.startsWith("-Dcodename1.javascriptport.webapp=")
-                    || opt.equals("-Dcodename1.javascriptport.webapp")) {
+            // Only a -Dkey=value form actually sets the property; a bare -Dkey
+            // does not, so it must NOT suppress the plugin-provided value.
+            if (opt.startsWith("-Dcodename1.javascriptport.webapp=")) {
                 webAppOverridden = true;
                 break;
             }
