@@ -88,6 +88,10 @@ public class AndroidGradleBuilder extends Executor {
     private static final String DESUGAR_JDK_LIBS_VERSION = "2.1.5";
     private static final String GRADLE_8_DISTRIBUTION_URL =
             "https://services.gradle.org/distributions/gradle-" + GRADLE_8_VERSION + "-bin.zip";
+    private static final int GRADLE_DOWNLOAD_ATTEMPTS = 3;
+    private static final long GRADLE_DOWNLOAD_RETRY_DELAY_MS = 2000L;
+    private static final int GRADLE_DOWNLOAD_CONNECT_TIMEOUT_MS = 30000;
+    private static final int GRADLE_DOWNLOAD_READ_TIMEOUT_MS = 300000;
 
     private String minimumGradleVersion = "6";
 
@@ -941,15 +945,7 @@ public class AndroidGradleBuilder extends Executor {
                     delTree(managedGradleHome);
                 }
                 File gradleZip = new File(managedGradleHome+".zip");
-                if (gradleZip.exists()) {
-                    gradleZip.delete();
-                }
-                try {
-                    log("Downloading gradle distribution from "+gradleDistributionUrl);
-                    FileUtils.copyURLToFile(new URL(gradleDistributionUrl), gradleZip);
-                } catch (Exception ex) {
-                    throw new BuildException("Failed to download gradle distribution from URL "+gradleDistributionUrl, ex);
-                }
+                downloadGradleDistribution(gradleZip);
                 try {
                     ZipFile gradleZipFile = new ZipFile(gradleZip);
                     File extracted = new File(path(gradleZip.getAbsolutePath()+"-extracted"));
@@ -5555,6 +5551,46 @@ public class AndroidGradleBuilder extends Executor {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private void downloadGradleDistribution(File gradleZip) throws BuildException {
+        File partialGradleZip = new File(gradleZip.getAbsolutePath() + ".part");
+        Exception lastFailure = null;
+        for (int attempt = 1; attempt <= GRADLE_DOWNLOAD_ATTEMPTS; attempt++) {
+            if (partialGradleZip.exists() && !partialGradleZip.delete()) {
+                throw new BuildException("Failed to remove partial gradle distribution at " + partialGradleZip);
+            }
+            if (gradleZip.exists() && !gradleZip.delete()) {
+                throw new BuildException("Failed to remove existing gradle distribution at " + gradleZip);
+            }
+            try {
+                log("Downloading gradle distribution from " + gradleDistributionUrl
+                        + " (attempt " + attempt + " of " + GRADLE_DOWNLOAD_ATTEMPTS + ")");
+                FileUtils.copyURLToFile(new URL(gradleDistributionUrl), partialGradleZip,
+                        GRADLE_DOWNLOAD_CONNECT_TIMEOUT_MS, GRADLE_DOWNLOAD_READ_TIMEOUT_MS);
+                FileUtils.moveFile(partialGradleZip, gradleZip);
+                return;
+            } catch (Exception ex) {
+                lastFailure = ex;
+                if (partialGradleZip.exists() && !partialGradleZip.delete()) {
+                    partialGradleZip.deleteOnExit();
+                }
+                if (gradleZip.exists() && !gradleZip.delete()) {
+                    gradleZip.deleteOnExit();
+                }
+                if (attempt < GRADLE_DOWNLOAD_ATTEMPTS) {
+                    log("Gradle distribution download failed: " + ex.getMessage() + ". Retrying...");
+                    try {
+                        Thread.sleep(GRADLE_DOWNLOAD_RETRY_DELAY_MS * attempt);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        throw new BuildException("Interrupted while retrying gradle distribution download", interrupted);
+                    }
+                }
+            }
+        }
+        throw new BuildException("Failed to download gradle distribution from URL "
+                + gradleDistributionUrl + " after " + GRADLE_DOWNLOAD_ATTEMPTS + " attempts", lastFailure);
     }
 
     public void extractAAR(InputStream source, File dir, String sdkPath) throws IOException {
