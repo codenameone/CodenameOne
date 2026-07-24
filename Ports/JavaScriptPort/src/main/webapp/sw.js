@@ -173,6 +173,9 @@ self.addEventListener('message', function(event){
         pushActionCategories = event.data.pushActionCategories;
         return;
     }
+    if (!event.data || event.data.command !== 'pushClientReady') {
+        return;
+    }
     var readyClient = event.source;
     if (pendingPushes.length > 0 && readyClient
             && typeof readyClient.postMessage === 'function') {

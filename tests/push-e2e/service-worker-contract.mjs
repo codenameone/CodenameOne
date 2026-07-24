@@ -13,9 +13,10 @@ const registrationSource = fs.readFileSync(path.join(repository,
 async function registrationScenario(subscription, typedEnvelope) {
     let registeredId;
     let registrationError;
+    const workerMessages = [];
     const activeWorker = {
         state: 'activated',
-        postMessage() {},
+        postMessage(value) { workerMessages.push(value); },
         addEventListener() {}
     };
     const serviceWorkerRegistration = {
@@ -55,7 +56,7 @@ async function registrationScenario(subscription, typedEnvelope) {
             typedEnvelope);
     await new Promise(resolve => setImmediate(resolve));
     await new Promise(resolve => setImmediate(resolve));
-    return {registeredId, registrationError};
+    return {registeredId, registrationError, workerMessages};
 }
 
 async function pushScenario(envelope, windows) {
@@ -128,16 +129,19 @@ async function pushScenario(envelope, windows) {
             assert.equal(typeof clickCompletion?.then, 'function');
             await clickCompletion;
         },
-        signalReady() {
+        signal(value) {
             assert.ok(handlers.message?.length > 0);
             assert.ok(openedClients.length > 0,
                     'a notification click must open a client before it signals readiness');
             for (const handler of handlers.message) {
                 handler({
-                    data: 'ready',
+                    data: value,
                     source: openedClients[openedClients.length - 1]
                 });
             }
+        },
+        signalReady() {
+            this.signal({command: 'pushClientReady'});
         }
     };
 }
@@ -160,6 +164,11 @@ result = await pushScenario({schema: 3, id: 'silent', silent: true, data: {revis
 assert.equal(result.posted.length, 0);
 assert.equal(result.notifications.length, 0, 'silent delivery must never create a notification');
 
+result = await pushScenario({schema: 3, id: 'data-only', data: {revision: 8}}, []);
+assert.equal(result.posted.length, 0);
+assert.equal(result.notifications.length, 0,
+        'data-only delivery must not create a blank notification');
+
 result = await pushScenario({...visible, deepLink: 'https://attacker.example/phish'}, []);
 await result.click(result.notifications[0]);
 assert.deepEqual(result.openedUrls, ['https://fixture/index.html'],
@@ -170,6 +179,9 @@ await result.click(result.notifications[0]);
 assert.deepEqual(result.openedUrls, ['https://fixture/orders/42']);
 assert.equal(result.posted.length, 0,
         'a newly opened deep-link client must receive the push only after it is ready');
+result.signal({command: 'unrelatedPageMessage'});
+assert.equal(result.posted.length, 0,
+        'an unrelated page message must not flush pending pushes');
 result.signalReady();
 assert.equal(result.posted.length, 1,
         'pending pushes must be delivered to the deep-link client that signals readiness');
@@ -183,5 +195,7 @@ result = await registrationScenario({
 assert.equal(result.registrationError, undefined);
 assert.match(result.registeredId, /^cn1-web-/,
         'typed registration must fall back safely when toJSON is not callable');
+assert.equal(result.workerMessages[0]?.command, 'pushClientReady',
+        'registration must send an explicit readiness command before configuration');
 
 console.log('push service-worker contract: PASS');

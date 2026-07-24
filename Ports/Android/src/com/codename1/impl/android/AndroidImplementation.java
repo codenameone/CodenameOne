@@ -844,10 +844,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                 return;
             }
             String title = message.optString("title", "");
+            String body = message.optString("body", "");
+            String image = message.optString("image", "");
+            if (title.length() == 0 && body.length() == 0 && image.length() == 0) {
+                return;
+            }
             if (title.length() == 0) {
                 title = context.getApplicationInfo().loadLabel(context.getPackageManager()).toString();
             }
-            String body = message.optString("body", "");
             Intent intent = new Intent(context, appStubClass);
             PendingIntent contentIntent = createPendingIntent(context, 0, intent);
             int smallIcon = context.getResources().getIdentifier("ic_stat_notify", "drawable",

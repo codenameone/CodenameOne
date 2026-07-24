@@ -50,10 +50,6 @@
             }
             if (serviceWorker) {
                 //console.log("Current state: "+serviceWorker.state);
-                if (serviceWorker.state === 'activated') {
-                    //console.log("Controller is "+serviceWorker.controller);
-                    serviceWorker.postMessage("a message");
-                }
                 serviceWorker.addEventListener('controllerchange', function (e) {
                     //console.log("Controller changed");
                 });
@@ -102,6 +98,9 @@
                 navigator.serviceWorker.addEventListener('controllerchange', function() {
                     //console.log('Okay, now things are under control. navigator.serviceWorker.controller is', navigator.serviceWorker.controller);
                     //navigator.serviceWorker.controller.postMessage("The client says hello");
+                });
+                serviceWorkerRegistration.active.postMessage({
+                    command: 'pushClientReady'
                 });
                 serviceWorkerRegistration.active.postMessage({
                     command: 'registerPushActionCategories',
