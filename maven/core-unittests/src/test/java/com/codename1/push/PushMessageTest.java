@@ -61,6 +61,13 @@ class PushMessageTest {
     }
 
     @Test
+    void rejectsNullAndEmptyEnvelopesAsIoErrors() {
+        assertThrows(IOException.class, () -> PushMessage.parse(null));
+        assertThrows(IOException.class, () -> PushMessage.parse(""));
+        assertThrows(IOException.class, () -> PushMessage.parse("  "));
+    }
+
+    @Test
     void acceptsFutureAdditiveEnvelopeSchemas() throws Exception {
         PushMessage message = PushMessage.parse(
                 "{\"schema\":4,\"body\":\"future\",\"futureOption\":\"preserved\"}");

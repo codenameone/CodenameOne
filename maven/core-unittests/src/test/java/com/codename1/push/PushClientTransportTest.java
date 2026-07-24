@@ -33,6 +33,7 @@ import com.codename1.surfaces.spi.SurfaceBridge;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.io.IOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -169,6 +170,16 @@ class PushClientTransportTest extends UITestBase {
         assertNull(PushClient.getActiveCallback());
         assertNotNull(listener.error);
         assertEquals("unsupported_transport", listener.error.getCode());
+    }
+
+    @Test
+    void managedRegistrationRejectsEmptyOrMissingSubscriptionIds() throws Exception {
+        assertThrows(IOException.class, () -> PushClient.managedRegistrationId(null));
+        assertThrows(IOException.class, () -> PushClient.managedRegistrationId(new byte[0]));
+        assertThrows(IOException.class, () -> PushClient.managedRegistrationId(
+                "{}".getBytes("UTF-8")));
+        assertEquals("subscription-1", PushClient.managedRegistrationId(
+                "{\"id\":\"subscription-1\"}".getBytes("UTF-8")));
     }
 
     private PushClient track(PushClient client) {
