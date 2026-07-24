@@ -261,7 +261,7 @@ public class Simulator {
         
         final ClassLoader fLdr = ldr;
         Thread.currentThread().setContextClassLoader(fLdr);
-        Class c = Class.forName("com.codename1.impl.javase.Executor", true, ldr);
+        final Class c = Class.forName("com.codename1.impl.javase.Executor", true, ldr);
         Method m = c.getDeclaredMethod("main", String[].class);
         m.invoke(null, new Object[]{argv});
         new Thread() {
@@ -277,6 +277,12 @@ public class Simulator {
                         System.setProperty("reload.simulator", "");
                         int version = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
                         System.setProperty("reload.simulator.count", String.valueOf(version+1));
+                        try {
+                            Method cleanup = c.getDeclaredMethod("cleanupForSimulatorReload");
+                            cleanup.invoke(null);
+                        } catch (Exception ex) {
+                            ex.printStackTrace();
+                        }
                         try {
                             main(argv);
                         } catch (Exception ex) {

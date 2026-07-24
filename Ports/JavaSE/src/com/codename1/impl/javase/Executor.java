@@ -38,6 +38,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Timer;
@@ -67,6 +68,7 @@ public class Executor {
     // when combined with Hotswap Agent.
     // https://github.com/HotswapProjects/HotswapAgent
     private static SourceChangeWatcher sourceWatcher;
+    private static final List<CSSWatcher> cssWatchers = new ArrayList<CSSWatcher>();
     
     private final static boolean IS_MAC;
     private final static boolean isWindows;
@@ -283,17 +285,30 @@ public class Executor {
                             Display.init(null);
                             if (CSSWatcher.isSupported()) {
                                 // Delay the starting of the CSS watcher to avoid compiling the CSS file while the theme is being loaded.
+                                final int simulatorReloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
                                 for (final String themePrefix : CSSWatcher.scanForThemePrefixes()) {
-                                    Timer t = new Timer();
+                                    final Timer timer = new Timer(true);
                                     TimerTask tt = new TimerTask() {
                                         @Override
                                         public void run() {
-                                            System.out.println("Starting CSS Watcher for prefix " + themePrefix);
-                                            CSSWatcher cssWatcher = new CSSWatcher(themePrefix);
-                                            cssWatcher.start();
+                                            try {
+                                                int currentReloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
+                                                if (currentReloadVersion != simulatorReloadVersion) {
+                                                    return;
+                                                }
+                                                System.out.println("Starting CSS Watcher for prefix " + themePrefix);
+                                                CSSWatcher cssWatcher = new CSSWatcher(themePrefix);
+                                                if (!registerCSSWatcher(cssWatcher, simulatorReloadVersion)) {
+                                                    cssWatcher.stop();
+                                                    return;
+                                                }
+                                                cssWatcher.start();
+                                            } finally {
+                                                timer.cancel();
+                                            }
                                         }
                                     };
-                                    t.schedule(tt, 2000);
+                                    timer.schedule(tt, 2000);
                                 }
 
                             }
@@ -424,6 +439,32 @@ public class Executor {
             } catch (Exception ex) {
                 ex.printStackTrace();
             } 
+        }
+    }
+
+    static boolean registerCSSWatcher(CSSWatcher cssWatcher, int simulatorReloadVersion) {
+        synchronized (cssWatchers) {
+            int currentReloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
+            if (currentReloadVersion != simulatorReloadVersion) {
+                return false;
+            }
+            cssWatchers.add(cssWatcher);
+            return true;
+        }
+    }
+
+    public static void cleanupForSimulatorReload() {
+        List<CSSWatcher> watchersToStop;
+        synchronized (cssWatchers) {
+            watchersToStop = new ArrayList<CSSWatcher>(cssWatchers);
+            cssWatchers.clear();
+        }
+        for (CSSWatcher cssWatcher : watchersToStop) {
+            cssWatcher.stop();
+        }
+        if (sourceWatcher != null) {
+            sourceWatcher.stop();
+            sourceWatcher = null;
         }
     }
 
