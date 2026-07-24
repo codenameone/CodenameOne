@@ -20,6 +20,10 @@ public final class InlineIntrinsics {
         RENAMES.put("java_lang_String_length___R_int", "cn1InlStrLength");
         RENAMES.put("java_lang_String_hashCode___R_int", "cn1InlStrHash");
         RENAMES.put("java_lang_String_charAt___int_R_char", "cn1InlStrCharAt");
+        // Dart List<int> index accesses (DartLongList) -- inlined to raw long[] access
+        // in a hot loop; see cn1InlDllGet/Set in cn1_intrinsics.h (__has_include-guarded).
+        RENAMES.put("dart_core_DartLongList_getLong___long_R_long", "cn1InlDllGet");
+        RENAMES.put("dart_core_DartLongList_setLong___long_long_R_long", "cn1InlDllSet");
     }
 
     private InlineIntrinsics() {

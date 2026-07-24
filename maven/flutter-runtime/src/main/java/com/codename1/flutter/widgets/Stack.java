@@ -15,6 +15,16 @@ public class Stack extends Widget {
 
     private Alignment alignment;
     private DartList<Widget> children;
+    private com.codename1.flutter.StackFit fit;
+    private com.codename1.flutter.Clip clipBehavior;
+
+    public void fit(com.codename1.flutter.StackFit v) {
+        this.fit = v;
+    }
+
+    public void clipBehavior(com.codename1.flutter.Clip v) {
+        this.clipBehavior = v;
+    }
 
     public void alignment(Alignment v) {
         this.alignment = v;

@@ -39,11 +39,78 @@ import java.util.List;
  * <p>Headless (no Display): the stack bookkeeping still runs — no Forms are
  * created and the route's builder is not invoked (it would run on mount).</p>
  */
-public final class Navigator {
+public class Navigator extends StatelessWidget {
 
     private static final List<RouteEntry> stack = new ArrayList<RouteEntry>();
 
-    private Navigator() {
+    // --- Nested Navigator widget (Flutter's embeddable Navigator) --------------
+    // A Navigator can also be used AS a widget (Reply's mail navigator, several
+    // demos): it owns a private route table via onGenerateRoute/initialRoute. This
+    // pass records the configuration and renders the initial route's page so the
+    // subtree has content; the private route stack is deferred.
+    private Object navigatorKey;
+    private String initialRoute;
+    private dart.runtime.Funcs.Func1<RouteSettings, Object> onGenerateRoute;
+    private dart.runtime.Funcs.Func1<RouteSettings, Object> onUnknownRoute;
+    private String restorationScopeId;
+    private Object observers;
+    private Object pages;
+    private Object onPopPage;
+
+    public Navigator() {
+    }
+
+    public Navigator(com.codename1.flutter.Key key) {
+        key(key);
+    }
+
+    public void navigatorKey(Object v) {
+        this.navigatorKey = v;
+    }
+
+    public void initialRoute(String v) {
+        this.initialRoute = v;
+    }
+
+    public void onGenerateRoute(dart.runtime.Funcs.Func1<RouteSettings, Object> v) {
+        this.onGenerateRoute = v;
+    }
+
+    public void onUnknownRoute(dart.runtime.Funcs.Func1<RouteSettings, Object> v) {
+        this.onUnknownRoute = v;
+    }
+
+    public void restorationScopeId(String v) {
+        this.restorationScopeId = v;
+    }
+
+    public void observers(Object v) {
+        this.observers = v;
+    }
+
+    public void pages(Object v) {
+        this.pages = v;
+    }
+
+    public void onPopPage(Object v) {
+        this.onPopPage = v;
+    }
+
+    @Override
+    public com.codename1.flutter.Widget build(com.codename1.flutter.BuildContext context) {
+        if (onGenerateRoute != null) {
+            RouteSettings settings = new RouteSettings();
+            settings.name(initialRoute);
+            Object route = onGenerateRoute.call(settings);
+            if (route instanceof MaterialPageRoute) {
+                dart.runtime.Funcs.Func1<com.codename1.flutter.BuildContext,
+                        com.codename1.flutter.Widget> b = ((MaterialPageRoute) route).getBuilder();
+                if (b != null) {
+                    return b.call(context);
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -107,6 +174,52 @@ public final class Navigator {
      */
     public static void reset() {
         stack.clear();
+    }
+
+    /**
+     * The single navigator handle for this process. Its {@code pop} delegates
+     * to {@link Navigator#pop}; the restoration-push helpers are no-ops that
+     * return an informational id (restoration is not persisted).
+     */
+    private static final NavigatorState STATE = new NavigatorState() {
+        @Override
+        public void pop(Object result) {
+            Navigator.pop(null);
+        }
+    };
+
+    /**
+     * The nearest navigator's mutable state ({@code Navigator.of(context)}).
+     * There is one navigator per process, so the handle is context-independent.
+     */
+    public static NavigatorState of(BuildContext context, Boolean rootNavigator) {
+        return STATE;
+    }
+
+    /**
+     * Restoration-aware push. Restoration is not persisted here, so the route
+     * is pushed immediately when it is a {@link MaterialPageRoute} and an empty
+     * (informational) restoration id is returned.
+     */
+    public static String restorablePush(BuildContext context,
+            dart.runtime.Funcs.Func2<BuildContext, Object, Object> routeBuilder, Object arguments) {
+        Object route = routeBuilder != null ? routeBuilder.call(context, arguments) : null;
+        if (route instanceof MaterialPageRoute) {
+            push(context, (MaterialPageRoute) route);
+        }
+        return "";
+    }
+
+    /**
+     * Pops the topmost route if one exists, returning whether anything was
+     * popped ({@code Navigator.maybePop}).
+     */
+    public static boolean maybePop(BuildContext context) {
+        if (stack.isEmpty()) {
+            return false;
+        }
+        pop(context);
+        return true;
     }
 
     private static final class RouteEntry {

@@ -4,48 +4,50 @@ import com.codename1.flutter.Brightness;
 import com.codename1.flutter.Color;
 
 /**
- * A material color scheme. {@link #fromSeed(Color, Brightness)} derives the
- * scheme from a seed color with a simple HSL-based approximation of Material
- * 3 tonal palettes (not the full HCT algorithm — M1 scope). The light scheme
- * (brightness null or {@code light}):
+ * A Material 3 color scheme. Two ways to build one:
  * <ul>
- *   <li>primary — seed hue/saturation at 40% lightness (tone 40)</li>
- *   <li>onPrimary — white</li>
- *   <li>inversePrimary — seed hue at 80% lightness (tone 80)</li>
- *   <li>secondary — desaturated seed at 45% lightness</li>
- *   <li>surface — near-white tinted with the seed hue (98% lightness)</li>
- *   <li>onSurface — the M3 near-black 0xFF1C1B1F</li>
+ *   <li>{@link #fromSeed(Color, Brightness)} derives the full role set from a
+ *       seed color with an HSL approximation of the M3 tonal palettes;</li>
+ *   <li>the write-once named constructor ({@code ColorScheme(primary: ...,
+ *       brightness: ...)}) sets roles explicitly — unset roles fall back to a
+ *       related role so callers that specify only a subset still read sensibly.</li>
  * </ul>
- *
- * <p>The dark scheme inverts the tone mapping (an approximation of M3's dark
- * tonal assignments — tone 80 primary on tone 6 surfaces — using HSL
- * lightness in place of HCT tone):</p>
- * <ul>
- *   <li>primary — seed hue at 80% lightness (tone 80)</li>
- *   <li>onPrimary — seed hue at 20% lightness (tone 20)</li>
- *   <li>inversePrimary — seed hue at 40% lightness (tone 40)</li>
- *   <li>secondary — desaturated seed at 70% lightness</li>
- *   <li>surface — near-black tinted with the seed hue (6% lightness)</li>
- *   <li>onSurface — the M3 near-white 0xFFE6E1E5</li>
- * </ul>
+ * The HSL derivation (not the full HCT algorithm) matches the earlier M1 scope.
  */
 public class ColorScheme {
 
-    private final Color primary;
-    private final Color inversePrimary;
-    private final Color onPrimary;
-    private final Color surface;
-    private final Color onSurface;
-    private final Color secondary;
+    private Brightness brightness;
+    private Color primary;
+    private Color onPrimary;
+    private Color primaryContainer;
+    private Color onPrimaryContainer;
+    private Color inversePrimary;
+    private Color secondary;
+    private Color onSecondary;
+    private Color secondaryContainer;
+    private Color onSecondaryContainer;
+    private Color tertiary;
+    private Color onTertiary;
+    private Color tertiaryContainer;
+    private Color onTertiaryContainer;
+    private Color error;
+    private Color onError;
+    private Color errorContainer;
+    private Color onErrorContainer;
+    private Color surface;
+    private Color onSurface;
+    private Color surfaceVariant;
+    private Color onSurfaceVariant;
+    private Color background;
+    private Color onBackground;
+    private Color outline;
+    private Color outlineVariant;
+    private Color shadow;
+    private Color scrim;
+    private Color inverseSurface;
+    private Color onInverseSurface;
 
-    public ColorScheme(Color primary, Color inversePrimary, Color onPrimary,
-                       Color surface, Color onSurface, Color secondary) {
-        this.primary = primary;
-        this.inversePrimary = inversePrimary;
-        this.onPrimary = onPrimary;
-        this.surface = surface;
-        this.onSurface = onSurface;
-        this.secondary = secondary;
+    public ColorScheme() {
     }
 
     public static ColorScheme fromSeed(Color seedColor) {
@@ -59,55 +61,160 @@ public class ColorScheme {
         double[] hsl = toHsl(seedColor.value());
         double h = hsl[0];
         double s = hsl[1];
+        ColorScheme c = new ColorScheme();
+        c.brightness = brightness;
         if (brightness == Brightness.dark) {
-            return new ColorScheme(
-                    fromHsl(h, Math.min(1, s + 0.15), 0.80),
-                    fromHsl(h, s, 0.40),
-                    fromHsl(h, s, 0.20),
-                    fromHsl(h, Math.min(0.25, s), 0.06),
-                    new Color(0xFFE6E1E5),
-                    fromHsl(h, s * 0.35, 0.70));
+            c.primary = fromHsl(h, Math.min(1, s + 0.15), 0.80);
+            c.inversePrimary = fromHsl(h, s, 0.40);
+            c.onPrimary = fromHsl(h, s, 0.20);
+            c.surface = fromHsl(h, Math.min(0.25, s), 0.06);
+            c.onSurface = new Color(0xFFE6E1E5);
+            c.secondary = fromHsl(h, s * 0.35, 0.70);
+        } else {
+            c.primary = fromHsl(h, s, 0.40);
+            c.inversePrimary = fromHsl(h, Math.min(1, s + 0.15), 0.80);
+            c.onPrimary = new Color(0xFFFFFFFF);
+            c.surface = fromHsl(h, Math.min(0.35, s), 0.98);
+            c.onSurface = new Color(0xFF1C1B1F);
+            c.secondary = fromHsl(h, s * 0.35, 0.45);
         }
-        return new ColorScheme(
-                fromHsl(h, s, 0.40),
-                fromHsl(h, Math.min(1, s + 0.15), 0.80),
-                new Color(0xFFFFFFFF),
-                fromHsl(h, Math.min(0.35, s), 0.98),
-                new Color(0xFF1C1B1F),
-                fromHsl(h, s * 0.35, 0.45));
+        return c;
     }
 
-    public Color primary() {
-        return primary;
+    private static final Color DEFAULT_SEED = new Color(0xFF6750A4);
+
+    public static ColorScheme light() {
+        return fromSeed(DEFAULT_SEED, Brightness.light);
     }
 
-    public Color inversePrimary() {
-        return inversePrimary;
+    public static ColorScheme dark() {
+        return fromSeed(DEFAULT_SEED, Brightness.dark);
     }
 
-    public Color onPrimary() {
-        return onPrimary;
+    // ------------------------------------------------------------------
+    // Named-parameter setters
+    // ------------------------------------------------------------------
+
+    public void brightness(Brightness v) { this.brightness = v; }
+    public void primary(Color v) { this.primary = v; }
+    public void onPrimary(Color v) { this.onPrimary = v; }
+    public void primaryContainer(Color v) { this.primaryContainer = v; }
+    public void onPrimaryContainer(Color v) { this.onPrimaryContainer = v; }
+    public void inversePrimary(Color v) { this.inversePrimary = v; }
+    public void secondary(Color v) { this.secondary = v; }
+    public void onSecondary(Color v) { this.onSecondary = v; }
+    public void secondaryContainer(Color v) { this.secondaryContainer = v; }
+    public void onSecondaryContainer(Color v) { this.onSecondaryContainer = v; }
+    public void tertiary(Color v) { this.tertiary = v; }
+    public void onTertiary(Color v) { this.onTertiary = v; }
+    public void tertiaryContainer(Color v) { this.tertiaryContainer = v; }
+    public void onTertiaryContainer(Color v) { this.onTertiaryContainer = v; }
+    public void error(Color v) { this.error = v; }
+    public void onError(Color v) { this.onError = v; }
+    public void errorContainer(Color v) { this.errorContainer = v; }
+    public void onErrorContainer(Color v) { this.onErrorContainer = v; }
+    public void surface(Color v) { this.surface = v; }
+    public void onSurface(Color v) { this.onSurface = v; }
+    public void surfaceVariant(Color v) { this.surfaceVariant = v; }
+    public void onSurfaceVariant(Color v) { this.onSurfaceVariant = v; }
+    public void background(Color v) { this.background = v; }
+    public void onBackground(Color v) { this.onBackground = v; }
+    public void outline(Color v) { this.outline = v; }
+    public void outlineVariant(Color v) { this.outlineVariant = v; }
+    public void shadow(Color v) { this.shadow = v; }
+    public void scrim(Color v) { this.scrim = v; }
+    public void inverseSurface(Color v) { this.inverseSurface = v; }
+    public void onInverseSurface(Color v) { this.onInverseSurface = v; }
+
+    // ------------------------------------------------------------------
+    // Getters (with role fallbacks for the unset subset)
+    // ------------------------------------------------------------------
+
+    private static Color or(Color a, Color b) {
+        return a != null ? a : b;
     }
 
-    public Color surface() {
-        return surface;
-    }
+    public Brightness brightness() { return brightness == null ? Brightness.light : brightness; }
+    public Color primary() { return primary; }
+    public Color onPrimary() { return onPrimary; }
+    public Color primaryContainer() { return or(primaryContainer, primary); }
+    public Color onPrimaryContainer() { return or(onPrimaryContainer, onPrimary); }
+    public Color inversePrimary() { return or(inversePrimary, primary); }
+    public Color secondary() { return or(secondary, primary); }
+    public Color onSecondary() { return or(onSecondary, onPrimary); }
+    public Color secondaryContainer() { return or(secondaryContainer, secondary()); }
+    public Color onSecondaryContainer() { return or(onSecondaryContainer, onSecondary()); }
+    public Color tertiary() { return or(tertiary, secondary()); }
+    public Color onTertiary() { return or(onTertiary, onSecondary()); }
+    public Color tertiaryContainer() { return or(tertiaryContainer, tertiary()); }
+    public Color onTertiaryContainer() { return or(onTertiaryContainer, onTertiary()); }
+    public Color error() { return or(error, new Color(0xFFB00020)); }
+    public Color onError() { return or(onError, new Color(0xFFFFFFFF)); }
+    public Color errorContainer() { return or(errorContainer, error()); }
+    public Color onErrorContainer() { return or(onErrorContainer, onError()); }
+    public Color surface() { return surface; }
+    public Color onSurface() { return onSurface; }
+    public Color surfaceVariant() { return or(surfaceVariant, surface); }
+    public Color onSurfaceVariant() { return or(onSurfaceVariant, onSurface); }
+    public Color background() { return or(background, surface); }
+    public Color onBackground() { return or(onBackground, onSurface); }
+    public Color outline() { return or(outline, new Color(0xFF79747E)); }
+    public Color outlineVariant() { return or(outlineVariant, outline()); }
+    public Color shadow() { return or(shadow, new Color(0xFF000000)); }
+    public Color scrim() { return or(scrim, new Color(0xFF000000)); }
+    public Color inverseSurface() { return or(inverseSurface, onSurface); }
+    public Color onInverseSurface() { return or(onInverseSurface, surface); }
 
-    public Color onSurface() {
-        return onSurface;
-    }
-
-    public Color secondary() {
-        return secondary;
+    /**
+     * Returns a copy with the supplied (non-null) roles overridden. Parameter
+     * order matches the Dart stub.
+     */
+    public ColorScheme copyWith(Brightness brightness, Color primary, Color onPrimary,
+                                Color primaryContainer, Color onPrimaryContainer, Color secondary,
+                                Color onSecondary, Color secondaryContainer, Color tertiary,
+                                Color error, Color onError, Color surface, Color onSurface,
+                                Color surfaceVariant, Color onSurfaceVariant, Color background,
+                                Color onBackground, Color outline, Color inversePrimary,
+                                Color inverseSurface, Color shadow) {
+        ColorScheme c = new ColorScheme();
+        c.brightness = brightness != null ? brightness : this.brightness;
+        c.primary = primary != null ? primary : this.primary;
+        c.onPrimary = onPrimary != null ? onPrimary : this.onPrimary;
+        c.primaryContainer = primaryContainer != null ? primaryContainer : this.primaryContainer;
+        c.onPrimaryContainer = onPrimaryContainer != null ? onPrimaryContainer : this.onPrimaryContainer;
+        c.secondary = secondary != null ? secondary : this.secondary;
+        c.onSecondary = onSecondary != null ? onSecondary : this.onSecondary;
+        c.secondaryContainer = secondaryContainer != null ? secondaryContainer : this.secondaryContainer;
+        c.tertiary = tertiary != null ? tertiary : this.tertiary;
+        c.error = error != null ? error : this.error;
+        c.onError = onError != null ? onError : this.onError;
+        c.surface = surface != null ? surface : this.surface;
+        c.onSurface = onSurface != null ? onSurface : this.onSurface;
+        c.surfaceVariant = surfaceVariant != null ? surfaceVariant : this.surfaceVariant;
+        c.onSurfaceVariant = onSurfaceVariant != null ? onSurfaceVariant : this.onSurfaceVariant;
+        c.background = background != null ? background : this.background;
+        c.onBackground = onBackground != null ? onBackground : this.onBackground;
+        c.outline = outline != null ? outline : this.outline;
+        c.inversePrimary = inversePrimary != null ? inversePrimary : this.inversePrimary;
+        c.inverseSurface = inverseSurface != null ? inverseSurface : this.inverseSurface;
+        c.shadow = shadow != null ? shadow : this.shadow;
+        // carry the rest unchanged
+        c.onSecondaryContainer = this.onSecondaryContainer;
+        c.onTertiary = this.onTertiary;
+        c.tertiaryContainer = this.tertiaryContainer;
+        c.onTertiaryContainer = this.onTertiaryContainer;
+        c.errorContainer = this.errorContainer;
+        c.onErrorContainer = this.onErrorContainer;
+        c.outlineVariant = this.outlineVariant;
+        c.scrim = this.scrim;
+        c.onInverseSurface = this.onInverseSurface;
+        return c;
     }
 
     // ------------------------------------------------------------------
     // HSL helpers
     // ------------------------------------------------------------------
 
-    /**
-     * @return {hue (0..360), saturation (0..1), lightness (0..1)}
-     */
     static double[] toHsl(int argb) {
         double r = ((argb >> 16) & 0xFF) / 255.0;
         double g = ((argb >> 8) & 0xFF) / 255.0;

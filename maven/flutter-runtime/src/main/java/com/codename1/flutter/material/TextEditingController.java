@@ -69,6 +69,21 @@ public class TextEditingController {
         }
     }
 
+    public void removeListener(Funcs.VoidFunc0 listener) {
+        if (listener != null) {
+            listeners.remove(listener);
+        }
+    }
+
+    /**
+     * Dart's {@code ChangeNotifier.dispose}: drops all listeners and unbinds
+     * from any mounted component. Idempotent.
+     */
+    public void dispose() {
+        listeners.clear();
+        this.bound = null;
+    }
+
     // ------------------------------------------------------------------
     // Framework plumbing (package private)
     // ------------------------------------------------------------------

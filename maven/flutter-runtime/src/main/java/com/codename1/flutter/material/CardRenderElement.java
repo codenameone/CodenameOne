@@ -69,6 +69,7 @@ public class CardRenderElement extends SingleChildRenderElement {
                     : Theme.of(this).colorScheme().surface().rgb();
             double elevation = card().getElevation() != null ? card().getElevation() : 1;
             RoundRectBorder border = RoundRectBorder.create()
+                    .useCache(false)
                     .cornerRadius(Dp.mm(CORNER_LP));
             if (elevation > 0) {
                 border = border

@@ -85,8 +85,15 @@ public final class AstBuilder {
     private void buildLibrary(Dart2Parser.LibraryDeclarationContext ctx, Library lib) {
         for (Dart2Parser.ImportOrExportContext ie : ctx.importOrExport()) {
             if (ie.libraryImport() != null) {
-                String uri = ie.libraryImport().importSpecification().configurableUri().getText();
+                Dart2Parser.ImportSpecificationContext spec = ie.libraryImport().importSpecification();
+                String uri = spec.configurableUri().getText();
                 lib.imports.add(stripQuotes(uri));
+                // `import '...' as prefix;` — record the prefix so prefixed member
+                // access (prefix.topLevelConst) resolves against the whole program.
+                if (spec.identifier() != null) {
+                    lib.importPrefixes.add(spec.identifier().getText());
+                    lib.prefixImports.put(spec.identifier().getText(), stripQuotes(uri));
+                }
             }
         }
         List<Dart2Parser.TopLevelDeclarationContext> decls = ctx.topLevelDeclaration();
@@ -111,6 +118,7 @@ public final class AstBuilder {
             pos(cd, ext);
             cd.name = ext.identifier() != null ? ext.identifier().getText()
                     : "Ext$" + Integer.toHexString(ext.getStart().getStartIndex());
+            cd.javaName = javaName;
             cd.extensionOn = buildType(ext.type());
             java.util.List<Dart2Parser.ClassMemberDeclarationContext> members = ext.classMemberDeclaration();
             java.util.List<Dart2Parser.MetadataContext> metas = ext.metadata();
@@ -124,6 +132,8 @@ public final class AstBuilder {
             pos(cd, mx);
             cd.name = mx.typeIdentifier().getText();
             cd.isMixin = true;
+            cd.javaName = javaName;
+            cd.javaName = javaName;
             java.util.List<Dart2Parser.ClassMemberDeclarationContext> members = mx.classMemberDeclaration();
             java.util.List<Dart2Parser.MetadataContext> metas = mx.metadata();
             for (int i = 0; i < members.size(); i++) {
@@ -165,6 +175,7 @@ public final class AstBuilder {
                     f.type = type;
                     f.isFinal = isFinal;
                     f.isStatic = true;
+                    f.javaName = javaName;
                     if (ii.expr() != null) {
                         f.initializer = buildExpr(ii.expr());
                     }
@@ -178,12 +189,103 @@ public final class AstBuilder {
                     f.type = type;
                     f.isFinal = true;
                     f.isStatic = true;
+                    f.javaName = javaName;
                     f.initializer = buildExpr(sf.expr());
                     lib.topLevelVars.add(f);
                 }
             }
+        } else if (ctx.typeAlias() != null) {
+            TypedefDecl td = buildTypedef(ctx.typeAlias());
+            if (td != null) {
+                lib.typedefs.add(td);
+            }
+        } else if (ctx.getterSignature() != null && ctx.functionBody() != null) {
+            // top-level getter: `T get x => ...;` -> a zero-arg static method on the library class
+            FunctionDecl fn = new FunctionDecl();
+            pos(fn, ctx);
+            fn.name = ctx.getterSignature().identifier().getText();
+            fn.returnType = ctx.getterSignature().type() != null
+                    ? buildType(ctx.getterSignature().type()) : TypeRef.DYNAMIC;
+            fn.isGetter = true;
+            fn.javaName = javaName;
+            buildFunctionBodyInto(ctx.functionBody(), fn);
+            lib.functions.add(fn);
+        } else if (ctx.setterSignature() != null && ctx.functionBody() != null) {
+            // top-level setter: `set x(v) { ... }` -> a static void method on the library class
+            FunctionDecl fn = new FunctionDecl();
+            pos(fn, ctx);
+            fn.name = ctx.setterSignature().identifier().getText();
+            fn.returnType = TypeRef.VOID;
+            fn.isSetter = true;
+            fn.javaName = javaName;
+            buildParams(ctx.setterSignature().formalParameterList(), fn.params);
+            buildFunctionBodyInto(ctx.functionBody(), fn);
+            lib.functions.add(fn);
         } else {
             unsupported(ctx, "E0103", "Unsupported top-level declaration: " + snippet(ctx));
+        }
+    }
+
+    private TypedefDecl buildTypedef(Dart2Parser.TypeAliasContext ctx) {
+        TypedefDecl td = new TypedefDecl();
+        pos(td, ctx);
+        if (ctx.functionTypeAlias() != null) {
+            // old-style: typedef ReturnType Name(params);
+            Dart2Parser.FunctionTypeAliasContext fta = ctx.functionTypeAlias();
+            td.name = fta.functionPrefix().identifier().getText();
+            td.returnType = fta.functionPrefix().type() != null
+                    ? buildType(fta.functionPrefix().type()) : TypeRef.DYNAMIC;
+            td.paramTypes = new java.util.ArrayList<TypeRef>();
+            if (fta.formalParameterPart() != null
+                    && fta.formalParameterPart().formalParameterList() != null) {
+                java.util.List<Param> ps = new java.util.ArrayList<Param>();
+                buildParams(fta.formalParameterPart().formalParameterList(), ps);
+                for (Param p : ps) {
+                    td.paramTypes.add(p.type == null ? TypeRef.DYNAMIC : p.type);
+                }
+            }
+            return td;
+        }
+        // new-style: typedef Name<T> = <type>;
+        td.name = ctx.typeIdentifier().getText();
+        if (ctx.typeParameters() != null) {
+            for (Dart2Parser.TypeParameterContext tp : ctx.typeParameters().typeParameter()) {
+                td.typeParams.add(tp.identifier().getText());
+            }
+        }
+        Dart2Parser.TypeContext type = ctx.type();
+        if (type != null && type.functionType() != null) {
+            fillFunctionTypedef(td, type.functionType());
+        } else if (type != null) {
+            td.aliased = buildType(type);
+        } else {
+            td.aliased = TypeRef.DYNAMIC;
+        }
+        return td;
+    }
+
+    /** Extracts the (paramTypes, returnType) signature of a {@code Ret Function(A, B)} type. */
+    private void fillFunctionTypedef(TypedefDecl td, Dart2Parser.FunctionTypeContext ft) {
+        td.returnType = ft.typeNotFunction() != null
+                ? buildTypeNotFunction(ft.typeNotFunction()) : TypeRef.DYNAMIC;
+        td.paramTypes = new java.util.ArrayList<TypeRef>();
+        Dart2Parser.FunctionTypeTailsContext tails = ft.functionTypeTails();
+        if (tails == null || tails.functionTypeTail() == null) {
+            return;
+        }
+        Dart2Parser.ParameterTypeListContext ptl = tails.functionTypeTail().parameterTypeList();
+        if (ptl == null || ptl.normalParameterTypes() == null) {
+            return;
+        }
+        for (Dart2Parser.NormalParameterTypeContext npt
+                : ptl.normalParameterTypes().normalParameterType()) {
+            if (npt.type() != null) {
+                td.paramTypes.add(buildType(npt.type()));
+            } else if (npt.typedIdentifier() != null && npt.typedIdentifier().type() != null) {
+                td.paramTypes.add(buildType(npt.typedIdentifier().type()));
+            } else {
+                td.paramTypes.add(TypeRef.DYNAMIC);
+            }
         }
     }
 
@@ -237,7 +339,25 @@ public final class AstBuilder {
         pos(ed, ctx);
         ed.name = ctx.identifier().getText();
         for (Dart2Parser.EnumEntryContext e : ctx.enumEntry()) {
-            ed.entries.add(e.identifier().getText());
+            // Dart 2.17 enhanced enums: the constant may carry constructor arguments
+            // (`material('...')`) or a named ctor (`x.named(...)`); we keep only the
+            // constant's own name. The first identifier is the constant.
+            ed.entries.add(e.identifier(0).getText());
+        }
+        // Enhanced-enum body: methods / getters, fields and constructors declared after the
+        // trailing `;`. These share the class-member grammar, so build them into a throwaway
+        // ClassDecl and lift the parsed members onto the enum.
+        List<Dart2Parser.ClassMemberDeclarationContext> members = ctx.classMemberDeclaration();
+        if (members != null && !members.isEmpty()) {
+            List<Dart2Parser.MetadataContext> metas = ctx.metadata();
+            ClassDecl holder = new ClassDecl();
+            holder.name = ed.name;
+            for (int i = 0; i < members.size(); i++) {
+                buildMember(members.get(i), metas.size() > i ? metas.get(i) : null, holder);
+            }
+            ed.fields.addAll(holder.fields);
+            ed.methods.addAll(holder.methods);
+            ed.ctors.addAll(holder.ctors);
         }
         return ed;
     }
@@ -291,6 +411,24 @@ public final class AstBuilder {
             cd.ctors.add(ctor);
             return;
         }
+        if (d.operatorSignature() != null) {
+            // abstract or external operator overload (e.g. `external Offset operator +(Offset o);`)
+            Dart2Parser.OperatorSignatureContext op = d.operatorSignature();
+            String mangled = mangleOperator(op.operator().getText());
+            if (mangled == null) {
+                unsupported(d, "E0109", "Unsupported operator overload: " + op.operator().getText());
+                return;
+            }
+            MethodDecl m = new MethodDecl();
+            pos(m, d);
+            m.isAbstract = true;
+            m.isOverride = override;
+            m.name = mangled;
+            m.returnType = op.type() != null ? buildType(op.type()) : TypeRef.VAR;
+            buildParams(op.formalParameterList(), m.params);
+            cd.methods.add(m);
+            return;
+        }
         if (d.functionSignature() != null || d.getterSignature() != null || d.setterSignature() != null) {
             // abstract or external member
             MethodDecl m = new MethodDecl();
@@ -331,6 +469,7 @@ public final class AstBuilder {
                 m.name = tmp.name;
                 m.returnType = tmp.returnType;
                 m.params = tmp.params;
+                m.typeParams = tmp.typeParams;
             } else if (d.getterSignature() != null) {
                 m.isGetter = true;
                 m.name = d.getterSignature().identifier().getText();
@@ -448,6 +587,7 @@ public final class AstBuilder {
             m.name = tmp.name;
             m.returnType = tmp.returnType;
             m.params = tmp.params;
+            m.typeParams = tmp.typeParams;
         } else if (sig.getterSignature() != null) {
             m.isGetter = true;
             m.name = sig.getterSignature().identifier().getText();
@@ -483,8 +623,12 @@ public final class AstBuilder {
                 }
                 buildArgs(e.arguments(), si.args);
                 ctor.superInit = si;
+            } else if (e.assertion() != null) {
+                // assert(...) is a debug-only runtime check with no bearing on transpiled
+                // semantics; drop it silently (production Dart strips asserts too).
+                continue;
             } else {
-                unsupported(e, "E0111", "assert(...) in initializer lists is ignored");
+                unsupported(e, "E0111", "Unsupported initializer-list entry: " + snippet(e));
             }
         }
     }
@@ -493,13 +637,20 @@ public final class AstBuilder {
         fn.returnType = sig.type() != null ? buildType(sig.type()) : TypeRef.VAR;
         fn.name = sig.identifier().getText();
         if (sig.formalParameterPart().typeParameters() != null) {
-            unsupported(sig, "E0112", "Generic methods are not supported yet (M2)");
+            for (Dart2Parser.TypeParameterContext tp
+                    : sig.formalParameterPart().typeParameters().typeParameter()) {
+                fn.typeParams.add(tp.identifier().getText());
+            }
         }
         buildParams(sig.formalParameterPart().formalParameterList(), fn.params);
     }
 
     private void buildFunctionBodyInto(Dart2Parser.FunctionBodyContext body, FunctionDecl fn) {
-        fn.isAsync = checkBodyModifiers(body);
+        if (body.SYNC_() != null && body.ST() != null) {
+            fn.isSyncStar = true;
+        } else {
+            fn.isAsync = checkBodyModifiers(body);
+        }
         if (body.block() != null) {
             fn.body = buildBlock(body.block());
         } else if (body.expr() != null) {
@@ -508,7 +659,12 @@ public final class AstBuilder {
     }
 
     private void buildFunctionBodyIntoMethod(Dart2Parser.FunctionBodyContext body, MethodDecl m) {
-        m.isAsync = checkBodyModifiers(body);
+        if (body.SYNC_() != null && body.ST() != null) {
+            // sync* generator: lowered by the emitter to a list-collecting body.
+            m.isSyncStar = true;
+        } else {
+            m.isAsync = checkBodyModifiers(body);
+        }
         if (body.block() != null) {
             m.body = buildBlock(body.block());
         } else if (body.expr() != null) {
@@ -519,7 +675,7 @@ public final class AstBuilder {
     /** Returns true when the body is async (plain `async`, not a generator). */
     private boolean checkBodyModifiers(Dart2Parser.FunctionBodyContext body) {
         if (body.ST() != null) {
-            unsupported(body, "E0303", "Generator bodies (sync*/async*) are not supported yet (M5)");
+            unsupported(body, "E0303", "async* generator bodies are not supported yet (M5)");
         }
         if (body.NATIVE_() != null) {
             unsupported(body, "E0113", "native bodies are not supported");
@@ -621,13 +777,40 @@ public final class AstBuilder {
 
     private TypeRef buildType(Dart2Parser.TypeContext ctx) {
         if (ctx.functionType() != null) {
-            // Function types appear in stubs (e.g. VoidCallback typedefs cover most cases).
+            // Inline function type (e.g. `void Function(int)`): preserve the signature so
+            // codegen can render a real Funcs.* SAM instead of falling back to Object.
             TypeRef t = new TypeRef("Function");
             pos(t, ctx);
             t.nullable = ctx.QU() != null;
+            fillFunctionSignature(t, ctx.functionType());
             return t;
         }
         return buildTypeNotFunction(ctx.typeNotFunction());
+    }
+
+    /** Captures the (paramTypes, returnType) of an inline {@code Ret Function(A, B)} type onto a TypeRef. */
+    private void fillFunctionSignature(TypeRef t, Dart2Parser.FunctionTypeContext ft) {
+        t.funcReturn = ft.typeNotFunction() != null
+                ? buildTypeNotFunction(ft.typeNotFunction()) : TypeRef.DYNAMIC;
+        t.funcParams = new java.util.ArrayList<TypeRef>();
+        Dart2Parser.FunctionTypeTailsContext tails = ft.functionTypeTails();
+        if (tails == null || tails.functionTypeTail() == null) {
+            return;
+        }
+        Dart2Parser.ParameterTypeListContext ptl = tails.functionTypeTail().parameterTypeList();
+        if (ptl == null || ptl.normalParameterTypes() == null) {
+            return;
+        }
+        for (Dart2Parser.NormalParameterTypeContext npt
+                : ptl.normalParameterTypes().normalParameterType()) {
+            if (npt.type() != null) {
+                t.funcParams.add(buildType(npt.type()));
+            } else if (npt.typedIdentifier() != null && npt.typedIdentifier().type() != null) {
+                t.funcParams.add(buildType(npt.typedIdentifier().type()));
+            } else {
+                t.funcParams.add(TypeRef.DYNAMIC);
+            }
+        }
     }
 
     private TypeRef buildTypeNotFunction(Dart2Parser.TypeNotFunctionContext ctx) {
@@ -641,6 +824,7 @@ public final class AstBuilder {
         if (ctx.functionType() != null) {
             TypeRef t = new TypeRef("Function");
             pos(t, ctx);
+            fillFunctionSignature(t, ctx.functionType());
             return t;
         }
         return buildTypeNotVoidNotFunction(ctx.typeNotVoidNotFunction());
@@ -702,7 +886,15 @@ public final class AstBuilder {
     }
 
     private Stmt buildStatement(Dart2Parser.StatementContext ctx) {
+        if (ctx == null) {
+            return null;
+        }
         Dart2Parser.NonLabelledStatementContext s = ctx.nonLabelledStatement();
+        if (s == null) {
+            // parser error-recovery can leave an empty statement node; a preceding
+            // syntax (E0001) diagnostic already flags the real cause.
+            return null;
+        }
         if (s.block() != null) {
             return buildBlock(s.block());
         }
@@ -718,6 +910,19 @@ public final class AstBuilder {
             es.expr = buildExpr(s.expressionStatement().expr());
             return es;
         }
+        if (s.yieldStatement() != null) {
+            YieldStmt y = new YieldStmt();
+            pos(y, s);
+            y.value = buildExpr(s.yieldStatement().expr());
+            return y;
+        }
+        if (s.yieldEachStatement() != null) {
+            YieldStmt y = new YieldStmt();
+            pos(y, s);
+            y.star = true;
+            y.value = buildExpr(s.yieldEachStatement().expr());
+            return y;
+        }
         if (s.returnStatement() != null) {
             ReturnStmt r = new ReturnStmt();
             pos(r, s);
@@ -730,6 +935,14 @@ public final class AstBuilder {
             IfStmt i = new IfStmt();
             pos(i, s);
             i.condition = buildExpr(s.ifStatement().expr());
+            // Dart 3 if-case: `if (expr case pattern [when guard]) ...`
+            if (s.ifStatement().guardedPattern() != null) {
+                Dart2Parser.GuardedPatternContext gp = s.ifStatement().guardedPattern();
+                i.casePattern = buildPattern(gp.pattern());
+                if (gp.WHEN_() != null && gp.expr() != null) {
+                    i.caseGuard = buildExpr(gp.expr());
+                }
+            }
             i.thenStmt = buildStatement(s.ifStatement().statement(0));
             if (s.ifStatement().statement().size() > 1) {
                 i.elseStmt = buildStatement(s.ifStatement().statement(1));
@@ -759,8 +972,277 @@ public final class AstBuilder {
             pos(c, s);
             return c;
         }
+        if (s.switchStatement() != null) {
+            return buildSwitch(s.switchStatement());
+        }
+        if (s.assertStatement() != null) {
+            // assert(...) is a debug-only runtime check with no bearing on transpiled
+            // semantics; drop it (production Dart strips asserts too), mirroring the
+            // initializer-list assert case. Blocks skip null statements.
+            return null;
+        }
+        if (s.localFunctionDeclaration() != null) {
+            return buildLocalFunction(s.localFunctionDeclaration());
+        }
         unsupported(s, "E0115", "Unsupported statement: " + snippet(s));
         return null;
+    }
+
+    /** A nested function declaration: `Ret name(params) { ... }` inside a body. */
+    private Stmt buildLocalFunction(Dart2Parser.LocalFunctionDeclarationContext ctx) {
+        LocalFunc lf = new LocalFunc();
+        pos(lf, ctx);
+        Dart2Parser.FunctionSignatureContext sig = ctx.functionSignature();
+        lf.returnType = sig.type() != null ? buildType(sig.type()) : TypeRef.VAR;
+        lf.name = sig.identifier().getText();
+        buildParams(sig.formalParameterPart().formalParameterList(), lf.params);
+        Dart2Parser.FunctionBodyContext body = ctx.functionBody();
+        lf.isAsync = checkBodyModifiers(body);
+        if (body.block() != null) {
+            lf.body = buildBlock(body.block());
+        } else if (body.expr() != null) {
+            lf.exprBody = buildExpr(body.expr());
+        }
+        return lf;
+    }
+
+    // ------------------------------------------------------------------
+    // Dart 3: switch statements / expressions and patterns
+    // ------------------------------------------------------------------
+
+    private Stmt buildSwitch(Dart2Parser.SwitchStatementContext ctx) {
+        SwitchStmt sw = new SwitchStmt();
+        pos(sw, ctx);
+        sw.subject = buildExpr(ctx.expr());
+        for (Dart2Parser.SwitchCaseContext cc : ctx.switchCase()) {
+            SwitchCase c = new SwitchCase();
+            pos(c, cc);
+            c.pattern = buildPattern(cc.guardedPattern().pattern());
+            if (cc.guardedPattern().WHEN_() != null && cc.guardedPattern().expr() != null) {
+                c.guard = buildExpr(cc.guardedPattern().expr());
+            }
+            addStatements(cc.statements(), c.body);
+            sw.cases.add(c);
+        }
+        if (ctx.defaultCase() != null) {
+            SwitchCase c = new SwitchCase();
+            pos(c, ctx.defaultCase());
+            c.isDefault = true;
+            addStatements(ctx.defaultCase().statements(), c.body);
+            sw.cases.add(c);
+        }
+        return sw;
+    }
+
+    private void addStatements(Dart2Parser.StatementsContext ctx, List<Stmt> out) {
+        if (ctx == null) {
+            return;
+        }
+        for (Dart2Parser.StatementContext st : ctx.statement()) {
+            Stmt s = buildStatement(st);
+            if (s != null) {
+                out.add(s);
+            }
+        }
+    }
+
+    private Expr buildSwitchExpr(Dart2Parser.SwitchExpressionContext ctx) {
+        SwitchExpr sw = new SwitchExpr();
+        pos(sw, ctx);
+        sw.subject = buildExpr(ctx.expr());
+        for (Dart2Parser.SwitchExpressionCaseContext ec : ctx.switchExpressionCase()) {
+            SwitchExprCase c = new SwitchExprCase();
+            pos(c, ec);
+            c.pattern = buildPattern(ec.guardedPattern().pattern());
+            if (ec.guardedPattern().WHEN_() != null && ec.guardedPattern().expr() != null) {
+                c.guard = buildExpr(ec.guardedPattern().expr());
+            }
+            c.value = buildExpr(ec.expr());
+            if (c.guard == null && c.pattern instanceof VariablePattern
+                    && ((VariablePattern) c.pattern).wildcard) {
+                c.isDefault = true;
+            }
+            sw.cases.add(c);
+        }
+        return sw;
+    }
+
+    private Pattern buildPattern(Dart2Parser.PatternContext ctx) {
+        return buildOrPattern(ctx.logicalOrPattern());
+    }
+
+    private Pattern buildOrPattern(Dart2Parser.LogicalOrPatternContext ctx) {
+        List<Dart2Parser.LogicalAndPatternContext> ands = ctx.logicalAndPattern();
+        if (ands.size() == 1) {
+            return buildAndPattern(ands.get(0));
+        }
+        OrPattern or = new OrPattern();
+        pos(or, ctx);
+        for (Dart2Parser.LogicalAndPatternContext a : ands) {
+            or.alternatives.add(buildAndPattern(a));
+        }
+        return or;
+    }
+
+    private Pattern buildAndPattern(Dart2Parser.LogicalAndPatternContext ctx) {
+        List<Dart2Parser.RelationalPatternContext> rels = ctx.relationalPattern();
+        if (rels.size() == 1) {
+            return buildRelationalPattern(rels.get(0));
+        }
+        AndPattern and = new AndPattern();
+        pos(and, ctx);
+        for (Dart2Parser.RelationalPatternContext r : rels) {
+            and.parts.add(buildRelationalPattern(r));
+        }
+        return and;
+    }
+
+    private Pattern buildRelationalPattern(Dart2Parser.RelationalPatternContext ctx) {
+        if (ctx.unaryPattern() != null) {
+            return buildUnaryPattern(ctx.unaryPattern());
+        }
+        RelationalPattern r = new RelationalPattern();
+        pos(r, ctx);
+        if (ctx.EE() != null) {
+            r.op = "==";
+        } else if (ctx.NE() != null) {
+            r.op = "!=";
+        } else if (ctx.LTE() != null) {
+            r.op = "<=";
+        } else if (ctx.GT() != null && ctx.EQ() != null) {
+            r.op = ">=";
+        } else if (ctx.LT() != null) {
+            r.op = "<";
+        } else {
+            r.op = ">";
+        }
+        r.operand = buildBitwiseOr(ctx.bitwiseOrExpression());
+        return r;
+    }
+
+    private Pattern buildUnaryPattern(Dart2Parser.UnaryPatternContext ctx) {
+        Pattern p = buildPrimaryPattern(ctx.primaryPattern());
+        if (ctx.AS_() != null && ctx.type() != null) {
+            CastPattern c = new CastPattern();
+            pos(c, ctx);
+            c.inner = p;
+            c.type = buildType(ctx.type());
+            return c;
+        }
+        return p;
+    }
+
+    private Pattern buildPrimaryPattern(Dart2Parser.PrimaryPatternContext ctx) {
+        if (ctx.constantPattern() != null) {
+            ConstantPattern c = new ConstantPattern();
+            pos(c, ctx);
+            Dart2Parser.ConstantPatternContext cp = ctx.constantPattern();
+            c.value = parseExprFragment(cp.getText(), cp.getStart().getLine(),
+                    cp.getStart().getCharPositionInLine());
+            return c;
+        }
+        if (ctx.objectPattern() != null) {
+            return buildObjectPattern(ctx.objectPattern());
+        }
+        if (ctx.recordPattern() != null) {
+            return buildRecordPattern(ctx.recordPattern());
+        }
+        if (ctx.listPattern() != null) {
+            return buildListPattern(ctx.listPattern());
+        }
+        if (ctx.variablePattern() != null) {
+            return buildVariablePattern(ctx.variablePattern());
+        }
+        if (ctx.pattern() != null) {
+            return buildPattern(ctx.pattern());
+        }
+        unsupported(ctx, "E0430", "Unsupported pattern: " + snippet(ctx));
+        return null;
+    }
+
+    private Pattern buildVariablePattern(Dart2Parser.VariablePatternContext ctx) {
+        VariablePattern v = new VariablePattern();
+        pos(v, ctx);
+        v.name = ctx.identifier().getText();
+        if ("_".equals(v.name)) {
+            v.wildcard = true;
+        }
+        if (ctx.type() != null) {
+            v.type = buildType(ctx.type());
+        }
+        return v;
+    }
+
+    private Pattern buildObjectPattern(Dart2Parser.ObjectPatternContext ctx) {
+        ObjectPattern o = new ObjectPattern();
+        pos(o, ctx);
+        o.type = new TypeRef(ctx.typeName().getText());
+        if (ctx.typeArguments() != null) {
+            for (Dart2Parser.TypeContext t : ctx.typeArguments().typeList().type()) {
+                o.type.args.add(buildType(t));
+            }
+        }
+        for (Dart2Parser.PatternFieldContext pf : ctx.patternField()) {
+            o.fields.add(buildPatternField(pf));
+        }
+        return o;
+    }
+
+    private Pattern buildRecordPattern(Dart2Parser.RecordPatternContext ctx) {
+        RecordPattern r = new RecordPattern();
+        pos(r, ctx);
+        for (Dart2Parser.PatternFieldContext pf : ctx.patternField()) {
+            r.fields.add(buildPatternField(pf));
+        }
+        return r;
+    }
+
+    private Pattern buildListPattern(Dart2Parser.ListPatternContext ctx) {
+        ListPattern l = new ListPattern();
+        pos(l, ctx);
+        for (Dart2Parser.PatternContext p : ctx.pattern()) {
+            l.elements.add(buildPattern(p));
+        }
+        return l;
+    }
+
+    private Expr buildRecordLit(Dart2Parser.RecordLiteralContext ctx) {
+        RecordLit r = new RecordLit();
+        pos(r, ctx);
+        // 2nd grammar alt: a leading `identifier : expr` named field
+        if (ctx.identifier() != null && ctx.expr() != null) {
+            RecordField f = new RecordField();
+            pos(f, ctx);
+            f.name = ctx.identifier().getText();
+            f.value = buildExpr(ctx.expr());
+            r.fields.add(f);
+        }
+        for (Dart2Parser.RecordFieldContext rf : ctx.recordField()) {
+            RecordField f = new RecordField();
+            pos(f, rf);
+            if (rf.identifier() != null) {
+                f.name = rf.identifier().getText();
+            }
+            f.value = buildExpr(rf.expr());
+            r.fields.add(f);
+        }
+        return r;
+    }
+
+    private PatternField buildPatternField(Dart2Parser.PatternFieldContext ctx) {
+        PatternField f = new PatternField();
+        pos(f, ctx);
+        if (ctx.identifier() != null) {
+            f.name = ctx.identifier().getText();
+        }
+        f.pattern = buildPattern(ctx.pattern());
+        // `Circle(:var radius)` shorthand — a colon with no name defaults to the bound variable's
+        // name. This must NOT fire for positional record fields like `(var x, var y)`, which have no
+        // colon and stay positional.
+        if (f.name == null && ctx.CO() != null && f.pattern instanceof VariablePattern) {
+            f.name = ((VariablePattern) f.pattern).name;
+        }
+        return f;
     }
 
     private Stmt buildTry(Dart2Parser.TryStatementContext ctx) {
@@ -831,7 +1313,11 @@ public final class AstBuilder {
         if (parts.IN_() != null) {
             ForInStmt fi = new ForInStmt();
             pos(fi, ctx);
-            if (parts.declaredIdentifier() != null) {
+            if (parts.pattern() != null) {
+                // Dart 3 pattern for-in: `for (final (a, b) in xs)` / `for (var [x] in xs)`
+                fi.pattern = buildPattern(parts.pattern());
+                fi.varType = TypeRef.VAR;
+            } else if (parts.declaredIdentifier() != null) {
                 fi.varName = parts.declaredIdentifier().identifier().getText();
                 fi.varType = buildFinalConstVarOrType(parts.declaredIdentifier().finalConstVarOrType());
             } else {
@@ -1291,6 +1777,11 @@ public final class AstBuilder {
     }
 
     private Expr buildPrimary(Dart2Parser.PrimaryContext ctx) {
+        if (ctx == null) {
+            // parser error-recovery can hand us a null primary; a preceding syntax
+            // (E0001) diagnostic already flags the real cause, so degrade gracefully.
+            return errExpr(null);
+        }
         if (ctx.thisExpression() != null) {
             ThisExpr t = new ThisExpr();
             pos(t, ctx);
@@ -1336,6 +1827,12 @@ public final class AstBuilder {
             cc.ctorName = ci.identifier().getText();
             buildArgs(ci.arguments(), cc.args);
             return cc;
+        }
+        if (ctx.switchExpression() != null) {
+            return buildSwitchExpr(ctx.switchExpression());
+        }
+        if (ctx.recordLiteral() != null) {
+            return buildRecordLit(ctx.recordLiteral());
         }
         if (ctx.expr() != null) {
             ParenExpr p = new ParenExpr();
@@ -1496,7 +1993,11 @@ public final class AstBuilder {
             pos(fe, e);
             Dart2Parser.ForLoopPartsContext parts = f.forLoopParts();
             if (parts.IN_() != null) {
-                if (parts.declaredIdentifier() != null) {
+                if (parts.pattern() != null) {
+                    // Dart 3 pattern for-in element: `for (final (i, x) in xs.indexed) ...`
+                    fe.pattern = buildPattern(parts.pattern());
+                    fe.varType = TypeRef.VAR;
+                } else if (parts.declaredIdentifier() != null) {
                     fe.varName = parts.declaredIdentifier().identifier().getText();
                     fe.varType = buildFinalConstVarOrType(parts.declaredIdentifier().finalConstVarOrType());
                 } else {
@@ -1529,34 +2030,91 @@ public final class AstBuilder {
             return fe;
         }
         if (e.mapElement() != null) {
-            unsupported(e, "E0204", "Map entries are only supported directly inside map literals");
-            return null;
+            // A key:value entry — valid when this element is (transitively) inside a map literal.
+            MapEntry me = new MapEntry();
+            pos(me, e);
+            me.key = buildExpr(e.mapElement().expr(0));
+            me.value = buildExpr(e.mapElement().expr(1));
+            return me;
         }
         return null;
     }
 
     private Expr buildSetOrMapLiteral(Dart2Parser.SetOrMapLiteralContext ctx) {
+        // Set vs map disambiguation (matching Dart): explicit <T>{...} or <K,V>{...} decides;
+        // otherwise a top-level `k: v` entry means a map, and any other non-empty body is a set.
+        List<Dart2Parser.TypeContext> typeArgs = ctx.typeArguments() != null
+                ? ctx.typeArguments().typeList().type() : null;
+        boolean hasMapEntry = false;
+        boolean hasAnyElement = ctx.elements() != null && !ctx.elements().element().isEmpty();
+        if (ctx.elements() != null) {
+            for (Dart2Parser.ElementContext e : ctx.elements().element()) {
+                if (e.mapElement() != null) {
+                    hasMapEntry = true;
+                    break;
+                }
+            }
+        }
+        boolean isSet;
+        if (typeArgs != null) {
+            isSet = typeArgs.size() == 1;
+        } else {
+            isSet = hasAnyElement && !hasMapEntry;
+        }
+        if (isSet) {
+            SetLit s = new SetLit();
+            pos(s, ctx);
+            s.isConst = ctx.CONST_() != null;
+            if (typeArgs != null && typeArgs.size() == 1) {
+                s.elementType = buildType(typeArgs.get(0));
+            }
+            if (ctx.elements() != null) {
+                for (Dart2Parser.ElementContext e : ctx.elements().element()) {
+                    Expr el = buildElement(e);
+                    if (el != null) {
+                        s.elements.add(el);
+                    }
+                }
+            }
+            return s;
+        }
         MapLit m = new MapLit();
         pos(m, ctx);
         m.isConst = ctx.CONST_() != null;
-        if (ctx.typeArguments() != null) {
-            List<Dart2Parser.TypeContext> args = ctx.typeArguments().typeList().type();
-            if (args.size() == 1) {
-                unsupported(ctx, "E0202", "Set literals are not supported yet (M2)");
-                return errExpr(ctx);
+        if (typeArgs != null && typeArgs.size() >= 2) {
+            m.keyType = buildType(typeArgs.get(0));
+            m.valueType = buildType(typeArgs.get(1));
+        }
+        boolean structured = false;
+        if (ctx.elements() != null) {
+            for (Dart2Parser.ElementContext e : ctx.elements().element()) {
+                if (e.ifElement() != null || e.forElement() != null || e.spreadElement() != null) {
+                    structured = true;
+                    break;
+                }
             }
-            m.keyType = buildType(args.get(0));
-            m.valueType = buildType(args.get(1));
+        }
+        if (structured) {
+            // Collection if/for/spread in a map literal: keep an ordered element list and let the
+            // emitter lower it to a DartMap builder (conditional / looped put()).
+            m.structured = true;
+            if (ctx.elements() != null) {
+                for (Dart2Parser.ElementContext e : ctx.elements().element()) {
+                    Expr el = buildElement(e);
+                    if (el != null) {
+                        m.elements.add(el);
+                    }
+                }
+            }
+            return m;
         }
         if (ctx.elements() != null) {
             for (Dart2Parser.ElementContext e : ctx.elements().element()) {
                 if (e.mapElement() != null) {
                     m.keys.add(buildExpr(e.mapElement().expr(0)));
                     m.values.add(buildExpr(e.mapElement().expr(1)));
-                } else if (e.expressionElement() != null) {
-                    unsupported(e, "E0202", "Set literals are not supported yet (M2)");
                 } else {
-                    unsupported(e, "E0201", "Collection if/for/spread elements are not supported yet (M2)");
+                    unsupported(e, "E0204", "Map entries are only supported directly inside map literals");
                 }
             }
         }

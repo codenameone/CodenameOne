@@ -28,6 +28,28 @@ public class Future<T> {
     Future() {
     }
 
+    /**
+     * Creates a future already completed with {@code v}. Lets an immediately
+     * available subclass in another package (e.g. Flutter foundation's
+     * {@code SynchronousFuture}) bridge in, since the no-arg constructor and
+     * {@link #complete} are package-private.
+     */
+    protected Future(T v) {
+        complete(v);
+    }
+
+    /**
+     * The completed value if this future has already resolved synchronously
+     * (e.g. a {@code SynchronousFuture}), otherwise null. Lets synchronous
+     * consumers such as the Localizations delegate pipeline read the result
+     * without parking the EDT.
+     */
+    public T getNow() {
+        synchronized (lock) {
+            return done ? value : null;
+        }
+    }
+
     /** An already-completed future. */
     public static <T> Future<T> value(T v) {
         Future<T> f = new Future<T>();
@@ -48,7 +70,25 @@ public class Future<T> {
      * thread sleeps and completes — no daemon flags, so the JVM can exit.
      */
     public static Future<Object> delayed(dart.core.Duration duration) {
-        return delayed(duration, null);
+        return delayed(duration, (Funcs.Func0<Object>) null);
+    }
+
+    /**
+     * Future.delayed with a void computation body. Dart's {@code computation}
+     * returns {@code FutureOr<T>}; a statement-body closure transpiles to a
+     * {@link Funcs.VoidFunc0}, so this overload lets those bind without forcing
+     * an artificial return value.
+     */
+    public static Future<Object> delayed(dart.core.Duration duration, final Funcs.VoidFunc0 computation) {
+        return delayed(duration, new Funcs.Func0<Object>() {
+            @Override
+            public Object call() {
+                if (computation != null) {
+                    computation.call();
+                }
+                return null;
+            }
+        });
     }
 
     public static Future<Object> delayed(dart.core.Duration duration, final Funcs.Func0<Object> computation) {
@@ -110,6 +150,72 @@ public class Future<T> {
             }
         });
         return next;
+    }
+
+    /**
+     * {@code then} with a void callback body — the common statement-body
+     * {@code .then((_) { ... })} shape, which transpiles to a
+     * {@link Funcs.VoidFunc1}. Mirrors {@link #then(Funcs.Func1)} but discards
+     * the (absent) callback result.
+     */
+    public Future<Object> then(final Funcs.VoidFunc1<T> onValue) {
+        return then(new Funcs.Func1<T, Object>() {
+            @Override
+            public Object call(T v) {
+                onValue.call(v);
+                return null;
+            }
+        });
+    }
+
+    /**
+     * {@code catchError} with a void handler {@code (error) { ... }}: runs the
+     * handler if this future completed with an error, recovering the chain.
+     */
+    public Future<T> catchError(final Funcs.VoidFunc1<Object> onError) {
+        onComplete(new Runnable() {
+            @Override
+            public void run() {
+                if (error != null) {
+                    onError.call(error);
+                }
+            }
+        });
+        return this;
+    }
+
+    /**
+     * {@code catchError} with a value-returning handler {@code (error) => v}:
+     * substitutes the recovery value when this future completed with an error.
+     */
+    public Future<Object> catchError(final Funcs.Func1<Object, Object> onError) {
+        final Future<Object> next = new Future<Object>();
+        onComplete(new Runnable() {
+            @Override
+            public void run() {
+                if (error != null) {
+                    try {
+                        next.complete(onError.call(error));
+                    } catch (Throwable t) {
+                        next.completeError(t);
+                    }
+                } else {
+                    next.complete(value);
+                }
+            }
+        });
+        return next;
+    }
+
+    /** {@code catchError(onError, test: ...)} — the optional {@code test} filter is accepted
+     *  for API shape (all errors are handled here). Void-handler form. */
+    public Future<T> catchError(final Funcs.VoidFunc1<Object> onError, Object test) {
+        return catchError(onError);
+    }
+
+    /** {@code catchError(onError, test: ...)} — value-handler form. */
+    public Future<Object> catchError(final Funcs.Func1<Object, Object> onError, Object test) {
+        return catchError(onError);
     }
 
     public Future<T> whenComplete(final Funcs.VoidFunc0 action) {

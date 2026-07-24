@@ -16,6 +16,16 @@ public class AlertDialog extends Widget {
     private Widget title;
     private Widget content;
     private DartList<Widget> actions;
+    private com.codename1.flutter.ShapeBorder shape;
+    private com.codename1.flutter.Color backgroundColor;
+
+    public void shape(com.codename1.flutter.ShapeBorder v) {
+        this.shape = v;
+    }
+
+    public void backgroundColor(com.codename1.flutter.Color v) {
+        this.backgroundColor = v;
+    }
 
     public void title(Widget v) {
         this.title = v;

@@ -81,6 +81,45 @@ public abstract class Element implements BuildContext {
         return null;
     }
 
+    @Override
+    public <W extends Widget> W dependOnInheritedWidgetOfExactType(Class<W> type) {
+        Element a = parent;
+        while (a != null) {
+            if (a.widget != null && type.isInstance(a.widget)) {
+                return type.cast(a.widget);
+            }
+            a = a.parent;
+        }
+        return null;
+    }
+
+    @Override
+    public Object providerValueOfType(Class<?> type) {
+        Element a = parent;
+        while (a != null) {
+            if (a.widget instanceof InheritedValueProvider) {
+                Object v = ((InheritedValueProvider) a.widget).providedValueFor(type);
+                if (v != null) {
+                    return v;
+                }
+            }
+            a = a.parent;
+        }
+        return null;
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> T watch(Class<T> type) {
+        return (T) providerValueOfType(type);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> T read(Class<T> type) {
+        return (T) providerValueOfType(type);
+    }
+
     // ------------------------------------------------------------------
     // Lifecycle
     // ------------------------------------------------------------------

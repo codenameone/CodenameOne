@@ -3,14 +3,16 @@ package com.codename1.flutter;
 /**
  * Immutable offsets for each of the four box edges, in logical pixels.
  */
-public final class EdgeInsets {
+public class EdgeInsets extends EdgeInsetsGeometry {
+
+    public static final EdgeInsets zero = new EdgeInsets(0, 0, 0, 0);
 
     private final double left;
     private final double top;
     private final double right;
     private final double bottom;
 
-    private EdgeInsets(double left, double top, double right, double bottom) {
+    protected EdgeInsets(double left, double top, double right, double bottom) {
         this.left = left;
         this.top = top;
         this.right = right;
@@ -29,6 +31,10 @@ public final class EdgeInsets {
         return new EdgeInsets(horizontal, vertical, horizontal, vertical);
     }
 
+    public static EdgeInsets fromLTRB(double left, double top, double right, double bottom) {
+        return new EdgeInsets(left, top, right, bottom);
+    }
+
     public double left() {
         return left;
     }
@@ -43,6 +49,19 @@ public final class EdgeInsets {
 
     public double bottom() {
         return bottom;
+    }
+
+    /**
+     * {@code EdgeInsetsGeometry.add}: the edge-wise sum of this and {@code other}.
+     * When {@code other} is a direction-relative inset it cannot be resolved
+     * without a text direction, so only the absolute component contributes.
+     */
+    public EdgeInsets add(EdgeInsetsGeometry other) {
+        if (other instanceof EdgeInsets) {
+            EdgeInsets o = (EdgeInsets) other;
+            return new EdgeInsets(left + o.left, top + o.top, right + o.right, bottom + o.bottom);
+        }
+        return this;
     }
 
     public double horizontal() {

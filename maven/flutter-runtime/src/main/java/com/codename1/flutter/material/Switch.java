@@ -24,6 +24,10 @@ public class Switch extends Widget {
         this.onChanged = v;
     }
 
+    /** The color of the track/thumb when the switch is on — Flutter's {@code activeColor}. */
+    public void activeColor(com.codename1.flutter.Color v) {
+    }
+
     public boolean getValue() {
         return value;
     }

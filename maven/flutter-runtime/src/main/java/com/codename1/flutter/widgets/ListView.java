@@ -29,6 +29,43 @@ public class ListView extends Widget {
     private boolean shrinkWrap;
     private Long itemCount;
     private Funcs.Func2<BuildContext, Long, Widget> itemBuilder;
+    private String restorationId;
+    private ScrollPhysics physics;
+    private boolean reverse;
+    private com.codename1.flutter.Axis scrollDirection = com.codename1.flutter.Axis.vertical;
+    private ScrollController controller;
+
+    public void restorationId(String v) {
+        this.restorationId = v;
+    }
+
+    public void physics(ScrollPhysics v) {
+        this.physics = v;
+    }
+
+    public void reverse(boolean v) {
+        this.reverse = v;
+    }
+
+    public void scrollDirection(com.codename1.flutter.Axis v) {
+        this.scrollDirection = v;
+    }
+
+    public void controller(ScrollController v) {
+        this.controller = v;
+    }
+
+    public ScrollPhysics getPhysics() {
+        return physics;
+    }
+
+    public boolean getReverse() {
+        return reverse;
+    }
+
+    public com.codename1.flutter.Axis getScrollDirection() {
+        return scrollDirection;
+    }
 
     public ListView() {
     }
@@ -65,6 +102,21 @@ public class ListView extends Widget {
         this.shrinkWrap = v;
     }
 
+    /**
+     * A fixed per-item extent along the scroll axis — Flutter's
+     * {@code ListView.itemExtent}. Held for a later layout pass.
+     */
+    public void itemExtent(double v) {
+    }
+
+    /**
+     * Whether this is the primary scroll view associated with the parent
+     * {@code PrimaryScrollController} ({@code ListView.primary}). Accepted for
+     * API compatibility; scroll-controller association is not modelled here.
+     */
+    public void primary(boolean v) {
+    }
+
     public DartList<Widget> getChildren() {
         return children;
     }
@@ -87,6 +139,23 @@ public class ListView extends Widget {
 
     public boolean isBuilderMode() {
         return itemBuilder != null;
+    }
+
+    /**
+     * Dart's {@code ListView.separated} named constructor. The separators are
+     * not materialized at this milestone (a later pass interleaves
+     * {@code separatorBuilder(context, index)} between items); the items
+     * themselves build exactly like {@link #builder}.
+     */
+    public static ListView separated(Key key, Long itemCount,
+                                     Funcs.Func2<BuildContext, Long, Widget> itemBuilder,
+                                     Funcs.Func2<BuildContext, Long, Widget> separatorBuilder,
+                                     EdgeInsets padding, Boolean shrinkWrap) {
+        ListView l = builder(key, itemCount, itemBuilder, padding);
+        if (shrinkWrap != null) {
+            l.shrinkWrap(shrinkWrap);
+        }
+        return l;
     }
 
     @Override

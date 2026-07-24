@@ -14,6 +14,12 @@ import java.util.RandomAccess;
  *
  * <p>Indexes in the Dart API arrive as {@code long} (Dart int); they are
  * range-checked with Dart's RangeError semantics.</p>
+ *
+ * <p>All the Dart-API methods route element access through the overridable
+ * {@link #get(int)}/{@link #set(int, Object)}/{@link #size()}/{@link #add(Object)}
+ * accessors, so a subclass backed by a primitive array (see
+ * {@link DartLongList}, {@link DartDoubleList}) inherits the whole surface
+ * while avoiding boxing on the hot index/add paths.</p>
  */
 public class DartList<E> extends AbstractList<E> implements RandomAccess {
 
@@ -25,8 +31,14 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         this.growable = true;
     }
 
-    private DartList(ArrayList<E> impl, boolean growable) {
+    DartList(ArrayList<E> impl, boolean growable) {
         this.impl = impl;
+        this.growable = growable;
+    }
+
+    /** Subclass hook: primitive-backed lists pass their own storage marker. */
+    DartList(boolean growable) {
+        this.impl = null;
         this.growable = growable;
     }
 
@@ -74,14 +86,19 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         return generate(length, generator, true);
     }
 
-    private void checkGrowable(String op) {
+    final boolean isGrowable() {
+        return growable;
+    }
+
+    void checkGrowable(String op) {
         if (!growable) {
             throw new UnsupportedError(op + " on a fixed-length list");
         }
     }
 
     // ------------------------------------------------------------------
-    // java.util.List plumbing
+    // java.util.List plumbing — the storage accessors (overridden by
+    // primitive-backed subclasses). Everything below routes through these.
     // ------------------------------------------------------------------
 
     @Override
@@ -116,132 +133,197 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
     @Override
     public E remove(int index) {
         checkGrowable("removeAt");
-        RangeError.checkValidIndex(index, impl.size());
+        RangeError.checkValidIndex(index, size());
         return impl.remove(index);
     }
 
     // ------------------------------------------------------------------
-    // Dart API (long-indexed)
+    // Dart API (long-indexed) — routed through the accessors above
     // ------------------------------------------------------------------
 
     /** Dart's list[i]. */
     public E idx(long index) {
-        RangeError.checkValidIndex(index, impl.size());
-        return impl.get((int) index);
+        RangeError.checkValidIndex(index, size());
+        return get((int) index);
     }
 
     /** Dart's list[i] = v. */
     public E idxSet(long index, E value) {
-        RangeError.checkValidIndex(index, impl.size());
-        impl.set((int) index, value);
+        RangeError.checkValidIndex(index, size());
+        set((int) index, value);
         return value;
     }
 
     public long length() {
-        return impl.size();
+        return size();
     }
 
     public boolean isNotEmpty() {
-        return !impl.isEmpty();
+        return size() != 0;
     }
 
     public E first() {
-        if (impl.isEmpty()) {
+        if (size() == 0) {
             throw new StateError("No element");
         }
-        return impl.get(0);
+        return get(0);
     }
 
     public E last() {
-        if (impl.isEmpty()) {
+        if (size() == 0) {
             throw new StateError("No element");
         }
-        return impl.get(impl.size() - 1);
+        return get(size() - 1);
     }
 
     public void insert(long index, E element) {
         checkGrowable("insert");
-        RangeError.checkValueInInterval(index, 0, impl.size(), "index");
-        impl.add((int) index, element);
+        RangeError.checkValueInInterval(index, 0, size(), "index");
+        add((int) index, element);
     }
 
     public E removeAt(long index) {
         checkGrowable("removeAt");
-        RangeError.checkValidIndex(index, impl.size());
-        return impl.remove((int) index);
+        RangeError.checkValidIndex(index, size());
+        return remove((int) index);
     }
 
     public E removeLast() {
         checkGrowable("removeLast");
-        if (impl.isEmpty()) {
+        if (size() == 0) {
             throw new RangeError("RangeError (index): Invalid value: Valid value range is empty: -1");
         }
-        return impl.remove(impl.size() - 1);
+        return remove(size() - 1);
     }
 
     /** Dart's List.remove(Object) — removes first match, returns whether found. */
     public boolean removeValue(Object value) {
         checkGrowable("remove");
-        for (int i = 0; i < impl.size(); i++) {
-            if (DartRuntime.eq(impl.get(i), value)) {
-                impl.remove(i);
+        for (int i = 0; i < size(); i++) {
+            if (DartRuntime.eq(get(i), value)) {
+                remove(i);
                 return true;
             }
         }
         return false;
     }
 
+    /** Dart's {@code List + List}: a new list with the elements of {@code a} then {@code b}. */
+    public static <E> DartList<E> concat(java.util.List<? extends E> a, java.util.List<? extends E> b) {
+        DartList<E> r = new DartList<E>();
+        if (a != null) {
+            r.addAll(a);
+        }
+        if (b != null) {
+            r.addAll(b);
+        }
+        return r;
+    }
+
     /** Dart's List.addAll — named distinctly because java.util.List.addAll(Collection) makes the overload ambiguous. */
     public void addAllIterable(Iterable<? extends E> elements) {
         checkGrowable("addAll");
         for (E e : elements) {
-            impl.add(e);
+            add(e);
         }
     }
 
     /** Dart's List.indexOf — long-typed; named to avoid clashing with java.util.List.indexOf(Object). */
     public long indexOfDart(E element) {
-        for (int i = 0; i < impl.size(); i++) {
-            if (DartRuntime.eq(impl.get(i), element)) {
+        for (int i = 0; i < size(); i++) {
+            if (DartRuntime.eq(get(i), element)) {
                 return i;
             }
         }
         return -1;
     }
 
+    /** Dart's {@code List.indexWhere(test, [start])}. */
+    public long indexWhere(Funcs.Func1<E, Boolean> test, long start) {
+        for (int i = (int) Math.max(0, start); i < size(); i++) {
+            if (Boolean.TRUE.equals(test.call(get(i)))) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    public long indexWhere(Funcs.Func1<E, Boolean> test) {
+        return indexWhere(test, 0);
+    }
+
+    /** Dart's {@code List.lastIndexWhere(test, [start])}. */
+    public long lastIndexWhere(Funcs.Func1<E, Boolean> test) {
+        for (int i = size() - 1; i >= 0; i--) {
+            if (Boolean.TRUE.equals(test.call(get(i)))) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /** Dart's {@code List.removeWhere(test)} — removes every matching element. */
+    public void removeWhere(Funcs.Func1<E, Boolean> test) {
+        checkGrowable("removeWhere");
+        for (int i = size() - 1; i >= 0; i--) {
+            if (Boolean.TRUE.equals(test.call(get(i)))) {
+                remove(i);
+            }
+        }
+    }
+
+    /** Dart's {@code List.retainWhere(test)} — keeps only matching elements. */
+    public void retainWhere(Funcs.Func1<E, Boolean> test) {
+        checkGrowable("retainWhere");
+        for (int i = size() - 1; i >= 0; i--) {
+            if (!Boolean.TRUE.equals(test.call(get(i)))) {
+                remove(i);
+            }
+        }
+    }
+
     public DartList<E> sublist(long start, long end) {
-        RangeError.checkValueInInterval(start, 0, impl.size(), "start");
-        RangeError.checkValueInInterval(end, start, impl.size(), "end");
+        RangeError.checkValueInInterval(start, 0, size(), "start");
+        RangeError.checkValueInInterval(end, start, size(), "end");
         DartList<E> l = new DartList<>();
         for (long i = start; i < end; i++) {
-            l.impl.add(impl.get((int) i));
+            l.add(get((int) i));
         }
         return l;
     }
 
     public DartList<E> sublist(long start) {
-        return sublist(start, impl.size());
+        return sublist(start, size());
     }
 
+    @SuppressWarnings("unchecked")
     public void sort(Funcs.Func2<E, E, Long> compare) {
+        int n = size();
+        Object[] arr = new Object[n];
+        for (int i = 0; i < n; i++) {
+            arr[i] = get(i);
+        }
         if (compare == null) {
-            impl.sort(null);
+            java.util.Arrays.sort(arr);
         } else {
-            impl.sort((a, b) -> {
-                long r = compare.call(a, b);
+            java.util.Arrays.sort(arr, (a, b) -> {
+                long r = compare.call((E) a, (E) b);
                 return r < 0 ? -1 : (r > 0 ? 1 : 0);
             });
+        }
+        for (int i = 0; i < n; i++) {
+            set(i, (E) arr[i]);
         }
     }
 
     public void sortDefault() {
-        impl.sort(null);
+        sort((Funcs.Func2<E, E, Long>) null);
     }
 
     public DartIterable<E> reversed() {
         DartList<E> self = this;
         return DartIterable.wrap(() -> new java.util.Iterator<E>() {
-            private int i = self.impl.size() - 1;
+            private int i = self.size() - 1;
 
             @Override
             public boolean hasNext() {
@@ -250,7 +332,7 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
 
             @Override
             public E next() {
-                return self.impl.get(i--);
+                return self.get(i--);
             }
         });
     }
@@ -273,6 +355,12 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         return asIterable().firstWhere(test, orElse);
     }
 
+    /** Dart's Iterable.elementAt(index) — O(1) for the random-access list. */
+    public E elementAt(long index) {
+        RangeError.checkValidIndex(index, size());
+        return get((int) index);
+    }
+
     public boolean any(Funcs.Func1<E, Boolean> test) {
         return asIterable().any(test);
     }
@@ -285,6 +373,58 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
         return asIterable().fold(initialValue, combine);
     }
 
+    public E reduce(Funcs.Func2<E, E, E> combine) {
+        return asIterable().reduce(combine);
+    }
+
+    public <R> DartIterable<R> expand(Funcs.Func1<E, Iterable<R>> f) {
+        return asIterable().expand(f);
+    }
+
+    public <T> DartIterable<T> whereType(Class<T> type) {
+        return asIterable().whereType(type);
+    }
+
+    public DartIterable<E> followedBy(Iterable<E> other) {
+        return asIterable().followedBy(other);
+    }
+
+    public DartIterable<E> take(long count) {
+        return asIterable().take(count);
+    }
+
+    public DartIterable<E> skip(long count) {
+        return asIterable().skip(count);
+    }
+
+    public DartMap<Long, E> asMap() {
+        return asIterable().asMap();
+    }
+
+    public E lastWhere(Funcs.Func1<E, Boolean> test, Funcs.Func0<E> orElse) {
+        return asIterable().lastWhere(test, orElse);
+    }
+
+    public E singleWhere(Funcs.Func1<E, Boolean> test, Funcs.Func0<E> orElse) {
+        return asIterable().singleWhere(test, orElse);
+    }
+
+    /** Dart's {@code List.getRange(start, end)} — a lazy view over a sub-range. */
+    public DartIterable<E> getRange(long start, long end) {
+        return sublist(start, end).asIterable();
+    }
+
+    /** Dart's {@code List.unmodifiable(source)} — a fixed-length copy. */
+    public static <E> DartList<E> unmodifiable(Iterable<? extends E> source) {
+        ArrayList<E> impl = new ArrayList<>();
+        if (source != null) {
+            for (E e : source) {
+                impl.add(e);
+            }
+        }
+        return new DartList<>(impl, false);
+    }
+
     public String join(String separator) {
         return asIterable().join(separator);
     }
@@ -295,23 +435,29 @@ public class DartList<E> extends AbstractList<E> implements RandomAccess {
 
     public void forEachDart(Funcs.VoidFunc1<E> action) {
         // Named forEachDart because AbstractList inherits Java's forEach(Consumer).
-        for (E e : impl) {
-            action.call(e);
+        for (int i = 0, n = size(); i < n; i++) {
+            action.call(get(i));
         }
     }
 
     public DartList<E> toList() {
-        return DartList.from(impl);
+        return DartList.from(this);
+    }
+
+    public DartSet<E> toSet() {
+        DartSet<E> s = new DartSet<E>();
+        s.addAll(this);
+        return s;
     }
 
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < impl.size(); i++) {
+        for (int i = 0; i < size(); i++) {
             if (i > 0) {
                 sb.append(", ");
             }
-            sb.append(DartRuntime.str(impl.get(i)));
+            sb.append(DartRuntime.str(get(i)));
         }
         return sb.append("]").toString();
     }

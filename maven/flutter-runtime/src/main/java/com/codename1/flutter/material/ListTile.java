@@ -18,6 +18,24 @@ public class ListTile extends Widget {
     private Widget subtitle;
     private Widget trailing;
     private Funcs.VoidFunc0 onTap;
+    private boolean selected;
+
+    public void selected(boolean v) {
+        this.selected = v;
+    }
+
+    public void contentPadding(com.codename1.flutter.EdgeInsetsGeometry v) {
+    }
+
+    public void mouseCursor(Object v) {
+    }
+
+    public void dense(boolean v) {
+    }
+
+    public boolean getSelected() {
+        return selected;
+    }
 
     public void leading(Widget v) {
         this.leading = v;

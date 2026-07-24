@@ -1,6 +1,8 @@
 package com.codename1.flutter.material;
 
+import com.codename1.flutter.Color;
 import com.codename1.flutter.Element;
+import com.codename1.flutter.Key;
 import com.codename1.flutter.Widget;
 
 import dart.runtime.Funcs;
@@ -16,6 +18,26 @@ public class FloatingActionButton extends Widget {
     private Funcs.VoidFunc0 onPressed;
     private String tooltip;
     private Widget child;
+    private Object heroTag;
+    private com.codename1.flutter.Color backgroundColor;
+    private com.codename1.flutter.Color foregroundColor;
+    private Double elevation;
+
+    public void heroTag(Object v) {
+        this.heroTag = v;
+    }
+
+    public void backgroundColor(com.codename1.flutter.Color v) {
+        this.backgroundColor = v;
+    }
+
+    public void foregroundColor(com.codename1.flutter.Color v) {
+        this.foregroundColor = v;
+    }
+
+    public void elevation(double v) {
+        this.elevation = v;
+    }
 
     public void onPressed(Funcs.VoidFunc0 v) {
         this.onPressed = v;
@@ -39,6 +61,21 @@ public class FloatingActionButton extends Widget {
 
     public Widget getChild() {
         return child;
+    }
+
+    /**
+     * {@code FloatingActionButton.extended}: a pill-shaped FAB with a label
+     * (and optional leading icon). The label is consumed as the FAB content;
+     * the leading icon is used when no label is supplied.
+     */
+    public static FloatingActionButton extended(Key key, Funcs.VoidFunc0 onPressed, Widget label,
+            Widget icon, String tooltip, Object heroTag, Color backgroundColor) {
+        FloatingActionButton f = new FloatingActionButton();
+        f.key(key);
+        f.onPressed(onPressed);
+        f.tooltip(tooltip);
+        f.child(label != null ? label : icon);
+        return f;
     }
 
     @Override

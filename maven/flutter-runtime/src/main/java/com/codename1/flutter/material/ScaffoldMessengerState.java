@@ -21,6 +21,15 @@ public class ScaffoldMessengerState {
     ScaffoldMessengerState() {
     }
 
+    /**
+     * {@code hideCurrentSnackBar}: dismisses the visible SnackBar. This runtime
+     * shows SnackBars through the auto-expiring {@link ToastBar}, so there is no
+     * retained handle to hide; the call clears the recorded message.
+     */
+    public void hideCurrentSnackBar(Object reason) {
+        lastMessage = null;
+    }
+
     public void showSnackBar(SnackBar snackBar) {
         if (snackBar == null) {
             return;

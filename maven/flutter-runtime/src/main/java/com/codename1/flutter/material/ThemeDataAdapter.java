@@ -76,9 +76,29 @@ public final class ThemeDataAdapter {
         fg(p, "FlutterOutlinedButton", primary);
         fg(p, "FlutterIconButton", onSurface);
 
-        // Strip-mode app bar; the ThemeData default is inversePrimary.
-        bg(p, "FlutterAppBar", inversePrimary);
+        // App bar; the Material 3 ThemeData default background is surface
+        // (with an elevation tint), title/icons onSurface.
+        bg(p, "FlutterAppBar", surface);
         fg(p, "FlutterAppBar", onSurface);
+
+        // Switch: the CN1 Switch paints the thumb from the fgColor and the
+        // track from the bgColor, picking the selected style when ON and the
+        // unselected style when OFF (Switch.java:410/575 vs 431/634). Mirror
+        // Material 3: ON => primary track + onPrimary (white) thumb;
+        // OFF => a muted container track + outline (grey) thumb.
+        String onTrack = primary;
+        String onThumb = onPrimary;
+        String offTrack = hex(new Color(0xFFE7E0EC));
+        String offThumb = hex(cs.outline());
+        p.put("FlutterSwitch.sel#bgColor", onTrack);
+        p.put("FlutterSwitch.sel#fgColor", onThumb);
+        p.put("FlutterSwitch.sel#transparency", "255");
+        p.put("FlutterSwitch.press#bgColor", onTrack);
+        p.put("FlutterSwitch.press#fgColor", onThumb);
+        p.put("FlutterSwitch.press#transparency", "255");
+        p.put("FlutterSwitch.bgColor", offTrack);
+        p.put("FlutterSwitch.fgColor", offThumb);
+        p.put("FlutterSwitch.transparency", "255");
 
         return p;
     }

@@ -155,4 +155,70 @@ public class Dart3SyntaxParseTest {
                 + "  print(base + sealed + when);\n"
                 + "}\n");
     }
+
+    // ------------------------------------------------------------------
+    // Dart 3 if-case statements
+    // ------------------------------------------------------------------
+
+    @Test
+    public void ifCaseStatement() {
+        parses("void f(Object n) {\n"
+                + "  if (n case int x) {\n"
+                + "    print(x);\n"
+                + "  }\n"
+                + "}\n");
+    }
+
+    @Test
+    public void ifCaseWithGuardAndElse() {
+        parses("void f(Object n) {\n"
+                + "  if (n case int x when x > 0) {\n"
+                + "    print(x);\n"
+                + "  } else {\n"
+                + "    print('no');\n"
+                + "  }\n"
+                + "}\n");
+    }
+
+    @Test
+    public void ifCaseObjectPatternDestructure() {
+        parses("class N { final int depth; N(this.depth); }\n"
+                + "void f(Object v) {\n"
+                + "  if (v case N(depth: 0)) {\n"
+                + "    print('zero');\n"
+                + "  }\n"
+                + "}\n");
+    }
+
+    // ------------------------------------------------------------------
+    // Dart 3 pattern for-in (record destructuring) + typed set collection-for
+    // ------------------------------------------------------------------
+
+    @Test
+    public void patternForInRecordDestructure() {
+        parses("void f(List<String> xs) {\n"
+                + "  for (final (int i, String s) in xs.indexed) {\n"
+                + "    print('$i:$s');\n"
+                + "  }\n"
+                + "}\n");
+    }
+
+    @Test
+    public void typedSetLiteralWithCollectionForAndIf() {
+        parses("Set<int> f(List<String> xs) {\n"
+                + "  return <int>{\n"
+                + "    for (final (int i, String s) in xs.indexed)\n"
+                + "      if (s.isNotEmpty) i,\n"
+                + "  };\n"
+                + "}\n");
+    }
+
+    @Test
+    public void mapLiteralWithCollectionFor() {
+        parses("Map<int, String> f(List<int> xs) {\n"
+                + "  return <int, String>{\n"
+                + "    for (final int x in xs) x: 'v',\n"
+                + "  };\n"
+                + "}\n");
+    }
 }

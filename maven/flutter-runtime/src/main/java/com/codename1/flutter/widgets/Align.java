@@ -13,6 +13,24 @@ public class Align extends Widget {
 
     private Alignment alignment;
     private Widget child;
+    private Double widthFactor;
+    private Double heightFactor;
+
+    public void widthFactor(Double v) {
+        this.widthFactor = v;
+    }
+
+    public void heightFactor(Double v) {
+        this.heightFactor = v;
+    }
+
+    public Double getWidthFactor() {
+        return widthFactor;
+    }
+
+    public Double getHeightFactor() {
+        return heightFactor;
+    }
 
     public void alignment(Alignment v) {
         this.alignment = v;

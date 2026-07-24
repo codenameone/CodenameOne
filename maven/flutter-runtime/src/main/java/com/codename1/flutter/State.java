@@ -47,6 +47,21 @@ public abstract class State<T extends StatefulWidget> {
     }
 
     /**
+     * Called immediately after {@link #initState} and again whenever an
+     * inherited widget this state depends on changes. No-op by default.
+     */
+    public void didChangeDependencies() {
+    }
+
+    /**
+     * Whether this state is currently in the tree ({@code State.mounted}):
+     * true between mount and {@link #dispose()}.
+     */
+    public boolean mounted() {
+        return element != null;
+    }
+
+    /**
      * Called when the element absorbed a new widget configuration. The new
      * widget is already available via {@link #widget()}.
      */

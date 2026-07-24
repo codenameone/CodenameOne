@@ -8,8 +8,20 @@ public class Color {
 
     private final int value;
 
-    public Color(int argb) {
-        this.value = argb;
+    public Color(long argb) {
+        // Dart `int` maps to Java `long` in the transpiler, and opaque ARGB
+        // literals (0xFF......) exceed the signed-int range; truncate to the
+        // 32-bit ARGB word. `new Color(intLiteral)` still widens in.
+        this.value = (int) argb;
+    }
+
+    /**
+     * {@code Color.fromRGBO}: red/green/blue channels (0..255) with a
+     * floating-point opacity (0.0..1.0) that becomes the alpha channel.
+     */
+    public static Color fromRGBO(long r, long g, long b, double opacity) {
+        long a = Math.round(opacity * 255.0) & 0xFF;
+        return new Color((a << 24) | ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF));
     }
 
     /**
@@ -40,6 +52,70 @@ public class Color {
      */
     public int rgb() {
         return value & 0xFFFFFF;
+    }
+
+    /**
+     * A copy of this color with the alpha channel replaced so it is {@code
+     * opacity} (0..1) of fully opaque; RGB is unchanged.
+     */
+    public Color withOpacity(double opacity) {
+        int a = (int) Math.round(Math.max(0, Math.min(1, opacity)) * 255.0);
+        return withAlpha(a);
+    }
+
+    /**
+     * A copy of this color with the alpha channel set to {@code a} (0..255).
+     * The parameter is a {@code long} because the transpiler maps Dart
+     * {@code int} to Java {@code long}.
+     */
+    public Color withAlpha(long a) {
+        int alpha = (int) (a & 0xFF);
+        return new Color(((long) alpha << 24) | (value & 0xFFFFFFL));
+    }
+
+    /**
+     * A copy with the supplied (non-null) 8-bit channels overridden; unset
+     * channels keep this color's value. Mirrors the older component form of
+     * Flutter's {@code Color.copyWith}. The boxed parameters are {@code Long}
+     * because the transpiler maps Dart {@code int} to Java {@code long}.
+     */
+    public Color copyWith(Long alpha, Long red, Long green, Long blue) {
+        int a = alpha != null ? (int) (alpha & 0xFF) : alpha();
+        int r = red != null ? (int) (red & 0xFF) : red();
+        int g = green != null ? (int) (green & 0xFF) : green();
+        int b = blue != null ? (int) (blue & 0xFF) : blue();
+        return new Color(((long) a << 24) | (r << 16) | (g << 8) | b);
+    }
+
+    /**
+     * Composites {@code foreground} over {@code background} using
+     * source-over alpha blending (Flutter's {@code Color.alphaBlend}); the
+     * result is fully opaque when {@code background} is opaque.
+     */
+    public static Color alphaBlend(Color foreground, Color background) {
+        int fa = foreground.alpha();
+        if (fa == 0xFF) {
+            return foreground;
+        }
+        if (fa == 0) {
+            return background;
+        }
+        double af = fa / 255.0;
+        double ab = background.alpha() / 255.0;
+        double ao = af + ab * (1 - af);
+        if (ao == 0) {
+            return new Color(0);
+        }
+        int r = blendChannel(foreground.red(), af, background.red(), ab, ao);
+        int g = blendChannel(foreground.green(), af, background.green(), ab, ao);
+        int b = blendChannel(foreground.blue(), af, background.blue(), ab, ao);
+        int a = (int) Math.round(ao * 255.0);
+        return new Color(((long) a << 24) | (r << 16) | (g << 8) | b);
+    }
+
+    private static int blendChannel(int cf, double af, int cb, double ab, double ao) {
+        double v = (cf * af + cb * ab * (1 - af)) / ao;
+        return Math.max(0, Math.min(255, (int) Math.round(v)));
     }
 
     @Override

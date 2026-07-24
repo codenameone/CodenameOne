@@ -1,39 +1,222 @@
 package com.codename1.flutter.material;
 
+import com.codename1.flutter.Color;
 import com.codename1.flutter.TextStyle;
 
 /**
- * Material default text styles (M1 subset). Fresh TextStyle instances are
- * returned on every call because TextStyle is a mutable write-once config
- * object; sharing instances would let one call site's mutation leak into
- * another's.
+ * Material 3 default text styles. Each getter returns the configured override
+ * when {@link #copyWith} (or a builder) supplied one, otherwise a fresh
+ * {@link TextStyle} carrying the M3 default logical size for that role. Fresh
+ * instances are returned for the defaults because TextStyle is a mutable
+ * write-once config object; sharing would leak one call site's mutation.
  */
 public class TextTheme {
 
-    /**
-     * Material headlineMedium: 28lp.
-     */
+    private TextStyle displayLarge;
+    private TextStyle displayMedium;
+    private TextStyle displaySmall;
+    private TextStyle headlineLarge;
+    private TextStyle headlineMedium;
+    private TextStyle headlineSmall;
+    private TextStyle titleLarge;
+    private TextStyle titleMedium;
+    private TextStyle titleSmall;
+    private TextStyle bodyLarge;
+    private TextStyle bodyMedium;
+    private TextStyle bodySmall;
+    private TextStyle labelLarge;
+    private TextStyle labelMedium;
+    private TextStyle labelSmall;
+
+    private static TextStyle sized(double size) {
+        TextStyle t = new TextStyle();
+        t.fontSize(size);
+        return t;
+    }
+
+    // ------------------------------------------------------------------
+    // Named-parameter setters (the Dart constructor's named args and any
+    // {@code textTheme.copyWith(role: style)}-style overrides land here).
+    // ------------------------------------------------------------------
+
+    public void displayLarge(TextStyle v) {
+        this.displayLarge = v;
+    }
+
+    public void displayMedium(TextStyle v) {
+        this.displayMedium = v;
+    }
+
+    public void displaySmall(TextStyle v) {
+        this.displaySmall = v;
+    }
+
+    public void headlineLarge(TextStyle v) {
+        this.headlineLarge = v;
+    }
+
+    public void headlineMedium(TextStyle v) {
+        this.headlineMedium = v;
+    }
+
+    public void headlineSmall(TextStyle v) {
+        this.headlineSmall = v;
+    }
+
+    public void titleLarge(TextStyle v) {
+        this.titleLarge = v;
+    }
+
+    public void titleMedium(TextStyle v) {
+        this.titleMedium = v;
+    }
+
+    public void titleSmall(TextStyle v) {
+        this.titleSmall = v;
+    }
+
+    public void bodyLarge(TextStyle v) {
+        this.bodyLarge = v;
+    }
+
+    public void bodyMedium(TextStyle v) {
+        this.bodyMedium = v;
+    }
+
+    public void bodySmall(TextStyle v) {
+        this.bodySmall = v;
+    }
+
+    public void labelLarge(TextStyle v) {
+        this.labelLarge = v;
+    }
+
+    public void labelMedium(TextStyle v) {
+        this.labelMedium = v;
+    }
+
+    public void labelSmall(TextStyle v) {
+        this.labelSmall = v;
+    }
+
+    public TextStyle displayLarge() {
+        return displayLarge != null ? displayLarge : sized(57);
+    }
+
+    public TextStyle displayMedium() {
+        return displayMedium != null ? displayMedium : sized(45);
+    }
+
+    public TextStyle displaySmall() {
+        return displaySmall != null ? displaySmall : sized(36);
+    }
+
+    public TextStyle headlineLarge() {
+        return headlineLarge != null ? headlineLarge : sized(32);
+    }
+
     public TextStyle headlineMedium() {
-        TextStyle t = new TextStyle();
-        t.fontSize(28);
-        return t;
+        return headlineMedium != null ? headlineMedium : sized(28);
     }
 
-    /**
-     * Material bodyMedium: 14lp.
-     */
-    public TextStyle bodyMedium() {
-        TextStyle t = new TextStyle();
-        t.fontSize(14);
-        return t;
+    public TextStyle headlineSmall() {
+        return headlineSmall != null ? headlineSmall : sized(24);
     }
 
-    /**
-     * Material titleLarge: 22lp.
-     */
     public TextStyle titleLarge() {
-        TextStyle t = new TextStyle();
-        t.fontSize(22);
-        return t;
+        return titleLarge != null ? titleLarge : sized(22);
+    }
+
+    public TextStyle titleMedium() {
+        return titleMedium != null ? titleMedium : sized(16);
+    }
+
+    public TextStyle titleSmall() {
+        return titleSmall != null ? titleSmall : sized(14);
+    }
+
+    public TextStyle bodyLarge() {
+        return bodyLarge != null ? bodyLarge : sized(16);
+    }
+
+    public TextStyle bodyMedium() {
+        return bodyMedium != null ? bodyMedium : sized(14);
+    }
+
+    public TextStyle bodySmall() {
+        return bodySmall != null ? bodySmall : sized(12);
+    }
+
+    public TextStyle labelLarge() {
+        return labelLarge != null ? labelLarge : sized(14);
+    }
+
+    public TextStyle labelMedium() {
+        return labelMedium != null ? labelMedium : sized(12);
+    }
+
+    public TextStyle labelSmall() {
+        return labelSmall != null ? labelSmall : sized(11);
+    }
+
+    /**
+     * Returns a copy with the supplied (non-null) roles overridden. Parameters
+     * follow the M3 role order declared in the Dart stub.
+     */
+    public TextTheme copyWith(TextStyle displayLarge, TextStyle displayMedium, TextStyle displaySmall,
+                              TextStyle headlineLarge, TextStyle headlineMedium, TextStyle headlineSmall,
+                              TextStyle titleLarge, TextStyle titleMedium, TextStyle titleSmall,
+                              TextStyle bodyLarge, TextStyle bodyMedium, TextStyle bodySmall,
+                              TextStyle labelLarge, TextStyle labelMedium, TextStyle labelSmall) {
+        TextTheme c = new TextTheme();
+        c.displayLarge = displayLarge != null ? displayLarge : this.displayLarge;
+        c.displayMedium = displayMedium != null ? displayMedium : this.displayMedium;
+        c.displaySmall = displaySmall != null ? displaySmall : this.displaySmall;
+        c.headlineLarge = headlineLarge != null ? headlineLarge : this.headlineLarge;
+        c.headlineMedium = headlineMedium != null ? headlineMedium : this.headlineMedium;
+        c.headlineSmall = headlineSmall != null ? headlineSmall : this.headlineSmall;
+        c.titleLarge = titleLarge != null ? titleLarge : this.titleLarge;
+        c.titleMedium = titleMedium != null ? titleMedium : this.titleMedium;
+        c.titleSmall = titleSmall != null ? titleSmall : this.titleSmall;
+        c.bodyLarge = bodyLarge != null ? bodyLarge : this.bodyLarge;
+        c.bodyMedium = bodyMedium != null ? bodyMedium : this.bodyMedium;
+        c.bodySmall = bodySmall != null ? bodySmall : this.bodySmall;
+        c.labelLarge = labelLarge != null ? labelLarge : this.labelLarge;
+        c.labelMedium = labelMedium != null ? labelMedium : this.labelMedium;
+        c.labelSmall = labelSmall != null ? labelSmall : this.labelSmall;
+        return c;
+    }
+
+    /**
+     * Returns a copy in which every role's style has {@code bodyColor} applied
+     * to the body/label/title roles and {@code displayColor} to the
+     * display/headline roles, with an optional {@code fontFamily} and font-size
+     * scaling applied uniformly. Mirrors Flutter's {@code TextTheme.apply}.
+     * Parameter order matches the Dart stub.
+     */
+    public TextTheme apply(String fontFamily, Double fontSizeFactor, Double fontSizeDelta,
+                           Color displayColor, Color bodyColor, Object decoration, Object decorationColor) {
+        TextTheme c = new TextTheme();
+        c.displayLarge = applyOne(displayLarge(), displayColor, fontFamily, fontSizeFactor, fontSizeDelta);
+        c.displayMedium = applyOne(displayMedium(), displayColor, fontFamily, fontSizeFactor, fontSizeDelta);
+        c.displaySmall = applyOne(displaySmall(), displayColor, fontFamily, fontSizeFactor, fontSizeDelta);
+        c.headlineLarge = applyOne(headlineLarge(), displayColor, fontFamily, fontSizeFactor, fontSizeDelta);
+        c.headlineMedium = applyOne(headlineMedium(), displayColor, fontFamily, fontSizeFactor, fontSizeDelta);
+        c.headlineSmall = applyOne(headlineSmall(), displayColor, fontFamily, fontSizeFactor, fontSizeDelta);
+        c.titleLarge = applyOne(titleLarge(), bodyColor, fontFamily, fontSizeFactor, fontSizeDelta);
+        c.titleMedium = applyOne(titleMedium(), bodyColor, fontFamily, fontSizeFactor, fontSizeDelta);
+        c.titleSmall = applyOne(titleSmall(), bodyColor, fontFamily, fontSizeFactor, fontSizeDelta);
+        c.bodyLarge = applyOne(bodyLarge(), bodyColor, fontFamily, fontSizeFactor, fontSizeDelta);
+        c.bodyMedium = applyOne(bodyMedium(), bodyColor, fontFamily, fontSizeFactor, fontSizeDelta);
+        c.bodySmall = applyOne(bodySmall(), bodyColor, fontFamily, fontSizeFactor, fontSizeDelta);
+        c.labelLarge = applyOne(labelLarge(), bodyColor, fontFamily, fontSizeFactor, fontSizeDelta);
+        c.labelMedium = applyOne(labelMedium(), bodyColor, fontFamily, fontSizeFactor, fontSizeDelta);
+        c.labelSmall = applyOne(labelSmall(), bodyColor, fontFamily, fontSizeFactor, fontSizeDelta);
+        return c;
+    }
+
+    private static TextStyle applyOne(TextStyle base, Color color, String fontFamily,
+                                      Double fontSizeFactor, Double fontSizeDelta) {
+        return base.apply(color, null, fontFamily, fontSizeFactor, fontSizeDelta, null);
     }
 }

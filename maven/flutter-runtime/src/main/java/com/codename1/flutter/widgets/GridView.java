@@ -1,11 +1,13 @@
 package com.codename1.flutter.widgets;
 
+import com.codename1.flutter.BuildContext;
 import com.codename1.flutter.EdgeInsets;
 import com.codename1.flutter.Element;
 import com.codename1.flutter.Key;
 import com.codename1.flutter.Widget;
 
 import dart.core.DartList;
+import dart.runtime.Funcs;
 
 /**
  * A scrollable grid with a fixed number of cross-axis cells, created via
@@ -21,8 +23,27 @@ public class GridView extends Widget {
     private Double crossAxisSpacing;
     private EdgeInsets padding;
     private DartList<Widget> children;
+    private Long itemCount;
+    private Funcs.Func2<BuildContext, Long, Widget> itemBuilder;
 
     private GridView() {
+    }
+
+    /**
+     * Dart's {@code GridView.builder} named constructor. The cross-axis count
+     * carried by {@code gridDelegate} is not decoded at this milestone (held
+     * opaquely); items build lazily like {@link com.codename1.flutter.widgets.ListView#builder}.
+     */
+    public static GridView builder(Key key, Long itemCount,
+                                   Funcs.Func2<BuildContext, Long, Widget> itemBuilder,
+                                   Object gridDelegate, EdgeInsets padding, Boolean shrinkWrap,
+                                   Object physics) {
+        GridView g = new GridView();
+        g.key(key);
+        g.itemCount = itemCount;
+        g.itemBuilder = itemBuilder;
+        g.padding = padding;
+        return g;
     }
 
     /**
@@ -65,6 +86,18 @@ public class GridView extends Widget {
 
     public DartList<Widget> getChildren() {
         return children;
+    }
+
+    public Long getItemCount() {
+        return itemCount;
+    }
+
+    public Funcs.Func2<BuildContext, Long, Widget> getItemBuilder() {
+        return itemBuilder;
+    }
+
+    public boolean isBuilderMode() {
+        return itemBuilder != null;
     }
 
     @Override

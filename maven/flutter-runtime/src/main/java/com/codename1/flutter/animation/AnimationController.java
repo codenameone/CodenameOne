@@ -1,0 +1,323 @@
+package com.codename1.flutter.animation;
+
+import com.codename1.ui.CN;
+import com.codename1.ui.Display;
+
+import dart.core.Duration;
+
+/**
+ * Drives an animation value between {@code lowerBound} and {@code upperBound}
+ * over a {@link Duration} — Flutter's {@code AnimationController}. In this
+ * runtime the controller self-drives: it advances the value on a repeating CN1
+ * timer ({@code CN.setTimeout}) on the EDT, firing value listeners each frame
+ * and status listeners at the transitions. The {@code vsync} TickerProvider is
+ * accepted for API shape but not otherwise used.
+ *
+ * <p>When CN1's Display is not initialized (headless), animations complete
+ * synchronously so logic that awaits {@code forward()} still progresses.</p>
+ */
+public class AnimationController extends Animation<Double> {
+
+    private double lowerBound = 0.0;
+    private double upperBound = 1.0;
+    private double currentValue;
+    private long durationMs = 300;
+    private long reverseDurationMs = -1;
+    private AnimationStatus status = AnimationStatus.dismissed;
+    private AnimationBehavior animationBehavior = AnimationBehavior.normal;
+
+    // Active run state.
+    private boolean running;
+    private int generation;
+    private long runStartTime;
+    private long runDurationMs;
+    private double runStartValue;
+    private double runTargetValue;
+    private AnimationStatus runStatus;
+
+    // Repeat config.
+    private boolean repeating;
+    private boolean repeatReverse;
+    private double repeatMin;
+    private double repeatMax;
+
+    public AnimationController() {
+    }
+
+    // ------------------------------------------------------------------
+    // Named-parameter setters (constructor arguments)
+    // ------------------------------------------------------------------
+
+    public void duration(Duration v) {
+        if (v != null) {
+            this.durationMs = v.inMilliseconds();
+        }
+    }
+
+    public void reverseDuration(Duration v) {
+        if (v != null) {
+            this.reverseDurationMs = v.inMilliseconds();
+        }
+    }
+
+    /**
+     * The Dart {@code value} setter — both the constructor {@code value:}
+     * argument and the imperative {@code controller.value = v} assignment map
+     * here (the transpiler emits the overloaded {@code value(v)} method). Stops
+     * any running animation, clamps to the bounds, and notifies listeners.
+     */
+    public void value(double v) {
+        stop(false);
+        double clamped = clamp(v);
+        this.currentValue = clamped;
+        AnimationStatus newStatus = statusForValue(clamped);
+        boolean statusChanged = newStatus != status;
+        this.status = newStatus;
+        notifyListeners();
+        if (statusChanged) {
+            notifyStatusListeners(status);
+        }
+    }
+
+    public void lowerBound(double v) {
+        this.lowerBound = v;
+    }
+
+    public void upperBound(double v) {
+        this.upperBound = v;
+    }
+
+    public void vsync(TickerProvider v) {
+        // self-driven; provider unused
+    }
+
+    public void debugLabel(String v) {
+        // ignored
+    }
+
+    /**
+     * How the controller behaves when animation is disabled by the platform —
+     * Flutter's {@code AnimationController.animationBehavior}. Captured for API
+     * shape; this runtime always animates (it does not consult a
+     * reduce-motion setting), matching {@link AnimationBehavior#preserve}.
+     */
+    public void animationBehavior(AnimationBehavior v) {
+        this.animationBehavior = v;
+    }
+
+    // ------------------------------------------------------------------
+    // Getters
+    // ------------------------------------------------------------------
+
+    @Override
+    public Double value() {
+        return currentValue;
+    }
+
+    @Override
+    public AnimationStatus status() {
+        return status;
+    }
+
+    public Duration duration() {
+        return Duration.ofMicroseconds(durationMs * 1000);
+    }
+
+    /** Flutter's {@code controller.view}: the controller is its own view. */
+    public Animation<Double> view() {
+        return this;
+    }
+
+    // ------------------------------------------------------------------
+    // Playback controls
+    // ------------------------------------------------------------------
+
+    public void forward(Double from) {
+        if (from != null) {
+            currentValue = clamp(from);
+        }
+        repeating = false;
+        beginRun(upperBound, durationMs, AnimationStatus.forward);
+    }
+
+    /** No-argument {@code forward()} — usable as a bare {@code VoidCallback} tear-off. */
+    public void forward() {
+        forward(null);
+    }
+
+    /** No-argument {@code reverse()} — usable as a bare {@code VoidCallback} tear-off. */
+    public void reverse() {
+        reverse(null);
+    }
+
+    public void reverse(Double from) {
+        if (from != null) {
+            currentValue = clamp(from);
+        }
+        repeating = false;
+        long d = reverseDurationMs >= 0 ? reverseDurationMs : durationMs;
+        beginRun(lowerBound, d, AnimationStatus.reverse);
+    }
+
+    /**
+     * Drives the controller with a fling toward the bound implied by the sign
+     * of {@code velocity} — Flutter's {@code AnimationController.fling}. A
+     * positive velocity flings toward {@code upperBound}, a negative one toward
+     * {@code lowerBound}. The {@code springDescription} (the spring modeling the
+     * fling's settle) and {@code animationBehavior} are captured for API shape;
+     * this runtime plays a plain timed run to the target bound.
+     */
+    public void fling(double velocity, Object springDescription, AnimationBehavior animationBehavior) {
+        repeating = false;
+        if (velocity < 0.0) {
+            beginRun(lowerBound, durationMs, AnimationStatus.reverse);
+        } else {
+            beginRun(upperBound, durationMs, AnimationStatus.forward);
+        }
+    }
+
+    public void animateTo(double target, Duration duration, Curve curve) {
+        repeating = false;
+        long d = duration != null ? duration.inMilliseconds() : durationMs;
+        AnimationStatus dir = target >= currentValue ? AnimationStatus.forward : AnimationStatus.reverse;
+        beginRun(clamp(target), d, dir);
+    }
+
+    public void animateBack(double target, Duration duration, Curve curve) {
+        repeating = false;
+        long d = duration != null ? duration.inMilliseconds()
+                : (reverseDurationMs >= 0 ? reverseDurationMs : durationMs);
+        beginRun(clamp(target), d, AnimationStatus.reverse);
+    }
+
+    public void repeat(Double min, Double max, Boolean reverse, Duration period) {
+        repeating = true;
+        repeatReverse = reverse != null && reverse;
+        repeatMin = min != null ? min : lowerBound;
+        repeatMax = max != null ? max : upperBound;
+        long d = period != null ? period.inMilliseconds() : durationMs;
+        currentValue = repeatMin;
+        beginRun(repeatMax, d, AnimationStatus.forward);
+    }
+
+    public void stop(Boolean canceled) {
+        running = false;
+        generation++;
+    }
+
+    public void reset() {
+        stop(false);
+        currentValue = lowerBound;
+        AnimationStatus newStatus = statusForValue(currentValue);
+        boolean changed = newStatus != status;
+        status = newStatus;
+        notifyListeners();
+        if (changed) {
+            notifyStatusListeners(status);
+        }
+    }
+
+    public void dispose() {
+        stop(false);
+    }
+
+    // ------------------------------------------------------------------
+    // Driving
+    // ------------------------------------------------------------------
+
+    private void beginRun(double target, long dMs, AnimationStatus phase) {
+        generation++;
+        final int gen = generation;
+        running = true;
+        runStartValue = currentValue;
+        runTargetValue = target;
+        runDurationMs = Math.max(0, dMs);
+        runStatus = phase;
+        runStartTime = now();
+
+        if (status != phase) {
+            status = phase;
+            notifyStatusListeners(status);
+        }
+
+        if (runDurationMs == 0 || runStartValue == runTargetValue || !Display.isInitialized()) {
+            finishRun(gen);
+            return;
+        }
+        scheduleTick(gen);
+    }
+
+    private void scheduleTick(final int gen) {
+        CN.setTimeout(16, new Runnable() {
+            @Override
+            public void run() {
+                tick(gen);
+            }
+        });
+    }
+
+    private void tick(int gen) {
+        if (gen != generation || !running) {
+            return;
+        }
+        long elapsed = now() - runStartTime;
+        double t = runDurationMs == 0 ? 1.0 : (double) elapsed / (double) runDurationMs;
+        if (t >= 1.0) {
+            finishRun(gen);
+            return;
+        }
+        currentValue = runStartValue + (runTargetValue - runStartValue) * t;
+        notifyListeners();
+        scheduleTick(gen);
+    }
+
+    private void finishRun(int gen) {
+        currentValue = runTargetValue;
+        running = false;
+        notifyListeners();
+        AnimationStatus terminal = statusForValue(currentValue);
+        if (terminal != status) {
+            status = terminal;
+            notifyStatusListeners(status);
+        }
+        if (repeating && Display.isInitialized()) {
+            if (repeatReverse) {
+                double nextTarget = currentValue >= repeatMax ? repeatMin : repeatMax;
+                AnimationStatus phase = nextTarget >= currentValue
+                        ? AnimationStatus.forward : AnimationStatus.reverse;
+                beginRun(nextTarget, runDurationMs, phase);
+            } else {
+                currentValue = repeatMin;
+                beginRun(repeatMax, runDurationMs, AnimationStatus.forward);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------------
+
+    private AnimationStatus statusForValue(double v) {
+        if (v <= lowerBound) {
+            return AnimationStatus.dismissed;
+        }
+        if (v >= upperBound) {
+            return AnimationStatus.completed;
+        }
+        return status == AnimationStatus.reverse ? AnimationStatus.reverse : AnimationStatus.forward;
+    }
+
+    private double clamp(double v) {
+        if (v < lowerBound) {
+            return lowerBound;
+        }
+        if (v > upperBound) {
+            return upperBound;
+        }
+        return v;
+    }
+
+    private static long now() {
+        return System.currentTimeMillis();
+    }
+}

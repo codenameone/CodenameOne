@@ -25,11 +25,20 @@ public class MediaQueryData {
     private final Size size;
     private final double devicePixelRatio;
     private final Brightness platformBrightness;
+    private final double textScaleFactor;
+    private final EdgeInsets padding;
 
     public MediaQueryData(Size size, double devicePixelRatio, Brightness platformBrightness) {
+        this(size, devicePixelRatio, platformBrightness, 1.0, EdgeInsets.all(0));
+    }
+
+    public MediaQueryData(Size size, double devicePixelRatio, Brightness platformBrightness,
+                          double textScaleFactor, EdgeInsets padding) {
         this.size = size;
         this.devicePixelRatio = devicePixelRatio;
         this.platformBrightness = platformBrightness == null ? Brightness.light : platformBrightness;
+        this.textScaleFactor = textScaleFactor;
+        this.padding = padding == null ? EdgeInsets.all(0) : padding;
     }
 
     public Size size() {
@@ -42,6 +51,65 @@ public class MediaQueryData {
 
     public Brightness platformBrightness() {
         return platformBrightness;
+    }
+
+    /**
+     * The number of font pixels per logical pixel (legacy Flutter accessor;
+     * defaults to 1.0 — this pass does not read the platform text-scale).
+     */
+    public double textScaleFactor() {
+        return textScaleFactor;
+    }
+
+    /**
+     * The parts of the display partially obscured by system UI (defaults to
+     * {@link EdgeInsets#all(double) EdgeInsets.all(0)}).
+     */
+    public EdgeInsets padding() {
+        return padding;
+    }
+
+    /**
+     * The parts of the display obscured by system UI that the app can still
+     * draw under (e.g. the on-screen keyboard). This pass does not track the
+     * keyboard, so it reports no insets.
+     */
+    public EdgeInsets viewInsets() {
+        return EdgeInsets.all(0);
+    }
+
+    /**
+     * The parts of the display obscured by system UI regardless of whether the
+     * app can draw under them (e.g. a hardware notch). This pass does not track
+     * system insets, so it reports none.
+     */
+    public EdgeInsets viewPadding() {
+        return EdgeInsets.all(0);
+    }
+
+    /**
+     * Returns a copy with the supplied (non-null) values overridden. Parameter
+     * order matches the Dart stub.
+     */
+    public MediaQueryData copyWith(Size size, Double devicePixelRatio, Double textScaleFactor,
+                                   EdgeInsets padding, Brightness platformBrightness) {
+        return new MediaQueryData(
+                size != null ? size : this.size,
+                devicePixelRatio != null ? devicePixelRatio : this.devicePixelRatio,
+                platformBrightness != null ? platformBrightness : this.platformBrightness,
+                textScaleFactor != null ? textScaleFactor : this.textScaleFactor,
+                padding != null ? padding : this.padding);
+    }
+
+    /**
+     * Returns a copy with the selected padding edges zeroed — Flutter's
+     * {@code MediaQueryData.removePadding}. This runtime does not scope media
+     * metrics through the element tree, so a same-metrics copy is returned
+     * (the removed edges are treated as a no-op).
+     */
+    public MediaQueryData removePadding(Boolean removeLeft, Boolean removeTop,
+            Boolean removeRight, Boolean removeBottom) {
+        return this;
     }
 
     /**

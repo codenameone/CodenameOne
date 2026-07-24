@@ -1,0 +1,164 @@
+package dart.core;
+
+import java.util.Calendar;
+import java.util.Date;
+import java.util.TimeZone;
+
+/**
+ * Dart's {@code dart:core} DateTime: an instant on the timeline, stored as
+ * milliseconds since the Unix epoch plus a UTC/local flag. Field access is
+ * computed on demand through {@link java.util.Calendar}.
+ */
+public final class DateTime {
+
+    private final long epochMillis;
+    private final boolean utc;
+
+    private DateTime(long epochMillis, boolean utc) {
+        this.epochMillis = epochMillis;
+        this.utc = utc;
+    }
+
+    /** Local-time constructor mirroring {@code DateTime(year, [month, day, ...])}. */
+    public DateTime(long year, long month, long day, long hour, long minute,
+                    long second, long millisecond, long microsecond) {
+        this(build(year, month, day, hour, minute, second, millisecond, false), false);
+    }
+
+    public static DateTime now() {
+        return new DateTime(System.currentTimeMillis(), false);
+    }
+
+    /** UTC constructor mirroring {@code DateTime.utc(year, [month, day, ...])}. */
+    public static DateTime utc(long year, long month, long day, long hour, long minute,
+                               long second, long millisecond, long microsecond) {
+        return new DateTime(build(year, month, day, hour, minute, second, millisecond, true), true);
+    }
+
+    public static DateTime fromMillisecondsSinceEpoch(long millisecondsSinceEpoch, boolean isUtc) {
+        return new DateTime(millisecondsSinceEpoch, isUtc);
+    }
+
+    private static long build(long year, long month, long day, long hour, long minute,
+                              long second, long millisecond, boolean utc) {
+        // CN1's Calendar has no clear(); every time-carrying field is set
+        // explicitly so no residual "now" component leaks in.
+        Calendar c = utc ? Calendar.getInstance(TimeZone.getTimeZone("UTC")) : Calendar.getInstance();
+        c.set(Calendar.YEAR, (int) year);
+        c.set(Calendar.MONTH, (int) (month < 1 ? 1 : month) - 1);
+        c.set(Calendar.DAY_OF_MONTH, (int) (day < 1 ? 1 : day));
+        c.set(Calendar.HOUR_OF_DAY, (int) hour);
+        c.set(Calendar.MINUTE, (int) minute);
+        c.set(Calendar.SECOND, (int) second);
+        c.set(Calendar.MILLISECOND, (int) millisecond);
+        return c.getTime().getTime();
+    }
+
+    private int field(int f) {
+        Calendar c = utc ? Calendar.getInstance(TimeZone.getTimeZone("UTC")) : Calendar.getInstance();
+        c.setTime(new Date(epochMillis));
+        return c.get(f);
+    }
+
+    public long year() {
+        return field(Calendar.YEAR);
+    }
+
+    public long month() {
+        return field(Calendar.MONTH) + 1;
+    }
+
+    public long day() {
+        return field(Calendar.DAY_OF_MONTH);
+    }
+
+    public long hour() {
+        return field(Calendar.HOUR_OF_DAY);
+    }
+
+    public long minute() {
+        return field(Calendar.MINUTE);
+    }
+
+    public long second() {
+        return field(Calendar.SECOND);
+    }
+
+    public long millisecond() {
+        return field(Calendar.MILLISECOND);
+    }
+
+    /** Dart weekday: Monday == 1 .. Sunday == 7. */
+    public long weekday() {
+        int calDow = field(Calendar.DAY_OF_WEEK); // SUNDAY==1 .. SATURDAY==7
+        return ((calDow + 5) % 7) + 1;
+    }
+
+    public long millisecondsSinceEpoch() {
+        return epochMillis;
+    }
+
+    public long microsecondsSinceEpoch() {
+        return epochMillis * 1000L;
+    }
+
+    public DateTime add(Duration duration) {
+        return new DateTime(epochMillis + duration.inMilliseconds(), utc);
+    }
+
+    public DateTime subtract(Duration duration) {
+        return new DateTime(epochMillis - duration.inMilliseconds(), utc);
+    }
+
+    public Duration difference(DateTime other) {
+        return Duration.ofMicroseconds((epochMillis - other.epochMillis) * 1000L);
+    }
+
+    public boolean isBefore(DateTime other) {
+        return epochMillis < other.epochMillis;
+    }
+
+    public boolean isAfter(DateTime other) {
+        return epochMillis > other.epochMillis;
+    }
+
+    public boolean isAtSameMomentAs(DateTime other) {
+        return epochMillis == other.epochMillis;
+    }
+
+    public DateTime toLocal() {
+        return utc ? new DateTime(epochMillis, false) : this;
+    }
+
+    public DateTime toUtc() {
+        return utc ? this : new DateTime(epochMillis, true);
+    }
+
+    public long compareTo(DateTime other) {
+        return epochMillis < other.epochMillis ? -1 : (epochMillis > other.epochMillis ? 1 : 0);
+    }
+
+    /** The underlying instant as a {@link java.util.Date} (used by DateFormat). */
+    public Date toJavaDate() {
+        return new Date(epochMillis);
+    }
+
+    public boolean isUtc() {
+        return utc;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        return o instanceof DateTime && ((DateTime) o).epochMillis == epochMillis;
+    }
+
+    @Override
+    public int hashCode() {
+        return (int) (epochMillis ^ (epochMillis >>> 32));
+    }
+
+    @Override
+    public String toString() {
+        return new Date(epochMillis).toString();
+    }
+}

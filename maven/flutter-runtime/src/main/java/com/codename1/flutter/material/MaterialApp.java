@@ -3,10 +3,20 @@ package com.codename1.flutter.material;
 import com.codename1.flutter.Brightness;
 import com.codename1.flutter.BuildContext;
 import com.codename1.flutter.Element;
+import com.codename1.flutter.Locale;
 import com.codename1.flutter.StatelessWidget;
 import com.codename1.flutter.ThemeMode;
 import com.codename1.flutter.Widget;
+import com.codename1.flutter.navigation.MaterialPageRoute;
+import com.codename1.flutter.navigation.Route;
+import com.codename1.flutter.navigation.RouteSettings;
+import com.codename1.flutter.services.SystemUiOverlayStyle;
+import com.codename1.flutter.widgets.ScrollBehavior;
 import com.codename1.ui.Display;
+
+import dart.core.DartIterable;
+import dart.core.DartList;
+import dart.runtime.Funcs;
 
 /**
  * The material application shell. Renders its {@code home} as its only
@@ -24,9 +34,25 @@ public class MaterialApp extends StatelessWidget {
     private ThemeData darkTheme;
     private ThemeMode themeMode;
     private Widget home;
+    private Object routes;
+    private String initialRoute;
+    private String restorationScopeId;
+    private boolean debugShowCheckedModeBanner = true;
+    private boolean resizeToAvoidBottomInset = true;
+    private Object localizationsDelegates;
+    private Object supportedLocales;
+    private Locale locale;
+    private SystemUiOverlayStyle systemOverlayStyle;
+    private Funcs.Func1<RouteSettings, Route> onGenerateRoute;
+    private ScrollBehavior scrollBehavior;
+    private Funcs.Func2<DartList<Locale>, DartIterable<Locale>, Locale> localeListResolutionCallback;
 
     public void title(String v) {
         this.title = v;
+    }
+
+    /** The key for the app's root Navigator — Flutter's {@code navigatorKey}. */
+    public void navigatorKey(Object v) {
     }
 
     public void theme(ThemeData v) {
@@ -43,6 +69,128 @@ public class MaterialApp extends StatelessWidget {
 
     public void home(Widget v) {
         this.home = v;
+    }
+
+    /**
+     * The app's named-route table — Flutter's {@code MaterialApp.routes} (a
+     * {@code Map<String, WidgetBuilder>}). Held untyped; the Navigator resolves
+     * a pushed route name against it.
+     */
+    public void routes(Object v) {
+        this.routes = v;
+    }
+
+    /** The name of the first route shown — Flutter's {@code initialRoute}. */
+    public void initialRoute(String v) {
+        this.initialRoute = v;
+    }
+
+    /**
+     * The identifier under which this app's state is saved and restored —
+     * Flutter's {@code restorationScopeId}.
+     */
+    public void restorationScopeId(String v) {
+        this.restorationScopeId = v;
+    }
+
+    /** Whether the debug "DEBUG" banner shows — Flutter's flag of the same name. */
+    public void debugShowCheckedModeBanner(boolean v) {
+        this.debugShowCheckedModeBanner = v;
+    }
+
+    /**
+     * Whether the body resizes when the on-screen keyboard appears — Flutter's
+     * {@code resizeToAvoidBottomInset} (mirrored on MaterialApp for apps that
+     * set it app-wide).
+     */
+    public void resizeToAvoidBottomInset(boolean v) {
+        this.resizeToAvoidBottomInset = v;
+    }
+
+    /**
+     * The app's localizations delegates — Flutter's {@code localizationsDelegates}
+     * (an {@code Iterable<LocalizationsDelegate>}). Held untyped.
+     */
+    public void localizationsDelegates(Object v) {
+        this.localizationsDelegates = v;
+    }
+
+    /**
+     * The locales this app declares support for — Flutter's
+     * {@code supportedLocales} (an {@code Iterable<Locale>}). Held untyped.
+     */
+    public void supportedLocales(Object v) {
+        this.supportedLocales = v;
+    }
+
+    /** Forces a specific locale, overriding the device locale — Flutter's {@code locale}. */
+    public void locale(Locale v) {
+        this.locale = v;
+    }
+
+    /**
+     * The overlay style (status/navigation bar) applied app-wide — Flutter's
+     * {@code SystemUiOverlayStyle}.
+     */
+    public void systemOverlayStyle(SystemUiOverlayStyle v) {
+        this.systemOverlayStyle = v;
+    }
+
+    /**
+     * A callback that builds a route for a name not found in {@link #routes} —
+     * Flutter's {@code onGenerateRoute} ({@code RouteFactory}).
+     */
+    public void onGenerateRoute(Funcs.Func1<RouteSettings, Route> v) {
+        this.onGenerateRoute = v;
+    }
+
+    /** The app-wide scroll behavior — Flutter's {@code scrollBehavior}. */
+    public void scrollBehavior(ScrollBehavior v) {
+        this.scrollBehavior = v;
+    }
+
+    /**
+     * Resolves the device's preferred locale list against the supported locales
+     * — Flutter's {@code localeListResolutionCallback}.
+     */
+    public void localeListResolutionCallback(Funcs.Func2<DartList<Locale>, DartIterable<Locale>, Locale> v) {
+        this.localeListResolutionCallback = v;
+    }
+
+    public Object getRoutes() {
+        return routes;
+    }
+
+    public String getInitialRoute() {
+        return initialRoute;
+    }
+
+    public String getRestorationScopeId() {
+        return restorationScopeId;
+    }
+
+    public boolean isDebugShowCheckedModeBanner() {
+        return debugShowCheckedModeBanner;
+    }
+
+    public boolean isResizeToAvoidBottomInset() {
+        return resizeToAvoidBottomInset;
+    }
+
+    public Object getLocalizationsDelegates() {
+        return localizationsDelegates;
+    }
+
+    public Object getSupportedLocales() {
+        return supportedLocales;
+    }
+
+    public Locale getLocale() {
+        return locale;
+    }
+
+    public SystemUiOverlayStyle getSystemOverlayStyle() {
+        return systemOverlayStyle;
     }
 
     public String getTitle() {
@@ -116,7 +264,77 @@ public class MaterialApp extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
-        return home;
+        Widget content = home;
+        // A routing-based app (no home widget) renders its initial route — Flutter
+        // calls onGenerateRoute with the initialRoute (default "/") and mounts the
+        // resulting route's page. new_gallery relies on this entirely.
+        if (content == null && onGenerateRoute != null) {
+            RouteSettings settings = new RouteSettings();
+            settings.name(initialRoute != null ? initialRoute : "/");
+            Route route = onGenerateRoute.call(settings);
+            if (route instanceof MaterialPageRoute) {
+                Funcs.Func1<BuildContext, Widget> b = ((MaterialPageRoute) route).getBuilder();
+                if (b != null) {
+                    content = b.call(context);
+                }
+            }
+        }
+        return wrapWithLocalizations(content);
+    }
+
+    /**
+     * Publishes the localized resources loaded from {@link #localizationsDelegates}
+     * so {@code Foo.of(context)} lookups below resolve. Flutter installs a
+     * Localizations widget above the app content; this mirrors that with a single
+     * {@link LocalizationsScope} carrying every delegate's synchronously-loaded value.
+     */
+    private Widget wrapWithLocalizations(Widget content) {
+        if (content == null) {
+            return null;
+        }
+        java.util.List<Object> resources = loadLocalizations();
+        if (resources.isEmpty()) {
+            return content;
+        }
+        LocalizationsScope scope = new LocalizationsScope(resources);
+        scope.child(content);
+        return scope;
+    }
+
+    private java.util.List<Object> loadLocalizations() {
+        java.util.List<Object> out = new java.util.ArrayList<Object>();
+        if (localizationsDelegates instanceof Iterable) {
+            Locale loc = effectiveLocale();
+            for (Object d : (Iterable<?>) localizationsDelegates) {
+                if (d instanceof com.codename1.flutter.l10n.LocalizationsDelegate) {
+                    try {
+                        dart.async.Future<?> f =
+                                ((com.codename1.flutter.l10n.LocalizationsDelegate<?>) d).load(loc);
+                        Object v = f != null ? f.getNow() : null;
+                        if (v != null) {
+                            out.add(v);
+                        }
+                    } catch (Throwable ignore) {
+                        // an opaque or unsupported delegate contributes nothing
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    private Locale effectiveLocale() {
+        if (locale != null) {
+            return locale;
+        }
+        if (supportedLocales instanceof Iterable) {
+            for (Object l : (Iterable<?>) supportedLocales) {
+                if (l instanceof Locale) {
+                    return (Locale) l;
+                }
+            }
+        }
+        return new Locale("en", null);
     }
 
     @Override

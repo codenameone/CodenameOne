@@ -1,8 +1,10 @@
 package com.codename1.flutter.material;
 
+import com.codename1.flutter.Clip;
 import com.codename1.flutter.Color;
 import com.codename1.flutter.EdgeInsets;
 import com.codename1.flutter.Element;
+import com.codename1.flutter.ShapeBorder;
 import com.codename1.flutter.Widget;
 
 /**
@@ -16,9 +18,27 @@ public class Card extends Widget {
     private Double elevation;
     private EdgeInsets margin;
     private Widget child;
+    private ShapeBorder shape;
+    private Clip clipBehavior;
 
     public void color(Color v) {
         this.color = v;
+    }
+
+    public void shape(ShapeBorder v) {
+        this.shape = v;
+    }
+
+    public void clipBehavior(Clip v) {
+        this.clipBehavior = v;
+    }
+
+    public ShapeBorder getShape() {
+        return shape;
+    }
+
+    public Clip getClipBehavior() {
+        return clipBehavior;
     }
 
     public void elevation(double v) {

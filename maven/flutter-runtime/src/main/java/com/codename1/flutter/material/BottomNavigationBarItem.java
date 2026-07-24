@@ -26,4 +26,14 @@ public class BottomNavigationBarItem {
     public String getLabel() {
         return label;
     }
+
+    /** Dart {@code item.icon} getter. */
+    public Widget icon() {
+        return icon;
+    }
+
+    /** Dart {@code item.label} getter. */
+    public String label() {
+        return label;
+    }
 }

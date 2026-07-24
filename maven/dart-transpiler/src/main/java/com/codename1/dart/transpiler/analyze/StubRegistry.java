@@ -8,7 +8,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -22,12 +24,25 @@ public final class StubRegistry {
     public final Map<String, Ast.ClassDecl> classes = new LinkedHashMap<String, Ast.ClassDecl>();
     public final Map<String, Ast.EnumDecl> enums = new LinkedHashMap<String, Ast.EnumDecl>();
     public final Map<String, Ast.FunctionDecl> functions = new LinkedHashMap<String, Ast.FunctionDecl>();
+    public final Map<String, Ast.FieldDecl> topLevelVars = new LinkedHashMap<String, Ast.FieldDecl>();
+    /** Stub extension declarations (`extension X on T { ... }`), keyed via their {@code on} type. */
+    public final List<Ast.ClassDecl> extensions = new ArrayList<Ast.ClassDecl>();
 
     /** Loads the embedded stub set (fallback when the classpath has none). */
     public static StubRegistry loadEmbedded(Diagnostics diags) {
         StubRegistry r = new StubRegistry();
+        r.loadBuiltins(diags);
         r.loadResource("/com/codename1/dart/stubs/flutter_material.dart", diags);
         return r;
+    }
+
+    /**
+     * Loads transpiler built-in stubs that must be present regardless of the runtime stub
+     * classpath — currently the dart:collection mixins (IterableMixin/ListMixin/MapMixin/SetMixin),
+     * which user classes apply via {@code with IterableMixin<T>}.
+     */
+    private void loadBuiltins(Diagnostics diags) {
+        loadResource("/com/codename1/dart/stubs/dart_collection.dart", diags);
     }
 
     /**
@@ -37,6 +52,8 @@ public final class StubRegistry {
      */
     public static StubRegistry loadFromClasspath(java.util.List<java.io.File> entries, Diagnostics diags) {
         StubRegistry r = new StubRegistry();
+        r.loadBuiltins(diags);
+        int builtinClasses = r.classes.size();
         for (java.io.File entry : entries) {
             try {
                 if (entry.isDirectory()) {
@@ -77,7 +94,8 @@ public final class StubRegistry {
                 diags.error(entry.getName(), 0, 0, "E0903", "Failed scanning for Dart stubs: " + e);
             }
         }
-        if (r.classes.isEmpty() && r.functions.isEmpty()) {
+        // Only the always-loaded builtins contributed — no runtime stubs on the classpath.
+        if (r.classes.size() == builtinClasses && r.functions.isEmpty()) {
             return loadEmbedded(diags);
         }
         return r;
@@ -107,13 +125,22 @@ public final class StubRegistry {
         AstBuilder builder = new AstBuilder(diags);
         Ast.Library lib = builder.parse(name, source);
         for (Ast.ClassDecl c : lib.classes) {
-            classes.put(c.name, c);
+            if (c.extensionOn != null) {
+                extensions.add(c);
+            } else {
+                classes.put(c.name, c);
+            }
         }
         for (Ast.EnumDecl e : lib.enums) {
             enums.put(e.name, e);
         }
         for (Ast.FunctionDecl f : lib.functions) {
             functions.put(f.name, f);
+        }
+        for (Ast.FieldDecl v : lib.topLevelVars) {
+            if (v.javaName != null) {
+                topLevelVars.put(v.name, v);
+            }
         }
     }
 
@@ -125,12 +152,49 @@ public final class StubRegistry {
         return enums.containsKey(dartName);
     }
 
+    /**
+     * Finds a stub extension declaring {@code member} for the given receiver type name.
+     * Matches the extension's {@code on} type against the receiver type or any of its stub
+     * supertypes (class chain), so an extension declared on a base type is still consulted.
+     */
+    public Ast.ClassDecl findExtension(String typeName, String member, boolean getter) {
+        for (String t = typeName; t != null; ) {
+            for (Ast.ClassDecl ext : extensions) {
+                if (!ext.extensionOn.name.equals(t)) {
+                    continue;
+                }
+                for (Ast.MethodDecl m : ext.methods) {
+                    if (m.name.equals(member) && m.isGetter == getter && !m.isSetter) {
+                        return ext;
+                    }
+                }
+            }
+            Ast.ClassDecl c = classes.get(t);
+            t = c != null && c.superclass != null ? c.superclass.name : null;
+        }
+        return null;
+    }
+
     /** Walks the stub superclass chain looking for a member. */
     public Ast.MethodDecl findMethod(String className, String member, boolean getter) {
         Ast.ClassDecl c = classes.get(className);
         while (c != null) {
             for (Ast.MethodDecl m : c.methods) {
                 if (m.name.equals(member) && m.isGetter == getter && !m.isSetter) {
+                    return m;
+                }
+            }
+            c = c.superclass != null ? classes.get(c.superclass.name) : null;
+        }
+        return null;
+    }
+
+    /** Walks the stub superclass chain looking for a declared setter (Dart {@code set x(v)}). */
+    public Ast.MethodDecl findSetter(String className, String member) {
+        Ast.ClassDecl c = classes.get(className);
+        while (c != null) {
+            for (Ast.MethodDecl m : c.methods) {
+                if (m.name.equals(member) && m.isSetter) {
                     return m;
                 }
             }

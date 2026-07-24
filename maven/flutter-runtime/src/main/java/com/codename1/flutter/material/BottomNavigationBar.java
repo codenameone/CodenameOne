@@ -1,5 +1,6 @@
 package com.codename1.flutter.material;
 
+import com.codename1.flutter.Color;
 import com.codename1.flutter.Element;
 import com.codename1.flutter.Widget;
 
@@ -19,6 +20,48 @@ public class BottomNavigationBar extends Widget {
     private DartList<BottomNavigationBarItem> items;
     private Long currentIndex;
     private Funcs.VoidFunc1<Long> onTap;
+    private BottomNavigationBarType type;
+    private Color backgroundColor;
+    private Color selectedItemColor;
+    private Color unselectedItemColor;
+    private Double selectedFontSize;
+    private Double unselectedFontSize;
+
+    public void type(BottomNavigationBarType v) {
+        this.type = v;
+    }
+
+    public void backgroundColor(Color v) {
+        this.backgroundColor = v;
+    }
+
+    public void selectedItemColor(Color v) {
+        this.selectedItemColor = v;
+    }
+
+    public void unselectedItemColor(Color v) {
+        this.unselectedItemColor = v;
+    }
+
+    public void selectedFontSize(double v) {
+        this.selectedFontSize = v;
+    }
+
+    public void unselectedFontSize(double v) {
+        this.unselectedFontSize = v;
+    }
+
+    public void showUnselectedLabels(boolean v) {
+    }
+
+    public void showSelectedLabels(boolean v) {
+    }
+
+    public void elevation(double v) {
+    }
+
+    public void iconSize(double v) {
+    }
 
     public void items(DartList<BottomNavigationBarItem> v) {
         this.items = v;

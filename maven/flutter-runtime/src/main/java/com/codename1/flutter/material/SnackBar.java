@@ -20,6 +20,25 @@ public class SnackBar extends Widget {
 
     private Widget content;
     private Duration duration;
+    private SnackBarAction action;
+    private SnackBarBehavior behavior;
+    private com.codename1.flutter.Color backgroundColor;
+
+    public void action(SnackBarAction v) {
+        this.action = v;
+    }
+
+    public void behavior(SnackBarBehavior v) {
+        this.behavior = v;
+    }
+
+    public void backgroundColor(com.codename1.flutter.Color v) {
+        this.backgroundColor = v;
+    }
+
+    public SnackBarAction getAction() {
+        return action;
+    }
 
     public void content(Widget v) {
         this.content = v;

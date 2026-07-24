@@ -14,10 +14,10 @@ import dart.runtime.Funcs;
  */
 public class Checkbox extends Widget {
 
-    private boolean value;
+    private Boolean value;
     private Funcs.VoidFunc1<Boolean> onChanged;
 
-    public void value(boolean v) {
+    public void value(Boolean v) {
         this.value = v;
     }
 
@@ -25,8 +25,16 @@ public class Checkbox extends Widget {
         this.onChanged = v;
     }
 
+    /**
+     * Whether the checkbox has a third "indeterminate" state
+     * ({@code Checkbox.tristate}). The CN1 checkbox is binary, so this flag is
+     * accepted for API compatibility but not otherwise modelled.
+     */
+    public void tristate(boolean v) {
+    }
+
     public boolean getValue() {
-        return value;
+        return value != null && value.booleanValue();
     }
 
     public Funcs.VoidFunc1<Boolean> getOnChanged() {

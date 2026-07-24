@@ -306,12 +306,16 @@ elements
     : element (C element)* C?
     ;
 
+// Dart 2.17 enhanced enums: constants may carry arguments and the body may
+// declare members after a `;` (getters/methods/fields/const constructors).
 enumEntry
-    : metadata identifier
+    : metadata identifier (typeArguments? arguments)?
+    | metadata identifier D identifier arguments
     ;
 
 enumType
-    : ENUM_ identifier OBC enumEntry (C enumEntry)* C? CBC
+    : ENUM_ identifier typeParameters? mixins? interfaces? OBC
+      enumEntry (C enumEntry)* C? (SC (metadata classMemberDeclaration)*)? CBC
     ;
 
 equalityExpression
@@ -392,6 +396,7 @@ forInitializerStatement
 forLoopParts
     : forInitializerStatement expr? SC expressionList?
     | metadata declaredIdentifier IN_ expr
+    | metadata (FINAL_ | VAR_) pattern IN_ expr
     | identifier IN_ expr
     ;
 
@@ -513,7 +518,7 @@ ifNullExpression
     ;
 
 ifStatement
-    : IF_ OP expr CP statement (ELSE_ statement)?
+    : IF_ OP expr (CASE_ guardedPattern)? CP statement (ELSE_ statement)?
     ;
 
 importOrExport
@@ -707,6 +712,10 @@ newExpression
 
 nonLabelledStatement
     : block
+    // yield / yield* must precede localVariableDeclaration: `yield` is also a legal identifier, so
+    // `yield i;` would otherwise parse as a variable declaration of a type named `yield`.
+    | yieldEachStatement
+    | yieldStatement
     | localVariableDeclaration
     | forStatement
     | whileStatement
@@ -718,8 +727,6 @@ nonLabelledStatement
     | breakStatement
     | continueStatement
     | returnStatement
-    | yieldStatement
-    | yieldEachStatement
     | expressionStatement
     | assertStatement
     | localFunctionDeclaration

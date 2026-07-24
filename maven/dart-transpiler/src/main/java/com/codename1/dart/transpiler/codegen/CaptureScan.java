@@ -20,6 +20,7 @@ final class CaptureScan {
 
     private final Set<String> assigned = new HashSet<String>();
     private final Set<String> referencedInLambda = new HashSet<String>();
+    private final Set<String> allReferenced = new HashSet<String>();
     private int lambdaDepth;
 
     private CaptureScan() {
@@ -43,6 +44,27 @@ final class CaptureScan {
         Set<String> boxed = new HashSet<String>(scan.assigned);
         boxed.retainAll(scan.referencedInLambda);
         return boxed;
+    }
+
+    /**
+     * True when {@code name} is referenced from inside a closure within
+     * {@code body}. A C-style for loop's index is reassigned by the loop's
+     * update clause, so a closure that captures it needs a per-iteration
+     * effectively-final copy (Dart binds the loop variable fresh each pass).
+     */
+    static boolean readInLambda(Stmt body, String name) {
+        CaptureScan scan = new CaptureScan();
+        scan.walkStmt(body);
+        return scan.referencedInLambda.contains(name);
+    }
+
+    /** Every identifier name referenced anywhere in an expression. */
+    static Set<String> referencedNames(Expr e) {
+        CaptureScan scan = new CaptureScan();
+        if (e != null) {
+            scan.walkExpr(e);
+        }
+        return scan.allReferenced;
     }
 
     private void walkBlock(Block b) {
@@ -86,6 +108,16 @@ final class CaptureScan {
             walkStmt(f.body);
         } else if (s instanceof ReturnStmt) {
             walkExpr(((ReturnStmt) s).value);
+        } else if (s instanceof Ast.LocalFunc) {
+            // A nested function is lowered to a lambda, so its body is a closure
+            // context: outer locals it references-and-mutates must be boxed too.
+            Ast.LocalFunc lf = (Ast.LocalFunc) s;
+            lambdaDepth++;
+            if (lf.body != null) {
+                walkBlock(lf.body);
+            }
+            walkExpr(lf.exprBody);
+            lambdaDepth--;
         }
     }
 
@@ -100,8 +132,10 @@ final class CaptureScan {
             return;
         }
         if (e instanceof Ident) {
+            String nm = ((Ident) e).name;
+            allReferenced.add(nm);
             if (lambdaDepth > 0) {
-                referencedInLambda.add(((Ident) e).name);
+                referencedInLambda.add(nm);
             }
         } else if (e instanceof Assign) {
             Assign a = (Assign) e;
@@ -138,6 +172,9 @@ final class CaptureScan {
             walkExpr(((PropertyGet) e).target);
         } else if (e instanceof Call) {
             Call c = (Call) e;
+            if (c.name != null) {
+                allReferenced.add(c.name);
+            }
             walkExpr(c.target);
             walkExprs(c.args.positional);
             for (NamedArg na : c.args.named) {

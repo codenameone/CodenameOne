@@ -26,6 +26,67 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
         return m;
     }
 
+    /**
+     * Dart's {@code Map.of(other)} / {@code Map.from(other)} — a new insertion-ordered
+     * map holding a shallow copy of {@code other}'s entries. The fixed-arity overload
+     * takes priority over the varargs {@link #of(Object...)} literal helper (a single
+     * {@code Map} argument is more specific), so map literals continue to resolve to
+     * the pairs form.
+     */
+    public static <K, V> DartMap<K, V> of(Map<? extends K, ? extends V> other) {
+        return from(other);
+    }
+
+    /**
+     * Dart's {@code Map.from(other)} — copy the entries of another map. Accepts any {@code Map}
+     * (Dart's {@code Map.from} takes an untyped map and the caller supplies K/V), casting the
+     * entries to the requested K/V per Dart's dynamic-map semantics.
+     */
+    @SuppressWarnings("unchecked")
+    public static <K, V> DartMap<K, V> from(Map<?, ?> other) {
+        DartMap<K, V> m = new DartMap<>();
+        if (other != null) {
+            m.putAll((Map<? extends K, ? extends V>) other);
+        }
+        return m;
+    }
+
+    /**
+     * Dart's {@code Map.fromIterable(iterable, {key, value})}. When {@code key} or
+     * {@code value} is null the element itself is used (Dart's identity default).
+     */
+    @SuppressWarnings("unchecked")
+    public static <E, K, V> DartMap<K, V> fromIterable(
+            Iterable<E> iterable,
+            Funcs.Func1<E, K> key,
+            Funcs.Func1<E, V> value) {
+        DartMap<K, V> m = new DartMap<>();
+        if (iterable != null) {
+            for (E e : iterable) {
+                K k = key != null ? key.call(e) : (K) e;
+                V v = value != null ? value.call(e) : (V) e;
+                m.put(k, v);
+            }
+        }
+        return m;
+    }
+
+    /** Dart's {@code Map.fromEntries(entries)}. */
+    public static <K, V> DartMap<K, V> fromEntries(Iterable<? extends MapEntry<K, V>> entries) {
+        DartMap<K, V> m = new DartMap<>();
+        if (entries != null) {
+            for (MapEntry<K, V> e : entries) {
+                m.put(e.key(), e.value());
+            }
+        }
+        return m;
+    }
+
+    /** Dart's {@code Map.identity()} — identity-keyed map (approximated by insertion order). */
+    public static <K, V> DartMap<K, V> identity() {
+        return new DartMap<>();
+    }
+
     /** Dart's map[key]. */
     public V idx(K key) {
         return get(key);
@@ -71,6 +132,67 @@ public class DartMap<K, V> extends LinkedHashMap<K, V> {
     /** Dart's Map.remove returns the removed value (or null). */
     public V removeDart(Object key) {
         return remove(key);
+    }
+
+    /** Dart's {@code Map.addAll(other)} — copies every entry of {@code other} in. */
+    public void addAll(Map<? extends K, ? extends V> other) {
+        if (other != null) {
+            putAll(other);
+        }
+    }
+
+    /** Dart's {@code Map.addEntries(entries)}. */
+    public void addEntries(Iterable<? extends MapEntry<K, V>> entries) {
+        if (entries != null) {
+            for (MapEntry<K, V> e : entries) {
+                put(e.key(), e.value());
+            }
+        }
+    }
+
+    /** Dart's {@code Map.entries} getter — an iterable of key/value pairs. */
+    public DartIterable<MapEntry<K, V>> entries() {
+        DartList<MapEntry<K, V>> out = new DartList<>();
+        for (Map.Entry<K, V> e : entrySet()) {
+            out.add(new MapEntry<>(e.getKey(), e.getValue()));
+        }
+        return out.asIterable();
+    }
+
+    /** Dart's {@code Map.removeWhere(test)}. */
+    public void removeWhere(Funcs.Func2<K, V, Boolean> test) {
+        java.util.Iterator<Map.Entry<K, V>> it = entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<K, V> e = it.next();
+            if (Boolean.TRUE.equals(test.call(e.getKey(), e.getValue()))) {
+                it.remove();
+            }
+        }
+    }
+
+    /** Dart's {@code Map.update(key, update, {ifAbsent})}. */
+    public V update(K key, Funcs.Func1<V, V> update, Funcs.Func0<V> ifAbsent) {
+        if (containsKey(key)) {
+            V v = update.call(get(key));
+            put(key, v);
+            return v;
+        }
+        if (ifAbsent != null) {
+            V v = ifAbsent.call();
+            put(key, v);
+            return v;
+        }
+        throw new ArgumentError("Key not in map: " + key);
+    }
+
+    /** Dart's {@code Map.map(transform)} — returns a new map of transformed entries. */
+    public <K2, V2> DartMap<K2, V2> mapEntries(Funcs.Func2<K, V, MapEntry<K2, V2>> transform) {
+        DartMap<K2, V2> m = new DartMap<>();
+        for (Map.Entry<K, V> e : entrySet()) {
+            MapEntry<K2, V2> me = transform.call(e.getKey(), e.getValue());
+            m.put(me.key(), me.value());
+        }
+        return m;
     }
 
     @Override

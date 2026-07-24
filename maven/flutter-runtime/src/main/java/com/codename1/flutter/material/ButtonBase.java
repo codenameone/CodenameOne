@@ -14,6 +14,7 @@ public abstract class ButtonBase extends Widget {
 
     private Funcs.VoidFunc0 onPressed;
     private Widget child;
+    private ButtonStyle style;
 
     public void onPressed(Funcs.VoidFunc0 v) {
         this.onPressed = v;
@@ -23,12 +24,20 @@ public abstract class ButtonBase extends Widget {
         this.child = v;
     }
 
+    public void style(ButtonStyle v) {
+        this.style = v;
+    }
+
     public Funcs.VoidFunc0 getOnPressed() {
         return onPressed;
     }
 
     public Widget getChild() {
         return child;
+    }
+
+    public ButtonStyle getStyle() {
+        return style;
     }
 
     @Override

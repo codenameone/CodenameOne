@@ -1,6 +1,7 @@
 package com.codename1.flutter.widgets;
 
 import com.codename1.flutter.Element;
+import com.codename1.flutter.Key;
 import com.codename1.flutter.Widget;
 
 /**
@@ -72,6 +73,24 @@ public class Positioned extends Widget {
 
     public Widget getChild() {
         return child;
+    }
+
+    /**
+     * {@code Positioned.fill}: pins the child to all four edges of the stack
+     * (each unspecified inset defaults to 0), so it fills the stack.
+     */
+    public static Positioned fill(Key key, Double left, Double top, Double right, Double bottom,
+            Widget child) {
+        Positioned p = new Positioned();
+        p.key(key);
+        p.left(left == null ? 0 : left);
+        p.top(top == null ? 0 : top);
+        p.right(right == null ? 0 : right);
+        p.bottom(bottom == null ? 0 : bottom);
+        if (child != null) {
+            p.child(child);
+        }
+        return p;
     }
 
     @Override

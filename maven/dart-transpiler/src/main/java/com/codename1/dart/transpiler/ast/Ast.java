@@ -42,6 +42,10 @@ public final class Ast {
         public String name;                       // "int", "String", "List", "Widget", "MyApp", "void", "var", "dynamic"
         public List<TypeRef> args = new ArrayList<TypeRef>();
         public boolean nullable;
+        // For an inline function type (name == "Function", e.g. `void Function(int)`):
+        // the parsed signature so codegen can render a real Funcs.* SAM instead of Object.
+        public List<TypeRef> funcParams;          // non-null iff this is an inline function type
+        public TypeRef funcReturn;                // return type of the inline function type
 
         public TypeRef(String name) {
             this.name = name;
@@ -99,14 +103,21 @@ public final class Ast {
     public static class Library extends Node {
         public String fileName;                   // e.g. "main.dart" (relative to source root)
         public List<String> imports = new ArrayList<String>();
+        /** Import prefix names introduced by `import '...' as name;` in this library. */
+        public List<String> importPrefixes = new ArrayList<String>();
+        /** `import '<uri>' as <prefix>;` — prefix name mapped to the (raw) import uri. */
+        public java.util.Map<String, String> prefixImports =
+                new java.util.LinkedHashMap<String, String>();
         public List<ClassDecl> classes = new ArrayList<ClassDecl>();
         public List<EnumDecl> enums = new ArrayList<EnumDecl>();
         public List<FunctionDecl> functions = new ArrayList<FunctionDecl>();
         public List<FieldDecl> topLevelVars = new ArrayList<FieldDecl>();
+        public List<TypedefDecl> typedefs = new ArrayList<TypedefDecl>();
     }
 
     public static class ClassDecl extends Node {
         public String name;
+        public Library ownerLibrary;              // the user library that declares this class (single-package model)
         public String javaName;                   // from @JavaName('...') in stub files
         public boolean isAbstract;
         public boolean isSealed;                  // Dart 3: sealed class C { }
@@ -180,11 +191,53 @@ public final class Ast {
         public String name;
         public String javaName;                   // from @JavaName('...') in stub files
         public List<String> entries = new ArrayList<String>();
+        // Dart 2.17 enhanced-enum body members (methods / getters, fields, constructors).
+        public List<FieldDecl> fields = new ArrayList<FieldDecl>();
+        public List<MethodDecl> methods = new ArrayList<MethodDecl>();
+        public List<CtorDecl> ctors = new ArrayList<CtorDecl>();
+
+        public MethodDecl method(String name) {
+            for (MethodDecl m : methods) {
+                if (m.name.equals(name) && !m.isGetter && !m.isSetter) {
+                    return m;
+                }
+            }
+            return null;
+        }
+
+        public MethodDecl getter(String name) {
+            for (MethodDecl m : methods) {
+                if (m.name.equals(name) && m.isGetter) {
+                    return m;
+                }
+            }
+            return null;
+        }
+
+        public boolean hasEntry(String name) {
+            return entries.contains(name);
+        }
+    }
+
+    /**
+     * A top-level {@code typedef}. For a function-type alias
+     * ({@code typedef Name = Ret Function(A, B);}) {@link #paramTypes} and
+     * {@link #returnType} hold the signature; for a plain alias
+     * ({@code typedef Name = Map<String, int>;}) {@link #aliased} holds the
+     * target type and the function fields are null.
+     */
+    public static class TypedefDecl extends Node {
+        public String name;
+        public List<String> typeParams = new ArrayList<String>();
+        public List<TypeRef> paramTypes;          // non-null for a function-type alias
+        public TypeRef returnType;                // non-null for a function-type alias
+        public TypeRef aliased;                   // non-null for a plain (non-function) alias
     }
 
     public static class FieldDecl extends Node {
         public TypeRef type;                      // may be VAR
         public String name;
+        public String javaName;                   // from @JavaName('...') in stub files (top-level vars)
         public Expr initializer;                  // nullable
         public boolean isFinal;
         public boolean isConst;
@@ -225,6 +278,7 @@ public final class Ast {
     public static class MethodDecl extends Node {
         public TypeRef returnType;                // may be VAR (=> inferred) or VOID
         public String name;
+        public List<String> typeParams = new ArrayList<String>();  // generic method: m<T>(...)
         public List<Param> params = new ArrayList<Param>();
         public boolean isStatic;
         public boolean isGetter;
@@ -232,6 +286,7 @@ public final class Ast {
         public boolean isOverride;                // had @override metadata
         public boolean isAbstract;                // no body
         public boolean isAsync;
+        public boolean isSyncStar;                // sync* generator body
         public Block body;                        // nullable when isAbstract or expression-bodied
         public Expr exprBody;                     // for `=> expr`
     }
@@ -242,6 +297,10 @@ public final class Ast {
         public String javaName;                   // from @JavaName('...') in stub files
         public boolean isExternal;
         public boolean isAsync;
+        public boolean isSyncStar;                // sync* generator body
+        public boolean isGetter;                  // top-level `T get x => ...`
+        public boolean isSetter;                  // top-level `set x(v) { ... }`
+        public List<String> typeParams = new ArrayList<String>();  // generic function: fn<T>(...)
         public List<Param> params = new ArrayList<Param>();
         public Block body;
         public Expr exprBody;
@@ -276,6 +335,8 @@ public final class Ast {
 
     public static class IfStmt extends Stmt {
         public Expr condition;
+        public Pattern casePattern;               // Dart 3 if-case: `if (expr case pattern)`; nullable
+        public Expr caseGuard;                    // optional `when` guard on the if-case; nullable
         public Stmt thenStmt;
         public Stmt elseStmt;                     // nullable
     }
@@ -295,6 +356,7 @@ public final class Ast {
     public static class ForInStmt extends Stmt {
         public TypeRef varType;                   // may be VAR
         public String varName;
+        public Pattern pattern;                   // Dart 3 pattern for-in (destructuring); null for simple var
         public Expr iterable;
         public Stmt body;
     }
@@ -303,10 +365,32 @@ public final class Ast {
         public Expr value;                        // nullable
     }
 
+    /** yield expr; / yield* expr; inside a sync* generator body. */
+    public static class YieldStmt extends Stmt {
+        public Expr value;
+        public boolean star;                      // yield* (delegates to a sub-iterable)
+    }
+
     public static class BreakStmt extends Stmt {
     }
 
     public static class ContinueStmt extends Stmt {
+    }
+
+    /**
+     * A function declared inside a method/function body:
+     * {@code Ret name(params) { ... }}. Lowered by the emitter to a local
+     * variable holding a lambda bound to a {@code Funcs.*} functional interface,
+     * so later {@code name(args)} calls and bare {@code name} tear-offs resolve
+     * against the local.
+     */
+    public static class LocalFunc extends Stmt {
+        public TypeRef returnType;                // may be VOID / VAR
+        public String name;
+        public List<Param> params = new ArrayList<Param>();
+        public Block body;                        // nullable when expression-bodied
+        public Expr exprBody;                     // for `=> expr`
+        public boolean isAsync;
     }
 
     // ------------------------------------------------------------------
@@ -347,6 +431,15 @@ public final class Ast {
         public TypeRef valueType;
         public List<Expr> keys = new ArrayList<Expr>();
         public List<Expr> values = new ArrayList<Expr>();
+        // Structured elements (MapEntry / IfElement / ForElement / SpreadElement) when the map
+        // literal contains collection if/for/spread; when non-empty the emitter uses a builder.
+        public List<Expr> elements = new ArrayList<Expr>();
+        public boolean structured;
+        public boolean isConst;
+    }
+    public static class SetLit extends Expr {
+        public TypeRef elementType;               // nullable
+        public List<Expr> elements = new ArrayList<Expr>();  // plain / spread / if / for
         public boolean isConst;
     }
 
@@ -400,6 +493,12 @@ public final class Ast {
         public boolean nullAware;
     }
 
+    /** key: value entry inside a map literal (used when a map has structured if/for/spread elements). */
+    public static class MapEntry extends Expr {
+        public Expr key;
+        public Expr value;
+    }
+
     /** if (cond) elem [else elem] inside a collection literal. */
     public static class IfElement extends Expr {
         public Expr condition;
@@ -411,6 +510,7 @@ public final class Ast {
     public static class ForElement extends Expr {
         public TypeRef varType;               // for-in var (may be VAR); null for classic
         public String varName;                // for-in variable; null for classic
+        public Pattern pattern;               // Dart 3 pattern for-in (destructuring); null otherwise
         public Expr iterable;                 // for-in source; null for classic
         public Stmt init;                     // classic parts (VarDeclStmt/ExprStmt)
         public Expr condition;
@@ -514,5 +614,112 @@ public final class Ast {
 
     public static class ParenExpr extends Expr {
         public Expr inner;
+    }
+
+    // ------------------------------------------------------------------
+    // Dart 3: switch statements / expressions and patterns
+    // ------------------------------------------------------------------
+
+    /** A `switch (e) { case p when g: stmts; default: stmts; }` statement. */
+    public static class SwitchStmt extends Stmt {
+        public Expr subject;
+        public List<SwitchCase> cases = new ArrayList<SwitchCase>();
+    }
+
+    /** One case (or the default) of a switch statement. */
+    public static class SwitchCase extends Node {
+        public Pattern pattern;                   // null for the default case
+        public Expr guard;                        // optional `when` guard
+        public List<Stmt> body = new ArrayList<Stmt>();
+        public boolean isDefault;
+    }
+
+    /** A `switch (e) { p when g => v, _ => v }` expression. */
+    public static class SwitchExpr extends Expr {
+        public Expr subject;
+        public List<SwitchExprCase> cases = new ArrayList<SwitchExprCase>();
+    }
+
+    /** One `pattern when guard => value` arm of a switch expression. */
+    public static class SwitchExprCase extends Node {
+        public Pattern pattern;
+        public Expr guard;
+        public Expr value;
+        public boolean isDefault;                 // the `_` wildcard arm
+    }
+
+    /** Base for Dart 3 patterns. */
+    public abstract static class Pattern extends Node {
+    }
+
+    /** A constant pattern: a literal or a (possibly qualified) constant reference. */
+    public static class ConstantPattern extends Pattern {
+        public Expr value;
+    }
+
+    /** A variable / wildcard pattern: `var x`, `final T x`, `T x`, or `_`. */
+    public static class VariablePattern extends Pattern {
+        public TypeRef type;                      // null when untyped (`var x` / bare)
+        public String name;
+        public boolean wildcard;                  // true for `_`
+    }
+
+    /** An object pattern: `Type(field: subpattern, ...)`. */
+    public static class ObjectPattern extends Pattern {
+        public TypeRef type;
+        public List<PatternField> fields = new ArrayList<PatternField>();
+    }
+
+    /** A record pattern: `(subpattern, name: subpattern, ...)`. */
+    public static class RecordPattern extends Pattern {
+        public List<PatternField> fields = new ArrayList<PatternField>();
+    }
+
+    /** A list pattern: `[p0, p1, ...]`. */
+    public static class ListPattern extends Pattern {
+        public List<Pattern> elements = new ArrayList<Pattern>();
+    }
+
+    /** A relational pattern: `> 5`, `== x`, `<= y`, etc. */
+    public static class RelationalPattern extends Pattern {
+        public String op;
+        public Expr operand;
+    }
+
+    /** A cast pattern: `subpattern as T`. */
+    public static class CastPattern extends Pattern {
+        public Pattern inner;
+        public TypeRef type;
+    }
+
+    /** A logical-or pattern: `a || b || c`. */
+    public static class OrPattern extends Pattern {
+        public List<Pattern> alternatives = new ArrayList<Pattern>();
+    }
+
+    /** A logical-and pattern: `a && b`. */
+    public static class AndPattern extends Pattern {
+        public List<Pattern> parts = new ArrayList<Pattern>();
+    }
+
+    /** A field of an object or record pattern: an optional name plus a sub-pattern. */
+    public static class PatternField extends Node {
+        public String name;                       // getter/field name (positional record field: null)
+        public Pattern pattern;
+    }
+
+    // ------------------------------------------------------------------
+    // Dart 3: record literals
+    // ------------------------------------------------------------------
+
+    /** A record literal: `(a, b, name: c)`. */
+    public static class RecordLit extends Expr {
+        public List<RecordField> fields = new ArrayList<RecordField>();
+    }
+
+    /** One field of a record literal (name null for a positional field). */
+    public static class RecordField extends Node {
+        public String name;
+        public Expr value;
     }
 }

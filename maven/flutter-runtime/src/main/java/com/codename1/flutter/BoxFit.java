@@ -5,5 +5,5 @@ package com.codename1.flutter;
  * Flutter's {@code BoxFit}.
  */
 public enum BoxFit {
-    fill, contain, cover, fitWidth, fitHeight, none
+    fill, contain, cover, fitWidth, fitHeight, none, scaleDown
 }

@@ -1,8 +1,14 @@
 package com.codename1.flutter.material;
 
+import com.codename1.flutter.Color;
 import com.codename1.flutter.Element;
+import com.codename1.flutter.FocusNode;
+import com.codename1.flutter.TextAlign;
+import com.codename1.flutter.TextStyle;
 import com.codename1.flutter.Widget;
+import com.codename1.flutter.services.TextInputAction;
 
+import dart.core.DartList;
 import dart.runtime.Funcs;
 
 /**
@@ -20,6 +26,66 @@ public class TextField extends Widget {
     private Boolean enabled;
     private Funcs.VoidFunc1<String> onChanged;
     private Funcs.VoidFunc1<String> onSubmitted;
+    private TextStyle style;
+    private Color cursorColor;
+    private TextInputAction textInputAction;
+    private String restorationId;
+    private Funcs.VoidFunc0 onTap;
+    private Long maxLines = 1L;
+    private DartList<String> autofillHints;
+    private Object keyboardType;
+    private Object textCapitalization;
+    private FocusNode focusNode;
+
+    public void textAlign(TextAlign v) {
+    }
+
+    public void style(TextStyle v) {
+        this.style = v;
+    }
+
+    public void cursorColor(Color v) {
+        this.cursorColor = v;
+    }
+
+    public void textInputAction(TextInputAction v) {
+        this.textInputAction = v;
+    }
+
+    public void restorationId(String v) {
+        this.restorationId = v;
+    }
+
+    public void onTap(Funcs.VoidFunc0 v) {
+        this.onTap = v;
+    }
+
+    public void maxLines(long v) {
+        this.maxLines = v;
+    }
+
+    public void minLines(long v) {
+    }
+
+    public void autofillHints(DartList<String> v) {
+        this.autofillHints = v;
+    }
+
+    public void keyboardType(Object v) {
+        this.keyboardType = v;
+    }
+
+    public void textCapitalization(Object v) {
+        this.textCapitalization = v;
+    }
+
+    public void focusNode(FocusNode v) {
+        this.focusNode = v;
+    }
+
+    public TextStyle getStyle() {
+        return style;
+    }
 
     public void controller(TextEditingController v) {
         this.controller = v;

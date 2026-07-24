@@ -20,6 +20,36 @@ public class Slider extends Widget {
     private Double max;
     private Long divisions;
     private Funcs.VoidFunc1<Double> onChanged;
+    private String label;
+    private Funcs.Func1<Double, String> semanticFormatterCallback;
+    private com.codename1.flutter.Color activeColor;
+    private com.codename1.flutter.Color inactiveColor;
+    private Funcs.VoidFunc1<Double> onChangeStart;
+    private Funcs.VoidFunc1<Double> onChangeEnd;
+
+    public void label(String v) {
+        this.label = v;
+    }
+
+    public void semanticFormatterCallback(Funcs.Func1<Double, String> v) {
+        this.semanticFormatterCallback = v;
+    }
+
+    public void activeColor(com.codename1.flutter.Color v) {
+        this.activeColor = v;
+    }
+
+    public void inactiveColor(com.codename1.flutter.Color v) {
+        this.inactiveColor = v;
+    }
+
+    public void onChangeStart(Funcs.VoidFunc1<Double> v) {
+        this.onChangeStart = v;
+    }
+
+    public void onChangeEnd(Funcs.VoidFunc1<Double> v) {
+        this.onChangeEnd = v;
+    }
 
     public void value(double v) {
         this.value = v;

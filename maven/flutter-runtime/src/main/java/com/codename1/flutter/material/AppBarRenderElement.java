@@ -74,14 +74,16 @@ public class AppBarRenderElement extends SingleChildRenderElement {
     /**
      * The bar background actually in effect: the explicit
      * {@code AppBar.backgroundColor} when given, else the M3 ThemeData
-     * default — colorScheme.inversePrimary.
+     * default — colorScheme.surface (matching Flutter's Material 3 AppBar,
+     * which sits on the surface with an elevation tint rather than a
+     * saturated fill).
      */
     private com.codename1.flutter.Color effectiveBackground() {
         if (appBar().getBackgroundColor() != null) {
             return appBar().getBackgroundColor();
         }
         try {
-            return Theme.of(this).colorScheme().inversePrimary();
+            return Theme.of(this).colorScheme().surface();
         } catch (Throwable t) {
             return null;
         }

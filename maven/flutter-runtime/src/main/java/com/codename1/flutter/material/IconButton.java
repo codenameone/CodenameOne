@@ -1,6 +1,7 @@
 package com.codename1.flutter.material;
 
 import com.codename1.flutter.Color;
+import com.codename1.flutter.EdgeInsets;
 import com.codename1.flutter.Element;
 import com.codename1.flutter.Widget;
 
@@ -18,9 +19,37 @@ public class IconButton extends Widget {
     private Widget icon;
     private Double iconSize;
     private Color color;
+    private String tooltip;
+    private EdgeInsets padding;
+    private Color hoverColor;
 
     public void onPressed(Funcs.VoidFunc0 v) {
         this.onPressed = v;
+    }
+
+    public void tooltip(String v) {
+        this.tooltip = v;
+    }
+
+    public void padding(EdgeInsets v) {
+        this.padding = v;
+    }
+
+    public void hoverColor(Color v) {
+        this.hoverColor = v;
+    }
+
+    public void splashRadius(double v) {
+    }
+
+    public void alignment(Object v) {
+    }
+
+    public void visualDensity(Object v) {
+    }
+
+    public String getTooltip() {
+        return tooltip;
     }
 
     public void icon(Widget v) {

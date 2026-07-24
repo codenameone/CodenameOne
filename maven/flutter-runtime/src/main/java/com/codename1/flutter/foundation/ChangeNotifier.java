@@ -1,0 +1,55 @@
+package com.codename1.flutter.foundation;
+
+import java.util.ArrayList;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
+
+import dart.runtime.Funcs;
+
+/**
+ * Flutter's ChangeNotifier. Applied in Dart as a mixin
+ * ({@code class EmailStore with ChangeNotifier}); the transpiler maps a stub
+ * mixin to an implemented Java interface, so the notifier state (the listener
+ * list) lives in an identity-keyed side table rather than in an instance field.
+ * Listeners are {@code VoidCallback}s ({@link Funcs.VoidFunc0}).
+ */
+public interface ChangeNotifier {
+
+    /** Identity-keyed listener lists for every ChangeNotifier instance. */
+    Map<ChangeNotifier, List<Funcs.VoidFunc0>> LISTENERS =
+            new IdentityHashMap<ChangeNotifier, List<Funcs.VoidFunc0>>();
+
+    static List<Funcs.VoidFunc0> listenersOf(ChangeNotifier self) {
+        List<Funcs.VoidFunc0> l = LISTENERS.get(self);
+        if (l == null) {
+            l = new ArrayList<Funcs.VoidFunc0>();
+            LISTENERS.put(self, l);
+        }
+        return l;
+    }
+
+    default void addListener(Funcs.VoidFunc0 listener) {
+        listenersOf(this).add(listener);
+    }
+
+    default void removeListener(Funcs.VoidFunc0 listener) {
+        listenersOf(this).remove(listener);
+    }
+
+    default void notifyListeners() {
+        // copy so listeners may add/remove during dispatch
+        for (Funcs.VoidFunc0 l : new ArrayList<Funcs.VoidFunc0>(listenersOf(this))) {
+            l.call();
+        }
+    }
+
+    default void dispose() {
+        LISTENERS.remove(this);
+    }
+
+    default boolean hasListeners() {
+        List<Funcs.VoidFunc0> l = LISTENERS.get(this);
+        return l != null && !l.isEmpty();
+    }
+}

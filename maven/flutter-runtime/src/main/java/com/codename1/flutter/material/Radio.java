@@ -13,33 +13,33 @@ import dart.runtime.Funcs;
  * moves the selection (controlled semantics). Backed by a CN1
  * {@link com.codename1.ui.RadioButton} (UIID "FlutterRadio").
  */
-public class Radio extends Widget {
+public class Radio<T> extends Widget {
 
-    private Object value;
-    private Object groupValue;
-    private Funcs.VoidFunc1<Object> onChanged;
+    private T value;
+    private T groupValue;
+    private Funcs.VoidFunc1<T> onChanged;
 
-    public void value(Object v) {
+    public void value(T v) {
         this.value = v;
     }
 
-    public void groupValue(Object v) {
+    public void groupValue(T v) {
         this.groupValue = v;
     }
 
-    public void onChanged(Funcs.VoidFunc1<Object> v) {
+    public void onChanged(Funcs.VoidFunc1<T> v) {
         this.onChanged = v;
     }
 
-    public Object getValue() {
+    public T getValue() {
         return value;
     }
 
-    public Object getGroupValue() {
+    public T getGroupValue() {
         return groupValue;
     }
 
-    public Funcs.VoidFunc1<Object> getOnChanged() {
+    public Funcs.VoidFunc1<T> getOnChanged() {
         return onChanged;
     }
 

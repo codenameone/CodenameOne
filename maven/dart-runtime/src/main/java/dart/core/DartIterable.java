@@ -21,6 +21,35 @@ public class DartIterable<E> implements Iterable<E> {
         return source instanceof DartIterable<E> di ? di : new DartIterable<>(source);
     }
 
+    /**
+     * Dart's {@code Iterable.generate(count, [generator])} — a lazy iterable of
+     * {@code count} elements produced by {@code generator(index)}. With no
+     * generator Dart yields the indices themselves.
+     */
+    public static <E> DartIterable<E> generate(long count, Funcs.Func1<Long, E> generator) {
+        return new DartIterable<>(() -> new Iterator<E>() {
+            private long i;
+
+            @Override
+            public boolean hasNext() {
+                return i < count;
+            }
+
+            @Override
+            public E next() {
+                if (i >= count) {
+                    throw new NoSuchElementException();
+                }
+                return generator.call(i++);
+            }
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <E> DartIterable<E> generate(long count) {
+        return generate(count, i -> (E) i);
+    }
+
     @Override
     public Iterator<E> iterator() {
         return source.iterator();
@@ -161,6 +190,21 @@ public class DartIterable<E> implements Iterable<E> {
         throw new StateError("No element");
     }
 
+    /** Dart's Iterable.elementAt(index) — the index-th element (0-based). */
+    public E elementAt(long index) {
+        if (index < 0) {
+            throw new RangeError("index out of range: " + index);
+        }
+        long i = 0;
+        for (E e : this) {
+            if (i == index) {
+                return e;
+            }
+            i++;
+        }
+        throw new RangeError("index out of range: " + index);
+    }
+
     public boolean any(Funcs.Func1<E, Boolean> test) {
         for (E e : this) {
             if (Boolean.TRUE.equals(test.call(e))) {
@@ -200,6 +244,238 @@ public class DartIterable<E> implements Iterable<E> {
             acc = combine.call(acc, e);
         }
         return acc;
+    }
+
+    /** Dart's {@code Iterable.reduce(combine)} — folds without a seed. */
+    public E reduce(Funcs.Func2<E, E, E> combine) {
+        Iterator<E> it = iterator();
+        if (!it.hasNext()) {
+            throw new StateError("No element");
+        }
+        E acc = it.next();
+        while (it.hasNext()) {
+            acc = combine.call(acc, it.next());
+        }
+        return acc;
+    }
+
+    /** Dart's {@code Iterable.expand(f)} — flat-maps each element to an iterable. */
+    public <R> DartIterable<R> expand(Funcs.Func1<E, Iterable<R>> f) {
+        Iterable<E> src = this;
+        return new DartIterable<>(() -> new Iterator<R>() {
+            private final Iterator<E> outer = src.iterator();
+            private Iterator<R> inner;
+
+            private void advance() {
+                while ((inner == null || !inner.hasNext()) && outer.hasNext()) {
+                    Iterable<R> next = f.call(outer.next());
+                    inner = next == null ? null : next.iterator();
+                }
+            }
+
+            @Override
+            public boolean hasNext() {
+                advance();
+                return inner != null && inner.hasNext();
+            }
+
+            @Override
+            public R next() {
+                advance();
+                if (inner == null || !inner.hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                return inner.next();
+            }
+        });
+    }
+
+    /** Dart's {@code Iterable.followedBy(other)} — lazy concatenation. */
+    public DartIterable<E> followedBy(Iterable<E> other) {
+        Iterable<E> src = this;
+        return new DartIterable<>(() -> new Iterator<E>() {
+            private Iterator<E> it = src.iterator();
+            private boolean second;
+
+            @Override
+            public boolean hasNext() {
+                if (it.hasNext()) {
+                    return true;
+                }
+                if (!second) {
+                    second = true;
+                    it = other == null ? java.util.Collections.<E>emptyIterator() : other.iterator();
+                }
+                return it.hasNext();
+            }
+
+            @Override
+            public E next() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                return it.next();
+            }
+        });
+    }
+
+    /**
+     * Dart's {@code Iterable.whereType&lt;T&gt;()} — the transpiler threads the
+     * requested type as a trailing {@code Class} witness.
+     */
+    @SuppressWarnings("unchecked")
+    public <T> DartIterable<T> whereType(Class<T> type) {
+        Iterable<E> src = this;
+        return new DartIterable<>(() -> new Iterator<T>() {
+            private final Iterator<E> it = src.iterator();
+            private boolean ready;
+            private T next;
+
+            private void advance() {
+                while (!ready && it.hasNext()) {
+                    E c = it.next();
+                    if (type == null ? c != null : type.isInstance(c)) {
+                        next = (T) c;
+                        ready = true;
+                    }
+                }
+            }
+
+            @Override
+            public boolean hasNext() {
+                advance();
+                return ready;
+            }
+
+            @Override
+            public T next() {
+                advance();
+                if (!ready) {
+                    throw new NoSuchElementException();
+                }
+                ready = false;
+                T r = next;
+                next = null;
+                return r;
+            }
+        });
+    }
+
+    /** Dart's {@code Iterable.asMap()} — index-to-element map. */
+    public DartMap<Long, E> asMap() {
+        DartMap<Long, E> m = new DartMap<>();
+        long i = 0;
+        for (E e : this) {
+            m.put(i++, e);
+        }
+        return m;
+    }
+
+    /** Dart's {@code Iterable.singleWhere(test, {orElse})}. */
+    public E singleWhere(Funcs.Func1<E, Boolean> test, Funcs.Func0<E> orElse) {
+        E found = null;
+        boolean seen = false;
+        for (E e : this) {
+            if (Boolean.TRUE.equals(test.call(e))) {
+                if (seen) {
+                    throw new StateError("Too many elements");
+                }
+                found = e;
+                seen = true;
+            }
+        }
+        if (seen) {
+            return found;
+        }
+        if (orElse != null) {
+            return orElse.call();
+        }
+        throw new StateError("No element");
+    }
+
+    /** Dart's {@code Iterable.lastWhere(test, {orElse})}. */
+    public E lastWhere(Funcs.Func1<E, Boolean> test, Funcs.Func0<E> orElse) {
+        E found = null;
+        boolean seen = false;
+        for (E e : this) {
+            if (Boolean.TRUE.equals(test.call(e))) {
+                found = e;
+                seen = true;
+            }
+        }
+        if (seen) {
+            return found;
+        }
+        if (orElse != null) {
+            return orElse.call();
+        }
+        throw new StateError("No element");
+    }
+
+    public DartIterable<E> takeWhile(Funcs.Func1<E, Boolean> test) {
+        Iterable<E> src = this;
+        return new DartIterable<>(() -> new Iterator<E>() {
+            private final Iterator<E> it = src.iterator();
+            private boolean done;
+            private boolean ready;
+            private E next;
+
+            private void advance() {
+                if (!ready && !done && it.hasNext()) {
+                    E c = it.next();
+                    if (Boolean.TRUE.equals(test.call(c))) {
+                        next = c;
+                        ready = true;
+                    } else {
+                        done = true;
+                    }
+                }
+            }
+
+            @Override
+            public boolean hasNext() {
+                advance();
+                return ready;
+            }
+
+            @Override
+            public E next() {
+                advance();
+                if (!ready) {
+                    throw new NoSuchElementException();
+                }
+                ready = false;
+                return next;
+            }
+        });
+    }
+
+    public DartIterable<E> skipWhile(Funcs.Func1<E, Boolean> test) {
+        Iterable<E> src = this;
+        return new DartIterable<>(() -> {
+            Iterator<E> it = src.iterator();
+            java.util.ArrayList<E> buffered = new java.util.ArrayList<>();
+            while (it.hasNext()) {
+                E c = it.next();
+                if (!Boolean.TRUE.equals(test.call(c))) {
+                    buffered.add(c);
+                    break;
+                }
+            }
+            Iterator<E> tail = it;
+            Iterator<E> head = buffered.iterator();
+            return new Iterator<E>() {
+                @Override
+                public boolean hasNext() {
+                    return head.hasNext() || tail.hasNext();
+                }
+
+                @Override
+                public E next() {
+                    return head.hasNext() ? head.next() : tail.next();
+                }
+            };
+        });
     }
 
     public String join(String separator) {

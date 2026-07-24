@@ -1,11 +1,17 @@
 package dart.core;
 
 import dart.runtime.DartRuntime;
+import dart.runtime.Funcs;
 
 import java.util.LinkedHashSet;
 
 /**
  * Dart's Set&lt;E&gt;: insertion-ordered (Dart set literals are LinkedHashSet).
+ * Extends {@link LinkedHashSet} for direct Java/CN1 interop and adds the Dart
+ * API surface the transpiler targets (set algebra plus the shared
+ * {@code Iterable} combinators, which delegate to a lazy {@link DartIterable}
+ * view so a {@code Set} used as an iterable emits the same call shapes as a
+ * {@code List}).
  */
 public class DartSet<E> extends LinkedHashSet<E> {
 
@@ -21,6 +27,22 @@ public class DartSet<E> extends LinkedHashSet<E> {
         return s;
     }
 
+    /** Dart's {@code Set.from(iterable)} / {@code Set.of(iterable)} — copy elements. */
+    public static <E> DartSet<E> from(Iterable<? extends E> elements) {
+        DartSet<E> s = new DartSet<>();
+        if (elements != null) {
+            for (E e : elements) {
+                s.add(e);
+            }
+        }
+        return s;
+    }
+
+    /** Dart's {@code Set.identity()} (approximated by insertion order). */
+    public static <E> DartSet<E> identity() {
+        return new DartSet<>();
+    }
+
     public long length() {
         return size();
     }
@@ -31,6 +53,183 @@ public class DartSet<E> extends LinkedHashSet<E> {
 
     public DartIterable<E> asIterable() {
         return DartIterable.wrap(this);
+    }
+
+    // --- set algebra ---------------------------------------------------
+
+    /** Dart's {@code Set.difference(other)} — elements not in {@code other}. */
+    public DartSet<E> difference(java.util.Set<?> other) {
+        DartSet<E> s = new DartSet<>();
+        for (E e : this) {
+            if (other == null || !other.contains(e)) {
+                s.add(e);
+            }
+        }
+        return s;
+    }
+
+    /** Dart's {@code Set.intersection(other)} — elements also in {@code other}. */
+    public DartSet<E> intersection(java.util.Set<?> other) {
+        DartSet<E> s = new DartSet<>();
+        for (E e : this) {
+            if (other != null && other.contains(e)) {
+                s.add(e);
+            }
+        }
+        return s;
+    }
+
+    /** Dart's {@code Set.union(other)} — elements in either set. */
+    public DartSet<E> union(java.util.Set<? extends E> other) {
+        DartSet<E> s = new DartSet<>();
+        s.addAll(this);
+        if (other != null) {
+            s.addAll(other);
+        }
+        return s;
+    }
+
+    /** Dart's {@code Set.containsAll(other)}. */
+    public boolean containsAll(Iterable<?> other) {
+        if (other != null) {
+            for (Object o : other) {
+                if (!contains(o)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    // --- mutators mirroring the transpiler's Iterable/Set intrinsics ----
+
+    /** Dart's {@code Set.remove(value)} — returns whether it was present. */
+    public boolean removeValue(Object value) {
+        return remove(value);
+    }
+
+    /** Dart's {@code Set.addAll(elements)} — named to avoid the Collection overload. */
+    public void addAllIterable(Iterable<? extends E> elements) {
+        if (elements != null) {
+            for (E e : elements) {
+                add(e);
+            }
+        }
+    }
+
+    public void removeAll(Iterable<?> elements) {
+        if (elements != null) {
+            for (Object o : elements) {
+                remove(o);
+            }
+        }
+    }
+
+    public void removeWhere(Funcs.Func1<E, Boolean> test) {
+        java.util.Iterator<E> it = iterator();
+        while (it.hasNext()) {
+            if (Boolean.TRUE.equals(test.call(it.next()))) {
+                it.remove();
+            }
+        }
+    }
+
+    // --- Iterable combinators (delegate to the lazy view) ---------------
+
+    public E first() {
+        return asIterable().first();
+    }
+
+    public E last() {
+        return asIterable().last();
+    }
+
+    public <R> DartIterable<R> map(Funcs.Func1<E, R> f) {
+        return asIterable().map(f);
+    }
+
+    public DartIterable<E> where(Funcs.Func1<E, Boolean> test) {
+        return asIterable().where(test);
+    }
+
+    public DartList<E> toList() {
+        return asIterable().toList();
+    }
+
+    public DartSet<E> toSet() {
+        return from(this);
+    }
+
+    public String join(String separator) {
+        return asIterable().join(separator);
+    }
+
+    public String join() {
+        return join("");
+    }
+
+    public boolean any(Funcs.Func1<E, Boolean> test) {
+        return asIterable().any(test);
+    }
+
+    public boolean every(Funcs.Func1<E, Boolean> test) {
+        return asIterable().every(test);
+    }
+
+    public <R> R fold(R initialValue, Funcs.Func2<R, E, R> combine) {
+        return asIterable().fold(initialValue, combine);
+    }
+
+    public E firstWhere(Funcs.Func1<E, Boolean> test, Funcs.Func0<E> orElse) {
+        return asIterable().firstWhere(test, orElse);
+    }
+
+    public E elementAt(long index) {
+        return asIterable().elementAt(index);
+    }
+
+    public void forEachDart(Funcs.VoidFunc1<E> action) {
+        for (E e : this) {
+            action.call(e);
+        }
+    }
+
+    // --- lazy Iterable operations, delegated to the iterable view -------
+
+    public E lastWhere(Funcs.Func1<E, Boolean> test, Funcs.Func0<E> orElse) {
+        return asIterable().lastWhere(test, orElse);
+    }
+
+    public E singleWhere(Funcs.Func1<E, Boolean> test, Funcs.Func0<E> orElse) {
+        return asIterable().singleWhere(test, orElse);
+    }
+
+    public E reduce(Funcs.Func2<E, E, E> combine) {
+        return asIterable().reduce(combine);
+    }
+
+    public <R> DartIterable<R> expand(Funcs.Func1<E, Iterable<R>> f) {
+        return asIterable().expand(f);
+    }
+
+    public DartIterable<E> followedBy(Iterable<E> other) {
+        return asIterable().followedBy(other);
+    }
+
+    public DartIterable<E> take(long count) {
+        return asIterable().take(count);
+    }
+
+    public DartIterable<E> skip(long count) {
+        return asIterable().skip(count);
+    }
+
+    public DartMap<Long, E> asMap() {
+        return asIterable().asMap();
+    }
+
+    public <T> DartIterable<T> whereType(Class<T> type) {
+        return asIterable().whereType(type);
     }
 
     @Override

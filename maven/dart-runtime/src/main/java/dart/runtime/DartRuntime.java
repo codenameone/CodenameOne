@@ -114,10 +114,15 @@ public final class DartRuntime {
         if (Double.isInfinite(d)) {
             return d > 0 ? "Infinity" : "-Infinity";
         }
-        if (d == Math.rint(d) && Math.abs(d) < 1e16) {
+        // Integral test without Math.rint (absent from the ParparVM minimal JavaAPI):
+        // inside the |d| < 1e16 (< 2^53) guard the long truncation is exact, so an
+        // integral double round-trips through (long) unchanged.
+        if (Math.abs(d) < 1e16 && d == (double) (long) d) {
             long l = (long) d;
-            if (l == 0 && Double.doubleToRawLongBits(d) != 0L) {
-                // negative zero
+            // Negative-zero detection without doubleToRawLongBits (also absent): the
+            // non-raw doubleToLongBits (a supported native) yields the same bit pattern
+            // for -0.0 as raw, and NaN was already handled above.
+            if (l == 0 && Double.doubleToLongBits(d) != 0L) {
                 return "-0.0";
             }
             return l + ".0";
@@ -137,6 +142,47 @@ public final class DartRuntime {
             exp = "+" + exp;
         }
         return mantissa + "e" + exp;
+    }
+
+    /**
+     * Dart's {@code num.toStringAsFixed(fractionDigits)} — a fixed-point decimal
+     * string with exactly {@code fractionDigits} digits after the point, rounding
+     * half away from zero. Implemented with integer scaling only (no String.format
+     * / BigDecimal / Math.rint), which the ParparVM minimal JavaAPI lacks.
+     */
+    public static String toStringAsFixed(double d, long fractionDigits) {
+        if (Double.isNaN(d)) {
+            return "NaN";
+        }
+        if (Double.isInfinite(d)) {
+            return d > 0 ? "Infinity" : "-Infinity";
+        }
+        int n = (int) fractionDigits;
+        if (n < 0) {
+            n = 0;
+        }
+        boolean neg = d < 0;
+        double abs = Math.abs(d);
+        double pow = 1;
+        for (int i = 0; i < n; i++) {
+            pow *= 10;
+        }
+        long scaled = (long) Math.floor(abs * pow + 0.5);
+        String digits = Long.toString(scaled);
+        StringBuilder sb = new StringBuilder();
+        if (neg && scaled != 0) {
+            sb.append('-');
+        }
+        if (n == 0) {
+            sb.append(digits);
+            return sb.toString();
+        }
+        while (digits.length() <= n) {
+            digits = "0" + digits;
+        }
+        int split = digits.length() - n;
+        sb.append(digits.substring(0, split)).append('.').append(digits.substring(split));
+        return sb.toString();
     }
 
     /**

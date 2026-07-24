@@ -62,6 +62,21 @@ public final class DartTranspiler {
                 program.add(builder.parse(rel, src));
             } catch (IOException e) {
                 diags.error(f.getName(), 0, 0, "E0003", "Cannot read file: " + e);
+            } catch (RuntimeException | StackOverflowError e) {
+                // Front-end robustness: a parser/AST-builder gap must never abort the whole build.
+                // Record it as a diagnostic (with the crash site) so a SINGLE pass over a large real
+                // app yields the full gap inventory instead of dying on the first unhandled construct.
+                StackTraceElement[] st = e.getStackTrace();
+                StackTraceElement top = null;
+                for (StackTraceElement s : st) {
+                    if (s.getClassName().startsWith("com.codename1.dart.transpiler")) { top = s; break; }
+                }
+                String at = top == null ? "" : "  @ "
+                        + top.getClassName().substring(top.getClassName().lastIndexOf('.') + 1)
+                        + "." + top.getMethodName() + ":" + top.getLineNumber();
+                diags.error(f.getName(), 0, 0, "E0004",
+                        "Front-end crash: " + e.getClass().getSimpleName()
+                        + (e.getMessage() != null ? ": " + e.getMessage() : "") + at);
             }
         }
 

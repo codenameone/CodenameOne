@@ -1,5 +1,6 @@
 package com.codename1.flutter.widgets;
 
+import com.codename1.flutter.Clip;
 import com.codename1.flutter.EdgeInsets;
 import com.codename1.flutter.Element;
 import com.codename1.flutter.Widget;
@@ -14,6 +15,16 @@ public class SingleChildScrollView extends Widget {
 
     private EdgeInsets padding;
     private Widget child;
+    private String restorationId;
+    private Clip clipBehavior;
+
+    public void restorationId(String v) {
+        this.restorationId = v;
+    }
+
+    public void clipBehavior(Clip v) {
+        this.clipBehavior = v;
+    }
 
     public void padding(EdgeInsets v) {
         this.padding = v;

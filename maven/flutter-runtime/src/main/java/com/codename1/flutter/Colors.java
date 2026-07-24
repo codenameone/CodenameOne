@@ -1,22 +1,75 @@
 package com.codename1.flutter;
 
+import com.codename1.generated.flutter.MaterialAccentColor;
+import com.codename1.generated.flutter.MaterialColor;
+
 /**
- * The material color swatch primaries (500 values), mirroring Flutter's
- * {@code Colors}.
+ * The material color swatch primaries (500 values), accent variants, and the
+ * black/white opacity constants, mirroring Flutter's {@code Colors}.
+ *
+ * <p>The named primaries are typed {@link MaterialColor} and the accents
+ * {@link MaterialAccentColor} (both extend {@link Color}) so the colors demo can
+ * index their shades — matching Flutter, where {@code Colors.red} is a swatch,
+ * not a plain color.</p>
  */
 public final class Colors {
 
     private Colors() {
     }
 
-    public static final Color deepPurple = new Color(0xFF673AB7);
-    public static final Color blue = new Color(0xFF2196F3);
-    public static final Color red = new Color(0xFFF44336);
-    public static final Color green = new Color(0xFF4CAF50);
-    public static final Color orange = new Color(0xFFFF9800);
-    public static final Color purple = new Color(0xFF9C27B0);
-    public static final Color white = new Color(0xFFFFFFFF);
-    public static final Color black = new Color(0xFF000000);
-    public static final Color grey = new Color(0xFF9E9E9E);
     public static final Color transparent = new Color(0x00000000);
+
+    public static final MaterialColor red = new MaterialColor(0xFFF44336);
+    public static final MaterialAccentColor redAccent = new MaterialAccentColor(0xFFFF5252);
+    public static final MaterialColor pink = new MaterialColor(0xFFE91E63);
+    public static final MaterialAccentColor pinkAccent = new MaterialAccentColor(0xFFFF4081);
+    public static final MaterialColor purple = new MaterialColor(0xFF9C27B0);
+    public static final MaterialAccentColor purpleAccent = new MaterialAccentColor(0xFFE040FB);
+    public static final MaterialColor deepPurple = new MaterialColor(0xFF673AB7);
+    public static final MaterialAccentColor deepPurpleAccent = new MaterialAccentColor(0xFF7C4DFF);
+    public static final MaterialColor indigo = new MaterialColor(0xFF3F51B5);
+    public static final MaterialAccentColor indigoAccent = new MaterialAccentColor(0xFF536DFE);
+    public static final MaterialColor blue = new MaterialColor(0xFF2196F3);
+    public static final MaterialAccentColor blueAccent = new MaterialAccentColor(0xFF448AFF);
+    public static final MaterialColor lightBlue = new MaterialColor(0xFF03A9F4);
+    public static final MaterialAccentColor lightBlueAccent = new MaterialAccentColor(0xFF40C4FF);
+    public static final MaterialColor cyan = new MaterialColor(0xFF00BCD4);
+    public static final MaterialAccentColor cyanAccent = new MaterialAccentColor(0xFF18FFFF);
+    public static final MaterialColor teal = new MaterialColor(0xFF009688);
+    public static final MaterialAccentColor tealAccent = new MaterialAccentColor(0xFF64FFDA);
+    public static final MaterialColor green = new MaterialColor(0xFF4CAF50);
+    public static final MaterialAccentColor greenAccent = new MaterialAccentColor(0xFF69F0AE);
+    public static final MaterialColor lightGreen = new MaterialColor(0xFF8BC34A);
+    public static final MaterialAccentColor lightGreenAccent = new MaterialAccentColor(0xFFB2FF59);
+    public static final MaterialColor lime = new MaterialColor(0xFFCDDC39);
+    public static final MaterialAccentColor limeAccent = new MaterialAccentColor(0xFFEEFF41);
+    public static final MaterialColor yellow = new MaterialColor(0xFFFFEB3B);
+    public static final MaterialAccentColor yellowAccent = new MaterialAccentColor(0xFFFFFF00);
+    public static final MaterialColor amber = new MaterialColor(0xFFFFC107);
+    public static final MaterialAccentColor amberAccent = new MaterialAccentColor(0xFFFFD740);
+    public static final MaterialColor orange = new MaterialColor(0xFFFF9800);
+    public static final MaterialAccentColor orangeAccent = new MaterialAccentColor(0xFFFFAB40);
+    public static final MaterialColor deepOrange = new MaterialColor(0xFFFF5722);
+    public static final MaterialAccentColor deepOrangeAccent = new MaterialAccentColor(0xFFFF6E40);
+    public static final MaterialColor brown = new MaterialColor(0xFF795548);
+    public static final MaterialColor grey = new MaterialColor(0xFF9E9E9E);
+    public static final MaterialColor blueGrey = new MaterialColor(0xFF607D8B);
+
+    public static final Color white = new Color(0xFFFFFFFF);
+    public static final Color white70 = new Color(0xB3FFFFFF);
+    public static final Color white60 = new Color(0x99FFFFFF);
+    public static final Color white54 = new Color(0x8AFFFFFF);
+    public static final Color white38 = new Color(0x62FFFFFF);
+    public static final Color white30 = new Color(0x4DFFFFFF);
+    public static final Color white24 = new Color(0x3DFFFFFF);
+    public static final Color white12 = new Color(0x1FFFFFFF);
+    public static final Color white10 = new Color(0x1AFFFFFF);
+
+    public static final Color black = new Color(0xFF000000);
+    public static final Color black87 = new Color(0xDD000000);
+    public static final Color black54 = new Color(0x8A000000);
+    public static final Color black45 = new Color(0x73000000);
+    public static final Color black38 = new Color(0x61000000);
+    public static final Color black26 = new Color(0x42000000);
+    public static final Color black12 = new Color(0x1F000000);
 }

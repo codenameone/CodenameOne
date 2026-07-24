@@ -14,9 +14,18 @@ public class Icon extends Widget {
     private final IconData icon;
     private Double size;
     private Color color;
+    private String semanticLabel;
 
     public Icon(IconData icon) {
         this.icon = icon;
+    }
+
+    public void semanticLabel(String v) {
+        this.semanticLabel = v;
+    }
+
+    public String getSemanticLabel() {
+        return semanticLabel;
     }
 
     public void size(double v) {

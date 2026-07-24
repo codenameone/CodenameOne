@@ -4,10 +4,14 @@ import com.codename1.flutter.Brightness;
 import com.codename1.flutter.Color;
 
 /**
- * Material theme configuration: a color scheme, the default text theme and a
- * brightness. When no explicit color scheme is set one is derived from the
- * default M3 seed honoring the brightness. M4 maps the ACTIVE ThemeData onto
- * the CN1 UIManager through {@link ThemeDataAdapter}.
+ * Material theme configuration: a color scheme, text themes, brightness and the
+ * component sub-theme bundles. When no explicit color scheme is set one is
+ * derived from the default M3 seed honoring the brightness. M4 maps the ACTIVE
+ * ThemeData onto the CN1 UIManager through {@link ThemeDataAdapter}.
+ *
+ * <p>Named Dart constructor parameters map to setter methods; {@link #copyWith}
+ * returns a merged copy. Sub-theme bundles owned by other runtime areas
+ * (snackBarTheme, inputDecorationTheme, ...) are held opaquely as {@code Object}.</p>
  */
 public class ThemeData {
 
@@ -15,38 +19,125 @@ public class ThemeData {
 
     private ColorScheme colorScheme;
     private TextTheme textTheme = new TextTheme();
+    private TextTheme primaryTextTheme = new TextTheme();
     private boolean useMaterial3 = true;
     private Brightness brightness;
 
-    public void colorScheme(ColorScheme v) {
-        this.colorScheme = v;
-    }
+    private Color primaryColor;
+    private Color scaffoldBackgroundColor;
+    private Color canvasColor;
+    private Color cardColor;
+    private Color dividerColor;
+    private Color focusColor;
+    private Color highlightColor;
+    private Color splashColor;
+    private Color hintColor;
+    private Color disabledColor;
+    private Color shadowColor;
+    private Color indicatorColor;
+    private Color secondaryHeaderColor;
+
+    private IconThemeData iconTheme;
+    private IconThemeData primaryIconTheme;
+    private AppBarTheme appBarTheme;
+    private ChipThemeData chipTheme;
+    private CheckboxThemeData checkboxTheme;
+    private CardTheme cardTheme;
+    private BottomAppBarThemeData bottomAppBarTheme;
+    private DividerThemeData dividerTheme;
+    private NavigationRailThemeData navigationRailTheme;
+
+    private Object snackBarTheme;
+    private Object inputDecorationTheme;
+    private Object radioTheme;
+    private Object switchTheme;
+    private Object tooltipTheme;
+    private BottomSheetThemeData bottomSheetTheme;
+    private SliderThemeData sliderTheme;
+    private Object floatingActionButtonTheme;
+    private Object elevatedButtonTheme;
+    private Object textButtonTheme;
+    private Object outlinedButtonTheme;
+    private Object pageTransitionsTheme;
+    private Object visualDensity;
+    private Object typography;
+    private Object platform;
+    private Boolean applyElevationOverlayColor;
+    private String fontFamily;
 
     /**
-     * Accepted for source compatibility; M1 always renders one way.
+     * {@code ThemeData.dark}: a theme whose brightness is dark; the color
+     * scheme is derived from the default seed honoring that brightness.
      */
-    public void useMaterial3(boolean v) {
-        this.useMaterial3 = v;
+    public static ThemeData dark(Boolean useMaterial3) {
+        ThemeData t = new ThemeData();
+        t.brightness(Brightness.dark);
+        if (useMaterial3 != null) {
+            t.useMaterial3(useMaterial3);
+        }
+        return t;
     }
 
-    /**
-     * The overall theme brightness; drives the default color scheme's tones
-     * when no explicit scheme is set.
-     */
-    public void brightness(Brightness v) {
-        this.brightness = v;
-    }
+    // ------------------------------------------------------------------
+    // Named-parameter setters
+    // ------------------------------------------------------------------
 
-    public boolean getUseMaterial3() {
-        return useMaterial3;
-    }
+    public void colorScheme(ColorScheme v) { this.colorScheme = v; }
+    public void colorSchemeSeed(Color seed) { this.colorScheme = ColorScheme.fromSeed(seed, brightness); }
+    public void useMaterial3(boolean v) { this.useMaterial3 = v; }
+    public void brightness(Brightness v) { this.brightness = v; }
+    public void textTheme(TextTheme v) { this.textTheme = v; }
+    public void primaryTextTheme(TextTheme v) { this.primaryTextTheme = v; }
+    public void primaryColor(Color v) { this.primaryColor = v; }
+    public void scaffoldBackgroundColor(Color v) { this.scaffoldBackgroundColor = v; }
+    public void canvasColor(Color v) { this.canvasColor = v; }
+    public void cardColor(Color v) { this.cardColor = v; }
+    public void dividerColor(Color v) { this.dividerColor = v; }
+    public void focusColor(Color v) { this.focusColor = v; }
+    public void highlightColor(Color v) { this.highlightColor = v; }
+    public void splashColor(Color v) { this.splashColor = v; }
+    public void hintColor(Color v) { this.hintColor = v; }
+    public void disabledColor(Color v) { this.disabledColor = v; }
+    public void shadowColor(Color v) { this.shadowColor = v; }
+    public void indicatorColor(Color v) { this.indicatorColor = v; }
+    public void secondaryHeaderColor(Color v) { this.secondaryHeaderColor = v; }
+    public void iconTheme(IconThemeData v) { this.iconTheme = v; }
+    public void primaryIconTheme(IconThemeData v) { this.primaryIconTheme = v; }
+    public void appBarTheme(AppBarTheme v) { this.appBarTheme = v; }
+    public void chipTheme(ChipThemeData v) { this.chipTheme = v; }
+    public void checkboxTheme(CheckboxThemeData v) { this.checkboxTheme = v; }
+    public void cardTheme(CardTheme v) { this.cardTheme = v; }
+    public void bottomAppBarTheme(BottomAppBarThemeData v) { this.bottomAppBarTheme = v; }
+    public void dividerTheme(DividerThemeData v) { this.dividerTheme = v; }
+    public void navigationRailTheme(NavigationRailThemeData v) { this.navigationRailTheme = v; }
+    public void snackBarTheme(Object v) { this.snackBarTheme = v; }
+    public void inputDecorationTheme(Object v) { this.inputDecorationTheme = v; }
+    public void radioTheme(Object v) { this.radioTheme = v; }
+    public void switchTheme(Object v) { this.switchTheme = v; }
+    public void tooltipTheme(Object v) { this.tooltipTheme = v; }
+    public void bottomSheetTheme(BottomSheetThemeData v) { this.bottomSheetTheme = v; }
+    public BottomSheetThemeData bottomSheetTheme() { return bottomSheetTheme != null ? bottomSheetTheme : new BottomSheetThemeData(); }
+    public void sliderTheme(SliderThemeData v) { this.sliderTheme = v; }
+    public SliderThemeData sliderTheme() { return sliderTheme != null ? sliderTheme : new SliderThemeData(); }
+    public void floatingActionButtonTheme(Object v) { this.floatingActionButtonTheme = v; }
+    public void elevatedButtonTheme(Object v) { this.elevatedButtonTheme = v; }
+    public void textButtonTheme(Object v) { this.textButtonTheme = v; }
+    public void outlinedButtonTheme(Object v) { this.outlinedButtonTheme = v; }
+    public void pageTransitionsTheme(Object v) { this.pageTransitionsTheme = v; }
+    public void visualDensity(Object v) { this.visualDensity = v; }
+    public void typography(Object v) { this.typography = v; }
+    public void platform(Object v) { this.platform = v; }
+    public void applyElevationOverlayColor(boolean v) { this.applyElevationOverlayColor = v; }
+    public void fontFamily(String v) { this.fontFamily = v; }
 
-    /**
-     * The declared brightness, defaulting to light.
-     */
-    public Brightness brightness() {
-        return brightness == null ? Brightness.light : brightness;
-    }
+    // ------------------------------------------------------------------
+    // Getters
+    // ------------------------------------------------------------------
+
+    public boolean getUseMaterial3() { return useMaterial3; }
+
+    /** The declared brightness, defaulting to light. */
+    public Brightness brightness() { return brightness == null ? Brightness.light : brightness; }
 
     public ColorScheme colorScheme() {
         if (colorScheme == null) {
@@ -55,7 +146,115 @@ public class ThemeData {
         return colorScheme;
     }
 
-    public TextTheme textTheme() {
-        return textTheme;
+    public TextTheme textTheme() { return textTheme; }
+    public TextTheme primaryTextTheme() { return primaryTextTheme; }
+    public Color primaryColor() { return primaryColor; }
+    public Color scaffoldBackgroundColor() { return scaffoldBackgroundColor; }
+    public Color canvasColor() { return canvasColor; }
+    public Color cardColor() { return cardColor; }
+    public Color dividerColor() { return dividerColor; }
+    public Color focusColor() { return focusColor; }
+    public Color highlightColor() { return highlightColor; }
+    public Color splashColor() { return splashColor; }
+    public Color hintColor() { return hintColor; }
+    public Color disabledColor() { return disabledColor; }
+    public Color shadowColor() { return shadowColor; }
+    public IconThemeData iconTheme() { return iconTheme; }
+    public IconThemeData primaryIconTheme() { return primaryIconTheme; }
+    public AppBarTheme appBarTheme() { return appBarTheme; }
+    public ChipThemeData chipTheme() { return chipTheme; }
+    public CheckboxThemeData checkboxTheme() { return checkboxTheme; }
+    public CardTheme cardTheme() { return cardTheme; }
+    public BottomAppBarThemeData bottomAppBarTheme() { return bottomAppBarTheme; }
+    public DividerThemeData dividerTheme() { return dividerTheme; }
+    public NavigationRailThemeData navigationRailTheme() {
+        return navigationRailTheme == null ? new NavigationRailThemeData() : navigationRailTheme;
+    }
+    public Object platform() { return platform; }
+
+    private ThemeData shallowClone() {
+        ThemeData c = new ThemeData();
+        c.colorScheme = colorScheme;
+        c.textTheme = textTheme;
+        c.primaryTextTheme = primaryTextTheme;
+        c.useMaterial3 = useMaterial3;
+        c.brightness = brightness;
+        c.primaryColor = primaryColor;
+        c.scaffoldBackgroundColor = scaffoldBackgroundColor;
+        c.canvasColor = canvasColor;
+        c.cardColor = cardColor;
+        c.dividerColor = dividerColor;
+        c.focusColor = focusColor;
+        c.highlightColor = highlightColor;
+        c.splashColor = splashColor;
+        c.hintColor = hintColor;
+        c.disabledColor = disabledColor;
+        c.shadowColor = shadowColor;
+        c.indicatorColor = indicatorColor;
+        c.secondaryHeaderColor = secondaryHeaderColor;
+        c.iconTheme = iconTheme;
+        c.primaryIconTheme = primaryIconTheme;
+        c.appBarTheme = appBarTheme;
+        c.chipTheme = chipTheme;
+        c.checkboxTheme = checkboxTheme;
+        c.cardTheme = cardTheme;
+        c.bottomAppBarTheme = bottomAppBarTheme;
+        c.dividerTheme = dividerTheme;
+        c.navigationRailTheme = navigationRailTheme;
+        c.snackBarTheme = snackBarTheme;
+        c.inputDecorationTheme = inputDecorationTheme;
+        c.radioTheme = radioTheme;
+        c.switchTheme = switchTheme;
+        c.tooltipTheme = tooltipTheme;
+        c.bottomSheetTheme = bottomSheetTheme;
+        c.floatingActionButtonTheme = floatingActionButtonTheme;
+        c.elevatedButtonTheme = elevatedButtonTheme;
+        c.textButtonTheme = textButtonTheme;
+        c.outlinedButtonTheme = outlinedButtonTheme;
+        c.pageTransitionsTheme = pageTransitionsTheme;
+        c.visualDensity = visualDensity;
+        c.typography = typography;
+        c.platform = platform;
+        c.applyElevationOverlayColor = applyElevationOverlayColor;
+        c.fontFamily = fontFamily;
+        return c;
+    }
+
+    /**
+     * Returns a copy with the supplied (non-null) values overridden. Parameter
+     * order matches the Dart stub.
+     */
+    public ThemeData copyWith(ColorScheme colorScheme, TextTheme textTheme, TextTheme primaryTextTheme,
+                              Brightness brightness, Color primaryColor, Color scaffoldBackgroundColor,
+                              Color canvasColor, Color cardColor, Color dividerColor, Color focusColor,
+                              Color highlightColor, Color splashColor, Color hintColor, Color disabledColor,
+                              IconThemeData iconTheme, AppBarTheme appBarTheme, ChipThemeData chipTheme,
+                              CardTheme cardTheme, DividerThemeData dividerTheme, Object platform,
+                              NavigationRailThemeData navigationRailTheme,
+                              Boolean applyElevationOverlayColor) {
+        ThemeData c = shallowClone();
+        if (colorScheme != null) c.colorScheme = colorScheme;
+        if (textTheme != null) c.textTheme = textTheme;
+        if (primaryTextTheme != null) c.primaryTextTheme = primaryTextTheme;
+        if (brightness != null) c.brightness = brightness;
+        if (primaryColor != null) c.primaryColor = primaryColor;
+        if (scaffoldBackgroundColor != null) c.scaffoldBackgroundColor = scaffoldBackgroundColor;
+        if (canvasColor != null) c.canvasColor = canvasColor;
+        if (cardColor != null) c.cardColor = cardColor;
+        if (dividerColor != null) c.dividerColor = dividerColor;
+        if (focusColor != null) c.focusColor = focusColor;
+        if (highlightColor != null) c.highlightColor = highlightColor;
+        if (splashColor != null) c.splashColor = splashColor;
+        if (hintColor != null) c.hintColor = hintColor;
+        if (disabledColor != null) c.disabledColor = disabledColor;
+        if (iconTheme != null) c.iconTheme = iconTheme;
+        if (appBarTheme != null) c.appBarTheme = appBarTheme;
+        if (chipTheme != null) c.chipTheme = chipTheme;
+        if (cardTheme != null) c.cardTheme = cardTheme;
+        if (dividerTheme != null) c.dividerTheme = dividerTheme;
+        if (navigationRailTheme != null) c.navigationRailTheme = navigationRailTheme;
+        if (platform != null) c.platform = platform;
+        if (applyElevationOverlayColor != null) c.applyElevationOverlayColor = applyElevationOverlayColor;
+        return c;
     }
 }
