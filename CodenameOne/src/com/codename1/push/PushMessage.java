@@ -46,7 +46,13 @@ public final class PushMessage {
     }
 
     public static PushMessage parse(String json) throws IOException {
+        if (json == null || json.trim().length() == 0) {
+            throw new IOException("Push envelope must be a JSON object");
+        }
         Map<String, Object> parsed = JSONParser.parseJSON(json);
+        if (parsed == null) {
+            throw new IOException("Push envelope must be a JSON object");
+        }
         Object schema = parsed.get("schema");
         if (!(schema instanceof Number) || ((Number) schema).intValue() < SCHEMA_VERSION) {
             throw new IOException("Unsupported push envelope schema");

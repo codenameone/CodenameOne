@@ -231,11 +231,8 @@ public final class PushClient {
             @Override
             protected void postResponse() {
                 try {
-                    Map<String, Object> response = JSONParser.parseJSON(getResponseData());
-                    Object id = response.get("id");
-                    if (id != null) {
-                        Preferences.set("push_v3_subscription", String.valueOf(id));
-                    }
+                    Preferences.set("push_v3_subscription",
+                            managedRegistrationId(getResponseData()));
                 } catch (IOException ex) {
                     fireError(new PushError("registration_response", ex.getMessage(), false));
                 }
@@ -255,35 +252,27 @@ public final class PushClient {
         NetworkManager.getInstance().addToQueue(request);
     }
 
+    static String managedRegistrationId(byte[] responseData) throws IOException {
+        if (responseData == null || responseData.length == 0) {
+            throw new IOException("BuildCloud registration returned an empty response");
+        }
+        Map<String, Object> response = JSONParser.parseJSON(responseData);
+        if (response == null) {
+            throw new IOException("BuildCloud registration returned an empty response");
+        }
+        Object id = response.get("id");
+        if (id == null || String.valueOf(id).trim().length() == 0) {
+            throw new IOException("BuildCloud registration response is missing an id");
+        }
+        return String.valueOf(id);
+    }
+
     private void unregisterManaged() {
-        final String id = Preferences.get("push_v3_subscription", null);
+        String id = Preferences.get("push_v3_subscription", null);
         if (id == null) {
             return;
         }
-        ConnectionRequest request = new ConnectionRequest() {
-            private void removePersistedId() {
-                if (id.equals(Preferences.get("push_v3_subscription", null))) {
-                    Preferences.delete("push_v3_subscription");
-                }
-            }
-
-            @Override
-            protected void postResponse() {
-                removePersistedId();
-            }
-
-            @Override
-            protected void handleErrorResponseCode(int code, String message) {
-                if (code == 404) {
-                    removePersistedId();
-                }
-            }
-        };
-        request.setUrl(endpoint("/subscriptions/") + id);
-        request.setHttpMethod("DELETE");
-        request.addRequestHeader("X-CN1-Push-App", appId);
-        request.setFailSilently(true);
-        NetworkManager.getInstance().addToQueue(request);
+        NetworkManager.getInstance().addToQueue(new ManagedUnregisterRequest(appId, id));
     }
 
     private static String endpoint(String suffix) {
@@ -312,6 +301,46 @@ public final class PushClient {
         }
         if (listener != null) {
             listener.onError(error);
+        }
+    }
+
+    private static final class ManagedUnregisterRequest extends ConnectionRequest {
+        private final String subscriptionId;
+
+        ManagedUnregisterRequest(String appId, String subscriptionId) {
+            this.subscriptionId = subscriptionId;
+            setUrl(endpoint("/subscriptions/") + subscriptionId);
+            setHttpMethod("DELETE");
+            addRequestHeader("X-CN1-Push-App", appId);
+            setFailSilently(true);
+        }
+
+        private void removePersistedId() {
+            if (subscriptionId.equals(Preferences.get("push_v3_subscription", null))) {
+                Preferences.delete("push_v3_subscription");
+            }
+        }
+
+        @Override
+        protected void postResponse() {
+            removePersistedId();
+        }
+
+        @Override
+        protected void handleErrorResponseCode(int code, String message) {
+            if (code == 404) {
+                removePersistedId();
+            }
+        }
+
+        @Override
+        public boolean equals(Object value) {
+            return super.equals(value);
+        }
+
+        @Override
+        public int hashCode() {
+            return super.hashCode();
         }
     }
 
