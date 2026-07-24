@@ -10,9 +10,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CSSWatcherTest {
+
+    private static class TrackingCSSWatcher extends CSSWatcher {
+        private int stopCount;
+
+        @Override
+        public void stop() {
+            stopCount++;
+            super.stop();
+        }
+    }
 
     @Test
     void addsLocalizationArgumentForProjectL10nDirectory(@TempDir Path tempDir) throws Exception {
@@ -52,6 +63,39 @@ class CSSWatcherTest {
             assertEquals(l10nDir.toFile().getAbsolutePath(), args.get(args.indexOf("-l") + 1));
         } finally {
             System.setProperty("user.dir", oldUserDir);
+        }
+    }
+
+    @Test
+    void simulatorReloadStopsEachRegisteredCSSWatcherOnce() {
+        TrackingCSSWatcher first = new TrackingCSSWatcher();
+        TrackingCSSWatcher second = new TrackingCSSWatcher();
+        int simulatorReloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
+        assertTrue(Executor.registerCSSWatcher(first, simulatorReloadVersion));
+        assertTrue(Executor.registerCSSWatcher(second, simulatorReloadVersion));
+
+        Executor.cleanupForSimulatorReload();
+        Executor.cleanupForSimulatorReload();
+
+        assertEquals(1, first.stopCount);
+        assertEquals(1, second.stopCount);
+    }
+
+    @Test
+    void staleSimulatorGenerationCannotRegisterDelayedCSSWatcher() {
+        String oldReloadVersion = System.getProperty("reload.simulator.count");
+        int simulatorReloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
+        TrackingCSSWatcher watcher = new TrackingCSSWatcher();
+        System.setProperty("reload.simulator.count", String.valueOf(simulatorReloadVersion + 1));
+        try {
+            assertFalse(Executor.registerCSSWatcher(watcher, simulatorReloadVersion));
+        } finally {
+            watcher.stop();
+            if (oldReloadVersion == null) {
+                System.clearProperty("reload.simulator.count");
+            } else {
+                System.setProperty("reload.simulator.count", oldReloadVersion);
+            }
         }
     }
 }

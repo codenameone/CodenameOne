@@ -52,8 +52,9 @@ public class CSSWatcher implements Runnable {
     private int simulatorReloadVersion = Integer.parseInt(System.getProperty("reload.simulator.count", "0"));
     private Thread watchThread, pulseThread;
     private ServerSocket pulseSocket;
-    private Process childProcess;
-    private boolean closing;
+    private volatile Process childProcess;
+    private volatile boolean closing;
+    private final Thread shutdownHook;
     private static final int MIN_DESIGNER_VERSION=6;
 
     private final String themePrefix;
@@ -64,7 +65,7 @@ public class CSSWatcher implements Runnable {
 
     public CSSWatcher(String themePrefix) {
         this.themePrefix = themePrefix;
-        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+        shutdownHook = new Thread(new Runnable() {
 
             @Override
             public void run() {
@@ -75,8 +76,9 @@ public class CSSWatcher implements Runnable {
                     } catch (Throwable t){}
                 }
             }
-            
-        }));
+
+        });
+        Runtime.getRuntime().addShutdownHook(shutdownHook);
     }
 
     public void stop() {
@@ -90,6 +92,11 @@ public class CSSWatcher implements Runnable {
             try {
                 pulseSocket.close();
             } catch (Exception ex){}
+        }
+        try {
+            Runtime.getRuntime().removeShutdownHook(shutdownHook);
+        } catch (Throwable t) {
+            // The JVM is already shutting down, or the hook was already removed.
         }
     }
     
@@ -231,6 +238,9 @@ public class CSSWatcher implements Runnable {
     }
 
     private void watch() throws IOException {
+        if (closing) {
+            return;
+        }
         if (pulseSocket == null || pulseSocket.isClosed()) {
             // If the the Simulator is killed then the shutdown hook doesn't run
             // so we need an alternative way for the ResourceEditorApp to know that
@@ -333,16 +343,23 @@ public class CSSWatcher implements Runnable {
             args.add("-Dprism.order=sw");
         }
         System.out.println("Running CSS watch with args " + args);
-        
-        
-        Process p = pb.start();
-        
-        if (childProcess != null) {
+
+        if (closing) {
+            stop();
+            return;
+        }
+        Process previousProcess = childProcess;
+        if (previousProcess != null && previousProcess.isAlive()) {
             try {
-                childProcess.destroyForcibly();
+                previousProcess.destroyForcibly();
             } catch (Throwable t){}
         }
+        Process p = pb.start();
         childProcess = p;
+        if (closing) {
+            stop();
+            return;
+        }
         String line;
        
         OutputStream stdin = p.getOutputStream();
@@ -388,8 +405,10 @@ public class CSSWatcher implements Runnable {
                 String l = reader.readLine();
                 if (l == null) {
                     if (!p.isAlive()) {
-                        watchThread = null;
-                        start();
+                        if (!closing) {
+                            watchThread = null;
+                            start();
+                        }
                         break;
                     }
                 }
@@ -427,8 +446,10 @@ public class CSSWatcher implements Runnable {
                 t.printStackTrace();
                 
                 if (!p.isAlive()) {
-                    watchThread = null;
-                    start();
+                    if (!closing) {
+                        watchThread = null;
+                        start();
+                    }
                     break;
                 }
             }
@@ -448,8 +469,8 @@ public class CSSWatcher implements Runnable {
         }
     }
     
-    public void start() {
-        if (watchThread == null) {
+    public synchronized void start() {
+        if (!closing && watchThread == null) {
             watchThread = new Thread(this);
             watchThread.setDaemon(true);
             watchThread.start(); 
