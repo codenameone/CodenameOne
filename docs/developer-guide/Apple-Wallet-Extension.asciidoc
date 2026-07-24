@@ -95,7 +95,7 @@ If you already have Xcode extension targets - from an issuer SDK vendor or an ex
 * `Info.plist` with the `NSExtension` dictionary
 * `MyWalletExtension.entitlements`
 * Optional `buildSettings.properties` with Xcode build settings, one per line (set `IPHONEOS_DEPLOYMENT_TARGET=14.0` for Wallet extensions)
-* Optional `.mobileprovision` for cloud device builds (or supply `ios.appext.MyWalletExtension.provisioningURL`)
+* Optional `.mobileprovision` for cloud device builds (or supply `ios.appext.MyWalletExtension.provisioningURL`; qualify it as `ios.debug.appext.MyWalletExtension.provisioningURL` / `ios.release.appext.MyWalletExtension.provisioningURL` to use different development and distribution profiles per build type)
 
 Each folder becomes an embedded extension target with bundle id `<your package>.<folder name>`. This mechanism isn't Wallet-specific - it embeds any iOS app extension type.
 

@@ -166,6 +166,13 @@ The build generates a `CN1Widgets` WidgetKit extension target into the Xcode pro
 
 Signing follows the generic app extension rules: the extension needs its own App ID (`<your package>.CN1Widgets`) with the App Groups capability and, for cloud device builds with manual signing, its own provisioning profile. Either place the `.mobileprovision` under `common/src/main/resources` or supply a URL with the `ios.appext.CN1Widgets.provisioningURL` build hint. With automatic (managed) signing and in local `ios-source` builds no extra configuration is needed -- Xcode provisions the extension target as usual.
 
+Like the app itself (`codename1.ios.debug.provision` / `codename1.ios.release.provision`), the extension needs a _development_ profile for debug device builds and a _distribution_ profile for release builds. Qualify any extension provisioning key with `debug` or `release` after the `ios.` segment and the build picks the variant matching the build target, falling back to the unqualified key when no matching variant is set:
+
+* Build hints: `codename1.arg.ios.debug.appext.CN1Widgets.provisioningURL` and `codename1.arg.ios.release.appext.CN1Widgets.provisioningURL`
+* Local profile paths in `codenameone_settings.properties`: `codename1.ios.debug.appext.CN1Widgets.provision` and `codename1.ios.release.appext.CN1Widgets.provision`
+
+The Certificate Wizard populates both `provision` variants automatically when it sets up widget extension signing (the development profile requires at least one registered device). An unqualified key alone still works and is used for both build types.
+
 Widget taps deep link back into the app through the `cn1surface://` URL scheme, which the build registers automatically.
 
 ==== Android
@@ -185,7 +192,8 @@ In a desktop build the app shows a tray icon whose menu pins a floating widget p
 | `ios.surfaces.appGroup` | `group.<package>` | The shared App Group id; the `appGroup` field in `surfaces.json` takes precedence
 | `ios.surfaces.deploymentTarget` | `16.1` | Deployment target of the widget extension (the host app is unaffected)
 | `ios.surfaces.frequentUpdates` | `false` | Adds `NSSupportsLiveActivitiesFrequentUpdates` for high-frequency live activity updates
-| `ios.appext.CN1Widgets.provisioningURL` | | URL of the extension's provisioning profile for cloud manual-signing builds
+| `ios.appext.CN1Widgets.provisioningURL` | | URL of the extension's provisioning profile for cloud manual-signing builds; used for both debug and release builds unless a qualified variant is set
+| `ios.debug.appext.CN1Widgets.provisioningURL` / `ios.release.appext.CN1Widgets.provisioningURL` | | Build-type-specific variants: the development profile URL for debug device builds and the distribution profile URL for release builds. The variant matching the build target overrides the unqualified hint
 | `ios.background_modes` | | Add `fetch` so background fetch can re-publish timelines on device
 | `android.surfaces.exactAlarms` | `false` | Schedule widget timeline entry flips with exact alarms; declares `SCHEDULE_EXACT_ALARM` and falls back to the inexact 30-second window when the user revokes the special app access
 | `windows.msix` | `false` | Wrap the Windows build in an MSIX package with a Widgets Board provider

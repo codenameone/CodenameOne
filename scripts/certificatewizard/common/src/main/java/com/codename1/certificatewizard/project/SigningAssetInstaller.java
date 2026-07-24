@@ -57,13 +57,20 @@ public final class SigningAssetInstaller {
     }
 
     public static void applyWidgetExtensionSigning(String settingsPath, String appGroupIdentifier,
-                                                   String extensionProfilePath) throws IOException {
+                                                   String releaseProfilePath, String debugProfilePath)
+            throws IOException {
         Map<String, String> updates = new HashMap<String, String>();
         if (appGroupIdentifier != null) {
             updates.put("codename1.arg.ios.surfaces.appGroup", appGroupIdentifier);
         }
-        if (extensionProfilePath != null) {
-            updates.put("codename1.ios.appext.CN1Widgets.provision", extensionProfilePath);
+        if (releaseProfilePath != null) {
+            // The unqualified key stays populated with the distribution profile so builds
+            // through tooling that predates the debug/release split keep working.
+            updates.put("codename1.ios.appext.CN1Widgets.provision", releaseProfilePath);
+            updates.put("codename1.ios.release.appext.CN1Widgets.provision", releaseProfilePath);
+        }
+        if (debugProfilePath != null) {
+            updates.put("codename1.ios.debug.appext.CN1Widgets.provision", debugProfilePath);
         }
         if (updates.isEmpty()) {
             return;

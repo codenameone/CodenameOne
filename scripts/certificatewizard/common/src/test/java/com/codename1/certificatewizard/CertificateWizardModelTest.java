@@ -211,24 +211,59 @@ class CertificateWizardModelTest {
         certs.add(dist.get(0).appleCertId());
         service.createProfile("My App Widgets App Store", "IOS_APP_STORE", extAppleId, certs,
                 new ArrayList<String>(), r -> assertTrue(r.ok));
+        List<SigningState.Certificate> dev = WizardDecisions.compatibleCertificates(state[0], "IOS_APP_DEVELOPMENT");
+        assertFalse(dev.isEmpty());
+        List<String> devCerts = new ArrayList<String>();
+        devCerts.add(dev.get(0).appleCertId());
+        List<String> deviceIds = new ArrayList<String>();
+        for (SigningState.Device d : state[0].devices) {
+            deviceIds.add(d.id());
+        }
+        assertTrue(WizardDecisions.canCreateProfile("IOS_APP_DEVELOPMENT", extAppleId, devCerts, deviceIds,
+                "My App Widgets Development"));
+        service.createProfile("My App Widgets Development", "IOS_APP_DEVELOPMENT", extAppleId, devCerts,
+                deviceIds, r -> assertTrue(r.ok));
         service.refresh(r -> state[0] = r.value);
-        boolean extProfile = false;
+        boolean extStoreProfile = false;
+        boolean extDevProfile = false;
         for (SigningState.Profile p : state[0].profiles) {
             if (extId.equals(p.bundleId()) && "IOS_APP_STORE".equals(p.profileType())) {
-                extProfile = true;
+                extStoreProfile = true;
+            }
+            if (extId.equals(p.bundleId()) && "IOS_APP_DEVELOPMENT".equals(p.profileType())) {
+                extDevProfile = true;
             }
         }
-        assertTrue(extProfile);
+        assertTrue(extStoreProfile);
+        assertTrue(extDevProfile);
 
         Path settings = Files.createTempFile("cn1-settings", ".properties");
         Files.writeString(settings, "codename1.packageName=com.example.app\n", StandardCharsets.UTF_8);
         SigningAssetInstaller.applyWidgetExtensionSigning(settings.toString(), groupId,
-                "/tmp/CN1Widgets.mobileprovision");
+                "/tmp/CN1Widgets.mobileprovision", "/tmp/CN1Widgets_Development.mobileprovision");
         String written = Files.readString(settings, StandardCharsets.UTF_8);
         assertTrue(written.contains("codename1.arg.ios.surfaces.appGroup=group.com.example.app"));
         assertTrue(written.contains(
                 "codename1.ios.appext.CN1Widgets.provision=/tmp/CN1Widgets.mobileprovision"));
+        assertTrue(written.contains(
+                "codename1.ios.release.appext.CN1Widgets.provision=/tmp/CN1Widgets.mobileprovision"));
+        assertTrue(written.contains(
+                "codename1.ios.debug.appext.CN1Widgets.provision=/tmp/CN1Widgets_Development.mobileprovision"));
         assertTrue(written.contains("codename1.packageName=com.example.app"));
+    }
+
+    @Test
+    void widgetExtensionSigningWithoutDevelopmentProfileOmitsDebugKey() throws Exception {
+        Path settings = Files.createTempFile("cn1-settings", ".properties");
+        Files.writeString(settings, "codename1.packageName=com.example.app\n", StandardCharsets.UTF_8);
+        SigningAssetInstaller.applyWidgetExtensionSigning(settings.toString(), "group.com.example.app",
+                "/tmp/CN1Widgets.mobileprovision", null);
+        String written = Files.readString(settings, StandardCharsets.UTF_8);
+        assertTrue(written.contains(
+                "codename1.ios.appext.CN1Widgets.provision=/tmp/CN1Widgets.mobileprovision"));
+        assertTrue(written.contains(
+                "codename1.ios.release.appext.CN1Widgets.provision=/tmp/CN1Widgets.mobileprovision"));
+        assertFalse(written.contains("codename1.ios.debug.appext.CN1Widgets.provision"));
     }
 
     @Test

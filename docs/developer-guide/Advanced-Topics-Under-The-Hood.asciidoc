@@ -539,7 +539,10 @@ Only supported for App Store builds. See https://www.codenameone.com/developer-g
 |Objective-C code injected at the matching marker comment in the generated Wallet extension sources, for custom behavior at each callback (for example adding fields to the issuer endpoint payload in `generateRequestInject`). See the <<Apple Wallet Extension,Apple Wallet Extension chapter>>.
 
 |ios.appext.NAME.provisioningURL
-|Cloud device builds only. URL of the provisioning profile for a generic app extension dropped into `ios/app_extensions/NAME/`, used when the extension folder doesn't bundle a `.mobileprovision` itself. The profile is installed on the build machine and added to the export options per bundle id.
+|Cloud device builds only. URL of the provisioning profile for a generic app extension dropped into `ios/app_extensions/NAME/` (or a generated extension such as `CN1Widgets`), used when the extension folder doesn't bundle a `.mobileprovision` itself. The profile is installed on the build machine and added to the export options per bundle id. Used for both debug and release builds unless a qualified variant (below) is set.
+
+|ios.debug.appext.NAME.provisioningURL / ios.release.appext.NAME.provisioningURL
+|Cloud device builds only. Build-type-specific variants of `ios.appext.NAME.provisioningURL`: point the `debug` variant at the extension's development profile and the `release` variant at its distribution profile. The Maven build resolves the variant matching the build target (`ios-device` and `ios-on-device-debug` are debug, `ios-device-release` is release) into the unqualified hint before submitting the build; the unqualified hint acts as the fallback. The same qualifiers work for the local-path settings `codename1.ios.debug.appext.NAME.provision` / `codename1.ios.release.appext.NAME.provision`.
 
 |codename1.mac.appid
 |Mac Native cloud builds only. The Mac bundle identifier registered in App Store Connect / Apple Developer. Distinct from `codename1.ios.appid` because Apple treats the iOS and Mac App Store records as separate products. Required for cloud Mac builds.
