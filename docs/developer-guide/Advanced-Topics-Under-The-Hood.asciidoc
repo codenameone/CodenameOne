@@ -786,8 +786,8 @@ This is great as it allows apps to be installed with a single click and no permi
 
 ===== Enabling permissions
 
-// vale-skip: write-good.TooWordy — 'minimum of API 33' is the precise term for the SDK floor.
-Codename One's Gradle 8 based Android builder detects the highest Android SDK you've installed and uses that value (with a minimum of API 33) for both the compile and target SDK versions, so the modern runtime permission flow is enabled by default. If you override the target version through the `android.targetSDKVersion` build hint the builder will honour it, but lowering the target may disable some compatibility libraries. Keeping the target current is strongly recommended for Play Store compliance.
+// vale-skip: write-good.TooWordy — 'minimum of API 36' is the precise term for the SDK floor.
+By default, Codename One's Gradle 8 based Android builder uses the highest Android SDK you've installed, with a minimum of API 36, for both the compile and target SDK versions. If you override the target through the `android.targetSDKVersion` build hint, the builder honours it while keeping the compile SDK at least as high as the target SDK. Lowering the target may disable some compatibility libraries. Keeping the target current is strongly recommended for Play Store compliance.
 
 ===== Permission prompts
 
@@ -803,7 +803,7 @@ If you explicitly lower the target SDK (for example: `android.targetSDKVersion=2
 .Install UI when using the old permissions system
 image::img/marshmallow-permissions-level21.png[Install UI when using the old permissions system,scaledwidth=20%]
 
-When you keep the default target (API 33+) the installer defers to the runtime permission flow and the installation UI looks like this instead:
+When you keep the default target (API 36+) the installer defers to the runtime permission flow and the installation UI looks like this instead:
 
 .Install UI when using the new permissions system
 image::img/marshmallow-permissions-level23.png[Install UI when using the new permissions system,scaledwidth=20%]

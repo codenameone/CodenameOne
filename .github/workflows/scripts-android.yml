@@ -121,7 +121,6 @@ jobs:
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
       - name: Free Disk Space
-        if: matrix.id != 'default'
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android/sdk/ndk

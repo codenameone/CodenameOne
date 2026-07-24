@@ -759,10 +759,12 @@ public class AndroidGradleBuilder extends Executor {
         }
 
         if (useGradle8) {
+            // Build Tools and platform SDK versions are independent; compileSdk is
+            // raised to at least targetSdk when the Gradle project is generated below.
             maxBuildToolsVersionInt = Math.max(33, maxBuildToolsVersionInt);
             maxBuildToolsVersion = "" + maxBuildToolsVersionInt;
 
-            maxPlatformVersionInt = Math.max(33, maxPlatformVersionInt);
+            maxPlatformVersionInt = Math.max(36, maxPlatformVersionInt);
             maxPlatformVersion = "" + maxPlatformVersionInt;
         }
 
@@ -4995,6 +4997,7 @@ public class AndroidGradleBuilder extends Executor {
             compileSdkVersion = "36";
             supportLibVersion = "28";
         }
+        compileSdkVersion = ensureCompileSdkAtLeastTarget(compileSdkVersion, targetNumber);
         jcenter =
                 "      google()\n" +
                         "     jcenter()\n" +
@@ -6200,7 +6203,23 @@ public class AndroidGradleBuilder extends Executor {
         }
     }
 
-    private Integer parseSdkInt(String value) {
+    // Package-private for direct unit testing; this is not part of the builder API.
+    static String ensureCompileSdkAtLeastTarget(String compileSdkVersion, String targetSdkVersion) {
+        Integer compileSdkInt = parseSdkInt(compileSdkVersion);
+        Integer targetSdkInt = parseSdkInt(targetSdkVersion);
+        if (targetSdkInt == null) {
+            return compileSdkVersion;
+        }
+        if (compileSdkVersion == null || compileSdkVersion.trim().isEmpty()) {
+            return String.valueOf(targetSdkInt);
+        }
+        if (compileSdkInt != null && targetSdkInt > compileSdkInt) {
+            return String.valueOf(targetSdkInt);
+        }
+        return compileSdkVersion;
+    }
+
+    private static Integer parseSdkInt(String value) {
         if (value == null) {
             return null;
         }
