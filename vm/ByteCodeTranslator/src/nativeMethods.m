@@ -2097,7 +2097,13 @@ JAVA_VOID java_lang_Thread_sleep___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG mil
     // which silently turned long sleeps into no-ops on those libcs. Honors the
     // interrupt flag so interrupt() now actually shortens a sleep instead of
     // relying on an accidental EINTR.
-    JAVA_LONG deadline = cn1SleepNowMicros() + millis * 1000;
+    // Saturate instead of overflowing: Thread.sleep(Long.MAX_VALUE) is a real
+    // "park this thread" idiom, and millis * 1000 would wrap negative and make
+    // it return immediately.
+    JAVA_LONG now = cn1SleepNowMicros();
+    JAVA_LONG maxMicros = 0x7fffffffffffffffLL;
+    JAVA_LONG deltaMicros = (millis > maxMicros / 1000) ? maxMicros : millis * 1000;
+    JAVA_LONG deadline = (deltaMicros > maxMicros - now) ? maxMicros : now + deltaMicros;
     for(;;) {
         if(threadStateData->interrupted) {
             break;
