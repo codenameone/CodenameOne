@@ -24,6 +24,7 @@ RUNNER = REPO_ROOT / (
     "examples/hellocodenameone/tests/Cn1ssDeviceRunner.java"
 )
 COMMON_SOURCES = REPO_ROOT / "scripts/hellocodenameone/common/src/main"
+STRICT_GATE_FAILED = 10
 
 START_RE = re.compile(r"suite starting test=([A-Za-z0-9_]+)")
 FINISH_RE = re.compile(r"suite finished test=([A-Za-z0-9_]+)")
@@ -521,6 +522,34 @@ def normalize(
     return report
 
 
+def strict_report_errors(report: dict) -> list[str]:
+    errors: list[str] = []
+    if not report.get("suite_finished"):
+        errors.append("suite did not emit its completion marker")
+    summary = report.get("summary")
+    if not isinstance(summary, dict):
+        raise ContractError("Expected report summary to be an object")
+
+    counts: dict[str, int] = {}
+    for key in ("pass", "fail", "skip", "not-run"):
+        if key not in summary:
+            raise ContractError(f"Report summary is missing required count {key!r}")
+        value = summary[key]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ContractError(
+                f"Expected report summary {key!r} to be a non-negative integer"
+            )
+        counts[key] = value
+
+    failed = counts["fail"]
+    not_run = counts["not-run"]
+    if failed:
+        errors.append(f"{failed} test(s) failed")
+    if not_run:
+        errors.append(f"{not_run} test(s) did not run")
+    return errors
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -541,6 +570,11 @@ def build_parser() -> argparse.ArgumentParser:
     normalize_parser.add_argument("--commit", default=os.environ.get("GITHUB_SHA", ""))
     normalize_parser.add_argument("--generated-at", default=utc_now())
     normalize_parser.add_argument("--binary-size", type=int)
+    normalize_parser.add_argument(
+        "--fail-on-test-problems",
+        action="store_true",
+        help="return nonzero after writing the report if tests fail, do not run, or the suite is incomplete",
+    )
     return parser
 
 
@@ -571,6 +605,14 @@ def main() -> int:
             f"Wrote {args.output}: "
             + ", ".join(f"{key}={value}" for key, value in report["summary"].items())
         )
+        if args.fail_on_test_problems:
+            strict_errors = strict_report_errors(report)
+            if strict_errors:
+                print(
+                    "port-status strict gate: " + "; ".join(strict_errors),
+                    file=sys.stderr,
+                )
+                return STRICT_GATE_FAILED
         return 0
     except ContractError as exc:
         print(f"port-status: {exc}", file=sys.stderr)
