@@ -15,7 +15,7 @@ import com.codename1.ui.Display;
  * Sizes to the child, or fills the bounded incoming axes when childless. The
  * child's components attach after the face, so they paint on top.
  */
-public class MaterialRenderElement extends SingleChildRenderElement {
+public class MaterialRenderElement extends com.codename1.flutter.widgets.EffectRenderElement {
 
     public MaterialRenderElement(Material widget) {
         super(widget);
@@ -26,27 +26,11 @@ public class MaterialRenderElement extends SingleChildRenderElement {
     }
 
     @Override
-    protected Widget childWidget() {
+    protected Widget effectChild() {
         return material().getChild();
     }
 
-    @Override
-    protected Component createComponent() {
-        if (!Display.isInitialized() || material().getColor() == null) {
-            return null;
-        }
-        Container face = new Container();
-        face.setUIID("FlutterMaterial");
-        face.getAllStyles().setPadding(0, 0, 0, 0);
-        face.getAllStyles().setMargin(0, 0, 0, 0);
-        applyStyle(face);
-        return face;
-    }
 
-    @Override
-    protected void updateComponent(Component c) {
-        applyStyle(c);
-    }
 
     private void applyStyle(Component face) {
         try {
@@ -81,6 +65,36 @@ public class MaterialRenderElement extends SingleChildRenderElement {
         }
     }
 
+    @Override
+    protected void paintWithEffect(com.codename1.ui.Graphics g,
+            com.codename1.ui.Container pane, Runnable paintChildren) {
+        styleOnce(pane);
+        // Clip.antiAlias would cut the subtree to the rounded shape; not done yet, so a
+        // child that fills the surface still paints square corners over the rounded
+        // background. Reported rather than left as a silent visual difference.
+        if (cornerRadiusLp() > 0
+                && material().getClipBehavior() != com.codename1.flutter.Clip.none) {
+            com.codename1.flutter.FlutterErrorReport.unimplemented("Material",
+                    "clipBehavior is ignored; a child filling the surface paints over its rounded corners");
+        }
+        paintChildren.run();
+    }
+
+    /// Applies the surface style when it first paints or after its configuration
+    /// changes. Re-deriving a RoundRectBorder on every frame would allocate per paint.
+    private String styleSignature;
+
+    private void styleOnce(com.codename1.ui.Container pane) {
+        String sig = cornerRadiusLp() + "|" + material().getElevation() + "|"
+                + (material().getColor() == null ? "-" : material().getColor().value());
+        if (sig.equals(styleSignature)) {
+            return;
+        }
+        styleSignature = sig;
+        applyStyle(pane);
+    }
+
+
     /// The corner radius in logical pixels from the shape or an explicit borderRadius.
     private double cornerRadiusLp() {
         Object r = material().getShape() instanceof com.codename1.flutter.RoundedRectangleBorder
@@ -93,16 +107,4 @@ public class MaterialRenderElement extends SingleChildRenderElement {
         return 0;
     }
 
-    @Override
-    protected Size performLayout(BoxConstraints constraints) {
-        RenderElement child = renderChild();
-        if (child == null) {
-            return constraints.constrain(new Size(
-                    constraints.hasBoundedWidth() ? constraints.maxWidth() : 0,
-                    constraints.hasBoundedHeight() ? constraints.maxHeight() : 0));
-        }
-        Size cs = child.layout(constraints);
-        setChildOffset(child, 0, 0);
-        return constraints.constrain(cs);
-    }
 }

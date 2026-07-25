@@ -75,6 +75,11 @@ public class Material extends Widget {
     }
 
     /// The shape given to this Material — a RoundedRectangleBorder carries the radius.
+    /// Whether this surface clips its subtree to its shape.
+    public Clip getClipBehavior() {
+        return clipBehavior;
+    }
+
     public Object getShape() {
         return shape;
     }
