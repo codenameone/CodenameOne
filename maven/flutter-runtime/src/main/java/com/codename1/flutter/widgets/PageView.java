@@ -78,6 +78,11 @@ public class PageView extends Widget {
         return controller;
     }
 
+    /** The scroll axis; null means Flutter's default, {@code Axis.horizontal}. */
+    public Object getScrollDirection() {
+        return scrollDirection;
+    }
+
     public DartList<Widget> getChildren() {
         return children;
     }

@@ -42,6 +42,20 @@ public class ListViewRenderElement extends ScrollRenderElement {
     }
 
     @Override
+    protected boolean horizontal() {
+        return listView().getScrollDirection() == com.codename1.flutter.Axis.horizontal;
+    }
+
+    /**
+     * Windowing is vertical-only: the scroll math and the spacers are written
+     * against item HEIGHTS. Horizontal lists in practice hold a handful of
+     * items (a row of cards), so they are built eagerly rather than windowed.
+     */
+    private boolean windowed() {
+        return listView().isBuilderMode() && !horizontal();
+    }
+
+    @Override
     protected Component createComponent() {
         Component c = super.createComponent();
         pane = c;
@@ -58,7 +72,7 @@ public class ListViewRenderElement extends ScrollRenderElement {
 
     /** Recomputes the visible window on scroll and rebuilds when it changed. */
     private void onScroll(int scrollY) {
-        if (pane == null || !listView().isBuilderMode()) {
+        if (pane == null || !windowed()) {
             return;
         }
         if (!measured) {
@@ -112,6 +126,13 @@ public class ListViewRenderElement extends ScrollRenderElement {
             items = w.getChildren() == null ? new DartList<Widget>() : w.getChildren();
             return wrap(w, items);
         }
+        if (!windowed()) {
+            long n = w.getItemCount();
+            for (long i = 0; i < n; i++) {
+                items.add(w.getItemBuilder().call(this, i));
+            }
+            return wrap(w, items);
+        }
         long count = w.getItemCount();
         int start = winStart;
         if (start >= count) {
@@ -140,16 +161,26 @@ public class ListViewRenderElement extends ScrollRenderElement {
     }
 
     private Widget wrap(ListView w, DartList<Widget> items) {
-        Column col = new Column();
-        col.crossAxisAlignment(CrossAxisAlignment.stretch);
-        col.mainAxisSize(MainAxisSize.min);
-        col.children(items);
+        Widget line;
+        if (horizontal()) {
+            Row row = new Row();
+            row.crossAxisAlignment(CrossAxisAlignment.stretch);
+            row.mainAxisSize(MainAxisSize.min);
+            row.children(items);
+            line = row;
+        } else {
+            Column col = new Column();
+            col.crossAxisAlignment(CrossAxisAlignment.stretch);
+            col.mainAxisSize(MainAxisSize.min);
+            col.children(items);
+            line = col;
+        }
         if (w.getPadding() == null) {
-            return col;
+            return line;
         }
         Padding p = new Padding();
         p.padding(w.getPadding());
-        p.child(col);
+        p.child(line);
         return p;
     }
 }

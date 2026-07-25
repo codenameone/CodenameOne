@@ -49,6 +49,24 @@ public abstract class ScrollRenderElement extends RenderElement {
         return false;
     }
 
+    /**
+     * The scroll axis. Horizontal scrollables lay their content out with a
+     * tight viewport height and an unbounded width — the mirror of the
+     * vertical contract — and hand CN1 an X-scrollable pane.
+     */
+    protected boolean horizontal() {
+        return false;
+    }
+
+    /**
+     * Whether CN1's scroll indicator is suppressed. A Flutter PageView paints
+     * no scrollbar at all — the peeking neighbour pages ARE the affordance —
+     * so a bar under the carousel is a visible artifact, not a feature.
+     */
+    protected boolean hideScrollbar() {
+        return false;
+    }
+
     private RenderHost innerHost() {
         if (innerHost == null) {
             innerHost = new RenderHost();
@@ -73,12 +91,22 @@ public abstract class ScrollRenderElement extends RenderElement {
             // headless unit tests: no CN1 components can exist
             return null;
         }
-        Container pane = new Container(new ScrollRootLayout(innerHost()));
+        Container pane = new Container(horizontal()
+                ? new com.codename1.flutter.rendering.HorizontalScrollRootLayout(innerHost())
+                : new ScrollRootLayout(innerHost()));
         pane.setUIID("FlutterScroll");
         pane.getAllStyles().setPadding(0, 0, 0, 0);
         pane.getAllStyles().setMargin(0, 0, 0, 0);
         pane.getAllStyles().setBgTransparency(0);
-        pane.setScrollableY(true);
+        if (horizontal()) {
+            pane.setScrollableX(true);
+            pane.setScrollableY(false);
+        } else {
+            pane.setScrollableY(true);
+        }
+        if (hideScrollbar()) {
+            pane.setScrollVisible(false);
+        }
         innerHost().container(pane);
         return pane;
     }
@@ -105,6 +133,10 @@ public abstract class ScrollRenderElement extends RenderElement {
 
     @Override
     protected Size performLayout(BoxConstraints constraints) {
+        return horizontal() ? layoutHorizontal(constraints) : layoutVertical(constraints);
+    }
+
+    private Size layoutVertical(BoxConstraints constraints) {
         RenderElement c = contentRender();
         double width = constraints.hasBoundedWidth() ? constraints.maxWidth() : 0;
         Size cs = Size.ZERO;
@@ -121,6 +153,28 @@ public abstract class ScrollRenderElement extends RenderElement {
             height = cs.height();
         } else {
             height = constraints.maxHeight();
+        }
+        return constraints.constrain(new Size(width, height));
+    }
+
+    /** The vertical contract with the axes swapped. */
+    private Size layoutHorizontal(BoxConstraints constraints) {
+        RenderElement c = contentRender();
+        double height = constraints.hasBoundedHeight() ? constraints.maxHeight() : 0;
+        Size cs = Size.ZERO;
+        if (c != null) {
+            cs = c.layout(constraints.hasBoundedHeight()
+                    ? com.codename1.flutter.rendering.HorizontalScrollRootLayout.contentConstraints(height)
+                    : BoxConstraints.loose(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY));
+            if (!constraints.hasBoundedHeight()) {
+                height = cs.height();
+            }
+        }
+        double width;
+        if (shrinkWrap() || !constraints.hasBoundedWidth()) {
+            width = cs.width();
+        } else {
+            width = constraints.maxWidth();
         }
         return constraints.constrain(new Size(width, height));
     }
