@@ -94,6 +94,109 @@ if [ -f "$HOME/.codenameoneSettings/settings.log" ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# 1b. Settings render matrix.
+#     The mojo run above covers the launch path on the runner's own desktop:
+#     100% scale, light mode, en-US. Real Windows 11 desktops are routinely
+#     none of those, and issue #5443 survived a fix that this single
+#     configuration was green for. The matrix drives the launcher directly
+#     (same binding file the mojo writes) so each run can vary the JVM's HiDPI
+#     scale, dark mode and locale, and captures the on-screen pixels plus a
+#     render-state dump next to every screenshot.
+# ---------------------------------------------------------------------------
+SETTINGS_CP_DIR="$TEMP_BASE/cn1-windows-settings-cp"
+mkdir -p "$SETTINGS_CP_DIR"
+cat > "$SETTINGS_CP_DIR/cp-pom.xml" <<EOF
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.codename1.demos</groupId>
+  <artifactId>windows-settings-classpath</artifactId>
+  <version>1.0</version>
+  <packaging>pom</packaging>
+  <dependencies>
+    <dependency>
+      <groupId>com.codenameone</groupId>
+      <artifactId>codenameone-settings</artifactId>
+      <version>$CN1_VERSION</version>
+    </dependency>
+    <dependency>
+      <groupId>com.codenameone</groupId>
+      <artifactId>codenameone-core</artifactId>
+      <version>$CN1_VERSION</version>
+    </dependency>
+    <dependency>
+      <groupId>com.codenameone</groupId>
+      <artifactId>codenameone-javase</artifactId>
+      <version>$CN1_VERSION</version>
+    </dependency>
+  </dependencies>
+</project>
+EOF
+mvn -B -q -f "$(winpath "$SETTINGS_CP_DIR/cp-pom.xml")" dependency:build-classpath \
+  "-Dmdep.outputFile=$(winpath "$SETTINGS_CP_DIR/cp.txt")"
+SETTINGS_CP="$(cat "$SETTINGS_CP_DIR/cp.txt")"
+
+BINDING_FILE="$SETTINGS_CP_DIR/settings.input"
+WORK_DIR_W="$(winpath "$WORK_DIR")"
+cat > "$BINDING_FILE" <<EOF
+# Codename One Settings project binding
+projectDir=$WORK_DIR_W
+settings=$WORK_DIR_W\\codenameone_settings.properties
+pom=$WORK_DIR_W\\pom.xml
+multimoduleRoot=$WORK_DIR_W
+EOF
+
+MATRIX_FAILURES=()
+
+# run_settings_scenario <name> [extra jvm args...]
+run_settings_scenario() {
+  local name="$1"; shift
+  local png="$ARTIFACTS_DIR/settings-$name.png"
+  local diag="$ARTIFACTS_DIR/settings-$name.txt"
+  wt_log "Settings render scenario: $name ($*)"
+  if ! "$JAVA_BIN" "$@" \
+      -Djava.awt.headless=false \
+      "-Dsettings.input=$(winpath "$BINDING_FILE")" \
+      "-Dsettings.screenshot=$(winpath "$png")" \
+      "-Dsettings.diagnostics=$(winpath "$diag")" \
+      -Dsettings.screenshot.delay=8000 \
+      -cp "$SETTINGS_CP" \
+      com.codename1.settings.CodenameOneSettingsLauncher \
+      > "$ARTIFACTS_DIR/settings-$name.log" 2>&1; then
+    wt_log "  scenario $name: launcher exited non-zero"
+    MATRIX_FAILURES+=("$name (launcher)")
+    return 0
+  fi
+  # The window the user looks at is the one that has to be right, so the
+  # on-screen grab is the gate; the offscreen paint is kept for comparison
+  # because a disagreement between the two is itself a finding.
+  local onscreen="$ARTIFACTS_DIR/settings-$name.onscreen.png"
+  local gate="$onscreen"
+  if [ ! -s "$gate" ]; then
+    wt_log "  scenario $name: no on-screen capture, falling back to offscreen paint"
+    gate="$png"
+  fi
+  # Deliberately loose bounds: the runner desktop is 1024x768, so a scaled
+  # window is legitimately small. The colour/flatness checks are the signal.
+  if ! "$JAVA_BIN" "$SANITY_SRC_W" "$(winpath "$gate")" 300 200; then
+    MATRIX_FAILURES+=("$name")
+  fi
+}
+
+run_settings_scenario baseline
+run_settings_scenario dark -Dsettings.darkMode=true
+run_settings_scenario hidpi125 -Dsun.java2d.uiScale=1.25
+run_settings_scenario hidpi150 -Dsun.java2d.uiScale=1.5
+run_settings_scenario hidpi175 -Dsun.java2d.uiScale=1.75
+run_settings_scenario hidpi150-dark -Dsun.java2d.uiScale=1.5 -Dsettings.darkMode=true
+run_settings_scenario locale-es -Duser.language=es -Duser.country=ES
+
+if [ ${#MATRIX_FAILURES[@]} -gt 0 ]; then
+  wt_log "Settings render matrix failed for: ${MATRIX_FAILURES[*]}" >&2
+  exit 1
+fi
+wt_log "Settings render matrix passed"
+
+# ---------------------------------------------------------------------------
 # 2. JavaSE simulator smoke via the shared verifier harness.
 # ---------------------------------------------------------------------------
 BUILD_DIR="$TEMP_BASE/cn1-windows-sim"
