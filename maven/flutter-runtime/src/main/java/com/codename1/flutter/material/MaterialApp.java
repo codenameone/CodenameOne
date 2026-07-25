@@ -335,6 +335,9 @@ public class MaterialApp extends StatelessWidget {
                         Object v = f != null ? f.getNow() : null;
                         if (v != null) {
                             out.add(v);
+                            logLoaded(d, v);
+                        } else {
+                            logLoaded(d, null);
                         }
                     } catch (Throwable err) {
                         // A delegate that fails contributes nothing, and the app
@@ -361,6 +364,17 @@ public class MaterialApp extends StatelessWidget {
      * the first thing worth knowing.
      */
     private static boolean loggedLocale;
+
+    /** What each delegate actually produced — the list is what every lookup searches. */
+    private static void logLoaded(Object delegate, Object value) {
+        try {
+            com.codename1.io.Log.p("Flutter runtime:   delegate "
+                    + delegate.getClass().getName() + " -> "
+                    + (value == null ? "null" : value.getClass().getName()));
+        } catch (Throwable ignore) {
+            // headless: Log has no storage backend
+        }
+    }
 
     private void logResolvedLocale(Locale loc) {
         if (loggedLocale) {

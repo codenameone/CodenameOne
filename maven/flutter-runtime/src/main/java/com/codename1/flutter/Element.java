@@ -192,8 +192,10 @@ public abstract class Element implements BuildContext {
     @Override
     public Object providerValueOfType(Class<?> type) {
         Element a = ancestorOf(this);
+        int providers = 0;
         while (a != null) {
             if (a.widget instanceof InheritedValueProvider) {
+                providers++;
                 Object v = ((InheritedValueProvider) a.widget).providedValueFor(type);
                 if (v != null) {
                     return v;
@@ -201,7 +203,39 @@ public abstract class Element implements BuildContext {
             }
             a = ancestorOf(a);
         }
+        reportMissingProvider(type, providers);
         return null;
+    }
+
+    private void reportMissingProvider(Class<?> type, int providersSeen) {
+        if (missingAncestorReports >= 5) {
+            return;
+        }
+        missingAncestorReports++;
+        // The summary goes out FIRST and on its own: the ancestor walk below
+        // touches every ancestor's class, and if any step of that throws the
+        // whole report would vanish into the guard.
+        try {
+            com.codename1.io.Log.p("Flutter runtime: no provider of "
+                    + (type == null ? "?" : type.getName())
+                    + " (" + providersSeen + " provider(s) searched)");
+        } catch (Throwable t) {
+            return;
+        }
+        try {
+            StringBuilder sb = new StringBuilder("Flutter runtime:   ancestors were:");
+            Element a = ancestorOf(this);
+            int depth = 0;
+            while (a != null && depth < 30) {
+                sb.append(depth == 0 ? " " : " < ");
+                sb.append(a.widget == null ? "null" : a.widget.getClass().getName());
+                a = ancestorOf(a);
+                depth++;
+            }
+            com.codename1.io.Log.p(sb.toString());
+        } catch (Throwable t) {
+            // diagnostics must never become the failure
+        }
     }
 
     @Override
