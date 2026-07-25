@@ -6099,7 +6099,13 @@ public class CSSTheme {
 
 
             com.codename1.ui.plaf.RoundRectBorder out = RoundRectBorder.create();
-            
+
+            // A stylesheet expects border-radius to round the corners of the box it already
+            // asked for, not to grow that box. Without this the default RoundRectBorder
+            // sizing reserves twice the radius, so "border-radius: 3mm" on a button turns
+            // into a 6mm tall button no matter what padding and font-size say.
+            out.cssBoxModel(true);
+
             ScaledUnit radius = getBorderRadius(styles);
             if (radius != null) {
                 out.cornerRadius(radius.getMMValue());

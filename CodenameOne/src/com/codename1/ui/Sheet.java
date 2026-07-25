@@ -988,6 +988,9 @@ public class Sheet extends Container {
             nb.strokeColor(b.getStrokeColor());
             nb.strokeOpacity(b.getStrokeOpacity());
             nb.stroke(b.getStrokeThickness(), b.isStrokeMM());
+            // A border that came out of a stylesheet must keep sizing like a CSS box,
+            // otherwise repositioning the sheet silently inflates it by twice the radius
+            nb.cssBoxModel(b.isCssBoxModel());
             b = nb;
             switch (getPositionInt()) {
                 case C:

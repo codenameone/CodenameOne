@@ -95,7 +95,7 @@ import javax.swing.tree.TreePath;
  * @author Shai Almog
  */
 public class EditableResources extends Resources implements TreeModel {
-    private static final short MINOR_VERSION = 15;
+    private static final short MINOR_VERSION = 16;
     private static final short MAJOR_VERSION = 1;
 
     private static final boolean IS_MAC;
@@ -685,6 +685,7 @@ public class EditableResources extends Resources implements TreeModel {
                                             rb = rb.strokeColor(b.getStrokeColor());
                                             rb = rb.strokeOpacity(b.getStrokeOpacity());
                                             rb = rb.bezierCorners(b.isBezierCorners());
+                                            rb = rb.cssBoxModel(b.isCssBoxModel());
                                             if (b.isTopOnlyMode()) {
                                                 rb.topOnlyMode(true);
                                             } else if (b.isBottomOnlyMode()) {
@@ -1199,8 +1200,9 @@ public class EditableResources extends Resources implements TreeModel {
                                             + "shadowBlur=\"" + rb.getShadowBlur()+ "\" " 
                                             + "topOnlyMode=\"" + rb.isTopOnlyMode()+ "\" " 
                                             + "bottomOnlyMode=\"" + rb.isBottomOnlyMode()+ "\" " 
-                                            + "cornerRadius=\"" + rb.getCornerRadius()+ "\" " 
-                                            + "bezierCorners=\"" + rb.isBezierCorners()+ "\" />\n");
+                                            + "cornerRadius=\"" + rb.getCornerRadius()+ "\" "
+                                            + "bezierCorners=\"" + rb.isBezierCorners()+ "\" "
+                                            + "cssBoxModel=\"" + rb.isCssBoxModel()+ "\" />\n");
                             
                                     continue;
                                 }
@@ -2340,6 +2342,8 @@ public class EditableResources extends Resources implements TreeModel {
             output.writeBoolean(rb.isTopRight());
             output.writeBoolean(rb.isBottomRight());
             output.writeBoolean(rb.isBottomLeft());
+            // CSS box model sizing, added in resource format 1.16
+            output.writeBoolean(rb.isCssBoxModel());
             return;
         }
         int type = Accessor.getType(border);

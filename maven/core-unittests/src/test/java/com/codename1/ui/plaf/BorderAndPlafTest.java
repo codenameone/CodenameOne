@@ -24,7 +24,9 @@ package com.codename1.ui.plaf;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.Button;
 import com.codename1.ui.Component;
+import com.codename1.ui.Display;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
@@ -39,6 +41,7 @@ import com.codename1.ui.plaf.StyleParser.PaddingInfo;
 import com.codename1.ui.plaf.StyleParser.ScalarValue;
 import com.codename1.ui.plaf.StyleParser.StyleInfo;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 
@@ -175,6 +178,154 @@ class BorderAndPlafTest extends UITestBase {
         assertEquals(PathIterator.SEG_LINETO, path.currentSegment(coordinates));
         assertEquals(30f, coordinates[0], 0.001f,
                 "RTL should mirror the square top-left corner to the top-right");
+    }
+
+    @FormTest
+    void testRoundRectBorderReservesTwiceTheRadiusByDefault() {
+        RoundRectBorder border = RoundRectBorder.create().cornerRadius(3f).shadowSpread(0f);
+
+        assertFalse(border.isCssBoxModel(), "the legacy pill sizing is the default");
+        int radius = Display.getInstance().convertToPixels(3f);
+        assertEquals(radius * 2, border.getMinimumHeight(),
+                "hand written borders keep growing the component so the full radius is drawn");
+        assertEquals(radius * 2, border.getMinimumWidth());
+    }
+
+    @FormTest
+    void testCssBoxModelBorderDoesNotReserveSpaceForTheRadius() {
+        RoundRectBorder border = RoundRectBorder.create().cornerRadius(3f).cssBoxModel(true);
+
+        assertTrue(border.isCssBoxModel());
+        assertEquals(0, border.getMinimumHeight(),
+                "border-radius never contributes to the size of a CSS box");
+        assertEquals(0, border.getMinimumWidth());
+    }
+
+    @FormTest
+    void testCssBoxModelBorderStillReservesRoomForItsShadow() {
+        RoundRectBorder border = RoundRectBorder.create()
+                .cornerRadius(3f)
+                .cssBoxModel(true)
+                .shadowSpread(2f)
+                .shadowOpacity(128);
+
+        assertEquals(Display.getInstance().convertToPixels(2f), border.getMinimumHeight(),
+                "a drawn shadow still needs its spread reserved, the radius does not");
+    }
+
+    /// Regression test for https://github.com/codenameone/CodenameOne/discussions/5454:
+    /// `border-radius: 0 3mm 3mm 0` on a button used to inflate its height because the
+    /// generated `RoundRectBorder` reserved twice the radius.
+    @FormTest
+    void testCssBoxModelBorderDoesNotInflateAButton() {
+        Button squareCorners = new Button("Send");
+        squareCorners.getAllStyles().setBorder(Border.createEmpty());
+        int expected = squareCorners.getPreferredSize().getHeight();
+
+        // Any radius bigger than the button itself, so the legacy reservation is the value
+        // that wins in the preferred size calculation and the difference is visible here.
+        float radius = expected;
+        assertTrue(rightRoundedCorners(radius).getMinimumHeight() > expected,
+                "test setup: the radius has to exceed the natural height of the button");
+
+        Button cssRounded = new Button("Send");
+        cssRounded.getAllStyles().setBorder(rightRoundedCorners(radius).cssBoxModel(true));
+
+        Button legacyRounded = new Button("Send");
+        legacyRounded.getAllStyles().setBorder(rightRoundedCorners(radius));
+
+        assertEquals(expected, cssRounded.getPreferredSize().getHeight(),
+                "rounding the corners must not change the height the stylesheet asked for");
+        assertEquals(rightRoundedCorners(radius).getMinimumHeight(),
+                legacyRounded.getPreferredSize().getHeight(),
+                "the legacy sizing is unchanged, it still grows the button to twice the radius");
+    }
+
+    private static RoundRectBorder rightRoundedCorners(float radius) {
+        return RoundRectBorder.create()
+                .cornerRadius(radius)
+                .shadowSpread(0f)
+                .topLeftMode(false)
+                .bottomLeftMode(false)
+                .topRightMode(true)
+                .bottomRightMode(true);
+    }
+
+    @FormTest
+    void testRoundRectBorderScalesTheRadiusDownToFitTheShape() {
+        // Both corners of every edge are rounded and the box is only as big as a single
+        // radius, so each corner may use at most half of what the border asks for.
+        int radius = Display.getInstance().convertToPixels(4f);
+
+        List<float[]> shape = shapeOf(RoundRectBorder.create().cornerRadius(4f).cssBoxModel(true),
+                radius, radius);
+
+        // The path opens at the point where the rounded top-left corner ends.
+        float[] moveTo = shape.get(0);
+        assertEquals(PathIterator.SEG_MOVETO, (int) moveTo[0]);
+        assertTrue(moveTo[1] > 0, "the corner is still rounded");
+        assertTrue(moveTo[1] <= radius / 2f + 0.001f,
+                "two rounded corners sharing an edge may use at most half of it each, was "
+                        + moveTo[1] + " of " + radius);
+    }
+
+    @FormTest
+    void testRoundRectBorderScalesTheRadiusPerEdgeNotPerShape() {
+        // Only the top-right corner is rounded, so nothing shares the top or the right edge
+        // with it and CSS lets it use a whole edge rather than half of one.
+        int radius = Display.getInstance().convertToPixels(4f);
+        int width = radius * 2;
+        int height = radius / 2;
+
+        RoundRectBorder border = RoundRectBorder.create()
+                .cornerRadius(4f)
+                .cssBoxModel(true)
+                .topLeftMode(false)
+                .bottomLeftMode(false)
+                .bottomRightMode(false)
+                .topRightMode(true);
+
+        List<float[]> shape = shapeOf(border, width, height);
+
+        // A square top-left corner opens the path at the origin, the line that follows runs
+        // along the top edge and stops where the single rounded corner begins.
+        float[] moveTo = shape.get(0);
+        assertEquals(PathIterator.SEG_MOVETO, (int) moveTo[0]);
+        assertEquals(0f, moveTo[1], 0.001f, "the square top-left corner starts at the origin");
+
+        float[] topEdge = shape.get(1);
+        assertEquals(PathIterator.SEG_LINETO, (int) topEdge[0]);
+        assertEquals(width - height, topEdge[1], 0.001f,
+                "the lone rounded corner scales to the whole height, not to half of it");
+    }
+
+    /// Paints the border into a component of the given size and returns the shape it filled
+    /// as `{segmentType, x, y}` rows. The tracked shape has to be walked with a single
+    /// iterator, a second one over the same shape does not start from the beginning.
+    private List<float[]> shapeOf(RoundRectBorder border, int width, int height) {
+        Label label = new Label();
+        label.setWidth(width);
+        label.setHeight(height);
+        label.getStyle().setBackgroundType(Style.BACKGROUND_NONE);
+        label.getStyle().setBgTransparency(0xff);
+        label.getStyle().setBgColor(0);
+        label.getStyle().setBorder(border);
+
+        implementation.setShapeSupported(true);
+        implementation.resetShapeTracking();
+        border.paintBorderBackground(Image.createImage(width, height).getGraphics(), label);
+
+        assertTrue(implementation.wasFillShapeInvoked());
+        List<float[]> segments = new ArrayList<float[]>();
+        PathIterator path = implementation.getLastFillShape().getPathIterator();
+        float[] coordinates = new float[6];
+        while (!path.isDone()) {
+            int type = path.currentSegment(coordinates);
+            segments.add(new float[]{type, coordinates[0], coordinates[1]});
+            path.next();
+        }
+        assertFalse(segments.isEmpty(), "the border should have filled a shape");
+        return segments;
     }
 
     @FormTest
