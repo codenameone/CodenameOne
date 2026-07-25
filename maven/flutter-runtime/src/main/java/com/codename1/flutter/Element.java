@@ -90,6 +90,37 @@ public abstract class Element implements BuildContext {
     }
 
     /**
+     * Whether {@code o} is an instance of {@code type}, checked by
+     * {@code Class.isInstance} and, failing that, by walking the object's own
+     * superclass chain.
+     *
+     * <p>The whole inherited-widget mechanism rests on this one predicate, and
+     * a backend where the reflective form answers incorrectly takes every
+     * {@code Foo.of(context)} down with it. The superclass walk needs no
+     * reflection beyond {@code getClass()}/{@code getSuperclass()} and answers
+     * the same question, so the two together are far harder to break than
+     * either alone.</p>
+     */
+    public static boolean isInstanceOf(Class<?> type, Object o) {
+        if (type == null || o == null) {
+            return false;
+        }
+        try {
+            if (type.isInstance(o)) {
+                return true;
+            }
+        } catch (Throwable ignore) {
+            // fall through to the explicit walk
+        }
+        for (Class<?> c = o.getClass(); c != null; c = c.getSuperclass()) {
+            if (c == type) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Links this root element's ancestor lookups to the context that pushed
      * it. Set by the Navigator when mounting a route.
      */
@@ -113,7 +144,7 @@ public abstract class Element implements BuildContext {
     public <W extends Widget> W dependOnInheritedWidgetOfExactType(Class<W> type) {
         Element a = ancestorOf(this);
         while (a != null) {
-            if (a.widget != null && type.isInstance(a.widget)) {
+            if (isInstanceOf(type, a.widget)) {
                 return type.cast(a.widget);
             }
             a = ancestorOf(a);

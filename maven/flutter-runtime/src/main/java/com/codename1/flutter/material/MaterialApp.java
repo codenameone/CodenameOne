@@ -326,6 +326,7 @@ public class MaterialApp extends StatelessWidget {
         java.util.List<Object> out = new java.util.ArrayList<Object>();
         if (localizationsDelegates instanceof Iterable) {
             Locale loc = effectiveLocale();
+            logResolvedLocale(loc);
             for (Object d : (Iterable<?>) localizationsDelegates) {
                 if (d instanceof com.codename1.flutter.l10n.LocalizationsDelegate) {
                     try {
@@ -351,6 +352,27 @@ public class MaterialApp extends StatelessWidget {
             }
         }
         return out;
+    }
+
+    /**
+     * Records which locale the app's localizations were resolved for. A
+     * delegate that has no table for that locale returns nothing, and the app
+     * then dies on {@code Foo.of(context)!} — so the locale actually used is
+     * the first thing worth knowing.
+     */
+    private static boolean loggedLocale;
+
+    private void logResolvedLocale(Locale loc) {
+        if (loggedLocale) {
+            return;
+        }
+        loggedLocale = true;
+        try {
+            com.codename1.io.Log.p("Flutter runtime: resolving localizations for locale "
+                    + (loc == null ? "null" : loc.languageCode() + "_" + loc.countryCode()));
+        } catch (Throwable ignore) {
+            // headless: Log has no storage backend
+        }
     }
 
     private Locale effectiveLocale() {

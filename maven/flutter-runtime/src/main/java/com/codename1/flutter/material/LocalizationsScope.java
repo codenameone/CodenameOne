@@ -53,7 +53,7 @@ public class LocalizationsScope extends SingleChildWidget implements InheritedVa
         List<Object> rs = resources();
         if (rs != null && type != null) {
             for (Object r : rs) {
-                if (r != null && type.isInstance(r)) {
+                if (com.codename1.flutter.Element.isInstanceOf(type, r)) {
                     return r;
                 }
             }
