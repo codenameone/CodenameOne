@@ -665,6 +665,7 @@ public final class RoundRectBorder extends Border {
             public void paint(Graphics g) {
                 super.paint(g);
                 try {
+                    boolean rtl = c.isRTL();
                     g.translate(getX(), getY());
                     int shapeX = 0;
                     int shapeY = 0;
@@ -686,13 +687,13 @@ public final class RoundRectBorder extends Border {
                         for (int iter = shadowSpreadL - 1; iter >= 0; iter--) {
                             tg.translate(iter, iter);
                             int iterOpacity = Math.max(0, Math.min(255, (int) (shadowOpacity * (shadowSpreadL - iter) / (float) shadowSpreadL)));
-                            drawShape(tg, shadowColor, shadowOpacity - iterOpacity, w - (iter * 2), h - (iter * 2));
+                            drawShape(tg, shadowColor, shadowOpacity - iterOpacity, w - (iter * 2), h - (iter * 2), rtl);
                             tg.translate(-iter, -iter);
                         }
                     }
                     tg.translate(shapeX, shapeY);
 
-                    GeneralPath gp = createShape(shapeW, shapeH);
+                    GeneralPath gp = createShape(shapeW, shapeH, rtl);
                     Style s = c.getStyle();
                     if (s.getBgImage() == null) {
                         byte type = s.getBackgroundType();
@@ -735,6 +736,7 @@ public final class RoundRectBorder extends Border {
         if (!useCache) {
             return createTargetComponentImage(c, w, h);
         }
+        boolean rtl = c.isRTL();
         Image target = ImageFactory.createImage(c, w, h, 0);
 
         int shapeX = 0;
@@ -757,7 +759,7 @@ public final class RoundRectBorder extends Border {
             for (int iter = shadowSpreadL - 1; iter >= 0; iter--) {
                 tg.translate(iter, iter);
                 int iterOpacity = Math.max(0, Math.min(255, (int) (shadowOpacity * (shadowSpreadL - iter) / (float) shadowSpreadL)));
-                drawShape(tg, shadowColor, shadowOpacity - iterOpacity, w - (iter * 2), h - (iter * 2));
+                drawShape(tg, shadowColor, shadowOpacity - iterOpacity, w - (iter * 2), h - (iter * 2), rtl);
                 tg.translate(-iter, -iter);
             }
 
@@ -771,7 +773,7 @@ public final class RoundRectBorder extends Border {
         }
         tg.translate(shapeX, shapeY);
 
-        GeneralPath gp = createShape(shapeW, shapeH);
+        GeneralPath gp = createShape(shapeW, shapeH, rtl);
         Style s = c.getStyle();
         if (s.getBgImage() == null) {
             byte type = s.getBackgroundType();
@@ -872,6 +874,7 @@ public final class RoundRectBorder extends Border {
 
         final int w = c.getWidth();
         final int h = c.getHeight();
+        boolean rtl = c.isRTL();
         int x = c.getX();
         int y = c.getY();
         boolean antiAliased = g.isAntiAliased();
@@ -882,7 +885,7 @@ public final class RoundRectBorder extends Border {
                 if (s.getBgImage() == null) {
                     byte type = s.getBackgroundType();
                     if (type == Style.BACKGROUND_IMAGE_SCALED || type == Style.BACKGROUND_NONE) {
-                        GeneralPath gp = createShape(w, h);
+                        GeneralPath gp = createShape(w, h, rtl);
                         byte bgt = c.getStyle().getBgTransparency();
                         if (bgt != 0) {
                             int a = g.getAlpha();
@@ -926,7 +929,7 @@ public final class RoundRectBorder extends Border {
                         int shapeW = w - inset * 2;
                         int shapeH = h - inset * 2;
                         if (shapeW > 0 && shapeH > 0) {
-                            GeneralPath gp = createShape(shapeW, shapeH);
+                            GeneralPath gp = createShape(shapeW, shapeH, rtl);
                             int dx = Math.round((shadowX - 0.5f) * blurPx);
                             int dy = Math.max(1, Math.round((shadowY * 0.5f + 0.25f) * blurPx));
                             g.translate(x + inset, y + inset);
@@ -976,13 +979,17 @@ public final class RoundRectBorder extends Border {
         }
     }
 
-    private GeneralPath createShape(int shapeW, int shapeH) {
+    private GeneralPath createShape(int shapeW, int shapeH, boolean rtl) {
         GeneralPath gp = new GeneralPath();
         float radius = Display.getInstance().convertToPixels(cornerRadius);
         float x = 0;
         float y = 0;
         float widthF = shapeW;
         float heightF = shapeH;
+        boolean roundTopLeft = rtl ? topRight : topLeft;
+        boolean roundTopRight = rtl ? topLeft : topRight;
+        boolean roundBottomLeft = rtl ? bottomRight : bottomLeft;
+        boolean roundBottomRight = rtl ? bottomLeft : bottomRight;
 
         if (getTrackComponent() != null || trackComponentSide >= 0) {
             int ah = CN.convertToPixels(arrowSize);
@@ -1019,7 +1026,7 @@ public final class RoundRectBorder extends Border {
 
         }
 
-        if (topLeft) {
+        if (roundTopLeft) {
             gp.moveTo(x + radius, y);
         } else {
             gp.moveTo(x, y);
@@ -1037,7 +1044,7 @@ public final class RoundRectBorder extends Border {
             gp.lineTo(x + widthF - radius, y);
             gp.quadTo(x + widthF, y, x + widthF, y + radius);
         } else {
-            if (topRight) {
+            if (roundTopRight) {
                 gp.lineTo(x + widthF - radius, y);
                 gp.quadTo(x + widthF, y, x + widthF, y + radius);
             } else {
@@ -1045,7 +1052,7 @@ public final class RoundRectBorder extends Border {
             }
         }
 
-        if (bottomRight) {
+        if (roundBottomRight) {
             gp.lineTo(x + widthF, y + heightF - radius);
             gp.quadTo(x + widthF, y + heightF, x + widthF - radius, y + heightF);
         } else {
@@ -1066,7 +1073,7 @@ public final class RoundRectBorder extends Border {
             gp.lineTo(x + radius, y + heightF);
             gp.quadTo(x, y + heightF, x, y + heightF - radius);
         } else {
-            if (bottomLeft) {
+            if (roundBottomLeft) {
                 gp.lineTo(x + radius, y + heightF);
                 gp.quadTo(x, y + heightF, x, y + heightF - radius);
             } else {
@@ -1075,7 +1082,7 @@ public final class RoundRectBorder extends Border {
         }
 
 
-        if (topLeft) {
+        if (roundTopLeft) {
             gp.lineTo(x, y + radius);
             gp.quadTo(x, y, x + radius, y);
         } else {
@@ -1123,10 +1130,10 @@ public final class RoundRectBorder extends Border {
         return Display.getInstance().convertToPixels(shadowSpread) + Display.getInstance().convertToPixels(cornerRadius) * 2;
     }
 
-    private void drawShape(Graphics g, int color, int opacity, int width, int height) {
+    private void drawShape(Graphics g, int color, int opacity, int width, int height, boolean rtl) {
         g.setColor(color);
         g.setAlpha(opacity);
-        GeneralPath gp = createShape(width, height);
+        GeneralPath gp = createShape(width, height, rtl);
         if (stroke1 == null) {
             stroke1 = new Stroke(1f, Stroke.CAP_ROUND, Stroke.JOIN_MITER, 1f);
         }

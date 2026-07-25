@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
 package com.codename1.ui.plaf;
 
 import com.codename1.junit.FormTest;
@@ -8,6 +30,7 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.Stroke;
+import com.codename1.ui.geom.PathIterator;
 import com.codename1.ui.plaf.StyleParser.BorderInfo;
 import com.codename1.ui.plaf.StyleParser.FontInfo;
 import com.codename1.ui.plaf.StyleParser.ImageInfo;
@@ -116,6 +139,42 @@ class BorderAndPlafTest extends UITestBase {
         assertEquals(1.5f, bounds[1], 0.001f);
         assertEquals(17f, bounds[2], 0.001f);
         assertEquals(7f, bounds[3], 0.001f);
+    }
+
+    @FormTest
+    void testRoundRectBorderMirrorsAsymmetricCornersInRTL() {
+        RoundRectBorder border = RoundRectBorder.create()
+                .cornerRadius(4f)
+                .topLeftMode(false)
+                .bottomLeftMode(false)
+                .topRightMode(true)
+                .bottomRightMode(true);
+
+        Label label = new Label();
+        label.setRTL(true);
+        label.setWidth(30);
+        label.setHeight(20);
+        label.getStyle().setBackgroundType(Style.BACKGROUND_NONE);
+        label.getStyle().setBgTransparency(0xff);
+        label.getStyle().setBgColor(0);
+        label.getStyle().setBorder(border);
+
+        implementation.setShapeSupported(true);
+        implementation.resetShapeTracking();
+        border.paintBorderBackground(Image.createImage(30, 20).getGraphics(), label);
+
+        assertTrue(implementation.wasFillShapeInvoked());
+        PathIterator path = implementation.getLastFillShape().getPathIterator();
+        float[] coordinates = new float[6];
+        assertFalse(path.isDone(), "RTL shape should contain a move-to segment");
+        assertEquals(PathIterator.SEG_MOVETO, path.currentSegment(coordinates));
+        assertTrue(coordinates[0] > 0,
+                "RTL should start after the mirrored rounded top-left corner");
+        path.next();
+        assertFalse(path.isDone(), "RTL shape should contain a top-edge line segment");
+        assertEquals(PathIterator.SEG_LINETO, path.currentSegment(coordinates));
+        assertEquals(30f, coordinates[0], 0.001f,
+                "RTL should mirror the square top-left corner to the top-right");
     }
 
     @FormTest
