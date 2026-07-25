@@ -50,13 +50,47 @@ public class MaterialRenderElement extends SingleChildRenderElement {
 
     private void applyStyle(Component face) {
         try {
+            double radiusLp = cornerRadiusLp();
+            double elevation = material().getElevation();
+            if (radiusLp > 0 || elevation > 0) {
+                // Rounded corners and a shadow are what make a Material surface read as
+                // Material; a bare bgColor gives a flat rectangle.
+                com.codename1.ui.plaf.RoundRectBorder border =
+                        com.codename1.ui.plaf.RoundRectBorder.create()
+                                .useCache(false)
+                                .cornerRadius(com.codename1.flutter.rendering.Dp.mm(radiusLp));
+                if (elevation > 0) {
+                    border = border
+                            .shadowOpacity(Math.min(255, (int) Math.round(20 + elevation * 15)))
+                            .shadowSpread((float) Math.min(3, 0.25f + elevation * 0.25f))
+                            .shadowY(1);
+                }
+                face.getAllStyles().setBorder(border);
+            }
             if (material().getColor() != null) {
-                face.getAllStyles().setBgColor(material().getColor().rgb());
-                face.getAllStyles().setBgTransparency(material().getColor().alpha());
+                com.codename1.flutter.material.ThemeDataAdapter.paintColor(
+                        face.getAllStyles(), material().getColor());
+                if (radiusLp > 0 || elevation > 0) {
+                    // the border paints the fill; keep the flat bg from squaring it off
+                    face.getAllStyles().setBgTransparency(
+                            material().getColor().alpha() == 0 ? 0 : 255);
+                }
             }
         } catch (Exception err) {
             // best-effort
         }
+    }
+
+    /// The corner radius in logical pixels from the shape or an explicit borderRadius.
+    private double cornerRadiusLp() {
+        Object r = material().getShape() instanceof com.codename1.flutter.RoundedRectangleBorder
+                ? ((com.codename1.flutter.RoundedRectangleBorder) material().getShape()).getBorderRadius()
+                : material().getBorderRadius();
+        if (r instanceof com.codename1.flutter.BorderRadius) {
+            com.codename1.flutter.Radius tl = ((com.codename1.flutter.BorderRadius) r).topLeft();
+            return tl == null ? 0 : tl.x();
+        }
+        return 0;
     }
 
     @Override

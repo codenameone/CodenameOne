@@ -74,6 +74,16 @@ public class Material extends Widget {
         this.child = v;
     }
 
+    /// The shape given to this Material — a RoundedRectangleBorder carries the radius.
+    public Object getShape() {
+        return shape;
+    }
+
+    /// The borderRadius given directly (Material accepts either form).
+    public Object getBorderRadius() {
+        return borderRadius;
+    }
+
     public Color getColor() {
         return color;
     }
