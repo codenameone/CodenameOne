@@ -168,7 +168,11 @@ public class JavaScriptBuilder extends Executor {
                         }
                     });
             jsOutputZip = new File(buildDir, request.getMainClass() + "-js.zip");
-            zipDirectory(distDir, jsOutputZip, distDir.getName());
+            // Zip the dist FLAT. The bundle is meant to be unpacked directly
+            // into a web root, so a "<MainClass>-js/" wrapper only forces every
+            // consumer to flatten it first. (The old cloud/TeaVM bundle was flat
+            // too, so this also keeps deployment scripts working across both.)
+            zipDirectory(distDir, jsOutputZip, null);
             log("Wrote browser bundle to " + jsOutputZip);
             return true;
         } catch (BuildException ex) {
@@ -889,7 +893,13 @@ public class JavaScriptBuilder extends Executor {
             return;
         }
         String rel = base.relativize(current.toPath()).toString().replace(File.separatorChar, '/');
-        String entryName = rootEntryName + "/" + rel;
+        // A null/empty root means "no wrapper directory", so the zip unpacks
+        // straight into a web root -- which is what a deployable bundle should
+        // do. Anything else nests the whole app under one directory that every
+        // consumer then has to flatten by hand.
+        String entryName = (rootEntryName == null || rootEntryName.isEmpty())
+                ? rel
+                : rootEntryName + "/" + rel;
         ZipEntry entry = new ZipEntry(entryName);
         zos.putNextEntry(entry);
         FileInputStream fis = new FileInputStream(current);

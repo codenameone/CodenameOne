@@ -112,7 +112,7 @@ public class ByteCodeTranslator {
                 if(f.getName().endsWith(".class")) {
                     Parser.parse(f);
                 } else {
-                    if(!f.isDirectory()) {
+                    if(!f.isDirectory() && !isBuildMetadata(f.getName())) {
                         // copy the file to the dest dir
                         copy(Files.newInputStream(f.toPath()), Files.newOutputStream(new File(outputDir, f.getName()).toPath()));
                     }
@@ -1212,6 +1212,20 @@ public class ByteCodeTranslator {
      * @param i source
      * @param o destination
      */
+    /**
+     * Build descriptors that ride along inside an application jar's META-INF
+     * but are not application resources. Every non-class input file is copied
+     * into the output by basename, so without this filter a Maven-built app
+     * leaks its pom.xml (dependency list and all), pom.properties and
+     * MANIFEST.MF into the bundle -- and for the JavaScript target that bundle
+     * IS a public document root.
+     */
+    private static boolean isBuildMetadata(String name) {
+        return "pom.xml".equals(name)
+                || "pom.properties".equals(name)
+                || "MANIFEST.MF".equals(name);
+    }
+
     public static void copy(InputStream i, OutputStream o) throws IOException {
         copy(i, o, 8192);
     }
