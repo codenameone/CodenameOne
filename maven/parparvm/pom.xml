@@ -218,11 +218,34 @@
                                            property="cn1.jsport.webapp.present"/>
                                 <fail unless="cn1.jsport.webapp.present"
                                       message="JavaScript-port webapp not found at ${codename1.javascriptport.webapp.dir} (expected port.js). Build from a full Codename One checkout, or point the build at the webapp with -Dcodename1.javascriptport.webapp.dir=/path/to/Ports/JavaScriptPort/src/main/webapp."/>
+                                <!-- Ant's jar task treats an existing archive as up to date when
+                                     it is newer than every input file, so on an incremental build
+                                     a change to the include/exclude list below is silently
+                                     ignored and a stale jar ships. Delete it first. -->
+                                <delete file="${project.build.directory}/bundle/JavaScriptPort.jar" quiet="true"/>
                                 <jar destfile="${project.build.directory}/bundle/JavaScriptPort.jar">
                                     <fileset dir="${project.build.directory}/javascript-port-classes"/>
                                     <zipfileset dir="${codename1.javascriptport.webapp.dir}" prefix="webapp">
                                         <exclude name="index.html"/>
                                         <exclude name="WEB-INF/**"/>
+                                        <!-- Demo/test fixtures used by the port's own in-repo test
+                                             app. They are NOT referenced by any port or core class,
+                                             yet the translator copies webapp/assets into every app
+                                             it builds, so shipping them here put ~3.6MB of dead
+                                             weight (a 2.1MB leather theme, a 666KB sample video)
+                                             into every JavaScript app's public web root. They stay
+                                             in the source tree, so in-repo builds and the
+                                             javascript-screenshots suite still see them.
+                                             The system themes assets/ must keep are the ones
+                                             HTML5Implementation.getNativeTheme() resolves:
+                                             iOS7Theme.res, iPhoneTheme.res, iOSModernTheme.res,
+                                             android_holo_light.res and tzone_theme.res. -->
+                                        <exclude name="assets/leather.res"/>
+                                        <exclude name="assets/chrome.res"/>
+                                        <exclude name="assets/video.mp4"/>
+                                        <exclude name="assets/test.json"/>
+                                        <exclude name="assets/Page.html"/>
+                                        <exclude name="assets/Handlee-Regular.ttf"/>
                                     </zipfileset>
                                 </jar>
                                 <zip destfile="${project.build.directory}/${project.build.finalName}-bundle.jar">
