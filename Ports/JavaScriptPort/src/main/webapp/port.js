@@ -2071,19 +2071,38 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag_java_lan
   return flags[jvm.toNativeString(name)] ? 1 : 0;
 });
 
+// A host call whose handler is absent is rejected by browser_bridge.js with
+// "Unhandled host call <symbol>" (see its dispatch fallback). browser_bridge.js
+// ships from the translator while this file ships from JavaScriptPort.jar, so a
+// page built against an older bridge can lack a handler this file already uses.
+// Detect that specific rejection so callers can degrade, without swallowing a
+// genuine failure reported BY a handler that does exist.
+function isUnhandledHostCall(err, symbol) {
+  const message = err && err.message ? String(err.message) : String(err == null ? "" : err);
+  return message.indexOf("Unhandled host call") >= 0 && message.indexOf(symbol) >= 0;
+}
+
 // The backside-hook queue (window.cn1NativeBacksideHooks, filled by
 // window.cn1RunOnMainThread in js/fontmetrics.js) lives on the MAIN thread and
 // holds main-thread closures. Draining it from the worker -- where `window` is
 // the worker global and the array does not exist -- threw
 // "Cannot read properties of undefined (reading 'length')" on every poll, so
-// route the drain to the host.
+// route the drain to the host. A missing handler (older browser_bridge.js) is a
+// no-op rather than a hard failure: there is nothing drainable on this side
+// anyway, and the poll runs on a timer, so throwing would break it repeatedly.
 bindNative([
   "cn1_com_codename1_impl_html5_HTML5Implementation_runPendingNativeBacksideHooks"
 ], function*() {
   if (typeof jvm.invokeHostNative !== "function") {
     return null;
   }
-  yield jvm.invokeHostNative("__cn1_run_backside_hooks__", []);
+  try {
+    yield jvm.invokeHostNative("__cn1_run_backside_hooks__", []);
+  } catch (err) {
+    if (!isUnhandledHostCall(err, "__cn1_run_backside_hooks__")) {
+      throw err;
+    }
+  }
   return null;
 });
 
@@ -2102,9 +2121,23 @@ bindNative([
     return null;
   }
   if (typeof jvm.invokeHostNative !== "function") {
+    eval(src);
     return null;
   }
-  yield jvm.invokeHostNative("__cn1_eval_on_main__", [{ script: src }]);
+  try {
+    yield jvm.invokeHostNative("__cn1_eval_on_main__", [{ script: src }]);
+  } catch (err) {
+    if (!isUnhandledHostCall(err, "__cn1_eval_on_main__")) {
+      // A real failure from the page-side eval. Propagate it, exactly as the
+      // in-worker eval(js) used to -- and do NOT re-run the script here, which
+      // would repeat whatever side effects it already had.
+      throw err;
+    }
+    // Older browser_bridge.js without the handler: fall back to the legacy
+    // worker-side eval. DOM-touching scripts still fail there (that is the bug
+    // this binding fixes), but everything else keeps working.
+    eval(src);
+  }
   return null;
 });
 
