@@ -32,8 +32,10 @@ class JavascriptCn1CoreCompletenessTest {
         Path distDir = translateCn1CoreSlice(config);
         assertTrue(Files.exists(distDir.resolve("translated_app.js")),
                 "Translator should emit translated JS for the Codename One core slice");
-        assertTrue(Files.exists(distDir.resolve("vm_protocol.md")),
-                "Translator should emit the VM protocol artifact for the Codename One core slice");
+        // vm_protocol.md is a developer artifact and is no longer written into
+        // the bundle by default (it would ship into the app's public web root);
+        // -Dparparvm.js.diagnostics brings it back. "Did the translator run"
+        // is already covered by translated_app.js above.
 
         String translatedApp = new String(Files.readAllBytes(distDir.resolve("translated_app.js")), StandardCharsets.UTF_8);
         assertTrue(translatedApp.contains("JsCodenameOneCoreSliceApp"),

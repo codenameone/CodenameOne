@@ -56,7 +56,20 @@ class JavascriptTargetIntegrationTest {
         compileAgainstJavaApi(config, sourceDir, classesDir, javaApiDir);
 
         Path outputDir = Files.createTempDirectory("js-target-output");
-        runJavascriptTranslator(classesDir, outputDir, "JsHello");
+        // vm_protocol.md is a developer artifact and is no longer written into
+        // the bundle by default -- the bundle is an app's public web root. The
+        // assertions below still cover it, so ask for it explicitly.
+        String prevDiagnostics = System.getProperty("parparvm.js.diagnostics");
+        System.setProperty("parparvm.js.diagnostics", "1");
+        try {
+            runJavascriptTranslator(classesDir, outputDir, "JsHello");
+        } finally {
+            if (prevDiagnostics == null) {
+                System.clearProperty("parparvm.js.diagnostics");
+            } else {
+                System.setProperty("parparvm.js.diagnostics", prevDiagnostics);
+            }
+        }
 
         Path distDir = outputDir.resolve("dist").resolve("JsHello-js");
         assertTrue(Files.exists(distDir.resolve("index.html")), "Translator should emit a minimal host page");

@@ -202,6 +202,43 @@ public class JavaScriptBuilder extends Executor {
         unzip(sourceZip, stageClasses, stageClasses, stageClasses);
     }
 
+    /**
+     * Strip optional parts of the port webapp from the staged copy, so the
+     * translator never copies them into the app's bundle.
+     *
+     * <p>video.js + RecordRTC (~944KB) are only ever pulled in by
+     * {@code VideoJS.init()}, which {@code HTML5Implementation.captureVideo()}
+     * calls behind a try/catch: without them it logs "VideoJS is not loaded,
+     * using default captureVideo behaviour. Add the javascript.includeVideoJS
+     * build hint..." and falls back. So the hint already described an opt-in
+     * that nothing on the build side implemented -- every app paid for the
+     * library whether or not it captured video. Honour the hint.
+     *
+     * <p>samplerate.min.js (~485KB) is unconditional dead weight: nothing
+     * loads it by path. js/fontmetrics.js only probes for an already-defined
+     * {@code Samplerate} global ("use libsamplerate if it is available"), and
+     * no script tag, ScriptTool call or bridge ever defines one.
+     */
+    private void pruneOptionalPortAssets(File webApp, BuildRequest request) {
+        File js = new File(webApp, "js");
+        if (!js.isDirectory()) {
+            return;
+        }
+        String includeVideoJs = request.getArg("javascript.includeVideoJS", "false");
+        if (!"true".equalsIgnoreCase(includeVideoJs)) {
+            File videojs = new File(js, "videojs");
+            if (videojs.isDirectory()) {
+                delTree(videojs, true);
+                debug("Omitting js/videojs (set the javascript.includeVideoJS "
+                        + "build hint to bundle the video capture libraries)");
+            }
+        }
+        File samplerate = new File(js, "samplerate.min.js");
+        if (samplerate.isFile()) {
+            samplerate.delete();
+        }
+    }
+
     private File locateJavaScriptPortSources(BuildRequest request) {
         String explicit = request.getArg("javascript.portSources", null);
         if (explicit != null && explicit.trim().length() > 0) {
@@ -270,6 +307,7 @@ public class JavaScriptBuilder extends Executor {
                         delTree(stagedWebApp, true);
                     }
                     jsPortWebApp = dest;
+                    pruneOptionalPortAssets(dest, request);
                 }
                 return stageClasses;
             } finally {

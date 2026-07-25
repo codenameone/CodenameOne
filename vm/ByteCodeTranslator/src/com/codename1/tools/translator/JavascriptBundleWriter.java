@@ -34,8 +34,26 @@ final class JavascriptBundleWriter {
         writeWorker(outputDirectory);
         writeBrowserBridge(outputDirectory);
         writeIndex(outputDirectory);
-        writeProtocol(outputDirectory);
-        writeJsoBridgeManifest(outputDirectory, classes);
+        // vm_protocol.md and jso-bridge-dispatch-ids.txt are developer
+        // artifacts, and this output directory becomes the app's PUBLIC web
+        // root. vm_protocol.md documents the worker boundary and is checked in
+        // at vm/ByteCodeTranslator/src/javascript/vm_protocol.md, so copying it
+        // into every deployed app just published documentation that nobody
+        // reads from there. jso-bridge-dispatch-ids.txt is a sidecar for the
+        // OPT-IN dispatch-id mangler (-Dparparvm.js.manglesigs=1) and nothing
+        // reads the emitted file at all. Emit both only when asked.
+        if (emitDiagnostics()) {
+            writeProtocol(outputDirectory);
+            writeJsoBridgeManifest(outputDirectory, classes);
+        }
+    }
+
+    /**
+     * {@code -Dparparvm.js.diagnostics=1} re-enables the developer-only
+     * artifacts alongside the bundle.
+     */
+    static boolean emitDiagnostics() {
+        return System.getProperty("parparvm.js.diagnostics") != null;
     }
 
     /**
