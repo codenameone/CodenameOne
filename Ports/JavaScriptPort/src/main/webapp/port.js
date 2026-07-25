@@ -2071,6 +2071,43 @@ bindNative(["cn1_com_codename1_impl_html5_HTML5Implementation_debugFlag_java_lan
   return flags[jvm.toNativeString(name)] ? 1 : 0;
 });
 
+// The backside-hook queue (window.cn1NativeBacksideHooks, filled by
+// window.cn1RunOnMainThread in js/fontmetrics.js) lives on the MAIN thread and
+// holds main-thread closures. Draining it from the worker -- where `window` is
+// the worker global and the array does not exist -- threw
+// "Cannot read properties of undefined (reading 'length')" on every poll, so
+// route the drain to the host.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_runPendingNativeBacksideHooks"
+], function*() {
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  yield jvm.invokeHostNative("__cn1_run_backside_hooks__", []);
+  return null;
+});
+
+// Display.execute("javascript:...") -> HTML5Implementation.eval_(js). The
+// stock @JSBody body is a bare ``eval(js)``, which runs inside the WORKER:
+// there is no document there and ``window`` is the worker global, so any
+// script that touches the DOM (the common case -- installing a listener,
+// appending an iframe, reading document.hidden) dies with
+// "document is not defined". Route it to the main thread instead, where the
+// page's real window/document live.
+bindNative([
+  "cn1_com_codename1_impl_html5_HTML5Implementation_eval__java_lang_String"
+], function*(js) {
+  const src = js == null ? "" : jvm.toNativeString(js);
+  if (!src) {
+    return null;
+  }
+  if (typeof jvm.invokeHostNative !== "function") {
+    return null;
+  }
+  yield jvm.invokeHostNative("__cn1_eval_on_main__", [{ script: src }]);
+  return null;
+});
+
 // The clipboard is unreachable from the worker (no document/execCommand, and
 // navigator.clipboard is Window-only), so route the write to the main thread
 // host bridge, which performs it within the forwarded click's user activation.
@@ -2776,21 +2813,11 @@ bindNative([
   }) |0;
 });
 
-bindCiFallback("Display.setProperty", [
-  "cn1_com_codename1_ui_Display_setProperty_java_lang_String_java_lang_String"
-], function*(__cn1ThisObject, key, value) {
-  if (!__cn1ThisObject) {
-    return null;
-  }
-  const map = __cn1ThisObject.__cn1RuntimeProperties || (__cn1ThisObject.__cn1RuntimeProperties = Object.create(null));
-  const k = key == null ? "" : jvm.toNativeString(key);
-  if (value == null) {
-    delete map[k];
-  } else {
-    map[k] = jvm.toNativeString(value);
-  }
-  return null;
-});
+// Display.setProperty is intentionally left to the translated Java method so
+// it stays in sync with Display.getProperty (see the note next to the former
+// Display.getProperty fallback below). The real method also routes special
+// keys such as "AppArg" (deep-link dispatch) and "blockOverdraw" into the
+// implementation, which a JS-map-only override silently swallowed.
 
 // The JSAffineTransform matrix is stored as { m00, m10, m01, m11, m02, m12 }
 // — plain fields, no accessor methods. The earlier version of this fallback
@@ -2879,16 +2906,17 @@ bindCiFallback("BrowserDomRenderingBackend.createCrossOriginImageElement", [
   return jvm.wrapJsObject(hostImage, "com_codename1_html5_js_dom_HTMLImageElement");
 });
 
-bindCiFallback("Display.getProperty", [
-  "cn1_com_codename1_ui_Display_getProperty_java_lang_String_java_lang_String_R_java_lang_String"
-], function*(__cn1ThisObject, key, defaultValue) {
-  const map = __cn1ThisObject && __cn1ThisObject.__cn1RuntimeProperties;
-  const k = key == null ? "" : jvm.toNativeString(key);
-  if (map && Object.prototype.hasOwnProperty.call(map, k)) {
-    return jvm.createStringLiteral(map[k]);
-  }
-  return defaultValue || null;
-});
+// Display.getProperty / Display.setProperty are deliberately NOT overridden
+// here. An earlier fallback pair kept properties in a JS-side map and
+// answered getProperty from that map alone, returning defaultValue on a
+// miss. That silently dropped the ``return impl.getProperty(key,
+// defaultValue)`` tail of the real Display.getProperty, so EVERY
+// implementation-provided key (browser.window.location.*, os.gzip,
+// browser.timezone, HTML5.platformName, ...) came back as the default.
+// Apps that resolve their API base from ``browser.window.location.origin``
+// then got "" and built relative URLs, which ConnectionRequest rejects with
+// "Only HTTP urls are supported!". The translated Display methods already
+// handle both the local-property map and the impl delegation.
 
 bindCiFallback("Display.addEdtErrorHandler", [
   "cn1_com_codename1_ui_Display_addEdtErrorHandler_com_codename1_ui_events_ActionListener"

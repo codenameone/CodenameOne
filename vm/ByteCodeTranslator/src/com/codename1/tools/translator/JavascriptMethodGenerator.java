@@ -5685,7 +5685,23 @@ private static void appendJsBodyMethod(StringBuilder out, ByteCodeClass cls, Byt
                 String paramName = params[i];
                 int argIndex = paramOffset + i;
                 ByteCodeMethodArg argType = i < arguments.size() ? arguments.get(i) : null;
-                if (argType != null && argType.isObject()) {
+                if (argType != null && argType.isObject()
+                        && argType.getArrayDimensions() == 0
+                        && "java_lang_String".equals(argType.getTypeName())) {
+                    // A java.lang.String argument must reach the hand-written
+                    // JSBody script as a REAL JS string. jvm.unwrapJsValue only
+                    // unwraps ``__jsValue`` holders, so a Java String instance
+                    // passed straight through arrives as an object: the script
+                    // then sees "[object Object]" and every use of it -- a
+                    // property lookup (``u[part]``), an === comparison, string
+                    // concatenation -- silently misbehaves. (This is what made
+                    // HTML5Implementation.mainLocationPart("origin") return ""
+                    // and, in turn, Display.getProperty("browser.window.location.
+                    // origin") answer empty.) Null stays null rather than
+                    // becoming the literal "null" that toNativeString yields.
+                    out.append("let ").append(paramName).append(" = __cn1Arg").append(argIndex + 1)
+                       .append(" == null ? null : jvm.toNativeString(__cn1Arg").append(argIndex + 1).append("); ");
+                } else if (argType != null && argType.isObject()) {
                     out.append("let ").append(paramName).append(" = jvm.unwrapJsValue(__cn1Arg").append(argIndex + 1).append("); ");
                 } else {
                     out.append("let ").append(paramName).append(" = __cn1Arg").append(argIndex + 1).append("; ");
