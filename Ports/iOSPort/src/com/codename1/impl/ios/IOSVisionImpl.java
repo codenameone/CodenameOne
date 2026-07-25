@@ -85,13 +85,25 @@ public final class IOSVisionImpl extends VisionImpl {
                     "Apple Vision requires encoded, NV21, or RGBA8888 input"));
             return out;
         }
+        analyzeInBackground(out, feature, mlKit, input,
+                image.getRotationDegrees(), width, height, frameFormat);
+        return out;
+    }
+
+    private static <T> void analyzeInBackground(final AsyncResource<T> out,
+                                                 final VisionFeature feature,
+                                                 final boolean mlKit,
+                                                 final byte[] input,
+                                                 final int rotation,
+                                                 final int width,
+                                                 final int height,
+                                                 final int frameFormat) {
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             public void run() {
                 try {
                     String json = IOSImplementation.nativeInstance.cn1VisionAnalyze(
                             input, feature.ordinal(), mlKit,
-                            image.getRotationDegrees(), width, height,
-                            frameFormat);
+                            rotation, width, height, frameFormat);
                     if (json == null || json.length() == 0) {
                         throw new VisionException(VisionException.BACKEND_ERROR,
                                 "Apple Vision returned no result");
@@ -114,7 +126,6 @@ public final class IOSVisionImpl extends VisionImpl {
                 }
             }
         });
-        return out;
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

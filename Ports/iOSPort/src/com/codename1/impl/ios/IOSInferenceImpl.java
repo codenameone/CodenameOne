@@ -63,6 +63,13 @@ public final class IOSInferenceImpl extends InferenceImpl {
     public AsyncResource<Object> open(final ModelSource source,
                                       final InferenceOptions options) {
         final AsyncResource<Object> out = new AsyncResource<Object>();
+        openInBackground(out, source, options);
+        return out;
+    }
+
+    private static void openInBackground(final AsyncResource<Object> out,
+                                         final ModelSource source,
+                                         final InferenceOptions options) {
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             public void run() {
                 try {
@@ -81,7 +88,6 @@ public final class IOSInferenceImpl extends InferenceImpl {
                 }
             }
         });
-        return out;
     }
 
     @Override
@@ -98,6 +104,13 @@ public final class IOSInferenceImpl extends InferenceImpl {
     public AsyncResource<Tensor[]> run(Object handle, final Tensor[] inputs) {
         final AsyncResource<Tensor[]> out = new AsyncResource<Tensor[]>();
         final Handle checked = checked(handle);
+        runInBackground(out, checked, inputs);
+        return out;
+    }
+
+    private static void runInBackground(final AsyncResource<Tensor[]> out,
+                                        final Handle checked,
+                                        final Tensor[] inputs) {
         final int id = checked.id;
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
             public void run() {
@@ -126,7 +139,6 @@ public final class IOSInferenceImpl extends InferenceImpl {
                 }
             }
         });
-        return out;
     }
 
     @Override

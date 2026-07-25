@@ -56,6 +56,11 @@ public final class IOSLanguageImpl extends LanguageImpl {
     @Override
     public AsyncResource<LanguageCandidate[]> identify(
             final String text, String backendId, final LanguageOptions options) {
+        return identifyInBackground(text, options);
+    }
+
+    private static AsyncResource<LanguageCandidate[]> identifyInBackground(
+            final String text, final LanguageOptions options) {
         final AsyncResource<LanguageCandidate[]> out =
                 new AsyncResource<LanguageCandidate[]>();
         run(out, new NativeCall<LanguageCandidate[]>() {
@@ -82,6 +87,12 @@ public final class IOSLanguageImpl extends LanguageImpl {
             final String text, final String sourceLanguage,
             final String targetLanguage, String backendId,
             LanguageOptions options) {
+        return translateInBackground(text, sourceLanguage, targetLanguage);
+    }
+
+    private static AsyncResource<String> translateInBackground(
+            final String text, final String sourceLanguage,
+            final String targetLanguage) {
         final AsyncResource<String> out = new AsyncResource<String>();
         run(out, new NativeCall<String>() {
             public String call() throws Exception {
@@ -97,8 +108,12 @@ public final class IOSLanguageImpl extends LanguageImpl {
     public AsyncResource<String[]> suggestReplies(
             SmartReplyMessage[] conversation, String backendId,
             LanguageOptions options) {
+        return suggestRepliesInBackground(conversationJson(conversation));
+    }
+
+    private static AsyncResource<String[]> suggestRepliesInBackground(
+            final String json) {
         final AsyncResource<String[]> out = new AsyncResource<String[]>();
-        final String json = conversationJson(conversation);
         run(out, new NativeCall<String[]>() {
             public String[] call() throws Exception {
                 Map root = parse(IOSImplementation.nativeInstance
