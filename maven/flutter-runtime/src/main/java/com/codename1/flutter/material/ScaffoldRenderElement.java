@@ -7,6 +7,7 @@ import com.codename1.flutter.rendering.Dp;
 import com.codename1.flutter.rendering.FlutterRootLayout;
 import com.codename1.flutter.rendering.RenderHost;
 import com.codename1.flutter.rendering.Size;
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Toolbar;
@@ -62,6 +63,68 @@ public class ScaffoldRenderElement extends RenderElement {
 
     private Scaffold scaffold() {
         return (Scaffold) widget();
+    }
+
+    /**
+     * The Scaffold's own face: an opaque fill covering its bounds, which the
+     * children then paint over (they attach after it in tree order).
+     *
+     * <p>Flutter's Scaffold is a Material — it is <em>opaque</em>, not a
+     * transparent frame. That matters whenever two Scaffolds are stacked, as
+     * in a backdrop: without the fill, the page underneath shows through every
+     * gap between the front page's children.</p>
+     */
+    @Override
+    protected Component createComponent() {
+        if (!com.codename1.ui.Display.isInitialized()) {
+            return null;
+        }
+        Container face = new Container();
+        face.setUIID("FlutterScaffold");
+        face.getAllStyles().setPadding(0, 0, 0, 0);
+        face.getAllStyles().setMargin(0, 0, 0, 0);
+        applyBackground(face);
+        return face;
+    }
+
+    @Override
+    protected void updateComponent(Component c) {
+        applyBackground(c);
+    }
+
+    @Override
+    public void themeChanged() {
+        super.themeChanged();
+        if (component() != null) {
+            applyBackground(component());
+        }
+    }
+
+    private void applyBackground(Component face) {
+        com.codename1.flutter.Color bg = effectiveBackground();
+        if (bg != null) {
+            ThemeDataAdapter.paintSolid(face.getAllStyles(), bg.rgb());
+        }
+    }
+
+    /**
+     * {@code Scaffold.backgroundColor} when given, else the theme's
+     * {@code scaffoldBackgroundColor}, else {@code colorScheme.background} —
+     * Flutter's own resolution order.
+     */
+    private com.codename1.flutter.Color effectiveBackground() {
+        if (scaffold().getBackgroundColor() != null) {
+            return scaffold().getBackgroundColor();
+        }
+        try {
+            ThemeData theme = Theme.of(this);
+            if (theme.scaffoldBackgroundColor() != null) {
+                return theme.scaffoldBackgroundColor();
+            }
+            return theme.colorScheme().background();
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     @Override

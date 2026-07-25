@@ -28,9 +28,10 @@ import java.util.Map;
  *       fgColor, FlutterIconButton fgColor</li>
  *   <li>colorScheme.primary/onPrimary — FlutterElevatedButton bg/fg;
  *       primary — FlutterTextButton/FlutterOutlinedButton fg</li>
- *   <li>colorScheme.inversePrimary — FlutterAppBar bgColor (the strip-mode
- *       app bar; toolbar mode is styled per-instance by
- *       AppBarRenderElement)</li>
+ *   <li>colorScheme.surface/onSurface — FlutterAppBar bg/fg: a Material 3 app
+ *       bar sits on the surface with an elevation tint rather than a saturated
+ *       fill (this is the strip-mode bar; toolbar mode is styled per-instance
+ *       by AppBarRenderElement, to the same default)</li>
  * </ul>
  *
  * <p>State-metric invariance (see RenderElement.unifyStateMetrics): the

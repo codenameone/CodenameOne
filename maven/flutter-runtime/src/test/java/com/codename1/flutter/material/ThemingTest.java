@@ -45,7 +45,10 @@ public class ThemingTest {
         assertEquals(ThemeDataAdapter.hex(t.colorScheme().onSurface()), p.get("FlutterText.fgColor"));
         assertEquals(ThemeDataAdapter.hex(t.colorScheme().primary()), p.get("FlutterElevatedButton.bgColor"));
         assertEquals(ThemeDataAdapter.hex(t.colorScheme().onPrimary()), p.get("FlutterElevatedButton.fgColor"));
-        assertEquals(ThemeDataAdapter.hex(t.colorScheme().inversePrimary()), p.get("FlutterAppBar.bgColor"));
+        // M3: the app bar sits on the surface with an elevation tint, not a
+        // saturated fill (matches AppBarRenderElement's per-instance default)
+        assertEquals(ThemeDataAdapter.hex(t.colorScheme().surface()), p.get("FlutterAppBar.bgColor"));
+        assertEquals(ThemeDataAdapter.hex(t.colorScheme().onSurface()), p.get("FlutterAppBar.fgColor"));
     }
 
     @Test
