@@ -255,9 +255,22 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
         }
     }
 
+    /**
+     * The raw response-header blob, never null. XMLHttpRequest's
+     * getAllResponseHeaders() is specified to return null when no response
+     * has been received yet (state UNSENT/OPENED), and it also comes back
+     * empty for an opaque/cross-origin response. Feeding that null straight
+     * into StringUtil.tokenize threw a NullPointerException out of the
+     * connection callback, which aborted the request the app was waiting on.
+     */
+    private String allResponseHeaders() {
+        String headers = req == null ? null : req.getAllResponseHeaders();
+        return headers == null ? "" : headers;
+    }
+
     public String[] getHeaderFieldNames() {
         List<String> out = new ArrayList<String>();
-        List<String> headerStrings =  StringUtil.tokenize(req.getAllResponseHeaders(), "\n");
+        List<String> headerStrings =  StringUtil.tokenize(allResponseHeaders(), "\n");
         for (String str : headerStrings){
             int colonPos = str.indexOf(":");
             if (colonPos < 0) {
@@ -281,7 +294,7 @@ public class NetworkConnection implements JavaScriptNetworkAdapter.Connection {
     private native static void log(String str);
     
     public String[] getHeaderFields(String name) {
-        List<String> flds =  StringUtil.tokenize(req.getAllResponseHeaders(), "\n");
+        List<String> flds =  StringUtil.tokenize(allResponseHeaders(), "\n");
         List<String> out = new ArrayList<String>();
         
         

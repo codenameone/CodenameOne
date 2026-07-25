@@ -2350,6 +2350,65 @@
     return ok;
   }
 
+  // ``window.cn1NativeBacksideHooks`` is the queue fed by
+  // ``window.cn1RunOnMainThread(cb)`` in js/fontmetrics.js -- a MAIN-THREAD
+  // script. The callbacks in it are main-thread closures (they touch the DOM,
+  // drive downloads inside a user gesture, ...), so the queue only exists here
+  // and can only be drained here. HTML5Implementation.runPendingNativeBacksideHooks
+  // used to drain it from inside the worker, where `window` is the worker
+  // global and the array is undefined -- that threw
+  // "Cannot read properties of undefined (reading 'length')" out of every
+  // backside-hook poll.
+  hostBridge.register('__cn1_run_backside_hooks__', function() {
+    var win = global.window || global;
+    var hooks = win ? win.cn1NativeBacksideHooks : null;
+    if (!hooks || typeof hooks.length !== 'number') {
+      return null;
+    }
+    while (hooks.length > 0) {
+      var f = hooks.shift();
+      try {
+        if (typeof f === 'function') {
+          f();
+        }
+      } catch (err) {
+        try {
+          console.log(err);
+        } catch (ignored) { /* console unavailable */ }
+      }
+    }
+    return null;
+  });
+
+  // Display.execute("javascript:...") has to run in the PAGE, not in the
+  // worker: the worker has no document and its `window` is the worker global,
+  // so evaluating there breaks every script that touches the DOM -- which is
+  // most of what the javascript: form is used for. Evaluate on the main thread
+  // and hand back a string form of the result when there is one.
+  hostBridge.register('__cn1_eval_on_main__', function(request) {
+    var src = (request && request.script != null) ? String(request.script) : '';
+    if (!src) {
+      return null;
+    }
+    try {
+      // Indirect eval so the script runs in global scope, exactly like a
+      // <script> in the page would (var/function declarations land on window).
+      var result = (0, eval)(src);
+      return result == null ? null : String(result);
+    } catch (err) {
+      // Log for the developer, then rethrow. The old in-worker
+      // ``@JSBody(script="eval(js)")`` let a broken script propagate into
+      // Java, and the host-call dispatcher turns a thrown handler error into
+      // an error callback -- so rethrowing keeps that contract instead of
+      // silently reporting success for a script that never ran.
+      try {
+        console.error('cn1 execute("javascript:") failed: '
+            + (err && err.message ? err.message : err));
+      } catch (ignored) { /* console unavailable */ }
+      throw err;
+    }
+  });
+
   hostBridge.register('__cn1_copy_to_clipboard__', function(request) {
     var text = (request && request.text != null) ? String(request.text) : '';
     var nav = global.navigator || (global.window && global.window.navigator);

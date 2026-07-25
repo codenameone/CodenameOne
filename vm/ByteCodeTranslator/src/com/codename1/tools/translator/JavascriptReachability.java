@@ -89,6 +89,15 @@ final class JavascriptReachability {
         "java_lang_ArithmeticException",
         "java_lang_ClassCastException",
         "java_lang_NegativeArraySizeException",
+        // Class objects are manufactured by the runtime (the per-class
+        // singletons parparvm_runtime.js hands to getClass() / class
+        // literals), never by a NEW instruction, so RTA would otherwise
+        // never mark java_lang_Class instantiated and would cull EVERY
+        // virtual method on it -- newInstance() (reached from
+        // Form.initLaf via LookAndFeel.getMenuBarClass()), getName(),
+        // isInstance(). Those calls then blow up at runtime with
+        // "Missing virtual method cn1_s_... on java_lang_Class".
+        "java_lang_Class",
         "java_lang_Object"
     };
 
