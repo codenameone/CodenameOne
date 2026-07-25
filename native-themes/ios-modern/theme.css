@@ -1012,14 +1012,14 @@ ChatBubbleRow { background-color: transparent; padding: 1mm 2mm; margin: 0; }
 ChatBubbleUser {
     background-color: var(--accent-color, #007aff);
     color: var(--accent-on-color, #ffffff);
-    padding: 2mm 3mm;
+    padding: 3mm 3mm;
     margin: 0.5mm 0;
     border-radius: 4mm;
 }
 ChatBubbleAssistant {
     background-color: #e5e5ea;
     color: #000000;
-    padding: 2mm 3mm;
+    padding: 3mm 3mm;
     margin: 0.5mm 0;
     border-radius: 4mm;
 }
