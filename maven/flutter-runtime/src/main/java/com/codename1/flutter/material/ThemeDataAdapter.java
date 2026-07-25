@@ -147,6 +147,30 @@ public final class ThemeDataAdapter {
     }
 
     /**
+     * Paints a Flutter {@link Color}, <b>honoring its alpha</b>.
+     *
+     * <p>{@code Colors.transparent} is {@code 0x00000000} — alpha 0 over black —
+     * and the gallery uses it for app bars and scaffolds that should show what
+     * is behind them. Painting only the RGB word turns every one of those into
+     * an opaque black band, so the alpha has to carry through: fully
+     * transparent means paint nothing at all.</p>
+     */
+    public static void paintColor(Style s, Color c) {
+        if (c == null) {
+            return;
+        }
+        int alpha = c.alpha();
+        if (alpha <= 0) {
+            s.setBackgroundType(Style.BACKGROUND_NONE);
+            s.setBgTransparency(0);
+            return;
+        }
+        s.setBackgroundType(Style.BACKGROUND_NONE);
+        s.setBgColor(c.rgb());
+        s.setBgTransparency(alpha);
+    }
+
+    /**
      * CN1 theme hex string for a color's 24-bit RGB portion.
      */
     public static String hex(Color c) {

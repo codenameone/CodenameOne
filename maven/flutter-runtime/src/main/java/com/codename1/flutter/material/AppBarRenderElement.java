@@ -92,7 +92,7 @@ public class AppBarRenderElement extends SingleChildRenderElement {
     private void applyStripStyle(Component strip) {
         com.codename1.flutter.Color bg = effectiveBackground();
         if (bg != null) {
-            ThemeDataAdapter.paintSolid(strip.getAllStyles(), bg.rgb());
+            ThemeDataAdapter.paintColor(strip.getAllStyles(), bg);
         }
     }
 
@@ -111,7 +111,7 @@ public class AppBarRenderElement extends SingleChildRenderElement {
         }
         com.codename1.flutter.Color bg = effectiveBackground();
         if (bg != null) {
-            ThemeDataAdapter.paintSolid(tb.getAllStyles(), bg.rgb());
+            ThemeDataAdapter.paintColor(tb.getAllStyles(), bg);
         }
     }
 

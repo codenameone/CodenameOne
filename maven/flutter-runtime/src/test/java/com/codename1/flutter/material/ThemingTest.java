@@ -144,4 +144,36 @@ public class ThemingTest {
         assertEquals(Brightness.dark, t.brightness(),
                 "a synthesized theme must carry the requested brightness");
     }
+
+    // ------------------------------------------------------------------
+    // Alpha
+    // ------------------------------------------------------------------
+
+    /**
+     * {@code Colors.transparent} is 0x00000000 — alpha 0 over BLACK. Painting
+     * only its RGB word turns every "transparent" app bar and scaffold in the
+     * gallery into an opaque black band.
+     */
+    @Test
+    public void transparentPaintsNothingRatherThanBlack() {
+        com.codename1.ui.plaf.Style s = new com.codename1.ui.plaf.Style();
+        ThemeDataAdapter.paintColor(s, new com.codename1.flutter.Color(0x00000000L));
+        assertEquals(0, s.getBgTransparency() & 0xFF, "alpha 0 must paint nothing");
+    }
+
+    @Test
+    public void opaqueColorPaintsFully() {
+        com.codename1.ui.plaf.Style s = new com.codename1.ui.plaf.Style();
+        ThemeDataAdapter.paintColor(s, new com.codename1.flutter.Color(0xFF2196F3L));
+        assertEquals(0x2196F3, s.getBgColor());
+        assertEquals(255, s.getBgTransparency() & 0xFF);
+    }
+
+    @Test
+    public void partialAlphaCarriesThrough() {
+        com.codename1.ui.plaf.Style s = new com.codename1.ui.plaf.Style();
+        ThemeDataAdapter.paintColor(s, new com.codename1.flutter.Color(0x80FF0000L));
+        assertEquals(0xFF0000, s.getBgColor());
+        assertEquals(0x80, s.getBgTransparency() & 0xFF);
+    }
 }

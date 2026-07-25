@@ -103,7 +103,7 @@ public class ScaffoldRenderElement extends RenderElement {
     private void applyBackground(Component face) {
         com.codename1.flutter.Color bg = effectiveBackground();
         if (bg != null) {
-            ThemeDataAdapter.paintSolid(face.getAllStyles(), bg.rgb());
+            ThemeDataAdapter.paintColor(face.getAllStyles(), bg);
         }
     }
 
