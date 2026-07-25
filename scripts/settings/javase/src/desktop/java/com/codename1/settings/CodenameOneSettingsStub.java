@@ -31,6 +31,8 @@ import java.awt.GraphicsEnvironment;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.KeyboardFocusManager;
+import java.awt.Rectangle;
+import java.awt.Robot;
 import java.awt.Taskbar;
 import java.awt.Toolkit;
 import java.awt.event.KeyEvent;
@@ -41,6 +43,8 @@ import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
@@ -256,11 +260,11 @@ public class CodenameOneSettingsStub implements Runnable, WindowListener {
             return;
         }
         try {
-            java.awt.Rectangle bounds = frm.getBounds();
+            Rectangle bounds = frm.getBounds();
             if (bounds.width <= 0 || bounds.height <= 0) {
                 return;
             }
-            BufferedImage image = new java.awt.Robot().createScreenCapture(bounds);
+            BufferedImage image = new Robot().createScreenCapture(bounds);
             ImageIO.write(image, "png", new File(onScreenPath(screenshot)));
         } catch (Throwable ex) {
             System.err.println("On-screen capture unavailable: " + ex);
@@ -284,7 +288,7 @@ public class CodenameOneSettingsStub implements Runnable, WindowListener {
         // handoff in this direction can deadlock. A timeout is not a failure
         // to report - a wedged EDT is exactly the kind of thing this dump
         // exists to catch, so say so in the file.
-        final java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(1);
+        final CountDownLatch done = new CountDownLatch(1);
         Display.getInstance().callSerially(() -> {
             try {
                 SettingsDiagnostics.write(target, frm);
@@ -293,7 +297,7 @@ public class CodenameOneSettingsStub implements Runnable, WindowListener {
             }
         });
         try {
-            if (!done.await(10, java.util.concurrent.TimeUnit.SECONDS)) {
+            if (!done.await(10, TimeUnit.SECONDS)) {
                 SettingsDiagnostics.writeUnresponsiveEdt(target, frm);
             }
         } catch (InterruptedException ex) {
