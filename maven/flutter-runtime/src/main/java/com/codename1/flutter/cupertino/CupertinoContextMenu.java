@@ -29,6 +29,7 @@ public class CupertinoContextMenu extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
+        com.codename1.flutter.FlutterErrorReport.unimplemented("CupertinoContextMenu", "the long-press context menu is not available");
         return child;
     }
 }

@@ -27,6 +27,7 @@ public class FadeThroughTransition extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
+        com.codename1.flutter.FlutterErrorReport.unimplemented("FadeThroughTransition", "the fade-through transition is not animated");
         return child;
     }
 }

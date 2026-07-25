@@ -49,6 +49,7 @@ public class Ink extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
+        com.codename1.flutter.FlutterErrorReport.unimplemented("Ink", "the ink decoration is not painted");
         return child;
     }
 }

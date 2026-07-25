@@ -42,6 +42,7 @@ public class GridTile extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
+        com.codename1.flutter.FlutterErrorReport.unimplemented("GridTile", "the tile header/footer are not rendered");
         return child;
     }
 }

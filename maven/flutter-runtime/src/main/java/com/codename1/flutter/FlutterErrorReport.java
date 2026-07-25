@@ -1,0 +1,210 @@
+package com.codename1.flutter;
+
+import com.codename1.io.Log;
+import com.codename1.ui.Display;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Collects the errors a Flutter tree throws, keeps the app running, and reports them
+ * in a form you can act on.
+ *
+ * <p>Without this, one failing screen ends the session: an uncaught error on the EDT
+ * raises Codename One's modal error dialog, which blocks the EDT, so every screen after
+ * it stalls too. During development that turns "this screen is broken" into "the app is
+ * dead", and it hides how many OTHER screens would have worked.</p>
+ *
+ * <p>What makes a report usable is the context, not the stack: transpiled build methods
+ * are inlined into the framework's frame on some backends, so a trace often names
+ * nothing but {@code Element.updateChild} repeated. Each error is therefore recorded
+ * with the widget that was building and the route that was on screen, and identical
+ * errors are counted rather than repeated — a rebuild loop would otherwise bury
+ * everything else.</p>
+ *
+ * <p>Enable with {@link #install()}; {@link #summary()} returns the inventory, which is
+ * what a sweep over an app's screens should be judged by.</p>
+ */
+public final class FlutterErrorReport {
+
+    /// One distinct failure and how often it happened.
+    public static final class Entry {
+        private final String type;
+        private final String message;
+        private final String building;
+        private final String route;
+        private int count;
+
+        Entry(String type, String message, String building, String route) {
+            this.type = type;
+            this.message = message;
+            this.building = building;
+            this.route = route;
+            this.count = 1;
+        }
+
+        public String type() {
+            return type;
+        }
+
+        public String message() {
+            return message;
+        }
+
+        /// The widget that was building when this happened, or null.
+        public String building() {
+            return building;
+        }
+
+        /// The route that was on screen, or null.
+        public String route() {
+            return route;
+        }
+
+        public int count() {
+            return count;
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder sb = new StringBuilder();
+            sb.append(count).append("x ").append(type);
+            if (message != null) {
+                sb.append(": ").append(message);
+            }
+            if (building != null) {
+                sb.append("  [while ").append(building).append("]");
+            }
+            if (route != null) {
+                sb.append("  [route ").append(route).append("]");
+            }
+            return sb.toString();
+        }
+    }
+
+    private static final Map<String, Entry> ENTRIES = new HashMap<String, Entry>();
+    private static final List<Entry> ORDER = new ArrayList<Entry>();
+    private static boolean installed;
+    private static String currentRoute;
+
+    private FlutterErrorReport() {
+    }
+
+    /**
+     * Starts collecting. Errors are logged and swallowed instead of stopping the app.
+     *
+     * <p>Call this from a debug or test build. A shipping app usually wants the opposite —
+     * the default dialog, or its own crash reporting — so this is opt-in rather than
+     * something {@code runApp} does for you.</p>
+     */
+    public static synchronized void install() {
+        if (installed) {
+            return;
+        }
+        installed = true;
+        Display.getInstance().addEdtErrorHandler(new ActionListener<ActionEvent>() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                record(evt.getSource());
+                // Consume: the default handling is a modal dialog, which would block the
+                // EDT and take every later screen down with this one.
+                evt.consume();
+            }
+        });
+    }
+
+    /** Whether collecting is active. */
+    public static synchronized boolean isInstalled() {
+        return installed;
+    }
+
+    /** Records the route now on screen, so later errors can name where they happened. */
+    public static synchronized void route(String name) {
+        currentRoute = name;
+    }
+
+    /**
+     * Records one failure. Public so a caller that catches an error itself — a route
+     * mount, a painter — can report it with the same context and de-duplication.
+     */
+    public static synchronized void record(Object error) {
+        String type = error == null ? "unknown" : error.getClass().getName();
+        String message = error instanceof Throwable ? ((Throwable) error).getMessage()
+                : (error == null ? null : String.valueOf(error));
+        String building = dart.runtime.DartRuntime.diagnosticContext();
+        String key = type + "|" + message + "|" + building + "|" + currentRoute;
+        Entry existing = ENTRIES.get(key);
+        if (existing != null) {
+            existing.count++;
+            return;   // already reported once; counting is enough
+        }
+        Entry entry = new Entry(type, message, building, currentRoute);
+        ENTRIES.put(key, entry);
+        ORDER.add(entry);
+        try {
+            Log.p("Flutter error: " + entry);
+        } catch (Throwable ignored) {
+            // headless: Log has no storage backend
+        }
+    }
+
+    /**
+     * Records that a widget rendered without its intended effect — a stub that passes
+     * its child through, or draws nothing at all.
+     *
+     * <p>These are the failures that are hardest to find, because nothing throws: the
+     * screen simply comes up empty or subtly wrong, and a sweep reports "no errors".
+     * Reporting them turns a blank screen into a list of what it needed and did not
+     * get.</p>
+     *
+     * @param widget the widget that is not fully implemented
+     * @param effect what is missing, phrased so it reads as a gap ("scale and rotation
+     *               are ignored")
+     */
+    public static synchronized void unimplemented(String widget, String effect) {
+        String key = "unimplemented|" + widget + "|" + effect + "|" + currentRoute;
+        Entry existing = ENTRIES.get(key);
+        if (existing != null) {
+            existing.count++;
+            return;
+        }
+        Entry entry = new Entry("unimplemented", widget + ": " + effect,
+                dart.runtime.DartRuntime.diagnosticContext(), currentRoute);
+        ENTRIES.put(key, entry);
+        ORDER.add(entry);
+        try {
+            Log.p("Flutter gap: " + entry);
+        } catch (Throwable ignored) {
+            // headless: Log has no storage backend
+        }
+    }
+
+    /** Every distinct failure, in the order first seen. */
+    public static synchronized List<Entry> entries() {
+        return new ArrayList<Entry>(ORDER);
+    }
+
+    /** Distinct failures, and the total including repeats. */
+    public static synchronized String summary() {
+        int total = 0;
+        for (Entry e : ORDER) {
+            total += e.count;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append(ORDER.size()).append(" distinct error(s), ").append(total).append(" total");
+        for (Entry e : ORDER) {
+            sb.append('\n').append("  ").append(e);
+        }
+        return sb.toString();
+    }
+
+    /** Forgets everything collected so far — lets a sweep measure one screen at a time. */
+    public static synchronized void reset() {
+        ENTRIES.clear();
+        ORDER.clear();
+    }
+}

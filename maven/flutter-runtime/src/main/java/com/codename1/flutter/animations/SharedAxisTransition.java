@@ -51,6 +51,7 @@ public class SharedAxisTransition extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
+        com.codename1.flutter.FlutterErrorReport.unimplemented("SharedAxisTransition", "the shared-axis transition is not animated");
         return child;
     }
 }

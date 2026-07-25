@@ -40,6 +40,7 @@ public class SliderTheme extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
+        com.codename1.flutter.FlutterErrorReport.unimplemented("SliderTheme", "slider theming is ignored");
         return child;
     }
 }

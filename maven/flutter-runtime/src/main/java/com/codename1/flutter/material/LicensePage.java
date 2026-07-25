@@ -31,6 +31,7 @@ public class LicensePage extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
+        com.codename1.flutter.FlutterErrorReport.unimplemented("LicensePage", "renders nothing");
         return null;
     }
 }

@@ -105,6 +105,7 @@ public class Transform extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
+        com.codename1.flutter.FlutterErrorReport.unimplemented("Transform", "scale, rotation and translation are ignored");
         return child;
     }
 }

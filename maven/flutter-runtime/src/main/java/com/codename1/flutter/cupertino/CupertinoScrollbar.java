@@ -37,6 +37,7 @@ public class CupertinoScrollbar extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
+        com.codename1.flutter.FlutterErrorReport.unimplemented("CupertinoScrollbar", "no scrollbar is drawn");
         return child;
     }
 }

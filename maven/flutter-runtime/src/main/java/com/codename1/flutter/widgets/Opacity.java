@@ -36,6 +36,7 @@ public class Opacity extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
+        com.codename1.flutter.FlutterErrorReport.unimplemented("Opacity", "opacity is ignored; the child paints fully opaque");
         return child;
     }
 }

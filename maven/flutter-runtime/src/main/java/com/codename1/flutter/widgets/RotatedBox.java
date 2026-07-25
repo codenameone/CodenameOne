@@ -33,6 +33,7 @@ public class RotatedBox extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
+        com.codename1.flutter.FlutterErrorReport.unimplemented("RotatedBox", "rotation is ignored");
         return child;
     }
 }

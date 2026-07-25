@@ -239,6 +239,8 @@ public class Navigator extends StatelessWidget {
     public static boolean pushNamed(BuildContext context, String name, Object arguments) {
         Route route = resolveRoute(name, arguments);
         if (route instanceof MaterialPageRoute) {
+            // Name the screen so any error it raises reports where it happened.
+            com.codename1.flutter.FlutterErrorReport.route(name);
             push(context, (MaterialPageRoute) route);
             return true;
         }

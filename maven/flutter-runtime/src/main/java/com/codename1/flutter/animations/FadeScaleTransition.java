@@ -34,6 +34,7 @@ public class FadeScaleTransition extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
+        com.codename1.flutter.FlutterErrorReport.unimplemented("FadeScaleTransition", "the fade/scale transition is not animated");
         return child;
     }
 }

@@ -62,6 +62,7 @@ public class PositionedDirectional extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
+        com.codename1.flutter.FlutterErrorReport.unimplemented("PositionedDirectional", "directional positioning is ignored");
         return child;
     }
 }

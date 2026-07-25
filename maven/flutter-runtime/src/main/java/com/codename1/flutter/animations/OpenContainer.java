@@ -95,6 +95,7 @@ public class OpenContainer<T> extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
+        com.codename1.flutter.FlutterErrorReport.unimplemented("OpenContainer", "the container transform renders nothing");
         return new SizedBox();
     }
 }

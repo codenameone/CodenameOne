@@ -39,6 +39,7 @@ public class FractionalTranslation extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
+        com.codename1.flutter.FlutterErrorReport.unimplemented("FractionalTranslation", "translation is ignored");
         return child;
     }
 }
