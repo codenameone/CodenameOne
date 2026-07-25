@@ -326,8 +326,17 @@ public class MaterialApp extends StatelessWidget {
                         if (v != null) {
                             out.add(v);
                         }
-                    } catch (Throwable ignore) {
-                        // an opaque or unsupported delegate contributes nothing
+                    } catch (Throwable err) {
+                        // A delegate that fails contributes nothing, and the app
+                        // then dies on `Foo.of(context)!` far away — so say which
+                        // one failed rather than swallowing it.
+                        try {
+                            com.codename1.io.Log.p("Flutter runtime: localizations delegate "
+                                    + d.getClass().getName() + " failed for locale "
+                                    + loc + ": " + err);
+                        } catch (Throwable ignore) {
+                            // headless: Log has no storage backend
+                        }
                     }
                 }
             }

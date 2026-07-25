@@ -53,6 +53,12 @@ public final class FlutterUI {
     public static RenderHost mountInNewForm(Widget root, Element contextFallback) {
         assertEdt();
         Form f = new Form(new BorderLayout());
+        // Flutter owns the whole canvas: the widget tree draws its own padding
+        // and safe areas, so any CN1 chrome inset on the Form or its content
+        // pane is a margin Flutter never asked for (it left pushed pages
+        // floating inside a frame).
+        stripChrome(f);
+        stripChrome(f.getContentPane());
         RenderHost host = new RenderHost();
         host.form(f);
         Container c = new Container(new FlutterRootLayout(host));
@@ -60,6 +66,29 @@ public final class FlutterUI {
         mount(root, host, new BuildOwner(), contextFallback);
         f.add(BorderLayout.CENTER, c);
         return host;
+    }
+
+    /**
+     * Removes a component's theme-supplied padding and margin. The units are
+     * set to pixels first: styles derived from the Material theme carry
+     * MILLIMETRE units, under which a zero is still zero but any later
+     * non-zero write would be reinterpreted at ~18x.
+     */
+    private static void stripChrome(com.codename1.ui.Component c) {
+        if (c == null) {
+            return;
+        }
+        com.codename1.ui.plaf.Style s = c.getAllStyles();
+        s.setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
+                com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
+                com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
+                com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+        s.setMarginUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
+                com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
+                com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS,
+                com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+        s.setPadding(0, 0, 0, 0);
+        s.setMargin(0, 0, 0, 0);
     }
 
     /**

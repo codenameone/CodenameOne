@@ -118,7 +118,44 @@ public abstract class Element implements BuildContext {
             }
             a = ancestorOf(a);
         }
+        reportMissingAncestor(type);
         return null;
+    }
+
+    /**
+     * Names the ancestors that were searched when an inherited-widget lookup
+     * comes up empty.
+     *
+     * <p>Dart code almost always writes {@code Foo.of(context)!}, so a failed
+     * lookup surfaces as a null-check TypeError somewhere else entirely, with
+     * no indication of WHICH widget was missing or what the context could
+     * actually see. Reporting it at the point of failure turns that into a
+     * one-line diagnosis. Capped, because a missing provider is usually
+     * missing on every build of every frame.</p>
+     */
+    private static int missingAncestorReports;
+
+    private void reportMissingAncestor(Class<?> type) {
+        if (missingAncestorReports >= 5) {
+            return;
+        }
+        missingAncestorReports++;
+        try {
+            StringBuilder sb = new StringBuilder("Flutter runtime: no ");
+            sb.append(type == null ? "?" : type.getName());
+            sb.append(" above this context; ancestors were:");
+            Element a = ancestorOf(this);
+            int depth = 0;
+            while (a != null && depth < 24) {
+                sb.append(depth == 0 ? " " : " < ");
+                sb.append(a.widget == null ? "null" : a.widget.getClass().getName());
+                a = ancestorOf(a);
+                depth++;
+            }
+            com.codename1.io.Log.p(sb.toString());
+        } catch (Throwable t) {
+            // diagnostics must never become the failure
+        }
     }
 
     @Override

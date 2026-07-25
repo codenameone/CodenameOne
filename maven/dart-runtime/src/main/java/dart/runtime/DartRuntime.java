@@ -19,11 +19,31 @@ public final class DartRuntime {
     private static Funcs.VoidFunc1<String> printSink;
 
     /**
+     * What the app was doing when a failure happens, appended to runtime
+     * errors. A UI framework built on this runtime sets it around a build;
+     * without it a {@code !} failure names no location at all, because the
+     * transpiled call sites are inlined into their caller's frame and the
+     * stack trace shows only the framework's own recursion.
+     */
+    private static String diagnosticContext;
+
+    /** Sets (or clears, with null) the context appended to runtime errors. */
+    public static void diagnosticContext(String context) {
+        diagnosticContext = context;
+    }
+
+    public static String diagnosticContext() {
+        return diagnosticContext;
+    }
+
+    /**
      * Dart's {@code x!} null-check operator.
      */
     public static <T> T nn(T v) {
         if (v == null) {
-            throw new TypeError("Null check operator used on a null value");
+            String where = diagnosticContext;
+            throw new TypeError("Null check operator used on a null value"
+                    + (where == null ? "" : " (while " + where + ")"));
         }
         return v;
     }
