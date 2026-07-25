@@ -246,6 +246,20 @@
                                         <exclude name="assets/test.json"/>
                                         <exclude name="assets/Page.html"/>
                                         <exclude name="assets/Handlee-Regular.ttf"/>
+                                        <!-- The port test app's own theme (1.4MB). Real apps ship
+                                             their own theme.res at the bundle root, and
+                                             getResourceAsStream() deliberately prefers the root for
+                                             theme.res / CN1Resource.res, so this copy is never read
+                                             (confirmed against a running app: the root theme.res is
+                                             fetched, this one never is). Shipping it also keeps a
+                                             shadowing hazard alive for no benefit. -->
+                                        <exclude name="assets/theme.res"/>
+                                        <!-- No code path returns tzone_theme.res: getNativeTheme()
+                                             only ever yields iOS7Theme / iPhoneTheme /
+                                             iOSModernTheme / android_holo_light /
+                                             AndroidMaterialTheme / androidTheme. The one mention of
+                                             tzone_theme in the port is inside a comment. -->
+                                        <exclude name="assets/tzone_theme.res"/>
                                     </zipfileset>
                                 </jar>
                                 <zip destfile="${project.build.directory}/${project.build.finalName}-bundle.jar">
