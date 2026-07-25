@@ -112,7 +112,7 @@ public class ByteCodeTranslator {
                 if(f.getName().endsWith(".class")) {
                     Parser.parse(f);
                 } else {
-                    if(!f.isDirectory() && !isBuildMetadata(f.getName())) {
+                    if(!f.isDirectory() && !isBuildMetadata(f)) {
                         // copy the file to the dest dir
                         copy(Files.newInputStream(f.toPath()), Files.newOutputStream(new File(outputDir, f.getName()).toPath()));
                     }
@@ -1206,26 +1206,39 @@ public class ByteCodeTranslator {
     
 
     /**
+     * Build descriptors that ride along inside an application jar's
+     * {@code META-INF} but are not application resources. Every non-class input
+     * file is copied into the output by basename, so without this filter a
+     * Maven-built app leaks its pom.xml (dependency list and all),
+     * pom.properties and MANIFEST.MF into the bundle -- and for the JavaScript
+     * target that bundle IS a public document root.
+     *
+     * <p>The check is path-aware on purpose: an app is free to ship a resource
+     * of its own that happens to be called pom.xml, and only the copies living
+     * under META-INF are jar metadata.
+     */
+    private static boolean isBuildMetadata(File f) {
+        String name = f.getName();
+        if (!"pom.xml".equals(name)
+                && !"pom.properties".equals(name)
+                && !"MANIFEST.MF".equals(name)) {
+            return false;
+        }
+        for (File parent = f.getParentFile(); parent != null; parent = parent.getParentFile()) {
+            if ("META-INF".equals(parent.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Copy the input stream into the output stream, closes both streams when finishing or in
      *  the case of an exception
      * 
      * @param i source
      * @param o destination
      */
-    /**
-     * Build descriptors that ride along inside an application jar's META-INF
-     * but are not application resources. Every non-class input file is copied
-     * into the output by basename, so without this filter a Maven-built app
-     * leaks its pom.xml (dependency list and all), pom.properties and
-     * MANIFEST.MF into the bundle -- and for the JavaScript target that bundle
-     * IS a public document root.
-     */
-    private static boolean isBuildMetadata(String name) {
-        return "pom.xml".equals(name)
-                || "pom.properties".equals(name)
-                || "MANIFEST.MF".equals(name);
-    }
-
     public static void copy(InputStream i, OutputStream o) throws IOException {
         copy(i, o, 8192);
     }

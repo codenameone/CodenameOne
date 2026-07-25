@@ -229,13 +229,19 @@ public class JavaScriptBuilder extends Executor {
             File videojs = new File(js, "videojs");
             if (videojs.isDirectory()) {
                 delTree(videojs, true);
-                debug("Omitting js/videojs (set the javascript.includeVideoJS "
-                        + "build hint to bundle the video capture libraries)");
+                if (videojs.exists()) {
+                    log("WARNING: could not delete " + videojs + "; it will ship in the bundle");
+                } else {
+                    debug("Omitting js/videojs (set the javascript.includeVideoJS "
+                            + "build hint to bundle the video capture libraries)");
+                }
             }
         }
         File samplerate = new File(js, "samplerate.min.js");
-        if (samplerate.isFile()) {
-            samplerate.delete();
+        if (samplerate.isFile() && !samplerate.delete()) {
+            // Not fatal -- the bundle just carries a dead 485KB file -- but say
+            // so rather than silently shipping what we claim to have pruned.
+            log("WARNING: could not delete " + samplerate + "; it will ship in the bundle");
         }
     }
 
