@@ -260,6 +260,14 @@ public class CodenameOneSettingsStub implements Runnable, WindowListener {
             return;
         }
         try {
+            // A grab of a window that is not on screen yet captures whatever
+            // is behind it, which reads as an empty window rather than as a
+            // missing capture. Better to write nothing and let the caller say
+            // so than to write a misleading image.
+            if (!frm.isShowing()) {
+                System.err.println("On-screen capture skipped: window is not showing");
+                return;
+            }
             Rectangle bounds = frm.getBounds();
             if (bounds.width <= 0 || bounds.height <= 0) {
                 return;
