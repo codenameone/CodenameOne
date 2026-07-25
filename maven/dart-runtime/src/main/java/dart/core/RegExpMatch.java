@@ -1,33 +1,37 @@
 package dart.core;
 
-import java.util.regex.MatchResult;
-
 /**
- * Dart's {@code dart:core} {@code RegExpMatch} (a {@code Match}). Wraps a
- * completed {@link MatchResult} so group/position accessors work after the
- * originating {@link java.util.regex.Matcher} has advanced.
+ * Dart's {@code dart:core} {@code RegExpMatch} (a {@code Match}).
  *
- * <p>Dart group indices are 0-based with group 0 being the whole match, which
- * matches {@link MatchResult#group(int)} exactly. Missing/unmatched groups
- * return {@code null} in Dart, mirrored here.</p>
+ * <p>Group text and offsets are SNAPSHOTTED at construction. The regex engine
+ * behind {@link RegExp} keeps its match state on the compiled pattern object
+ * and overwrites it on the next match, so a Match holding a reference to it
+ * would silently change under the caller — a Dart Match is a value.</p>
+ *
+ * <p>Dart group indices are 0-based with group 0 being the whole match;
+ * unmatched groups are {@code null}.</p>
  */
 public final class RegExpMatch {
 
-    private final MatchResult result;
+    private final String[] groups;
+    private final int[] starts;
+    private final int[] ends;
     private final String input;
 
-    RegExpMatch(MatchResult result, String input) {
-        this.result = result;
+    RegExpMatch(String[] groups, int[] starts, int[] ends, String input) {
+        this.groups = groups;
+        this.starts = starts;
+        this.ends = ends;
         this.input = input;
     }
 
     /** Dart's {@code Match.group(index)} — null for an unmatched group. */
     public String group(long index) {
         int i = (int) index;
-        if (i < 0 || i > result.groupCount()) {
+        if (i < 0 || i >= groups.length) {
             throw new RangeError("group index out of range: " + index);
         }
-        return result.group(i);
+        return groups[i];
     }
 
     /** Dart's {@code match[index]} operator. */
@@ -37,17 +41,17 @@ public final class RegExpMatch {
 
     /** Dart's {@code Match.groupCount} getter — number of capturing groups. */
     public long groupCount() {
-        return result.groupCount();
+        return groups.length - 1;
     }
 
     /** Dart's {@code Match.start} getter. */
     public long start() {
-        return result.start();
+        return starts[0];
     }
 
     /** Dart's {@code Match.end} getter. */
     public long end() {
-        return result.end();
+        return ends[0];
     }
 
     /** Dart's {@code Match.input} getter. */
@@ -57,7 +61,7 @@ public final class RegExpMatch {
 
     /** Dart's {@code Match.groups(indices)} — the listed groups in order. */
     public DartList<String> groups(java.util.List<? extends Number> indices) {
-        DartList<String> out = new DartList<>();
+        DartList<String> out = new DartList<String>();
         for (Number n : indices) {
             out.add(group(n.longValue()));
         }

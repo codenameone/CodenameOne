@@ -124,15 +124,23 @@ public class Navigator extends StatelessWidget {
             e.form = host.form();
             e.rootElement = host.rootElement();
             Toolbar tb = e.form.getToolbar();
-            if (tb != null) {
-                // a root Scaffold bound itself to the Form Toolbar; give it
-                // the material back arrow
+            if (tb != null && host.isFormToolbarBound()) {
+                // a root Scaffold bound its AppBar to the Form Toolbar; give
+                // that bar the material back arrow
                 tb.setBackCommand("", new ActionListener<ActionEvent>() {
                     @Override
                     public void actionPerformed(ActionEvent evt) {
                         pop(null);
                     }
                 });
+            } else if (tb != null) {
+                // The page draws its own AppBar in-canvas (a Scaffold nested
+                // below another render widget, as the gallery's demo pages
+                // are). Showing the Form's Toolbar too would put two bars on
+                // the page AND shrink the Flutter canvas by the toolbar inset,
+                // which is what left demo pages floating inside a margin.
+                tb.setVisible(false);
+                tb.setHidden(true);
             }
             stack.add(e);
             e.form.show();

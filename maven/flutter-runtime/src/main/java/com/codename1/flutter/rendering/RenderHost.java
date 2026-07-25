@@ -61,6 +61,25 @@ public class RenderHost {
         this.toolbar = toolbar;
     }
 
+    private boolean formToolbarBound;
+
+    /**
+     * Whether a root-mode Scaffold in this host's tree claimed the Form's
+     * Toolbar for its AppBar.
+     *
+     * <p>A route whose Scaffold is nested (inside a ColoredBox, say) renders
+     * its AppBar as an in-canvas strip instead, and then the Form must show no
+     * Toolbar at all — otherwise the page carries two bars and CN1's toolbar
+     * inset shrinks the Flutter canvas.</p>
+     */
+    public boolean isFormToolbarBound() {
+        return formToolbarBound;
+    }
+
+    public void formToolbarBound(boolean v) {
+        this.formToolbarBound = v;
+    }
+
     public boolean isToolbarTitleHost() {
         return toolbarTitleHost;
     }

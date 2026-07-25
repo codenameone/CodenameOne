@@ -143,6 +143,9 @@ public class ScaffoldRenderElement extends RenderElement {
         RenderHost mountHost = parent != null ? parent.host() : host();
         if (!hasRenderAncestor && mountHost != null && mountHost.form() != null) {
             rootMode = true;
+            if (scaffold().getAppBar() != null) {
+                mountHost.formToolbarBound(true);
+            }
             prepareToolbarHost(mountHost.form());
             prepareDrawerHost(mountHost.form());
             prepareBottomHost(mountHost.form());

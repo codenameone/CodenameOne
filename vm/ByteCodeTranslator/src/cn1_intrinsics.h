@@ -231,4 +231,41 @@ static inline JAVA_CHAR cn1InlStrCharAt(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s
 
 #endif // CN1_HAVE_SB_INTRINSICS
 
+#if defined(__has_include)
+#if __has_include("dart_core_DartLongList.h")
+#include "dart_core_DartLongList.h"
+#define CN1_HAVE_DLL_INTRINSICS 1
+#endif
+#endif
+
+#ifdef CN1_HAVE_DLL_INTRINSICS
+
+// Dart List<int> element access. The bounds test is against the LOGICAL length
+// (which can be smaller than the backing array), exactly as DartLongList does;
+// out-of-range falls through to the out-of-line method so RangeError.indexError
+// stays single-sourced there.
+
+static inline JAVA_LONG cn1InlDllGet(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT self, JAVA_LONG index) {
+    struct obj__dart_core_DartLongList* t = (struct obj__dart_core_DartLongList*)self;
+    if(__builtin_expect(self != JAVA_NULL &&
+            index >= 0 && index < (JAVA_LONG)t->dart_core_DartLongList_len, 1)) {
+        JAVA_ARRAY arr = (JAVA_ARRAY)t->dart_core_DartLongList_a;
+        return ((JAVA_ARRAY_LONG*)arr->data)[(JAVA_INT)index];
+    }
+    return dart_core_DartLongList_getLong___long_R_long(threadStateData, self, index);
+}
+
+static inline JAVA_LONG cn1InlDllSet(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT self, JAVA_LONG index, JAVA_LONG value) {
+    struct obj__dart_core_DartLongList* t = (struct obj__dart_core_DartLongList*)self;
+    if(__builtin_expect(self != JAVA_NULL &&
+            index >= 0 && index < (JAVA_LONG)t->dart_core_DartLongList_len, 1)) {
+        JAVA_ARRAY arr = (JAVA_ARRAY)t->dart_core_DartLongList_a;
+        ((JAVA_ARRAY_LONG*)arr->data)[(JAVA_INT)index] = value;
+        return value;
+    }
+    return dart_core_DartLongList_setLong___long_long_R_long(threadStateData, self, index, value);
+}
+
+#endif // CN1_HAVE_DLL_INTRINSICS
+
 #endif // CN1_INTRINSICS_H
