@@ -70,6 +70,23 @@ public class FadeInImage extends StatelessWidget {
 
     @Override
     public Widget build(BuildContext context) {
+        // Render the target image directly (the cross-fade from the placeholder is
+        // deferred). Falls back to the placeholder, then an empty box, when absent.
+        ImageProvider shown = image != null ? image : placeholder;
+        if (shown != null) {
+            Image img = new Image();
+            img.image(shown);
+            if (width != null) {
+                img.width(width);
+            }
+            if (height != null) {
+                img.height(height);
+            }
+            if (fit != null) {
+                img.fit(fit);
+            }
+            return img;
+        }
         SizedBox box = new SizedBox();
         if (width != null) {
             box.width(width);

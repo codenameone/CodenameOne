@@ -1,6 +1,7 @@
 package com.codename1.flutter.widgets;
 
 import com.codename1.flutter.BoxFit;
+import com.codename1.flutter.FlutterAssets;
 import com.codename1.flutter.RenderElement;
 import com.codename1.flutter.rendering.BoxConstraints;
 import com.codename1.flutter.rendering.Dp;
@@ -77,10 +78,11 @@ public class ImageRenderElement extends RenderElement {
         img = null;
         try {
             if (image().getAssetName() != null) {
-                InputStream is = Display.getInstance().getResourceAsStream(
-                        getClass(), "/assets/" + image().getAssetName());
+                String res = FlutterAssets.resourceName(image().getAssetName());
+                InputStream is = Display.getInstance().getResourceAsStream(getClass(), res);
                 if (is == null) {
-                    Log.p("Flutter runtime: asset image not found: /assets/" + image().getAssetName());
+                    Log.p("Flutter runtime: asset image not found: " + image().getAssetName()
+                            + " (resource " + res + ")");
                 } else {
                     img = EncodedImage.create(is);
                 }

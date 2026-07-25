@@ -29,8 +29,9 @@ import java.nio.file.StandardCopyOption;
  * <ul>
  *   <li>{@code src/main/flutter/**&#47;*.dart} — Dart sources (whole-program
  *       transpile; subdirectories allowed)</li>
- *   <li>{@code src/main/flutter/assets/**} — bundled assets, copied to the
- *       build output so {@code Image.asset(...)} resolves</li>
+ *   <li>{@code src/main/flutter/assets/**} — bundled assets, flattened into the
+ *       build output (Codename One resources are flat on every port) so
+ *       {@code Image.asset(...)} resolves</li>
  * </ul>
  *
  * <p>When the directory does not exist the goal is a silent no-op. When it
@@ -137,6 +138,15 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
                 + "    </dependency>\n");
     }
 
+    /**
+     * Copies {@code src/main/flutter/assets} into the build output, <em>flattened</em>.
+     *
+     * <p>Codename One resources are flat on every port — {@code getResourceAsStream}
+     * rejects a name containing a {@code '/'} past the leading one — so the asset
+     * tree cannot be mirrored. Each asset is written to the output root under the
+     * name produced by {@link #flatAssetName}, which the Flutter runtime's
+     * {@code FlutterAssets} recomputes when resolving {@code Image.asset(...)}.</p>
+     */
     private void copyAssets() throws MojoExecutionException {
         File assets = new File(flutterSourceDir, "assets");
         if (!assets.isDirectory()) {
@@ -144,26 +154,61 @@ public class TranscodeFlutterMojo extends AbstractCN1Mojo {
         }
         File outDir = new File(project.getBuild().getOutputDirectory());
         try {
-            copyRecursive(assets.toPath(), new File(outDir, "assets").toPath());
+            Files.createDirectories(outDir.toPath());
+            // "assets/" stays in the Flutter asset key, matching pubspec paths
+            int count = flattenInto(assets, "assets", outDir);
+            getLog().info("Flattened " + count + " Flutter asset(s) into the build output");
         } catch (IOException e) {
             throw new MojoExecutionException("Failed copying Flutter assets", e);
         }
     }
 
-    private void copyRecursive(Path from, Path to) throws IOException {
-        Files.createDirectories(to);
-        File[] children = from.toFile().listFiles();
+    private int flattenInto(File dir, String assetPrefix, File outDir) throws IOException {
+        File[] children = dir.listFiles();
         if (children == null) {
-            return;
+            return 0;
         }
+        int count = 0;
         for (File child : children) {
-            Path target = to.resolve(child.getName());
+            String key = assetPrefix + "/" + child.getName();
             if (child.isDirectory()) {
-                copyRecursive(child.toPath(), target);
+                count += flattenInto(child, key, outDir);
             } else {
-                Files.copy(child.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
+                Files.copy(child.toPath(), new File(outDir, flatAssetName(key)).toPath(),
+                        StandardCopyOption.REPLACE_EXISTING);
+                count++;
             }
         }
+        return count;
+    }
+
+    /**
+     * The flat resource name for a Flutter asset key. Doubles every {@code '_'}
+     * then uses {@code '_'} as the path separator, so the encoding is
+     * unambiguous while introducing no characters that were not already legal
+     * in the source path (extensions survive for native bundlers).
+     *
+     * <p><b>Keep in sync</b> with {@code com.codename1.flutter.FlutterAssets} in
+     * the Flutter runtime — deliberately duplicated rather than shared, because
+     * this plugin must not depend on the runtime it builds against.</p>
+     */
+    static String flatAssetName(String assetKey) {
+        String p = assetKey;
+        while (p.startsWith("/")) {
+            p = p.substring(1);
+        }
+        StringBuilder sb = new StringBuilder("cn1f_");
+        for (int i = 0; i < p.length(); i++) {
+            char c = p.charAt(i);
+            if (c == '_') {
+                sb.append("__");
+            } else if (c == '/') {
+                sb.append('_');
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 
     private void sweepStaleOutput() {
