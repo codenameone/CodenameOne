@@ -236,10 +236,14 @@
                                              into every JavaScript app's public web root. They stay
                                              in the source tree, so in-repo builds and the
                                              javascript-screenshots suite still see them.
-                                             The system themes assets/ must keep are the ones
-                                             HTML5Implementation.getNativeTheme() resolves:
-                                             iOS7Theme.res, iPhoneTheme.res, iOSModernTheme.res,
-                                             android_holo_light.res and tzone_theme.res. -->
+                                             Kept: the native themes installNativeTheme() can open
+                                             from the bundle. The JS port defaults to the LEGACY
+                                             pair (android_holo_light.res on an Android user agent,
+                                             iOS7Theme.res elsewhere) so existing screenshot
+                                             baselines stay comparable; iPhoneTheme.res is the
+                                             ios.themeMode=legacy opt-in. The modern themes
+                                             (iOSModernTheme.res / AndroidMaterialTheme.res) live in
+                                             Themes/ and are staged per target, not from here. -->
                                         <exclude name="assets/leather.res"/>
                                         <exclude name="assets/chrome.res"/>
                                         <exclude name="assets/video.mp4"/>
@@ -254,11 +258,8 @@
                                              fetched, this one never is). Shipping it also keeps a
                                              shadowing hazard alive for no benefit. -->
                                         <exclude name="assets/theme.res"/>
-                                        <!-- No code path returns tzone_theme.res: getNativeTheme()
-                                             only ever yields iOS7Theme / iPhoneTheme /
-                                             iOSModernTheme / android_holo_light /
-                                             AndroidMaterialTheme / androidTheme. The one mention of
-                                             tzone_theme in the port is inside a comment. -->
+                                        <!-- No theme-resolution path yields tzone_theme.res; the one
+                                             mention of it in the port is inside a comment. -->
                                         <exclude name="assets/tzone_theme.res"/>
                                     </zipfileset>
                                 </jar>
