@@ -238,7 +238,7 @@ public final class InlinableConstructor {
             // NB: a ctor's methodName is rewritten to "__INIT__" in the BytecodeMethod
             // ctor, so match on isConstructor() + the (untouched) descriptor.
             if (m.isConstructor() && desc.equals(m.getSignature())) {
-                m.computeInlinableConstructorPlan(); // idempotent; normally already done
+                m.computeRawMethodPlans(); // idempotent; normally already done
                 return m.getInlinableConstructorPlan();
             }
         }

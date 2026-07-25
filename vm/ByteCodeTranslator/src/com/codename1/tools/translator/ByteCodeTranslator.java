@@ -83,11 +83,24 @@ public class ByteCodeTranslator {
         }
     }
     
+    private static void sortByName(File[] files) {
+        if (files != null) {
+            java.util.Arrays.sort(files, (a, b) -> a.getName().compareTo(b.getName()));
+        }
+    }
+
     void execute(File sourceDir, File outputDir) throws Exception {
         File[] directoryList = sourceDir.listFiles(pathname ->
                 !pathname.isHidden() && !pathname.getName().startsWith(".") && pathname.isDirectory());
         File[] fileList = sourceDir.listFiles(pathname ->
                 !pathname.isHidden() && !pathname.getName().startsWith(".") && !pathname.isDirectory());
+        // listFiles() returns whatever order the filesystem hands back, which can
+        // differ between two builds of the same input (the app classes are
+        // re-extracted per build). Parse order is observable in the output --
+        // cross-class analyses see either the raw or the already-optimized form of
+        // another class -- so sort it and keep builds reproducible.
+        sortByName(directoryList);
+        sortByName(fileList);
         if(fileList != null) {
             for(File f : fileList) {
                 if (f.getName().equals("module-info.class")) {

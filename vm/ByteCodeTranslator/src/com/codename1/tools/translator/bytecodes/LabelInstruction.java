@@ -130,7 +130,30 @@ public class LabelInstruction extends Instruction {
             usedLabels.put(l,l);
         }
     }
-        
+
+    /**
+     * True when {@code l} is branched to: the target of a jump, a switch case
+     * or default, or the entry of a catch handler -- in other words when it
+     * marks a control-flow join.
+     *
+     * Peephole passes that match ADJACENT instruction pairs must not look
+     * through such a label: the instruction after it can also be reached from
+     * a predecessor that never executed the instruction before it, so folding
+     * the pair changes what the other predecessors do.
+     *
+     * Every one of those registrations happens in a constructor (Jump,
+     * CustomJump, SwitchInstruction, TryCatch), i.e. while the method is being
+     * parsed, so the answer is already final by the time optimize() runs. Try
+     * RANGE boundaries are not included -- addTryBeginLabel/addTryEndLabel run
+     * later, during emission -- but a try range start or end is not branched
+     * to, so it is not a join either. The handler is, and that one is
+     * registered at parse time.
+     */
+    public static boolean isJumpTarget(Label l) {
+        return usedLabels.get(l) != null;
+    }
+
+
     @Override
     public void appendInstruction(StringBuilder b) {
         if(usedLabels.get(parent)==null) {

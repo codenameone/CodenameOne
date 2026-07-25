@@ -1333,9 +1333,9 @@ public class Parser extends ClassVisitor {
         @Override
         public void visitEnd() {
             super.visitEnd();
-            // LEVER B: snapshot the inlinable-constructor plan from the RAW instruction
+            // LEVER B: snapshot the plans that must be read off the RAW instruction
             // list now, before optimize() (run later, per-class) folds the PUTFIELDs.
-            mtd.computeInlinableConstructorPlan();
+            mtd.computeRawMethodPlans();
             resolveDupForms(dupAnalysisOwner, dupAnalysisNode, mtd);
         }
 

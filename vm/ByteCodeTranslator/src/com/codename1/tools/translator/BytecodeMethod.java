@@ -1292,20 +1292,33 @@ public class BytecodeMethod implements SignatureSet {
     // looks this up at emit time -- decoupling the analysis (raw, deterministic) from
     // the cross-class emission order. null == not an inlinable ctor.
     private com.codename1.tools.translator.bytecodes.InlinableConstructor inlinableCtorPlan;
-    private boolean inlinableCtorComputed;
+    private boolean rawPlansComputed;
 
-    public void computeInlinableConstructorPlan() {
-        if (inlinableCtorComputed) {
+    /**
+     * Snapshots every analysis whose answer must be read off the RAW instruction
+     * list. Called from Parser.MethodVisitorWrapper.visitEnd, before any
+     * optimize() folds opcodes into custom instructions -- so that a pass running
+     * over one class cannot get a different answer about another class depending
+     * on which of the two was optimized first.
+     */
+    public void computeRawMethodPlans() {
+        if (rawPlansComputed) {
             return;
         }
-        inlinableCtorComputed = true;
+        rawPlansComputed = true;
         if (constructor) {
             inlinableCtorPlan = com.codename1.tools.translator.bytecodes.InlinableConstructor.analyzeRaw(this, desc);
             // FUSED OBJECTS: snapshot the fused-construction plan from the same RAW
             // list (the class-level @Fused gate is applied by the users of the plan;
             // the shape analysis is cheap and most ctors bail on the first check).
             fusedCtorPlan = com.codename1.tools.translator.bytecodes.FusedConstructor.analyzeRaw(this, desc);
+            // SCALAR REPLACEMENT: same reason, same RAW list -- see srAnalyzeCtor.
+            analyzeScalarConstructorRaw();
         }
+        // SCALAR REPLACEMENT: trivial getters are folded into a struct member read
+        // at their CALL sites, in other classes. Same rule as the plans above --
+        // recognize the shape on the raw list, never on the live one.
+        analyzeTrivialGetterRaw();
     }
 
     public com.codename1.tools.translator.bytecodes.InlinableConstructor getInlinableConstructorPlan() {
@@ -2675,6 +2688,39 @@ public class BytecodeMethod implements SignatureSet {
         return s.replace('.', '_').replace('/', '_').replace('$', '_');
     }
 
+    /**
+     * Like {@link #srNextReal(int)} but a control-flow join ends the lookahead.
+     *
+     * Every scalar-replacement match is a claim about two ADJACENT instructions
+     * ("this ALOAD feeds that GETFIELD", "this NEW feeds that DUP"). srNextReal
+     * skips every LabelInstruction, including the ones that are jump targets --
+     * so it happily pairs instructions that are not on a common path. javac
+     * emits exactly that for {@code (c ? p : q).x}:
+     *
+     *     ALOAD p ; GOTO L ; [L1:] ALOAD q ; [L:] GETFIELD x
+     *
+     * Folding "ALOAD q ; GETFIELD x" into a read of q's scalar struct rewrites
+     * the GETFIELD that the {@code p} path also branches into, so that path
+     * silently reads q's field (and leaks its own receiver on the operand
+     * stack). Stopping at the join leaves the whole site alone.
+     */
+    private int srNextRealNoJoin(int from) {
+        for (int i = from; i < instructions.size(); i++) {
+            Instruction in = instructions.get(i);
+            if (in instanceof LabelInstruction) {
+                if (LabelInstruction.isJumpTarget(((LabelInstruction) in).getLabel())) {
+                    return -1;
+                }
+                continue;
+            }
+            if (in instanceof LineNumber || in instanceof LocalVariable) {
+                continue;
+            }
+            return i;
+        }
+        return -1;
+    }
+
     /** Next index of a non-trivia instruction at or after {@code from}, or -1. */
     private int srNextReal(int from) {
         for (int i = from; i < instructions.size(); i++) {
@@ -2817,7 +2863,7 @@ public class BytecodeMethod implements SignatureSet {
             }
 
             // DUP must immediately follow the NEW.
-            int dupIdx = srNextReal(idx + 1);
+            int dupIdx = srNextRealNoJoin(idx + 1);
             if (dupIdx < 0 || instructions.get(dupIdx).getOpcode() != Opcodes.DUP) {
                 continue;
             }
@@ -2827,7 +2873,7 @@ public class BytecodeMethod implements SignatureSet {
             // or any control flow -- those break the simple receiver-at-bottom shape.
             int invIdx = -1;
             boolean bail = false;
-            for (int j = srNextReal(dupIdx + 1); j >= 0; j = srNextReal(j + 1)) {
+            for (int j = srNextRealNoJoin(dupIdx + 1); j >= 0; j = srNextRealNoJoin(j + 1)) {
                 Instruction c = instructions.get(j);
                 int op = c.getOpcode();
                 if (c instanceof Invoke && op == Opcodes.INVOKESPECIAL
@@ -2859,7 +2905,7 @@ public class BytecodeMethod implements SignatureSet {
             Invoke initInv = (Invoke) instructions.get(invIdx);
 
             // ASTORE n must immediately follow the constructor call.
-            int storeIdx = srNextReal(invIdx + 1);
+            int storeIdx = srNextRealNoJoin(invIdx + 1);
             if (storeIdx < 0) {
                 continue;
             }
@@ -2874,7 +2920,7 @@ public class BytecodeMethod implements SignatureSet {
             char[] quals = new char[0];
             String[][] mapOut = new String[1][];
             char[][] qualOut = new char[1][];
-            if (!srAnalyzeCtor(x, initInv, saType, mapOut, qualOut)) {
+            if (!srAnalyzeCtor(x, initInv, mapOut, qualOut)) {
                 continue;
             }
             members = mapOut[0];
@@ -3555,18 +3601,67 @@ public class BytecodeMethod implements SignatureSet {
     }
 
     /**
-     * Verifies X.<init> is exactly Object.<init> + param->field PUTFIELD groups,
+     * Verifies X.&lt;init&gt; is exactly Object.&lt;init&gt; + param-&gt;field PUTFIELD groups,
      * each ctor param consumed once, every instance field of X assigned once.
      * On success fills membersOut[0] / qualsOut[0] indexed by ctor-arg position.
+     *
+     * The instruction-shape half runs at PARSE time (see
+     * {@link #analyzeScalarConstructorRaw()}) because optimize() folds the
+     * ALOAD/xLOAD/PUTFIELD groups into opaque custom instructions -- reading
+     * the ctor's live list here would make the answer depend on whether X had
+     * already been optimized, i.e. on class processing order. Only the
+     * class-level bijection check, which needs the resolved field list, is
+     * left for here.
      */
-    private boolean srAnalyzeCtor(ByteCodeClass x, Invoke initInv, String saType,
+    private boolean srAnalyzeCtor(ByteCodeClass x, Invoke initInv,
                                   String[][] membersOut, char[][] qualsOut) {
         String desc = initInv.getDesc();
+        BytecodeMethod ctor = null;
+        for (BytecodeMethod m : x.getMethods()) {
+            if ("__INIT__".equals(m.getMethodName()) && desc.equals(m.getSignature())) {
+                ctor = m;
+                break;
+            }
+        }
+        if (ctor == null || !ctor.srCtorShapeOk) {
+            return false;
+        }
+        // every instance field of X must be assigned exactly once (definite init)
+        int instanceFieldCount = 0;
+        for (ByteCodeField bf : x.getFields()) {
+            if (!bf.isStaticField()) {
+                instanceFieldCount++;
+                if (!ctor.srCtorAssigned.contains(srMangle(x.getClsName()) + "_" + bf.getFieldName())) {
+                    return false;
+                }
+            }
+        }
+        if (instanceFieldCount != ctor.srCtorAssigned.size()) {
+            return false;
+        }
+
+        membersOut[0] = ctor.srCtorMembers;
+        qualsOut[0] = ctor.srCtorQuals;
+        return true;
+    }
+
+    // Shape half of srAnalyzeCtor, snapshotted from the RAW instruction list at
+    // parse time (called from computeRawMethodPlans, exactly like the
+    // InlinableConstructor / FusedConstructor plans next to it).
+    private String[] srCtorMembers;
+    private char[] srCtorQuals;
+    private java.util.Set<String> srCtorAssigned;
+    private boolean srCtorShapeOk;
+
+    private void analyzeScalarConstructorRaw() {
+        srCtorShapeOk = false;
+        srCtorAssigned = java.util.Collections.emptySet();
         List<ByteCodeMethodArg> args = Util.getMethodArgs(desc);
         int n = args.size();
         if (n == 0) {
-            return false; // empty ctor leaves fields uninitialized under scalar repl
+            return; // empty ctor leaves fields uninitialized under scalar repl
         }
+        String saType = srMangle(clsName);
         // ctor-arg local-slot layout (this=0; long/double take two slots)
         Map<Integer, Integer> slotToParam = new HashMap<Integer, Integer>();
         int slot = 1;
@@ -3575,19 +3670,8 @@ public class BytecodeMethod implements SignatureSet {
             slot += args.get(i).isDoubleOrLong() ? 2 : 1;
         }
 
-        BytecodeMethod ctor = null;
-        for (BytecodeMethod m : x.getMethods()) {
-            if ("__INIT__".equals(m.getMethodName()) && desc.equals(m.getSignature())) {
-                ctor = m;
-                break;
-            }
-        }
-        if (ctor == null) {
-            return false;
-        }
-
         List<Instruction> body = new ArrayList<Instruction>();
-        for (Instruction in : ctor.getInstructions()) {
+        for (Instruction in : instructions) {
             if (in instanceof LineNumber || in instanceof LabelInstruction || in instanceof LocalVariable) {
                 continue;
             }
@@ -3603,7 +3687,7 @@ public class BytecodeMethod implements SignatureSet {
                 && "<init>".equals(((Invoke) body.get(i + 1)).getName())) {
             Invoke sup = (Invoke) body.get(i + 1);
             if (!"java/lang/Object".equals(sup.getOwner()) || !"()V".equals(sup.getDesc())) {
-                return false;
+                return;
             }
             i += 2;
         }
@@ -3615,73 +3699,61 @@ public class BytecodeMethod implements SignatureSet {
             Instruction a = body.get(i);
             if (a.getOpcode() == Opcodes.RETURN) {
                 if (i != body.size() - 1) {
-                    return false; // trailing instructions after the void return
+                    return; // trailing instructions after the void return
                 }
                 break;
             }
             if (i + 2 >= body.size()) {
-                return false;
+                return;
             }
             Instruction l0 = body.get(i), l1 = body.get(i + 1), l2 = body.get(i + 2);
             if (!(l0 instanceof VarOp) || l0.getOpcode() != Opcodes.ALOAD || ((VarOp) l0).getIndex() != 0) {
-                return false;
+                return;
             }
             if (!(l1 instanceof VarOp)) {
-                return false;
+                return;
             }
             int lop = l1.getOpcode();
             if (lop != Opcodes.ILOAD && lop != Opcodes.LLOAD && lop != Opcodes.FLOAD && lop != Opcodes.DLOAD) {
-                return false; // object load -> not a primitive param store
+                return; // object load -> not a primitive param store
             }
             Integer pi = slotToParam.get(((VarOp) l1).getIndex());
             if (pi == null) {
-                return false; // not loading a ctor param exactly
+                return; // not loading a ctor param exactly
             }
             if (!(l2 instanceof Field) || l2.getOpcode() != Opcodes.PUTFIELD) {
-                return false;
+                return;
             }
             Field f = (Field) l2;
             if (f.isObject() || !srMangle(f.getOwner()).equals(saType)) {
-                return false;
+                return;
             }
             char q = args.get(pi).getQualifier();
             if (q != srQualifierOfDesc(f.getDesc())) {
-                return false; // ctor param type must match field type
+                return; // ctor param type must match field type
             }
             if (members[pi] != null) {
-                return false; // param stored into two fields
+                return; // param stored into two fields
             }
             String member = srMangle(f.getOwner()) + "_" + f.getFieldName();
             if (!assigned.add(member)) {
-                return false; // field assigned twice
+                return; // field assigned twice
             }
             members[pi] = member;
             quals[pi] = q;
             i += 3;
         }
 
-        for (int k = 0; k < n; k++) {
-            if (members[k] == null) {
-                return false; // some ctor param never stored
+        for (String member : members) {
+            if (member == null) {
+                return; // some ctor param never stored
             }
-        }
-        // every instance field of X must be assigned exactly once (definite init)
-        int instanceFieldCount = 0;
-        for (ByteCodeField bf : x.getFields()) {
-            if (!bf.isStaticField()) {
-                instanceFieldCount++;
-                if (!assigned.contains(srMangle(x.getClsName()) + "_" + bf.getFieldName())) {
-                    return false;
-                }
-            }
-        }
-        if (instanceFieldCount != assigned.size()) {
-            return false;
         }
 
-        membersOut[0] = members;
-        qualsOut[0] = quals;
-        return true;
+        srCtorMembers = members;
+        srCtorQuals = quals;
+        srCtorAssigned = assigned;
+        srCtorShapeOk = true;
     }
 
     private static char srQualifierOfDesc(String desc) {
@@ -3716,9 +3788,9 @@ public class BytecodeMethod implements SignatureSet {
                 if (i < storeIdx) {
                     return false; // read before the construction
                 }
-                int g = srNextReal(i + 1);
+                int g = srNextRealNoJoin(i + 1);
                 if (g < 0) {
-                    return false;
+                    return false; // nothing usable, or a control-flow join in between
                 }
                 Instruction nxt = instructions.get(g);
                 // Accept a direct field read OR a trivial-getter call (the receiver is a `new x()`,
@@ -3740,38 +3812,62 @@ public class BytecodeMethod implements SignatureSet {
     /** If {@code inv} calls a trivial getter (body exactly {@code ALOAD 0; GETFIELD f; xRETURN})
      *  declared on {@code x}, returns that field, else null. The receiver at the call is a
      *  {@code new x()}, so dispatch is deterministically x's own method -- folding it to a field
-     *  read is sound regardless of any subclass overrides. */
+     *  read is sound regardless of any subclass overrides.
+     *
+     *  The shape itself is recognized at parse time ({@link #analyzeTrivialGetterRaw()}): by the
+     *  time this call site is optimized the getter's own list may already have been folded into
+     *  custom instructions, and matching against that would make the decision depend on class
+     *  processing order. */
     private Field srTrivialGetterField(Invoke inv, ByteCodeClass x) {
         int op = inv.getOpcode();
         if (op != Opcodes.INVOKEVIRTUAL && op != Opcodes.INVOKESPECIAL && op != Opcodes.INVOKEINTERFACE) {
             return null;
         }
         for (BytecodeMethod m : x.getMethods()) {
-            if (!inv.getName().equals(m.getMethodName())) {
+            // name AND descriptor: an overload set shares the name, and binding the
+            // wrong member of it would fold the read to the wrong field.
+            if (!inv.getName().equals(m.getMethodName()) || !inv.getDesc().equals(m.getSignature())) {
                 continue;
             }
-            Instruction a = null, b = null, c = null;
-            int count = 0;
-            for (Instruction bi : m.getInstructions()) {
-                if (bi instanceof LineNumber || bi instanceof LabelInstruction || bi instanceof LocalVariable) {
-                    continue;
-                }
-                count++;
-                if (count == 1) { a = bi; } else if (count == 2) { b = bi; } else if (count == 3) { c = bi; } else { return null; }
-            }
-            if (count != 3
-                    || !(a instanceof VarOp) || a.getOpcode() != Opcodes.ALOAD || ((VarOp) a).getIndex() != 0
-                    || !(b instanceof Field) || b.getOpcode() != Opcodes.GETFIELD) {
-                return null;
-            }
-            int rc = c.getOpcode();
-            if (rc != Opcodes.IRETURN && rc != Opcodes.LRETURN && rc != Opcodes.FRETURN
-                    && rc != Opcodes.DRETURN && rc != Opcodes.ARETURN) {
-                return null;
-            }
-            return (Field) b;
+            return m.trivialGetterField;
         }
         return null;
+    }
+
+    // The GETFIELD a trivial getter returns, snapshotted from the RAW instruction list at parse
+    // time; null when this method is not a trivial getter. Only the field's owner/name/descriptor
+    // are ever read from it, and those are fixed at construction.
+    private Field trivialGetterField;
+
+    private void analyzeTrivialGetterRaw() {
+        Instruction a = null, b = null, c = null;
+        int count = 0;
+        for (Instruction bi : instructions) {
+            if (bi instanceof LineNumber || bi instanceof LabelInstruction || bi instanceof LocalVariable) {
+                continue;
+            }
+            count++;
+            if (count == 1) {
+                a = bi;
+            } else if (count == 2) {
+                b = bi;
+            } else if (count == 3) {
+                c = bi;
+            } else {
+                return;
+            }
+        }
+        if (count != 3
+                || !(a instanceof VarOp) || a.getOpcode() != Opcodes.ALOAD || ((VarOp) a).getIndex() != 0
+                || !(b instanceof Field) || b.getOpcode() != Opcodes.GETFIELD) {
+            return;
+        }
+        int rc = c.getOpcode();
+        if (rc != Opcodes.IRETURN && rc != Opcodes.LRETURN && rc != Opcodes.FRETURN
+                && rc != Opcodes.DRETURN && rc != Opcodes.ARETURN) {
+            return;
+        }
+        trivialGetterField = (Field) b;
     }
 
     /**
@@ -3788,7 +3884,10 @@ public class BytecodeMethod implements SignatureSet {
                     || ((VarOp) in).getIndex() != localN) {
                 continue;
             }
-            int g = srNextReal(i + 1);
+            int g = srNextRealNoJoin(i + 1);
+            if (g < 0) {
+                continue; // cannot happen for a validated local; never rewrite blind
+            }
             Instruction gi = instructions.get(g);
             // Either an immediate GETFIELD or a trivial-getter call (validated above); both fold to
             // the same scalar member read, replacing the second instruction and dropping the ALOAD.
