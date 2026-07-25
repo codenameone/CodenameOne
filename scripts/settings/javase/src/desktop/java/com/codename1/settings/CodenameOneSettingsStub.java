@@ -31,6 +31,8 @@ import java.awt.GraphicsEnvironment;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.KeyboardFocusManager;
+import java.awt.Rectangle;
+import java.awt.Robot;
 import java.awt.Taskbar;
 import java.awt.Toolkit;
 import java.awt.event.KeyEvent;
@@ -41,6 +43,9 @@ import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
@@ -186,7 +191,10 @@ public class CodenameOneSettingsStub implements Runnable, WindowListener {
 
     private static void scheduleScreenshotIfRequested() {
         String screenshot = System.getProperty("settings.screenshot");
-        if (screenshot == null || screenshot.length() == 0) {
+        String diagnostics = System.getProperty("settings.diagnostics");
+        boolean wantsScreenshot = screenshot != null && screenshot.length() > 0;
+        boolean wantsDiagnostics = diagnostics != null && diagnostics.length() > 0;
+        if (!wantsScreenshot && !wantsDiagnostics) {
             return;
         }
         // CI runners paint the first frame much slower than dev machines;
@@ -194,22 +202,131 @@ public class CodenameOneSettingsStub implements Runnable, WindowListener {
         int delay = Integer.getInteger("settings.screenshot.delay", 1200);
         Timer timer = new Timer(delay, e -> {
             try {
-                BufferedImage image = new BufferedImage(frm.getContentPane().getWidth(),
-                        frm.getContentPane().getHeight(), BufferedImage.TYPE_INT_ARGB);
-                Graphics2D graphics = image.createGraphics();
-                frm.getContentPane().paint(graphics);
-                graphics.dispose();
-                ImageIO.write(image, "png", new File(screenshot));
+                if (wantsScreenshot) {
+                    captureOffscreen(new File(screenshot));
+                    captureOnScreen(screenshot);
+                }
             } catch (Exception ex) {
                 ex.printStackTrace();
-            } finally {
-                if (!"false".equals(System.getProperty("settings.screenshot.exit"))) {
-                    Display.getInstance().exitApplication();
-                }
             }
+            if (!wantsDiagnostics) {
+                exitAfterCapture();
+                return;
+            }
+            // The diagnostics probe waits on the Codename One EDT, and the
+            // Codename One EDT waits on this thread inside blit()'s
+            // SwingUtilities.invokeAndWait - so the wait has to happen off the
+            // AWT thread or the two deadlock and every report reads as a
+            // wedged EDT.
+            Thread worker = new Thread(() -> {
+                try {
+                    captureDiagnostics(new File(diagnostics));
+                } finally {
+                    exitAfterCapture();
+                }
+            }, "cn1-settings-diagnostics");
+            worker.setDaemon(true);
+            worker.start();
         });
         timer.setRepeats(false);
         timer.start();
+    }
+
+    private static void exitAfterCapture() {
+        if (!"false".equals(System.getProperty("settings.screenshot.exit"))) {
+            Display.getInstance().exitApplication();
+        }
+    }
+
+    private static void captureOffscreen(File target) throws Exception {
+        BufferedImage image = new BufferedImage(frm.getContentPane().getWidth(),
+                frm.getContentPane().getHeight(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics = image.createGraphics();
+        frm.getContentPane().paint(graphics);
+        graphics.dispose();
+        ImageIO.write(image, "png", target);
+    }
+
+    /**
+     * Grabs the composited desktop pixels behind the window alongside the
+     * offscreen paint. The two can disagree: {@code contentPane.paint()} drives
+     * a fresh Swing paint pass, so it can look healthy while the window the
+     * user is actually staring at shows a stale or unpainted surface - which is
+     * the shape of issue #5443. Written next to the screenshot as
+     * {@code <name>.onscreen.png}; a Robot grab is best effort (locked-down or
+     * headless sessions deny it) and never fails the capture.
+     */
+    private static void captureOnScreen(String screenshot) {
+        if (!Boolean.parseBoolean(System.getProperty("settings.screenshot.onscreen", "true"))) {
+            return;
+        }
+        try {
+            // A grab of a window that is not on screen yet captures whatever
+            // is behind it, which reads as an empty window rather than as a
+            // missing capture. Better to write nothing and let the caller say
+            // so than to write a misleading image.
+            if (!frm.isShowing()) {
+                System.err.println("On-screen capture skipped: window is not showing");
+                return;
+            }
+            Rectangle bounds = frm.getBounds();
+            if (bounds.width <= 0 || bounds.height <= 0) {
+                return;
+            }
+            BufferedImage image = new Robot().createScreenCapture(bounds);
+            ImageIO.write(image, "png", new File(onScreenPath(screenshot)));
+        } catch (Throwable ex) {
+            System.err.println("On-screen capture unavailable: " + ex);
+        }
+    }
+
+    static String onScreenPath(String screenshot) {
+        int dot = screenshot.lastIndexOf('.');
+        int separator = Math.max(screenshot.lastIndexOf('/'), screenshot.lastIndexOf('\\'));
+        if (dot > separator) {
+            return screenshot.substring(0, dot) + ".onscreen" + screenshot.substring(dot);
+        }
+        return screenshot + ".onscreen.png";
+    }
+
+    private static void captureDiagnostics(File target) {
+        // The UIID/theme probes read live Codename One state, so they run on
+        // the Codename One EDT. We wait on a latch rather than
+        // callSeriallyAndWait: this runs on the AWT thread, and blit() blocks
+        // the Codename One EDT on SwingUtilities.invokeAndWait, so a blocking
+        // handoff in this direction can deadlock. A timeout is not a failure
+        // to report - a wedged EDT is exactly the kind of thing this dump
+        // exists to catch, so say so in the file.
+        //
+        // Exactly one of the two writers may touch the file. A merely slow EDT
+        // can run its probe after the timeout has already written the fallback,
+        // and overwriting it would throw away the stack dump naming whatever
+        // the EDT was stuck on - the reason the fallback exists.
+        final CountDownLatch done = new CountDownLatch(1);
+        final AtomicBoolean claimed = new AtomicBoolean(false);
+        Display.getInstance().callSerially(() -> {
+            try {
+                if (claimed.compareAndSet(false, true)) {
+                    SettingsDiagnostics.write(target, frm);
+                }
+            } finally {
+                done.countDown();
+            }
+        });
+        try {
+            if (done.await(10, TimeUnit.SECONDS)) {
+                return;
+            }
+            if (!claimed.compareAndSet(false, true)) {
+                // The EDT claimed the report just as we timed out and is still
+                // writing it; let it finish rather than racing it to the file.
+                done.await(10, TimeUnit.SECONDS);
+                return;
+            }
+            SettingsDiagnostics.writeUnresponsiveEdt(target, frm);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private static void applyApplicationIcon(JFrame frame) {

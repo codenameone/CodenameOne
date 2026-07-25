@@ -82,9 +82,70 @@ public class ScreenshotSanity {
             fail("screenshot is " + (dominant * 100 / sampled)
                     + "% a single color - window likely rendered nothing: " + file);
         }
+
+        int coverage = contentCoveragePercent(image);
+        if (coverage < MIN_COVERAGE_PERCENT) {
+            fail("screenshot has content in only " + coverage + "% of the window ("
+                    + "expected at least " + MIN_COVERAGE_PERCENT + "%) - the window is mostly"
+                    + " an unpainted surface: " + file);
+        }
         System.out.println("[screenshot-sanity] OK " + file + " " + image.getWidth() + "x"
                 + image.getHeight() + " colors=" + histogram.size()
-                + " dominant=" + (dominant * 100 / sampled) + "%");
+                + " dominant=" + (dominant * 100 / sampled) + "%"
+                + " coverage=" + coverage + "%");
+    }
+
+    /**
+     * Minimum share of the window that must carry something other than a flat
+     * fill. Measured values: a healthy Settings window covers 63-72%, a healthy
+     * simulator 89-95%, and the black window from issue #5443 covers 16-18%.
+     */
+    private static final int MIN_COVERAGE_PERCENT = 35;
+
+    private static final int GRID_COLUMNS = 24;
+    private static final int GRID_ROWS = 16;
+
+    /**
+     * Percentage of grid cells that contain more than one color.
+     *
+     * The whole-image histogram is not enough on its own: the #5443 window is
+     * an unpainted black surface with one app icon drawn into it, which is
+     * enough color variety and low enough single-color dominance to sail
+     * through both checks above. What actually distinguishes a rendered UI is
+     * that the detail is spread across the window rather than pooled in one
+     * corner.
+     */
+    private static int contentCoveragePercent(BufferedImage image) {
+        int populated = 0;
+        for (int row = 0; row < GRID_ROWS; row++) {
+            for (int column = 0; column < GRID_COLUMNS; column++) {
+                if (cellHasContent(image, column, row)) {
+                    populated++;
+                }
+            }
+        }
+        return populated * 100 / (GRID_COLUMNS * GRID_ROWS);
+    }
+
+    private static boolean cellHasContent(BufferedImage image, int column, int row) {
+        int x0 = column * image.getWidth() / GRID_COLUMNS;
+        int x1 = (column + 1) * image.getWidth() / GRID_COLUMNS;
+        int y0 = row * image.getHeight() / GRID_ROWS;
+        int y1 = (row + 1) * image.getHeight() / GRID_ROWS;
+        int stepX = Math.max(1, (x1 - x0) / 8);
+        int stepY = Math.max(1, (y1 - y0) / 8);
+        int first = -1;
+        for (int y = y0; y < y1; y += stepY) {
+            for (int x = x0; x < x1; x += stepX) {
+                int rgb = image.getRGB(x, y) & 0xffffff;
+                if (first == -1) {
+                    first = rgb;
+                } else if (first != rgb) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static void fail(String message) {
