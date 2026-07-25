@@ -15,16 +15,44 @@ import java.util.List;
  */
 public class LocalizationsScope extends SingleChildWidget implements InheritedValueProvider {
 
-    private final List<Object> resources;
+    private List<Object> resources;
+    private final dart.runtime.Funcs.Func0<List<Object>> supplier;
 
     public LocalizationsScope(List<Object> resources) {
         this.resources = resources;
+        this.supplier = null;
+    }
+
+    /**
+     * A scope whose resources load on first lookup. Deferring matters: loading
+     * during the app's build reads the delegate list at the earliest possible
+     * moment, which on a lazily-initialised backend can be before the class
+     * holding it has run its static initialiser.
+     */
+    public LocalizationsScope(dart.runtime.Funcs.Func0<List<Object>> supplier) {
+        this.supplier = supplier;
+    }
+
+    private List<Object> resources() {
+        if (resources == null && supplier != null) {
+            resources = supplier.call();
+            if (resources != null && resources.isEmpty()) {
+                try {
+                    com.codename1.io.Log.p("Flutter runtime: no localizations resolved for this app; "
+                            + "every Foo.of(context) below will be null");
+                } catch (Throwable ignore) {
+                    // headless: Log has no storage backend
+                }
+            }
+        }
+        return resources;
     }
 
     @Override
     public Object providedValueFor(Class<?> type) {
-        if (resources != null && type != null) {
-            for (Object r : resources) {
+        List<Object> rs = resources();
+        if (rs != null && type != null) {
+            for (Object r : rs) {
                 if (r != null && type.isInstance(r)) {
                     return r;
                 }

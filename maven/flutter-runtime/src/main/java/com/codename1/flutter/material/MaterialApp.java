@@ -304,11 +304,20 @@ public class MaterialApp extends StatelessWidget {
         if (content == null) {
             return null;
         }
-        java.util.List<Object> resources = loadLocalizations();
-        if (resources.isEmpty()) {
-            return content;
-        }
-        LocalizationsScope scope = new LocalizationsScope(resources);
+        // The scope is installed UNCONDITIONALLY and loads its resources on
+        // first lookup rather than here. Loading eagerly during build reads
+        // the app's delegate list at the earliest possible moment — before,
+        // on a lazily-initialised backend, the class holding it has
+        // necessarily run its static initialiser — and an empty result then
+        // meant no scope at all, so every `Foo.of(context)!` below died with
+        // no clue why. Deferring makes the lookup ask when the answer is
+        // knowable.
+        LocalizationsScope scope = new LocalizationsScope(new Funcs.Func0<java.util.List<Object>>() {
+            @Override
+            public java.util.List<Object> call() {
+                return loadLocalizations();
+            }
+        });
         scope.child(content);
         return scope;
     }

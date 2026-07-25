@@ -25,10 +25,36 @@ public final class Localizations {
         if (context == null || witness == null) {
             return null;
         }
+        T value;
         try {
-            return context.read(witness);
+            value = context.read(witness);
         } catch (Throwable t) {
+            report("Localizations.of(" + witness.getName() + ") threw: " + t);
             return null;
+        }
+        if (value == null) {
+            report("Localizations.of(" + witness.getName() + ") found nothing; the app's "
+                    + "localizationsDelegates produced no matching object");
+        }
+        return value;
+    }
+
+    private static int reports;
+
+    /**
+     * Dart writes {@code Foo.of(context)!}, so a null here becomes a null-check
+     * TypeError elsewhere with no hint of which lookup failed. Capped, because
+     * a missing localization is missing on every build.
+     */
+    private static void report(String message) {
+        if (reports >= 5) {
+            return;
+        }
+        reports++;
+        try {
+            com.codename1.io.Log.p("Flutter runtime: " + message);
+        } catch (Throwable ignore) {
+            // headless: Log has no storage backend
         }
     }
 
