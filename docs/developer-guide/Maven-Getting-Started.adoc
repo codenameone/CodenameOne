@@ -337,7 +337,7 @@ Settings is a Codename One app hosted in a native window, so a window that opens
 
 [source,shell]
 ----
-mvn cn1:settings -Dsettings.diagnostics=cn1-settings-diagnostics.txt
+include::../demos/common/src/main/snippets/developer-guide/maven-appendix-control-center.sh[tag=maven-appendix-control-center-bash-002,indent=0]
 ----
 
 The file records the OS and JDK, the HiDPI scale the JVM reports, the window and canvas geometry, the size Codename One laid the form out at, and the colours and font metrics resolved for the theme. Add `-Dsettings.screenshot=shot.png` to also write the window contents; a second `shot.onscreen.png` captures the pixels actually on screen, which can differ from the offscreen paint. The launch log is at `~/.codenameoneSettings/settings.log`.
