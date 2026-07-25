@@ -30,7 +30,10 @@ import org.junit.jupiter.api.Test;
 import org.w3c.css.sac.LexicalUnit;
 
 import java.io.File;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -93,11 +96,10 @@ class CSSThemeBorderRadiusTest extends UITestBase {
     private Border borderOf(String css, String uiid) throws Exception {
         File f = File.createTempFile("cn1-test-", ".css");
         f.deleteOnExit();
-        FileWriter w = new FileWriter(f);
-        try {
+        // Explicit UTF-8 rather than the platform default, so the parser reads back what
+        // was written no matter which charset the host defaults to.
+        try (Writer w = new OutputStreamWriter(new FileOutputStream(f), StandardCharsets.UTF_8)) {
             w.write(css);
-        } finally {
-            w.close();
         }
         CSSTheme theme = CSSTheme.load(f.toURI().toURL());
         CSSTheme.Element element = theme.elements.get(uiid);

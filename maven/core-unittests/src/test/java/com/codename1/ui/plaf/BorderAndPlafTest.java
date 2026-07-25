@@ -222,9 +222,11 @@ class BorderAndPlafTest extends UITestBase {
         squareCorners.getAllStyles().setBorder(Border.createEmpty());
         int expected = squareCorners.getPreferredSize().getHeight();
 
-        // Any radius bigger than the button itself, so the legacy reservation is the value
-        // that wins in the preferred size calculation and the difference is visible here.
-        float radius = expected;
+        // A radius in millimeters that converts to more pixels than the button is tall, so
+        // the legacy reservation is the value that wins in the preferred size calculation
+        // and the difference between the two modes is visible here at any density.
+        float pxPerMm = Display.getInstance().convertToPixels(1f);
+        float radius = expected / pxPerMm + 1f;
         assertTrue(rightRoundedCorners(radius).getMinimumHeight() > expected,
                 "test setup: the radius has to exceed the natural height of the button");
 
@@ -297,6 +299,24 @@ class BorderAndPlafTest extends UITestBase {
         assertEquals(PathIterator.SEG_LINETO, (int) topEdge[0]);
         assertEquals(width - height, topEdge[1], 0.001f,
                 "the lone rounded corner scales to the whole height, not to half of it");
+    }
+
+    @FormTest
+    void testLegacyBorderAlsoScalesTheRadiusWhenForcedSmaller() {
+        // The legacy minimum size asks for room to draw the full radius, but a layout is
+        // free to ignore it. The corners then scale to whatever the component actually got
+        // rather than folding the path over itself, in this mode too.
+        int radius = Display.getInstance().convertToPixels(4f);
+        RoundRectBorder border = RoundRectBorder.create().cornerRadius(4f).shadowSpread(0f);
+        assertFalse(border.isCssBoxModel(), "this is the legacy sizing");
+        assertTrue(border.getMinimumHeight() > radius, "test setup: the border wants more than it gets");
+
+        List<float[]> shape = shapeOf(border, radius, radius);
+
+        float[] moveTo = shape.get(0);
+        assertEquals(PathIterator.SEG_MOVETO, (int) moveTo[0]);
+        assertTrue(moveTo[1] > 0 && moveTo[1] <= radius / 2f + 0.001f,
+                "the corner scales to the component it was given, was " + moveTo[1] + " of " + radius);
     }
 
     /// Paints the border into a component of the given size and returns the shape it filled
