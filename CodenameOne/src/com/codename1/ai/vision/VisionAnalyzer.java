@@ -28,5 +28,6 @@ import com.codename1.util.AsyncResource;
 public interface VisionAnalyzer<T> extends AutoCloseable {
     boolean isSupported();
     AsyncResource<T> process(VisionImage image);
+    @Override
     void close();
 }

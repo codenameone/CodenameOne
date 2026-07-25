@@ -37,11 +37,13 @@ abstract class AbstractVisionAnalyzer<T> implements VisionAnalyzer<T> {
         this.options = options == null ? new VisionOptions() : options;
     }
 
+    @Override
     public final boolean isSupported() {
         VisionImpl impl = implementation();
         return impl != null && impl.isSupported(feature, options.getBackend().getId());
     }
 
+    @Override
     public final AsyncResource<T> process(VisionImage image) {
         if (image == null) {
             throw new NullPointerException("image");
@@ -59,6 +61,7 @@ abstract class AbstractVisionAnalyzer<T> implements VisionAnalyzer<T> {
         return impl.analyze(feature, options.getBackend().getId(), image, options);
     }
 
+    @Override
     public final void close() {
         closed = true;
         if (implementation != null) {

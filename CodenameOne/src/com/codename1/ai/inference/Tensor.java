@@ -75,13 +75,22 @@ public final class Tensor {
     private static void validateData(TensorType type, Object data) {
         boolean valid;
         switch (type) {
-            case FLOAT32: valid = data instanceof float[]; break;
-            case INT32: valid = data instanceof int[]; break;
-            case INT64: valid = data instanceof long[]; break;
+            case FLOAT32:
+                valid = data instanceof float[];
+                break;
+            case INT32:
+                valid = data instanceof int[];
+                break;
+            case INT64:
+                valid = data instanceof long[];
+                break;
             case UINT8:
             case INT8:
-            case BOOL: valid = data instanceof byte[]; break;
-            default: valid = false;
+            case BOOL:
+                valid = data instanceof byte[];
+                break;
+            default:
+                valid = false;
         }
         if (!valid) {
             throw new IllegalArgumentException("Data array does not match " + type);
@@ -93,25 +102,35 @@ public final class Tensor {
             return 1;
         }
         int out = 1;
-        for (int i = 0; i < shape.length; i++) {
-            if (shape[i] < 0) {
+        for (int dimension : shape) {
+            if (dimension < 0) {
                 return -1;
             }
-            out *= shape[i];
+            out *= dimension;
         }
         return out;
     }
 
     private static int dataLength(Object value) {
-        if (value instanceof float[]) return ((float[]) value).length;
-        if (value instanceof int[]) return ((int[]) value).length;
-        if (value instanceof long[]) return ((long[]) value).length;
-        if (value instanceof byte[]) return ((byte[]) value).length;
+        if (value instanceof float[]) {
+            return ((float[]) value).length;
+        }
+        if (value instanceof int[]) {
+            return ((int[]) value).length;
+        }
+        if (value instanceof long[]) {
+            return ((long[]) value).length;
+        }
+        if (value instanceof byte[]) {
+            return ((byte[]) value).length;
+        }
         throw new IllegalArgumentException("Unsupported tensor data array");
     }
 
     private static int[] copy(int[] value) {
-        if (value == null) return new int[0];
+        if (value == null) {
+            return new int[0];
+        }
         int[] out = new int[value.length];
         System.arraycopy(value, 0, out, 0, value.length);
         return out;

@@ -61,6 +61,7 @@ public final class ModelCache {
 
         final AsyncResource<ModelSource> out = new AsyncResource<ModelSource>();
         Display.getInstance().scheduleBackgroundTask(new Runnable() {
+            @Override
             public void run() {
                 final FileSystemStorage fs = FileSystemStorage.getInstance();
                 final String directory = fs.getAppHomePath() + "ai-models/";
@@ -80,6 +81,7 @@ public final class ModelCache {
                     return;
                 }
                 Display.getInstance().callSerially(new Runnable() {
+                    @Override
                     public void run() {
                         download(out, url, sha256, target, fileName);
                     }
@@ -109,8 +111,10 @@ public final class ModelCache {
         request.setUrl(url);
         request.setDestinationFile(temporary);
         request.addResponseListener(new ActionListener<NetworkEvent>() {
+            @Override
             public void actionPerformed(NetworkEvent event) {
                 Display.getInstance().scheduleBackgroundTask(new Runnable() {
+                    @Override
                     public void run() {
                         try {
                             if (!verify(temporary, sha256)) {
@@ -130,6 +134,7 @@ public final class ModelCache {
             }
         });
         ActionListener<NetworkEvent> failure = new ActionListener<NetworkEvent>() {
+            @Override
             public void actionPerformed(NetworkEvent event) {
                 if (fs.exists(temporary)) {
                     fs.delete(temporary);
@@ -178,6 +183,7 @@ public final class ModelCache {
 
     private static <T> void complete(final AsyncResource<T> out, final T value) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 out.complete(value);
             }
@@ -186,6 +192,7 @@ public final class ModelCache {
 
     private static void fail(final AsyncResource<?> out, final Throwable error) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 out.error(new InferenceException("Could not cache LiteRT model", error));
             }

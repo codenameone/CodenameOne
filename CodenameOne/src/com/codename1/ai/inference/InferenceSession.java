@@ -56,10 +56,12 @@ public final class InferenceSession implements AutoCloseable {
         }
         impl.open(source, options == null ? new InferenceOptions() : options)
                 .ready(new SuccessCallback<Object>() {
+                    @Override
                     public void onSucess(Object value) {
                         out.complete(new InferenceSession(impl, value));
                     }
                 }).except(new SuccessCallback<Throwable>() {
+                    @Override
                     public void onSucess(Throwable error) {
                         out.error(error);
                     }
@@ -87,6 +89,7 @@ public final class InferenceSession implements AutoCloseable {
         implementation.resizeInput(handle, name, shape);
     }
 
+    @Override
     public void close() {
         if (!closed) {
             closed = true;

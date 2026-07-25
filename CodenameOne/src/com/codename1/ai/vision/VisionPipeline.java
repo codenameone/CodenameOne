@@ -48,6 +48,7 @@ public final class VisionPipeline<T> implements AutoCloseable {
         this.analyzer = analyzer;
         this.listener = listener;
         frameListener = new FrameListener() {
+            @Override
             public void onFrame(CameraFrame frame) {
                 accept(VisionImage.fromCameraFrame(frame));
             }
@@ -71,16 +72,20 @@ public final class VisionPipeline<T> implements AutoCloseable {
 
     private void process(final VisionImage image) {
         analyzer.process(image).ready(new SuccessCallback<T>() {
+            @Override
             public void onSucess(final T value) {
                 onFinished(new Runnable() {
+                    @Override
                     public void run() {
                         listener.result(value, image);
                     }
                 });
             }
         }).except(new SuccessCallback<Throwable>() {
+            @Override
             public void onSucess(final Throwable error) {
                 onFinished(new Runnable() {
+                    @Override
                     public void run() {
                         listener.error(error);
                     }
@@ -91,6 +96,7 @@ public final class VisionPipeline<T> implements AutoCloseable {
 
     private void onFinished(final Runnable notification) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 VisionImage next;
                 synchronized (VisionPipeline.this) {
@@ -117,6 +123,7 @@ public final class VisionPipeline<T> implements AutoCloseable {
         }
     }
 
+    @Override
     public void close() {
         synchronized (this) {
             if (closed) {

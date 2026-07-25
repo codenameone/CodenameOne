@@ -67,7 +67,9 @@ public final class ModelSource {
     }
 
     public byte[] getBytes() {
-        if (bytes == null) return null;
+        if (bytes == null) {
+            return null;
+        }
         byte[] out = new byte[bytes.length];
         System.arraycopy(bytes, 0, out, 0, bytes.length);
         return out;
