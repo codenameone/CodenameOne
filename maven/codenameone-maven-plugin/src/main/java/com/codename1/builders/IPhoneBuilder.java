@@ -22,6 +22,7 @@
  */
 package com.codename1.builders;
 
+import com.codename1.build.shared.PlatformFeatureCatalog;
 import com.codename1.util.IOSWalletExtensionBuilder;
 import com.codename1.util.IOSWidgetExtensionBuilder;
 import org.w3c.dom.Document;
@@ -117,6 +118,9 @@ public class IPhoneBuilder extends Executor {
     private boolean usesBluetoothPeripheral;
     private boolean usesCn1Camera;
     private boolean usesCn1Ar;
+    private boolean usesCn1Vision;
+    private boolean usesCn1Language;
+    private boolean usesCn1Inference;
     // Set when the app references com.codename1.car.* (Apple CarPlay support). Gates the
     // CN1_USE_CARPLAY native define, CarPlay.framework linkage, the carplay entitlement and the
     // CarPlay scene in the Info.plist scene manifest. Apps that never touch the API see no change.
@@ -791,10 +795,10 @@ public class IPhoneBuilder extends Executor {
         }
         
         // Accumulator for AI/ML class hits. After the scan we apply
-        // every matched AiDependencyTable.Entry -- appending pods,
+        // every matched PlatformFeatureCatalog.Entry -- appending pods,
         // SPM specs, plist defaults and Android perms -- so the user
         // doesn't have to declare them by hand.
-        final AiDependencyTable.Accumulator aiAcc = new AiDependencyTable.Accumulator();
+        final PlatformFeatureCatalog.Accumulator aiAcc = new PlatformFeatureCatalog.Accumulator();
 
         try {
             scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
@@ -874,6 +878,16 @@ public class IPhoneBuilder extends Executor {
                     if (!usesCn1Ar && cls.indexOf("com/codename1/ar/") == 0) {
                         usesCn1Ar = true;
                     }
+                    if (!usesCn1Vision && isVisionAnalyzerClass(cls)) {
+                        usesCn1Vision = true;
+                    }
+                    if (!usesCn1Language && isLanguageFeatureClass(cls)) {
+                        usesCn1Language = true;
+                    }
+                    if (!usesCn1Inference
+                            && "com/codename1/ai/inference/InferenceSession".equals(cls)) {
+                        usesCn1Inference = true;
+                    }
                     // Apple CarPlay (com.codename1.car.*). Gated on actual usage so the
                     // CarPlay scene/entitlement/framework are only added for apps that
                     // build an in-car experience.
@@ -927,6 +941,7 @@ public class IPhoneBuilder extends Executor {
 
                 @Override
                 public void usesClassMethod(String cls, String method) {
+                    aiAcc.consumeMethod(cls, method);
                     if (cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0
                             || (cls.indexOf("com/codename1/calendar/CalendarManager") == 0
                             && (method.indexOf("getLocalSource") >= 0
@@ -1018,10 +1033,20 @@ public class IPhoneBuilder extends Executor {
             // upgrade the effective mode to BOTH below).
             boolean projectPrefersSpm = dependencyConfig.usesSwiftPackages() && !dependencyConfig.usesCocoaPods();
             StringBuilder spmPackages = new StringBuilder(request.getArg("ios.spm.packages", ""));
-            for (AiDependencyTable.Entry entry : aiAcc.hits()) {
+            for (PlatformFeatureCatalog.Entry entry : aiAcc.hits()) {
+                // Google ML Kit and TensorFlowLiteObjC publish iOS/device and
+                // simulator slices, but not Mac Catalyst slices. Keep the
+                // framework-only Apple Vision implementation enabled for
+                // macNative while leaving language/inference on their safe
+                // unsupported native stubs.
+                boolean includeApplePackageDependencies =
+                        !macNativeBuilder.isEnabled()
+                        || entry.iosDependenciesSupportMacCatalyst();
                 boolean handledViaSpm = false;
-                if (projectPrefersSpm && !entry.iosSpmSpecs().isEmpty()) {
-                    for (AiDependencyTable.IosSpm spm : entry.iosSpmSpecs()) {
+                if (includeApplePackageDependencies
+                        && projectPrefersSpm
+                        && !entry.iosSpmSpecs().isEmpty()) {
+                    for (PlatformFeatureCatalog.IosSpm spm : entry.iosSpmSpecs()) {
                         if (spmPackages.length() > 0) spmPackages.append(';');
                         spmPackages.append(spm.identity).append('|')
                                 .append(spm.url).append('|')
@@ -1040,7 +1065,7 @@ public class IPhoneBuilder extends Executor {
                     }
                     handledViaSpm = true;
                 }
-                if (!handledViaSpm) {
+                if (includeApplePackageDependencies && !handledViaSpm) {
                     for (String pod : entry.iosPods()) {
                         if (iosPods.length() > 0) iosPods += ",";
                         iosPods += pod;
@@ -2401,7 +2426,7 @@ public class IPhoneBuilder extends Executor {
             // First-class Bluetooth: weak-link CoreBluetooth and compile in
             // the CN1Bluetooth natives only when the app references
             // com.codename1.bluetooth.*. The NSBluetooth* privacy strings
-            // are defaulted (only-if-unset) by the AiDependencyTable entry
+            // are defaulted (only-if-unset) by the PlatformFeatureCatalog entry
             // through the standard plist application above. Background
             // operation is opt-in through the ios.bluetooth.background hint
             // ("central", "peripheral" or "central,peripheral"), merged into
@@ -2452,7 +2477,7 @@ public class IPhoneBuilder extends Executor {
             // INCLUDE_CAMERA_USAGE (the old modal Capture API): the new
             // AVFoundation natives are only built when the app actually
             // references com.codename1.camera.*, matching the AVFoundation
-            // framework injection driven by the same scan via AiDependencyTable.
+            // framework injection driven by the same scan via PlatformFeatureCatalog.
             if (usesCn1Camera) {
                 try {
                     replaceInFile(new File(buildinRes,
@@ -2468,7 +2493,7 @@ public class IPhoneBuilder extends Executor {
             // Augmented reality: uncomment INCLUDE_CN1_AR so the CN1AR
             // natives (ARKit + ARSCNView) compile in, and link ARKit /
             // SceneKit explicitly -- neither is default-linked and the
-            // AiDependencyTable iosFrameworks field is documentation-only.
+            // PlatformFeatureCatalog iosFrameworks field is documentation-only.
             // Apps that never reference com.codename1.ar leave the define
             // commented out so no ARKit symbol is referenced, which keeps
             // Apple's API-usage scan quiet and tvOS/watchOS slices clean.
@@ -2487,6 +2512,56 @@ public class IPhoneBuilder extends Executor {
                     addLibs = arLibs;
                 } else if (!addLibs.toLowerCase().contains("arkit.framework")) {
                     addLibs = addLibs + ";" + arLibs;
+                }
+            }
+
+            if (usesCn1Vision) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define INCLUDE_CN1_VISION",
+                            "#define INCLUDE_CN1_VISION");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable INCLUDE_CN1_VISION", ex);
+                }
+                String visionLibs =
+                        "Vision.framework;CoreImage.framework;CoreVideo.framework";
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = visionLibs;
+                } else if (!addLibs.toLowerCase().contains("vision.framework")) {
+                    addLibs = addLibs + ";" + visionLibs;
+                }
+            }
+
+            if (usesCn1Language) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define INCLUDE_CN1_LANGUAGE",
+                            "#define INCLUDE_CN1_LANGUAGE");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable INCLUDE_CN1_LANGUAGE", ex);
+                }
+            }
+
+            if (usesCn1Inference) {
+                try {
+                    replaceInFile(new File(buildinRes,
+                            "CodenameOne_GLViewController.h"),
+                            "//#define INCLUDE_CN1_INFERENCE",
+                            "#define INCLUDE_CN1_INFERENCE");
+                } catch (IOException ex) {
+                    throw new BuildException(
+                            "Failed to enable INCLUDE_CN1_INFERENCE", ex);
+                }
+                String inferenceLibs =
+                        "CoreML.framework;Metal.framework;Accelerate.framework";
+                if (addLibs == null || addLibs.length() == 0) {
+                    addLibs = inferenceLibs;
+                } else if (!addLibs.toLowerCase().contains("coreml.framework")) {
+                    addLibs = addLibs + ";" + inferenceLibs;
                 }
             }
 
@@ -5480,6 +5555,22 @@ public class IPhoneBuilder extends Executor {
         
         }
         return out.toString();
+    }
+
+    private static boolean isVisionAnalyzerClass(String cls) {
+        return "com/codename1/ai/vision/TextRecognizer".equals(cls)
+                || "com/codename1/ai/vision/BarcodeScanner".equals(cls)
+                || "com/codename1/ai/vision/FaceDetector".equals(cls)
+                || "com/codename1/ai/vision/ImageLabeler".equals(cls)
+                || "com/codename1/ai/vision/PoseDetector".equals(cls)
+                || "com/codename1/ai/vision/SelfieSegmenter".equals(cls)
+                || "com/codename1/ai/vision/DocumentScanner".equals(cls);
+    }
+
+    private static boolean isLanguageFeatureClass(String cls) {
+        return "com/codename1/ai/language/LanguageIdentifier".equals(cls)
+                || "com/codename1/ai/language/Translator".equals(cls)
+                || "com/codename1/ai/language/SmartReply".equals(cls);
     }
 
 }

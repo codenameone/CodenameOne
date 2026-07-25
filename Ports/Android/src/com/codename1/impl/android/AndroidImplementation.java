@@ -11247,6 +11247,32 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    @Override
+    public com.codename1.impl.VisionImpl createVisionImpl() {
+        return (com.codename1.impl.VisionImpl) createOptionalAiBackend(
+                "com.codename1.impl.android.ai.AndroidVisionImpl");
+    }
+
+    @Override
+    public com.codename1.impl.InferenceImpl createInferenceImpl() {
+        return (com.codename1.impl.InferenceImpl) createOptionalAiBackend(
+                "com.codename1.impl.android.ai.AndroidInferenceImpl");
+    }
+
+    @Override
+    public com.codename1.impl.LanguageImpl createLanguageImpl() {
+        return (com.codename1.impl.LanguageImpl) createOptionalAiBackend(
+                "com.codename1.impl.android.ai.AndroidLanguageImpl");
+    }
+
+    private Object createOptionalAiBackend(String className) {
+        try {
+            return Class.forName(className).newInstance();
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
     // Deeper-network connectivity platform factories. Each returns a small
     // platform-specific class living under
     // com.codename1.impl.android.connectivity. Those classes are loaded

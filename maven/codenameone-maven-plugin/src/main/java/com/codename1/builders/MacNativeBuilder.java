@@ -334,7 +334,7 @@ class MacNativeBuilder {
         // explicit device entitlements; without them the OS refuses to
         // open the AVCaptureSession even when the Info.plist usage
         // descriptions are present. We piggyback on the iOS plist hints
-        // already populated by AiDependencyTable -- when the build
+        // already populated by PlatformFeatureCatalog -- when the build
         // pipeline detected com.codename1.camera.* (or any other API
         // that triggers NSCameraUsageDescription / NSMicrophoneUsageDescription)
         // we mirror that into the Mac entitlements. Developers may

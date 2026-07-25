@@ -4765,6 +4765,31 @@ public class IOSImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public com.codename1.impl.VisionImpl createVisionImpl() {
+        for (int feature = 0; feature <= 6; feature++) {
+            if (nativeInstance.cn1VisionIsSupported(feature, false)
+                    || nativeInstance.cn1VisionIsSupported(feature, true)) {
+                return new IOSVisionImpl();
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public com.codename1.impl.LanguageImpl createLanguageImpl() {
+        return nativeInstance.cn1LanguageIsSupported(0)
+                || nativeInstance.cn1LanguageIsSupported(1)
+                || nativeInstance.cn1LanguageIsSupported(2)
+                ? new IOSLanguageImpl() : null;
+    }
+
+    @Override
+    public com.codename1.impl.InferenceImpl createInferenceImpl() {
+        return nativeInstance.cn1InferenceIsSupported()
+                ? new IOSInferenceImpl() : null;
+    }
+
+    @Override
     public String [] getAvailableRecordingMimeTypes() {
         // All of these amount to the same thing.
         // We record in AAC format, wrapped in an mp4 container.

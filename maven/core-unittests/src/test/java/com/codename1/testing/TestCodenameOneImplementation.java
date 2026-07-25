@@ -936,6 +936,37 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return arImpl;
     }
 
+    private com.codename1.impl.VisionImpl visionImpl;
+    private com.codename1.impl.InferenceImpl inferenceImpl;
+    private com.codename1.impl.LanguageImpl languageImpl;
+
+    public void setVisionImpl(com.codename1.impl.VisionImpl visionImpl) {
+        this.visionImpl = visionImpl;
+    }
+
+    @Override
+    public com.codename1.impl.VisionImpl createVisionImpl() {
+        return visionImpl;
+    }
+
+    public void setInferenceImpl(com.codename1.impl.InferenceImpl inferenceImpl) {
+        this.inferenceImpl = inferenceImpl;
+    }
+
+    @Override
+    public com.codename1.impl.InferenceImpl createInferenceImpl() {
+        return inferenceImpl;
+    }
+
+    public void setLanguageImpl(com.codename1.impl.LanguageImpl languageImpl) {
+        this.languageImpl = languageImpl;
+    }
+
+    @Override
+    public com.codename1.impl.LanguageImpl createLanguageImpl() {
+        return languageImpl;
+    }
+
     private com.codename1.sensors.MotionSensorManager motionSensorManager;
 
     /**

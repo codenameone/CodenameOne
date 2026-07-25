@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """
-Regenerates every AI cn1lib (cn1-ai-*) under maven/ as a proper multi-module
-Maven project: root + common + ios + android + javase + lib. Each module's
-sources are emitted by this script -- there are NO empty stubs.
+Regenerates the deliberately external AI cn1libs listed in ``LIBS``.
 
-Run with `python3 scripts/gen-ai-cn1libs.py` from any working directory.
-Existing cn1-ai-* directories are wiped and rewritten.
+Small platform AI features (vision, language services, and LiteRT/Core ML
+inference) are built into Codename One and selected by the platform builders.
+Only features with exceptionally large native runtimes or model payloads,
+currently Whisper and Stable Diffusion, remain cn1libs.
+
+Run with ``python3 scripts/gen-ai-cn1libs.py`` from any working directory.
+Only the cn1lib directories listed in ``LIBS`` are wiped and rewritten.
 """
 
 from __future__ import annotations
@@ -2606,17 +2609,6 @@ def lib_stablediffusion() -> Lib:
 
 
 LIBS: list[Lib] = [
-    lib_mlkit_text(),
-    lib_mlkit_barcode(),
-    lib_mlkit_face(),
-    lib_mlkit_labeling(),
-    lib_mlkit_translate(),
-    lib_mlkit_smartreply(),
-    lib_mlkit_langid(),
-    lib_mlkit_pose(),
-    lib_mlkit_segmentation(),
-    lib_mlkit_docscan(),
-    lib_tflite(),
     lib_whisper(),
     lib_stablediffusion(),
 ]

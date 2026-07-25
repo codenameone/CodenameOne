@@ -22,7 +22,7 @@
  */
 package com.codename1.builders;
 
-
+import com.codename1.build.shared.PlatformFeatureCatalog;
 
 import static com.codename1.maven.PathUtil.path;
 
@@ -467,6 +467,11 @@ public class AndroidGradleBuilder extends Executor {
     private boolean migrateToAndroidX;
     private boolean shouldIncludeGoogleImpl;
     private boolean arSupport;
+    private boolean visionSupport;
+    private boolean inferenceSupport;
+    private boolean languageSupport;
+    private final Set<String> includedAiAdapterSources =
+            new HashSet<String>();
 
     static {
         isMac = System.getProperty("os.name").toLowerCase().contains("mac");
@@ -1313,12 +1318,16 @@ public class AndroidGradleBuilder extends Executor {
             wakeLock = true;
         }
         mediaPlaybackPermission = false;
+        visionSupport = false;
+        inferenceSupport = false;
+        languageSupport = false;
+        includedAiAdapterSources.clear();
 
         // Accumulator for AI/ML class hits. After the scan we apply
-        // every matched AiDependencyTable.Entry -- appending Gradle
+        // every matched PlatformFeatureCatalog.Entry -- appending Gradle
         // deps to additionalDependencies (later) and permissions/
         // features to xPermissions right now.
-        final AiDependencyTable.Accumulator aiAcc = new AiDependencyTable.Accumulator();
+        final PlatformFeatureCatalog.Accumulator aiAcc = new PlatformFeatureCatalog.Accumulator();
 
         try {
             scanClassesForPermissions(dummyClassesDir, new Executor.ClassScanner() {
@@ -1327,6 +1336,21 @@ public class AndroidGradleBuilder extends Executor {
                 @Override
                 public void usesClass(String cls) {
                     aiAcc.consume(cls);
+                    String aiAdapter = androidAiAdapterSource(cls);
+                    if (aiAdapter != null) {
+                        includedAiAdapterSources.add(aiAdapter);
+                    }
+                    if (aiAdapter != null
+                            && cls.indexOf("com/codename1/ai/vision/") == 0) {
+                        visionSupport = true;
+                    }
+                    if ("com/codename1/ai/inference/InferenceSession".equals(cls)) {
+                        inferenceSupport = true;
+                    }
+                    if (aiAdapter != null
+                            && cls.indexOf("com/codename1/ai/language/") == 0) {
+                        languageSupport = true;
+                    }
                     if (cls.indexOf("com/codename1/ar/") == 0) {
                         // Keeps the ARCore-backed impl sources (deleted for
                         // non-AR apps below) and bumps minSdk to the ARCore
@@ -1501,6 +1525,7 @@ public class AndroidGradleBuilder extends Executor {
 
                 @Override
                 public void usesClassMethod(String cls, String method) {
+                    aiAcc.consumeMethod(cls, method);
                     if (cls.indexOf("com/codename1/calendar/LocalCalendarSource") == 0
                             || (cls.indexOf("com/codename1/calendar/CalendarManager") == 0
                             && (method.indexOf("getLocalSource") >= 0
@@ -1666,7 +1691,7 @@ public class AndroidGradleBuilder extends Executor {
         // additionalDependencies is written to build.gradle below.
         StringBuilder aiExtraGradleDependencies = new StringBuilder();
         String aiApplicationMetaData = "";
-        for (AiDependencyTable.Entry entry : aiAcc.hits()) {
+        for (PlatformFeatureCatalog.Entry entry : aiAcc.hits()) {
             for (String perm : entry.androidPermissions()) {
                 String addString = "    <uses-permission android:name=\"" + perm + "\" />\n";
                 xPermissions += permissionAdd(request, perm, addString);
@@ -2453,6 +2478,8 @@ public class AndroidGradleBuilder extends Executor {
             }
             arPackage.delete();
         }
+
+        pruneOptionalAiSources(srcDir);
 
         final String moPubAdUnitId = request.getArg("android.mopubId", null);
         if (moPubAdUnitId != null && moPubAdUnitId.length() > 0) {
@@ -4605,6 +4632,9 @@ public class AndroidGradleBuilder extends Executor {
 
         String keepFirebase = "-keep class com.google.android.gms.** { *; }\n\n" +
                 "-keep class com.google.firebase.** { *; }\n\n";
+        String keepAi = visionSupport || languageSupport || inferenceSupport
+                ? "-keep class com.codename1.impl.android.ai.** { *; }\n\n"
+                : "";
         // workaround broken optimizer in proguard
         String proguardConfigOverride = "-dontusemixedcaseclassnames\n"
                 + "-dontskipnonpubliclibraryclasses\n"
@@ -4615,6 +4645,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "\n"
                 + "-dontwarn com.google.android.gms.**\n"
                 + keepFirebase
+                + keepAi
                 + "-keep class com.codename1.impl.android.AndroidBrowserComponentCallback {\n"
                 + "*;\n"
                 + "}\n\n"
@@ -5253,6 +5284,79 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
         return true;
+    }
+
+    private void pruneOptionalAiSources(File srcDir) {
+        File aiDir = new File(srcDir,
+                "com/codename1/impl/android/ai");
+        String[] vision = {
+            "AndroidTextRecognitionAdapter.java",
+            "AndroidBarcodeScanningAdapter.java",
+            "AndroidFaceDetectionAdapter.java",
+            "AndroidImageLabelingAdapter.java",
+            "AndroidPoseDetectionAdapter.java",
+            "AndroidSelfieSegmentationAdapter.java"
+        };
+        String[] language = {
+            "AndroidLanguageIdAdapter.java",
+            "AndroidTranslationAdapter.java",
+            "AndroidSmartReplyAdapter.java"
+        };
+        pruneAiGroup(aiDir, visionSupport,
+                new String[] {"AndroidVisionImpl.java",
+                    "AndroidVisionAdapter.java"}, vision);
+        pruneAiGroup(aiDir, languageSupport,
+                new String[] {"AndroidLanguageImpl.java",
+                    "AndroidLanguageAdapter.java"}, language);
+        if (!inferenceSupport) {
+            new File(aiDir, "AndroidInferenceImpl.java").delete();
+        }
+    }
+
+    private void pruneAiGroup(File aiDir, boolean groupIncluded,
+                              String[] sharedSources, String[] adapters) {
+        if (!groupIncluded) {
+            for (int i = 0; i < sharedSources.length; i++) {
+                new File(aiDir, sharedSources[i]).delete();
+            }
+        }
+        for (int i = 0; i < adapters.length; i++) {
+            if (!groupIncluded
+                    || !includedAiAdapterSources.contains(adapters[i])) {
+                new File(aiDir, adapters[i]).delete();
+            }
+        }
+    }
+
+    static String androidAiAdapterSource(String cls) {
+        if ("com/codename1/ai/vision/TextRecognizer".equals(cls)) {
+            return "AndroidTextRecognitionAdapter.java";
+        }
+        if ("com/codename1/ai/vision/BarcodeScanner".equals(cls)) {
+            return "AndroidBarcodeScanningAdapter.java";
+        }
+        if ("com/codename1/ai/vision/FaceDetector".equals(cls)) {
+            return "AndroidFaceDetectionAdapter.java";
+        }
+        if ("com/codename1/ai/vision/ImageLabeler".equals(cls)) {
+            return "AndroidImageLabelingAdapter.java";
+        }
+        if ("com/codename1/ai/vision/PoseDetector".equals(cls)) {
+            return "AndroidPoseDetectionAdapter.java";
+        }
+        if ("com/codename1/ai/vision/SelfieSegmenter".equals(cls)) {
+            return "AndroidSelfieSegmentationAdapter.java";
+        }
+        if ("com/codename1/ai/language/LanguageIdentifier".equals(cls)) {
+            return "AndroidLanguageIdAdapter.java";
+        }
+        if ("com/codename1/ai/language/Translator".equals(cls)) {
+            return "AndroidTranslationAdapter.java";
+        }
+        if ("com/codename1/ai/language/SmartReply".equals(cls)) {
+            return "AndroidSmartReplyAdapter.java";
+        }
+        return null;
     }
 
     static String xmlize(String s) {

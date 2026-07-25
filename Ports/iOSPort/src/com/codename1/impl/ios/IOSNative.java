@@ -538,6 +538,24 @@ public final class IOSNative {
     native void cn1CameraResume(long sessionPeer);
     native void cn1CameraClose(long sessionPeer);
 
+    // On-device image analysis backed by Apple Vision/Core Image.
+    native boolean cn1VisionIsSupported(int feature, boolean mlKit);
+    native String cn1VisionAnalyze(byte[] imageData, int feature, boolean mlKit,
+                                   int rotationDegrees, int width, int height,
+                                   int frameFormat);
+    native boolean cn1LanguageIsSupported(int feature);
+    native String cn1LanguageIdentify(String text, float minimumConfidence);
+    native String cn1LanguageTranslate(String text, String sourceLanguage,
+                                       String targetLanguage);
+    native String cn1LanguageSmartReply(String conversationJson);
+    native boolean cn1InferenceIsSupported();
+    native String cn1InferenceOpen(byte[] model, int threads, int accelerator,
+                                   boolean allowFallback);
+    native String cn1InferenceMetadata(int handle, boolean outputs);
+    native String cn1InferenceRun(int handle, String inputsJson);
+    native String cn1InferenceResize(int handle, int index, int[] shape);
+    native void cn1InferenceClose(int handle);
+
     // Augmented reality API (com.codename1.ar). Backed by CN1AR.m which wraps
     // an ARKit ARSession composited through an ARSCNView. The IOSARImpl class
     // on the Java side routes static callbacks delivered from the session and

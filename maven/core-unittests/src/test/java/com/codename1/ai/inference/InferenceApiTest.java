@@ -1,0 +1,107 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ */
+package com.codename1.ai.inference;
+
+import com.codename1.impl.InferenceImpl;
+import com.codename1.junit.UITestBase;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
+import org.junit.jupiter.api.Test;
+
+import java.util.concurrent.atomic.AtomicReference;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class InferenceApiTest extends UITestBase {
+    @Test
+    void tensorsAreImmutableAndValidateShape() {
+        float[] source = new float[] {1, 2};
+        Tensor tensor = Tensor.floats("input", new int[] {1, 2}, source);
+        source[0] = 9;
+        assertArrayEquals(new float[] {1, 2}, (float[]) tensor.getData());
+        float[] returned = (float[]) tensor.getData();
+        returned[1] = 9;
+        assertArrayEquals(new float[] {1, 2}, (float[]) tensor.getData());
+        assertThrows(IllegalArgumentException.class, () ->
+                Tensor.floats("bad", new int[] {3}, new float[] {1, 2}));
+    }
+
+    @Test
+    void sessionLifecycleForwardsToBackend() {
+        RecordingInferenceImpl backend = new RecordingInferenceImpl();
+        implementation.setInferenceImpl(backend);
+        InferenceSession session = await(InferenceSession.open(
+                ModelSource.bytes(new byte[] {1}), new InferenceOptions().threads(2)));
+        assertEquals(2, session.getInputs()[0].getShape()[1]);
+        Tensor[] output = await(session.run(new Tensor[] {
+                Tensor.floats("input", new int[] {1, 2}, new float[] {1, 2})
+        }));
+        assertArrayEquals(new float[] {3}, (float[]) output[0].getData());
+        session.resizeInput("input", new int[] {1, 4});
+        assertEquals("input", backend.resizedName);
+        session.close();
+        session.close();
+        assertEquals(1, backend.closeCount);
+        assertThrows(IllegalStateException.class, session::getInputs);
+    }
+
+    private <T> T await(AsyncResource<T> resource) {
+        final AtomicReference<T> value = new AtomicReference<T>();
+        resource.ready(new SuccessCallback<T>() {
+            public void onSucess(T result) {
+                value.set(result);
+            }
+        });
+        flushSerialCalls();
+        assertTrue(resource.isDone());
+        assertNotNull(value.get());
+        return resource.get();
+    }
+
+    private static final class RecordingInferenceImpl extends InferenceImpl {
+        final Object handle = new Object();
+        String resizedName;
+        int closeCount;
+
+        public boolean isSupported() {
+            return true;
+        }
+
+        public AsyncResource<Object> open(ModelSource source, InferenceOptions options) {
+            AsyncResource<Object> result = new AsyncResource<Object>();
+            result.complete(handle);
+            return result;
+        }
+
+        public TensorInfo[] getInputs(Object value) {
+            assertSame(handle, value);
+            return new TensorInfo[] {
+                    new TensorInfo("input", TensorType.FLOAT32, new int[] {1, 2}, 0)
+            };
+        }
+
+        public TensorInfo[] getOutputs(Object value) {
+            return new TensorInfo[] {
+                    new TensorInfo("output", TensorType.FLOAT32, new int[] {1}, 0)
+            };
+        }
+
+        public AsyncResource<Tensor[]> run(Object value, Tensor[] inputs) {
+            AsyncResource<Tensor[]> result = new AsyncResource<Tensor[]>();
+            result.complete(new Tensor[] {
+                    Tensor.floats("output", new int[] {1}, new float[] {3})
+            });
+            return result;
+        }
+
+        public void resizeInput(Object value, String name, int[] shape) {
+            resizedName = name;
+        }
+
+        public void close(Object value) {
+            closeCount++;
+        }
+    }
+}

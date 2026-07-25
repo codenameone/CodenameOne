@@ -20,14 +20,6 @@ public final class MavenCentralSearch {
         ArrayList<ExtensionDescriptor> out = new ArrayList<ExtensionDescriptor>();
         out.add(maven("Google Maps", "Native Google Maps integration for Codename One apps.",
                 "com.codenameone", "googlemaps-lib", "1.0.1", "pom"));
-        out.add(maven("ML Kit Barcode", "Decode QR, EAN, Code 128, and other ML Kit barcode formats.",
-                "com.codenameone", "cn1-ai-mlkit-barcode-lib", "LATEST", "pom"));
-        out.add(maven("ML Kit Document Scanner", "Capture and crop document photos with native VisionKit and Google Play Services support.",
-                "com.codenameone", "cn1-ai-mlkit-docscan-lib", "LATEST", "pom"));
-        out.add(maven("ML Kit Face Detection", "Detect faces and bounding rectangles using ML Kit-backed native providers.",
-                "com.codenameone", "cn1-ai-mlkit-face-lib", "LATEST", "pom"));
-        out.add(maven("TensorFlow Lite", "TensorFlow Lite inference bridge packaged as a Codename One cn1lib.",
-                "com.codenameone", "cn1-ai-tflite-lib", "LATEST", "pom"));
         out.add(maven("Whisper", "Speech-to-text support through the Codename One AI Whisper cn1lib.",
                 "com.codenameone", "cn1-ai-whisper-lib", "LATEST", "pom"));
         out.add(legacy("Bouncy Castle SDK", "Legacy cn1lib catalog entry for Bouncy Castle cryptography support."));

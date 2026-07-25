@@ -122,6 +122,17 @@ void cn1RunSyncOnMainQueue(void (^block)(void));
 #undef INCLUDE_CN1_AR
 #endif
 
+// INCLUDE_CN1_VISION gates Apple Vision/Core Image analysis. It is enabled
+// only when the app references com.codename1.ai.vision.
+//#define INCLUDE_CN1_VISION
+//#define INCLUDE_CN1_LANGUAGE
+//#define INCLUDE_CN1_INFERENCE
+#if TARGET_OS_WATCH || TARGET_OS_TV
+#undef INCLUDE_CN1_VISION
+#undef INCLUDE_CN1_LANGUAGE
+#undef INCLUDE_CN1_INFERENCE
+#endif
+
 // CN1_USE_CARPLAY gates the Apple CarPlay native bridge
 // (CodenameOne_CarPlaySceneDelegate.{h,m} + the IOSNative carPlay* trampolines:
 // CarPlay.framework, the CPTemplate translation). IPhoneBuilder uncomments this

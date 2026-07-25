@@ -211,6 +211,19 @@ def validate(manifest: dict) -> dict:
                     problems.append(f"Stored report {report_path} has an invalid result for {test}")
                 elif result.get("status") == "skip":
                     skipped_tests.add(test)
+            actual_summary = Counter(
+                result.get("status")
+                for result in report_tests.values()
+                if isinstance(result, dict)
+            )
+            expected_summary = {
+                key: actual_summary.get(key, 0)
+                for key in ("pass", "fail", "skip", "not-run")
+            }
+            if report.get("summary") != expected_summary:
+                problems.append(
+                    f"Stored report {report_path} summary does not match its test results"
+                )
 
     manual_feature_count = 0
     try:

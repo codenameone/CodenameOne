@@ -378,6 +378,27 @@
       "tests": ["CameraApiTest"]
     },
     {
+      "id": "on-device-vision",
+      "category": "On-device AI",
+      "name": "Vision analysis",
+      "description": "Checks camera-frame image ownership, backend capability reporting, and analyzer lifecycle for OCR, barcodes, faces, image labels, pose, segmentation, and document scanning.",
+      "tests": ["VisionOnDeviceApiTest"]
+    },
+    {
+      "id": "on-device-language",
+      "category": "On-device AI",
+      "name": "Language services",
+      "description": "Checks language identification, translation, and smart-reply capability reporting plus deterministic unsupported fallbacks.",
+      "tests": ["LanguageOnDeviceApiTest"]
+    },
+    {
+      "id": "on-device-inference",
+      "category": "On-device AI",
+      "name": "Model inference",
+      "description": "Checks immutable tensor and model-source contracts, inference options, runtime capability reporting, and deterministic unsupported fallback behavior.",
+      "tests": ["InferenceOnDeviceApiTest"]
+    },
+    {
       "id": "calendar-integration",
       "category": "Platform-dependent APIs",
       "name": "Calendar integration",

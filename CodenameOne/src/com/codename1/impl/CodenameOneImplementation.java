@@ -7400,6 +7400,27 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
+    /// Factory for the built-in on-device vision API.
+    ///
+    /// @hidden
+    public VisionImpl createVisionImpl() {
+        return null;
+    }
+
+    /// Factory for the built-in LiteRT inference API.
+    ///
+    /// @hidden
+    public InferenceImpl createInferenceImpl() {
+        return null;
+    }
+
+    /// Factory for built-in on-device language services.
+    ///
+    /// @hidden
+    public LanguageImpl createLanguageImpl() {
+        return null;
+    }
+
     /// Captures a screenshot of the screen.
     ///
     /// #### Returns
