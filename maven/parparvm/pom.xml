@@ -261,6 +261,36 @@
                                         <!-- No theme-resolution path yields tzone_theme.res; the one
                                              mention of it in the port is inside a comment. -->
                                         <exclude name="assets/tzone_theme.res"/>
+                                        <!-- The native themes come from Themes/ below instead of
+                                             from these copies, which drift: the webapp's
+                                             iPhoneTheme.res already differs from the Themes/ one. -->
+                                        <exclude name="assets/iOS7Theme.res"/>
+                                        <exclude name="assets/iPhoneTheme.res"/>
+                                        <exclude name="assets/android_holo_light.res"/>
+                                    </zipfileset>
+                                    <!-- Native themes, straight from the single source of truth in
+                                         Themes/ (kept in sync from the CSS sources by
+                                         .github/workflows/native-themes-sync.yml), the same way
+                                         maven/ios folds iOSModernTheme.res into nativeios.jar and
+                                         maven/javase copies the whole set onto its classpath.
+
+                                         All six ship because HTML5Implementation.
+                                         resolveNativeThemeResource() picks between them at RUNTIME
+                                         from the browser user agent plus the ios.themeMode /
+                                         and.themeMode / nativeTheme / javascript.native.theme
+                                         hints, so the build cannot know which one an app will
+                                         need: "modern" resolves to iOSModernTheme.res in an
+                                         iOS-like browser and AndroidMaterialTheme.res everywhere
+                                         else, and "legacy" to iPhoneTheme.res or androidTheme.res.
+                                         Shipping only some of them is why opting in used to fall
+                                         back to the legacy theme instead of applying. -->
+                                    <zipfileset dir="${project.basedir}/../../Themes" prefix="webapp/assets">
+                                        <include name="iOS7Theme.res"/>
+                                        <include name="iPhoneTheme.res"/>
+                                        <include name="iOSModernTheme.res"/>
+                                        <include name="androidTheme.res"/>
+                                        <include name="android_holo_light.res"/>
+                                        <include name="AndroidMaterialTheme.res"/>
                                     </zipfileset>
                                 </jar>
                                 <zip destfile="${project.build.directory}/${project.build.finalName}-bundle.jar">
