@@ -42,6 +42,8 @@ public class ImageRenderElement extends RenderElement {
 
     private com.codename1.ui.Image img;
     private String loadedSource;
+    /** Device pixels per logical pixel in the loaded asset file (1, 2, 3...). */
+    private double assetRatio = 1;
 
     public ImageRenderElement(Image widget) {
         super(widget);
@@ -76,15 +78,16 @@ public class ImageRenderElement extends RenderElement {
         }
         loadedSource = source;
         img = null;
+        assetRatio = 1;
         try {
             if (image().getAssetName() != null) {
-                String res = FlutterAssets.resourceName(image().getAssetName());
-                InputStream is = Display.getInstance().getResourceAsStream(getClass(), res);
-                if (is == null) {
+                FlutterAssets.Resolved res = FlutterAssets.open(getClass(), image().getAssetName());
+                if (res == null) {
                     Log.p("Flutter runtime: asset image not found: " + image().getAssetName()
-                            + " (resource " + res + ")");
+                            + " (resource " + FlutterAssets.resourceName(image().getAssetName()) + ")");
                 } else {
-                    img = EncodedImage.create(is);
+                    img = EncodedImage.create(res.stream());
+                    assetRatio = res.ratio();
                 }
             } else if (image().getUrl() != null) {
                 int pw = (int) Math.max(1, Math.round(Dp.px(
@@ -109,9 +112,14 @@ public class ImageRenderElement extends RenderElement {
         Double wPx = image().getWidth() == null ? null : Double.valueOf(Dp.px(image().getWidth()));
         Double hPx = image().getHeight() == null ? null : Double.valueOf(Dp.px(image().getHeight()));
         BoxConstraints inner = constraints.tighten(wPx, hPx);
+        // A density variant carries `assetRatio` device pixels per logical
+        // pixel, so its natural size on screen is the decoded size rescaled
+        // from that density to the screen's — a 3.0x file on a 3x screen is
+        // 1:1, the same file on a 2x screen is two thirds the size.
+        double naturalScale = assetRatio > 0 ? Dp.scale() / assetRatio : 1;
         Size natural = img == null
                 ? new Size(wPx == null ? 0 : wPx, hPx == null ? 0 : hPx)
-                : new Size(img.getWidth(), img.getHeight());
+                : new Size(img.getWidth() * naturalScale, img.getHeight() * naturalScale);
         return inner.constrain(natural);
     }
 

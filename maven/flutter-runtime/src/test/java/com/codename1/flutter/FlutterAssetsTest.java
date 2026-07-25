@@ -66,4 +66,50 @@ class FlutterAssetsTest {
     void neverStartsWithReservedRawPrefix() {
         assertTrue(FlutterAssets.flatName("raw/thing.png").startsWith("cn1f_"));
     }
+
+    // ------------------------------------------------------------------
+    // Density variants
+    // ------------------------------------------------------------------
+
+    @Test
+    void variantsPreferTheSmallestAtLeastAsDenseAsTheScreen() {
+        String[] c = FlutterAssets.variantCandidates("assets/icons/material.png", 3);
+        assertEquals("assets/icons/3.0x/material.png", c[0]);
+        assertEquals("assets/icons/4.0x/material.png", c[1]);
+    }
+
+    @Test
+    void variantsFallBackDownwardThenToTheUnscaledAsset() {
+        String[] c = FlutterAssets.variantCandidates("assets/icons/material.png", 3);
+        assertEquals("assets/icons/2.0x/material.png", c[2]);
+        assertEquals("assets/icons/1.5x/material.png", c[3]);
+        assertEquals("assets/icons/material.png", c[c.length - 1],
+                "the unscaled asset is always the last resort");
+    }
+
+    @Test
+    void aDenserScreenThanAnyVariantTakesTheDensestAvailable() {
+        String[] c = FlutterAssets.variantCandidates("a/b.png", 5);
+        assertEquals("a/4.0x/b.png", c[0]);
+        assertEquals("a/3.0x/b.png", c[1]);
+    }
+
+    @Test
+    void anUnscaledScreenSkipsVariantsFirst() {
+        String[] c = FlutterAssets.variantCandidates("a/b.png", 1);
+        assertEquals("a/1.5x/b.png", c[0], "1.5x is the smallest variant at least as dense as 1x");
+        assertEquals("a/b.png", c[c.length - 1]);
+    }
+
+    @Test
+    void variantOfARootLevelAsset() {
+        assertEquals("2.0x/b.png", FlutterAssets.variantCandidates("b.png", 2)[0]);
+    }
+
+    @Test
+    void ratioOfIdentifiesTheLoadedDensity() {
+        assertEquals(3.0, FlutterAssets.ratioOf("a/3.0x/b.png", "a/b.png"), 0.001);
+        assertEquals(1.5, FlutterAssets.ratioOf("a/1.5x/b.png", "a/b.png"), 0.001);
+        assertEquals(1.0, FlutterAssets.ratioOf("a/b.png", "a/b.png"), 0.001);
+    }
 }

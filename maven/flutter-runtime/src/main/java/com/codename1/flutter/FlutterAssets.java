@@ -47,6 +47,118 @@ public class FlutterAssets {
     }
 
     /**
+     * The device-pixel-ratio variants Flutter recognises, ascending. A variant
+     * of {@code dir/name.ext} lives at {@code dir/<ratio>x/name.ext}.
+     */
+    private static final double[] VARIANTS = {1.5, 2.0, 3.0, 4.0};
+
+    /**
+     * Asset paths to try for {@code assetPath} at the given device pixel
+     * ratio, most preferred first — Flutter's resolution rule: the smallest
+     * variant at least as dense as the screen, then denser ones, then the
+     * closest lower ones, and finally the unscaled asset.
+     *
+     * <p>Flutter reads the available variants from a build-generated manifest;
+     * we probe instead, so the order is what matters and a missing variant
+     * simply falls through to the next candidate.</p>
+     */
+    public static String[] variantCandidates(String assetPath, double dpr) {
+        int slash = assetPath.lastIndexOf('/');
+        String dir = slash < 0 ? "" : assetPath.substring(0, slash + 1);
+        String file = slash < 0 ? assetPath : assetPath.substring(slash + 1);
+
+        String[] out = new String[VARIANTS.length + 1];
+        int n = 0;
+        // ascending from the first variant >= dpr
+        for (int i = 0; i < VARIANTS.length; i++) {
+            if (VARIANTS[i] >= dpr) {
+                out[n++] = dir + ratioDir(VARIANTS[i]) + file;
+            }
+        }
+        // then descending through the ones below it
+        for (int i = VARIANTS.length - 1; i >= 0; i--) {
+            if (VARIANTS[i] < dpr) {
+                out[n++] = dir + ratioDir(VARIANTS[i]) + file;
+            }
+        }
+        out[n++] = assetPath;
+
+        String[] trimmed = new String[n];
+        System.arraycopy(out, 0, trimmed, 0, n);
+        return trimmed;
+    }
+
+    private static String ratioDir(double ratio) {
+        // Flutter names these "1.5x", "2.0x", "3.0x" — one decimal, always
+        long whole = (long) ratio;
+        long tenth = Math.round((ratio - whole) * 10);
+        return whole + "." + tenth + "x/";
+    }
+
+    /** An opened asset together with the density it was authored for. */
+    public static class Resolved {
+        private final java.io.InputStream stream;
+        private final double ratio;
+
+        Resolved(java.io.InputStream stream, double ratio) {
+            this.stream = stream;
+            this.ratio = ratio;
+        }
+
+        public java.io.InputStream stream() {
+            return stream;
+        }
+
+        /**
+         * Device pixels per logical pixel in the loaded file — 1 for the
+         * unscaled asset, 3 for a {@code 3.0x} variant. Divide the decoded
+         * pixel size by this to get the image's logical size.
+         */
+        public double ratio() {
+            return ratio;
+        }
+    }
+
+    /**
+     * Opens the best available variant of a Flutter asset for the current
+     * screen density, or null when no candidate resolves.
+     */
+    public static Resolved open(Class<?> cls, String assetPath) {
+        double dpr = 1;
+        try {
+            if (com.codename1.ui.Display.isInitialized()) {
+                dpr = com.codename1.flutter.rendering.Dp.scale();
+            }
+        } catch (Throwable t) {
+            // headless: keep the unscaled asset
+        }
+        String[] candidates = variantCandidates(assetPath, dpr);
+        for (int i = 0; i < candidates.length; i++) {
+            java.io.InputStream is = com.codename1.ui.Display.getInstance()
+                    .getResourceAsStream(cls, resourceName(candidates[i]));
+            if (is != null) {
+                return new Resolved(is, ratioOf(candidates[i], assetPath));
+            }
+        }
+        return null;
+    }
+
+    /** The density a resolved candidate was authored for. */
+    static double ratioOf(String candidate, String assetPath) {
+        if (candidate.equals(assetPath)) {
+            return 1;
+        }
+        int end = candidate.lastIndexOf('/');
+        int start = candidate.lastIndexOf('/', end - 1);
+        String dir = candidate.substring(start + 1, end);
+        try {
+            return Double.parseDouble(dir.substring(0, dir.length() - 1));
+        } catch (NumberFormatException e) {
+            return 1;
+        }
+    }
+
+    /**
      * The flattened file name (no leading slash) for a Flutter asset path —
      * what the build writes into the output directory.
      */
