@@ -285,14 +285,7 @@ and Core Image. iOS can select ML Kit explicitly:
 
 [source,java]
 ----
-VisionOptions options = new VisionOptions()
-        .backend(VisionBackends.appleVision())
-        .minimumConfidence(0.5f);
-
-new TextRecognizer(options)
-        .process(VisionImage.encoded(jpegBytes))
-        .ready(result -> Log.p(result.getText()))
-        .except(error -> Log.e(error));
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AiAndSpeechOnDeviceSnippet.java[tag=ai-and-speech-on-device-vision,indent=0]
 ----
 
 Create and reuse an analyzer when processing a sequence. Call `close()`
@@ -365,17 +358,7 @@ a native LiteRT runtime, including Mac native, return `false` from
 
 [source,java]
 ----
-InferenceSession.open(
-        ModelSource.resource("/models/classifier.tflite"),
-        new InferenceOptions().accelerator(
-                InferenceOptions.Accelerator.AUTO))
-    .ready(session -> {
-        Tensor input = Tensor.floats("serving_default_input",
-                new int[] {1, 224, 224, 3}, pixels);
-        session.run(new Tensor[] {input})
-                .ready(outputs -> consume(outputs[0]))
-                .except(error -> Log.e(error));
-    });
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AiAndSpeechOnDeviceSnippet.java[tag=ai-and-speech-on-device-inference,indent=0]
 ----
 
 Open is asynchronous because model initialization can allocate native
@@ -400,12 +383,7 @@ SDKs.
 
 [source,java]
 ----
-if (Translator.isSupported()) {
-    Translator.translate("Where is the station?", "en", "fr",
-            new LanguageOptions())
-        .ready(value -> Log.p(value))
-        .except(error -> Log.e(error));
-}
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AiAndSpeechOnDeviceSnippet.java[tag=ai-and-speech-on-device-language,indent=0]
 ----
 
 `LanguageBackends.auto()` selects ML Kit on the supported Android and
