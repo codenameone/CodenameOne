@@ -295,13 +295,13 @@ linked backend, and OS version.
 
 `VisionPipeline` attaches an analyzer to a `CameraSession` frame stream
 and keeps only the newest pending frame. Live OCR and pose detection
-therefore cannot build an unbounded queue when inference is slower than
+therefore can't build an unbounded queue when inference is slower than
 the camera. Results and errors are delivered on the Codename One EDT.
 
 `DocumentScanner` currently performs still-image rectangle correction on
 Apple platforms. Google's Android document scanner is an interactive
 camera flow rather than an analyzer for an existing `VisionImage`, so the
-Android backend reports it as unsupported instead of silently launching UI.
+Android backend reports it as unsupported rather than launching a UI flow.
 
 ==== Vision feature and dependency selection
 
@@ -344,7 +344,7 @@ each class the application actually uses:
 
 The optional iOS ML Kit pod is added only when both the analyzer and
 `VisionBackends.mlKit()` are referenced. Referencing one Android
-analyzer does not compile or package the other five adapters.
+analyzer doesn't compile or package the other five adapters.
 
 === Portable LiteRT inference
 
@@ -370,7 +370,7 @@ Bundle small models as resources. For larger models use
 `ModelCache.fetch(url, cacheKey, sha256)`, which downloads over HTTPS,
 verifies the optional SHA-256 digest, and reuses the app-private cached
 file. The URL must use HTTPS. Treat the digest as required when the
-model is not controlled by the same deployment pipeline as the app.
+model isn't controlled by the same deployment pipeline as the app.
 
 === On-device language services
 
@@ -378,7 +378,7 @@ model is not controlled by the same deployment pipeline as the app.
 `LanguageOptions`. Translation models are downloaded and cached by ML
 Kit when a language pair is first used. Android and iOS builders
 select `language-id`, `translate`, and `smart-reply` independently, so
-using language identification alone does not package the other two
+using language identification alone doesn't package the other two
 SDKs.
 
 [source,java]
@@ -401,7 +401,7 @@ targets and Android uses ML Kit. Language services and LiteRT inference
 have native implementations on Android and iOS. JavaSE, JavaScript,
 native Windows, native Linux, watchOS, and tvOS report unsupported for
 these new APIs; Mac native reports unsupported for language and LiteRT.
-No target silently sends data to a cloud inference service. Large
+No target sends data to a cloud inference service. Large
 portable runtimes or model payloads for the remaining targets remain
 appropriate opt-in libraries.
 
@@ -413,7 +413,7 @@ dependency decisions.
 === Migrating from the AI cn1libs
 
 The old `com.codename1.ai.mlkit.*` and `com.codename1.ai.tflite`
-packages are not compatibility aliases. Remove those dependencies and
+packages aren't compatibility aliases. Remove those dependencies and
 move directly to `com.codename1.ai.vision`,
 `com.codename1.ai.language`, or `com.codename1.ai.inference`. Result
 coordinates are normalized floats rather than packed
@@ -423,8 +423,8 @@ and models are intentionally large.
 
 Remove the retired cn1lib dependency before adding the built-in class.
 Keeping both packages can leave duplicate ML Kit versions in an
-Android or CocoaPods dependency graph. The builders deliberately do
-not ship compatibility aliases because those aliases would keep the
+Android or CocoaPods dependency graph. The builders don't ship
+compatibility aliases because those aliases would keep the
 old native-interface and packaging contracts alive.
 
 ==== Putting it all together
