@@ -116,6 +116,9 @@ Pods projects. The repository's iOS UI and native-test runners also select
 `ARCHS=x86_64`, so Apple Silicon hosts use the supported simulator slice
 without requiring an application build hint. TensorFlow Lite's XCFramework
 does include an `arm64` simulator slice and does not trigger this fallback.
+The iOS NEON implementation reports SIMD as unsupported in that x86_64
+configuration and aliases its native entry points to the generic scalar
+implementation; device and arm64-simulator builds retain the NEON path.
 
 ## Image and camera contract
 

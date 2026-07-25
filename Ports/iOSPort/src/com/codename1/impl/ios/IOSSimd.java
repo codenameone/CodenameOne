@@ -11,15 +11,17 @@ import com.codename1.util.Simd;
 public class IOSSimd extends Simd {
     @Override
     public boolean isSupported() {
-        return true;
+        return isNativeSupported();
     }
 
     /// NEON: the chained byte-shuffle codec (Base64) is ~75-83% faster than the
     /// autovectorized scalar even at -O2, so the codec should use the SIMD path.
     @Override
     public boolean isByteShuffleAccelerated() {
-        return true;
+        return isNativeSupported();
     }
+
+    private native boolean isNativeSupported();
 
     @Override
     public byte[] allocByte(int size) {
